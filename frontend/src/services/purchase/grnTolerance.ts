@@ -1,28 +1,28 @@
 /**
- * GRN receiving tolerance vs open (pending) qty — frontend mirror of backend calculator.
+ * GRN receiving tolerance — frontend mirror (demo mode). API mode uses POST /purchase/grns/evaluate-lines.
+ * Excess-only band; no symmetric lower tolerance.
  */
 
 export type GrnLineToleranceStatus =
-  | 'OK'
-  | 'PARTIAL'
   | 'NOT_RECEIVED'
-  | 'SHORT_OUTSIDE'
-  | 'EXCESS_WITHIN'
-  | 'EXCESS_OUTSIDE'
+  | 'PARTIAL'
+  | 'EXACT'
+  | 'EXCESS_WITHIN_TOLERANCE'
+  | 'EXCESS_OUTSIDE_TOLERANCE'
 
 export type EvaluateGrnToleranceInput = {
   openQuantity: number
   receivedQuantity: number
   itemTolerancePct?: number | null
+  receivingToleranceId?: string | null
   setupTolerancePct?: number | null
   allowOverReceipt?: boolean
-  closeOpenQuantity?: boolean
+  shortCloseRequested?: boolean
 }
 
 export type EvaluateGrnToleranceResult = {
   tolerancePercentage: number
   variancePercentage: number | null
-  lowerBound: number
   upperBound: number
   shortQuantity: number
   excessQuantity: number
@@ -36,26 +36,24 @@ function n(value: unknown, fallback = 0): number {
 }
 
 export function resolveReceivingTolerancePct(input: {
+  receivingToleranceId?: string | null
   itemTolerancePct?: number | null
   setupTolerancePct?: number | null
   allowOverReceipt?: boolean
 }): number {
-  const item = n(input.itemTolerancePct)
-  if (item > 0) return item
-  if (input.allowOverReceipt) {
-    const setup = n(input.setupTolerancePct)
-    return setup > 0 ? setup : 0
+  if (input.receivingToleranceId != null) {
+    return n(input.itemTolerancePct)
   }
-  return 0
+  if (input.allowOverReceipt) return n(input.setupTolerancePct)
+  const legacy = n(input.itemTolerancePct)
+  return legacy > 0 ? legacy : 0
 }
 
 export function evaluateGrnLineTolerance(input: EvaluateGrnToleranceInput): EvaluateGrnToleranceResult {
   const open = Math.max(0, n(input.openQuantity))
   const received = Math.max(0, n(input.receivedQuantity))
   const tolerancePercentage = resolveReceivingTolerancePct(input)
-  const band = open > 0 ? (open * tolerancePercentage) / 100 : 0
-  const lowerBound = Math.max(0, open - band)
-  const upperBound = open + band
+  const upperBound = open + (open > 0 ? (open * tolerancePercentage) / 100 : 0)
   const shortQuantity = Math.max(0, open - received)
   const excessQuantity = Math.max(0, received - open)
   const variancePercentage =
@@ -65,7 +63,6 @@ export function evaluateGrnLineTolerance(input: EvaluateGrnToleranceInput): Eval
     return {
       tolerancePercentage,
       variancePercentage: open > 0 ? -100 : null,
-      lowerBound,
       upperBound,
       shortQuantity: open,
       excessQuantity: 0,
@@ -74,113 +71,89 @@ export function evaluateGrnLineTolerance(input: EvaluateGrnToleranceInput): Eval
     }
   }
 
-  if (received > upperBound + 1e-9) {
+  if (received < open) {
     return {
       tolerancePercentage,
       variancePercentage,
-      lowerBound,
       upperBound,
       shortQuantity,
-      excessQuantity,
-      toleranceStatus: 'EXCESS_OUTSIDE',
-      requiresApproval: true,
+      excessQuantity: 0,
+      toleranceStatus: 'PARTIAL',
+      requiresApproval: Boolean(input.shortCloseRequested),
     }
   }
 
-  if (received > open + 1e-9 && received <= upperBound + 1e-9) {
+  if (received === open) {
     return {
       tolerancePercentage,
-      variancePercentage,
-      lowerBound,
+      variancePercentage: 0,
       upperBound,
-      shortQuantity,
-      excessQuantity,
-      toleranceStatus: 'EXCESS_WITHIN',
-      requiresApproval: false,
+      shortQuantity: 0,
+      excessQuantity: 0,
+      toleranceStatus: 'EXACT',
+      requiresApproval: Boolean(input.shortCloseRequested),
     }
   }
 
-  if (received + 1e-9 >= lowerBound && received <= upperBound + 1e-9) {
+  if (received <= upperBound + 1e-9) {
     return {
       tolerancePercentage,
       variancePercentage,
-      lowerBound,
       upperBound,
-      shortQuantity,
+      shortQuantity: 0,
       excessQuantity,
-      toleranceStatus: 'OK',
-      requiresApproval: false,
-    }
-  }
-
-  if (input.closeOpenQuantity) {
-    return {
-      tolerancePercentage,
-      variancePercentage,
-      lowerBound,
-      upperBound,
-      shortQuantity,
-      excessQuantity,
-      toleranceStatus: 'SHORT_OUTSIDE',
-      requiresApproval: true,
+      toleranceStatus: 'EXCESS_WITHIN_TOLERANCE',
+      requiresApproval: Boolean(input.shortCloseRequested),
     }
   }
 
   return {
     tolerancePercentage,
     variancePercentage,
-    lowerBound,
     upperBound,
-    shortQuantity,
+    shortQuantity: 0,
     excessQuantity,
-    toleranceStatus: 'PARTIAL',
-    requiresApproval: false,
+    toleranceStatus: 'EXCESS_OUTSIDE_TOLERANCE',
+    requiresApproval: true,
   }
 }
 
 export const GRN_TOLERANCE_STATUS_LABELS: Record<GrnLineToleranceStatus, string> = {
-  OK: 'OK',
-  PARTIAL: 'Partial',
   NOT_RECEIVED: 'Not received',
-  SHORT_OUTSIDE: 'Short (outside tolerance)',
-  EXCESS_WITHIN: 'Excess (within tolerance)',
-  EXCESS_OUTSIDE: 'Excess (outside tolerance)',
+  PARTIAL: 'Partial',
+  EXACT: 'Exact',
+  EXCESS_WITHIN_TOLERANCE: 'Excess (within tolerance)',
+  EXCESS_OUTSIDE_TOLERANCE: 'Excess (outside tolerance)',
 }
 
 export function lineRequiresToleranceApproval(status: GrnLineToleranceStatus): boolean {
-  return status === 'SHORT_OUTSIDE' || status === 'EXCESS_OUTSIDE'
+  return status === 'EXCESS_OUTSIDE_TOLERANCE'
 }
 
-/** One evaluated GRN line for document-level rollup (multi-item receive). */
 export type GrnToleranceLineSnapshot = {
   itemCode?: string
   openQuantity: number
   receivedQuantity: number
   itemTolerancePct?: number | null
+  receivingToleranceId?: string | null
   setupTolerancePct?: number | null
   allowOverReceipt?: boolean
-  closeOpenQuantity?: boolean
+  shortCloseRequested?: boolean
 }
 
 export type GrnDocumentToleranceSummary = {
   lineCount: number
   notReceivedCount: number
   partialCount: number
-  okCount: number
+  exactCount: number
   excessWithinCount: number
   outsideCount: number
-  /** Lines with receivedQuantity > 0 (will move stock / reduce PO open). */
   receivableLineCount: number
   allNotReceived: boolean
-  /** True if ANY line is SHORT_OUTSIDE or EXCESS_OUTSIDE — whole GRN needs approval. */
   requiresApproval: boolean
   lines: Array<EvaluateGrnToleranceResult & { itemCode?: string }>
 }
 
-/**
- * Evaluate every line independently, then roll up header flags.
- * Receiving 1 of 3 items → that line OK/PARTIAL/…; others NOT_RECEIVED; no approval unless the received line is outside.
- */
 export function evaluateGrnDocumentTolerance(
   lines: GrnToleranceLineSnapshot[],
 ): GrnDocumentToleranceSummary {
@@ -189,25 +162,26 @@ export function evaluateGrnDocumentTolerance(
       openQuantity: l.openQuantity,
       receivedQuantity: l.receivedQuantity,
       itemTolerancePct: l.itemTolerancePct,
+      receivingToleranceId: l.receivingToleranceId,
       setupTolerancePct: l.setupTolerancePct,
       allowOverReceipt: l.allowOverReceipt,
-      closeOpenQuantity: l.closeOpenQuantity,
+      shortCloseRequested: l.shortCloseRequested,
     })
     return { ...result, itemCode: l.itemCode }
   })
 
   const notReceivedCount = evaluated.filter((l) => l.toleranceStatus === 'NOT_RECEIVED').length
   const partialCount = evaluated.filter((l) => l.toleranceStatus === 'PARTIAL').length
-  const okCount = evaluated.filter((l) => l.toleranceStatus === 'OK').length
-  const excessWithinCount = evaluated.filter((l) => l.toleranceStatus === 'EXCESS_WITHIN').length
-  const outsideCount = evaluated.filter((l) => lineRequiresToleranceApproval(l.toleranceStatus)).length
+  const exactCount = evaluated.filter((l) => l.toleranceStatus === 'EXACT').length
+  const excessWithinCount = evaluated.filter((l) => l.toleranceStatus === 'EXCESS_WITHIN_TOLERANCE').length
+  const outsideCount = evaluated.filter((l) => l.requiresApproval).length
   const receivableLineCount = lines.filter((l) => n(l.receivedQuantity) > 0).length
 
   return {
     lineCount: evaluated.length,
     notReceivedCount,
     partialCount,
-    okCount,
+    exactCount,
     excessWithinCount,
     outsideCount,
     receivableLineCount,

@@ -2072,14 +2072,20 @@ export interface GoodsReceiptLine {
   tolerancePercentage?: number
   variancePercentage?: number | null
   toleranceStatus?:
-    | 'OK'
-    | 'PARTIAL'
     | 'NOT_RECEIVED'
-    | 'SHORT_OUTSIDE'
-    | 'EXCESS_WITHIN'
-    | 'EXCESS_OUTSIDE'
+    | 'PARTIAL'
+    | 'EXACT'
+    | 'EXCESS_WITHIN_TOLERANCE'
+    | 'EXCESS_OUTSIDE_TOLERANCE'
   closeOpenQuantity?: boolean
-  /** Item master tolerance used for client preview before save. */
+  shortCloseRequested?: boolean
+  receivedWeight?: number | null
+  expectedWeight?: number | null
+  maximumAllowedWeight?: number | null
+  weightToleranceStatus?: string
+  requiresApproval?: boolean
+  approvalReasons?: string[]
+  receivingToleranceId?: string | null
   receivingTolerancePercentage?: number
   orderedUomQty?: number
   remarks: string

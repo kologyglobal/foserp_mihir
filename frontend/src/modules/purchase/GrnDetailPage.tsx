@@ -531,7 +531,7 @@ export function GrnDetailPage() {
                     </td>
                     <td className="whitespace-nowrap">
                       {GRN_TOLERANCE_STATUS_LABELS[
-                        (l.toleranceStatus ?? 'OK') as keyof typeof GRN_TOLERANCE_STATUS_LABELS
+                        (l.toleranceStatus ?? 'EXACT') as keyof typeof GRN_TOLERANCE_STATUS_LABELS
                       ] ?? l.toleranceStatus}
                     </td>
                     <td className="num tabular-nums">{formatNumber(l.acceptedQty)}</td>

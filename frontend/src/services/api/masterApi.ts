@@ -30,6 +30,8 @@ export interface MasterRecordDto {
   igst?: number | string
   applicableFor?: 'SALES' | 'PURCHASE' | 'BOTH'
   description?: string | null
+  percentage?: number | string
+  isSystem?: boolean
   uomType?: string
   decimalPlaces?: number
   isBaseUnit?: boolean

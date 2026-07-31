@@ -90,8 +90,16 @@ const itemBaseSchema = z.object({
   purchaseQtyPerUom: z.coerce.number().positive().default(1),
   /** Vendor units per 1 primary/base unit. */
   uomConversionFactor: z.coerce.number().positive().optional(),
-  /** ±% receiving tolerance vs open PO qty on GRN. */
+  /** ±% receiving tolerance vs open PO qty on GRN (legacy dual-read). */
   receivingTolerancePercentage: z.coerce.number().min(0).max(100).optional(),
+  receivingToleranceId: z.string().uuid().nullable().optional(),
+  receiptEntryMode: z.enum(['UNIT_ONLY', 'WEIGHT_ONLY', 'UNIT_AND_WEIGHT']).optional(),
+  conversionCalculationMode: z.enum(['AUTOMATIC', 'MANUAL']).optional(),
+  allowManualUnitQuantity: z.boolean().optional(),
+  allowManualWeightQuantity: z.boolean().optional(),
+  requireWeightAtReceipt: z.boolean().optional(),
+  weightUomId: z.string().uuid().nullable().optional(),
+  standardWeightPerBaseUnit: z.coerce.number().min(0).optional(),
   salesDescription: z.string().trim().max(5000).nullable().optional(),
   salesUomId: z.string().uuid().nullable().optional(),
   defaultSalesRate: z.coerce.number().min(0).optional(),

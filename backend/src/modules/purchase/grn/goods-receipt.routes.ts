@@ -8,6 +8,7 @@ import { uuidParamSchema } from '../../../utils/pagination.js'
 import * as controller from './goods-receipt.controller.js'
 import {
   createGoodsReceiptSchema,
+  evaluateGrnLinesSchema,
   grnLifecycleRemarksSchema,
   listGoodsReceiptsQuerySchema,
   updateGoodsReceiptSchema,
@@ -33,6 +34,13 @@ router.get(
   '/next-number',
   requirePermission('purchase.grn.create'),
   controller.previewNextGoodsReceiptNumber,
+)
+
+router.post(
+  '/evaluate-lines',
+  requirePermission('purchase.grn.view'),
+  validateBody(evaluateGrnLinesSchema),
+  controller.evaluateGoodsReceiptLines,
 )
 
 router.get(

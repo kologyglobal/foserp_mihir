@@ -1550,7 +1550,7 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       tolerancePercentage: Number(l.tolerancePercentage) || 0,
       variancePercentage:
         l.variancePercentage == null ? null : Number(l.variancePercentage),
-      toleranceStatus: (l.toleranceStatus as GoodsReceiptLine['toleranceStatus']) || 'OK',
+      toleranceStatus: (l.toleranceStatus as GoodsReceiptLine['toleranceStatus']) || 'EXACT',
       closeOpenQuantity: Boolean(l.closeOpenQuantity),
       remarks: l.remarks || '',
     })),

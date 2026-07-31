@@ -19,6 +19,11 @@ import {
 } from '@/modules/masters/shared/MastersLegacyRedirects'
 import { UomListPage, UomFormPage, UomDetailPage } from '@/modules/masters/uom/UomPages'
 import { HsnListPage, HsnFormPage, HsnDetailPage } from '@/modules/masters/hsn/HsnPages'
+import {
+  ReceivingToleranceListPage,
+  ReceivingToleranceFormPage,
+  ReceivingToleranceDetailPage,
+} from '@/modules/masters/receiving-tolerance/ReceivingTolerancePages'
 import { GstGroupListPage, GstGroupFormPage, GstGroupDetailPage } from '@/modules/masters/gst-group/GstGroupPages'
 import { GstRateListPage, GstRateFormPage, GstRateDetailPage } from '@/modules/masters/gst-rate/GstRatePages'
 import {
@@ -197,6 +202,10 @@ export const masterRouteChildren: RouteObject[] = [
   { path: 'masters/hsn/new', element: <HsnFormPage /> },
   { path: 'masters/hsn/:id', element: <HsnDetailPage /> },
   { path: 'masters/hsn/:id/edit', element: <HsnFormPage /> },
+  { path: 'masters/receiving-tolerances', element: <ReceivingToleranceListPage /> },
+  { path: 'masters/receiving-tolerances/new', element: <ReceivingToleranceFormPage /> },
+  { path: 'masters/receiving-tolerances/:id', element: <ReceivingToleranceDetailPage /> },
+  { path: 'masters/receiving-tolerances/:id/edit', element: <ReceivingToleranceFormPage /> },
 
   { path: 'masters/gst-groups', element: <GstGroupListPage /> },
   { path: 'masters/gst-groups/new', element: <GstGroupFormPage /> },

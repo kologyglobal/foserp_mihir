@@ -1,5 +1,5 @@
 import type { Item, ItemCategory, Vendor } from '../../types/master'
-import type { GstGroupCode, GstRate, HsnMaster } from '../../types/taxMaster'
+import type { GstGroupCode, GstRate, HsnMaster, ReceivingToleranceMaster } from '../../types/taxMaster'
 import { useMasterStore } from '../../store/masterStore'
 import { bumpMasterLookupCache } from '../api/lookupCache'
 import * as api from '../api/masterBatchApi'
@@ -41,6 +41,18 @@ function upsertHsn(row: HsnMaster): void {
 
 function removeHsn(id: string): void {
   useMasterStore.setState((s) => ({ hsnMasters: s.hsnMasters.filter((h) => h.id !== id) }))
+  bumpMasterLookupCache()
+}
+
+function upsertReceivingTolerance(row: ReceivingToleranceMaster): void {
+  useMasterStore.setState((s) => ({
+    receivingTolerances: [row, ...s.receivingTolerances.filter((r) => r.id !== row.id)],
+  }))
+  bumpMasterLookupCache()
+}
+
+function removeReceivingTolerance(id: string): void {
+  useMasterStore.setState((s) => ({ receivingTolerances: s.receivingTolerances.filter((r) => r.id !== id) }))
   bumpMasterLookupCache()
 }
 
@@ -93,9 +105,10 @@ function removeVendor(id: string): void {
 }
 
 export async function syncBatchMastersFromApi(): Promise<void> {
-  const [categories, hsn, gstGroups, gstRates, items, vendors] = await Promise.all([
+  const [categories, hsn, receivingTolerances, gstGroups, gstRates, items, vendors] = await Promise.all([
     api.fetchItemCategories(),
     api.fetchHsnCodes(),
+    api.fetchReceivingTolerances(),
     api.fetchGstGroups(),
     api.fetchGstRates(),
     api.fetchItems(),
@@ -105,6 +118,7 @@ export async function syncBatchMastersFromApi(): Promise<void> {
   useMasterStore.setState({
     categories: categories.map(api.mapCategoryDto),
     hsnMasters: hsn.map(api.mapHsnDto),
+    receivingTolerances: receivingTolerances.map(api.mapReceivingToleranceDto),
     gstGroups: gstGroups.map(api.mapGstGroupDto),
     gstRates: gstRates.map(api.mapGstRateDto),
     items: items.map(api.mapItemDto),
@@ -187,6 +201,47 @@ export async function apiDeactivateHsn(id: string): Promise<void> {
   return withSubmitLock(lockKey('master:hsn:deactivate', id), async () => {
     const res = await api.deactivateMasterApi('hsn-sac', id)
     upsertHsn(api.mapHsnDto(res.data))
+  })
+}
+
+export async function apiCreateReceivingTolerance(
+  data: Omit<ReceivingToleranceMaster, 'id' | 'createdAt' | 'updatedAt' | 'isSystem'>,
+): Promise<string> {
+  return withSubmitLock(lockKey('master:receiving-tolerance:create'), async () => {
+    const res = await api.createMasterApi('receiving-tolerances', api.receivingToleranceToApiPayload(data))
+    upsertReceivingTolerance(api.mapReceivingToleranceDto(res.data))
+    return res.data.id
+  })
+}
+
+export async function apiUpdateReceivingTolerance(id: string, data: Partial<ReceivingToleranceMaster>): Promise<void> {
+  return withSubmitLock(lockKey('master:receiving-tolerance:update', id), async () => {
+    const existing = useMasterStore.getState().getReceivingTolerance(id)
+    if (!existing) throw new Error('Receiving tolerance not found')
+    const merged = { ...existing, ...data }
+    const res = await api.updateMasterApi('receiving-tolerances', id, api.receivingToleranceToApiPayload(merged))
+    upsertReceivingTolerance(api.mapReceivingToleranceDto(res.data))
+  })
+}
+
+export async function apiDeleteReceivingTolerance(id: string): Promise<void> {
+  return withSubmitLock(lockKey('master:receiving-tolerance:delete', id), async () => {
+    await api.deleteMasterApi('receiving-tolerances', id)
+    removeReceivingTolerance(id)
+  })
+}
+
+export async function apiActivateReceivingTolerance(id: string): Promise<void> {
+  return withSubmitLock(lockKey('master:receiving-tolerance:activate', id), async () => {
+    const res = await api.activateMasterApi('receiving-tolerances', id)
+    upsertReceivingTolerance(api.mapReceivingToleranceDto(res.data))
+  })
+}
+
+export async function apiDeactivateReceivingTolerance(id: string): Promise<void> {
+  return withSubmitLock(lockKey('master:receiving-tolerance:deactivate', id), async () => {
+    const res = await api.deactivateMasterApi('receiving-tolerances', id)
+    upsertReceivingTolerance(api.mapReceivingToleranceDto(res.data))
   })
 }
 

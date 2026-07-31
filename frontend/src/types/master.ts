@@ -259,8 +259,16 @@ export interface Item extends MasterRecordAudit {
   purchaseQtyPerUom?: number
   /** Vendor units per 1 primary/base unit (e.g. 3 m = 1 NOS). */
   uomConversionFactor?: number
-  /** ±% band for GRN receiving vs open qty. */
+  /** ±% band for GRN receiving vs open qty (legacy dual-read). */
   receivingTolerancePercentage?: number
+  receivingToleranceId?: string | null
+  receiptEntryMode?: 'UNIT_ONLY' | 'WEIGHT_ONLY' | 'UNIT_AND_WEIGHT'
+  conversionCalculationMode?: 'AUTOMATIC' | 'MANUAL'
+  allowManualUnitQuantity?: boolean
+  allowManualWeightQuantity?: boolean
+  requireWeightAtReceipt?: boolean
+  weightUomId?: string | null
+  standardWeightPerBaseUnit?: number
   /** Read-only inventory snapshot fields */
   inventoryQty?: number
   qtyOnPurchaseOrder?: number

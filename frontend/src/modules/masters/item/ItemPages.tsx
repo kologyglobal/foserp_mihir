@@ -73,7 +73,12 @@ const schema = z.object({
   purchaseUomId: z.string().nullable().optional(),
   purchaseQtyPerUom: z.coerce.number().positive().default(1),
   uomConversionFactor: z.coerce.number().positive().optional(),
+  receivingToleranceId: z.string().nullable().optional(),
   receivingTolerancePercentage: z.coerce.number().min(0).max(100).optional(),
+  receiptEntryMode: z.enum(['UNIT_ONLY', 'WEIGHT_ONLY', 'UNIT_AND_WEIGHT']).optional(),
+  standardWeightPerBaseUnit: z.coerce.number().min(0).optional(),
+  weightUomId: z.string().nullable().optional(),
+  requireWeightAtReceipt: z.boolean().optional(),
   hsnId: z.string().nullable().optional(),
   hsnCode: z.string(),
   gstGroupId: z.string().nullable().optional(),
@@ -238,6 +243,7 @@ export function ItemFormPage() {
   const uoms = useActiveUoms()
   const getHsn = useMasterStore((s) => s.getHsn)
   const getGstGroup = useMasterStore((s) => s.getGstGroup)
+  const receivingTolerances = useMasterStore((s) => s.receivingTolerances.filter((r) => r.isActive))
   const addItem = useMasterStore((s) => s.addItem)
   const updateItem = useMasterStore((s) => s.updateItem)
   const bomHeaders = useBomStore((s) => s.bomHeaders)
@@ -267,7 +273,12 @@ export function ItemFormPage() {
           quantityPerUom: existing.quantityPerUom ?? 1,
           purchaseQtyPerUom: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
           uomConversionFactor: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
+          receivingToleranceId: existing.receivingToleranceId ?? '',
           receivingTolerancePercentage: existing.receivingTolerancePercentage ?? 0,
+          receiptEntryMode: existing.receiptEntryMode ?? 'UNIT_ONLY',
+          standardWeightPerBaseUnit: existing.standardWeightPerBaseUnit ?? 0,
+          weightUomId: existing.weightUomId ?? '',
+          requireWeightAtReceipt: existing.requireWeightAtReceipt ?? false,
           salesDescription: existing.salesDescription ?? '',
           salesUomId: existing.salesUomId ?? existing.baseUomId,
           defaultSalesRate: existing.defaultSalesRate ?? 0,
@@ -294,7 +305,12 @@ export function ItemFormPage() {
           quantityPerUom: 1,
           purchaseQtyPerUom: 1,
           uomConversionFactor: 1,
+          receivingToleranceId: '',
           receivingTolerancePercentage: 0,
+          receiptEntryMode: 'UNIT_ONLY',
+          standardWeightPerBaseUnit: 0,
+          weightUomId: '',
+          requireWeightAtReceipt: false,
           reorderLevel: 0,
           reorderQty: 0,
           standardRate: 0,
@@ -538,20 +554,42 @@ export function ItemFormPage() {
               Vendor units per 1 stock unit (e.g. 3 Meter = 1 NOS). Use 1 when purchase UOM equals base UOM.
             </p>
           </FormField>
-          <FormField
-            label="Receiving tolerance (%)"
-            error={errors.receivingTolerancePercentage?.message}
-          >
-            <Input
-              type="number"
-              step="0.01"
-              min={0}
-              max={100}
-              {...register('receivingTolerancePercentage')}
-            />
+          <FormField label="Receiving tolerance" error={errors.receivingToleranceId?.message}>
+            <Select
+              value={watch('receivingToleranceId') ?? ''}
+              onChange={(e) => {
+                const tolId = e.target.value || null
+                setValue('receivingToleranceId', tolId, { shouldValidate: true })
+                const tol = receivingTolerances.find((r) => r.id === tolId)
+                if (tol) setValue('receivingTolerancePercentage', tol.percentage)
+              }}
+            >
+              <option value="">— Select —</option>
+              {receivingTolerances.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.code} — {r.name} ({r.percentage}%)
+                </option>
+              ))}
+            </Select>
             <p className="mt-1 text-xs text-erp-muted">
-              ±% band vs open PO qty on GRN (e.g. 2 = accept 98–102%). 0 = exact / Setup fallback.
+              Excess-only band vs open PO qty on GRN. Leave empty to use Purchase Setup fallback.
             </p>
+          </FormField>
+          <FormField label="Receipt entry mode">
+            <Select {...register('receiptEntryMode')}>
+              <option value="UNIT_ONLY">Unit only</option>
+              <option value="WEIGHT_ONLY">Weight only</option>
+              <option value="UNIT_AND_WEIGHT">Unit and weight</option>
+            </Select>
+          </FormField>
+          <FormField label="Standard weight per base unit">
+            <Input type="number" step="0.0001" min={0} {...register('standardWeightPerBaseUnit')} />
+          </FormField>
+          <FormField label="Weight UOM">
+            <UomMasterSelect value={watch('weightUomId') ?? ''} onChange={(v) => setValue('weightUomId', v || null)} />
+          </FormField>
+          <FormField label="Require weight at receipt">
+            <Checkbox {...register('requireWeightAtReceipt')} label="Weight mandatory on GRN" />
           </FormField>
           <FormField label="Material Grade">
             <Input {...register('materialGrade')} />

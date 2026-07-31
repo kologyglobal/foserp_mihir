@@ -44,8 +44,13 @@ export const goodsReceiptLineInputSchema = z.object({
   manufacturingDate: z.string().trim().optional().nullable(),
   expiryDate: z.string().trim().optional().nullable(),
   qcRequired: z.boolean().optional(),
-  /** Close remaining open qty; under-band short becomes SHORT_OUTSIDE (approval). */
+  receivedWeight: z.coerce.number().min(0).optional().nullable(),
+  manualUnitEntry: z.boolean().optional(),
+  manualWeightEntry: z.boolean().optional(),
+  /** Close remaining open qty (legacy alias — prefer shortCloseRequested). */
   closeOpenQuantity: z.boolean().optional(),
+  shortCloseRequested: z.boolean().optional(),
+  shortCloseReason: z.string().trim().max(500).optional().nullable(),
   remarks: z.string().trim().max(2000).optional().nullable(),
 }).superRefine((line, ctx) => {
   if (line.receivedUomQuantity == null && line.receivedQuantity == null) {
@@ -92,7 +97,13 @@ export const grnLifecycleRemarksSchema = z
   })
   .default({})
 
+export const evaluateGrnLinesSchema = z.object({
+  purchaseOrderId: z.string().uuid(),
+  lines: z.array(goodsReceiptLineInputSchema).min(1),
+})
+
 export type ListGoodsReceiptsQuery = z.infer<typeof listGoodsReceiptsQuerySchema>
 export type CreateGoodsReceiptInput = z.infer<typeof createGoodsReceiptSchema>
 export type UpdateGoodsReceiptInput = z.infer<typeof updateGoodsReceiptSchema>
 export type GoodsReceiptLineInput = z.infer<typeof goodsReceiptLineInputSchema>
+export type EvaluateGrnLinesInput = z.infer<typeof evaluateGrnLinesSchema>

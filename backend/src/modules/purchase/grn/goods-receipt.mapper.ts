@@ -121,8 +121,59 @@ export function mapGoodsReceiptToDto(grn: GrnWithRelations) {
           ? null
           : qty((line as { variancePercentage?: unknown }).variancePercentage),
       toleranceStatus:
-        ((line as { toleranceStatus?: string }).toleranceStatus as string | undefined) ?? 'OK',
-      closeOpenQuantity: Boolean((line as { closeOpenQuantity?: boolean }).closeOpenQuantity),
+        ((line as { toleranceStatus?: string }).toleranceStatus as string | undefined) ?? 'EXACT',
+      receivingToleranceIdSnapshot:
+        (line as { receivingToleranceIdSnapshot?: string | null }).receivingToleranceIdSnapshot ?? null,
+      receivingToleranceCodeSnapshot:
+        (line as { receivingToleranceCodeSnapshot?: string }).receivingToleranceCodeSnapshot ?? '',
+      receivingToleranceNameSnapshot:
+        (line as { receivingToleranceNameSnapshot?: string }).receivingToleranceNameSnapshot ?? '',
+      receivingTolerancePercentageSnapshot: qty(
+        (line as { receivingTolerancePercentageSnapshot?: unknown }).receivingTolerancePercentageSnapshot ?? 0,
+      ),
+      maximumAllowedUnitQuantity: qty(
+        (line as { maximumAllowedUnitQuantity?: unknown }).maximumAllowedUnitQuantity ?? 0,
+      ),
+      unitVariance: qty((line as { unitVariance?: unknown }).unitVariance ?? 0),
+      receivedWeight:
+        (line as { receivedWeight?: unknown }).receivedWeight == null
+          ? null
+          : qty((line as { receivedWeight?: unknown }).receivedWeight),
+      expectedWeight:
+        (line as { expectedWeight?: unknown }).expectedWeight == null
+          ? null
+          : qty((line as { expectedWeight?: unknown }).expectedWeight),
+      maximumAllowedWeight:
+        (line as { maximumAllowedWeight?: unknown }).maximumAllowedWeight == null
+          ? null
+          : qty((line as { maximumAllowedWeight?: unknown }).maximumAllowedWeight),
+      weightVariance:
+        (line as { weightVariance?: unknown }).weightVariance == null
+          ? null
+          : qty((line as { weightVariance?: unknown }).weightVariance),
+      weightVariancePercentage:
+        (line as { weightVariancePercentage?: unknown }).weightVariancePercentage == null
+          ? null
+          : qty((line as { weightVariancePercentage?: unknown }).weightVariancePercentage),
+      weightConversionRateSnapshot:
+        (line as { weightConversionRateSnapshot?: unknown }).weightConversionRateSnapshot == null
+          ? null
+          : qty((line as { weightConversionRateSnapshot?: unknown }).weightConversionRateSnapshot),
+      weightUomIdSnapshot:
+        (line as { weightUomIdSnapshot?: string | null }).weightUomIdSnapshot ?? null,
+      weightUomCodeSnapshot: (line as { weightUomCodeSnapshot?: string }).weightUomCodeSnapshot ?? '',
+      weightToleranceStatus:
+        (line as { weightToleranceStatus?: string }).weightToleranceStatus ?? 'NOT_APPLICABLE',
+      manualUnitEntry: Boolean((line as { manualUnitEntry?: boolean }).manualUnitEntry),
+      manualWeightEntry: Boolean((line as { manualWeightEntry?: boolean }).manualWeightEntry),
+      requiresApproval: Boolean((line as { requiresApproval?: boolean }).requiresApproval),
+      approvalReasons: (line as { approvalReasons?: string[] }).approvalReasons ?? [],
+      shortCloseRequested: Boolean((line as { shortCloseRequested?: boolean }).shortCloseRequested),
+      shortCloseReason: (line as { shortCloseReason?: string | null }).shortCloseReason ?? null,
+      closeOpenQuantity: Boolean(
+        (line as { shortCloseRequested?: boolean }).shortCloseRequested ??
+          (line as { closeOpenQuantity?: boolean }).closeOpenQuantity,
+      ),
       remarks: line.remarks,
     })),
   }
@@ -141,6 +192,13 @@ export function mapReceivableLineDto(line: {
   rate: unknown
   uom?: { code: string } | null
   receivingTolerancePercentage?: number | null
+  receivingToleranceId?: string | null
+  receivingToleranceCode?: string | null
+  receiptEntryMode?: string | null
+  standardWeightPerBaseUnit?: number | null
+  weightUomId?: string | null
+  weightUomCode?: string | null
+  requireWeightAtReceipt?: boolean | null
   uomQuantity?: unknown
   uomConversionFactor?: unknown
 }) {
@@ -163,5 +221,12 @@ export function mapReceivableLineDto(line: {
     rate: qty(line.rate),
     uomConversionFactor: factor,
     receivingTolerancePercentage: qty(line.receivingTolerancePercentage),
+    receivingToleranceId: line.receivingToleranceId ?? null,
+    receivingToleranceCode: line.receivingToleranceCode ?? null,
+    receiptEntryMode: line.receiptEntryMode ?? 'UNIT_ONLY',
+    standardWeightPerBaseUnit: qty(line.standardWeightPerBaseUnit),
+    weightUomId: line.weightUomId ?? null,
+    weightUomCode: line.weightUomCode ?? '',
+    requireWeightAtReceipt: Boolean(line.requireWeightAtReceipt),
   }
 }

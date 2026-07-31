@@ -222,7 +222,7 @@ function linesFromGrn(grn: GoodsReceiptNote): LineDraft[] {
     expiryControlled: l.expiryControlled,
     tolerancePercentage: l.tolerancePercentage ?? 0,
     variancePercentage: l.variancePercentage ?? null,
-    toleranceStatus: l.toleranceStatus ?? 'OK',
+    toleranceStatus: l.toleranceStatus ?? 'EXACT',
     closeOpenQuantity: Boolean(l.closeOpenQuantity),
     receivingTolerancePercentage: l.receivingTolerancePercentage ?? l.tolerancePercentage ?? 0,
     remarks: l.remarks,

@@ -1,28 +1,34 @@
 /**
- * GRN receiving tolerance vs open (pending) qty.
- *
- * variancePct = ((received - open) / open) * 100 when open > 0
- * Tolerance % comes from Item Master, with Purchase Setup over-receipt % as fallback.
+ * GRN receiving tolerance — delegates to receiving-tolerance domain service.
+ * Backend result is authoritative; this module preserves legacy call sites.
  */
+import type { GrnLineToleranceStatus } from '@prisma/client'
+import {
+  evaluateReceiptLine,
+  qtyToNumber,
+  resolveReceivingTolerance,
+  type ReceiptLineEvaluationInput,
+} from '../receiving-tolerance/index.js'
 
-export type GrnLineToleranceStatus =
-  | 'OK'
-  | 'PARTIAL'
-  | 'NOT_RECEIVED'
-  | 'SHORT_OUTSIDE'
-  | 'EXCESS_WITHIN'
-  | 'EXCESS_OUTSIDE'
+export type GrnLineToleranceStatusLegacy = GrnLineToleranceStatus
 
 export type EvaluateGrnToleranceInput = {
   openQuantity: number
   receivedQuantity: number
-  /** Item Master receivingTolerancePercentage (preferred). */
   itemTolerancePct?: number | null
-  /** Setup overReceiptTolerancePct used when item % is 0/null and allowOverReceipt. */
+  receivingToleranceId?: string | null
+  masterTolerance?: ReceiptLineEvaluationInput['masterTolerance']
   setupTolerancePct?: number | null
   allowOverReceipt?: boolean
-  /** When true, under-receipt outside lower band closes open → SHORT_OUTSIDE. */
   closeOpenQuantity?: boolean
+  shortCloseRequested?: boolean
+  shortCloseReason?: string | null
+  receivedWeight?: number | null
+  standardWeightPerBaseUnit?: number | null
+  receiptEntryMode?: ReceiptLineEvaluationInput['receiptEntryMode']
+  manualUnitEntry?: boolean
+  manualWeightEntry?: boolean
+  weightUomCode?: string | null
 }
 
 export type EvaluateGrnToleranceResult = {
@@ -34,139 +40,130 @@ export type EvaluateGrnToleranceResult = {
   excessQuantity: number
   toleranceStatus: GrnLineToleranceStatus
   requiresApproval: boolean
+  approvalReasons: string[]
+  receivingToleranceIdSnapshot: string | null
+  receivingToleranceCodeSnapshot: string
+  receivingToleranceNameSnapshot: string
+  receivingTolerancePercentageSnapshot: number
+  maximumAllowedUnitQuantity: number
+  unitVariance: number
+  expectedWeight: number | null
+  maximumAllowedWeight: number | null
+  receivedWeight: number | null
+  weightVariance: number | null
+  weightVariancePercentage: number | null
+  weightConversionRateSnapshot: number | null
+  weightUomCodeSnapshot: string
+  weightToleranceStatus: string
+  manualUnitEntry: boolean
+  manualWeightEntry: boolean
+  shortCloseRequested: boolean
+  shortCloseReason: string | null
 }
 
-function n(value: unknown, fallback = 0): number {
-  const x = Number(value ?? fallback)
-  return Number.isFinite(x) ? x : fallback
-}
-
-/** Resolve effective ±% band for this receipt line. */
 export function resolveReceivingTolerancePct(input: {
+  receivingToleranceId?: string | null
+  masterTolerance?: ReceiptLineEvaluationInput['masterTolerance']
   itemTolerancePct?: number | null
   setupTolerancePct?: number | null
   allowOverReceipt?: boolean
 }): number {
-  const item = n(input.itemTolerancePct)
-  if (item > 0) return item
-  if (input.allowOverReceipt) {
-    const setup = n(input.setupTolerancePct)
-    return setup > 0 ? setup : 0
-  }
-  return 0
+  return qtyToNumber(
+    resolveReceivingTolerance({
+      receivingToleranceId: input.receivingToleranceId,
+      masterTolerance: input.masterTolerance ?? null,
+      receivingTolerancePercentageLegacy: input.itemTolerancePct,
+      setupTolerancePct: input.setupTolerancePct,
+      allowOverReceipt: input.allowOverReceipt,
+    }).percentage,
+  )
 }
 
 export function evaluateGrnLineTolerance(input: EvaluateGrnToleranceInput): EvaluateGrnToleranceResult {
-  const open = Math.max(0, n(input.openQuantity))
-  const received = Math.max(0, n(input.receivedQuantity))
-  const tolerancePercentage = resolveReceivingTolerancePct(input)
-  const band = open > 0 ? (open * tolerancePercentage) / 100 : 0
-  const lowerBound = Math.max(0, open - band)
-  const upperBound = open + band
-  const shortQuantity = Math.max(0, open - received)
-  const excessQuantity = Math.max(0, received - open)
-  const variancePercentage =
-    open > 0 ? Number((((received - open) / open) * 100).toFixed(4)) : received > 0 ? 100 : null
+  const evaluated = evaluateReceiptLine({
+    openUnitQuantity: input.openQuantity,
+    receivedUnitQuantity: input.receivedQuantity,
+    receivingToleranceId: input.receivingToleranceId,
+    masterTolerance: input.masterTolerance,
+    receivingTolerancePercentage: input.itemTolerancePct,
+    setupTolerancePct: input.setupTolerancePct,
+    allowOverReceipt: input.allowOverReceipt,
+    shortCloseRequested: input.shortCloseRequested ?? input.closeOpenQuantity,
+    shortCloseReason: input.shortCloseReason,
+    receivedWeight: input.receivedWeight,
+    standardWeightPerBaseUnit: input.standardWeightPerBaseUnit,
+    receiptEntryMode: input.receiptEntryMode,
+    manualUnitEntry: input.manualUnitEntry,
+    manualWeightEntry: input.manualWeightEntry,
+    weightUomCode: input.weightUomCode,
+  })
 
-  if (received <= 0) {
-    return {
-      tolerancePercentage,
-      variancePercentage: open > 0 ? -100 : null,
-      lowerBound,
-      upperBound,
-      shortQuantity: open,
-      excessQuantity: 0,
-      toleranceStatus: 'NOT_RECEIVED',
-      requiresApproval: false,
-    }
-  }
-
-  if (received > upperBound + 1e-9) {
-    return {
-      tolerancePercentage,
-      variancePercentage,
-      lowerBound,
-      upperBound,
-      shortQuantity,
-      excessQuantity,
-      toleranceStatus: 'EXCESS_OUTSIDE',
-      requiresApproval: true,
-    }
-  }
-
-  if (received > open + 1e-9 && received <= upperBound + 1e-9) {
-    return {
-      tolerancePercentage,
-      variancePercentage,
-      lowerBound,
-      upperBound,
-      shortQuantity,
-      excessQuantity,
-      toleranceStatus: 'EXCESS_WITHIN',
-      requiresApproval: false,
-    }
-  }
-
-  // Within band around open (including exact).
-  if (received + 1e-9 >= lowerBound && received <= upperBound + 1e-9) {
-    return {
-      tolerancePercentage,
-      variancePercentage,
-      lowerBound,
-      upperBound,
-      shortQuantity,
-      excessQuantity,
-      toleranceStatus: 'OK',
-      requiresApproval: false,
-    }
-  }
-
-  // Below lower band
-  if (input.closeOpenQuantity) {
-    return {
-      tolerancePercentage,
-      variancePercentage,
-      lowerBound,
-      upperBound,
-      shortQuantity,
-      excessQuantity,
-      toleranceStatus: 'SHORT_OUTSIDE',
-      requiresApproval: true,
-    }
-  }
+  const open = input.openQuantity
+  const pct = qtyToNumber(evaluated.tolerancePercentage)
+  const band = open > 0 ? (open * pct) / 100 : 0
 
   return {
-    tolerancePercentage,
-    variancePercentage,
-    lowerBound,
-    upperBound,
-    shortQuantity,
-    excessQuantity,
-    toleranceStatus: 'PARTIAL',
-    requiresApproval: false,
+    tolerancePercentage: pct,
+    variancePercentage: evaluated.variancePercentage ? qtyToNumber(evaluated.variancePercentage) : null,
+    lowerBound: Math.max(0, open - band),
+    upperBound: open + band,
+    shortQuantity: qtyToNumber(evaluated.shortQuantity),
+    excessQuantity: qtyToNumber(evaluated.excessQuantity),
+    toleranceStatus: evaluated.unitToleranceStatus,
+    requiresApproval: evaluated.requiresApproval,
+    approvalReasons: evaluated.approvalReasons,
+    receivingToleranceIdSnapshot: evaluated.receivingToleranceIdSnapshot,
+    receivingToleranceCodeSnapshot: evaluated.receivingToleranceCodeSnapshot,
+    receivingToleranceNameSnapshot: evaluated.receivingToleranceNameSnapshot,
+    receivingTolerancePercentageSnapshot: qtyToNumber(evaluated.receivingTolerancePercentageSnapshot),
+    maximumAllowedUnitQuantity: qtyToNumber(evaluated.maximumAllowedUnitQuantity),
+    unitVariance: qtyToNumber(evaluated.unitVariance),
+    expectedWeight: evaluated.expectedWeight ? qtyToNumber(evaluated.expectedWeight) : null,
+    maximumAllowedWeight: evaluated.maximumAllowedWeight
+      ? qtyToNumber(evaluated.maximumAllowedWeight)
+      : null,
+    receivedWeight: evaluated.receivedWeight ? qtyToNumber(evaluated.receivedWeight) : null,
+    weightVariance: evaluated.weightVariance ? qtyToNumber(evaluated.weightVariance) : null,
+    weightVariancePercentage: evaluated.weightVariancePercentage
+      ? qtyToNumber(evaluated.weightVariancePercentage)
+      : null,
+    weightConversionRateSnapshot: evaluated.weightConversionRateSnapshot
+      ? qtyToNumber(evaluated.weightConversionRateSnapshot)
+      : null,
+    weightUomCodeSnapshot: evaluated.weightUomCodeSnapshot,
+    weightToleranceStatus: evaluated.weightToleranceStatus,
+    manualUnitEntry: evaluated.manualUnitEntry,
+    manualWeightEntry: evaluated.manualWeightEntry,
+    shortCloseRequested: evaluated.shortCloseRequested,
+    shortCloseReason: evaluated.shortCloseReason,
   }
 }
 
 export function lineRequiresToleranceApproval(status: GrnLineToleranceStatus): boolean {
-  return status === 'SHORT_OUTSIDE' || status === 'EXCESS_OUTSIDE'
+  return status === 'EXCESS_OUTSIDE_TOLERANCE'
 }
 
-/** Document rollup — approval if ANY line is outside; zero lines stay NOT_RECEIVED independently. */
 export type GrnToleranceLineSnapshot = {
   itemCode?: string
   openQuantity: number
   receivedQuantity: number
   itemTolerancePct?: number | null
+  receivingToleranceId?: string | null
+  masterTolerance?: ReceiptLineEvaluationInput['masterTolerance']
   setupTolerancePct?: number | null
   allowOverReceipt?: boolean
   closeOpenQuantity?: boolean
+  shortCloseRequested?: boolean
+  receivedWeight?: number | null
+  standardWeightPerBaseUnit?: number | null
+  receiptEntryMode?: ReceiptLineEvaluationInput['receiptEntryMode']
 }
 
 export type GrnDocumentToleranceSummary = {
   lineCount: number
   notReceivedCount: number
   partialCount: number
-  okCount: number
+  exactCount: number
   excessWithinCount: number
   outsideCount: number
   receivableLineCount: number
@@ -183,25 +180,31 @@ export function evaluateGrnDocumentTolerance(
       openQuantity: l.openQuantity,
       receivedQuantity: l.receivedQuantity,
       itemTolerancePct: l.itemTolerancePct,
+      receivingToleranceId: l.receivingToleranceId,
+      masterTolerance: l.masterTolerance,
       setupTolerancePct: l.setupTolerancePct,
       allowOverReceipt: l.allowOverReceipt,
       closeOpenQuantity: l.closeOpenQuantity,
+      shortCloseRequested: l.shortCloseRequested ?? l.closeOpenQuantity,
+      receivedWeight: l.receivedWeight,
+      standardWeightPerBaseUnit: l.standardWeightPerBaseUnit,
+      receiptEntryMode: l.receiptEntryMode,
     })
     return { ...result, itemCode: l.itemCode }
   })
 
   const notReceivedCount = evaluated.filter((l) => l.toleranceStatus === 'NOT_RECEIVED').length
   const partialCount = evaluated.filter((l) => l.toleranceStatus === 'PARTIAL').length
-  const okCount = evaluated.filter((l) => l.toleranceStatus === 'OK').length
-  const excessWithinCount = evaluated.filter((l) => l.toleranceStatus === 'EXCESS_WITHIN').length
-  const outsideCount = evaluated.filter((l) => lineRequiresToleranceApproval(l.toleranceStatus)).length
-  const receivableLineCount = lines.filter((l) => n(l.receivedQuantity) > 0).length
+  const exactCount = evaluated.filter((l) => l.toleranceStatus === 'EXACT').length
+  const excessWithinCount = evaluated.filter((l) => l.toleranceStatus === 'EXCESS_WITHIN_TOLERANCE').length
+  const outsideCount = evaluated.filter((l) => l.requiresApproval).length
+  const receivableLineCount = lines.filter((l) => l.receivedQuantity > 0).length
 
   return {
     lineCount: evaluated.length,
     notReceivedCount,
     partialCount,
-    okCount,
+    exactCount,
     excessWithinCount,
     outsideCount,
     receivableLineCount,

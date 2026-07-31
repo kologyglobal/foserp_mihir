@@ -108,3 +108,8 @@ export const getReceivableLines = asyncHandler(async (req: Request, res: Respons
   const data = await service.getReceivableLines(getTenantId(req), getRouteParam(req, 'id'))
   sendSuccess(res, 'Receivable PO lines retrieved', data)
 })
+
+export const evaluateGoodsReceiptLines = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.evaluateGoodsReceiptLines(getTenantId(req), req.body)
+  sendSuccess(res, 'GRN lines evaluated', data)
+})

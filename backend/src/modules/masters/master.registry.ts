@@ -6,6 +6,7 @@ import {
   createGstGroupSchema,
   createGstRateSchema,
   createHsnSacSchema,
+  createReceivingToleranceSchema,
   createItemCategorySchema,
   createLocationSchema,
   createPlantSchema,
@@ -20,6 +21,7 @@ import {
   updateGstGroupSchema,
   updateGstRateSchema,
   updateHsnSacSchema,
+  updateReceivingToleranceSchema,
   updateItemCategorySchema,
   updateLocationSchema,
   updatePlantSchema,
@@ -41,6 +43,7 @@ export type MasterResourceSlug =
   | 'bins'
   | 'item-categories'
   | 'hsn-sac'
+  | 'receiving-tolerances'
   | 'gst-groups'
   | 'gst-rates'
   | 'products'
@@ -59,6 +62,7 @@ export interface MasterResourceConfig {
     | 'masterBin'
     | 'masterItemCategory'
     | 'masterHsnCode'
+    | 'masterReceivingTolerance'
     | 'masterGstGroup'
     | 'masterGstRate'
     | 'masterProduct'
@@ -168,6 +172,15 @@ export const MASTER_RESOURCES: Record<MasterResourceSlug, MasterResourceConfig> 
     createSchema: createHsnSacSchema,
     updateSchema: updateHsnSacSchema,
     lookupFields: ['id', 'code', 'description'],
+  },
+  'receiving-tolerances': {
+    slug: 'receiving-tolerances',
+    permissionKey: 'receiving_tolerance',
+    prismaModel: 'masterReceivingTolerance',
+    listQuerySchema: listMastersQuerySchema,
+    createSchema: createReceivingToleranceSchema,
+    updateSchema: updateReceivingToleranceSchema,
+    lookupFields: ['id', 'code', 'name', 'description'],
   },
   'gst-groups': {
     slug: 'gst-groups',

@@ -13,6 +13,8 @@ function normalizeNullableIds(input: Record<string, unknown>): Record<string, un
     'gstGroupId',
     'purchaseUomId',
     'salesUomId',
+    'receivingToleranceId',
+    'weightUomId',
     'productionBomId',
     'qualityTestGroupCode',
     'routingNo',
@@ -84,6 +86,34 @@ async function assertTenantFk(tenantId: string, input: Record<string, unknown>):
       throw new ValidationError('HSN code does not belong to the selected GST group')
     }
   }
+  if (input.receivingToleranceId) {
+    const tol = await prisma.masterReceivingTolerance.findFirst({
+      where: { id: String(input.receivingToleranceId), ...tenantActiveFilter(tenantId), status: 'ACTIVE' },
+    })
+    if (!tol) throw new ValidationError('Receiving tolerance not found or inactive in tenant')
+  }
+  if (input.weightUomId) {
+    const uom = await prisma.masterUom.findFirst({
+      where: { id: String(input.weightUomId), ...tenantActiveFilter(tenantId) },
+    })
+    if (!uom) throw new ValidationError('Weight UOM not found in tenant')
+  }
+}
+
+async function syncReceivingToleranceLegacyPct(
+  tenantId: string,
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  if (data.receivingToleranceId === undefined) return data
+  if (data.receivingToleranceId) {
+    const tol = await prisma.masterReceivingTolerance.findFirst({
+      where: { id: String(data.receivingToleranceId), ...tenantActiveFilter(tenantId), status: 'ACTIVE' },
+      select: { percentage: true },
+    })
+    if (!tol) throw new ValidationError('Receiving tolerance not found or inactive in tenant')
+    data.receivingTolerancePercentage = Number(tol.percentage)
+  }
+  return data
 }
 
 function buildWhere(tenantId: string, query: ListItemsQuery | ItemLookupQuery, activeOnly?: boolean) {
@@ -241,6 +271,7 @@ export async function createItem(
 ) {
   let data = normalizeNullableIds(input)
   await assertTenantFk(tenantId, data)
+  data = await syncReceivingToleranceLegacyPct(tenantId, data)
   data = await applyCategoryStockDefaults(tenantId, data, { isCreate: true })
   data = applySalesFieldDefaults(data, { isCreate: true })
   try {
@@ -269,6 +300,7 @@ export async function updateItem(
   await getItem(tenantId, id)
   let data = normalizeNullableIds(input)
   await assertTenantFk(tenantId, data)
+  data = await syncReceivingToleranceLegacyPct(tenantId, data)
   data = await applyCategoryStockDefaults(tenantId, data, { isCreate: false })
   data = applySalesFieldDefaults(data, { isCreate: false })
   try {

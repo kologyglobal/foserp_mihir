@@ -1,10 +1,60 @@
 import { prisma } from '../../../config/prisma.js'
 
+export type DefaultLegalEntitySeed = {
+  code?: string
+  legalName?: string
+  displayName?: string
+  tradeName?: string
+  pan?: string
+  gstin?: string
+  registeredAddressJson?: Record<string, unknown>
+  branchCode?: string
+  branchName?: string
+}
+
+const DEFAULT_SEED: Required<
+  Pick<
+    DefaultLegalEntitySeed,
+    | 'code'
+    | 'legalName'
+    | 'displayName'
+    | 'tradeName'
+    | 'pan'
+    | 'gstin'
+    | 'registeredAddressJson'
+    | 'branchCode'
+    | 'branchName'
+  >
+> = {
+  code: 'LE-MAIN',
+  legalName: 'Demo Legal Entity Private Limited',
+  displayName: 'Demo Legal Entity',
+  tradeName: 'Demo Legal Entity',
+  pan: 'AABCV1234F',
+  gstin: '27AABCV1234F1Z5',
+  registeredAddressJson: {
+    line1: 'Demo Industrial Estate',
+    city: 'Pune',
+    state: 'Maharashtra',
+    postalCode: '411001',
+    country: 'India',
+    countryCode: 'IN',
+    stateCode: '27',
+  },
+  branchCode: 'HO',
+  branchName: 'Head Office',
+}
+
 /**
  * Ensures the tenant has at least one active default legal entity + FinanceSettings.
  * Used by purchase → AP handoff and local seed scripts when finance setup was skipped.
  */
-export async function ensureDefaultLegalEntity(tenantId: string): Promise<string> {
+export async function ensureDefaultLegalEntity(
+  tenantId: string,
+  seed: DefaultLegalEntitySeed = {},
+): Promise<string> {
+  const cfg = { ...DEFAULT_SEED, ...seed }
+
   const existing = await prisma.legalEntity.findFirst({
     where: { tenantId, isActive: true },
     orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
@@ -16,35 +66,27 @@ export async function ensureDefaultLegalEntity(tenantId: string): Promise<string
     const le = await prisma.legalEntity.create({
       data: {
         tenantId,
-        code: 'LE-MAIN',
-        legalName: 'Demo Legal Entity Private Limited',
-        displayName: 'Demo Legal Entity',
-        tradeName: 'Demo Legal Entity',
+        code: cfg.code,
+        legalName: cfg.legalName,
+        displayName: cfg.displayName,
+        tradeName: cfg.tradeName,
         entityType: 'PRIVATE_LIMITED',
-        pan: 'AABCV1234F',
-        gstin: '27AABCV1234F1Z5',
+        pan: cfg.pan,
+        gstin: cfg.gstin,
         baseCurrency: 'INR',
         countryCode: 'IN',
         stateCode: '27',
         fiscalYearStartMonth: 4,
         isDefault: true,
         isActive: true,
-        registeredAddressJson: {
-          line1: 'Demo Industrial Estate',
-          city: 'Pune',
-          state: 'Maharashtra',
-          postalCode: '411001',
-          country: 'India',
-          countryCode: 'IN',
-          stateCode: '27',
-        },
+        registeredAddressJson: cfg.registeredAddressJson,
         branches: {
           create: {
             tenantId,
-            code: 'HO',
-            name: 'Head Office',
+            code: cfg.branchCode,
+            name: cfg.branchName,
             branchType: 'HEAD_OFFICE',
-            gstin: '27AABCV1234F1Z5',
+            gstin: cfg.gstin,
             stateCode: '27',
             isHeadOffice: true,
             isDefault: true,
