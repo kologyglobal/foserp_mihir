@@ -31,6 +31,11 @@ SELECT
 FROM (
   SELECT 'col' AS kind, 'master_items' AS tbl, 'uomConversionFactor' AS col, 'master_items.uomConversionFactor' AS obj
   UNION ALL SELECT 'col', 'master_items', 'receivingTolerancePercentage', 'master_items.receivingTolerancePercentage'
+  UNION ALL SELECT 'col', 'master_items', 'imageUrl', 'master_items.imageUrl'
+  UNION ALL SELECT 'col', 'master_items', 'batchTracked', 'master_items.batchTracked'
+  UNION ALL SELECT 'col', 'master_items', 'serialTracked', 'master_items.serialTracked'
+  UNION ALL SELECT 'col', 'master_items', 'salesAllowed', 'master_items.salesAllowed'
+  UNION ALL SELECT 'col', 'master_items', 'defaultFulfilmentMethod', 'master_items.defaultFulfilmentMethod'
   UNION ALL SELECT 'col', 'purchase_order_lines', 'uomQuantity', 'purchase_order_lines.uomQuantity'
   UNION ALL SELECT 'col', 'purchase_order_lines', 'uomConversionFactor', 'purchase_order_lines.uomConversionFactor'
   UNION ALL SELECT 'col', 'purchase_order_lines', 'unitCostPrimary', 'purchase_order_lines.unitCostPrimary'
@@ -112,6 +117,8 @@ FROM (
   SELECT '20260727180000_purchase_multi_unit_uom' AS migration_name
   UNION ALL SELECT '20260728140000_grn_receiving_tolerance'
   UNION ALL SELECT '20260728180000_po_versioning'
+  UNION ALL SELECT '20260730100000_po_line_tax_bin_qc_snapshots'
+  UNION ALL SELECT '20260730110000_item_master_image_url'
 ) AS need
 LEFT JOIN `_prisma_migrations` AS m
   ON m.migration_name = need.migration_name
