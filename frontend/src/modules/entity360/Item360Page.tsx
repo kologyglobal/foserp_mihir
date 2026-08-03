@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { ArrowDownToLine, Package, Paperclip, ShoppingCart, TrendingDown } from 'lucide-react'
+import { ArrowDownToLine, Package, ShoppingCart, TrendingDown } from 'lucide-react'
 import { Entity360Shell, Entity360Panel } from '../../components/design-system/Entity360Shell'
 import { FactBox } from '../../components/design-system/FactBox'
 import { QuickActions } from '../../components/design-system/WorkspaceLayout'

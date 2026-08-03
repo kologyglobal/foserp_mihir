@@ -352,7 +352,6 @@ export function ItemFormPage() {
   const leafCategories = useLeafCategories()
   const uoms = useActiveUoms()
   const getHsn = useMasterStore((s) => s.getHsn)
-  const getGstGroup = useMasterStore((s) => s.getGstGroup)
   const receivingToleranceRows = useMasterStore((s) => s.receivingTolerances)
   const receivingTolerances = useMemo(
     () => receivingToleranceRows.filter((r) => r.isActive),
@@ -397,7 +396,6 @@ export function ItemFormPage() {
   const hsnId = watch('hsnId') ?? ''
   const gstGroupId = watch('gstGroupId') ?? ''
   const baseUomId = watch('baseUomId')
-  const inventoryType = watch('inventoryType')
   const purchaseUomId = watch('purchaseUomId') ?? ''
   const uomConversionFactor = watch('uomConversionFactor') ?? 1
 
