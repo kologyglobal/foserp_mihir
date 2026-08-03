@@ -57,6 +57,24 @@ run(['ci'], frontend)
 console.log('Installing deterministic backend dependencies')
 run(['ci'], backend)
 
+const skipMigrate =
+  process.env.RUN_MIGRATE_ON_BUILD === 'false' ||
+  process.env.RUN_MIGRATE_ON_BUILD === '0'
+
+if (!skipMigrate) {
+  console.log('Applying pending Prisma migrations against deploy database')
+  execFileSync(process.execPath, [join(backend, 'scripts', 'migrate-deploy.mjs')], {
+    cwd: backend,
+    env: {
+      ...process.env,
+      RUN_MIGRATE_ON_BUILD: 'true',
+    },
+    stdio: 'inherit',
+  })
+} else {
+  console.warn('RUN_MIGRATE_ON_BUILD=false — skipping prisma migrate deploy during build')
+}
+
 console.log('Building Vite frontend in API mode')
 run(
   ['run', 'build'],

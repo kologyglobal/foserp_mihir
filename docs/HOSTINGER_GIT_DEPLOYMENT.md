@@ -37,37 +37,34 @@ VITE_TENANT_SLUG=vasant-trailers
 Backend database/JWT variables remain configured in Hostinger Environment
 Variables. Never place their values in Git.
 
-## Database migrations (automatic on Hostinger restart)
+## Database migrations (automatic)
 
-After each redeploy, **`hostinger-start.mjs` runs `prisma migrate deploy`**
-before the API starts (`backend/scripts/migrate-deploy.mjs`). Pending
-migrations from `backend/prisma/migrations/` are applied using hPanel `DB_*`
-env vars — **no manual phpMyAdmin step** on normal releases.
+Pending migrations apply in **two** places (same script: `backend/scripts/migrate-deploy.mjs`):
 
-Startup log should include:
+1. **During `npm run build`** — after `backend/npm ci`, before Vite/backend compile.
+   Build logs must show:
+   ```text
+   Applying pending Prisma migrations against deploy database
+   [migrate-deploy] Target database: user@host:3306/your_db
+   [migrate-deploy] Database schema is up to date.
+   ```
+2. **On app restart** — `hostinger-start.mjs` runs migrate again before loading
+   `dist/server.js` (safety net if build skipped migrate).
+
+Requires hPanel **`DB_HOST`**, **`DB_NAME`**, **`DB_USER`**, **`DB_PASS`**
+(or `DATABASE_URL`) to be set for **Build** and **Runtime** — not only runtime.
+
+Emergency bypass (manual SQL already applied):
 
 ```text
-[hostinger-start] Running prisma migrate deploy before server start…
-[migrate-deploy] Applying pending Prisma migrations…
-[migrate-deploy] Database schema is up to date.
-```
-
-Emergency bypass only (schema already repaired manually):
-
-```text
+RUN_MIGRATE_ON_BUILD=false
 RUN_MIGRATE_ON_START=false
 ```
 
-If migrate is **Killed** on Hostinger (OOM), use either:
-
-1. **GitHub Actions** — workflow `Database migrate` (after green `Build` on
-   `main`) when `STAGE_DB_*` / `PROD_DB_*` repository secrets are configured.
-2. **Local PC** — `cd backend && DB_HOST=… DB_USER=… DB_PASS=… DB_NAME=… node scripts/migrate-deploy.mjs`
-3. **phpMyAdmin** — idempotent scripts under `backend/scripts/live-deploy-*.sql`
-
-For the prepared FIN-CLOSE-1 database batch, follow
-[`accounting/FIN_CLOSE_1_HOSTINGER_MIGRATION_RUNBOOK.md`](accounting/FIN_CLOSE_1_HOSTINGER_MIGRATION_RUNBOOK.md).
-One-off mapping scripts after migrate remain explicit human actions when documented.
+If migrate is **Killed** during build, use **GitHub Actions → Database migrate**
+(with `STAGE_DB_*` / `PROD_DB_*` secrets) or phpMyAdmin:
+`backend/scripts/live-deploy-receiving-tolerance-master.sql` and peers under
+`backend/scripts/live-deploy-*.sql`.
 
 ## What the build does
 
@@ -80,9 +77,11 @@ One-off mapping scripts after migrate remain explicit human actions when documen
 5. Copies `frontend/dist` to `backend/public`
 6. Writes `backend/public/build-meta.json` with the deployed Git revision
 
-The publish step occurs only after both builds pass. `npm start` launches
-`backend/hostinger-start.mjs`, which applies pending Prisma migrations then
-loads `dist/server.js`.
+Step 2b (after backend `npm ci`): **`migrate deploy`** against the deploy DB.
+
+The publish step occurs only after builds pass and migrations succeed. `npm start`
+launches `backend/hostinger-start.mjs`, which runs migrate again then loads
+`dist/server.js`.
 
 ## Verification after every deployment
 

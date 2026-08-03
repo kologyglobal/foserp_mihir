@@ -1,9 +1,9 @@
 /**
- * Apply pending Prisma migrations (CI + Hostinger startup).
+ * Apply pending Prisma migrations (Hostinger build + startup + CI).
  * Lightweight — does not run prisma generate (build already did that).
  *
  * Env: DATABASE_URL or DB_HOST / DB_USER / DB_PASS / DB_NAME / DB_PORT
- * Opt-out: RUN_MIGRATE_ON_START=false
+ * Opt-out: RUN_MIGRATE_ON_BUILD=false or RUN_MIGRATE_ON_START=false
  */
 import { config } from 'dotenv'
 import { spawnSync } from 'node:child_process'
@@ -24,31 +24,59 @@ function buildDatabaseUrl() {
   return `mysql://${user}:${pass}@${host}:${port}/${name}`
 }
 
-process.env.DATABASE_URL = buildDatabaseUrl()
+const databaseUrl = buildDatabaseUrl()
+process.env.DATABASE_URL = databaseUrl
 
-if (!process.env.DATABASE_URL.includes('@')) {
-  console.error('[migrate-deploy] DATABASE_URL / DB_* not configured — skipping migrate.')
-  process.exit(process.env.RUN_MIGRATE_ON_START === 'true' ? 1 : 0)
+function parseDbTarget(url) {
+  try {
+    const u = new URL(url)
+    return {
+      host: u.hostname,
+      port: u.port || '3306',
+      database: u.pathname.replace(/^\//, ''),
+      user: u.username,
+    }
+  } catch {
+    return { host: '?', port: '?', database: '?', user: '?' }
+  }
 }
 
+const target = parseDbTarget(databaseUrl)
+const isHostingerBuild = Boolean(
+  process.env.HOSTINGER_GIT_COMMIT || process.env.RUN_MIGRATE_ON_BUILD === 'true',
+)
+const isProduction = process.env.NODE_ENV === 'production'
+
+if (!databaseUrl.includes('@') || !target.database) {
+  console.error('[migrate-deploy] DATABASE_URL / DB_* not configured.')
+  process.exit(isHostingerBuild || isProduction ? 1 : 0)
+}
+
+if (isHostingerBuild && (target.host === 'localhost' || target.database === 'fos_erp')) {
+  console.error(
+    `[migrate-deploy] Refusing to migrate default local target ${target.user}@${target.host}/${target.database} during Hostinger build.`,
+  )
+  console.error('[migrate-deploy] Set DB_HOST and DB_NAME in hPanel Environment Variables.')
+  process.exit(1)
+}
+
+console.log(
+  `[migrate-deploy] Target database: ${target.user}@${target.host}:${target.port}/${target.database}`,
+)
 console.log('[migrate-deploy] Applying pending Prisma migrations…')
 
 const prismaBin = join(backend, 'node_modules', 'prisma', 'build', 'index.js')
-const args = ['migrate', 'deploy']
-const cmd = process.execPath
-const cmdArgs = [prismaBin, ...args]
-
-const result = spawnSync(cmd, cmdArgs, {
+const result = spawnSync(process.execPath, [prismaBin, 'migrate', 'deploy'], {
   cwd: backend,
   env: {
     ...process.env,
-    NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=512',
+    NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=768',
   },
   stdio: 'inherit',
 })
 
 if (result.status !== 0) {
-  console.error('[migrate-deploy] Failed — server must not start with a schema mismatch.')
+  console.error('[migrate-deploy] Failed — deploy cannot continue with a schema mismatch.')
   process.exit(result.status ?? 1)
 }
 
