@@ -1,11 +1,10 @@
 /* =========================================================
    LIVE DEPLOY — Receiving Tolerance Master
-   File: live-deploy-receiving-tolerance-master.sql
    Migration: 20260801100000_receiving_tolerance_master
-   Idempotent — safe to re-run on stage Hostinger DB.
+   IMPORTANT: Select your LIVE database in phpMyAdmin first
+   (must match hPanel DB_NAME — e.g. u233611619_foserp).
+   Idempotent — safe to re-run.
    ========================================================= */
-
-USE `u233611619_foserp`;
 
 SELECT DATABASE() AS current_db, NOW() AS ran_at, 'receiving_tolerance_master' AS script;
 SET @db := DATABASE();
@@ -93,5 +92,15 @@ WHERE t.deletedAt IS NULL
     SELECT 1 FROM master_receiving_tolerances rt
     WHERE rt.tenantId = t.id AND rt.code = v.code AND rt.deletedAt IS NULL
   );
+
+INSERT IGNORE INTO `_prisma_migrations`
+(`id`,`checksum`,`finished_at`,`migration_name`,`logs`,`rolled_back_at`,`started_at`,`applied_steps_count`)
+VALUES
+(UUID(),'manual-live-repair',NOW(3),'20260801100000_receiving_tolerance_master',NULL,NULL,NOW(3),1);
+
+SELECT
+  (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=@db AND TABLE_NAME='master_receiving_tolerances') AS has_tolerance_table,
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='master_items' AND COLUMN_NAME='receivingToleranceId') AS has_item_fk_column,
+  (SELECT COUNT(*) FROM `_prisma_migrations` WHERE migration_name='20260801100000_receiving_tolerance_master') AS migration_recorded;
 
 SELECT 'receiving_tolerance_master deploy complete' AS status;

@@ -22,7 +22,7 @@ In **Websites → Node.js Web App → Settings & Redeploy**:
 | Framework | Other / Express |
 | Node.js | 22.x (20.x minimum) |
 | Install command | `npm ci` |
-| Build command | `npm run build` |
+| Build command | `npm run build` (repo root) **or** ensure backend build runs migrate — see note below |
 | Output directory | `backend` |
 | Entry file | `hostinger-start.mjs` |
 
@@ -53,6 +53,10 @@ Pending migrations apply in **two** places (same script: `backend/scripts/migrat
 
 Requires hPanel **`DB_HOST`**, **`DB_NAME`**, **`DB_USER`**, **`DB_PASS`**
 (or `DATABASE_URL`) to be set for **Build** and **Runtime** — not only runtime.
+
+If your Hostinger log shows only `fos-erp-backend@1.0.0 build` (backend-only),
+migrations run inside **`backend/package.json` `build`** after `prisma generate`.
+You must still provide **`DB_*` during the build step** in hPanel.
 
 Emergency bypass (manual SQL already applied):
 

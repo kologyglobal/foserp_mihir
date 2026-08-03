@@ -34,7 +34,10 @@ if (!skipMigrate) {
   const migrateScript = join(backend, 'scripts', 'migrate-deploy.mjs')
   const migrate = spawnSync(process.execPath, [migrateScript], {
     cwd: backend,
-    env: process.env,
+    env: {
+      ...process.env,
+      HOSTINGER_STARTUP: '1',
+    },
     stdio: 'inherit',
   })
   if (migrate.status !== 0) {
