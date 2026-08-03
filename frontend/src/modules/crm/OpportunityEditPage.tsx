@@ -50,12 +50,14 @@ import {
 } from '../../utils/opportunitySmartOverview'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { AppLink } from '../../components/ui/AppLink'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { useOpportunityEditor } from './hooks/useOpportunityEditor'
 
 export function OpportunityEditPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const apiMode = useApiMode()
+  const showLocationField = !useTenantProfileStore((s) => s.isServices())
   const editor = useOpportunityEditor(id)
   const {
     opportunity,
@@ -411,7 +413,9 @@ export function OpportunityEditPage() {
               ))}
             </Select>
           </ErpFieldRow>
-          <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
+          {showLocationField ? (
+            <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
+          ) : null}
         </ErpCardSection>
 
         <ErpProductPricingSection
@@ -457,7 +461,7 @@ export function OpportunityEditPage() {
             value={formatCrmCurrency(dealValue)}
             hint="Synced from product lines (subtotal − discount + tax)."
           />
-          <ErpFieldRow label="Probability" required>
+          <ErpFieldRow label="Probability">
             <div className="dyn-probability-field">
               <div className="dyn-probability-field__track">
                 <input
@@ -484,12 +488,11 @@ export function OpportunityEditPage() {
           <ErpViewField label="Tax" value={formatCrmCurrency(summary.gstAmount)} hint="GST from product lines" />
           <ErpFieldRow
             label="Expected Close Date"
-            required
             dataField="expectedCloseDate"
-            fieldState={!expectedCloseDate && validationErrors.length ? 'error' : 'idle'}
-            fieldError={!expectedCloseDate ? validationErrors.find((e) => /close/i.test(e)) : undefined}
+            fieldState={validationErrors.some((e) => /close/i.test(e)) ? 'error' : 'idle'}
+            fieldError={validationErrors.find((e) => /close/i.test(e))}
           >
-            <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} required className="erp-input" />
+            <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} className="erp-input" />
           </ErpFieldRow>
           <ErpViewField label="Currency" value="INR (₹)" />
         </ErpCardSection>

@@ -23,7 +23,7 @@ import {
   SourceDocumentCard,
   sourceTypeLabel,
 } from '@/modules/accounting/shared/invoices'
-import { invoiceDisplayNumber, moneyInStatusTone, MONEY_IN_STATUS_LABELS, parseDecimal, resolveSettlementStatus, SETTLEMENT_STATUS_LABELS, settlementStatusTone } from '../moneyInUi'
+import { invoiceDisplayNumber, moneyInStatusTone, MONEY_IN_STATUS_LABELS, parseDecimal, resolveSettlementStatus, SETTLEMENT_STATUS_LABELS, settlementStatusTone, summarizeReceiptValidationToast } from '../moneyInUi'
 import { PostConfirmModal } from '../components/PostConfirmModal'
 import { TotalsPanel } from '../components/TotalsPanel'
 import { ValidationDrawer } from '../components/ValidationDrawer'
@@ -119,7 +119,12 @@ export function InvoiceDetailPage() {
       const r = await validateSalesInvoice(id)
       setReport(r)
       setShowValidate(true)
-      if (r.valid) notify.success('Validation passed')
+      if (r.valid) {
+        notify.success('Validation passed')
+      } else {
+        const toast = summarizeReceiptValidationToast(r)
+        if (toast) notify.error(toast)
+      }
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Validation failed')
     }

@@ -232,7 +232,13 @@ export async function convertLead(tenantId: string, id: string, userId: string, 
   let stageId = input.stageId
 
   if (!pipelineId || !stageId) {
-    const pipeline = await repo.getDefaultPipeline(tenantId)
+    let pipeline = await repo.getDefaultPipeline(tenantId)
+    if (!pipeline || pipeline.stages.length === 0) {
+      // Self-heal tenants that never had a CRM pipeline provisioned — qualifying
+      // a lead should always be able to produce an opportunity.
+      const { ensureDefaultPipeline } = await import('../pipelines/pipeline.repository.js')
+      pipeline = await ensureDefaultPipeline(tenantId, userId)
+    }
     if (!pipeline || pipeline.stages.length === 0) {
       throw new InvalidStateError('No default pipeline configured')
     }

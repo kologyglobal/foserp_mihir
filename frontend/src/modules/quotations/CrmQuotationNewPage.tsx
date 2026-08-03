@@ -140,12 +140,10 @@ export function CrmQuotationNewPage() {
   const skipModeChooser = Boolean(prefillOppId || prefillCustomerId)
 
   const openOpps = useMemo(() => {
-    const open = opportunities
+    return opportunities
       .filter((o) => o.status === 'open')
-      .filter((o) => !prefillCustomerId || o.customerId === prefillCustomerId)
       .sort((a, b) => b.value - a.value)
-    return open
-  }, [opportunities, prefillCustomerId])
+  }, [opportunities])
 
   const defaultOppId = prefillOppId && openOpps.some((o) => o.id === prefillOppId)
     ? prefillOppId
@@ -163,6 +161,12 @@ export function CrmQuotationNewPage() {
     }
     return ''
   })
+
+  /** Active opportunities for the selected customer (opportunity-path create). */
+  const customerOpenOpps = useMemo(() => {
+    if (!customerId) return []
+    return openOpps.filter((o) => o.customerId === customerId)
+  }, [openOpps, customerId])
   const [templateId, setTemplateId] = useState(featuredTemplate?.id ?? '')
   const [lines, setLines] = useState<OpportunityLine[]>(() => {
     if (!defaultOppId) return [createEmptyOpportunityLine(1)]
@@ -255,8 +259,9 @@ export function CrmQuotationNewPage() {
   const selectedOpp = createMode === 'opportunity'
     ? openOpps.find((o) => o.id === opportunityId)
     : undefined
+  // Customer is authoritative; opportunity may reinforce it once chosen
   const effectiveCustomerId = createMode === 'opportunity'
-    ? (selectedOpp?.customerId ?? '')
+    ? (customerId || selectedOpp?.customerId || '')
     : customerId
   const { locationId, setLocationId } = useDocumentLocation('sales', selectedOpp?.locationId)
   const showLocationField = !useTenantProfileStore((s) => s.isServices())
@@ -275,7 +280,13 @@ export function CrmQuotationNewPage() {
     setCreateMode(mode)
     setValidationErrors([])
     if (mode === 'opportunity') {
-      const nextOppId = opportunityId || defaultOppId
+      // Keep customer; only auto-select opportunity if it belongs to that customer
+      const nextOppId =
+        opportunityId && openOpps.some((o) => o.id === opportunityId && (!customerId || o.customerId === customerId))
+          ? opportunityId
+          : defaultOppId && openOpps.some((o) => o.id === defaultOppId && (!customerId || o.customerId === customerId))
+            ? defaultOppId
+            : ''
       setOpportunityId(nextOppId)
       const opp = nextOppId ? openOpps.find((o) => o.id === nextOppId) : undefined
       if (opp) {
@@ -287,7 +298,7 @@ export function CrmQuotationNewPage() {
       } else {
         setLines([createEmptyOpportunityLine(1)])
         setScopeNotes('')
-        setCustomerId(prefillCustomerId)
+        if (!customerId) setCustomerId(prefillCustomerId)
       }
     } else {
       setOpportunityId('')
@@ -306,6 +317,24 @@ export function CrmQuotationNewPage() {
   function reopenModeChooser() {
     setModeChosen(false)
     setValidationErrors([])
+  }
+
+  /** Customer-first: clearing / changing customer filters opportunities and may clear a mismatch. */
+  function handleCustomerChange(nextCustomerId: string) {
+    setCustomerId(nextCustomerId)
+    if (createMode !== 'opportunity') return
+    if (!nextCustomerId) {
+      setOpportunityId('')
+      setLines([createEmptyOpportunityLine(1)])
+      setScopeNotes('')
+      return
+    }
+    const current = opportunityId ? openOpps.find((o) => o.id === opportunityId) : undefined
+    if (current && current.customerId !== nextCustomerId) {
+      setOpportunityId('')
+      setLines([createEmptyOpportunityLine(1)])
+      setScopeNotes('')
+    }
   }
 
   function handleOpportunityChange(id: string) {
@@ -355,8 +384,8 @@ export function CrmQuotationNewPage() {
       }
       const keys = Object.keys(fieldMap)
       const fieldLabels: Record<string, string> = {
+        customerId: 'Customer',
         opportunityId: 'Opportunity',
-        customerId: 'Client / Company',
         templateId: 'Template',
         validUntil: 'Valid until',
         paymentTerms: 'Payment terms',
@@ -365,8 +394,8 @@ export function CrmQuotationNewPage() {
         lines: 'Line items',
       }
       const sectionByField: Record<string, string> = {
-        opportunityId: 'quote-section-quick',
         customerId: 'quote-section-quick',
+        opportunityId: 'quote-section-quick',
         templateId: 'quote-section-quick',
         validUntil: 'quote-section-commercial',
         paymentTerms: 'quote-section-commercial',
@@ -757,15 +786,43 @@ export function CrmQuotationNewPage() {
         </ErpFieldRow>
 
         {createMode === 'opportunity' ? (
-          <ErpFieldRow label="Opportunity" required horizontal={false} className="crm-quotation-info__source" dataField="opportunityId">
-            <OpportunitySelectPicker
-              opportunities={openOpps}
-              customers={customers}
-              products={products}
-              value={opportunityId}
-              onChange={handleOpportunityChange}
-            />
-          </ErpFieldRow>
+          <>
+            <ErpFieldRow label="Customer" required horizontal={false} className="crm-quotation-info__source" dataField="customerId">
+              <QuickCreateSelect
+                entityType="customer"
+                value={customerId}
+                onChange={handleCustomerChange}
+                options={customerOptions}
+                placeholder="Search by code, name, or city…"
+                allowEmpty
+                emptyOptionLabel={SELECT_PLACEHOLDER}
+              />
+            </ErpFieldRow>
+            <ErpFieldRow
+              label="Opportunity"
+              required
+              horizontal={false}
+              className="crm-quotation-info__source"
+              dataField="opportunityId"
+              hint={
+                !customerId
+                  ? 'Select a customer first to list their active opportunities'
+                  : customerOpenOpps.length === 0
+                    ? 'No open opportunities for this customer'
+                    : 'Active (open) opportunities for the selected customer'
+              }
+            >
+              <OpportunitySelectPicker
+                opportunities={customerOpenOpps}
+                customers={customers}
+                products={products}
+                value={opportunityId}
+                onChange={handleOpportunityChange}
+                disabled={!customerId}
+                placeholder={customerId ? 'Search opportunity…' : 'Select a customer first…'}
+              />
+            </ErpFieldRow>
+          </>
         ) : (
           <ErpFieldRow label="Customer" required horizontal={false} className="crm-quotation-info__source" dataField="customerId">
             <QuickCreateSelect
@@ -839,9 +896,11 @@ export function CrmQuotationNewPage() {
         ) : (
           <p className="quote-create-context quote-create-context--hint">
             {createMode === 'opportunity'
-              ? (prefillCustomerId && openOpps.length === 0
-                ? 'No open opportunities for this customer — switch to Direct, or create a deal first.'
-                : 'Select an opportunity to load the customer and product lines.')
+              ? (!customerId
+                ? 'Select a customer first, then choose an active opportunity.'
+                : customerOpenOpps.length === 0
+                  ? 'No open opportunities for this customer — switch to Direct, or create a deal first.'
+                  : 'Select an opportunity to load product lines.')
               : 'Select a customer to continue.'}
           </p>
         )}

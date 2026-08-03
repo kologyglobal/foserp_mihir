@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Eye, Layout, Layers, Printer, Save, Download, Bookmark, FileText, Plus, Pencil,
+  Edit3, RotateCcw,
 } from 'lucide-react'
 import { OperationalPageShell } from '../design-system/OperationalPageShell'
 import { ErpButton } from '../erp/ErpButton'
@@ -12,7 +13,7 @@ import { useCrmStore } from '../../store/crmStore'
 import { QuotationSectionEditor } from './QuotationSectionEditor'
 import { QuotationPrintDocument } from './QuotationPrintDocument'
 import { QuotationPrintLayoutPanel } from './QuotationPrintLayoutPanel'
-import type { QuotationPrintLayout, QuotationSection, QuotationTemplateSection } from '../../types/crm'
+import type { QuotationPrintLayout, QuotationSection, QuotationTemplate, QuotationTemplateSection } from '../../types/crm'
 import type { Customer } from '../../types/master'
 import { cloneTemplateSections } from '../../utils/quotationEngine/cloneSections'
 import { DEFAULT_QUOTATION_PRINT_LAYOUT, resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
@@ -59,20 +60,26 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [previewZoom, setPreviewZoom] = useState(0.55)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [previewEditMode, setPreviewEditMode] = useState(false)
+  const [previewDirty, setPreviewDirty] = useState(false)
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
+
+  function resetFromTemplate(t: QuotationTemplate) {
+    setSections(cloneTemplateSections(t.sections, genId))
+    setPrintLayout(resolveQuotationPrintLayout(t))
+    setMeta({
+      templateName: t.templateName,
+      productFamily: t.productFamily,
+      defaultTerms: t.defaultTerms,
+      defaultWarranty: t.defaultWarranty,
+      defaultExclusions: t.defaultExclusions,
+      isActive: t.isActive,
+    })
+  }
 
   useEffect(() => {
     if (!tpl) return
-    setSections(cloneTemplateSections(tpl.sections, genId))
-    setPrintLayout(resolveQuotationPrintLayout(tpl))
-    setMeta({
-      templateName: tpl.templateName,
-      productFamily: tpl.productFamily,
-      defaultTerms: tpl.defaultTerms,
-      defaultWarranty: tpl.defaultWarranty,
-      defaultExclusions: tpl.defaultExclusions,
-      isActive: tpl.isActive,
-    })
+    resetFromTemplate(tpl)
   }, [templateId, tpl, tpl?.version, tpl?.sections.length])
 
   const sorted = useMemo(() => [...sections].sort((a, b) => a.sequenceNo - b.sequenceNo), [sections])
@@ -219,11 +226,59 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
   }
 
   async function handleDownloadPdf() {
+    const wasEditing = previewEditMode
+    if (wasEditing) setPreviewEditMode(false)
+    await new Promise((resolve) => window.setTimeout(resolve, 40))
     const fileName = `${meta.templateName || 'quotation-template'}.pdf`
     notify.info('Preparing PDF…')
     const result = await downloadQuotationPdf({ fileName })
     if (result.ok) notify.success(`Downloaded ${result.fileName}`)
     else notify.error(result.error)
+    if (wasEditing) setPreviewEditMode(true)
+  }
+
+  function handlePrintPreview() {
+    const wasEditing = previewEditMode
+    if (wasEditing) setPreviewEditMode(false)
+    printQuotationDocument({ fileName: `${meta.templateName || 'quotation-template'}.pdf` })
+    if (wasEditing) window.setTimeout(() => setPreviewEditMode(true), 1200)
+  }
+
+  async function savePreviewEdits() {
+    const ok = await saveTemplate()
+    if (ok) setPreviewDirty(false)
+    return ok
+  }
+
+  function discardPreviewEdits() {
+    if (tpl) resetFromTemplate(tpl)
+    setPreviewDirty(false)
+  }
+
+  function handlePreviewContentChange(id: string, value: string) {
+    setPrintLayout((pl) => ({ ...pl, contentOverrides: { ...(pl.contentOverrides ?? {}), [id]: value } }))
+    setPreviewDirty(true)
+  }
+
+  function handlePreviewSectionFieldChange(sectionId: string, field: 'title' | 'content', value: string) {
+    setSections((secs) => secs.map((s) => (s.id === sectionId ? { ...s, [field]: value } : s)))
+    setPreviewDirty(true)
+  }
+
+  function handlePreviewSpecRowChange(
+    sectionId: string,
+    rowId: string,
+    field: 'label' | 'value' | 'unit',
+    value: string,
+  ) {
+    setSections((secs) =>
+      secs.map((s) =>
+        s.id === sectionId
+          ? { ...s, specRows: s.specRows?.map((r) => (r.id === rowId ? { ...r, [field]: value } : r)) }
+          : s,
+      ),
+    )
+    setPreviewDirty(true)
   }
 
   const specTableCount = sorted.filter((s) => s.contentFormat === 'spec_table').length
@@ -242,26 +297,53 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
           <ErpCommandBar
             inline
             sticky={false}
-            primaryAction={{
-              id: 'designer',
-              label: 'Open Designer',
-              icon: Pencil,
-              onClick: () => navigate(`/crm/quotation-templates/${templateId}/editor`),
-            }}
-            secondaryActions={[
-              {
-                id: 'print',
-                label: 'Print',
-                icon: Printer,
-                onClick: () => printQuotationDocument({ fileName: `${meta.templateName || 'quotation-template'}.pdf` }),
-              },
-              {
-                id: 'pdf',
-                label: 'Download PDF',
-                icon: Download,
-                onClick: () => void handleDownloadPdf(),
-              },
-            ]}
+            primaryAction={
+              previewEditMode
+                ? {
+                    id: 'save-preview-edits',
+                    label: isSubmitting ? 'Saving…' : 'Save Changes',
+                    icon: Save,
+                    onClick: () => { void savePreviewEdits() },
+                    disabled: isSubmitting || !previewDirty,
+                    disabledReason: !previewDirty ? 'No changes to save' : undefined,
+                  }
+                : {
+                    id: 'edit-preview',
+                    label: 'Edit Content',
+                    icon: Edit3,
+                    onClick: () => setPreviewEditMode(true),
+                  }
+            }
+            secondaryActions={
+              previewEditMode
+                ? [
+                    {
+                      id: 'discard-preview-edits',
+                      label: 'Discard Changes',
+                      icon: RotateCcw,
+                      onClick: discardPreviewEdits,
+                      disabled: !previewDirty || isSubmitting,
+                    },
+                    {
+                      id: 'done-editing',
+                      label: 'Done Editing',
+                      icon: Eye,
+                      onClick: () => setPreviewEditMode(false),
+                    },
+                    { id: 'print', label: 'Print', icon: Printer, onClick: handlePrintPreview },
+                    { id: 'pdf', label: 'Download PDF', icon: Download, onClick: () => void handleDownloadPdf() },
+                  ]
+                : [
+                    {
+                      id: 'designer',
+                      label: 'Open Designer',
+                      icon: Pencil,
+                      onClick: () => navigate(`/crm/quotation-templates/${templateId}/editor`),
+                    },
+                    { id: 'print', label: 'Print', icon: Printer, onClick: handlePrintPreview },
+                    { id: 'pdf', label: 'Download PDF', icon: Download, onClick: () => void handleDownloadPdf() },
+                  ]
+            }
             moreActions={[
               { id: 'templates', label: 'All Templates', icon: Bookmark, onClick: () => navigate('/crm/quotation-templates') },
               { id: 'quotations', label: 'Quotations', icon: FileText, onClick: () => navigate('/crm/quotations') },
@@ -275,13 +357,26 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
           { label: 'Version', value: `v${tpl.version ?? 1}`, accent: 'slate' },
         ]}
       >
-        <div className="quo-preview-shell">
+        <div className={cn('quo-preview-shell', previewEditMode && 'quo-preview-shell--editing')}>
+          {previewEditMode ? (
+            <div className="quo-preview-edit-banner">
+              <span>✎ Editing preview</span>
+              <span className="quo-preview-edit-banner__hint">
+                Click any highlighted text below to edit it inline, then Save Changes to update the template.
+                {previewDirty ? ' You have unsaved changes.' : ''}
+              </span>
+            </div>
+          ) : null}
           <div className="quo-preview-canvas">
             <QuotationPrintDocument
               doc={mockDoc}
               quotation={mockQuotation}
               customer={mockCustomer}
               printLayout={printLayout}
+              editable={previewEditMode}
+              onContentChange={handlePreviewContentChange}
+              onSectionFieldChange={handlePreviewSectionFieldChange}
+              onSpecRowChange={handlePreviewSpecRowChange}
             />
           </div>
         </div>

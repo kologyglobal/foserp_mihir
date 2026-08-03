@@ -19,6 +19,7 @@ import {
 import type { ProductMasterPick } from '../../utils/opportunityProductOptions'
 import { isItemSellable, itemNotSellableForSalesMessage } from '../../utils/opportunityItemOptions'
 import { notify } from '../../store/toastStore'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { cn } from '../../utils/cn'
 
 export const PRODUCT_PRICING_GST_RATES = [0, 5, 12, 18, 28] as const
@@ -82,19 +83,22 @@ export function ErpProductPricingPanel({
   onCustomChargesChange,
   className,
 }: ErpProductPricingPanelProps) {
+  /** Freight is manufacturing-oriented; hide for SERVICES packaging (e.g. Kology). */
+  const showFreight = !useTenantProfileStore((s) => s.isServices())
   const [localFreight, setLocalFreight] = useState(0)
   const [localDiscountMode, setLocalDiscountMode] = useState<OrderDiscountMode>('flat')
   const [localDiscountInput, setLocalDiscountInput] = useState(0)
   const [localInstallation, setLocalInstallation] = useState(0)
   const [localCustom, setLocalCustom] = useState(0)
 
-  const freightAmount = freightProp ?? localFreight
+  const freightAmount = showFreight ? (freightProp ?? localFreight) : 0
   const orderDiscountMode = discountModeProp ?? localDiscountMode
   const orderDiscountInput = discountInputProp ?? localDiscountInput
   const installationAmount = installationProp ?? localInstallation
   const customCharges = customProp ?? localCustom
 
   const setFreight = (n: number) => {
+    if (!showFreight) return
     const next = Math.max(0, n)
     if (onFreightChange) onFreightChange(next)
     else setLocalFreight(next)
@@ -355,21 +359,23 @@ export function ErpProductPricingPanel({
           <div className="so-pricing-adjust">
             <p className="so-pricing-adjust__title">Order adjustments</p>
             <div className="so-pricing-charges">
-              <label className="so-pricing-charge">
-                <span className="so-pricing-charge__label">Freight</span>
-                <div className="so-pricing-charge__control">
-                  <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
-                  <Input
-                    type="number"
-                    min={0}
-                    className="so-pricing-input so-pricing-input--num"
-                    value={freightAmount}
-                    onChange={(e) => setFreight(Number(e.target.value) || 0)}
-                    disabled={readOnly}
-                    aria-label="Freight"
-                  />
-                </div>
-              </label>
+              {showFreight ? (
+                <label className="so-pricing-charge">
+                  <span className="so-pricing-charge__label">Freight</span>
+                  <div className="so-pricing-charge__control">
+                    <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      className="so-pricing-input so-pricing-input--num"
+                      value={freightAmount}
+                      onChange={(e) => setFreight(Number(e.target.value) || 0)}
+                      disabled={readOnly}
+                      aria-label="Freight"
+                    />
+                  </div>
+                </label>
+              ) : null}
               <div className="so-pricing-charge">
                 <div className="so-pricing-charge__label-row">
                   <span className="so-pricing-charge__label">Order discount</span>
@@ -497,10 +503,12 @@ export function ErpProductPricingPanel({
                 <span>Total GST</span>
                 <span className="tabular-nums">{formatCurrency(orderSummary.totalGst)}</span>
               </div>
-              <div className="so-pricing-summary__row">
-                <span>Freight</span>
-                <span className="tabular-nums">{formatCurrency(freightAmount)}</span>
-              </div>
+              {showFreight ? (
+                <div className="so-pricing-summary__row">
+                  <span>Freight</span>
+                  <span className="tabular-nums">{formatCurrency(freightAmount)}</span>
+                </div>
+              ) : null}
               {installationAmount > 0 ? (
                 <div className="so-pricing-summary__row">
                   <span>Installation</span>

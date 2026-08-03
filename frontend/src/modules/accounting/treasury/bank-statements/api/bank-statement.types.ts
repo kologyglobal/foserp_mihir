@@ -95,7 +95,35 @@ export interface TreasuryAccountSummary {
   currencyCode: string
   accountType?: 'BANK' | 'CASH' | 'CLEARING'
   status?: 'ACTIVE' | 'INACTIVE' | 'CLOSED'
-  bankProfile?: { bankName?: string; branchName?: string; ifscCode?: string } | null
+  bankProfile?: {
+    bankName?: string | null
+    branchName?: string | null
+    ifscCode?: string | null
+    bankAccountKind?: string | null
+    accountNumberLast4?: string | null
+    accountNumberMasked?: string | null
+    accountHolderName?: string | null
+    overdraftLimit?: string | null
+    upiVpa?: string | null
+  } | null
+  cashProfile?: {
+    custodianName?: string | null
+    locationDescription?: string | null
+    imprestLimit?: string | null
+    custodianUserId?: string | null
+  } | null
+  tenantId?: string
+  legalEntityId?: string
+  glAccountId?: string
+  branchId?: string | null
+  description?: string | null
+  createdAt?: string
+  updatedAt?: string
+  activatedAt?: string | null
+  deactivatedAt?: string | null
+  closedAt?: string | null
+  closeReason?: string | null
+  deactivationReason?: string | null
 }
 
 export interface BankStatementListItem {

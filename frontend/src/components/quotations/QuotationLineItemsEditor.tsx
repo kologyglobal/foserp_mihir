@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { QuotationPriceLine } from '../../types/crm'
 import { ErpProductPricingPanel } from '../erp/ErpProductPricingSection'
 import { useMasterStore } from '../../store/masterStore'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import {
   opportunityLinesToQuotationPriceLines,
   quotationPriceLinesToOpportunityLines,
@@ -42,6 +43,8 @@ export function QuotationLineItemsEditor({
   showFreightExtras = false,
   rowErrors,
 }: QuotationLineItemsEditorProps) {
+  const showFreight = !useTenantProfileStore((s) => s.isServices())
+  const effectiveFreight = showFreight ? freightAmount : 0
   const products = useMasterStore((s) => s.products)
   const items = useMasterStore((s) => s.items)
   const uoms = useMasterStore((s) => s.uoms)
@@ -65,7 +68,11 @@ export function QuotationLineItemsEditor({
   const [orderDiscountMode, setOrderDiscountMode] = useState<OrderDiscountMode>('flat')
   const [orderDiscountInput, setOrderDiscountInput] = useState(0)
 
-  const extras: QuotationLineExtras = { freightAmount, installationAmount, customCharges }
+  const extras: QuotationLineExtras = {
+    freightAmount: effectiveFreight,
+    installationAmount,
+    customCharges,
+  }
 
   function handleLinesChange(nextOppLines: ReturnType<typeof syncOpportunityLines>) {
     if (!onChange) return
@@ -74,7 +81,11 @@ export function QuotationLineItemsEditor({
 
   function handleExtrasChange(patch: Partial<QuotationLineExtras>) {
     if (!onChange) return
-    onChange(priceLines, { ...extras, ...patch })
+    onChange(priceLines, {
+      ...extras,
+      ...patch,
+      ...(showFreight ? {} : { freightAmount: 0 }),
+    })
   }
 
   return (
@@ -87,9 +98,9 @@ export function QuotationLineItemsEditor({
         rowErrors={rowErrors}
         readOnly={readOnly}
         showAdjustments
-        freightAmount={freightAmount}
+        freightAmount={effectiveFreight}
         onFreightChange={
-          onChange && !readOnly
+          showFreight && onChange && !readOnly
             ? (next) => handleExtrasChange({ freightAmount: next })
             : undefined
         }

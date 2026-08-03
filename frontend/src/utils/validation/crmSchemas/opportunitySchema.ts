@@ -42,7 +42,7 @@ export function validateOpportunityForm(input: OpportunityHeaderInput): {
 
   const closeDateError = validateCrmCalendarDate(input.expectedCloseDate, {
     label: 'Expected Close Date',
-    required: true,
+    required: false,
     notBefore: getDateInputMin(),
     notBeforeMessage: 'Expected Close Date cannot be in the past',
   })

@@ -75,6 +75,7 @@ function effectiveEnabled(
 export async function listModuleStatus(tenantId: string): Promise<{
   modules: ModuleStatusRow[]
   enabledKeys: string[]
+  businessType: string
 }> {
   const tenant = await prisma.tenant.findFirst({ where: { id: tenantId, deletedAt: null } })
   if (!tenant) throw new NotFoundError('Tenant not found')
@@ -124,6 +125,7 @@ export async function listModuleStatus(tenantId: string): Promise<{
   return {
     modules,
     enabledKeys: modules.filter((m) => m.isEnabled).map((m) => m.key),
+    businessType: tenant.businessType,
   }
 }
 

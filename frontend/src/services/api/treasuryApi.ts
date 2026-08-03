@@ -1,4 +1,12 @@
 import type {
+  CreateTreasuryAccountInput,
+  TreasuryAccountDto,
+} from '../../modules/accounting/treasury/accounts/treasury-account.types'
+import type {
+  ListTreasuryTransactionsQuery,
+  TreasuryTransactionDto,
+} from '../../modules/accounting/treasury/transactions/treasury-transaction.types'
+import type {
   BankStatementDetail,
   BankStatementListItem,
   CreateManualStatementInput,
@@ -11,7 +19,6 @@ import type {
   MappingTemplateDto,
   Paginated,
   PreviewImportBatchInput,
-  TreasuryAccountSummary,
   UpdateBankStatementInput,
 } from '../../modules/accounting/treasury/bank-statements/api/bank-statement.types'
 import type {
@@ -148,8 +155,47 @@ export async function listTreasuryAccounts(params: {
   page?: number
   limit?: number
 }) {
-  const res = await apiRequest<TreasuryAccountSummary[]>(
+  const res = await apiRequest<TreasuryAccountDto[]>(
     `${tenantPath(`${TREASURY}/accounts`)}${buildQuery(params)}`,
+  )
+  return toPaginated(res, params.limit ?? 50)
+}
+
+export async function getTreasuryAccount(id: string) {
+  return apiRequest<TreasuryAccountDto>(tenantPath(`${TREASURY}/accounts/${id}`))
+}
+
+export async function createTreasuryAccount(data: CreateTreasuryAccountInput) {
+  return apiRequest<TreasuryAccountDto>(tenantPath(`${TREASURY}/accounts`), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function activateTreasuryAccount(id: string, expectedUpdatedAt: string, reason?: string | null) {
+  return apiRequest<TreasuryAccountDto>(tenantPath(`${TREASURY}/accounts/${id}/activate`), {
+    method: 'POST',
+    body: JSON.stringify({ expectedUpdatedAt, reason: reason || undefined }),
+  })
+}
+
+export async function deactivateTreasuryAccount(id: string, expectedUpdatedAt: string, reason?: string | null) {
+  return apiRequest<TreasuryAccountDto>(tenantPath(`${TREASURY}/accounts/${id}/deactivate`), {
+    method: 'POST',
+    body: JSON.stringify({ expectedUpdatedAt, reason: reason || undefined }),
+  })
+}
+
+export async function closeTreasuryAccount(id: string, expectedUpdatedAt: string, reason?: string | null) {
+  return apiRequest<TreasuryAccountDto>(tenantPath(`${TREASURY}/accounts/${id}/close`), {
+    method: 'POST',
+    body: JSON.stringify({ expectedUpdatedAt, reason: reason || undefined }),
+  })
+}
+
+export async function listTreasuryTransactions(params: ListTreasuryTransactionsQuery) {
+  const res = await apiRequest<TreasuryTransactionDto[]>(
+    `${tenantPath(`${TREASURY}/transactions`)}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`,
   )
   return toPaginated(res, params.limit ?? 50)
 }

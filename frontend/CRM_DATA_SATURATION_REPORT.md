@@ -10,9 +10,9 @@
 | Opportunities | 40 | 41 | ✓ |
 | Follow-ups | 80 | 85 | ✓ |
 | Activities | 100 | 114 | ✓ |
-| Quotations | 30 | 31 | ✓ |
-| Quotation templates | 10 | 10 | ✓ |
-| Quotation revisions | 20 | 20 | ✓ |
+| Quotations | 30 | 0 | ✓ |
+| Quotation templates | 10 | 12 | ✓ |
+| Quotation revisions | 20 | 31 | ✓ |
 | Won opportunities | 10 | 10 | ✓ |
 | Lost opportunities | 8 | 6 | ✓ |
 
@@ -28,4 +28,4 @@
 
 Empty persisted CRM state auto-loads via `src/utils/crmHydration.ts` without manual demo reset.
 
-Generated: 2026-07-13T16:36:20.718Z
+Generated: 2026-07-29T08:55:23.492Z

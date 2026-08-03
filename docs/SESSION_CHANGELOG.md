@@ -1,4 +1,13 @@
-﻿## 2026-07-30 — FIN-CLOSE-1 retro cost + deploy preparation
+﻿## 2026-08-03 — CRM SO/quotation customer-first, Customer 360, document titles
+
+### Shipped
+- Sales order / quotation create: customer first, then filtered open opportunities / unconverted quotations.
+- Browser document titles: active page + tenant name (tenantProfileStore hydrate).
+- Customer 360 denser board layout (profile + commercial KPIs).
+- Merged with `origin/main` (maintenance, year-end, purchase/inventory packs through 2026-07-30).
+
+---
+# 2026-07-30 — FIN-CLOSE-1 retro cost + deploy preparation
 
 ### Shipped
 - GRN-linked Vendor Invoice price delta now splits between remaining inventory value and PPV through the existing Inventory Costing engine.

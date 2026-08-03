@@ -209,6 +209,16 @@ export function SalesPaymentAllocationPage() {
     [selectedReceipt, openInvoices.length, selectedTotal, remaining],
   )
 
+  function reportError(message: string) {
+    setError(message)
+    notify.error(message)
+  }
+
+  function reportWarning(message: string) {
+    setError(message)
+    notify.warning(message)
+  }
+
   function resetWorkspace(options?: { keepCustomer?: boolean }) {
     if (!options?.keepCustomer) setCustomerId('')
     setSelectedReceiptId('')
@@ -227,11 +237,27 @@ export function SalesPaymentAllocationPage() {
 
   function applySuggested() {
     if (!selectedReceipt) {
-      setError('Select a receipt before suggesting allocations.')
+      reportWarning('Select a receipt before suggesting allocations.')
       return
     }
-    setAmounts(suggestAllocationAmounts(openInvoices, selectedReceipt.unallocatedAmount))
+    if (openInvoices.length === 0) {
+      reportWarning('No open tax invoices to map this payment receipt against for this customer.')
+      return
+    }
+    const suggested = suggestAllocationAmounts(openInvoices, selectedReceipt.unallocatedAmount)
+    const mappedCount = Object.keys(suggested).length
+    if (mappedCount === 0) {
+      reportWarning('Could not map amounts — invoice balances may already be settled or zero.')
+      setAmounts({})
+      return
+    }
+    setAmounts(suggested)
     setError(null)
+    notify.success(
+      mappedCount === 1
+        ? 'Suggested allocation for 1 invoice'
+        : `Suggested allocation for ${mappedCount} invoices`,
+    )
   }
 
   function clearAmounts() {
@@ -242,22 +268,22 @@ export function SalesPaymentAllocationPage() {
   async function submit() {
     setError(null)
     if (!selectedReceiptId) {
-      setError('Select a receipt to allocate.')
+      reportError('Select a receipt to allocate.')
       return
     }
     const allocationsPayload = Object.entries(amounts)
       .map(([invoiceId, raw]) => ({ invoiceId, amount: Number(raw) }))
       .filter((row) => Number.isFinite(row.amount) && row.amount > 0)
     if (!allocationsPayload.length) {
-      setError('Enter at least one allocation amount.')
+      reportError('Enter at least one allocation amount.')
       return
     }
     if (overReceipt) {
-      setError('Allocation total exceeds the receipt unallocated balance.')
+      reportError('Allocation total exceeds the receipt unallocated balance.')
       return
     }
     if (overInvoice) {
-      setError('One or more amounts exceed the invoice balance due.')
+      reportError('One or more amounts exceed the invoice balance due.')
       return
     }
 
@@ -273,7 +299,7 @@ export function SalesPaymentAllocationPage() {
         ? await apiAllocatePayments(payload)
         : allocatePayments(payload)
       if (!result.ok) {
-        setError(result.error ?? 'Allocation failed')
+        reportError(result.error ?? 'Allocation failed')
         return
       }
       notify.success('Payment allocated')

@@ -70,6 +70,7 @@ export function QuotationPrintLayoutPanel({ layout, onChange }: QuotationPrintLa
           >
             <option value="default">Default — ERP branded</option>
             <option value="vf_word">VF Word — letter-style sans-serif (ISO templates)</option>
+            <option value="kology_proposal">Kology — outbound pilot proposal</option>
           </Select>
         </label>
       </div>

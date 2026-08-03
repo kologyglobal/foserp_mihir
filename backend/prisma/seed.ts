@@ -1031,6 +1031,9 @@ async function main(): Promise<void> {
   console.log('  Accounts:    accounts@vasant-trailers.com / Accounts@123   → Finance Manager')
   console.log('  CRM User (CRM-only): crm.user@vasant-trailers.com / CrmUser@123')
   console.log(`\nLogin with tenantSlug: "${tenant.slug}"`)
+
+  const { seedKologyTenant } = await import('./seedKology.js')
+  await seedKologyTenant(permissionMap, seedRole)
 }
 
 main()

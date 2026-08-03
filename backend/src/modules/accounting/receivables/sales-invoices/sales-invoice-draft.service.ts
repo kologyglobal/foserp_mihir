@@ -8,6 +8,7 @@ import { calculateSalesInvoice } from '../calculation/sales-invoice-calculation.
 import { validateSalesInvoiceDraft } from '../calculation/sales-invoice-validation-preview.service.js'
 import { requireActiveCustomerParty } from '../customer-party/customer-party.service.js'
 import { loadSalesOrderSource } from '../source/sales-order-source.service.js'
+import { loadProformaInvoiceSource } from '../source/proforma-invoice-source.service.js'
 import * as repo from './sales-invoice.repository.js'
 import {
   SalesInvoiceDraftCalculationFailedError,
@@ -22,6 +23,8 @@ import {
 } from './sales-invoice-validation.service.js'
 import { validateAndEnrichSalesInvoiceSourceLinks } from './sales-invoice-source-validation.service.js'
 import { serializeSalesInvoiceDetail } from './sales-invoice-read.service.js'
+import { assertSalesOrderNotOverInvoiced } from './sales-order-invoice-amount.guard.js'
+import { prisma } from '../../../../config/database.js'
 
 function auditMeta(req: Request) {
   return auditFromRequest(req)
@@ -81,6 +84,11 @@ export async function createSalesInvoiceDraft(req: Request, tenantId: string, in
     sourceSnapshot = source.snapshot
     metaWarnings = source.warnings
   }
+  if (input.sourceType === 'PROFORMA_INVOICE' && input.sourceDocumentId) {
+    const source = await loadProformaInvoiceSource(tenantId, input.sourceDocumentId, input.customerId)
+    sourceSnapshot = source.snapshot
+    metaWarnings = source.warnings
+  }
 
   const enrichedLinks = await validateAndEnrichSalesInvoiceSourceLinks({
     tenantId,
@@ -94,6 +102,26 @@ export async function createSalesInvoiceDraft(req: Request, tenantId: string, in
   const calcInput = buildCalculationInputFromRequest(input, legalEntity.stateCode)
   const calc = calculateSalesInvoice(calcInput)
   throwOnCalcFailure(calc)
+
+  if (input.sourceType === 'SALES_ORDER' && input.sourceDocumentId) {
+    const order = await prisma.crmSalesOrder.findFirst({
+      where: { id: input.sourceDocumentId, tenantId, deletedAt: null },
+      select: { grandTotal: true },
+    })
+    const soTotal = Number(order?.grandTotal ?? 0)
+    if (soTotal > 0) {
+      const amountCheck = await assertSalesOrderNotOverInvoiced({
+        tenantId,
+        salesOrderId: input.sourceDocumentId,
+        soTotalAmount: soTotal,
+        thisInvoiceGrandTotal: Number(calc.totalAmount ?? 0),
+      })
+      metaWarnings.push({
+        code: 'SO_INVOICEABILITY',
+        message: `Already invoiced ₹${amountCheck.alreadyInvoiced.toFixed(2)}; remaining ₹${amountCheck.remaining.toFixed(2)}`,
+      })
+    }
+  }
 
   const userId = req.context?.userId
   const invoice = await repo.createSalesInvoiceDraft(tenantId, input, calc, party, userId, {
@@ -125,6 +153,9 @@ export async function updateSalesInvoiceDraft(
 
   if (input.sourceType === 'SALES_ORDER' && input.sourceDocumentId) {
     await loadSalesOrderSource(tenantId, input.sourceDocumentId, input.customerId)
+  }
+  if (input.sourceType === 'PROFORMA_INVOICE' && input.sourceDocumentId) {
+    await loadProformaInvoiceSource(tenantId, input.sourceDocumentId, input.customerId)
   }
 
   const calcInput = buildCalculationInputFromRequest(

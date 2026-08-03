@@ -51,6 +51,16 @@ export const createLegalEntitySchema = z.object({
   fiscalYearStartMonth: z.coerce.number().int().min(1).max(12).default(4),
   isDefault: z.boolean().optional(),
   initialBranch: initialBranchSchema,
+  /** Letterhead / print contact details — Proforma, Sales Order, Tax Invoice. */
+  email: z.string().trim().email().or(z.literal('')).optional(),
+  phone: z.string().trim().max(30).optional(),
+  website: z.string().trim().max(255).optional(),
+  /** Letterhead bank details for remittance instructions on print documents. */
+  bankAccountName: z.string().trim().max(200).optional(),
+  bankName: z.string().trim().max(200).optional(),
+  bankAccountNumber: z.string().trim().max(40).optional(),
+  bankIfscCode: z.string().trim().max(20).optional(),
+  bankBranch: z.string().trim().max(200).optional(),
 })
 
 export const updateLegalEntitySchema = createLegalEntitySchema

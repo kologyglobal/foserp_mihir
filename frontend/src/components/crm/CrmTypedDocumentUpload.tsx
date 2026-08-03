@@ -96,9 +96,7 @@ export function CrmTypedDocumentUpload({
   return (
     <div className={cn('crm-typed-doc-upload col-span-2', className)}>
       <div className="crm-typed-doc-upload__type-row">
-        <label className="crm-typed-doc-upload__label">
-          Attachment type <span className="text-red-600">*</span>
-        </label>
+        <label className="crm-typed-doc-upload__label">Attachment type</label>
         <ErpSmartSelect
           options={typeSelectOptions}
           value={selectedTypeCode}
@@ -112,7 +110,7 @@ export function CrmTypedDocumentUpload({
           <p className="crm-typed-doc-upload__hint">{documentTypeUploadHint(selectedType)}</p>
         ) : (
           <p className="crm-typed-doc-upload__hint crm-typed-doc-upload__hint--muted">
-            Select an attachment type to enable upload. Types are managed in CRM Document Type / Attachment Master.
+            Optional — select a type only when attaching files. Types are managed in CRM Document Type / Attachment Master.
           </p>
         )}
       </div>

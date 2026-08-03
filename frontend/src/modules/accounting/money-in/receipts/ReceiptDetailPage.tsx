@@ -19,7 +19,7 @@ import type { CustomerReceiptDto, CustomerReceiptValidationPreview, ReceiptAlloc
 import { formatCurrency } from '@/utils/formatters/currency'
 import { mergeAllowedAction, useMoneyInPermissions } from '@/utils/permissions/moneyIn'
 import { notify } from '@/store/toastStore'
-import { RECEIPT_STATUS_LABELS, receiptDisplayNumber, receiptStatusTone, parseDecimal } from '../moneyInUi'
+import { RECEIPT_STATUS_LABELS, receiptDisplayNumber, receiptStatusTone, parseDecimal, summarizeReceiptValidationToast } from '../moneyInUi'
 import { ValidationDrawer } from '../components/ValidationDrawer'
 import { MoneyInWorkspaceShell } from '../MoneyInWorkspaceShell'
 
@@ -71,7 +71,12 @@ export function ReceiptDetailPage() {
       const r = await validateCustomerReceipt(id)
       setReport(r)
       setShowValidate(true)
-      if (r.valid) notify.success('Validation passed')
+      if (r.valid) {
+        notify.success('Validation passed')
+      } else {
+        const toast = summarizeReceiptValidationToast(r)
+        if (toast) notify.error(toast)
+      }
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Validation failed')
     }

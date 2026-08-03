@@ -21,6 +21,8 @@ export interface AuthSession {
   refreshToken: string
   tenantId: string
   tenantSlug: string
+  /** Display name for chrome / document title (from /auth/me when available). */
+  tenantName?: string
   /** Epoch ms when the access token should be treated as expired (client-side). */
   accessTokenExpiresAt?: number
   user: {

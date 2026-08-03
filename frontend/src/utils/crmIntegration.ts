@@ -29,8 +29,9 @@ export function populateDocumentFromOpportunity(
   },
 ): QuotationSection[] {
   return sections.map((s) => {
+    // Keep template placeholders ({{customer_name}}, etc.) — resolved at preview/print time.
     if (s.sectionType === 'customer_details') {
-      return { ...s, content: `${input.customerName}\nContact: ${input.contactName}\nSales owner: ${input.ownerName}` }
+      return s
     }
     if (s.sectionType === 'scope' || s.sectionType === 'specification') {
       return { ...s, content: input.productRequirement }

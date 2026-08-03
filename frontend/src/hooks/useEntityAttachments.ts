@@ -25,6 +25,19 @@ const ALLOWED_MIME_PREFIXES = [
   'application/vnd.ms-powerpoint',
 ]
 
+/**
+ * True for a raw network-level failure (backend unreachable, DNS, CORS preflight, dev
+ * server mid-restart) — as opposed to a real API error (403/404/500 with a JSON body).
+ * These are transient in local dev and should never surface as a scary "Failed to fetch".
+ */
+function isNetworkFetchError(err: unknown): boolean {
+  if (err instanceof TypeError) return true
+  const message = err instanceof Error ? err.message : String(err ?? '')
+  return /failed to fetch|networkerror|load failed|network request failed/i.test(message)
+}
+
+const ATTACHMENTS_OFFLINE_MESSAGE = "Couldn't reach the server to load attachments. Check your connection and retry."
+
 export function isAllowedAttachmentFile(file: File): string | null {
   if (file.size > CRM_MAX_ATTACHMENT_BYTES) {
     return `File exceeds ${Math.round(CRM_MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB limit.`
@@ -49,10 +62,15 @@ function readFileAsBase64(file: File): Promise<string> {
   })
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export function useEntityAttachments(entityType: CrmEntityTypeApi, entityId: string | undefined) {
   const [attachments, setAttachments] = useState<CrmAttachmentDto[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isOffline, setIsOffline] = useState(false)
   const [pending, setPending] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
 
@@ -60,10 +78,28 @@ export function useEntityAttachments(entityType: CrmEntityTypeApi, entityId: str
     if (!isApiMode() || !entityId) return
     setLoading(true)
     setError(null)
+    setIsOffline(false)
     try {
       const res = await fetchEntityAttachmentsApi(entityType, entityId)
       setAttachments(res.data)
     } catch (err) {
+      if (isNetworkFetchError(err)) {
+        // Dev backend / proxy hiccups are common (tsx watch restart) — one silent retry
+        // before treating this as a real "server unreachable" state.
+        try {
+          await delay(700)
+          const res = await fetchEntityAttachmentsApi(entityType, entityId)
+          setAttachments(res.data)
+        } catch (retryErr) {
+          if (isNetworkFetchError(retryErr)) {
+            setIsOffline(true)
+            setError(ATTACHMENTS_OFFLINE_MESSAGE)
+          } else {
+            setError(formatApiError(retryErr))
+          }
+        }
+        return
+      }
       setError(formatApiError(err))
     } finally {
       setLoading(false)
@@ -147,6 +183,7 @@ export function useEntityAttachments(entityType: CrmEntityTypeApi, entityId: str
     attachments,
     loading,
     error,
+    isOffline,
     pending,
     uploadProgress,
     refresh,

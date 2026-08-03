@@ -102,4 +102,25 @@ export class SalesOrderCustomerMismatchError extends SalesInvoiceError {
   }
 }
 
+export class ProformaInvoiceNotFoundError extends SalesInvoiceError {
+  constructor(id?: string) {
+    super(404, id ? `Proforma invoice not found: ${id}` : 'Proforma invoice not found', 'PROFORMA_INVOICE_NOT_FOUND')
+    this.name = 'ProformaInvoiceNotFoundError'
+  }
+}
+
+export class ProformaInvoiceNotEligibleError extends SalesInvoiceError {
+  constructor(message = 'Proforma invoice is not eligible for tax invoice creation') {
+    super(422, message, 'PROFORMA_INVOICE_NOT_ELIGIBLE')
+    this.name = 'ProformaInvoiceNotEligibleError'
+  }
+}
+
+export class ProformaInvoiceCustomerMismatchError extends SalesInvoiceError {
+  constructor() {
+    super(422, 'Customer does not match the linked proforma invoice', 'PROFORMA_INVOICE_CUSTOMER_MISMATCH')
+    this.name = 'ProformaInvoiceCustomerMismatchError'
+  }
+}
+
 export { ValidationError, NotFoundError, InvalidStateError, ConflictError }

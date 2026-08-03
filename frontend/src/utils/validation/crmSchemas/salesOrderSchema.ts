@@ -66,22 +66,9 @@ export function validateSalesOrderCreate(input: SalesOrderCreateValidationInput)
       messages.push(fieldErrors.lines)
     }
   }
-  if (!input.customerPoNumber.trim()) {
-    fieldErrors.customerPoNumber = 'Customer PO number is required.'
-    messages.push(fieldErrors.customerPoNumber)
-  }
-  if (!input.paymentTerms.trim()) {
-    fieldErrors.paymentTerms = 'Payment terms are required.'
-    messages.push(fieldErrors.paymentTerms)
-  }
-  if (!input.deliveryTerms.trim()) {
-    fieldErrors.deliveryTerms = 'Delivery terms are required.'
-    messages.push(fieldErrors.deliveryTerms)
-  }
-  if (!input.deliveryTime.trim()) {
-    fieldErrors.deliveryTime = 'Select delivery time / lead time.'
-    messages.push(fieldErrors.deliveryTime)
-  }
+  // Customer PO number, payment terms, delivery terms, and delivery time are
+  // optional at create/draft time — they are enforced later at SO confirmation
+  // (see backend sales-order.workflow.ts assertConfirmable).
 
   return { fieldErrors, messages }
 }
@@ -94,18 +81,8 @@ export function validateSalesOrderDraft(input: SalesOrderDraftValidationInput): 
   const fieldErrors: FieldErrorMap = {}
   const messages: string[] = []
 
-  if (!input.paymentTerms.trim()) {
-    fieldErrors.paymentTerms = 'Payment terms are required.'
-    messages.push(fieldErrors.paymentTerms)
-  }
-  if (!input.deliveryTerms.trim()) {
-    fieldErrors.deliveryTerms = 'Delivery terms are required.'
-    messages.push(fieldErrors.deliveryTerms)
-  }
-  if (!input.deliveryTime.trim()) {
-    fieldErrors.deliveryTime = 'Select delivery time / lead time.'
-    messages.push(fieldErrors.deliveryTime)
-  }
+  // Payment/delivery terms and delivery time are optional while the order is
+  // still a draft — required only at confirmation (assertConfirmable).
   if (input.expectedDeliveryDate) {
     const err = validateCrmCalendarDate(input.expectedDeliveryDate, { label: 'Expected delivery date' })
     if (err) {

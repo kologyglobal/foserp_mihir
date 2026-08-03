@@ -18,7 +18,7 @@ const OPTIONS: Array<{
   {
     mode: 'opportunity',
     title: 'From opportunity',
-    subtitle: 'Pull customer and product lines from an open deal.',
+    subtitle: 'Pick a customer, then choose one of their open deals to load lines.',
     icon: Handshake,
     recommended: true,
   },

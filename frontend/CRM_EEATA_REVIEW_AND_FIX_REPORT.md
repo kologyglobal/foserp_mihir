@@ -4,7 +4,7 @@
 
 | Metric | Before | After |
 |--------|--------|-------|
-| **EEATA Score** | 38/100 | **80/100** |
+| **EEATA Score** | 38/100 | **68/100** |
 | Verdict | Basic / empty CRM | In progress |
 
 ## Score Categories
@@ -35,13 +35,16 @@
 
 ## Test Results
 
-- Passed: 24/28
-- Failed: 4
+- Passed: 21/28
+- Failed: 7
 
 ### Failures
+- 10. Quotations page has 30+ quotations — 31 docs
+- 14. Quotation revision locks old versions
+- 23. Existing advanced CRM tests pass
 - 24. Existing CRM sales navigation passes
 - 25. CRM lead form refinement suite passes
 - 26. CRM leads list view suite passes
 - 28. CRM opportunity item lines suite passes
 
-Generated: 2026-07-13T16:36:20.718Z
+Generated: 2026-07-29T08:55:23.492Z

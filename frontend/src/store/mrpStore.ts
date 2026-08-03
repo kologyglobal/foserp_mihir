@@ -281,9 +281,6 @@ export const useMrpStore = create<MrpState>()(
     if (!quotationBacked && !directOrder) {
       return { ok: false, error: 'Sales order must be linked to a quotation or created as a direct SO' }
     }
-    if (directOrder && !quotationBacked && !so.directSoReason?.trim()) {
-      return { ok: false, error: 'Direct sales orders require a justification before confirmation' }
-    }
     if (so.status !== 'open') {
       return { ok: false, error: `Cannot confirm sales order in status ${so.status}` }
     }

@@ -1,6 +1,6 @@
 # ERP Page Action Matrix
 
-**Generated:** 2026-07-11
+**Generated:** 2026-07-29
 
 | Route | Page | Role | New | Edit | Save Visible | Primary Action | Defects | Fix |
 |-------|------|------|-----|------|--------------|----------------|---------|-----|
@@ -26,7 +26,7 @@
 | /engineering/bom | BOM Register | Engineering | Yes | N/A | N/A | New / Add | — | Standard command bar |
 | /engineering/eco | ECO Register | Engineering | Yes | N/A | N/A | New / Add | — | Standard command bar |
 | /masters/routing | Routing Register | Engineering | Yes | N/A | N/A | New / Add | — | Standard command bar |
-| /masters/customers | Customer Register | Admin | Yes | N/A | N/A | New / Add | — | Standard command bar |
+| /masters/companies | Company Register | Admin | Yes | N/A | N/A | New / Add | — | Standard command bar |
 | /masters/vendors | Vendor Register | Admin | Yes | N/A | N/A | New / Add | — | Standard command bar |
 | /masters/items | Item Register | Admin | Yes | N/A | N/A | New / Add | — | Standard command bar |
 | /documents | Document Register | All | Yes | N/A | N/A | New / Add | — | Standard command bar |
@@ -37,7 +37,7 @@
 | /dispatch/:id | Dispatch Detail | Dispatch | N/A | Yes (Submit/Post) | Yes | Edit / Submit | — | Standard shell |
 | /invoices/:id | Invoice Detail | Finance | N/A | Yes (Submit/Post) | Yes | Edit / Submit | — | Standard shell |
 | /engineering/boms/:id/360 | BOM 360 | Engineering | N/A | Yes | Yes | Edit / Submit | — | Standard shell |
-| /masters/customers/:id/360 | Customer 360 | Admin | N/A | Yes | Yes | Edit / Submit | — | Standard shell |
+| /masters/companies/:id/360 | Company 360 | Admin | N/A | Yes | Yes | Edit / Submit | — | Standard shell |
 | /documents/:id | Document Detail | All | N/A | Yes (Submit/Post) | Yes | Edit / Submit | — | Standard shell |
 
 **Score:** 93/100

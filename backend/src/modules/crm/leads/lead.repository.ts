@@ -462,6 +462,7 @@ export async function releaseLeadsLinkedToOpportunity(
     const linkedByConvertFk = lead.opportunityId === opportunityId
     const converted =
       lead.stage === 'converted_to_opportunity' || lead.lifecycleStatus === 'converted'
+    // Converted lead whose convert target is this opp (by FK or by opportunity.leadId)
     const shouldRelease =
       linkedByConvertFk
       || (converted && opportunityLeadId === lead.id && (!lead.opportunityId || lead.opportunityId === opportunityId))

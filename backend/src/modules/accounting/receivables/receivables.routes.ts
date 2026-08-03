@@ -6,6 +6,7 @@ import allocationRoutes from './allocations/customer-receipt-allocation.routes.j
 import customerCreditNoteRoutes from './credit-notes/customer-credit-note.routes.js'
 import creditNoteAllocationRoutes from './credit-notes/allocations/customer-credit-note-allocation.routes.js'
 import arDisputeRoutes from './disputes/ar-dispute.routes.js'
+import recurringInvoiceRoutes from './recurring-invoices/recurring-invoice.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -16,5 +17,6 @@ router.use('/invoices', salesInvoiceRoutes)
 router.use('/receipts', customerReceiptRoutes)
 router.use('/credit-notes', customerCreditNoteRoutes)
 router.use('/disputes', arDisputeRoutes)
+router.use('/recurring-schedules', recurringInvoiceRoutes)
 
 export default router

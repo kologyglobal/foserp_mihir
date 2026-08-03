@@ -1,10 +1,12 @@
 import { useMemo } from 'react'
-import type { QuotationDocument, QuotationPrintLayout } from '../../types/crm'
+import type { CrmContact, QuotationDocument, QuotationPrintLayout, QuotationSpecRow } from '../../types/crm'
 import type { Quotation } from '../../types/sales'
 import type { Customer } from '../../types/master'
 import type { Opportunity } from '../../types/crm'
 import { buildQuotationMergeMap, resolvePlaceholders } from '../../utils/quotationEngine/placeholders'
-import { QUOTATION_COMPANY } from '../../utils/quotationEngine/companyProfile'
+import { useCompanyProfile } from '../../utils/quotationEngine/companyProfile'
+import { CompanyBankDetailsBlock } from '../print/CompanyBankDetailsBlock'
+import { EditableText } from '../print/EditableText'
 import { calcPriceSummary, syncLineTotals } from '../../utils/crmQuotationCalc'
 import { amountInWordsINR } from '../../utils/quotationEngine/amountInWords'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
@@ -15,33 +17,98 @@ import {
   sectionHasPageBreak,
 } from '../../utils/quotationEngine/printLayout'
 import { cn } from '../../utils/cn'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
+import { KologyProposalPrintDocument } from './KologyProposalPrintDocument'
+import { resolveCustomerDetailsPrintContent } from '../../utils/quotationEngine/customerDetails'
+
+export type QuotationSectionFieldChange = (sectionId: string, field: 'title' | 'content', value: string) => void
+export type QuotationSpecRowFieldChange = (
+  sectionId: string,
+  rowId: string,
+  field: 'label' | 'value' | 'unit',
+  value: string,
+) => void
 
 interface QuotationPrintDocumentProps {
   doc: QuotationDocument
   quotation: Quotation
   customer?: Customer
   opportunity?: Opportunity
+  contact?: CrmContact | null
   contactName?: string
   className?: string
   printLayout?: QuotationPrintLayout
+  /** Enables inline WYSIWYG editing on the print canvas (template preview editor). */
+  editable?: boolean
+  /** kology_proposal skin — persists edits into `printLayout.contentOverrides[id]`. */
+  onContentChange?: (id: string, value: string) => void
+  /** section-driven skins — persists edits directly onto the section's title/content. */
+  onSectionFieldChange?: QuotationSectionFieldChange
+  /** section-driven skins — persists edits onto a spec_table row. */
+  onSpecRowChange?: QuotationSpecRowFieldChange
+}
+
+function SectionTitle({
+  sectionId,
+  title,
+  editable,
+  onSectionFieldChange,
+  className,
+}: {
+  sectionId: string
+  title: string
+  editable?: boolean
+  onSectionFieldChange?: QuotationSectionFieldChange
+  className?: string
+}) {
+  return (
+    <EditableText
+      id={`section-title-${sectionId}`}
+      value={title}
+      editable={editable}
+      onChange={(_id, value) => onSectionFieldChange?.(sectionId, 'title', value)}
+      as="h2"
+      className={className ?? 'quo-print-section__title'}
+    />
+  )
 }
 
 function PrintSpecTable({
+  sectionId,
   rows,
   map,
+  editable,
+  onSpecRowChange,
 }: {
+  sectionId: string
   rows: NonNullable<QuotationDocument['sections'][0]['specRows']>
   map: Record<string, string>
+  editable?: boolean
+  onSpecRowChange?: QuotationSpecRowFieldChange
 }) {
   return (
     <table className="quo-print-spec">
       <tbody>
-        {rows.map((r) => (
+        {rows.map((r: QuotationSpecRow) => (
           <tr key={r.id}>
             <td className="quo-print-spec__no">{r.sectionNo}</td>
-            <td className="quo-print-spec__label">{resolvePlaceholders(r.label, map)}</td>
+            <td className="quo-print-spec__label">
+              <EditableText
+                id={`spec-${r.id}-label`}
+                value={editable ? r.label : resolvePlaceholders(r.label, map)}
+                editable={editable}
+                onChange={(_id, value) => onSpecRowChange?.(sectionId, r.id, 'label', value)}
+                as="span"
+              />
+            </td>
             <td className="quo-print-spec__value">
-              {resolvePlaceholders(r.value, map)}
+              <EditableText
+                id={`spec-${r.id}-value`}
+                value={editable ? r.value : resolvePlaceholders(r.value, map)}
+                editable={editable}
+                onChange={(_id, value) => onSpecRowChange?.(sectionId, r.id, 'value', value)}
+                as="span"
+              />
               {r.unit ? ` ${r.unit}` : ''}
             </td>
           </tr>
@@ -91,6 +158,7 @@ function QuotationLetterhead({
   revisionNo: number
   validityDate?: string | null
 }) {
+  const company = useCompanyProfile()
   return (
     <header className={cn('quo-print-header', printLayout.headerStyle === 'cover' && 'quo-print-header--cover')}>
       <div className="quo-print-header__brand">
@@ -98,23 +166,24 @@ function QuotationLetterhead({
           <div className="quo-print-header__logo-wrap">
             <img
               className="quo-print-header__logo-img"
-              src={QUOTATION_COMPANY.logoUrl}
-              alt={QUOTATION_COMPANY.brandName}
+              src={company.logoUrl}
+              alt={company.brandName}
             />
           </div>
         ) : null}
         <div className="quo-print-header__identity">
-          <h1 className="quo-print-header__company">{QUOTATION_COMPANY.legalName}</h1>
-          <p className="quo-print-header__tagline">{QUOTATION_COMPANY.tagline}</p>
+          <h1 className="quo-print-header__company">{company.legalName}</h1>
+          {company.tagline ? <p className="quo-print-header__tagline">{company.tagline}</p> : null}
           {printLayout.headerStyle !== 'minimal' ? (
             <>
-              <p className="quo-print-header__address">{QUOTATION_COMPANY.address}</p>
-              <p className="quo-print-header__address">{QUOTATION_COMPANY.registeredOffice}</p>
+              <p className="quo-print-header__address">{company.address}</p>
+              {company.registeredOffice ? (
+                <p className="quo-print-header__address">{company.registeredOffice}</p>
+              ) : null}
               <p className="quo-print-header__contact">
-                {QUOTATION_COMPANY.phone} · {QUOTATION_COMPANY.email}
-                {QUOTATION_COMPANY.website ? ` · ${QUOTATION_COMPANY.website}` : ''}
+                {[company.phone, company.email, company.website].filter(Boolean).join(' · ')}
               </p>
-              <p className="quo-print-header__gstin">GSTIN: {QUOTATION_COMPANY.gstin}</p>
+              {company.gstin ? <p className="quo-print-header__gstin">GSTIN: {company.gstin}</p> : null}
             </>
           ) : null}
         </div>
@@ -151,23 +220,47 @@ export function QuotationPrintDocument({
   quotation,
   customer,
   opportunity,
+  contact,
   contactName,
   className,
   printLayout = DEFAULT_QUOTATION_PRINT_LAYOUT,
+  editable,
+  onContentChange,
+  onSectionFieldChange,
+  onSpecRowChange,
 }: QuotationPrintDocumentProps) {
+  const showFreight = !useTenantProfileStore((s) => s.isServices())
+  const company = useCompanyProfile()
   const map = useMemo(
-    () => buildQuotationMergeMap({ document: doc, quotation, customer, opportunity, contactName }),
-    [doc, quotation, customer, opportunity, contactName],
+    () => buildQuotationMergeMap({ document: doc, quotation, customer, opportunity, contact, contactName }),
+    [doc, quotation, customer, opportunity, contact, contactName],
   )
   const sorted = useMemo(() => [...doc.sections].sort((a, b) => a.sequenceNo - b.sequenceNo), [doc.sections])
   const lines = syncLineTotals(doc.priceLines)
-  const summary = calcPriceSummary(lines, doc.freightAmount, doc.installationAmount, doc.customCharges)
+  const freightAmount = showFreight ? doc.freightAmount : 0
+  const summary = calcPriceSummary(lines, freightAmount, doc.installationAmount, doc.customCharges)
   const layoutClass = printLayoutClassNames(printLayout)
   const isVfWord = printLayout.printSkin === 'vf_word'
 
+  if (printLayout.printSkin === 'kology_proposal') {
+    return (
+      <KologyProposalPrintDocument
+        doc={doc}
+        quotation={quotation}
+        customer={customer}
+        opportunity={opportunity}
+        contactName={contactName}
+        className={className}
+        printLayout={printLayout}
+        editable={editable}
+        onContentChange={onContentChange}
+      />
+    )
+  }
+
   return (
     <article
-      className={cn('quo-print-doc', layoutClass, className)}
+      className={cn('quo-print-doc', layoutClass, editable && 'quo-print-doc--editing', className)}
       style={printLayoutStyleVars(printLayout)}
     >
       {printLayout.showCompanyHeader ? (
@@ -216,7 +309,13 @@ export function QuotationPrintDocument({
               )}
             >
               {!printLayout.showCompanyHeader ? (
-                <h2 className="quo-print-section__title quo-print-cover__title">{sec.title}</h2>
+                <SectionTitle
+                  sectionId={sec.id}
+                  title={sec.title}
+                  editable={editable}
+                  onSectionFieldChange={onSectionFieldChange}
+                  className="quo-print-section__title quo-print-cover__title"
+                />
               ) : null}
 
               {metaRows.length > 0 ? (
@@ -260,7 +359,7 @@ export function QuotationPrintDocument({
               key={sec.id}
               className={cn('quo-print-section quo-print-section--price', pageBreak && 'quo-print-section--break')}
             >
-              <h2 className="quo-print-section__title">{sec.title}</h2>
+              <SectionTitle sectionId={sec.id} title={sec.title} editable={editable} onSectionFieldChange={onSectionFieldChange} />
               <table className="quo-print-price">
                 <thead>
                   <tr>
@@ -326,14 +425,24 @@ export function QuotationPrintDocument({
         if (sec.contentFormat === 'spec_table' && sec.specRows?.length) {
           return (
             <section key={sec.id} className={cn('quo-print-section', pageBreak && 'quo-print-section--break')}>
-              <h2 className="quo-print-section__title">{sec.title}</h2>
-              <PrintSpecTable rows={sec.specRows} map={map} />
+              <SectionTitle sectionId={sec.id} title={sec.title} editable={editable} onSectionFieldChange={onSectionFieldChange} />
+              <PrintSpecTable
+                sectionId={sec.id}
+                rows={sec.specRows}
+                map={map}
+                editable={editable}
+                onSpecRowChange={onSpecRowChange}
+              />
             </section>
           )
         }
 
-        const content = resolvePlaceholders(sec.content, map)
-        if (!content.trim()) return null
+        const rawContent =
+          sec.sectionType === 'customer_details'
+            ? resolveCustomerDetailsPrintContent(sec.content, map, doc.salesOwnerName)
+            : sec.content
+        const content = editable ? rawContent : resolvePlaceholders(rawContent, map)
+        if (!content.trim() && !editable) return null
 
         if (sec.sectionType === 'customer_details' && printLayout.showCustomerBlock) {
           return null
@@ -345,9 +454,17 @@ export function QuotationPrintDocument({
               key={sec.id}
               className={cn('quo-print-section quo-print-section--customer', pageBreak && 'quo-print-section--break')}
             >
-              <h2 className="quo-print-section__title">{sec.title}</h2>
+              <SectionTitle sectionId={sec.id} title={sec.title} editable={editable} onSectionFieldChange={onSectionFieldChange} />
               <div className="quo-print-customer-card">
-                <div className="quo-print-customer-card__body">{content}</div>
+                <EditableText
+                  id={`section-body-${sec.id}`}
+                  value={content}
+                  editable={editable}
+                  onChange={(_id, value) => onSectionFieldChange?.(sec.id, 'content', value)}
+                  as="div"
+                  multiline
+                  className="quo-print-customer-card__body"
+                />
               </div>
             </section>
           )
@@ -355,8 +472,17 @@ export function QuotationPrintDocument({
 
         return (
           <section key={sec.id} className={cn('quo-print-section', pageBreak && 'quo-print-section--break')}>
-            <h2 className="quo-print-section__title">{sec.title}</h2>
-            <div className="quo-print-section__body">{content}</div>
+            <SectionTitle sectionId={sec.id} title={sec.title} editable={editable} onSectionFieldChange={onSectionFieldChange} />
+            <EditableText
+              id={`section-body-${sec.id}`}
+              value={content}
+              editable={editable}
+              onChange={(_id, value) => onSectionFieldChange?.(sec.id, 'content', value)}
+              as="div"
+              multiline
+              className="quo-print-section__body"
+              placeholder="Click to add content…"
+            />
           </section>
         )
       })}
@@ -366,7 +492,7 @@ export function QuotationPrintDocument({
           {printLayout.showSignatureBlock ? (
             <div className="quo-print-footer__sign-row">
               <div className="quo-print-footer__closing">
-                <p className="quo-print-footer__for">For, {QUOTATION_COMPANY.legalName}</p>
+                <p className="quo-print-footer__for">For, {company.legalName}</p>
               </div>
               <div className="quo-print-signature">
                 <div className="quo-print-signature__line" />
@@ -375,10 +501,11 @@ export function QuotationPrintDocument({
               </div>
             </div>
           ) : null}
+          {company.bankDetails ? <CompanyBankDetailsBlock bank={company.bankDetails} /> : null}
           {printLayout.showPageFooter ? (
             <div className="quo-print-footer__bar">
-              <span>GSTIN: {QUOTATION_COMPANY.gstin}</span>
-              <span>{QUOTATION_COMPANY.website}</span>
+              {company.gstin ? <span>GSTIN: {company.gstin}</span> : null}
+              <span>{company.website}</span>
               <span className="quo-print-footer__page">Confidential — for addressee only</span>
             </div>
           ) : null}

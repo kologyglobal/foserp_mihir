@@ -10,6 +10,7 @@ import {
   UNIT_PRICE_REQUIRED_MESSAGE,
 } from '../../utils/opportunityLineCalc'
 import { cn } from '../../utils/cn'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 
 interface QuotationPriceTableProps {
   lines: QuotationPriceLine[]
@@ -23,13 +24,15 @@ interface QuotationPriceTableProps {
 
 export function QuotationPriceTable({
   lines,
-  freightAmount,
+  freightAmount: freightProp,
   installationAmount,
   customCharges,
   editable,
   rowErrors = {},
   onChange,
 }: QuotationPriceTableProps) {
+  const showFreight = !useTenantProfileStore((s) => s.isServices())
+  const freightAmount = showFreight ? freightProp : 0
   const synced = syncLineTotals(lines)
   const summary = calcPriceSummary(synced, freightAmount, installationAmount, customCharges)
 
@@ -193,15 +196,17 @@ export function QuotationPriceTable({
         </div>
         {editable ? (
           <>
-            <div className="quo-editor-price__summary-row">
-              <span>Freight</span>
-              <FormattedCurrencyInput
-                className="quo-editor-price__summary-input"
-                value={freightAmount}
-                onValueChange={(next) => onChange?.(synced, { freightAmount: Math.max(0, next), installationAmount, customCharges })}
-                aria-label="Freight"
-              />
-            </div>
+            {showFreight ? (
+              <div className="quo-editor-price__summary-row">
+                <span>Freight</span>
+                <FormattedCurrencyInput
+                  className="quo-editor-price__summary-input"
+                  value={freightAmount}
+                  onValueChange={(next) => onChange?.(synced, { freightAmount: Math.max(0, next), installationAmount, customCharges })}
+                  aria-label="Freight"
+                />
+              </div>
+            ) : null}
             <div className="quo-editor-price__summary-row">
               <span>Installation</span>
               <FormattedCurrencyInput
@@ -214,7 +219,7 @@ export function QuotationPriceTable({
           </>
         ) : (
           <>
-            {freightAmount > 0 ? (
+            {showFreight && freightAmount > 0 ? (
               <div className="quo-editor-price__summary-row">
                 <span>Freight</span>
                 <span className="tabular-nums">{formatCrmCurrency(freightAmount)}</span>
