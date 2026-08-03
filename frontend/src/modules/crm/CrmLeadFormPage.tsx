@@ -63,6 +63,7 @@ import {
   applyLeadStageDefaults,
   buildLeadStageSmartSelectOptions,
   resolveLeadConvertToOpportunityGate,
+  toLeadDateOnly,
 } from '../../utils/leadUtils'
 import {
   isLeadFieldLocked,
@@ -205,7 +206,7 @@ export function CrmLeadFormPage() {
   const [email, setEmail] = useState(existing?.email ?? '')
   const [leadOwnerId, setLeadOwnerId] = useState(existing?.leadOwnerId ?? session.id)
   const [priority, setPriority] = useState<LeadPriority>(existing?.priority ?? 'medium')
-  const [createdDate, setCreatedDate] = useState(existing?.createdDate ?? todayIso())
+  const [createdDate, setCreatedDate] = useState(toLeadDateOnly(existing?.createdDate) ?? todayIso())
   const [source, setSource] = useState<LeadSource>(existing?.source ?? 'other')
   const [industry, setIndustry] = useState(existing?.industry ?? '')
   const [requirementLines, setRequirementLines] = useState<OpportunityLine[]>(() =>
@@ -274,7 +275,7 @@ export function CrmLeadFormPage() {
     )
     setExpectedValue(duplicateSource.expectedValue ?? 0)
     setProbability(duplicateSource.probability ?? 30)
-    setExpectedCloseDate(duplicateSource.expectedCloseDate ?? '')
+    setExpectedCloseDate(toLeadDateOnly(duplicateSource.expectedCloseDate) ?? '')
     setRemarks(duplicateSource.remarks ?? '')
     setLeadStage('new')
     setNotQualifiedReason('')
@@ -298,7 +299,7 @@ export function CrmLeadFormPage() {
     setEmail(existing.email ?? '')
     setLeadOwnerId(existing.leadOwnerId)
     setPriority(existing.priority)
-    setCreatedDate(existing.createdDate)
+    setCreatedDate(toLeadDateOnly(existing.createdDate) ?? todayIso())
     setSource(existing.source)
     setIndustry(existing.industry ?? '')
     setRequirementLines(
@@ -310,16 +311,16 @@ export function CrmLeadFormPage() {
     )
     setExpectedValue(existing.expectedValue ?? 0)
     setProbability(existing.probability ?? 30)
-    setExpectedCloseDate(existing.expectedCloseDate ?? '')
+    setExpectedCloseDate(toLeadDateOnly(existing.expectedCloseDate) ?? '')
     setRemarks(existing.remarks ?? '')
     setLeadStage(existing.stage)
     setNotQualifiedReason(existing.notQualifiedReason ?? '')
     setActivityStatus(existing.activityStatus)
     setInactiveReason(existing.inactiveReason ?? '')
     setLifecycleStatus(existing.lifecycleStatus)
-    setClosedDate(existing.closedDate ?? '')
+    setClosedDate(toLeadDateOnly(existing.closedDate) ?? '')
     setClosedReason(existing.closedReason ?? '')
-    setNextFollowUpDate(existing.nextFollowUpDate ?? '')
+    setNextFollowUpDate(toLeadDateOnly(existing.nextFollowUpDate) ?? '')
     setFollowUpType(existing.followUpType ?? 'call')
     setFollowUpNotes(existing.followUpNotes ?? '')
     if (existing.locationId) setLocationId(existing.locationId)
@@ -484,7 +485,6 @@ export function CrmLeadFormPage() {
       createdDate,
       mobile,
       email,
-      remarks,
       expectedValue,
     },
     {
@@ -507,10 +507,6 @@ export function CrmLeadFormPage() {
       },
       email: {
         validate: (v) => validateEmail(String(v ?? '')),
-      },
-      remarks: {
-        required: true,
-        message: 'Notes are required',
       },
     },
   )
@@ -1657,26 +1653,20 @@ export function CrmLeadFormPage() {
           <ErpFieldGroup label="Enquiry Notes" columns={1} className="crm-lead-zoho-section">
             <ErpFieldRow
               label="Notes"
-              required
               colSpan={3}
               horizontal={false}
               dataField="remarks"
-              fieldState={
-                (inlineValidation.fieldError('remarks') ?? validationErrors.remarks)
-                  ? 'error'
-                  : inlineValidation.fieldState('remarks')
-              }
-              fieldError={inlineValidation.fieldError('remarks') ?? validationErrors.remarks}
+              fieldState={validationErrors.remarks ? 'error' : 'idle'}
+              fieldError={validationErrors.remarks}
               hint="Capture call summaries, requirements, and next steps."
             >
               <Textarea
                 rows={3}
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
-                onBlur={() => inlineValidation.touch('remarks')}
                 placeholder="Context from first call or enquiry…"
                 className="erp-input"
-                error={Boolean(inlineValidation.fieldError('remarks') ?? validationErrors.remarks)}
+                error={Boolean(validationErrors.remarks)}
                 disabled={fieldLocked('remarks')}
               />
             </ErpFieldRow>

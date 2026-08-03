@@ -249,10 +249,45 @@ export function mapMoneyInError(code: string | undefined, fallback?: string): st
   return MONEY_IN_ERROR_MESSAGES[code] ?? fallback ?? code.replace(/_/g, ' ')
 }
 
+function issueSeverity(issue: CalculationIssue): 'error' | 'warning' {
+  const s = String(issue.severity ?? 'error').toLowerCase()
+  return s === 'warning' ? 'warning' : 'error'
+}
+
 export function groupValidationIssues(issues: CalculationIssue[]) {
-  const errors = issues.filter((i) => i.severity !== 'warning')
-  const warnings = issues.filter((i) => i.severity === 'warning')
+  const errors = issues.filter((i) => issueSeverity(i) === 'error')
+  const warnings = issues.filter((i) => issueSeverity(i) === 'warning')
   return { errors, warnings }
+}
+
+const MAPPING_ISSUE_RE = /mapping|account.?not.?ready|bank.?cash account|receivable|tds_receivable|bank_charges|gl account/i
+
+/** True when an issue is about GL account mapping readiness (not a generic form field). */
+export function isAccountMappingIssue(issue: Pick<CalculationIssue, 'code' | 'message' | 'field'>): boolean {
+  if (issue.code && /ACCOUNT|MAPPING|RECEIVABLE|BANK_CASH|BANK_CHARGE|TDS_/i.test(issue.code)) return true
+  if (issue.field && /ACCOUNT|MAPPING|RECEIVABLE|BANK_CASH|BANK_CHARGE|TDS_/i.test(issue.field)) return true
+  return MAPPING_ISSUE_RE.test(issue.message ?? '')
+}
+
+/**
+ * Toast copy when receipt validation fails — prefers GL mapping messages so
+ * "account mapping missing" is not hidden behind only a side drawer.
+ */
+export function summarizeReceiptValidationToast(
+  report: { valid: boolean; errors: CalculationIssue[]; warnings: CalculationIssue[] },
+): string | null {
+  if (report.valid) return null
+  const mapping = report.errors.filter(isAccountMappingIssue)
+  if (mapping.length === 1) return mapping[0]!.message
+  if (mapping.length > 1) {
+    return `Account mapping incomplete (${mapping.length}): ${mapping[0]!.message}`
+  }
+  if (report.errors.length === 1) return report.errors[0]!.message
+  if (report.errors.length > 1) {
+    return `Validation failed (${report.errors.length} errors). ${report.errors[0]!.message}`
+  }
+  if (report.warnings.length) return report.warnings[0]!.message
+  return 'Validation failed'
 }
 
 export function invoiceDisplayNumber(inv: { invoiceNumber: string | null; draftReference: string | null }) {

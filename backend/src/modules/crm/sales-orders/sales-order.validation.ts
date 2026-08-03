@@ -108,13 +108,6 @@ export const createSalesOrderSchema = z
         path: ['itemId'],
       })
     }
-    if (data.source === 'direct' && !data.directSoReason?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'directSoReason is required for direct sales orders',
-        path: ['directSoReason'],
-      })
-    }
   })
 
 export const updateSalesOrderSchema = z.object({

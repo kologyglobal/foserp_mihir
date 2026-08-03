@@ -959,7 +959,7 @@ const swaggerSpecDraft = {
         tags: ['CRM Sales Orders'],
         summary: 'Create draft sales order (direct or quotation-linked)',
         description:
-          'Creates status=open. Direct source requires directSoReason. Prefer POST …/quotations/:id/convert-to-sales-order for approved quotation conversion.',
+          'Creates status=open. directSoReason is optional for direct source. Prefer POST …/quotations/:id/convert-to-sales-order for approved quotation conversion.',
         parameters: [tenantSlugParam],
         responses: { 201: { description: 'Created' }, 422: { description: 'Validation / invalid state' } },
       },

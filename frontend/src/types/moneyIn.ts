@@ -47,7 +47,19 @@ export interface CalculationIssue {
   code: string
   message: string
   field?: string
-  severity?: 'error' | 'warning'
+  /** Backend often sends uppercase ERROR/WARNING; UI normalizes in groupValidationIssues. */
+  severity?: 'error' | 'warning' | 'ERROR' | 'WARNING'
+}
+
+export interface ReceiptMappingAccountState {
+  mappingKey: string
+  required: boolean
+  configured: boolean
+  accountId: string | null
+  accountCode: string | null
+  accountName: string | null
+  valid: boolean
+  issues?: CalculationIssue[]
 }
 
 export interface SalesInvoiceValidationPreview {
@@ -1050,6 +1062,14 @@ export interface CustomerReceiptValidationPreview {
   valid: boolean
   errors: CalculationIssue[]
   warnings: CalculationIssue[]
+  /** Present on live API validation — GL default mappings for post. */
+  accountReadiness?: {
+    bankCash: ReceiptMappingAccountState
+    customerReceivable: ReceiptMappingAccountState
+    customerTds: ReceiptMappingAccountState
+    bankCharges: ReceiptMappingAccountState[]
+    otherDeductions: ReceiptMappingAccountState[]
+  }
 }
 
 export interface PostCustomerReceiptResult {

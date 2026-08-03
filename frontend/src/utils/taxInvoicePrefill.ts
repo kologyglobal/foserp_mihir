@@ -152,6 +152,64 @@ export function resolveTaxInvoiceFromSalesOrder(
   }
 }
 
+/** Blank editable line for direct (customer) tax invoices — no SO/proforma cap. */
+export function blankTaxInvoiceLine(lineNo = 1): CrmCommercialLine {
+  return withTotals(
+    {
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `cil-${Date.now()}-${lineNo}`,
+      itemId: '',
+      itemCode: '',
+      description: '',
+      hsnCode: '',
+      qty: 1,
+      uom: 'Nos',
+      unitPrice: 0,
+      discountPct: 0,
+      taxPct: DEFAULT_GST_RATE,
+      sourceLineId: null,
+      maxQty: null,
+    },
+    lineNo,
+  )
+}
+
+/** Direct tax invoice from customer master — no sales order or proforma required. */
+export function resolveTaxInvoiceFromCustomer(customerId: string): TaxInvoicePrefillResult {
+  const customer = useMasterStore.getState().getCustomer(customerId)
+  if (!customer) return { ok: false, error: 'Customer not found.' }
+  if (customer.isActive === false) return { ok: false, error: 'Customer is inactive.' }
+
+  const customerState = customer.state || 'Maharashtra'
+  const lines = [blankTaxInvoiceLine(1)]
+  return {
+    ok: true,
+    data: {
+      source: 'direct',
+      customerId: customer.id,
+      customerName: customer.customerName,
+      customerGstin: customer.gstin ?? '',
+      customerState,
+      customerAddress: formatCustomerBillingAddress(customer),
+      billingAddress: formatCustomerBillingAddress(customer),
+      shippingAddress: resolveCustomerShippingAddress(customer),
+      paymentTerms: '30% advance, balance before dispatch',
+      deliveryTerms: 'Ex-works Pune',
+      customerPoNumber: null,
+      remarks: '',
+      salesOrderId: null,
+      salesOrderNo: null,
+      quotationId: null,
+      quotationNo: null,
+      proformaInvoiceId: null,
+      proformaNo: null,
+      lines,
+      gst: buildGst(lines, customerState),
+    },
+  }
+}
+
 /** Issued proforma → tax invoice line prefill (qty editable for partial). */
 export function resolveTaxInvoiceFromProforma(
   proformaId: string,

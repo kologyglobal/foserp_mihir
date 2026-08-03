@@ -181,7 +181,11 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
     })
   }
   if (!salesQuotation?.validityDate) {
-    issues.push({ id: 'no-validity', message: 'Quotation validity date is required.', blocking: true })
+    issues.push({
+      id: 'no-validity',
+      message: 'Optional: validity date is not set on the quotation — a default validity is applied on conversion.',
+      blocking: false,
+    })
   }
 
   const blocking = issues.filter((i) => i.blocking)

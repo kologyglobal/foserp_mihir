@@ -24,6 +24,7 @@ interface OpportunitySelectPickerProps {
   value: string
   onChange: (opportunityId: string) => void
   disabled?: boolean
+  placeholder?: string
 }
 
 function buildOptions(
@@ -79,6 +80,7 @@ export function OpportunitySelectPicker({
   value,
   onChange,
   disabled,
+  placeholder = 'Search by deal no, name, customer, product, owner, or stage…',
 }: OpportunitySelectPickerProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
@@ -170,7 +172,7 @@ export function OpportunitySelectPicker({
   }
 
   return (
-    <div ref={wrapRef} className="crm-opp-picker">
+    <div ref={wrapRef} className={cn('crm-opp-picker', disabled && 'crm-opp-picker--disabled')}>
       <div ref={anchorRef} className="erp-search-field" onClick={() => openList()}>
         <Search className="erp-search-field__icon" strokeWidth={2} aria-hidden />
         <input
@@ -179,8 +181,9 @@ export function OpportunitySelectPicker({
           className="erp-input erp-search-field__input w-full"
           value={displayValue}
           disabled={disabled}
-          placeholder="Search by deal no, name, customer, product, owner, or stage…"
+          placeholder={placeholder}
           aria-label="Opportunity"
+          aria-disabled={disabled || undefined}
           onChange={(e) => handleFilterChange(e.target.value)}
           onFocus={() => {
             if (disabled) return
@@ -199,7 +202,11 @@ export function OpportunitySelectPicker({
             role="listbox"
           >
             {filtered.length === 0 ? (
-              <p className="crm-opp-picker__empty">No matching open opportunities.</p>
+              <p className="crm-opp-picker__empty">
+                {options.length === 0
+                  ? 'No open opportunities for this customer.'
+                  : 'No matching open opportunities.'}
+              </p>
             ) : (
               <ul className="crm-opp-picker__list">
                 {filtered.map((option) => {

@@ -4,33 +4,50 @@ import { decimalToNumber } from '../../../shared/index.js'
 import { ensureLeadCompany } from './lead.repository.js'
 
 /**
- * Mirrors a lead's early-funnel stage into the CRM Opportunity pipeline so the
- * Opportunities list/pipeline always shows what Leads shows for open deals —
- * without requiring the explicit "Convert" action, which still fully converts
- * (and locks) the lead later on. Only the stages Leads exposes as open/working
- * ("New" and "Qualified") are mirrored; disqualified/closed/converted leads are
- * left to their own dedicated flows.
+ * Mirrors Leads UI open sections into the Opportunity pipeline:
+ * - Leads "New" (new / contacted) → Opportunity "New Lead"
+ * - Leads "Qualified" (qualified / requirement_collected KPI) → Opportunity "Qualified"
+ *
+ * Does not require Convert. Convert still owns locking via lead.opportunityId.
  */
-const LEAD_STAGE_TO_PIPELINE_SLUG: Record<string, string> = {
+export const LEAD_STAGE_TO_PIPELINE_SLUG: Record<string, string> = {
   new: 'new_lead',
   contacted: 'new_lead',
-  requirement_collected: 'new_lead',
+  requirement_collected: 'qualified',
   qualified: 'qualified',
+}
+
+const OPEN_MIRROR_STAGES = Object.keys(LEAD_STAGE_TO_PIPELINE_SLUG)
+
+function resolveTargetStage<T extends { id: string; slug: string; name: string; probability: number }>(
+  stages: T[],
+  targetSlug: string,
+): T | undefined {
+  const bySlug = stages.find((s) => s.slug === targetSlug)
+  if (bySlug) return bySlug
+  const label = targetSlug === 'new_lead' ? 'new lead' : targetSlug.replace(/_/g, ' ')
+  return (
+    stages.find((s) => s.name.trim().toLowerCase() === label) ??
+    stages.find((s) => s.name.trim().toLowerCase().includes(label)) ??
+    stages[0]
+  )
 }
 
 export async function syncLeadOpportunityStage(
   tenantId: string,
   userId: string,
   lead: CrmLead,
-): Promise<void> {
-  if (lead.opportunityId) return // fully converted — owned by the Convert flow from here on
+): Promise<string | null> {
+  // Fully converted — Convert flow owns the deal from here on.
+  if (lead.opportunityId) return lead.opportunityId
+
   const targetSlug = LEAD_STAGE_TO_PIPELINE_SLUG[lead.stage]
-  if (!targetSlug) return
+  if (!targetSlug) return null
 
   const { ensureDefaultPipeline } = await import('../pipelines/pipeline.repository.js')
   const pipeline = await ensureDefaultPipeline(tenantId, userId)
-  const targetStage = pipeline.stages.find((s) => s.slug === targetSlug) ?? pipeline.stages[0]
-  if (!targetStage) return
+  const targetStage = resolveTargetStage(pipeline.stages, targetSlug)
+  if (!targetStage) return null
 
   const existing = await prisma.crmOpportunity.findFirst({
     where: { tenantId, leadId: lead.id, deletedAt: null },
@@ -38,7 +55,7 @@ export async function syncLeadOpportunityStage(
   })
 
   if (existing) {
-    if (existing.stageId === targetStage.id) return
+    if (existing.stageId === targetStage.id) return existing.id
     await prisma.crmOpportunity.update({
       where: { id: existing.id },
       data: {
@@ -49,16 +66,31 @@ export async function syncLeadOpportunityStage(
       },
     })
     const { recordStageHistory } = await import('../opportunities/opportunity.repository.js')
-    await recordStageHistory(tenantId, existing.id, existing.stageId, targetStage.id, userId, `Lead stage: ${lead.stage}`)
-    return
+    await recordStageHistory(
+      tenantId,
+      existing.id,
+      existing.stageId,
+      targetStage.id,
+      userId,
+      `Lead stage: ${lead.stage}`,
+    )
+    return existing.id
   }
 
-  const companyId = lead.companyId ?? (await ensureLeadCompany(prisma, tenantId, lead, userId))
+  let companyId = lead.companyId
+  if (!companyId) {
+    companyId = await ensureLeadCompany(prisma, tenantId, lead, userId)
+    await prisma.crmLead.update({
+      where: { id: lead.id },
+      data: { companyId, updatedBy: userId },
+    })
+  }
+
   const { nextCode } = await import('../../../services/codeSeries.service.js')
   const { createOpportunity } = await import('../opportunities/opportunity.repository.js')
   const opportunityCode = await nextCode(tenantId, 'OPPORTUNITY')
 
-  await createOpportunity(tenantId, userId, {
+  const created = await createOpportunity(tenantId, userId, {
     opportunityCode,
     opportunityName: lead.companyName ?? lead.prospectName,
     customerId: companyId,
@@ -73,6 +105,7 @@ export async function syncLeadOpportunityStage(
     productRequirement: lead.productRequirement ?? undefined,
     status: 'open',
   })
+  return created.id
 }
 
 /** Best-effort wrapper — a mirror failure must never block the lead write itself. */
@@ -80,9 +113,9 @@ export async function syncLeadOpportunityStageSafely(
   tenantId: string,
   userId: string,
   lead: CrmLead,
-): Promise<void> {
+): Promise<string | null> {
   try {
-    await syncLeadOpportunityStage(tenantId, userId, lead)
+    return await syncLeadOpportunityStage(tenantId, userId, lead)
   } catch (err) {
     console.error('[crm] Failed to sync lead → opportunity mirror', {
       tenantId,
@@ -90,5 +123,42 @@ export async function syncLeadOpportunityStageSafely(
       stage: lead.stage,
       err,
     })
+    return null
   }
+}
+
+/**
+ * Creates/updates opportunity mirrors for open leads that are missing one.
+ * Safe to call from Opportunities list (page 1) so historical leads appear under New/Qualified.
+ */
+export async function backfillMissingLeadOpportunityMirrors(
+  tenantId: string,
+  userId: string,
+  limit = 50,
+): Promise<number> {
+  const alreadyLinked = await prisma.crmOpportunity.findMany({
+    where: { tenantId, deletedAt: null, leadId: { not: null } },
+    select: { leadId: true },
+    distinct: ['leadId'],
+  })
+  const linkedIds = alreadyLinked.map((r) => r.leadId!).filter(Boolean)
+
+  const leads = await prisma.crmLead.findMany({
+    where: {
+      tenantId,
+      deletedAt: null,
+      opportunityId: null,
+      stage: { in: OPEN_MIRROR_STAGES },
+      ...(linkedIds.length ? { id: { notIn: linkedIds } } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  })
+
+  let synced = 0
+  for (const lead of leads) {
+    const id = await syncLeadOpportunityStageSafely(tenantId, userId, lead)
+    if (id) synced += 1
+  }
+  return synced
 }

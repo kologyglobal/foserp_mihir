@@ -1,6 +1,6 @@
 # Action Permission Visibility Report
 
-**Generated:** 2026-07-11
+**Generated:** 2026-07-29
 
 ## Rules
 

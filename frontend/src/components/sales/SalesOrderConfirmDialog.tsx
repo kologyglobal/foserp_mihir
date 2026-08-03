@@ -54,7 +54,8 @@ export function buildSalesOrderConfirmDefaults(order: SalesOrder): Omit<SalesOrd
   }
 }
 
-export function needsDirectSoReason(order: SalesOrder): boolean {
+/** Direct SO justification is optional — this only controls whether the field is shown. */
+export function showsDirectSoReason(order: SalesOrder): boolean {
   const quotationBacked = Boolean(order.quotationId)
   const directOrder = order.source === 'direct' || Boolean(order.directSoReason?.trim())
   return directOrder && !quotationBacked
@@ -71,9 +72,6 @@ export function validateSalesOrderConfirmValues(
   if (!values.deliveryTime.trim()) errors.push('Delivery time / lead time is required.')
   if (values.documentFile && !values.documentTypeCode.trim()) {
     errors.push('Document type is required when uploading a file.')
-  }
-  if (needsDirectSoReason(order) && !values.directSoReason.trim()) {
-    errors.push('Direct sales orders require a justification before confirmation.')
   }
   const grand = order.grandTotal != null ? Number(order.grandTotal) : 0
   if (!(grand > 0) && !(order.qty > 0 && (order.unitPrice ?? 0) > 0)) {
@@ -131,7 +129,7 @@ export function SalesOrderConfirmDialog({
     setLocalError(null)
   }, [open, order])
 
-  const requireDirectReason = useMemo(() => (order ? needsDirectSoReason(order) : false), [order])
+  const showDirectReason = useMemo(() => (order ? showsDirectSoReason(order) : false), [order])
 
   const selectedType = values.documentTypeCode
     ? getByCode('document-types', values.documentTypeCode)
@@ -287,16 +285,14 @@ export function SalesOrderConfirmDialog({
               onChange={(e) => patch({ requiredDate: e.target.value })}
             />
           </label>
-          {requireDirectReason ? (
+          {showDirectReason ? (
             <label className="block space-y-1.5 sm:col-span-2">
-              <span className="text-[12px] font-semibold text-erp-text">
-                Direct SO justification <span className="text-erp-danger">*</span>
-              </span>
+              <span className="text-[12px] font-semibold text-erp-text">Direct SO justification</span>
               <Textarea
                 rows={2}
                 value={values.directSoReason}
                 onChange={(e) => patch({ directSoReason: e.target.value })}
-                placeholder="Why is this order created without a quotation?"
+                placeholder="Optional: why is this order created without a quotation?"
               />
             </label>
           ) : null}

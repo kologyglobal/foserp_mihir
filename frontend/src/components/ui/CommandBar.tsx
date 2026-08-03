@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -173,23 +174,56 @@ export function CommandBarOverflowMenu({
 }) {
   const visible = actions.filter((a) => a.label)
   const [open, setOpen] = useState(false)
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
   const ref = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  const positionMenu = useCallback(() => {
+    const trigger = ref.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const menu = menuRef.current
+    const width = Math.max(menu?.offsetWidth ?? 0, 200)
+    const height = menu?.scrollHeight ?? visible.length * 34 + 8
+    const spaceBelow = window.innerHeight - rect.bottom - 8
+    const spaceAbove = rect.top - 8
+    const openUp = height > spaceBelow && spaceAbove > spaceBelow
+    setMenuStyle({
+      position: 'fixed',
+      left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+      top: openUp ? undefined : rect.bottom + 4,
+      bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
+      maxHeight: Math.max(120, (openUp ? spaceAbove : spaceBelow) - 4),
+      zIndex: 10050,
+    })
+  }, [visible.length])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    positionMenu()
+  }, [open, positionMenu])
 
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) return
+      setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
     document.addEventListener('mousedown', close)
     window.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', positionMenu, true)
+    window.addEventListener('resize', positionMenu)
     return () => {
       document.removeEventListener('mousedown', close)
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', positionMenu, true)
+      window.removeEventListener('resize', positionMenu)
     }
-  }, [open])
+  }, [open, positionMenu])
 
   if (visible.length === 0) return null
 
@@ -202,7 +236,10 @@ export function CommandBarOverflowMenu({
             'erp-command-more__icon-btn',
             open && 'erp-command-more__icon-btn--open',
           )}
-          onClick={() => setOpen((v) => !v)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setOpen((v) => !v)
+          }}
           aria-expanded={open}
           aria-haspopup="menu"
           aria-label={label}
@@ -215,39 +252,52 @@ export function CommandBarOverflowMenu({
           icon={TriggerIcon}
           label={label}
           accent
-          onClick={() => setOpen((v) => !v)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setOpen((v) => !v)
+          }}
           aria-expanded={open}
           aria-haspopup="menu"
           className={open ? 'border-erp-primary/35 bg-erp-primary-soft' : undefined}
         />
       )}
-      {open ? (
-        <div className="erp-command-more__menu" role="menu">
-          {visible.map((action) => {
-            const Icon = action.icon ?? Circle
-            return (
-              <button
-                key={action.id}
-                type="button"
-                role="menuitem"
-                className={cn(
-                  'erp-command-more__item',
-                  action.danger && 'erp-command-more__item--danger',
-                )}
-                disabled={action.disabled}
-                title={action.disabled ? action.disabledReason : undefined}
-                onClick={() => {
-                  setOpen(false)
-                  action.onClick?.()
-                }}
-              >
-                <Icon className="h-4 w-4 shrink-0 opacity-70" />
-                {action.label}
-              </button>
-            )
-          })}
-        </div>
-      ) : null}
+      {open && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="erp-command-more__menu erp-command-more__menu--portal"
+              style={menuStyle}
+              role="menu"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {visible.map((action) => {
+                const Icon = action.icon ?? Circle
+                return (
+                  <button
+                    key={action.id}
+                    type="button"
+                    role="menuitem"
+                    className={cn(
+                      'erp-command-more__item',
+                      action.danger && 'erp-command-more__item--danger',
+                    )}
+                    disabled={action.disabled}
+                    title={action.disabled ? action.disabledReason : undefined}
+                    onClick={() => {
+                      setOpen(false)
+                      action.onClick?.()
+                    }}
+                  >
+                    <Icon className="h-4 w-4 shrink-0 opacity-70" />
+                    {action.label}
+                  </button>
+                )
+              })}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }

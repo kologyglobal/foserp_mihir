@@ -435,3 +435,63 @@ export async function findLeadAssignmentHistory(tenantId: string, leadId: string
     orderBy: { createdAt: 'desc' },
   })
 }
+
+/**
+ * After an opportunity is deleted: clear convert lock and reopen Converted leads as Qualified.
+ * Mirror-only leads (open New/Qualified with opportunity.leadId but no convert) are left unchanged.
+ */
+export async function releaseLeadsLinkedToOpportunity(
+  tenantId: string,
+  opportunityId: string,
+  userId: string,
+  opportunityLeadId?: string | null,
+): Promise<number> {
+  const candidates = await prisma.crmLead.findMany({
+    where: {
+      tenantId,
+      deletedAt: null,
+      OR: [
+        { opportunityId },
+        ...(opportunityLeadId ? [{ id: opportunityLeadId }] : []),
+      ],
+    },
+  })
+
+  let released = 0
+  for (const lead of candidates) {
+    const linkedByConvertFk = lead.opportunityId === opportunityId
+    const converted =
+      lead.stage === 'converted_to_opportunity' || lead.lifecycleStatus === 'converted'
+    // Converted lead whose convert target is this opp (by FK or by opportunity.leadId)
+    const shouldRelease =
+      linkedByConvertFk
+      || (converted && opportunityLeadId === lead.id && (!lead.opportunityId || lead.opportunityId === opportunityId))
+
+    if (!shouldRelease) continue
+
+    const fromStage = lead.stage
+    const toStage = 'qualified'
+    await prisma.crmLead.update({
+      where: { id: lead.id, tenantId },
+      data: {
+        stage: toStage,
+        lifecycleStatus: 'qualified',
+        opportunityId: null,
+        convertedAt: null,
+        updatedBy: userId,
+      },
+    })
+    await prisma.crmLeadStatusHistory.create({
+      data: {
+        tenantId,
+        leadId: lead.id,
+        fromStage,
+        toStage,
+        changedBy: userId,
+        reason: 'Opportunity deleted — lead reopened as Qualified',
+      },
+    })
+    released += 1
+  }
+  return released
+}

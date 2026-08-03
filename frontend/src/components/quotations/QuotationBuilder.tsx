@@ -108,7 +108,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
       headerPatch.deliveryTerms = resolveCommercialTermSelectValue('delivery-terms', fromSections.deliveryTerms)
     }
     if (!quotation.validityDate && headerPatch.validityDate === undefined) {
-      /* leave empty — user must set */
+      headerPatch.validityDate = addDays(new Date().toISOString(), 30)
     }
 
     if (Object.keys(headerPatch).length > 0) {
@@ -311,20 +311,23 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
     else notify.error(r.error ?? 'Failed to save PDF')
   }
 
+  const openPreview = () => navigate(`/crm/quotations/${doc.quotationId}/preview?doc=${documentId}`)
+  const canSubmitApproval = !locked && doc.status === 'draft'
+
   const secondaryActions = [
-    { id: 'preview', label: 'Preview', icon: Eye, onClick: () => navigate(`/crm/quotations/${doc.quotationId}/preview?doc=${documentId}`) },
+    ...(canSubmitApproval
+      ? [{ id: 'preview', label: 'Preview', icon: Eye, onClick: openPreview }]
+      : []),
     { id: 'print', label: 'Print', icon: Printer, onClick: () => navigate(`/crm/quotations/${doc.quotationId}/print?doc=${documentId}`) },
     { id: 'pdf', label: 'Export PDF', icon: Download, onClick: handleGeneratePdf },
+    ...(doc.status === 'approved'
+      ? [{ id: 'mark-sent', label: 'Send to Customer', icon: Send, onClick: () => { void markSent(documentId) } }]
+      : []),
     { id: 'dms', label: 'Save to DMS', icon: FileText, onClick: handleSavePdfToDms },
+    ...(revisionPolicy.canCreateRevision
+      ? [{ id: 'new-revision', label: 'New Revision', icon: GitBranch, onClick: handleNewRevision }]
+      : []),
   ]
-
-  if (doc.status === 'approved') {
-    secondaryActions.splice(3, 0, { id: 'mark-sent', label: 'Send to Customer', icon: Send, onClick: () => { void markSent(documentId) } })
-  }
-
-  if (revisionPolicy.canCreateRevision) {
-    secondaryActions.push({ id: 'new-revision', label: 'New Revision', icon: GitBranch, onClick: handleNewRevision })
-  }
 
   return (
     <OperationalPageShell
@@ -339,18 +342,14 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
         { label: 'Editor' },
       )}
       autoBreadcrumbs={false}
-      actions={
-        <Link to={`/crm/quotations/${doc.quotationId}`}>
-          <ErpButton variant="secondary" size="sm" icon={ArrowLeft}>Quote 360</ErpButton>
-        </Link>
-      }
+      backLink={{ to: `/crm/quotations/${doc.quotationId}`, label: 'Back to Quote 360' }}
       commandBar={
         <ErpCommandBar
           sticky={false}
           primaryAction={
-            !locked && doc.status === 'draft'
+            canSubmitApproval
               ? { id: 'submit-approval', label: 'Submit Approval', icon: CheckCircle, onClick: () => void handleSubmitApprovalClick() }
-              : { id: 'preview', label: 'Preview Document', icon: Eye, onClick: () => navigate(`/crm/quotations/${doc.quotationId}/preview?doc=${documentId}`) }
+              : { id: 'preview', label: 'Preview Document', icon: Eye, onClick: openPreview }
           }
           secondaryActions={secondaryActions}
         />
@@ -573,10 +572,6 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
         onSave={flashSaved}
         saveDisabled={!canEdit}
         saveDisabledReason={locked ? 'Document is locked' : 'Document cannot be edited'}
-        onPreview={() => navigate(`/crm/quotations/${doc.quotationId}/preview?doc=${documentId}`)}
-        onSubmitApproval={!locked && doc.status === 'draft' ? handleSubmitApprovalClick : undefined}
-        showSubmitApproval={!locked && doc.status === 'draft'}
-        onGeneratePdf={handleGeneratePdf}
         onSaveAndClose={handleSaveAndClose}
       />
     </OperationalPageShell>

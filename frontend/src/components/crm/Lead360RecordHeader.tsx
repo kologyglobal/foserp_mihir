@@ -97,9 +97,10 @@ export function Lead360RecordHeader({
   const stageLabel = leadStageLabel(lead.stage)
   const priorityLabel = leadPriorityLabel(lead.priority)
   const ownerName = lead.leadOwnerName?.trim() || '—'
+  const canQuote = !isConverted
   const canQuoteViaOpp = Boolean(quoteOpportunityId)
   const convertPrimary = canConvert
-  const quotePrimary = canQuoteViaOpp && !convertPrimary
+  const quotePrimary = canQuote && !convertPrimary
   const editPrimary = canEdit && !convertPrimary && !quotePrimary
 
   const moreActions: CommandBarOverflowAction[] = [
@@ -111,7 +112,7 @@ export function Lead360RecordHeader({
             icon: Calendar,
             onClick: onScheduleActivity,
           },
-          ...(canQuoteViaOpp
+          ...(canQuote
             ? [
                 {
                   id: 'quotation',
@@ -201,13 +202,17 @@ export function Lead360RecordHeader({
             <ErpButton size="sm" variant="secondary" icon={Calendar} onClick={onScheduleActivity} title="Schedule Activity">
               Schedule
             </ErpButton>
-            {canQuoteViaOpp ? (
+            {canQuote ? (
               <ErpButton
                 size="sm"
                 variant={quotePrimary ? 'primary' : 'secondary'}
                 icon={FileText}
                 onClick={onCreateQuotation}
-                title="Create Quotation"
+                title={
+                  canQuoteViaOpp
+                    ? 'Create Quotation'
+                    : 'Qualifies the lead if needed, then opens quotation'
+                }
               >
                 Quotation
               </ErpButton>
@@ -222,7 +227,9 @@ export function Lead360RecordHeader({
           onClick={onConvert}
           disabled={!canConvert}
           disabledReason={
-            isConverted ? 'Already converted' : 'Qualify and link company first'
+            isConverted
+              ? 'Already converted'
+              : 'Requires convert permission — open leads are auto-qualified on click'
           }
           title="Convert to Opportunity"
         >

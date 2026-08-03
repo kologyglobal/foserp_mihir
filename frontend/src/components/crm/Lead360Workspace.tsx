@@ -74,8 +74,8 @@ import {
 import {
   leadPriorityLabel,
   leadStageLabel,
-  resolveLeadConvertActionGate,
 } from '@/utils/leadUtils'
+import { ensureLeadReadyForCommercialAction } from '@/utils/leadConvertPrepare'
 import {
   formatMissingStageFieldsMessage,
   getLeadStageCompleteness,
@@ -106,6 +106,8 @@ export function Lead360Workspace() {
   const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
   const advanceLeadStage = useSalesStore((s) => s.advanceLeadStage)
   const archiveLead = useSalesStore((s) => s.archiveLead)
+  const updateLead = useSalesStore((s) => s.updateLead)
+  const getLead = useSalesStore((s) => s.getLead)
 
   const [toast, setToast] = useState<string | null>(null)
   const [followUpOpen, setFollowUpOpen] = useState(false)
@@ -167,6 +169,52 @@ export function Lead360Workspace() {
   const linkedOpportunity = quoteOpportunityId
     ? opportunities.find((o) => o.id === quoteOpportunityId)
     : undefined
+
+  const prepareCommercialAction = useCallback(async () => {
+    if (!lead) return null
+    const ready = await ensureLeadReadyForCommercialAction(lead, {
+      customers,
+      updateLead,
+      advanceLeadStage,
+      getLead,
+      opportunities: () => useCrmStore.getState().opportunities,
+      canConvertPermission: canCrmPermission('crm.lead.convert'),
+      canQualifyPermission: canCrmPermission('crm.lead.qualify'),
+    })
+    if (!ready.ok) {
+      notify.warning(ready.reason)
+      return null
+    }
+    if (ready.qualifiedNow) {
+      notify.success('Lead qualified')
+    }
+    return ready
+  }, [lead, customers, updateLead, advanceLeadStage, getLead])
+
+  const goCreateOpportunity = useCallback(async () => {
+    const ready = await prepareCommercialAction()
+    if (!ready) return
+    navigate(
+      `/crm/opportunities/new?customerId=${encodeURIComponent(ready.customerId)}&leadId=${encodeURIComponent(ready.lead.id)}`,
+    )
+  }, [prepareCommercialAction, navigate])
+
+  const goCreateQuotation = useCallback(async () => {
+    const ready = await prepareCommercialAction()
+    if (!ready) return
+    const oppId =
+      ready.opportunityId
+      ?? primaryLinkedOpportunityIdForLead(ready.lead, useCrmStore.getState().opportunities)
+    if (oppId) {
+      navigate(`/crm/quotations/new?opportunityId=${encodeURIComponent(oppId)}`)
+      return
+    }
+    notify.warning('Lead is ready — create the opportunity, then quotation')
+    navigate(
+      `/crm/opportunities/new?customerId=${encodeURIComponent(ready.customerId)}&leadId=${encodeURIComponent(ready.lead.id)}`,
+    )
+  }, [prepareCommercialAction, navigate])
+
   const customerQuotations = useMemo(
     () => (lead?.customerId ? quotations.filter((q) => q.customerId === lead.customerId).slice(0, 5) : []),
     [quotations, lead?.customerId],
@@ -185,19 +233,8 @@ export function Lead360Workspace() {
       onEdit: lead ? () => navigate(routes.edit(lead.id)) : undefined,
       onFollowUp: () => setFollowUpOpen(true),
       onCall: lead?.mobile ? () => window.open(`tel:${lead.mobile}`) : () => setLogActivityOpen(true),
-      onCreateQuotation: quoteOpportunityId
-        ? () => navigate(`/crm/quotations/new?opportunityId=${quoteOpportunityId}`)
-        : undefined,
-      onCreateOpportunity: lead
-        ? () => {
-            const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
-            if (!gate.ok) {
-              notify.warning(gate.reason)
-              return
-            }
-            navigate(`/crm/opportunities/new?customerId=${encodeURIComponent(lead.customerId!)}&leadId=${encodeURIComponent(lead.id)}`)
-          }
-        : undefined,
+      onCreateQuotation: lead ? () => { void goCreateQuotation() } : undefined,
+      onCreateOpportunity: lead ? () => { void goCreateOpportunity() } : undefined,
     },
     Boolean(lead),
   )
@@ -329,9 +366,9 @@ export function Lead360Workspace() {
   const canConvertOpp =
     canConvertLeadPerm
     && editPolicy.mode !== 'limited'
-    && lead.stage === 'qualified'
-    && Boolean(lead.customerId)
     && !isConverted
+    && !isClosed
+    && lead.stage !== 'not_qualified'
   const canClose = canEdit && editPolicy.canChangeStage && lead.stage !== 'closed' && !isConverted
 
   const {
@@ -518,16 +555,10 @@ export function Lead360Workspace() {
       onEdit={() => navigate(routes.edit(lead.id))}
       onScheduleActivity={() => setFollowUpOpen(true)}
       onCreateQuotation={() => {
-        if (!quoteOpportunityId) return
-        navigate(`/crm/quotations/new?opportunityId=${quoteOpportunityId}`)
+        void goCreateQuotation()
       }}
       onConvert={() => {
-        const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
-        if (!gate.ok) {
-          notify.warning(gate.reason)
-          return
-        }
-        navigate(`/crm/opportunities/new?customerId=${encodeURIComponent(lead.customerId ?? '')}&leadId=${encodeURIComponent(lead.id)}`)
+        void goCreateOpportunity()
       }}
       onLogActivity={() => setLogActivityOpen(true)}
       onViewHistory={() => setHistoryOpen(true)}
@@ -542,18 +573,11 @@ export function Lead360Workspace() {
       input={smartOverviewInput}
       onGoToSection={handleSmartOverviewAction}
       onCreateOpportunity={() => {
-        const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
-        if (!gate.ok) {
-          notify.warning(gate.reason)
-          return
-        }
-        navigate(`/crm/opportunities/new?customerId=${encodeURIComponent(lead.customerId!)}&leadId=${encodeURIComponent(lead.id)}`)
+        void goCreateOpportunity()
       }}
-      onCreateQuotation={
-        quoteOpportunityId
-          ? () => navigate(`/crm/quotations/new?opportunityId=${encodeURIComponent(quoteOpportunityId)}`)
-          : undefined
-      }
+      onCreateQuotation={() => {
+        void goCreateQuotation()
+      }}
       onScheduleFollowUp={() => setFollowUpOpen(true)}
       onLogActivity={() => setLogActivityOpen(true)}
     />

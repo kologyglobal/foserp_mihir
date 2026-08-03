@@ -1,3 +1,290 @@
+/* CRM Lead create/edit — structured capture workspace.
+   The corresponding crm-lead-zoho-* markup intentionally stays page-scoped so
+   other CRM card forms keep their existing density. */
+.crm-lead-form-page--zoho .crm-lead-form-body {
+  gap: 14px;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-layout {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+  min-width: 0;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail {
+  position: sticky;
+  top: 12px;
+  z-index: 3;
+  min-width: 0;
+  padding: 14px 12px 12px;
+  border: 1px solid var(--dyn-border, #e1e5ea);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__eyebrow {
+  margin: 0 0 3px;
+  color: var(--dyn-primary, #0078d4);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__title {
+  margin: 0 0 12px;
+  color: var(--dyn-text, #1f2933);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__item {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--dyn-text-secondary, #5f6b7a);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__item:hover {
+  color: var(--dyn-primary, #0078d4);
+  background: color-mix(in srgb, var(--dyn-primary, #0078d4) 7%, #fff);
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__item:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--dyn-primary, #0078d4) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #c8cdd3;
+  border-radius: 50%;
+  color: #fff;
+  background: #fff;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__item.is-done {
+  color: var(--dyn-text, #1f2933);
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__item.is-done .crm-lead-zoho-rail__marker {
+  border-color: #107c10;
+  background: #107c10;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__label {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__progress {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dyn-border, #e1e5ea);
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  color: var(--dyn-text-secondary, #5f6b7a);
+  font-size: 10.5px;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__progress-meta strong {
+  color: var(--dyn-primary, #0078d4);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__bar {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf0f3;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dyn-primary, #0078d4);
+  transition: width 220ms ease;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-canvas > [id] {
+  min-width: 0;
+  scroll-margin-top: 16px;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-block > .erp-field-group,
+.crm-lead-form-page--zoho #lead-section-enquiry-notes > .erp-field-group {
+  overflow: visible;
+  padding: 0 16px 16px;
+  border: 1px solid var(--dyn-border, #e1e5ea);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-block > .erp-field-group > .erp-field-group__label,
+.crm-lead-form-page--zoho #lead-section-enquiry-notes > .erp-field-group > .erp-field-group__label {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 -16px 14px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--dyn-border, #e1e5ea);
+  color: var(--dyn-text, #1f2933);
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-form-grid--cols-3,
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-form-grid--cols-4 {
+  gap: 14px 16px;
+}
+
+.crm-opportunity-form-page--zoho .crm-opportunity-info__name {
+  grid-column: span 3;
+}
+
+.crm-quotation-form-page--zoho .crm-quotation-info__source,
+.crm-quotation-form-page--zoho .crm-quotation-info__template {
+  grid-column: span 2;
+}
+
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-field-label,
+.crm-lead-form-page--zoho #lead-section-enquiry-notes .erp-field-label {
+  margin-bottom: 5px;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-input,
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-select,
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-smart-select__control {
+  min-height: 36px;
+}
+
+.crm-lead-form-page--zoho #lead-section-enquiry-notes textarea.erp-input {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-canvas > div > .erp-card-section,
+.crm-lead-form-page--zoho .crm-lead-zoho-canvas > div > .erp-product-pricing-section {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
+}
+
+@media (max-width: 1279px) {
+  .crm-lead-form-page--zoho .crm-lead-zoho-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail {
+    position: static;
+    padding: 10px 12px;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__eyebrow,
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__title {
+    display: none;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__list {
+    flex-direction: row;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__item {
+    display: inline-flex;
+    width: auto;
+    min-width: max-content;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__progress {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__progress-meta {
+    margin-bottom: 4px;
+  }
+}
+
+@media (max-width: 899px) {
+  .crm-opportunity-form-page--zoho .crm-opportunity-info__name,
+  .crm-quotation-form-page--zoho .crm-quotation-info__source,
+  .crm-quotation-form-page--zoho .crm-quotation-info__template {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 767px) {
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail {
+    margin-inline: -4px;
+    border-radius: 8px;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-block > .erp-field-group,
+  .crm-lead-form-page--zoho #lead-section-enquiry-notes > .erp-field-group {
+    padding: 0 12px 12px;
+    border-radius: 8px;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-block > .erp-field-group > .erp-field-group__label,
+  .crm-lead-form-page--zoho #lead-section-enquiry-notes > .erp-field-group > .erp-field-group__label {
+    margin-inline: -12px;
+    padding-inline: 12px;
+  }
+}
 /* vite-tailwind-layer-shim: keep @layer valid when Vite HMR processes this file alone */
 @tailwind components;
 
@@ -3330,42 +3617,43 @@ a.crm-companies-table__name:hover {
   position: relative;
   overflow: hidden;
   margin-bottom: 0;
-  border-radius: 14px;
+  border-radius: 10px;
   border: 1px solid var(--erp-border);
   background:
-    linear-gradient(145deg, color-mix(in srgb, var(--erp-primary) 4%, #fff) 0%, #fff 42%, #f8fafc 100%);
+    linear-gradient(145deg, color-mix(in srgb, var(--erp-primary) 3%, #fff) 0%, #fff 48%, #f8fafc 100%);
   color: var(--erp-text);
-  box-shadow: var(--erp-shadow-sm);
+  box-shadow: none;
 }
 
 .customer-360-hero__glow {
   position: absolute;
   right: -48px;
   top: -48px;
-  width: 240px;
-  height: 240px;
+  width: 200px;
+  height: 200px;
   border-radius: 999px;
-  background: radial-gradient(circle, color-mix(in srgb, var(--erp-primary) 14%, transparent) 0%, transparent 68%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--erp-primary) 10%, transparent) 0%, transparent 68%);
   pointer-events: none;
 }
 
 .customer-360-hero__inner {
   position: relative;
   display: grid;
-  gap: 16px;
-  padding: 20px 20px 16px;
+  gap: 12px;
+  padding: 12px 14px 10px;
 }
 
 @media (min-width: 1024px) {
   .customer-360-hero__inner {
-    grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.8fr);
+    grid-template-columns: minmax(0, 1.7fr) minmax(220px, 0.75fr);
     align-items: stretch;
+    gap: 14px;
   }
 }
 
 .customer-360-hero__identity {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
 }
 
@@ -3373,34 +3661,33 @@ a.crm-companies-table__name:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
-  border-radius: 14px;
-  font-size: 18px;
+  border-radius: 10px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--erp-primary);
   background: color-mix(in srgb, var(--erp-primary) 10%, #fff);
   border: 1px solid color-mix(in srgb, var(--erp-primary) 22%, var(--erp-border));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .customer-360-hero__badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .customer-360-hero__type {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: var(--erp-muted);
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
@@ -3408,16 +3695,16 @@ a.crm-companies-table__name:hover {
 
 .customer-360-hero__name {
   margin: 0;
-  font-size: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  font-size: clamp(1.05rem, 1rem + 0.35vw, 1.25rem);
   font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
   color: var(--erp-text);
 }
 
 .customer-360-hero__code {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 2px 0 0;
+  font-size: 11px;
   font-family: var(--erp-font-family-mono, ui-monospace, monospace);
   color: var(--erp-muted);
 }
@@ -3425,36 +3712,36 @@ a.crm-companies-table__name:hover {
 .customer-360-hero__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 14px;
-  margin-top: 12px;
-  font-size: 13px;
+  gap: 6px 12px;
+  margin-top: 8px;
+  font-size: 12px;
   color: var(--erp-muted);
 }
 
 .customer-360-hero__meta span {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .customer-360-hero__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .customer-360-hero__action {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 8px;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--erp-primary) 28%, var(--erp-border));
   background: color-mix(in srgb, var(--erp-primary) 8%, #fff);
   color: var(--erp-primary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
@@ -3475,19 +3762,18 @@ a.crm-companies-table__name:hover {
 }
 
 .customer-360-hero__contact-card {
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95);
   border: 1px solid var(--erp-border);
-  backdrop-filter: blur(6px);
 }
 
 .customer-360-hero__contact-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -3495,8 +3781,8 @@ a.crm-companies-table__name:hover {
 }
 
 .customer-360-hero__contact-name {
-  margin: 8px 0 0;
-  font-size: 16px;
+  margin: 5px 0 0;
+  font-size: 14px;
   font-weight: 600;
   color: var(--erp-text);
 }
@@ -3504,18 +3790,18 @@ a.crm-companies-table__name:hover {
 .customer-360-hero__contact-lines {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 4px;
+  margin-top: 8px;
 }
 
 .customer-360-hero__contact-link {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   border: none;
   background: none;
   padding: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--erp-primary);
   text-align: left;
   cursor: pointer;
@@ -3526,16 +3812,16 @@ a.crm-companies-table__name:hover {
 }
 
 .customer-360-hero__contact-muted {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--erp-muted);
 }
 
 .customer-360-hero__gst {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 12px 0 0;
-  padding-top: 10px;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-top: 8px;
   border-top: 1px dashed #e2e8f0;
   font-size: 11px;
   color: var(--erp-muted);
@@ -3544,7 +3830,7 @@ a.crm-companies-table__name:hover {
 .customer-360-hero__stats {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   border-top: 1px solid var(--erp-border);
   background: #eef2f7;
@@ -3552,31 +3838,32 @@ a.crm-companies-table__name:hover {
 
 @media (min-width: 768px) {
   .customer-360-hero__stats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 
 .customer-360-hero__stat {
-  padding: 12px 14px;
+  padding: 8px 10px;
   background: #fff;
 }
 
 .customer-360-hero__stat-label {
   display: block;
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 650;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .customer-360-hero__stat-value {
   display: block;
-  margin-top: 4px;
-  font-size: 15px;
+  margin-top: 2px;
+  font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--erp-text);
+  line-height: 1.25;
 }
 
 .customer-360-hero__stat--warning .customer-360-hero__stat-value {
@@ -3590,22 +3877,28 @@ a.crm-companies-table__name:hover {
 .customer-360-workspace {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.65rem;
 }
 
 .customer-360-tab-panel {
   min-width: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--erp-border);
   background: var(--erp-surface);
-  padding: 1rem 1.25rem 1.25rem;
-  box-shadow: var(--erp-shadow-sm);
+  padding: 0.65rem 0.75rem 0.85rem;
+  box-shadow: none;
 }
 
 .customer-360-tab-body {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.65rem;
+}
+
+.customer-360-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
 }
 
 .customer-360-insight {
@@ -3613,53 +3906,319 @@ a.crm-companies-table__name:hover {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px 16px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--erp-primary) 22%, var(--erp-border));
-  background: linear-gradient(90deg, color-mix(in srgb, var(--erp-primary) 8%, #fff), #fff 55%);
+  gap: 8px 12px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--erp-primary) 16%, var(--erp-border));
+  background: color-mix(in srgb, var(--erp-primary) 4%, #fff);
 }
 
 .customer-360-insight__eyebrow {
   margin: 0;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--erp-primary);
 }
 
 .customer-360-insight__title {
-  margin: 4px 0 0;
-  font-size: 14px;
+  margin: 1px 0 0;
+  font-size: 12.5px;
   font-weight: 650;
   color: var(--erp-text);
+  line-height: 1.35;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+}
+
+.customer-360-insight__pipe {
+  color: #cbd5e1;
+  font-weight: 400;
 }
 
 .customer-360-insight__desc {
-  margin: 2px 0 0;
-  font-size: 12px;
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 450;
+  color: var(--erp-muted);
+}
+
+/* Equal-height twin pane board */
+.customer-360-board {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #e8edf3;
+}
+
+@media (min-width: 960px) {
+  .customer-360-board:not(.customer-360-board--contacts) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+
+.customer-360-board--contacts {
+  background: #fff;
+  gap: 0;
+  padding: 0;
+}
+
+.customer-360-board__pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100%;
+  background: #fff;
+  padding: 10px 12px 12px;
+}
+
+.customer-360-board__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.customer-360-board__head--row {
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.customer-360-board__head-start {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.customer-360-board__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  color: var(--erp-primary);
+  background: color-mix(in srgb, var(--erp-primary) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--erp-primary) 18%, var(--erp-border));
+}
+
+.customer-360-board__icon--teal {
+  color: #0f766e;
+  background: color-mix(in srgb, #0f766e 10%, #fff);
+  border-color: color-mix(in srgb, #0f766e 20%, var(--erp-border));
+}
+
+.customer-360-board__icon--slate {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.customer-360-board__icon--blue {
+  color: var(--erp-primary);
+}
+
+.customer-360-board__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--erp-text);
+  line-height: 1.25;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.customer-360-board__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.15rem;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.customer-360-board__sub {
+  margin: 1px 0 0;
+  font-size: 11px;
+  color: var(--erp-muted);
+  line-height: 1.3;
+}
+
+.customer-360-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid #e8edf3;
+  border-radius: 8px;
+  overflow: hidden;
+  flex: 1;
+  align-content: start;
+  background: #e8edf3;
+}
+
+.customer-360-facts--3 {
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-top: 8px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .customer-360-facts,
+  .customer-360-facts--3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.customer-360-fact {
+  display: grid;
+  grid-template-columns: minmax(72px, 34%) minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 6px 8px;
+  background: #fff;
+  border-right: 1px solid #eef2f7;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.customer-360-fact--wide {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(88px, 18%) minmax(0, 1fr);
+}
+
+.customer-360-fact__k {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.customer-360-fact__v {
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--erp-text);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.customer-360-fact__mono {
+  font-family: var(--erp-font-family-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.customer-360-fact__link {
+  color: var(--erp-primary);
+  text-decoration: none;
+}
+
+.customer-360-fact__link:hover {
+  text-decoration: underline;
+}
+
+.customer-360-money {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid #e8edf3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #e8edf3;
+}
+
+@media (max-width: 720px) {
+  .customer-360-money {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.customer-360-money__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 8px;
+  background: #fff;
+}
+
+.customer-360-money__cell--primary {
+  background: color-mix(in srgb, var(--erp-primary) 3.5%, #fff);
+}
+
+.customer-360-money__k {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.customer-360-money__v {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--erp-text);
+  line-height: 1.2;
+}
+
+.customer-360-money__v.is-warn {
+  color: #b45309;
+}
+
+.customer-360-contacts {
+  padding: 8px 10px 10px;
+}
+
+.customer-360-contacts__legacy {
+  margin: 6px 2px 0;
+  font-size: 11px;
   color: var(--erp-muted);
 }
 
 .customer-360-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 16px;
+  gap: 8px 12px;
 }
 
 .customer-360-field__label {
   display: block;
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 650;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .customer-360-field__value {
   display: block;
-  margin-top: 4px;
+  margin-top: 2px;
   font-size: 13px;
   font-weight: 550;
   color: var(--erp-text);
@@ -3668,14 +4227,14 @@ a.crm-companies-table__name:hover {
 
 .customer-360-activity {
   margin-top: 0;
-  padding: 10px 12px 4px;
+  padding: 8px 10px 2px;
   border: 1px solid #eef0f3;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fff;
 }
 
 .customer-360-activity__title {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -3685,7 +4244,7 @@ a.crm-companies-table__name:hover {
 
 .customer-360-layout {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .customer-360-main {
@@ -3695,7 +4254,7 @@ a.crm-companies-table__name:hover {
 .customer-360-aside {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .customer-360-empty__icon {
@@ -9797,6 +10356,15 @@ a.crm-companies-table__name:hover {
 
 .crm-opp-picker {
   position: relative;
+}
+
+.crm-opp-picker--disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.crm-opp-picker--disabled .erp-search-field {
+  pointer-events: none;
 }
 
 .crm-opp-picker__dropdown {
@@ -18171,6 +18739,41 @@ a.crm-companies-table__name:hover {
   .pi-print-totals__row--grand {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+}
+
+/* ── Sales order / proforma / quotation print pagination ──────────────── */
+@media print {
+  /* Chrome treats a non-visible overflow box as monolithic, so a letterhead
+     taller than one sheet loses everything after page 1. */
+  .so-print-doc,
+  .pi-print-doc {
+    overflow: visible;
+  }
+
+  .so-print-table thead,
+  .pi-print-table thead,
+  .quo-print-price thead,
+  .quo-print-spec thead {
+    display: table-header-group;
+  }
+
+  .so-print-table tr,
+  .pi-print-table tr,
+  .quo-print-price tr,
+  .quo-print-spec tr {
+    break-inside: avoid;
+  }
+
+  .so-print-parties,
+  .so-print-party,
+  .so-print-totals,
+  .so-print-signatures,
+  .pi-print-parties,
+  .pi-print-party,
+  .pi-print-totals,
+  .pi-print-signatures {
+    break-inside: avoid;
   }
 }
 

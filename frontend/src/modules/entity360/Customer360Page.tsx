@@ -19,6 +19,7 @@ import {
   ShoppingCart,
   Target,
   Truck,
+  User,
   Wallet,
 } from 'lucide-react'
 import { Entity360Panel } from '../../components/design-system/Entity360Shell'
@@ -69,7 +70,6 @@ import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import {
   EnterpriseFormSectionNav,
 } from '../../design-system/workspace'
-import { ErpCardSection } from '../../components/erp/card-form'
 import {
   buildCompanyAiInsight,
   buildCompanyKeyDetails,
@@ -462,6 +462,14 @@ export function Customer360Page() {
       tone: financeOutstanding > 0 ? ('warning' as const) : ('success' as const),
     },
     {
+      label: 'Invoiced',
+      value: financeMoneyVisible ? formatCurrency(financeInvoiced) : '—',
+    },
+    {
+      label: 'Credit days',
+      value: `${customer.creditDays || 0}d`,
+    },
+    {
       label: 'Contacts',
       value: String(crmContacts.length),
     },
@@ -675,7 +683,7 @@ export function Customer360Page() {
           <div className="customer-360-tab-panel">
             <div className="customer-360-tab-body">
       {tab === 'overview' && (
-        <div className="customer-360-overview space-y-4">
+        <div className="customer-360-overview">
           {(nextCrmFollowUp || companyStatus?.label) ? (
             <div className="customer-360-insight" role="status">
               <div className="customer-360-insight__copy">
@@ -684,11 +692,12 @@ export function Customer360Page() {
                   {nextCrmFollowUp
                     ? `Follow-up due ${formatDate(nextCrmFollowUp.dueDate)}`
                     : smartNextAction.title}
-                </p>
-                <p className="customer-360-insight__desc">
-                  {nextCrmFollowUp
-                    ? `${nextCrmFollowUp.followUpType.replace(/_/g, ' ')} · ${nextCrmFollowUp.assignedToName || 'Unassigned'}`
-                    : smartNextAction.description}
+                  <span className="customer-360-insight__pipe">·</span>
+                  <span className="customer-360-insight__desc">
+                    {nextCrmFollowUp
+                      ? `${nextCrmFollowUp.followUpType.replace(/_/g, ' ')} · ${nextCrmFollowUp.assignedToName || 'Unassigned'}`
+                      : smartNextAction.description}
+                  </span>
                 </p>
               </div>
               <Button
@@ -710,146 +719,267 @@ export function Customer360Page() {
             </div>
           ) : null}
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ErpCardSection
-              title={COMPANY_TERMINOLOGY.profile}
-              subtitle="Identity, territory and credit"
-              icon={Target}
-              accent="blue"
-              columns={2}
-              collapsible
-              defaultOpen
-            >
-              <div className="customer-360-field-grid">
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Party status</span>
-                  <span className="customer-360-field__value"><CompanyCustomerBadge company={customer} /></span>
+          <section className="customer-360-board" aria-label="Company overview">
+            <div className="customer-360-board__pane">
+              <header className="customer-360-board__head">
+                <span className="customer-360-board__icon customer-360-board__icon--blue" aria-hidden>
+                  <Target className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="customer-360-board__title">{COMPANY_TERMINOLOGY.profile}</h3>
+                  <p className="customer-360-board__sub">Identity · tax · credit · address</p>
                 </div>
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Industry</span>
-                  <span className="customer-360-field__value"><TypeBadge value={customer.customerType} color="blue" /></span>
+              </header>
+
+              <div className="customer-360-facts">
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Party</span>
+                  <span className="customer-360-fact__v"><CompanyCustomerBadge company={customer} /></span>
                 </div>
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">City</span>
-                  <span className="customer-360-field__value">{customer.city || '—'}</span>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Status</span>
+                  <span className="customer-360-fact__v"><ActiveBadge isActive={customer.isActive} /></span>
                 </div>
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Contact</span>
-                  <span className="customer-360-field__value">{customer.contactPerson || '—'}</span>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Type</span>
+                  <span className="customer-360-fact__v"><TypeBadge value={customer.customerType} color="blue" /></span>
                 </div>
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Credit limit</span>
-                  <span className="customer-360-field__value">
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Industry</span>
+                  <span className="customer-360-fact__v">{customer.industry?.trim() || customer.customerType?.toUpperCase() || '—'}</span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Territory</span>
+                  <span className="customer-360-fact__v">{customer.salesTerritory || '—'}</span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Owner</span>
+                  <span className="customer-360-fact__v">{customer.ownerName?.trim() || '—'}</span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Credit limit</span>
+                  <span className="customer-360-fact__v tabular-nums">
                     {formatCurrency(customer.creditLimit && customer.creditLimit > 0 ? customer.creditLimit : data.creditLimit)}
                   </span>
                 </div>
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Status</span>
-                  <span className="customer-360-field__value"><ActiveBadge isActive={customer.isActive} /></span>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Credit days</span>
+                  <span className="customer-360-fact__v tabular-nums">
+                    {customer.creditDays != null ? `${customer.creditDays} days` : '—'}
+                  </span>
                 </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">GSTIN</span>
+                  <span className="customer-360-fact__v customer-360-fact__mono">
+                    {customer.gstin?.trim() || '—'}
+                  </span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">PAN</span>
+                  <span className="customer-360-fact__v customer-360-fact__mono">
+                    {customer.pan?.trim() || '—'}
+                  </span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Contact</span>
+                  <span className="customer-360-fact__v">{customer.contactPerson || '—'}</span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Phone</span>
+                  <span className="customer-360-fact__v tabular-nums">
+                    {customer.contactPhone ? (
+                      <a href={`tel:${customer.contactPhone}`} className="customer-360-fact__link">{customer.contactPhone}</a>
+                    ) : '—'}
+                  </span>
+                </div>
+                <div className="customer-360-fact customer-360-fact--wide">
+                  <span className="customer-360-fact__k">Email</span>
+                  <span className="customer-360-fact__v">
+                    {customer.contactEmail ? (
+                      <a href={`mailto:${customer.contactEmail}`} className="customer-360-fact__link">{customer.contactEmail}</a>
+                    ) : '—'}
+                  </span>
+                </div>
+                <div className="customer-360-fact customer-360-fact--wide">
+                  <span className="customer-360-fact__k">Billing address</span>
+                  <span className="customer-360-fact__v">
+                    {[
+                      customer.addressLine1,
+                      customer.addressLine2,
+                      [customer.city, customer.state, customer.pincode].filter(Boolean).join(', '),
+                      customer.country,
+                    ].filter(Boolean).join(' · ') || '—'}
+                  </span>
+                </div>
+                {(customer.shippingAddress || customer.shippingCity) ? (
+                  <div className="customer-360-fact customer-360-fact--wide">
+                    <span className="customer-360-fact__k">Shipping</span>
+                    <span className="customer-360-fact__v">
+                      {[
+                        customer.shippingAddress,
+                        customer.shippingAddressLine2,
+                        [customer.shippingCity, customer.shippingState, customer.shippingPincode].filter(Boolean).join(', '),
+                      ].filter(Boolean).join(' · ') || '—'}
+                    </span>
+                  </div>
+                ) : null}
+                {(customer.deliveryAddress || customer.deliveryCity) ? (
+                  <div className="customer-360-fact customer-360-fact--wide">
+                    <span className="customer-360-fact__k">Delivery</span>
+                    <span className="customer-360-fact__v">
+                      {[
+                        customer.deliveryAddress,
+                        customer.deliveryAddressLine2,
+                        [customer.deliveryCity, customer.deliveryState, customer.deliveryPincode].filter(Boolean).join(', '),
+                      ].filter(Boolean).join(' · ') || '—'}
+                    </span>
+                  </div>
+                ) : null}
               </div>
-            </ErpCardSection>
+            </div>
 
-            <ErpCardSection
-              title="Commercial snapshot"
-              subtitle="Orders, receivables and CRM pulse"
-              icon={Wallet}
-              accent="teal"
-              columns={2}
-              collapsible
-              defaultOpen
-            >
-              <div className="customer-360-field-grid">
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Outstanding</span>
-                  <span className="customer-360-field__value">
+            <div className="customer-360-board__pane">
+              <header className="customer-360-board__head">
+                <span className="customer-360-board__icon customer-360-board__icon--teal" aria-hidden>
+                  <Wallet className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="customer-360-board__title">Commercial position</h3>
+                  <p className="customer-360-board__sub">Receivables · fulfilment · CRM pulse</p>
+                </div>
+              </header>
+
+              <div className="customer-360-money" role="group" aria-label="Money metrics">
+                <div className="customer-360-money__cell customer-360-money__cell--primary">
+                  <span className="customer-360-money__k">Outstanding</span>
+                  <span className={`customer-360-money__v${financeOutstanding > 0 ? ' is-warn' : ''}`}>
                     {financeMoneyVisible ? formatCurrency(financeOutstanding) : '—'}
                   </span>
                 </div>
-                {isApiMode() ? (
-                  <>
-                    <div className="customer-360-field">
-                      <span className="customer-360-field__label">Invoiced</span>
-                      <span className="customer-360-field__value">
-                        {financeMoneyVisible ? formatCurrency(financeInvoiced) : '—'}
-                      </span>
-                    </div>
-                    <div className="customer-360-field">
-                      <span className="customer-360-field__label">Collected</span>
-                      <span className="customer-360-field__value">
-                        {financeMoneyVisible ? formatCurrency(financeCollected) : '—'}
-                      </span>
-                    </div>
-                    <div className="customer-360-field">
-                      <span className="customer-360-field__label">Dispatched value</span>
-                      <span className="customer-360-field__value">{formatCurrency(financeDispatched)}</span>
-                    </div>
-                  </>
-                ) : null}
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Open orders</span>
-                  <span className="customer-360-field__value">{data.openSo.length}</span>
+                <div className="customer-360-money__cell customer-360-money__cell--primary">
+                  <span className="customer-360-money__k">Invoiced</span>
+                  <span className="customer-360-money__v">
+                    {financeMoneyVisible ? formatCurrency(financeInvoiced) : '—'}
+                  </span>
                 </div>
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Dispatch pending</span>
-                  <span className="customer-360-field__value">{data.pendingDispatch.length}</span>
+                <div className="customer-360-money__cell customer-360-money__cell--primary">
+                  <span className="customer-360-money__k">Collected</span>
+                  <span className="customer-360-money__v">
+                    {financeMoneyVisible ? formatCurrency(financeCollected) : '—'}
+                  </span>
                 </div>
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Payment pending</span>
-                  <span className="customer-360-field__value">{data.paymentPending.length}</span>
+                <div className="customer-360-money__cell customer-360-money__cell--primary">
+                  <span className="customer-360-money__k">Ordered</span>
+                  <span className="customer-360-money__v">
+                    {financeMoneyVisible ? formatCurrency(financeOrdered) : '—'}
+                  </span>
                 </div>
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Next follow-up</span>
-                  <span className="customer-360-field__value">{crmSummary?.nextFollowUpDate ?? '—'}</span>
+                <div className="customer-360-money__cell">
+                  <span className="customer-360-money__k">Dispatched</span>
+                  <span className="customer-360-money__v">{formatCurrency(financeDispatched)}</span>
                 </div>
-                <div className="customer-360-field">
-                  <span className="customer-360-field__label">Last CRM activity</span>
-                  <span className="customer-360-field__value">
+                <div className="customer-360-money__cell">
+                  <span className="customer-360-money__k">Open SO</span>
+                  <span className="customer-360-money__v">{data.openSo.length}</span>
+                </div>
+                <div className="customer-360-money__cell">
+                  <span className="customer-360-money__k">Dispatch pending</span>
+                  <span className="customer-360-money__v">{data.pendingDispatch.length}</span>
+                </div>
+                <div className="customer-360-money__cell">
+                  <span className="customer-360-money__k">Payment pending</span>
+                  <span className="customer-360-money__v">{data.paymentPending.length}</span>
+                </div>
+              </div>
+
+              <div className="customer-360-facts customer-360-facts--3">
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Pipeline</span>
+                  <span className="customer-360-fact__v tabular-nums">{formatCrmCurrency(crmSummary?.pipelineValue ?? 0)}</span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Open opps</span>
+                  <span className="customer-360-fact__v tabular-nums">
+                    {crmSummary?.openOpportunities ?? customerCrmOpps.filter((o) => o.status === 'open').length}
+                  </span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Quotations</span>
+                  <span className="customer-360-fact__v tabular-nums">{data.customerQuotations.length}</span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Proformas</span>
+                  <span className="customer-360-fact__v tabular-nums">{customerProformas.length}</span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Next follow-up</span>
+                  <span className="customer-360-fact__v">
+                    {crmSummary?.nextFollowUpDate ? formatDate(crmSummary.nextFollowUpDate) : '—'}
+                  </span>
+                </div>
+                <div className="customer-360-fact">
+                  <span className="customer-360-fact__k">Last activity</span>
+                  <span className="customer-360-fact__v">
                     {crmSummary?.lastActivityAt ? formatDate(crmSummary.lastActivityAt) : '—'}
                   </span>
                 </div>
               </div>
-            </ErpCardSection>
-          </div>
+            </div>
+          </section>
 
         {id && (
-          <Entity360Panel title="Contacts">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[12px] text-erp-muted">
-                {crmContacts.length} contact{crmContacts.length === 1 ? '' : 's'} linked to this company
-              </p>
+          <section className="customer-360-board customer-360-board--contacts" aria-label="Contacts">
+            <header className="customer-360-board__head customer-360-board__head--row">
+              <div className="customer-360-board__head-start">
+                <span className="customer-360-board__icon customer-360-board__icon--slate" aria-hidden>
+                  <User className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="customer-360-board__title">
+                    Contacts
+                    <span className="customer-360-board__count">{crmContacts.length}</span>
+                  </h3>
+                  <p className="customer-360-board__sub">
+                    {crmContacts.length === 0
+                      ? 'No contacts linked yet'
+                      : 'People who buy, approve, and follow up'}
+                  </p>
+                </div>
+              </div>
               <Button size="sm" onClick={() => navigate(`/crm/contacts/new?customerId=${id}`)}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                <Plus className="mr-1 h-3.5 w-3.5" />
                 New Contact
               </Button>
+            </header>
+            <div className="customer-360-contacts">
+              <DataGrid
+                data={crmContacts}
+                columns={[
+                  {
+                    accessorKey: 'name',
+                    header: 'Contact',
+                    cell: ({ row }) => (
+                      <TableLink to={`/crm/contacts/${row.original.id}`}>
+                        {row.original.name}
+                        {row.original.isPrimary ? ' · Primary' : ''}
+                      </TableLink>
+                    ),
+                  },
+                  { accessorKey: 'designation', header: 'Designation' },
+                  { accessorKey: 'department', header: 'Department', cell: ({ row }) => row.original.department || '—' },
+                  { accessorKey: 'phone', header: 'Phone' },
+                  { accessorKey: 'email', header: 'Email' },
+                ]}
+                compact
+                emptyMessage="No contacts yet — add the first contact for this company."
+              />
+              {customerContacts.length > crmContacts.length ? (
+                <p className="customer-360-contacts__legacy">
+                  {customerContacts.length - crmContacts.length} legacy master contact(s) also on file.
+                </p>
+              ) : null}
             </div>
-            <DataGrid
-              data={crmContacts}
-              columns={[
-                {
-                  accessorKey: 'name',
-                  header: 'Contact',
-                  cell: ({ row }) => (
-                    <TableLink to={`/crm/contacts/${row.original.id}`}>
-                      {row.original.name}
-                      {row.original.isPrimary ? ' · Primary' : ''}
-                    </TableLink>
-                  ),
-                },
-                { accessorKey: 'designation', header: 'Designation' },
-                { accessorKey: 'department', header: 'Department', cell: ({ row }) => row.original.department || '—' },
-                { accessorKey: 'phone', header: 'Phone' },
-                { accessorKey: 'email', header: 'Email' },
-              ]}
-              compact
-              emptyMessage="No contacts yet — add the first contact for this company."
-            />
-            {customerContacts.length > crmContacts.length ? (
-              <p className="mt-2 text-[11px] text-erp-muted">
-                {customerContacts.length - crmContacts.length} legacy master contact(s) also on file.
-              </p>
-            ) : null}
-          </Entity360Panel>
+          </section>
         )}
         <CustomerTrailerQrPanel customerId={customer.id} customerName={customer.customerName} />
         </div>

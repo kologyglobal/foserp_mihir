@@ -5,7 +5,7 @@
 | | Score |
 |---|-------|
 | Before | 38/100 |
-| After | **80/100** |
+| After | **68/100** |
 | Target | 95+/100 |
 | Verdict | **Needs follow-up** |
 
@@ -32,7 +32,7 @@ All CRM entity pages populate from connected store data when hydration runs.
 
 ## Tests
 
-`npm run test:crm-eeata-fix`: 24 passed, 4 failed
+`npm run test:crm-eeata-fix`: 21 passed, 7 failed
 
 ## Remaining Gaps
 
@@ -40,4 +40,4 @@ All CRM entity pages populate from connected store data when hydration runs.
 - PDF export for quotations (preview exists)
 - Deep WhatsApp integration (action links only)
 
-Generated: 2026-07-13T16:36:20.718Z
+Generated: 2026-07-29T08:55:23.492Z

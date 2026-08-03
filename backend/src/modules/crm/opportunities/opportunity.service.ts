@@ -40,6 +40,12 @@ async function mapOpportunityWithNames(
 }
 
 export async function listOpportunities(tenantId: string, query: ListOpportunitiesQuery, userId?: string) {
+  // Ensure every open lead appears under Opportunities New/Qualified (create + historical backfill).
+  if (userId && (!query.page || query.page <= 1)) {
+    const { backfillMissingLeadOpportunityMirrors } = await import('../leads/lead-opportunity-sync.js')
+    await backfillMissingLeadOpportunityMirrors(tenantId, userId, 50)
+  }
+
   const { loadCrmOrgScopeWhere } = await import('../shared/crm-org-scope.js')
   const orgScope = await loadCrmOrgScopeWhere(tenantId, userId)
   const result = await repo.findOpportunities(tenantId, query, orgScope as never)
@@ -132,6 +138,10 @@ export async function deleteOpportunity(tenantId: string, id: string, userId: st
   const existing = await repo.findOpportunityById(tenantId, id)
   if (!existing) throw new NotFoundError('Opportunity not found')
   await repo.softDeleteOpportunity(tenantId, id, userId)
+
+  // Converted leads stay "Converted" until the deal link is cleared — reopen as Qualified.
+  const { releaseLeadsLinkedToOpportunity } = await import('../leads/lead.repository.js')
+  await releaseLeadsLinkedToOpportunity(tenantId, id, userId, existing.leadId)
 }
 
 export async function winOpportunity(tenantId: string, id: string, userId: string, input: WinOpportunityInput) {

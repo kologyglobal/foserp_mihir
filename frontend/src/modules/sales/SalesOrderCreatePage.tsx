@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
   Building2,
+  Check,
   ClipboardList,
   ExternalLink,
   FileImage,
@@ -21,9 +22,8 @@ import {
   ErpCardSection,
   ErpFieldGroup,
   ErpFieldRow,
-  ErpQuickEntrySection,
-  ErpStickySaveBar,
 } from '../../components/erp/card-form'
+import { FormActionBar } from '../../components/erp/FormActionBar'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip'
@@ -76,6 +76,7 @@ import {
   type SalesOrderCreateMode,
 } from '../../components/sales/SalesOrderCreateModeChooser'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
+import { cn } from '../../utils/cn'
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
 
@@ -250,6 +251,7 @@ export function SalesOrderNewPage() {
   const fromOpportunity = Boolean(opportunityPrefill)
   const createTitle = fromOpportunity ? 'Create Sales Order' : 'New Sales Order'
 
+  /** Pending approved quotes for SO create — exclude already converted / already linked SOs. */
   const quotationOptions = useMemo(() => {
     const latestByQuotation = new Map<string, (typeof quotationDocuments)[0]>()
     for (const doc of quotationDocuments) {
@@ -257,7 +259,17 @@ export function SalesOrderNewPage() {
       if (!cur || doc.revisionNo > cur.revisionNo) latestByQuotation.set(doc.quotationId, doc)
     }
     return [...latestByQuotation.values()]
-      .filter((d) => d.status === 'approved' || d.status === 'converted')
+      .filter((doc) => {
+        // Latest doc that can convert to SO: approved or customer-sent; not converted/rejected.
+        if (doc.status !== 'approved' && doc.status !== 'sent') return false
+        const q = getQuotation(doc.quotationId)
+        if (!q) return false
+        if (q.salesOrderId) return false
+        if (q.status === 'converted' || q.status === 'cancelled') return false
+        // Customer-first: only list quotes for the selected bill-to
+        if (!customerId || q.customerId !== customerId) return false
+        return true
+      })
       .map((doc) => {
         const q = getQuotation(doc.quotationId)
         const cust = q ? customers.find((c) => c.id === q.customerId) : undefined
@@ -273,14 +285,13 @@ export function SalesOrderNewPage() {
           (doc.totalAmount > 0 ? doc.totalAmount : null)
           ?? (q?.pricing?.grandTotal && q.pricing.grandTotal > 0 ? q.pricing.grandTotal : null)
           ?? 0
-        const statusLabel = doc.status === 'converted' ? 'Converted' : 'Approved'
         const owner = doc.salesOwnerName?.trim()
         return {
           value: doc.id,
           label: `${quotationNo} · Rev ${doc.revisionNo}`,
           subtitle: companyBits.join(' · '),
           trailing: total > 0 ? formatCurrency(total) : '—',
-          badge: owner ? `${statusLabel} · ${owner}` : statusLabel,
+          badge: owner ? `Pending SO · ${owner}` : 'Pending SO',
           searchText: [
             quotationNo,
             companyName,
@@ -289,7 +300,6 @@ export function SalesOrderNewPage() {
             cust?.state,
             cust?.gstin,
             owner,
-            statusLabel,
             String(total),
           ]
             .filter(Boolean)
@@ -298,7 +308,7 @@ export function SalesOrderNewPage() {
         }
       })
       .sort((a, b) => a.label.localeCompare(b.label))
-  }, [quotationDocuments, getQuotation, customers])
+  }, [quotationDocuments, getQuotation, customers, customerId])
 
   const customerOptions = useMemo(
     () => customers.map((c) => ({ id: c.id, label: `${c.customerCode} · ${c.customerName}` })),
@@ -388,6 +398,20 @@ export function SalesOrderNewPage() {
     if (inheritedLoc) setLocationId(inheritedLoc)
     const loc = inheritedLoc ? locations.find((l) => l.id === inheritedLoc) : null
     if (loc) setDeliveryLocation(locationDisplayLabel(loc))
+  }
+
+  /** Customer-first flow: changing customer clears an incompatible quotation selection. */
+  function handleCustomerChange(nextCustomerId: string) {
+    setCustomerId(nextCustomerId)
+    if (!quotationDocumentId) return
+    const doc = getQuotationDocument(quotationDocumentId)
+    const q = doc ? getQuotation(doc.quotationId) : undefined
+    if (!nextCustomerId || !q || q.customerId !== nextCustomerId) {
+      setQuotationDocumentId('')
+      if (createMode === 'quotation' && directSoReason.startsWith('Approved quotation handover')) {
+        setDirectSoReason('')
+      }
+    }
   }
 
   function handleCreateModeChange(mode: SoCreateMode) {
@@ -687,18 +711,6 @@ export function SalesOrderNewPage() {
     ? getQuotation(opportunityPrefill.quotationId)?.quotationNo
     : undefined
   const quotationDisplayNo = linkedQuotationNo ?? opportunityQuotationNo ?? '—'
-
-  const documentStrip = [
-    { label: 'SO No.', value: 'Auto on save' },
-    { label: 'Status', value: 'Draft SO' },
-    { label: 'Mode', value: modeBadgeLabel, highlight: true },
-    { label: 'Customer', value: customer?.customerName ?? '—', highlight: Boolean(customerId) },
-    { label: 'Customer PO', value: customerPoNumber.trim() || '—', highlight: Boolean(customerPoNumber.trim()) },
-    { label: 'Quotation', value: createMode === 'quotation' ? quotationDisplayNo : '—', highlight: createMode === 'quotation' && quotationDisplayNo !== '—' },
-    { label: 'Opportunity', value: opportunityPrefill?.opportunityNo ?? '—', highlight: Boolean(opportunityPrefill) },
-    { label: 'Lines', value: String(lines.length), highlight: lines.length > 0 },
-    { label: 'Grand Total', value: orderSummary.grandTotal > 0 ? formatCurrency(orderSummary.grandTotal) : '—', highlight: orderSummary.grandTotal > 0 },
-  ]
 
   const recordTitle = fromOpportunity && opportunityPrefill
     ? opportunityPrefill.opportunityName
@@ -1173,35 +1185,12 @@ export function SalesOrderNewPage() {
         ) : null}
       </div>
 
-      {createMode === 'quotation' ? (
-        <ErpFieldRow
-          label="Quotation Number (Reference)"
-          required
-          colSpan={3}
-          dataField="quotationDocumentId"
-          fieldError={validationErrors.quotationDocumentId}
-          hint="Approved quotations only — selecting one fills customer, lines, and terms"
-        >
-          <ErpSmartSelect
-            options={quotationOptions}
-            value={quotationDocumentId}
-            onChange={(v) => {
-              if (v) applyQuotation(v)
-              else setQuotationDocumentId('')
-            }}
-            allowEmpty
-            placeholder="Search quotation no, customer, city, amount…"
-            dropdownMinWidth={480}
-          />
-        </ErpFieldRow>
-      ) : null}
-
       <ErpFieldGroup label="Bill-to customer" className="so-qe-customer-group">
         <ErpFieldRow label="Customer" required colSpan={3} dataField="customerId" fieldError={validationErrors.customerId}>
           <QuickCreateSelect
             entityType="customer"
             value={customerId}
-            onChange={setCustomerId}
+            onChange={handleCustomerChange}
             options={customerOptions}
             placeholder="Search by code, name, or city…"
           />
@@ -1281,6 +1270,40 @@ export function SalesOrderNewPage() {
         )}
       </ErpFieldGroup>
 
+      {createMode === 'quotation' ? (
+        <ErpFieldRow
+          label="Quotation Number (Reference)"
+          required
+          colSpan={3}
+          dataField="quotationDocumentId"
+          fieldError={validationErrors.quotationDocumentId}
+          hint={
+            !customerId
+              ? 'Select a customer first — only their approved quotations without a sales order appear here'
+              : quotationOptions.length === 0
+                ? 'No pending approved quotations for this customer (already converted or not ready yet)'
+                : 'Pending quotations (no sales order yet) — selecting one fills lines and commercial terms'
+          }
+        >
+          <ErpSmartSelect
+            options={quotationOptions}
+            value={quotationDocumentId}
+            onChange={(v) => {
+              if (v) applyQuotation(v)
+              else setQuotationDocumentId('')
+            }}
+            allowEmpty
+            disabled={!customerId}
+            placeholder={
+              customerId
+                ? 'Search pending quotation no, amount…'
+                : 'Select a customer first…'
+            }
+            dropdownMinWidth={480}
+          />
+        </ErpFieldRow>
+      ) : null}
+
       <ErpFieldGroup label="Customer purchase order" className="so-qe-po-group" columns={4}>
         <ErpFieldRow label="Customer PO Number" dataField="customerPoNumber" fieldError={validationErrors.customerPoNumber}>
           <Input
@@ -1299,13 +1322,15 @@ export function SalesOrderNewPage() {
             onChange={(e) => setExpectedDeliveryDate(e.target.value)}
           />
         </ErpFieldRow>
+        <ErpFieldRow label="Create Mode" readOnly>
+          <Input value={modeBadgeLabel} readOnly />
+        </ErpFieldRow>
       </ErpFieldGroup>
     </>
   )
 
   const linesSection = (
     <ErpCardSection
-      id="so-section-lines"
       nbaTarget="lines"
       title="Product & Pricing"
       subtitle="Build line items, then review adjustments and the live order total."
@@ -1322,7 +1347,6 @@ export function SalesOrderNewPage() {
 
   const commercialSection = (
     <ErpCardSection
-      id="so-section-commercial"
       title="Commercial & Delivery"
       subtitle="Payment, fulfilment location, and optional notes."
       icon={Banknote}
@@ -1333,7 +1357,7 @@ export function SalesOrderNewPage() {
       columns={1}
     >
       <div className="so-commercial-body">
-        <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={3}>
+        <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={4}>
           <ErpFieldRow label="Payment Terms" dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
             <CommercialTermSelect
               termType="payment"
@@ -1366,6 +1390,9 @@ export function SalesOrderNewPage() {
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </Select>
+          </ErpFieldRow>
+          <ErpFieldRow label="Order Total" readOnly>
+            <Input value={formatCurrency(orderSummary.grandTotal)} readOnly />
           </ErpFieldRow>
         </ErpFieldGroup>
 
@@ -1416,7 +1443,6 @@ export function SalesOrderNewPage() {
 
   const documentsSection = (
     <ErpCardSection
-      id="so-section-documents"
       title="Document Attachments"
       subtitle="PDF, images, Excel, drawings, and customer PO."
       icon={Paperclip}
@@ -1524,30 +1550,50 @@ export function SalesOrderNewPage() {
   ) : null
 
   const formBody = (
-    <div className="erp-form-body crm-so-create-body">
+    <div className="erp-form-body crm-lead-form-body crm-so-create-body">
       {contextBanner}
-      <ErpQuickEntrySection
-        id="so-section-quick"
-        title="Quick Entry"
-        subtitle={
-          createMode === 'quotation'
-            ? 'From quotation — pick an approved quote, then confirm PO details.'
-            : 'Direct sales order — choose customer and PO; quotation not required.'
-        }
-        collapsedSummary={
-          customer
-            ? `${customer.customerName}${customerPoNumber ? ` · PO ${customerPoNumber}` : ''}`
-            : createMode === 'quotation'
-              ? 'Select quotation and customer'
-              : 'Select customer and PO'
-        }
-      >
-        {customerFields}
-      </ErpQuickEntrySection>
+      <div className="crm-lead-zoho-layout">
+        <nav className="crm-lead-zoho-rail" aria-label="Sales order form sections">
+          <p className="crm-lead-zoho-rail__eyebrow">Create Sales Order</p>
+          <p className="crm-lead-zoho-rail__title">Sections</p>
+          <ul className="crm-lead-zoho-rail__list">
+            {completionItems.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={cn('crm-lead-zoho-rail__item', item.done && 'is-done')}
+                  onClick={() => scrollToSection(item.id)}
+                >
+                  <span className="crm-lead-zoho-rail__marker" aria-hidden>
+                    {item.done ? <Check size={12} strokeWidth={2.5} /> : null}
+                  </span>
+                  <span className="crm-lead-zoho-rail__label">{item.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="crm-lead-zoho-rail__progress" aria-label={`${completionPercent}% complete`}>
+            <div className="crm-lead-zoho-rail__progress-meta">
+              <span>Completion</span>
+              <strong>{completionPercent}%</strong>
+            </div>
+            <div className="crm-lead-zoho-rail__bar">
+              <div className="crm-lead-zoho-rail__bar-fill" style={{ width: `${completionPercent}%` }} />
+            </div>
+          </div>
+        </nav>
 
-      {linesSection}
-      {commercialSection}
-      {documentsSection}
+        <div className="crm-lead-form-flow crm-lead-zoho-canvas">
+          <div id="so-section-quick" className="crm-lead-quick-entry crm-lead-zoho-block">
+            <ErpFieldGroup label="Sales Order Information" columns={4} className="crm-lead-zoho-section">
+              {customerFields}
+            </ErpFieldGroup>
+          </div>
+          <div id="so-section-lines">{linesSection}</div>
+          <div id="so-section-commercial">{commercialSection}</div>
+          <div id="so-section-documents">{documentsSection}</div>
+        </div>
+      </div>
     </div>
   )
 
@@ -1578,10 +1624,11 @@ export function SalesOrderNewPage() {
       <CrmCardFormShell
         title={createTitle}
         badge={fromCrm ? 'CRM' : 'Sales'}
-        className={`${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview crm-so-create-page`}
+        className={`${ENTERPRISE_FORM_CLASS} crm-lead-form-page crm-lead-form-page--zoho crm-sales-order-form-page--zoho enterprise-workspace--crm-smart-overview crm-so-create-page`}
         collapsibleFactBox
         factBoxLabel="Smart Context"
         suppressFactBoxRecord
+        hideRecordBar
         stickyFooter
         recordNo="New"
         recordTitle={recordTitle}
@@ -1602,18 +1649,17 @@ export function SalesOrderNewPage() {
             ? crmChildBreadcrumbs('Sales Orders', CRM_SALES_ORDERS_PATH, 'New')
             : salesChildBreadcrumbs('Sales Orders', '/sales/orders', createTitle)
         }
-        documentStrip={documentStrip}
         factBox={factBox}
         onSubmit={handleSubmit}
         onSaveShortcut={() => persist('save')}
         onSaveCloseShortcut={() => persist('save_close')}
         onSaveAndNewShortcut={() => persist('save_new')}
         footer={(
-          <ErpStickySaveBar
+          <FormActionBar
             sticky
-            cancelTo={listPath}
-            submitLabel="Save"
-            isSubmitting={isSubmitting}
+            busy={isSubmitting}
+            dirty={Boolean(customerId || quotationDocumentId || customerPoNumber.trim() || hasValidLines)}
+            onCancel={() => navigate(listPath)}
             onSave={() => void persist('save')}
             onSaveAndNew={() => void persist('save_new')}
             onSaveAndClose={() => void persist('save_close')}

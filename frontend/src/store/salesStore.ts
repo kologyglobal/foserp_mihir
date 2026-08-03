@@ -224,7 +224,7 @@ interface SalesState {
     paymentTerms: string
     deliveryTerms: string
     deliveryTime: string
-    directSoReason: string
+    directSoReason?: string
     expectedDeliveryDate?: string
     deliveryLocation?: string
     locationId?: string | null
@@ -1049,7 +1049,6 @@ export const useSalesStore = create<SalesState>()(
       createDirectSalesOrder: (input) => {
         const perm = assertPermission('sales', 'create')
         if (!perm.ok) return perm
-        if (!input.directSoReason?.trim()) return { ok: false, error: 'Reason for direct SO is required' }
         // Customer PO number, payment terms, delivery terms, and delivery time are optional
         // at create time — enforced later at SO confirmation.
 
@@ -1113,7 +1112,7 @@ export const useSalesStore = create<SalesState>()(
           itemId: primary.itemId ?? null,
           qty: totalQty,
           requiredDate: input.expectedDeliveryDate ?? addDays(new Date().toISOString(), 60),
-          remarks: `Direct SO — ${input.directSoReason}`,
+          remarks: input.directSoReason?.trim() ? `Direct SO — ${input.directSoReason.trim()}` : 'Direct SO',
           quotationId: input.quotationId ?? '',
           quotationNo: input.quotationNo ?? '',
           quotationRevisionNo: input.quotationRevisionNo ?? 0,
@@ -1137,7 +1136,7 @@ export const useSalesStore = create<SalesState>()(
           basicAmount,
           gstAmount,
           internalRemarks: input.internalRemarks,
-          directSoReason: input.directSoReason,
+          directSoReason: input.directSoReason?.trim() || null,
           lines: builtLines,
           source: input.quotationId || input.opportunityId ? 'quotation' : 'direct',
         })

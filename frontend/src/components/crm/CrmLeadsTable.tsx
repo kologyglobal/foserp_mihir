@@ -278,7 +278,7 @@ export function CrmLeadsTable({
                     disabled: !onCreateQuotation,
                     title: quoteOppId
                       ? undefined
-                      : 'Requires a linked opportunity — convert the lead first',
+                      : 'Qualifies the lead if needed, then opens quotation (or opportunity first)',
                   },
                 ]}
               />

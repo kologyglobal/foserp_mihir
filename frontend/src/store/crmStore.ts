@@ -28,7 +28,11 @@ import { applyPrimaryContactFlags, syncCrmContactToMaster, syncPrimaryToCustomer
 import { getStageProbability, opportunityStageLabel } from '../utils/opportunityUtils'
 import { opportunityRequirementDisplay } from '../utils/leadRequirementLines'
 import { leadStageLabel, resolveLeadConvertToOpportunityGate } from '../utils/leadUtils'
-import { LEAD_STAGE_TO_OPPORTUNITY_STAGE } from '../utils/leadOpportunitySync'
+import {
+  LEAD_STAGE_TO_OPPORTUNITY_STAGE,
+  reopenLeadAfterOpportunityDelete,
+  shouldReopenLeadAfterOpportunityDelete,
+} from '../utils/leadOpportunitySync'
 import { DEFAULT_QUOTATION_TEMPLATES } from '../data/quotations/quotationTemplates'
 import { buildCrmSampleData, emptyCrmState } from '../data/crm/crmSampleSeed'
 import { mergeAudit, stampCreated, stampModified } from '../utils/audit'
@@ -82,6 +86,15 @@ import { validateFollowUpAt } from '../utils/validation/crmDatePolicy'
 
 function genId(prefix: string) {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
+}
+
+const DEFAULT_VALIDITY_DAYS = 30
+
+/** Header validity is required to convert to a sales order — never leave it unset on create. */
+function defaultQuotationValidityDate(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + DEFAULT_VALIDITY_DAYS)
+  return d.toISOString().slice(0, 10)
 }
 
 /** Block non-sales items at the first CRM write — not only at SO convert. */
@@ -880,7 +893,17 @@ export const useCrmStore = create<CrmState>()(
 
       deleteOpportunity: (id) => {
         if (isApiMode()) return import('../services/bridges/crmApiBridge').then((m) => m.apiDeleteOpportunity(id))
+        const opp = get().getOpportunity(id)
         set((s) => ({ opportunities: s.opportunities.filter((o) => o.id !== id) }))
+        if (opp) {
+          useSalesStore.setState((s) => ({
+            leads: s.leads.map((lead) =>
+              shouldReopenLeadAfterOpportunityDelete(lead, id, opp.leadId)
+                ? reopenLeadAfterOpportunityDelete(lead)
+                : lead,
+            ),
+          }))
+        }
         return { ok: true }
       },
 
@@ -1544,7 +1567,7 @@ export const useCrmStore = create<CrmState>()(
           || resolveCommercialTermSelectValue('delivery-terms', deliveryDefault.text)
           || deliveryDefault.text
         const deliveryTime = extras?.deliveryTime?.trim() || resolveDefaultDeliveryTime()
-        const validityDate = extras?.validityDate?.trim() || undefined
+        const validityDate = extras?.validityDate?.trim() || defaultQuotationValidityDate()
         // Human-readable requirement — never the encoded <!--fos-lead-lines--> payload.
         const requirementText = opportunityRequirementDisplay(opp.productRequirement)
         const commercialNotes = requirementText
@@ -1731,7 +1754,7 @@ export const useCrmStore = create<CrmState>()(
           || resolveCommercialTermSelectValue('delivery-terms', deliveryDefault.text)
           || deliveryDefault.text
         const deliveryTime = extras?.deliveryTime?.trim() || resolveDefaultDeliveryTime()
-        const validityDate = extras?.validityDate?.trim() || undefined
+        const validityDate = extras?.validityDate?.trim() || defaultQuotationValidityDate()
         const commercialNotes = extras?.scopeNotes?.trim() || undefined
         const qty = resolvedLines[0]?.qty ?? 1
         const productRequirement = resolvedLines
@@ -1908,6 +1931,20 @@ export const useCrmStore = create<CrmState>()(
           )
         }
 
+        // Locked headers cannot be edited — mirror backend convert backfill for demo mode.
+        let resolvedValidity = salesQuo?.validityDate?.trim() || ''
+        if (!resolvedValidity) {
+          const base = (salesQuo?.createdAt ?? new Date().toISOString()).slice(0, 10)
+          const d = new Date(base)
+          d.setDate(d.getDate() + DEFAULT_VALIDITY_DAYS)
+          resolvedValidity = d.toISOString().slice(0, 10)
+          useSalesStore.setState((s) => ({
+            quotations: s.quotations.map((q) =>
+              q.id === doc.quotationId ? { ...q, validityDate: resolvedValidity } : q,
+            ),
+          }))
+        }
+
         const line = primaryPriceLine(doc)
         const lines = syncLineTotals(doc.priceLines).filter((l) => !l.isOptional)
         const summary = calcPriceSummary(lines, doc.freightAmount, doc.installationAmount, doc.customCharges)
@@ -1937,7 +1974,7 @@ export const useCrmStore = create<CrmState>()(
           technicalNotes: doc.technicalNotes ?? sectionContent(doc, 'technical'),
           customerPoNumber: handover?.customerPoNumber,
           customerPoDate: handover?.customerPoDate,
-          expectedDeliveryDate: handover?.expectedDeliveryDate,
+          expectedDeliveryDate: handover?.expectedDeliveryDate || resolvedValidity,
           deliveryLocation: handover?.deliveryLocation,
           locationId: handover?.locationId ?? salesQuo?.locationId ?? opportunity?.locationId ?? null,
           internalRemarks: handover?.internalRemarks,

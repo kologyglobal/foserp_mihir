@@ -24,6 +24,9 @@ export const CUSTOMER_APPROVAL_STATUSES = ['pending', 'approved', 'rejected'] as
 
 export const DEFAULT_GST_PCT = 18
 
+/** Align with frontend quotation create default (`crmStore` / quotation create page). */
+export const DEFAULT_VALIDITY_DAYS = 30
+
 /** Align with frontend `types/crm.ts` — auto-approve when discount ≤ this % */
 export const DISCOUNT_APPROVAL_THRESHOLD = 10
 export const APPROVAL_AMOUNT_THRESHOLD = 5_000_000

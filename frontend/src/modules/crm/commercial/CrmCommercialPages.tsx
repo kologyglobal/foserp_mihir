@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
   Building2,
+  Check,
   ChevronRight,
   ClipboardList,
   Download,
@@ -14,18 +15,23 @@ import {
   Receipt,
   Send,
   ShoppingBag,
+  Trash2,
   XCircle,
   ArrowLeftRight,
 } from 'lucide-react'
 import { OperationalPageShell } from '../../../components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '../../../components/erp/ErpCommandBar'
-import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '../../../components/erp/card-form'
+import { ErpCardSection, ErpFieldGroup, ErpFieldRow } from '../../../components/erp/card-form'
+import { FormActionBar } from '../../../components/erp/FormActionBar'
 import { ErpSegmentedControl } from '../../../components/erp/ErpSegmentedControl'
 import { ErpSmartSelect } from '../../../components/erp/ErpSmartSelect'
 import { Select, Input, Textarea } from '../../../components/forms/Inputs'
+import { CommercialTermSelect } from '../../../components/masters/GeographySelects'
 import { TableLink } from '../../../components/ui/AppLink'
 import { Toast } from '../../../components/ui/Toast'
 import { SELECT_PLACEHOLDER } from '../../../components/forms/selectStandards'
+import { useSellableItems } from '../../../hooks/useMasterLists'
+import { canUseItemInSales } from '../../../utils/opportunityItemOptions'
 import { salesCustomer360Path } from '../../../config/entity360Routes'
 import {
   ENTERPRISE_FORM_CLASS,
@@ -59,13 +65,20 @@ import {
 import { computeProformaLineTotals } from '../../../utils/proformaInvoiceLines'
 import { computeGst, gstSchemeLabel } from '../../../utils/gstEngine'
 import {
+  blankTaxInvoiceLine,
+  resolveTaxInvoiceFromCustomer,
   resolveTaxInvoiceFromProforma,
   resolveTaxInvoiceFromSalesOrder,
   type TaxInvoicePrefill,
 } from '../../../utils/taxInvoicePrefill'
 import { SalesTaxInvoiceListPage } from '../../sales/SalesTaxInvoiceListPage'
+import { cn } from '../../../utils/cn'
+import type { CrmCommercialLine } from '../../../types/crmCommercial'
+import { DEFAULT_GST_RATE } from '../../../types/invoice'
 
-type InvoiceCreateSource = 'sales_order' | 'proforma' | 'customer'
+type InvoiceCreateSource = 'sales_order' | 'proforma' | 'direct'
+
+const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
 
 /** @deprecated Use SalesTaxInvoiceListPage — kept for older imports. */
 export function CrmInvoiceListPage() {
@@ -241,24 +254,44 @@ export function CrmInvoiceDetailPage() {
   )
 }
 
-function patchPrefillLineQty(prefill: TaxInvoicePrefill, lineId: string, qtyRaw: string): TaxInvoicePrefill {
-  const qty = Number(qtyRaw)
-  const lines = prefill.lines.map((line) => {
-    if (line.id !== lineId) return line
-    const capped = Number.isFinite(qty)
-      ? Math.min(Math.max(0, qty), line.maxQty ?? line.qty)
-      : 0
-    const totals = computeProformaLineTotals({ ...line, qty: capped })
-    return { ...line, qty: capped, ...totals }
-  })
+function recomputePrefill(prefill: TaxInvoicePrefill, lines: CrmCommercialLine[]): TaxInvoicePrefill {
   const withNos = lines.map((line, idx) => ({ ...line, lineNo: idx + 1 }))
   const taxable = withNos.reduce((s, l) => s + l.taxableValue, 0)
-  const avgRate = withNos.length ? withNos.reduce((s, l) => s + l.taxPct, 0) / withNos.length : 18
+  const avgRate = withNos.length
+    ? withNos.reduce((s, l) => s + l.taxPct, 0) / withNos.length
+    : DEFAULT_GST_RATE
   return {
     ...prefill,
     lines: withNos,
     gst: computeGst(taxable, prefill.customerState, avgRate),
   }
+}
+
+function patchPrefillLineQty(prefill: TaxInvoicePrefill, lineId: string, qtyRaw: string): TaxInvoicePrefill {
+  const qty = Number(qtyRaw)
+  const lines = prefill.lines.map((line) => {
+    if (line.id !== lineId) return line
+    const nextQty = Number.isFinite(qty)
+      ? Math.max(0, line.maxQty != null ? Math.min(qty, line.maxQty) : qty)
+      : 0
+    const totals = computeProformaLineTotals({ ...line, qty: nextQty })
+    return { ...line, qty: nextQty, ...totals }
+  })
+  return recomputePrefill(prefill, lines)
+}
+
+function patchPrefillLine(
+  prefill: TaxInvoicePrefill,
+  lineId: string,
+  patch: Partial<CrmCommercialLine>,
+): TaxInvoicePrefill {
+  const lines = prefill.lines.map((line) => {
+    if (line.id !== lineId) return line
+    const next = { ...line, ...patch }
+    const totals = computeProformaLineTotals(next)
+    return { ...next, ...totals }
+  })
+  return recomputePrefill(prefill, lines)
 }
 
 export function CrmInvoiceCreatePage() {
@@ -273,9 +306,11 @@ export function CrmInvoiceCreatePage() {
   const proformas = useProformaInvoiceStore((s) => s.proformaInvoices)
   const customers = useMasterStore((s) => s.customers)
   const getCustomer = useMasterStore((s) => s.getCustomer)
+  const getItem = useMasterStore((s) => s.getItem)
+  const sellableItems = useSellableItems()
 
   const [sourceType, setSourceType] = useState<InvoiceCreateSource>(
-    salesOrderId ? 'sales_order' : proformaId ? 'proforma' : 'customer',
+    salesOrderId ? 'sales_order' : proformaId ? 'proforma' : 'direct',
   )
   const [selectedSo, setSelectedSo] = useState(salesOrderId ?? '')
   const [selectedPi, setSelectedPi] = useState(proformaId ?? '')
@@ -283,6 +318,8 @@ export function CrmInvoiceCreatePage() {
   const [prefill, setPrefill] = useState<TaxInvoicePrefill | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+
+  const isDirect = sourceType === 'direct' || prefill?.source === 'direct'
 
   const confirmedSos = useMemo(
     () => salesOrders.filter((s) => s.status !== 'open' && s.status !== 'closed'),
@@ -319,26 +356,44 @@ export function CrmInvoiceCreatePage() {
         })),
     [customers],
   )
+  const itemOptions = useMemo(
+    () =>
+      sellableItems.map((i) => ({
+        value: i.id,
+        label: `${i.itemCode} · ${i.itemName}`,
+        searchText: `${i.itemCode} ${i.itemName}`.toLowerCase(),
+      })),
+    [sellableItems],
+  )
 
   const activeLines = useMemo(
-    () => (prefill ? prefill.lines.filter((l) => l.qty > 0) : []),
+    () =>
+      prefill
+        ? prefill.lines.filter((l) => l.qty > 0 && Boolean(l.itemId || l.itemCode) && l.unitPrice >= 0)
+        : [],
     [prefill],
   )
-  const canCreate = Boolean(prefill && activeLines.length > 0 && !creating)
+  const canCreate = Boolean(
+    prefill &&
+      activeLines.length > 0 &&
+      activeLines.every((l) => l.itemId || l.itemCode) &&
+      !creating,
+  )
 
   const sourceDone = Boolean(
     (sourceType === 'sales_order' && selectedSo && prefill) ||
       (sourceType === 'proforma' && selectedPi && prefill) ||
-      (sourceType === 'customer' && selectedCustomer && prefill),
+      (sourceType === 'direct' && selectedCustomer && prefill),
   )
   const linesDone = activeLines.length > 0
   const completionItems = useMemo(
     () => [
       { id: 'source', label: 'Source document', done: sourceDone },
+      { id: 'customer', label: 'Customer & Commercial', done: Boolean(prefill) },
       { id: 'lines', label: 'Invoice lines', done: linesDone },
-      { id: 'review', label: 'Ready to create', done: canCreate },
+      { id: 'totals', label: 'Tax & Totals', done: canCreate },
     ],
-    [sourceDone, linesDone, canCreate],
+    [sourceDone, prefill, linesDone, canCreate],
   )
   const completionPercent = Math.round(
     (completionItems.filter((i) => i.done).length / completionItems.length) * 100,
@@ -386,14 +441,15 @@ export function CrmInvoiceCreatePage() {
       setError(null)
       return
     }
-    const so = confirmedSos.find((s) => s.customerId === customerId)
-    if (!so) {
+    const result = resolveTaxInvoiceFromCustomer(customerId)
+    if (!result.ok) {
       clearLoaded()
-      setError('No confirmed sales order found for this customer. Create an invoice from an SO or proforma instead.')
+      setError(result.error)
       return
     }
-    setSelectedSo(so.id)
-    loadFromSalesOrder(so.id)
+    setSelectedSo('')
+    setPrefill(result.data)
+    setError(null)
   }
 
   function switchSourceType(next: InvoiceCreateSource) {
@@ -402,7 +458,39 @@ export function CrmInvoiceCreatePage() {
     setError(null)
     if (next !== 'sales_order') setSelectedSo('')
     if (next !== 'proforma') setSelectedPi('')
-    if (next !== 'customer') setSelectedCustomer('')
+    if (next !== 'direct') setSelectedCustomer('')
+  }
+
+  function addDirectLine() {
+    if (!prefill) return
+    setPrefill(recomputePrefill(prefill, [...prefill.lines, blankTaxInvoiceLine(prefill.lines.length + 1)]))
+  }
+
+  function removeDirectLine(lineId: string) {
+    if (!prefill || prefill.lines.length <= 1) return
+    setPrefill(recomputePrefill(prefill, prefill.lines.filter((l) => l.id !== lineId)))
+  }
+
+  function selectDirectItem(lineId: string, itemId: string) {
+    if (!prefill || !itemId) return
+    const check = canUseItemInSales(itemId)
+    if (!check.ok) {
+      setError(check.error ?? 'Item is not allowed for sales')
+      return
+    }
+    const item = getItem(itemId)
+    setError(null)
+    setPrefill(
+      patchPrefillLine(prefill, lineId, {
+        itemId,
+        itemCode: item?.itemCode ?? '',
+        description: item?.itemName ?? '',
+        hsnCode: item?.hsnCode ?? '',
+        uom: 'Nos',
+        unitPrice: item?.defaultSalesRate ?? item?.standardRate ?? 0,
+        taxPct: DEFAULT_GST_RATE,
+      }),
+    )
   }
 
   useEffect(() => {
@@ -448,7 +536,11 @@ export function CrmInvoiceCreatePage() {
   async function handleCreate() {
     setError(null)
     if (!prefill || activeLines.length === 0) {
-      setError('Select a source document to load the invoice first.')
+      setError(
+        isDirect
+          ? 'Select a customer and add at least one product line before saving.'
+          : 'Select a source document to load the invoice first.',
+      )
       return
     }
 
@@ -480,33 +572,12 @@ export function CrmInvoiceCreatePage() {
     navigate(`/sales/invoices/${result.id}`)
   }
 
-  const documentStrip = [
-    { label: 'Invoice', value: 'New draft', highlight: true },
-    { label: 'Status', value: 'Not created' },
-    {
-      label: 'Source',
-      value:
-        sourceType === 'sales_order'
-          ? 'Sales Order'
-          : sourceType === 'proforma'
-            ? 'Proforma'
-            : 'Customer',
-    },
-    {
-      label: 'Customer',
-      value: prefill?.customerName ?? '—',
-      highlight: Boolean(prefill?.customerName),
-    },
-    {
-      label: 'Lines',
-      value: prefill ? String(activeLines.length) : '—',
-    },
-    {
-      label: 'Grand Total',
-      value: prefill ? formatCurrency(prefill.gst.grandTotal) : '—',
-      highlight: Boolean(prefill),
-    },
-  ]
+  function scrollToInvoiceSection(sectionId: string) {
+    document.getElementById(`ti-section-${sectionId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
 
   const factBox = (
     <EnterpriseBusinessFactBox
@@ -522,9 +593,11 @@ export function CrmInvoiceCreatePage() {
           id: 'next',
           label: 'Suggested Next',
           value: !sourceDone
-            ? 'Choose SO, proforma, or customer'
+            ? 'Choose SO, proforma, or direct customer'
             : !linesDone
-              ? 'Set at least one line qty > 0'
+              ? isDirect
+                ? 'Add product lines with qty > 0'
+                : 'Set at least one line qty > 0'
               : 'Create draft invoice',
           tone: 'info' as const,
         },
@@ -537,7 +610,7 @@ export function CrmInvoiceCreatePage() {
           { label: 'Customer', value: prefill?.customerName ?? '—' },
           {
             label: 'Document',
-            value: prefill?.salesOrderNo ?? prefill?.proformaNo ?? '—',
+            value: prefill?.salesOrderNo ?? prefill?.proformaNo ?? (isDirect && prefill ? 'Direct' : '—'),
           },
           { label: 'Active lines', value: String(activeLines.length) },
           {
@@ -568,8 +641,7 @@ export function CrmInvoiceCreatePage() {
         ]}
       />
       <p className="mt-3 rounded-lg border border-erp-border bg-erp-surface-alt/60 p-3 text-[12px] text-erp-muted">
-        Partial invoices are supported — remaining SO quantity stays available for another invoice.
-        Drafts can be cancelled before posting.
+        Direct invoices need only a customer and product lines. From SO/proforma, partial quantities stay available for another invoice. Drafts can be cancelled before posting.
       </p>
     </EnterpriseBusinessFactBox>
   )
@@ -578,7 +650,7 @@ export function CrmInvoiceCreatePage() {
     <SalesCardFormShell
       title="Create Tax Invoice"
       badge="Sales"
-      className={ENTERPRISE_FORM_CLASS}
+      className={`${ENTERPRISE_FORM_CLASS} crm-lead-form-page crm-lead-form-page--zoho crm-sales-invoice-form-page--zoho enterprise-workspace--crm-smart-overview`}
       recordNo="New"
       recordTitle={prefill?.customerName ?? 'Tax Invoice'}
       status="Draft"
@@ -588,17 +660,18 @@ export function CrmInvoiceCreatePage() {
           ? 'From Sales Order'
           : sourceType === 'proforma'
             ? 'From Proforma'
-            : 'From Customer'
+            : 'Direct'
       }
       createdDate={formatDate(new Date().toISOString().slice(0, 10))}
       company={prefill?.customerName}
       favoritePath="/sales/invoices/new"
       breadcrumbs={salesChildBreadcrumbs('Tax Invoices', '/sales/invoices', 'New Invoice')}
-      documentStrip={documentStrip}
       validationErrors={error ? [error] : undefined}
       factBox={factBox}
+      suppressFactBoxRecord
       collapsibleFactBox
       factBoxLabel="Smart Context"
+      hideRecordBar
       stickyFooter
       onSubmit={(e) => {
         e.preventDefault()
@@ -606,11 +679,14 @@ export function CrmInvoiceCreatePage() {
       }}
       onSaveShortcut={() => void handleCreate()}
       footer={(
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          cancelTo="/sales/invoices"
-          submitLabel={creating ? 'Creating…' : 'Create Draft Invoice'}
-          isSubmitting={creating}
+          busy={creating}
+          disabled={!canCreate}
+          disabledReason={!sourceDone ? (isDirect ? 'Select a customer' : 'Select a source document') : !linesDone ? 'Add at least one product line' : undefined}
+          dirty={Boolean(selectedSo || selectedPi || selectedCustomer || prefill)}
+          saveLabel="Create Draft Invoice"
+          onCancel={() => navigate('/sales/invoices')}
           onSave={() => void handleCreate()}
           hint={(
             <span className="text-[12px] text-erp-muted">
@@ -621,16 +697,42 @@ export function CrmInvoiceCreatePage() {
         />
       )}
     >
-      <ErpCardSection
-        id="ti-section-source"
-        title="Source document"
-        subtitle="Load customer, commercial terms, and lines from a confirmed sales order, issued proforma, or customer."
-        icon={FileText}
-        accent="blue"
-        collapsible
-        defaultOpen
-      >
-        <ErpFieldRow label="Create from" colSpan={2}>
+      <div className="erp-form-body crm-lead-form-body crm-sales-invoice-create-body">
+        <div className="crm-lead-zoho-layout">
+          <nav className="crm-lead-zoho-rail" aria-label="Tax invoice form sections">
+            <p className="crm-lead-zoho-rail__eyebrow">Create Tax Invoice</p>
+            <p className="crm-lead-zoho-rail__title">Sections</p>
+            <ul className="crm-lead-zoho-rail__list">
+              {completionItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={cn('crm-lead-zoho-rail__item', item.done && 'is-done')}
+                    onClick={() => scrollToInvoiceSection(item.id)}
+                  >
+                    <span className="crm-lead-zoho-rail__marker" aria-hidden>
+                      {item.done ? <Check size={12} strokeWidth={2.5} /> : null}
+                    </span>
+                    <span className="crm-lead-zoho-rail__label">{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="crm-lead-zoho-rail__progress" aria-label={`${completionPercent}% complete`}>
+              <div className="crm-lead-zoho-rail__progress-meta">
+                <span>Completion</span>
+                <strong>{completionPercent}%</strong>
+              </div>
+              <div className="crm-lead-zoho-rail__bar">
+                <div className="crm-lead-zoho-rail__bar-fill" style={{ width: `${completionPercent}%` }} />
+              </div>
+            </div>
+          </nav>
+
+          <div className="crm-lead-form-flow crm-lead-zoho-canvas">
+      <div id="ti-section-source" className="crm-lead-quick-entry crm-lead-zoho-block">
+      <ErpFieldGroup label="Tax Invoice Information" columns={4} className="crm-lead-zoho-section">
+        <ErpFieldRow label="Create from" colSpan={3} horizontal={false}>
           <ErpSegmentedControl<InvoiceCreateSource>
             name="Tax invoice create source"
             value={sourceType}
@@ -649,9 +751,9 @@ export function CrmInvoiceCreatePage() {
                 icon: Receipt,
               },
               {
-                value: 'customer',
-                label: 'Customer',
-                description: 'Use the latest confirmed SO for the bill-to customer.',
+                value: 'direct',
+                label: 'Direct',
+                description: 'Pick a customer and enter product lines — no SO or proforma needed.',
                 icon: Building2,
               },
             ]}
@@ -662,7 +764,8 @@ export function CrmInvoiceCreatePage() {
           <ErpFieldRow
             label="Sales Order"
             required
-            colSpan={2}
+            colSpan={3}
+            horizontal={false}
             hint="Confirmed sales orders only — open drafts are excluded"
           >
             <ErpSmartSelect
@@ -684,7 +787,8 @@ export function CrmInvoiceCreatePage() {
           <ErpFieldRow
             label="Proforma Invoice"
             required
-            colSpan={2}
+            colSpan={3}
+            horizontal={false}
             hint="Issued proformas only"
           >
             <ErpSmartSelect
@@ -702,12 +806,13 @@ export function CrmInvoiceCreatePage() {
           </ErpFieldRow>
         ) : null}
 
-        {sourceType === 'customer' ? (
+        {sourceType === 'direct' ? (
           <ErpFieldRow
             label="Customer"
             required
-            colSpan={2}
-            hint="Loads the latest confirmed sales order for this customer"
+            colSpan={3}
+            horizontal={false}
+            hint="Loads bill-to details from the customer master. Add product lines below."
           >
             <ErpSmartSelect
               options={customerOptions}
@@ -724,27 +829,35 @@ export function CrmInvoiceCreatePage() {
         ) : null}
 
         {!prefill && !error ? (
-          <div className="col-span-2">
+          <div className="col-span-full">
             <p className="pi-create-mode-hint">
               <PenLine className="h-4 w-4 shrink-0" aria-hidden />
-              Select a source above to auto-load customer, taxes, addresses, and invoice lines.
+              {sourceType === 'direct'
+                ? 'Select a customer to start a direct tax invoice, then add product lines.'
+                : 'Select a source above to auto-load customer, taxes, addresses, and invoice lines.'}
             </p>
           </div>
         ) : null}
-      </ErpCardSection>
+      </ErpFieldGroup>
+      </div>
 
       {prefill ? (
         <>
+          <div id="ti-section-customer">
           <ErpCardSection
-            id="ti-section-customer"
             title="Customer & commercial"
-            subtitle="Bill-to account and commercial terms inherited from the source document."
+            subtitle={
+              isDirect
+                ? 'Bill-to account from customer master. Edit commercial terms as needed.'
+                : 'Bill-to account and commercial terms inherited from the source document.'
+            }
             icon={Building2}
             accent="teal"
             collapsible
             defaultOpen
+            columns={4}
           >
-            <aside className="so-customer-card col-span-2" aria-label="Selected customer">
+            <aside className="so-customer-card col-span-full" aria-label="Selected customer">
               <div className="so-customer-card__header">
                 <div className="so-customer-card__avatar" aria-hidden>
                   {prefill.customerName
@@ -775,15 +888,50 @@ export function CrmInvoiceCreatePage() {
                     </div>
                     <div className="so-customer-card__fact">
                       <dt>Customer PO</dt>
-                      <dd>{prefill.customerPoNumber || '—'}</dd>
+                      <dd>
+                        {isDirect ? (
+                          <Input
+                            value={prefill.customerPoNumber ?? ''}
+                            onChange={(e) =>
+                              setPrefill({ ...prefill, customerPoNumber: e.target.value || null })
+                            }
+                            placeholder="Optional PO reference"
+                          />
+                        ) : (
+                          prefill.customerPoNumber || '—'
+                        )}
+                      </dd>
                     </div>
                   </dl>
                 </div>
               </div>
             </aside>
 
-            <ErpFieldRow label="Payment terms" readOnly>{prefill.paymentTerms || '—'}</ErpFieldRow>
-            <ErpFieldRow label="Delivery terms" readOnly>{prefill.deliveryTerms || '—'}</ErpFieldRow>
+            {isDirect ? (
+              <>
+                <ErpFieldRow label="Payment terms" horizontal={false}>
+                  <CommercialTermSelect
+                    termType="payment"
+                    value={prefill.paymentTerms}
+                    onChange={(v) => setPrefill({ ...prefill, paymentTerms: v })}
+                    placeholder="Select payment terms"
+                  />
+                </ErpFieldRow>
+                <ErpFieldRow label="Delivery terms" horizontal={false}>
+                  <CommercialTermSelect
+                    termType="delivery"
+                    value={prefill.deliveryTerms}
+                    onChange={(v) => setPrefill({ ...prefill, deliveryTerms: v })}
+                    placeholder="Select delivery terms"
+                  />
+                </ErpFieldRow>
+              </>
+            ) : (
+              <>
+                <ErpFieldRow label="Payment terms" readOnly>{prefill.paymentTerms || '—'}</ErpFieldRow>
+                <ErpFieldRow label="Delivery terms" readOnly>{prefill.deliveryTerms || '—'}</ErpFieldRow>
+              </>
+            )}
             {prefill.salesOrderNo ? (
               <ErpFieldRow label="Sales Order" readOnly>
                 <TableLink to={`/sales/orders/${prefill.salesOrderId}`}>{prefill.salesOrderNo}</TableLink>
@@ -800,9 +948,10 @@ export function CrmInvoiceCreatePage() {
               </ErpFieldRow>
             ) : null}
           </ErpCardSection>
+          </div>
 
+          <div id="ti-section-addresses">
           <ErpCardSection
-            id="ti-section-addresses"
             title="Addresses"
             subtitle="Billing and shipping addresses from the source document."
             icon={MapPin}
@@ -821,11 +970,16 @@ export function CrmInvoiceCreatePage() {
               </p>
             </ErpFieldRow>
           </ErpCardSection>
+          </div>
 
+          <div id="ti-section-lines">
           <ErpCardSection
-            id="ti-section-lines"
-            title="Invoice lines"
-            subtitle="Adjust quantity for a partial invoice (capped at remaining)."
+            title="Product & Pricing"
+            subtitle={
+              isDirect
+                ? 'Add sellable items and set quantity, rate, and tax.'
+                : 'Adjust quantity for a partial invoice (capped at remaining).'
+            }
             icon={ClipboardList}
             accent="green"
             collapsible
@@ -833,59 +987,190 @@ export function CrmInvoiceCreatePage() {
             className="!max-w-none"
             columns={1}
           >
-            <div className="col-span-full overflow-x-auto erp-line-items-grid">
-              <table className="w-full min-w-[720px] text-[12px] erp-line-items-grid__table">
-                <thead>
-                  <tr className="border-b border-erp-border bg-erp-surface-alt/60 text-left text-[11px] uppercase tracking-wide text-erp-muted">
-                    <th className="px-2 py-2">Item</th>
-                    <th className="px-2 py-2 text-right">Qty</th>
-                    <th className="px-2 py-2 text-right">Max</th>
-                    <th className="px-2 py-2 text-right">Rate</th>
-                    <th className="px-2 py-2">Tax %</th>
-                    <th className="px-2 py-2 text-right">Line total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {prefill.lines.map((line) => (
-                    <tr key={line.id} className="border-b border-erp-border/60">
-                      <td className="px-2 py-2">
-                        <div className="font-medium text-erp-text">{line.itemCode || '—'}</div>
-                        <div className="text-[11px] text-erp-muted">{line.description}</div>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={line.maxQty ?? undefined}
-                          step="1"
-                          className="ml-auto w-24 text-right"
-                          value={String(line.qty)}
-                          onChange={(e) => setPrefill(patchPrefillLineQty(prefill, line.id, e.target.value))}
-                        />
-                      </td>
-                      <td className="py-2 px-2 text-right tabular-nums text-erp-muted">
-                        {line.maxQty ?? line.qty} {line.uom}
-                      </td>
-                      <td className="py-2 px-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
-                      <td className="py-2 px-2">{line.taxPct}%</td>
-                      <td className="py-2 px-2 text-right font-semibold tabular-nums text-erp-primary">
-                        {formatCurrency(line.lineTotal)}
-                      </td>
+            {isDirect ? (
+              <div className="col-span-full so-pricing-panel so-pricing-panel--pro">
+                <div className="so-pricing-table-wrap">
+                  <table className="so-pricing-table">
+                    <thead>
+                      <tr>
+                        <th className="so-pricing-th so-pricing-th--center">#</th>
+                        <th className="so-pricing-th">Product</th>
+                        <th className="so-pricing-th so-pricing-th--right">Qty</th>
+                        <th className="so-pricing-th so-pricing-th--right">Unit price</th>
+                        <th className="so-pricing-th so-pricing-th--right">Disc %</th>
+                        <th className="so-pricing-th so-pricing-th--right">GST %</th>
+                        <th className="so-pricing-th so-pricing-th--right">Line total</th>
+                        <th className="so-pricing-th so-pricing-th--center" aria-label="Actions" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {prefill.lines.map((line, idx) => (
+                        <tr key={line.id} className="so-pricing-row">
+                          <td className="so-pricing-td so-pricing-td--center tabular-nums text-erp-muted">
+                            {idx + 1}
+                          </td>
+                          <td className="so-pricing-td so-pricing-td--product">
+                            <ErpSmartSelect
+                              options={itemOptions}
+                              value={line.itemId}
+                              onChange={(v) => {
+                                if (v) selectDirectItem(line.id, v)
+                              }}
+                              placeholder="Select sellable item…"
+                              appearance="dropdown"
+                              dropdownMinWidth={360}
+                              emptyMessage="Only items allowed for sales can be selected."
+                            />
+                          </td>
+                          <td className="so-pricing-td">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="1"
+                              className="so-pricing-input so-pricing-input--num"
+                              value={String(line.qty)}
+                              onChange={(e) =>
+                                setPrefill(patchPrefillLineQty(prefill, line.id, e.target.value))
+                              }
+                            />
+                          </td>
+                          <td className="so-pricing-td">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className="so-pricing-input so-pricing-input--num"
+                              value={String(line.unitPrice)}
+                              onChange={(e) =>
+                                setPrefill(
+                                  patchPrefillLine(prefill, line.id, {
+                                    unitPrice: Number(e.target.value) || 0,
+                                  }),
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="so-pricing-td">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              className="so-pricing-input so-pricing-input--num"
+                              value={String(line.discountPct)}
+                              onChange={(e) =>
+                                setPrefill(
+                                  patchPrefillLine(prefill, line.id, {
+                                    discountPct: Number(e.target.value) || 0,
+                                  }),
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="so-pricing-td">
+                            <select
+                              className="erp-input so-pricing-input so-pricing-input--select"
+                              value={line.taxPct}
+                              onChange={(e) =>
+                                setPrefill(
+                                  patchPrefillLine(prefill, line.id, {
+                                    taxPct: Number(e.target.value) || DEFAULT_GST_RATE,
+                                  }),
+                                )
+                              }
+                            >
+                              {GST_RATE_OPTIONS.map((rate) => (
+                                <option key={rate} value={rate}>
+                                  {rate}%
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="so-pricing-td so-pricing-td--right so-pricing-td--total tabular-nums">
+                            {formatCurrency(line.lineTotal)}
+                          </td>
+                          <td className="so-pricing-td so-pricing-td--center">
+                            <button
+                              type="button"
+                              className="so-pricing-remove"
+                              onClick={() => removeDirectLine(line.id)}
+                              disabled={prefill.lines.length <= 1}
+                              aria-label="Remove line"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="so-pricing-toolbar">
+                  <button type="button" className="so-pricing-add" onClick={addDirectLine}>
+                    <Plus className="h-4 w-4" /> Add item line
+                  </button>
+                  <p className="so-pricing-toolbar__hint">
+                    <span className="so-pricing-toolbar__count">{prefill.lines.length}</span>
+                    {' '}line{prefill.lines.length === 1 ? '' : 's'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="col-span-full overflow-x-auto erp-line-items-grid">
+                <table className="w-full min-w-[720px] text-[12px] erp-line-items-grid__table">
+                  <thead>
+                    <tr className="border-b border-erp-border bg-erp-surface-alt/60 text-left text-[11px] uppercase tracking-wide text-erp-muted">
+                      <th className="px-2 py-2">Item</th>
+                      <th className="px-2 py-2 text-right">Qty</th>
+                      <th className="px-2 py-2 text-right">Max</th>
+                      <th className="px-2 py-2 text-right">Rate</th>
+                      <th className="px-2 py-2">Tax %</th>
+                      <th className="px-2 py-2 text-right">Line total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {prefill.lines.map((line) => (
+                      <tr key={line.id} className="border-b border-erp-border/60">
+                        <td className="px-2 py-2">
+                          <div className="font-medium text-erp-text">{line.itemCode || '—'}</div>
+                          <div className="text-[11px] text-erp-muted">{line.description}</div>
+                        </td>
+                        <td className="px-2 py-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={line.maxQty ?? undefined}
+                            step="1"
+                            className="ml-auto w-24 text-right"
+                            value={String(line.qty)}
+                            onChange={(e) => setPrefill(patchPrefillLineQty(prefill, line.id, e.target.value))}
+                          />
+                        </td>
+                        <td className="py-2 px-2 text-right tabular-nums text-erp-muted">
+                          {line.maxQty ?? line.qty} {line.uom}
+                        </td>
+                        <td className="py-2 px-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
+                        <td className="py-2 px-2">{line.taxPct}%</td>
+                        <td className="py-2 px-2 text-right font-semibold tabular-nums text-erp-primary">
+                          {formatCurrency(line.lineTotal)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </ErpCardSection>
+          </div>
 
+          <div id="ti-section-totals">
           <ErpCardSection
-            id="ti-section-totals"
             title="Tax & totals"
             subtitle="GST breakdown and grand total for the quantities above."
             icon={Banknote}
             accent="amber"
             collapsible
             defaultOpen
+            columns={4}
           >
             <ErpFieldRow label="Taxable" readOnly>{formatCurrency(prefill.gst.taxableAmount)}</ErpFieldRow>
             <ErpFieldRow label="Scheme" readOnly>{gstSchemeLabel(prefill.gst.scheme)}</ErpFieldRow>
@@ -908,8 +1193,12 @@ export function CrmInvoiceCreatePage() {
               </ErpFieldRow>
             ) : null}
           </ErpCardSection>
+          </div>
         </>
       ) : null}
+          </div>
+        </div>
+      </div>
     </SalesCardFormShell>
   )
 }
@@ -960,11 +1249,13 @@ export function ProformaReceivePaymentPage() {
     setError(null)
     if (!paymentMode) {
       setError('Select a payment mode.')
+      notify.error('Select a payment mode.')
       return
     }
     const amt = Number(amount)
     if (!Number.isFinite(amt) || amt <= 0) {
       setError('Enter a valid amount received.')
+      notify.error('Enter a valid amount received.')
       return
     }
     const payload = {
@@ -985,10 +1276,12 @@ export function ProformaReceivePaymentPage() {
         })
       : receive(payload)
     if (!result.ok) {
-      setError(result.error ?? 'Failed to record receipt')
+      const msg = result.error ?? 'Failed to record receipt'
+      setError(msg)
+      notify.error(msg)
       return
     }
-    notify.success(`Receipt recorded`)
+    notify.success(`Receipt recorded — map it to tax invoices from Payment Allocation when ready`)
     navigate(`/sales/proforma-invoices/${proforma!.id}`)
   }
 

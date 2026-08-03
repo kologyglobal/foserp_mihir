@@ -2,6 +2,7 @@ import type { AuthSession } from '../api/client'
 import { API_CONFIG } from '../../config/apiConfig'
 import { setStoredSession, withAccessExpiry } from '../api/client'
 import { mapForgotResetErrorMessage, mapLoginErrorMessage } from '../../modules/auth/authMessages'
+import type { TenantCompanyProfile } from '../../store/tenantProfileStore'
 
 export async function login(email: string, password: string, tenantSlug?: string): Promise<AuthSession> {
   let res: Response
@@ -77,6 +78,7 @@ export async function fetchMe() {
       slug: string
       businessType?: 'MANUFACTURING' | 'SERVICES'
       displayTerminology?: Record<string, string>
+      companyProfile?: TenantCompanyProfile | null
     }
   }>('/auth/me')
 }

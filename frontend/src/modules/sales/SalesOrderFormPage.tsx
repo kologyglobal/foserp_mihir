@@ -282,7 +282,7 @@ export function SalesOrderEditPage() {
       <SalesCardFormShell
         title="Edit Sales Order"
         badge={fromCrm ? 'CRM' : 'Sales'}
-        className={ENTERPRISE_FORM_CLASS}
+        className={`${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview`}
         recordNo={so.salesOrderNo}
         recordTitle={customer?.customerName ?? so.salesOrderNo}
         status="Draft"
@@ -295,6 +295,7 @@ export function SalesOrderEditPage() {
         commandBar={commandBar}
         documentStrip={documentStrip}
         factBox={factBox}
+        suppressFactBoxRecord
         collapsibleFactBox
         factBoxLabel="Smart Context"
         stickyFooter

@@ -577,7 +577,7 @@ export function SalesOrder360Page() {
       <SalesCardFormShell
         title={so.salesOrderNo}
         badge={crmMode ? 'CRM' : 'Sales'}
-        className={ENTERPRISE_FORM_DETAIL_CLASS}
+        className={`${ENTERPRISE_FORM_DETAIL_CLASS} enterprise-workspace--crm-smart-overview`}
         recordNo={so.salesOrderNo}
         recordTitle={customer?.customerName ?? so.salesOrderNo}
         status={salesOrderStatusLabel(so.status)}
@@ -590,6 +590,7 @@ export function SalesOrder360Page() {
         commandBar={commandBar}
         documentStrip={documentStrip}
         factBox={factBox}
+        suppressFactBoxRecord
         collapsibleFactBox
         factBoxLabel="Smart Context"
         stickyFooter={false}

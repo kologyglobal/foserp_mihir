@@ -7,11 +7,7 @@ import { formatCurrency, formatNumber } from './formatters/currency'
 import { formatDate } from './dates/format'
 import { gstSchemeLabel } from './gstEngine'
 import { downloadTextFile } from './purchaseOrderExport'
-import {
-  downloadElementAsPdf,
-  findPrintDocumentElement,
-  type DocumentPdfResult,
-} from './documentPdfDownload'
+import { downloadPrintDocumentPdf, type DocumentPdfResult } from './documentPdfDownload'
 
 function escapeHtml(value: string | number | null | undefined): string {
   return String(value ?? '')
@@ -338,48 +334,10 @@ export function buildProformaPrintHtml(proforma: ProformaInvoice): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(proforma.proformaNo)} — Proforma Invoice</title><style>${PI_PRINT_CSS}</style></head><body>${buildProformaPrintBodyHtml(proforma)}</body></html>`
 }
 
-function absoluteBrandAsset(path: string): string {
-  if (/^https?:\/\//i.test(path)) return path
-  try {
-    return new URL(path, window.location.origin).href
-  } catch {
-    return path
-  }
-}
-
-/** Download a real PDF matching the professional proforma letterhead. */
+/** Download a real PDF of the on-screen proforma letterhead preview. */
 export async function downloadProformaPdf(proforma: ProformaInvoice): Promise<DocumentPdfResult> {
   const fileName = `${proforma.proformaNo.trim().replace(/[^\w.-]+/g, '_') || 'Proforma'}.pdf`
-  const existing = findPrintDocumentElement('.pi-print-doc')
-  if (existing) {
-    return downloadElementAsPdf(existing, fileName)
-  }
-
-  const host = document.createElement('div')
-  host.setAttribute('aria-hidden', 'true')
-  host.style.cssText =
-    'position:fixed;left:-12000px;top:0;width:210mm;background:#fff;pointer-events:none;z-index:-1;'
-  const style = document.createElement('style')
-  style.textContent = PI_PRINT_CSS
-  host.appendChild(style)
-  const logoUrl = getActiveCompanyProfile().logoUrl
-  const wrap = document.createElement('div')
-  wrap.innerHTML = buildProformaPrintBodyHtml(proforma).replace(
-    `src="${logoUrl}"`,
-    `src="${absoluteBrandAsset(logoUrl)}"`,
-  )
-  host.appendChild(wrap)
-  document.body.appendChild(host)
-
-  try {
-    const el = host.querySelector('.pi-print-doc')
-    if (!(el instanceof HTMLElement)) {
-      return { ok: false, error: 'Could not build proforma preview for PDF export.' }
-    }
-    return await downloadElementAsPdf(el, fileName)
-  } finally {
-    host.remove()
-  }
+  return downloadPrintDocumentPdf({ fileName, selectors: ['.pi-print-doc'] })
 }
 
 /** Browser print dialog (from on-page preview). */

@@ -430,7 +430,7 @@ export function ProformaInvoiceFormPage() {
   )
 
   const lineGrid = (
-    <div className="col-span-2 so-pricing-panel so-pricing-panel--pro">
+    <div className="so-pricing-panel so-pricing-panel--pro">
       <div className="so-pricing-table-wrap">
         <table className="so-pricing-table">
           <colgroup>
@@ -755,9 +755,10 @@ export function ProformaInvoiceFormPage() {
           collapsible
           defaultOpen
           className="!max-w-none"
+          columns={1}
         >
           {lineGrid}
-          <div className="col-span-2 flex justify-end pt-2">
+          <div className="flex min-w-0 justify-end pt-2">
             <div className="quo-editor-price__summary so-direct-order-summary">
               <div className="quo-editor-price__summary-row">
                 <span>Total Quantity</span>

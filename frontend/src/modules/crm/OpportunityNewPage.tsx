@@ -3,11 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
   Building2,
+  Check,
   FileText,
   Paperclip,
 } from 'lucide-react'
-import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpQuickEntrySection, ErpViewField } from '../../components/erp/card-form'
+import { ErpCardSection, ErpFieldGroup, ErpFieldRow, ErpViewField } from '../../components/erp/card-form'
 import { ErpProductPricingSection } from '../../components/erp/ErpProductPricingSection'
+import { FormActionBar } from '../../components/erp/FormActionBar'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
 import { Input, Select, Textarea } from '../../components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '../../components/forms/selectStandards'
@@ -73,6 +75,7 @@ import {
   opportunityOverviewTitle,
   resolveOpportunityNextBestAction,
 } from '../../utils/opportunitySmartOverview'
+import { cn } from '../../utils/cn'
 
 function defaultCloseDate() {
   const d = new Date()
@@ -477,17 +480,6 @@ export function OpportunityNewPage() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const documentStrip = [
-    { label: 'Opportunity No.', value: 'Auto on save', highlight: false },
-    { label: 'Status', value: 'Open' },
-    { label: 'Stage', value: opportunityStageLabel(stage) },
-    { label: 'Owner', value: owner.label },
-    { label: 'Customer', value: customer?.customerName ?? '—', highlight: Boolean(customerId) },
-    { label: 'Priority', value: opportunityPriorityLabel(priority) },
-    { label: 'Deal Value', value: formatCrmCurrency(dealValue), highlight: dealValue > 0 },
-    { label: 'Source Lead', value: lead?.leadNo ?? '—', highlight: Boolean(lead) },
-  ]
-
   const smartOverviewInput = useMemo(() => ({
     opportunityName,
     customerName: customer?.customerName ?? '',
@@ -550,7 +542,7 @@ export function OpportunityNewPage() {
     <CrmCardFormShell
       title="New Opportunity"
       badge="CRM"
-      className={`${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview`}
+      className={`${ENTERPRISE_FORM_CLASS} crm-lead-form-page crm-lead-form-page--zoho crm-opportunity-form-page--zoho enterprise-workspace--crm-smart-overview`}
       recordNo="New"
       recordTitle={opportunityName || customer?.customerName || 'New Opportunity'}
       status="Open"
@@ -562,9 +554,9 @@ export function OpportunityNewPage() {
       company={customer?.customerName}
       favoritePath="/crm/opportunities/new"
       breadcrumbs={crmChildBreadcrumbs('Opportunities', '/crm/opportunities', 'New Opportunity')}
-      documentStrip={documentStrip}
       factBox={factBox}
       suppressFactBoxRecord
+      hideRecordBar
       collapsibleFactBox
       factBoxLabel="Smart Context"
       onSubmit={handleSubmit}
@@ -573,10 +565,10 @@ export function OpportunityNewPage() {
       onSaveAndNewShortcut={() => createDeal('new')}
       stickyFooter
       footer={(
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          isSubmitting={isSubmitting}
-          submitLabel="Save"
+          busy={isSubmitting}
+          dirty={Boolean(customerId || opportunityName.trim() || hasValidLine)}
           onCancel={handleCancel}
           onSave={() => createDeal('open')}
           onSaveAndNew={() => createDeal('new')}
@@ -589,15 +581,46 @@ export function OpportunityNewPage() {
         />
       )}
     >
-      <div className="erp-form-body">
-      <ErpQuickEntrySection
-        id="opp-section-quick"
-        title="Quick Entry"
-        subtitle="Customer, opportunity name, and ownership — create the deal fast."
-      >
+      <div className="erp-form-body crm-lead-form-body">
+        <div className="crm-lead-zoho-layout">
+          <nav className="crm-lead-zoho-rail" aria-label="Opportunity form sections">
+            <p className="crm-lead-zoho-rail__eyebrow">Create Opportunity</p>
+            <p className="crm-lead-zoho-rail__title">Sections</p>
+            <ul className="crm-lead-zoho-rail__list">
+              {completionItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={cn('crm-lead-zoho-rail__item', item.done && 'is-done')}
+                    onClick={() => scrollToSection(item.id)}
+                  >
+                    <span className="crm-lead-zoho-rail__marker" aria-hidden>
+                      {item.done ? <Check size={12} strokeWidth={2.5} /> : null}
+                    </span>
+                    <span className="crm-lead-zoho-rail__label">{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="crm-lead-zoho-rail__progress" aria-label={`${completionPercent}% complete`}>
+              <div className="crm-lead-zoho-rail__progress-meta">
+                <span>Completion</span>
+                <strong>{completionPercent}%</strong>
+              </div>
+              <div className="crm-lead-zoho-rail__bar">
+                <div className="crm-lead-zoho-rail__bar-fill" style={{ width: `${completionPercent}%` }} />
+              </div>
+            </div>
+          </nav>
+
+          <div className="crm-lead-form-flow crm-lead-zoho-canvas">
+      <div id="opp-section-quick" className="crm-lead-quick-entry crm-lead-zoho-block">
+      <ErpFieldGroup label="Opportunity Information" columns={4} className="crm-lead-zoho-section">
         <ErpFieldRow
           label="Customer"
           required
+          colSpan={3}
+          horizontal={false}
           dataField="customerId"
           fieldState={
             inline.fieldError('customerId') || validationErrors.some((e) => /company|customer/i.test(e))
@@ -623,7 +646,7 @@ export function OpportunityNewPage() {
             emptyOptionLabel={SELECT_PLACEHOLDER}
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Contact">
+        <ErpFieldRow label="Contact" horizontal={false}>
           <Select native value={contactId} onChange={(e) => setContactId(e.target.value)} disabled={!customerId} className="erp-input">
             <option value="">{SELECT_PLACEHOLDER}</option>
             {customerContacts.map((c) => (
@@ -634,6 +657,8 @@ export function OpportunityNewPage() {
         <ErpFieldRow
           label="Opportunity Name"
           required
+          horizontal={false}
+          className="crm-opportunity-info__name"
           dataField="opportunityName"
           fieldState={
             inline.fieldError('opportunityName') || validationErrors.some((e) => /name/i.test(e))
@@ -660,7 +685,7 @@ export function OpportunityNewPage() {
             className="erp-input"
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Stage">
+        <ErpFieldRow label="Stage" horizontal={false}>
           <Select native value={stage} onChange={(e) => handleStageChange(e.target.value as OpportunityStage)} className="erp-input">
             {stageOptions.map((s) => (
               <option key={s.id} value={s.id}>{s.label}</option>
@@ -670,6 +695,7 @@ export function OpportunityNewPage() {
         <ErpFieldRow
           label="Owner"
           required
+          horizontal={false}
           dataField="ownerId"
           fieldState={inline.fieldError('ownerId') ? 'error' : inline.fieldState('ownerId')}
           fieldError={inline.fieldError('ownerId')}
@@ -694,7 +720,7 @@ export function OpportunityNewPage() {
             )}
           </Select>
         </ErpFieldRow>
-        <ErpFieldRow label="Priority">
+        <ErpFieldRow label="Priority" horizontal={false}>
           <Select native value={priority} onChange={(e) => setPriority(e.target.value as OpportunityPriority)} className="erp-input">
             {resolvedPriorities.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
@@ -703,6 +729,7 @@ export function OpportunityNewPage() {
         </ErpFieldRow>
         <ErpFieldRow
           label="Expected Close Date"
+          horizontal={false}
           dataField="expectedCloseDate"
           fieldState={
             validationErrors.some((e) => /close date/i.test(e)) ? 'error' : 'idle'
@@ -723,16 +750,17 @@ export function OpportunityNewPage() {
           />
         </ErpFieldRow>
         {lead ? (
-          <ErpFieldRow label="Source Lead" readOnly colSpan={2}>
+          <ErpFieldRow label="Source Lead" readOnly colSpan={3} horizontal={false}>
             <Input value={`${lead.leadNo} · ${lead.prospectName}`} readOnly className="erp-input" />
           </ErpFieldRow>
         ) : null}
-      </ErpQuickEntrySection>
+      </ErpFieldGroup>
+      </div>
 
 
       {showLocationSection ? (
+        <div id="opp-section-location">
         <ErpCardSection
-          id="opp-section-location"
           title="Location"
           subtitle="Sales branch / location for this opportunity."
           icon={Building2}
@@ -743,10 +771,12 @@ export function OpportunityNewPage() {
         >
           <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
         </ErpCardSection>
+        </div>
       ) : null}
 
+      <div id="opp-section-products">
       <ErpProductPricingSection
-        sectionId="opp-section-products"
+        sectionId="opp-section-products-pricing"
         nbaTarget="products"
         forceOpenKey={forceOpenProductsKey || undefined}
         title="Product & Pricing"
@@ -773,13 +803,15 @@ export function OpportunityNewPage() {
           </ErpFieldRow>
         </div>
       </ErpProductPricingSection>
+      </div>
 
+      <div id="opp-section-commercial">
       <ErpCardSection
-        id="opp-section-commercial"
         title="Commercial"
         subtitle="Product lines drive Final Quoted Value — probability drives weighted forecast."
         icon={Banknote}
         accent="green"
+        columns={4}
         collapsible
         defaultOpen
       >
@@ -812,9 +844,10 @@ export function OpportunityNewPage() {
         />
         <ErpViewField label="Currency" value="INR (₹)" />
       </ErpCardSection>
+      </div>
 
+      <div id="opp-section-documents">
       <ErpCardSection
-        id="opp-section-documents"
         title="Attachments"
         subtitle="Choose document type, then upload supporting files."
         icon={Paperclip}
@@ -827,8 +860,11 @@ export function OpportunityNewPage() {
           onChange={setAttachments}
         />
       </ErpCardSection>
+      </div>
       
 
+          </div>
+        </div>
       </div>
     </CrmCardFormShell>
   )
