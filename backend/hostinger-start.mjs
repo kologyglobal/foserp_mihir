@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -23,5 +24,26 @@ if (!existsSync(join(frontend, 'index.html'))) {
 // Keep dotenv and all relative backend paths stable.
 process.chdir(backend)
 process.env.FRONTEND_DIST = process.env.FRONTEND_DIST ?? resolve(frontend)
+
+const skipMigrate =
+  process.env.RUN_MIGRATE_ON_START === 'false' ||
+  process.env.RUN_MIGRATE_ON_START === '0'
+
+if (!skipMigrate) {
+  console.log('[hostinger-start] Running prisma migrate deploy before server start…')
+  const migrateScript = join(backend, 'scripts', 'migrate-deploy.mjs')
+  const migrate = spawnSync(process.execPath, [migrateScript], {
+    cwd: backend,
+    env: process.env,
+    stdio: 'inherit',
+  })
+  if (migrate.status !== 0) {
+    throw new Error(
+      'Prisma migrate deploy failed on startup. Set RUN_MIGRATE_ON_START=false only for emergency bypass; fix migrations or apply live SQL scripts.',
+    )
+  }
+} else {
+  console.warn('[hostinger-start] RUN_MIGRATE_ON_START=false — skipping migrate deploy.')
+}
 
 await import(pathToFileURL(server).href)

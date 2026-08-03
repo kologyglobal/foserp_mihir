@@ -1,0 +1,111 @@
+# Optional: run Prisma migrate deploy against stage/prod from GitHub (plenty of RAM).
+# Configure repository secrets, then this runs automatically after a green main build.
+#
+# Required secrets (stage example):
+#   STAGE_DB_HOST, STAGE_DB_USER, STAGE_DB_PASS, STAGE_DB_NAME
+# Optional: STAGE_DB_PORT (default 3306)
+
+name: Database migrate
+
+on:
+  workflow_run:
+    workflows: [Build]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Target database
+        required: true
+        default: stage
+        type: choice
+        options:
+          - stage
+          - production
+
+concurrency:
+  group: database-migrate-${{ github.event.inputs.target || 'stage' }}
+  cancel-in-progress: false
+
+jobs:
+  migrate-stage:
+    name: migrate deploy (stage)
+    if: >
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'stage') ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Prisma migrate deploy (stage)
+        if: env.STAGE_DB_HOST != ''
+        working-directory: backend
+        env:
+          STAGE_DB_HOST: ${{ secrets.STAGE_DB_HOST }}
+          STAGE_DB_USER: ${{ secrets.STAGE_DB_USER }}
+          STAGE_DB_PASS: ${{ secrets.STAGE_DB_PASS }}
+          STAGE_DB_NAME: ${{ secrets.STAGE_DB_NAME }}
+          STAGE_DB_PORT: ${{ secrets.STAGE_DB_PORT }}
+          DB_HOST: ${{ secrets.STAGE_DB_HOST }}
+          DB_USER: ${{ secrets.STAGE_DB_USER }}
+          DB_PASS: ${{ secrets.STAGE_DB_PASS }}
+          DB_NAME: ${{ secrets.STAGE_DB_NAME }}
+          DB_PORT: ${{ secrets.STAGE_DB_PORT || '3306' }}
+        run: node scripts/migrate-deploy.mjs
+
+      - name: Skip — stage DB secrets not configured
+        if: env.STAGE_DB_HOST == ''
+        env:
+          STAGE_DB_HOST: ${{ secrets.STAGE_DB_HOST }}
+        run: echo "STAGE_DB_* secrets not set — skipped. Configure in GitHub repo secrets or rely on Hostinger startup migrate."
+
+  migrate-production:
+    name: migrate deploy (production)
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Prisma migrate deploy (production)
+        working-directory: backend
+        env:
+          DB_HOST: ${{ secrets.PROD_DB_HOST }}
+          DB_USER: ${{ secrets.PROD_DB_USER }}
+          DB_PASS: ${{ secrets.PROD_DB_PASS }}
+          DB_NAME: ${{ secrets.PROD_DB_NAME }}
+          DB_PORT: ${{ secrets.PROD_DB_PORT || '3306' }}
+        run: node scripts/migrate-deploy.mjs
