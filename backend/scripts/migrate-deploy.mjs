@@ -9,6 +9,7 @@ import { config } from 'dotenv'
 import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { recoverKnownMigrationBlockers } from './migrate-recover-known-blockers.mjs'
 
 const backend = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -84,6 +85,22 @@ if (isDeployContext && usingDefaultLocalTarget) {
 console.log(
   `[migrate-deploy] Target database: ${target.user}@${target.host}:${target.port}/${target.database}`,
 )
+
+let dbPassword = ''
+try {
+  dbPassword = decodeURIComponent(new URL(databaseUrl).password)
+} catch {
+  dbPassword = process.env.DB_PASS ?? ''
+}
+
+await recoverKnownMigrationBlockers({
+  host: target.host,
+  port: Number(target.port),
+  user: target.user,
+  password: dbPassword,
+  database: target.database,
+})
+
 console.log('[migrate-deploy] Applying pending Prisma migrations…')
 
 const prismaBin = join(backend, 'node_modules', 'prisma', 'build', 'index.js')

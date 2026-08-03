@@ -156,23 +156,7 @@ SET
 WHERE `migration_name` = '20260727180000_crm_product_to_item_phase9_not_null'
   AND `finished_at` IS NULL;
 
-INSERT INTO `_prisma_migrations` (
-  `id`, `checksum`, `finished_at`, `migration_name`, `logs`, `rolled_back_at`, `started_at`, `applied_steps_count`
-)
-SELECT
-  UUID(),
-  'live-fix-p3018',
-  NOW(3),
-  '20260727180000_crm_product_to_item_phase9_not_null',
-  NULL,
-  NULL,
-  NOW(3),
-  1
-FROM DUAL
-WHERE NOT EXISTS (
-  SELECT 1 FROM `_prisma_migrations`
-  WHERE migration_name = '20260727180000_crm_product_to_item_phase9_not_null'
-);
+/* If no row exists at all, npm run db:recover-live-p3018 inserts with correct checksum. */
 
 /* ── 7) Verify ── */
 SELECT
