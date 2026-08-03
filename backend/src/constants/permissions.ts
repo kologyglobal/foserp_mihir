@@ -76,7 +76,7 @@ export const PERMISSIONS = [
   'crm.quotation.update',
   'crm.quotation.delete',
   'crm.quotation.approve',
-  /** Convert approved quotation → sales order (maps from product code convert_sales_order). */
+  /** Convert approved quotation â†’ sales order (maps from product code convert_sales_order). */
   'crm.quotation.convert',
 
   'crm.sales_order.view',
@@ -85,7 +85,7 @@ export const PERMISSIONS = [
   'crm.sales_order.delete',
   'crm.sales_order.confirm',
 
-  /** CRM commercial & receivables (lightweight — no Accounting module required). */
+  /** CRM commercial & receivables (lightweight â€” no Accounting module required). */
   'crm.commercial.view',
   'crm.commercial.receipt.view',
   'crm.commercial.receipt.create',
@@ -222,7 +222,7 @@ export const PERMISSIONS = [
 
   'master.hsn.import',
 
-  // Purchase module — canonical keys (PR / Planning / RFQ / PO)
+  // Purchase module â€” canonical keys (PR / Planning / RFQ / PO)
   /** Module shell / nav gate (Route matrix `purchase.view`). */
   'purchase.view',
   'purchase.dashboard.view',
@@ -258,7 +258,7 @@ export const PERMISSIONS = [
   /**
    * Maker-checker override: approve documents you created/requested yourself.
    * Only effective when Purchase Setup selfApprovalPolicy = PERMISSION_ONLY.
-   * Deliberately excluded from PURCHASE_OPS — grant explicitly (admin/CEO roles get it via full sets).
+   * Deliberately excluded from PURCHASE_OPS â€” grant explicitly (admin/CEO roles get it via full sets).
    */
   'purchase.approvals.self_approve',
   'purchase.grn.view',
@@ -290,7 +290,7 @@ export const PERMISSIONS = [
   'purchase.setup.view',
   'purchase.setup.manage',
 
-  // Finance / Accounting Phase 1 — setup only (no GL posting)
+  // Finance / Accounting Phase 1 â€” setup only (no GL posting)
   'finance.view',
   'finance.settings.view',
   'finance.settings.manage',
@@ -312,7 +312,7 @@ export const PERMISSIONS = [
   'finance.fx_revaluation.preview',
   'finance.fx_revaluation.post',
   'finance.fx_revaluation.reverse',
-  // Period-close adjustments — month-end accruals + prepaid amortisation
+  // Period-close adjustments â€” month-end accruals + prepaid amortisation
   'finance.period_adjustment.view',
   'finance.period_adjustment.manage',
   'finance.period_adjustment.post',
@@ -340,7 +340,7 @@ export const PERMISSIONS = [
   'finance.fiscal_year.manage',
   'finance.posting_period.manage',
 
-  // Finance Phase 2A/2B — ledger foundation + internal posting engine
+  // Finance Phase 2A/2B â€” ledger foundation + internal posting engine
   'finance.voucher.view',
   'finance.voucher.create',
   'finance.voucher.edit',
@@ -354,7 +354,7 @@ export const PERMISSIONS = [
   'finance.posting_rule.view',
   'finance.posting_rule.manage',
 
-  // Finance Phase 3A1 — AR foundation (DB + repos; no HTTP invoice routes in 3A1)
+  // Finance Phase 3A1 â€” AR foundation (DB + repos; no HTTP invoice routes in 3A1)
   'finance.ar.view',
   'finance.ar.invoice.view',
   'finance.ar.invoice.create',
@@ -382,7 +382,7 @@ export const PERMISSIONS = [
   'finance.ar.credit_note.mark_ready',
   'finance.ar.credit_note.reverse',
 
-  // Finance Phase 4A1 — AP foundation (DB + repos; no HTTP vendor-invoice routes in 4A1)
+  // Finance Phase 4A1 â€” AP foundation (DB + repos; no HTTP vendor-invoice routes in 4A1)
   // Phase 4A3 adds draft workflow HTTP routes (submit/approve/reject/revise/mark-ready/cancel).
   'finance.ap.view',
   'finance.ap.vendor_invoice.view',
@@ -396,7 +396,7 @@ export const PERMISSIONS = [
   'finance.ap.vendor_invoice.mark_ready',
   'finance.ap.open_item.view',
 
-  // Finance Phase 4B1 — AP payment / allocation foundation (DB + repos; no HTTP routes)
+  // Finance Phase 4B1 â€” AP payment / allocation foundation (DB + repos; no HTTP routes)
   'finance.ap.payment.view',
   'finance.ap.payment.create',
   'finance.ap.payment.edit',
@@ -411,7 +411,7 @@ export const PERMISSIONS = [
   'finance.ap.allocation.reverse',
   'finance.ap.advance.view',
 
-  // Finance Phase 4C2 — vendor adjustments / Money Out corrections
+  // Finance Phase 4C2 â€” vendor adjustments / Money Out corrections
   'finance.ap.adjustment.view',
   'finance.ap.adjustment.create',
   'finance.ap.adjustment.edit',
@@ -423,7 +423,7 @@ export const PERMISSIONS = [
   'finance.ap.adjustment.mark_ready',
   'finance.ap.corrections.view',
 
-  // Finance Phase 4D2 — AP-to-GL reconciliation + close gate (persisted runs; no GL/period mutation)
+  // Finance Phase 4D2 â€” AP-to-GL reconciliation + close gate (persisted runs; no GL/period mutation)
   'finance.ap.reconciliation.view',
   'finance.ap.reconciliation.run',
   'finance.ap.reconciliation.export',
@@ -433,7 +433,7 @@ export const PERMISSIONS = [
   'finance.ap.close_gate.run',
   'finance.ap.close_gate.export',
 
-  // Finance Phase 5A1 — Bank & Cash treasury foundation (account master + GL mapping +
+  // Finance Phase 5A1 â€” Bank & Cash treasury foundation (account master + GL mapping +
   // payment-account routing + reconciliation settings + bank-statement DB foundation).
   // Statement perms are registered for the future import/match/reconcile phase; no HTTP
   // route checks them yet in 5A1.
@@ -461,7 +461,7 @@ export const PERMISSIONS = [
   'finance.treasury.statement.match',
   'finance.treasury.statement.reconcile',
 
-  // Finance Phase 5A3 — bank reconciliation workspace (fine-grained)
+  // Finance Phase 5A3 â€” bank reconciliation workspace (fine-grained)
   'finance.bank.reconciliation.view',
   'finance.bank.reconciliation.run_auto_match',
   'finance.bank.reconciliation.match',
@@ -475,7 +475,7 @@ export const PERMISSIONS = [
   'finance.bank.reconciliation.clearing_post',
   'finance.bank.reconciliation.adjustment_draft_create',
 
-  // Finance Phase 5B1 — internal treasury transfers
+  // Finance Phase 5B1 â€” internal treasury transfers
   'finance.treasury.transfer.view',
   'finance.treasury.transfer.create',
   'finance.treasury.transfer.edit',
@@ -488,7 +488,7 @@ export const PERMISSIONS = [
   'finance.treasury.transfer.reverse',
   'finance.treasury.transfer.in_transit.view',
 
-  // Finance Phase 5B2 — cheque management
+  // Finance Phase 5B2 â€” cheque management
   'finance.treasury.cheque.view',
   'finance.treasury.cheque.create',
   'finance.treasury.cheque.edit',
@@ -502,7 +502,7 @@ export const PERMISSIONS = [
   'finance.treasury.cheque.cancel',
   'finance.treasury.cheque.reverse',
 
-  // Finance Phase 5B3 — treasury adjustments (bank charges/interest/direct debit-credit)
+  // Finance Phase 5B3 â€” treasury adjustments (bank charges/interest/direct debit-credit)
   'finance.treasury.adjustment.view',
   'finance.treasury.adjustment.create',
   'finance.treasury.adjustment.edit',
@@ -512,24 +512,24 @@ export const PERMISSIONS = [
   'finance.treasury.adjustment.cancel',
   'finance.treasury.adjustment.reverse',
 
-  // Finance Phase 5B3 — bank statement classification / posting rules
+  // Finance Phase 5B3 â€” bank statement classification / posting rules
   'finance.treasury.posting_rule.view',
   'finance.treasury.posting_rule.manage',
 
-  // Finance Phase 5B3 — standing instructions (draft-only generation)
+  // Finance Phase 5B3 â€” standing instructions (draft-only generation)
   'finance.treasury.standing_instruction.view',
   'finance.treasury.standing_instruction.manage',
   'finance.treasury.standing_instruction.generate',
 
-  // Finance Phase 5B3 — bankbook / cashbook (read-only)
+  // Finance Phase 5B3 â€” bankbook / cashbook (read-only)
   'finance.treasury.book.view',
 
-  // Finance Phase 5C1 — cash position / liquidity / day-close controls
+  // Finance Phase 5C1 â€” cash position / liquidity / day-close controls
   'finance.treasury.liquidity.view',
   'finance.treasury.closing.view',
   'finance.treasury.closing.manage',
 
-  // Finance Phase 5D1 — bank connector scaffold (no live bank APIs)
+  // Finance Phase 5D1 â€” bank connector scaffold (no live bank APIs)
   'finance.bank_connector.view',
   'finance.bank_connector.manage',
   'finance.bank_connector.sync',
@@ -537,11 +537,11 @@ export const PERMISSIONS = [
   // Tax compliance extracts (GST outward/inward/summary + future export)
   'finance.tax.view',
   'finance.tax.extract',
-  // Tax compliance Phase 2 — e-invoice / e-way (simulated NIC by default)
+  // Tax compliance Phase 2 â€” e-invoice / e-way (simulated NIC by default)
   'finance.tax.einvoice.manage',
   'finance.tax.eway.manage',
 
-  // Finance Fixed Assets Phase 1–2 — register, capitalize, depreciate, simple dispose
+  // Finance Fixed Assets Phase 1â€“2 â€” register, capitalize, depreciate, simple dispose
   'finance.fa.view',
   'finance.fa.create',
   'finance.fa.edit',
@@ -553,15 +553,15 @@ export const PERMISSIONS = [
   'finance.fa.impair',
   'finance.fa.maintain',
 
-  // Finance Budgeting Phase 1 — versions, annual lines, budget vs actual
+  // Finance Budgeting Phase 1 â€” versions, annual lines, budget vs actual
   'finance.budget.view',
   'finance.budget.create',
   'finance.budget.edit',
   'finance.budget.approve',
 
-  // ── Frontend route-matrix module keys (PermissionModule.PermissionAction) ──
+  // â”€â”€ Frontend route-matrix module keys (PermissionModule.PermissionAction) â”€â”€
   // SPA soft-gates and nav shells; reserved for future APIs. Keep in sync with
-  // frontend/src/config/permissionMatrix.ts modules × actions.
+  // frontend/src/config/permissionMatrix.ts modules Ã— actions.
   'masters.view', 'masters.create', 'masters.edit', 'masters.submit', 'masters.approve',
   'masters.release', 'masters.post', 'masters.cancel', 'masters.close', 'masters.print',
   'masters.export', 'masters.override',
@@ -570,7 +570,7 @@ export const PERMISSIONS = [
   'engineering.release', 'engineering.post', 'engineering.cancel', 'engineering.close', 'engineering.print',
   'engineering.export', 'engineering.override',
 
-  // purchase.* fine-grained keys above; matrix also uses purchase.create|edit|…
+  // purchase.* fine-grained keys above; matrix also uses purchase.create|edit|â€¦
   'purchase.create', 'purchase.edit', 'purchase.submit', 'purchase.approve', 'purchase.release',
   'purchase.post', 'purchase.cancel', 'purchase.close', 'purchase.print', 'purchase.export',
   'purchase.override',
@@ -619,14 +619,14 @@ export const PERMISSIONS = [
   'manufacturing.work_orders.cancel', 'manufacturing.work_orders.close',
   'manufacturing.work_orders.close_with_difference', 'manufacturing.work_orders.reopen',
   'manufacturing.work_orders.override_route',
-  // Phase 2A — Production Demand + Work Order execution (no inventory/quality/GL)
+  // Phase 2A â€” Production Demand + Work Order execution (no inventory/quality/GL)
   'manufacturing.demand.view', 'manufacturing.demand.create', 'manufacturing.demand.convert',
   'manufacturing.work_orders.release', 'manufacturing.work_orders.assign',
   'manufacturing.stage.view', 'manufacturing.stage.execute',
   'manufacturing.progress.record', 'manufacturing.progress.correct',
   'manufacturing.progress.reverse',
   'manufacturing.timeline.view', 'manufacturing.control_room.view',
-  // Phase 2B — assignments, daily production, issues, operator UX
+  // Phase 2B â€” assignments, daily production, issues, operator UX
   'manufacturing.daily_production.view', 'manufacturing.daily_production.create', 'manufacturing.daily_production.submit',
   'manufacturing.daily_production.reverse',
   'manufacturing.assignment.view', 'manufacturing.assignment.manage', 'manufacturing.assignment.reassign',
@@ -650,7 +650,7 @@ export const PERMISSIONS = [
   'manufacturing.quality.view', 'manufacturing.quality.inspect', 'manufacturing.quality.accept_deviation',
   'manufacturing.scrap.record', 'manufacturing.rework.manage',
   'manufacturing.cost.view', 'manufacturing.variance.view',
-  // Phase 7E — manufacturing costing + accounting productionisation
+  // Phase 7E â€” manufacturing costing + accounting productionisation
   'manufacturing.costing_policy.view', 'manufacturing.costing_policy.manage',
   'manufacturing.account_mapping.view', 'manufacturing.account_mapping.manage',
   'manufacturing.cost.calculate', 'manufacturing.cost.details', 'manufacturing.cost.provisional_view',
@@ -673,7 +673,7 @@ export const PERMISSIONS = [
   'manufacturing.job_work_dispatch.reverse',
   'manufacturing.job_work_receipt.reverse',
   'manufacturing.split.reverse',
-  // Phase 5C — transaction corrections / reversals
+  // Phase 5C â€” transaction corrections / reversals
   'manufacturing.correction.view',
   'manufacturing.correction.request',
   'manufacturing.correction.approve',
@@ -682,7 +682,7 @@ export const PERMISSIONS = [
   'manufacturing.correction.admin',
   'manufacturing.reports.view', 'manufacturing.reports.export',
   'manufacturing.settings.view', 'manufacturing.settings.manage',
-  // Phase 5A — runtime change requests (manufacturing-scoped approval workflow)
+  // Phase 5A â€” runtime change requests (manufacturing-scoped approval workflow)
   'manufacturing.runtime_change.view', 'manufacturing.runtime_change.request',
   'manufacturing.runtime_change.apply', 'manufacturing.runtime_change.approve',
   'manufacturing.runtime_change.reject', 'manufacturing.runtime_change.quantity',
@@ -719,7 +719,7 @@ export const PERMISSIONS = [
   'maintenance.cost.manage',
   'maintenance.report.view',
 
-  // HRMS Phase 1 — foundation + employee master
+  // HRMS Phase 1 â€” foundation + employee master
   'hrms.employee.view',
   'hrms.employee.create',
   'hrms.employee.edit',
@@ -742,14 +742,14 @@ export const PERMISSIONS = [
   'hrms.attendance.view',
   'hrms.attendance.manage',
 
-  // HRMS Phase 5 — Overtime management
+  // HRMS Phase 5 â€” Overtime management
   'hrms.overtime.view',
   'hrms.overtime.create',
   'hrms.overtime.approve',
   'hrms.overtime.manage',
   'hrms.overtime.override_limit',
 
-  // HRMS Phase 6 — Salary structure & assignments
+  // HRMS Phase 6 â€” Salary structure & assignments
   'hrms.salary.component.view',
   'hrms.salary.component.manage',
   'hrms.salary.structure.view',
@@ -757,20 +757,20 @@ export const PERMISSIONS = [
   'hrms.salary.assignment.view',
   'hrms.salary.assignment.manage',
 
-  // HRMS Phase 7 — Payroll run & calculation
+  // HRMS Phase 7 â€” Payroll run & calculation
   'hrms.payroll.view',
   'hrms.payroll.create',
   'hrms.payroll.calculate',
   'hrms.payroll.review',
   'hrms.payroll.finalize',
 
-  // HRMS Phase 8 — Statutory (PF/ESIC/PT/TDS/LWF) rules, profiles & registers
+  // HRMS Phase 8 â€” Statutory (PF/ESIC/PT/TDS/LWF) rules, profiles & registers
   'hrms.statutory.view',
   'hrms.statutory.manage',
   'hrms.statutory.override',
   'hrms.statutory.reports',
 
-  // HRMS Phase 9 — Payslip + payroll accounting + salary payment
+  // HRMS Phase 9 â€” Payslip + payroll accounting + salary payment
   'hrms.payslip.view',
   'hrms.payslip.generate',
   'hrms.payroll.accounting.view',
@@ -781,7 +781,7 @@ export const PERMISSIONS = [
   'hrms.salary_payment.confirm',
   'hrms.salary_payment.export',
 
-  // HRMS Phase 10 — Loans & salary advances
+  // HRMS Phase 10 â€” Loans & salary advances
   'hrms.loan.view',
   'hrms.loan.create',
   'hrms.loan.approve',
@@ -789,7 +789,7 @@ export const PERMISSIONS = [
   'hrms.loan.manage',
   'hrms.loan.repayment',
 
-  // HRMS Phase 11 — Exit & Full & Final
+  // HRMS Phase 11 â€” Exit & Full & Final
   'hrms.exit.view',
   'hrms.exit.create',
   'hrms.exit.approve',
@@ -800,7 +800,7 @@ export const PERMISSIONS = [
   'hrms.fnf.post',
   'hrms.fnf.pay',
 
-  // Phase 7D — reporting foundation (saved views, exception centre, traceability)
+  // Phase 7D â€” reporting foundation (saved views, exception centre, traceability)
   'manufacturing.reports.saved_views',
   'manufacturing.reports.shared_views',
   'manufacturing.reports.production',
@@ -818,7 +818,7 @@ export const PERMISSIONS = [
   'quality.release', 'quality.post', 'quality.cancel', 'quality.close', 'quality.print',
   'quality.export', 'quality.override',
   'quality.decision.correct',
-  // Phase 7D — quality reporting
+  // Phase 7D â€” quality reporting
   'quality.reports.view',
   'quality.reports.production',
   'quality.reports.ncr',
@@ -827,7 +827,7 @@ export const PERMISSIONS = [
   'dispatch.release', 'dispatch.post', 'dispatch.cancel', 'dispatch.close', 'dispatch.print',
   'dispatch.pod.view', 'dispatch.pod.record',
   'dispatch.export', 'dispatch.override',
-  // Phase 7C5 — reverse / reconciliation
+  // Phase 7C5 â€” reverse / reconciliation
   'dispatch.reverse.request',
   'dispatch.reverse.approve',
   'dispatch.reverse.apply',
@@ -836,7 +836,7 @@ export const PERMISSIONS = [
   // Commercial O2C policy (partial / multi / invoice mode / POD)
   'dispatch.settings.view',
   'dispatch.settings.manage',
-  // Phase 7C1 — requirements / readiness / draft orders
+  // Phase 7C1 â€” requirements / readiness / draft orders
   'dispatch.requirement.view',
   'dispatch.requirement.synchronise',
   'dispatch.requirement.hold',
@@ -850,7 +850,7 @@ export const PERMISSIONS = [
   'dispatch.order.cancel',
   'dispatch.basic_confirm',
   'dispatch.legacy_7c0_use',
-  // Phase 7C2 — reservation + picking
+  // Phase 7C2 â€” reservation + picking
   'dispatch.reservation.view',
   'dispatch.reservation.create',
   'dispatch.reservation.release',
@@ -870,7 +870,7 @@ export const PERMISSIONS = [
   'dispatch.pick_list.cancel',
   'dispatch.tracking.view',
   'dispatch.tracking.allocate',
-  // Phase 7C3 — packing (operational allocation)
+  // Phase 7C3 â€” packing (operational allocation)
   'dispatch.packing.view',
   'dispatch.packing.create',
   'dispatch.packing.edit',
@@ -894,7 +894,7 @@ export const PERMISSIONS = [
   'dispatch.packing_shortage.resolve',
   'dispatch.packing_reports.view',
   'dispatch.packing_reports.export',
-  // Phase 7C4 — Delivery Challan (document only)
+  // Phase 7C4 â€” Delivery Challan (document only)
   'dispatch.challan.view',
   'dispatch.challan.create',
   'dispatch.challan.edit',
@@ -909,7 +909,7 @@ export const PERMISSIONS = [
   'dispatch.challan.override_warning',
   'dispatch.challan.reports',
   'dispatch.challan.export',
-  // Phase 7D — dispatch reporting (7C0 SO fulfilment scope only)
+  // Phase 7D â€” dispatch reporting (7C0 SO fulfilment scope only)
   'dispatch.reports.view',
   'dispatch.reports.fulfilment',
   'dispatch.reports.invoice_readiness',
@@ -950,7 +950,7 @@ export const PERMISSIONS = [
   'gate.report.view',
   'gate.settings.manage',
 
-  // Phase 7D — cross-module operational exception centre
+  // Phase 7D â€” cross-module operational exception centre
   'operations.exceptions.view',
   'operations.exceptions.manage',
 
@@ -985,12 +985,25 @@ export const PERMISSIONS = [
 
   'settings.view', 'settings.create', 'settings.edit', 'settings.submit', 'settings.approve',
   'settings.release', 'settings.post', 'settings.cancel', 'settings.close', 'settings.print',
-  'settings.export', 'settings.override',
+  'settings.export', 'settings.override',// Knowledge Base / OpenKB (Wave 1)
+  'kb.document.view',
+  'kb.document.create',
+  'kb.document.update',
+  'kb.document.delete',
+  'kb.document.reindex',
+  'kb.search.view',
+  'kb.chat.use',
+  'kb.copilot.use',
+  'kb.insights.view',
+  'kb.analytics.view',
+  'kb.category.manage',
+  'kb.tag.manage',
+  'kb.admin.manage',
 ] as const
 
 export type PermissionName = (typeof PERMISSIONS)[number]
 
-/** Platform-only permissions — never granted to tenant-scoped admin roles. */
+/** Platform-only permissions â€” never granted to tenant-scoped admin roles. */
 const PLATFORM_ONLY_PERMISSIONS = new Set<PermissionName>([
   'tenant.manage',
   'tenant.create',
@@ -1006,6 +1019,17 @@ export const TENANT_ADMIN_PERMISSIONS: PermissionName[] = PERMISSIONS.filter(
 )
 
 const MASTER_VIEW_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('master.') && p.endsWith('.view'))
+/** Knowledge read/use grants for typical operators and Viewer. */
+const KB_USE_PERMISSIONS: PermissionName[] = PERMISSIONS.filter(
+  (p) =>
+    p === 'kb.document.view' ||
+    p === 'kb.search.view' ||
+    p === 'kb.chat.use' ||
+    p === 'kb.copilot.use' ||
+    p === 'kb.insights.view',
+)
+/** Full Knowledge admin suite (document write + taxonomy + settings). */
+const KB_ADMIN_PERMISSIONS: PermissionName[] = PERMISSIONS.filter((p) => p.startsWith('kb.'))
 const PURCHASE_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('purchase.'))
 const PURCHASE_OPS = PURCHASE_PERMISSIONS.filter(
   (p) =>
@@ -1105,11 +1129,11 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
   'Super Admin': [...PERMISSIONS],
   /** Full tenant workspace access (all modules except platform tenant.*). */
   'Tenant Admin': [...TENANT_ADMIN_PERMISSIONS],
-  /** Alias some tenants may use — same grant set as Tenant Admin. */
+  /** Alias some tenants may use â€” same grant set as Tenant Admin. */
   Admin: [...TENANT_ADMIN_PERMISSIONS],
-  /** Product persona name — same grant set as Tenant Admin (includes purchase.setup.manage). */
+  /** Product persona name â€” same grant set as Tenant Admin (includes purchase.setup.manage). */
   Administrator: [...TENANT_ADMIN_PERMISSIONS],
-  /** Executive alias — full workspace access for testing / leadership accounts. */
+  /** Executive alias â€” full workspace access for testing / leadership accounts. */
   CEO: [...TENANT_ADMIN_PERMISSIONS],
   'Master Data Manager': PERMISSIONS.filter((p) => p.startsWith('master.') || p.startsWith('masters.')),
   'Purchase Manager': [
@@ -1159,7 +1183,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.item.view',
   ],
   /**
-   * Department Manager — view department PRs; approve / reject / send back.
+   * Department Manager â€” view department PRs; approve / reject / send back.
    * `Department Head` kept as an alias for existing tenants.
    */
   'Department Manager': [
@@ -1535,7 +1559,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.warehouse.view',
     'master.location.view',
     'master.bin.view',
-    // Ops manufacturing only — Finance owns enable / sign-off / failed-event retry.
+    // Ops manufacturing only â€” Finance owns enable / sign-off / failed-event retry.
     ...PRODUCTION_PERMISSIONS.filter(
       (p) =>
         !p.startsWith('manufacturing.accounting.') ||
@@ -1545,7 +1569,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     // Manufacturing QC list/get needs module quality.view (decide can use manufacturing.quality.inspect)
     'quality.view',
     'quality.submit',
-    // Phase 7D — cross-module reporting/exceptions visible to Production Manager
+    // Phase 7D â€” cross-module reporting/exceptions visible to Production Manager
     'quality.reports.view',
     'quality.reports.production',
     'quality.reports.ncr',
@@ -1554,7 +1578,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'dispatch.reports.invoice_readiness',
     'operations.exceptions.view',
     'operations.exceptions.manage',
-    // Maintenance V1 — full operational access
+    // Maintenance V1 â€” full operational access
     'maintenance.view',
     'maintenance.create',
     'maintenance.start',
@@ -1582,7 +1606,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.machine.view',
     'manufacturing.work_orders.view',
     'manufacturing.dashboard.view',
-    // Phase 2A — shopfloor execution (view + hands-on stage/progress work, no create/release)
+    // Phase 2A â€” shopfloor execution (view + hands-on stage/progress work, no create/release)
     'manufacturing.demand.view',
     'manufacturing.work_orders.start',
     'manufacturing.work_orders.hold',
@@ -1593,7 +1617,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.progress.record',
     'manufacturing.timeline.view',
     'manufacturing.control_room.view',
-    // Phase 2B — daily production + team assignments + issues
+    // Phase 2B â€” daily production + team assignments + issues
     'manufacturing.daily_production.view',
     'manufacturing.daily_production.create',
     'manufacturing.daily_production.submit',
@@ -1607,14 +1631,14 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.issue.resolve',
     'manufacturing.downtime.view',
     'manufacturing.downtime.manage',
-    // Phase 5A — runtime changes (assignment / hold / request)
+    // Phase 5A â€” runtime changes (assignment / hold / request)
     'manufacturing.runtime_change.view',
     'manufacturing.runtime_change.request',
     'manufacturing.runtime_change.apply',
     'manufacturing.runtime_change.assignment',
     'manufacturing.runtime_change.machine',
     'manufacturing.runtime_change.hold',
-    // Phase 5B — WIP / material transfers
+    // Phase 5B â€” WIP / material transfers
     'manufacturing.wip.move',
     'manufacturing.materials.transfer',
     'manufacturing.materials.view',
@@ -1625,7 +1649,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.material.release_reservation',
     'manufacturing.material.reallocate',
     'manufacturing.material.additional_issue',
-    // Maintenance V1 — coordinate repair / test (no cost manage / close)
+    // Maintenance V1 â€” coordinate repair / test (no cost manage / close)
     'maintenance.view',
     'maintenance.create',
     'maintenance.start',
@@ -1645,7 +1669,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     // Product label on kiosk cards (read-only WO header fields)
     'manufacturing.work_orders.view',
     'master.item.view',
-    // Maintenance V1 — report breakdown only
+    // Maintenance V1 â€” report breakdown only
     'maintenance.view',
     'maintenance.create',
   ],
@@ -1673,16 +1697,16 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.work_centre.view', 'manufacturing.work_centre.manage',
     'manufacturing.machine.view', 'manufacturing.machine.manage',
     'manufacturing.work_orders.view',
-    // Phase 2A — planning/engineering visibility (no execution actions)
+    // Phase 2A â€” planning/engineering visibility (no execution actions)
     'manufacturing.demand.view',
     'manufacturing.stage.view',
     'manufacturing.timeline.view',
-    // Phase 2B — view assignments and issues only
+    // Phase 2B â€” view assignments and issues only
     'manufacturing.assignment.view',
     'manufacturing.issue.view',
     'manufacturing.downtime.view',
     'manufacturing.daily_production.view',
-    // Phase 5A — route / machine / work centre runtime changes
+    // Phase 5A â€” route / machine / work centre runtime changes
     'manufacturing.runtime_change.view',
     'manufacturing.runtime_change.request',
     'manufacturing.runtime_change.route',
@@ -1715,7 +1739,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.item.view',
     'master.product.view',
   ],
-  /** CRM-only persona — no purchase, manufacturing, inventory, finance, or admin modules. */
+  /** CRM-only persona â€” no purchase, manufacturing, inventory, finance, or admin modules. */
   'CRM User': [
     'crm.lead.view', 'crm.lead.create', 'crm.lead.update',
     'crm.contact.view', 'crm.contact.create', 'crm.contact.update',
@@ -1865,6 +1889,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.work_centre.view',
     'user.view',
   ],
+
   Viewer: [
     'crm.lead.view', 'crm.contact.view', 'crm.company.view',
     'crm.activity.view', 'crm.follow_up.view', 'crm.pipeline.view', 'crm.opportunity.view',
@@ -1873,14 +1898,18 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'crm.indiamart.view', 'crm.indiamart.enquiry.view',
     'user.view',
     ...MASTER_VIEW_PERMISSIONS,
+    ...KB_USE_PERMISSIONS,
   ],
+
+  /** Knowledge operators - full document lifecycle + chat without platform admin. */
+  'Knowledge Manager': [...KB_ADMIN_PERMISSIONS],
 }
 
-/** Product / UI persona — same grants as Production Manager (includes manufacturing.bom.create). */
+/** Product / UI persona â€” same grants as Production Manager (includes manufacturing.bom.create). */
 ROLE_PERMISSIONS['Production Head'] = [...ROLE_PERMISSIONS['Production Manager']]
 
 /**
- * Legacy → canonical purchase permission aliases.
+ * Legacy â†’ canonical purchase permission aliases.
  * Existing JWT / DB grants using old names still authorize the new route checks.
  */
 export const PURCHASE_PERMISSION_ALIASES: Record<string, PermissionName> = {
@@ -1912,7 +1941,7 @@ export function permissionSetIncludes(granted: readonly string[], required: stri
   return false
 }
 
-/** Canonical CRM opportunity pipeline — keep in sync with frontend opportunity-stages master / OPPORTUNITY_STAGES. */
+/** Canonical CRM opportunity pipeline â€” keep in sync with frontend opportunity-stages master / OPPORTUNITY_STAGES. */
 export const DEFAULT_PIPELINE_STAGES = [
   { name: 'New Lead', slug: 'new_lead', sequence: 1, probability: 10 },
   { name: 'Qualified', slug: 'qualified', sequence: 2, probability: 20 },

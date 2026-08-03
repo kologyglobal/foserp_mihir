@@ -39,6 +39,25 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === 'true'),
   CRM_UPLOAD_DIR: z.string().optional(),
+  /** Knowledge Base document root (defaults to uploads/knowledge in services when unset). */
+  KB_UPLOAD_DIR: z.string().optional(),
+  /** Max raw document bytes for KB upload (default 25MB). */
+  KB_MAX_UPLOAD_BYTES: z.coerce.number().default(25 * 1024 * 1024),
+  /** Feature kill-switch for background indexing (Wave 2+). Default true outside production when unset handled later. */
+  KB_INDEXING_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  KB_OCR_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_BASE_URL: z.string().url().optional(),
+  OPENKB_BASE_URL: z.string().url().optional(),
+  OPENKB_API_KEY: z.string().optional(),
+  KB_EMBEDDING_MODEL: z.string().optional(),
+  KB_CHAT_MODEL: z.string().optional(),
   /** Phase 5A2 — directory for uploaded bank statement import files. */
   TREASURY_STATEMENT_UPLOAD_DIR: z.string().optional(),
   /** Decoded file size cap for CRM attachments (default 25MB). JSON body limit is sized for base64. */

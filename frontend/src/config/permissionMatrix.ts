@@ -85,6 +85,8 @@ export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: Permissio
   // CRM shell: canRoute uses canAccessCrmShell / JWT crm.*.view — matrix key only for AccessDenied label in demo.
   { prefix: '/crm', permission: 'sales.view', pageName: 'CRM' },
   { prefix: '/reports', permission: 'reports.view', pageName: 'Reports' },
+  // Knowledge shell: canRoute uses canAccessKnowledgeShell (not sales.view).
+  { prefix: '/knowledge', permission: 'sales.view', pageName: 'Knowledge Base' },
   { prefix: '/m/crm', permission: 'sales.view', pageName: 'Mobile CRM' },
   { prefix: '/m/qc', permission: 'quality.view', pageName: 'Mobile QC' },
   { prefix: '/m/ncr', permission: 'quality.view', pageName: 'Mobile NCR' },

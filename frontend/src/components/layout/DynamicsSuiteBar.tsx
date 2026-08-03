@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayoutGrid, Menu, RefreshCw, Search } from 'lucide-react'
+import { LayoutGrid, Menu, RefreshCw, Search, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUIStore } from '../../store/uiStore'
 import { getUserLandingPath } from '../../utils/permissions/moduleCategoryAccess'
@@ -12,6 +12,7 @@ import { AppLauncher } from './AppLauncher'
 /** Full-width Dynamics 365 suite bar */
 export function DynamicsSuiteBar() {
   const setSearchOpen = useUIStore((s) => s.setSearchOpen)
+  const openCopilot = useUIStore((s) => s.openCopilot)
   const toggleMobileNav = useUIStore((s) => s.toggleMobileNav)
   const landingPath = getUserLandingPath()
   const [refreshing, setRefreshing] = useState(false)
@@ -83,6 +84,18 @@ export function DynamicsSuiteBar() {
             className={cn('h-4 w-4', refreshing && 'animate-spin')}
             strokeWidth={1.75}
           />
+        </button>
+
+        
+        <button
+          type="button"
+          className="d365-suite-copilot-btn"
+          onClick={openCopilot}
+          aria-label="Open Copilot"
+          title="Copilot (Ctrl+.)"
+        >
+          <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+          <span className="d365-suite-copilot-btn__label">Copilot</span>
         </button>
 
         <NotificationBell className="d365-suite-icon-btn d365-suite-notify border-0 bg-transparent shadow-none hover:bg-white/10 hover:text-white" />

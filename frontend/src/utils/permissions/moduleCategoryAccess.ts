@@ -12,6 +12,7 @@ import { canAccessManufacturingShell } from './manufacturing'
 import { hasFinancePermission } from './finance'
 import { hasMaintenancePermission } from './maintenance'
 import { canAccessHrmsShell } from './hrms'
+import { canAccessKnowledgeShell } from './knowledge'
 
 /** Whether a sidebar module category should appear for the current session. */
 export function canAccessModuleCategory(categoryId: string): boolean {
@@ -51,6 +52,8 @@ export function canAccessModuleCategory(categoryId: string): boolean {
       return canPermission('production', 'view')
     case 'reports':
       return canPermission('reports', 'view')
+    case 'knowledge':
+      return canAccessKnowledgeShell()
     case 'admin':
       return canAccessAdminShell()
     default:

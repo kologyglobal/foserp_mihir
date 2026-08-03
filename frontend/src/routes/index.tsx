@@ -27,6 +27,7 @@ import { accountingRouteChildren } from './accountingRoutes'
 import { adminRouteChildren } from './adminRoutes'
 import { organisationRouteChildren } from './organisationRoutes'
 import { operationsRouteChildren } from './operationsRoutes'
+import { knowledgeRouteChildren } from './knowledgeRoutes'
 import { NotificationCenterPage } from '@/modules/notifications/NotificationCenterPage'
 import { NotificationPreferencesPage } from '@/modules/notifications/NotificationPreferencesPage'
 
@@ -70,6 +71,7 @@ export const router = createBrowserRouter([
           ...organisationRouteChildren,
           ...adminRouteChildren,
           ...accountRouteChildren,
+          ...knowledgeRouteChildren,
           { path: '*', element: <PageNotFoundPage /> },
         ],
       },

@@ -547,6 +547,24 @@ model Tenant {
   gateApprovals         GateApproval[]
   gateActivities        GateActivity[]
 
+
+  // Knowledge Base / OpenKB Wave 1
+  knowledgeCategories     KnowledgeCategory[]
+  knowledgeTags           KnowledgeTag[]
+  knowledgeSources        KnowledgeSource[]
+  knowledgeDocuments      KnowledgeDocument[]
+  knowledgeVersions       KnowledgeVersion[]
+  knowledgeChunks         KnowledgeChunk[]
+  knowledgeEmbeddings     KnowledgeEmbedding[]
+  knowledgeDocumentTags   KnowledgeDocumentTag[]
+  knowledgeChatSessions   KnowledgeChatSession[]
+  knowledgeChatMessages   KnowledgeChatMessage[]
+  knowledgeFeedback       KnowledgeFeedback[]
+  knowledgePermissions    KnowledgePermission[]
+  knowledgeActivityLogs   KnowledgeActivityLog[]
+
+  // Mobile push token registration (Expo)
+  mobileDeviceTokens      MobileDeviceToken[]
   // In-app CRM + ops notifications (tenant-scoped)
   notifications              Notification[]
   notificationPreferences    NotificationPreference[]
@@ -603,6 +621,7 @@ model User {
   hrEmployeeLinks        HrEmployee[]            @relation("HrEmployeeUser")
   notificationsReceived  Notification[]          @relation("NotificationRecipient")
   notificationPreferences NotificationPreference[]
+  mobileDeviceTokens       MobileDeviceToken[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -835,6 +854,30 @@ model RefreshToken {
   @@index([tenantId])
   @@index([tokenHash])
   @@map("refresh_tokens")
+}
+
+/// Expo push token registration only (M3.1). Delivery engine is not implemented.
+model MobileDeviceToken {
+  id            String    @id @default(uuid())
+  tenantId      String
+  userId        String
+  expoPushToken String    @db.VarChar(512)
+  deviceId      String?   @db.VarChar(128)
+  platform      String    @db.VarChar(32)
+  appVersion    String?   @db.VarChar(32)
+  status        String    @default("ACTIVE") @db.VarChar(16)
+  revokedAt     DateTime?
+  lastSeenAt    DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, expoPushToken])
+  @@index([tenantId, userId])
+  @@index([tenantId, status])
+  @@map("mobile_device_tokens")
 }
 
 model PasswordResetToken {
@@ -20678,4 +20721,372 @@ model NotificationTenantSettings {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("notification_tenant_settings")
+}
+
+
+// ─── Knowledge Base / OpenKB (Wave 1 foundation) ─────────────────────────────
+
+enum KnowledgeDocumentStatus {
+  DRAFT
+  PROCESSING
+  READY
+  FAILED
+  ARCHIVED
+}
+
+enum KnowledgeDocumentKind {
+  UPLOAD
+  URL
+  HTML
+  MARKDOWN
+  TEXT
+  ERP_LINK
+}
+
+enum KnowledgeSourceType {
+  MANUAL
+  URL
+  UPLOAD
+  ERP_MODULE
+  OPENKB
+}
+
+enum KnowledgeChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum KnowledgeFeedbackRating {
+  UP
+  DOWN
+  SCORE
+}
+
+enum KnowledgePermissionPrincipalType {
+  USER
+  ROLE
+  ALL_TENANT
+}
+
+enum KnowledgePermissionAction {
+  VIEW
+  EDIT
+  ADMIN
+  CHAT
+}
+
+model KnowledgeCategory {
+  id          String    @id @default(uuid())
+  tenantId    String
+  parentId    String?
+  code        String    @db.VarChar(64)
+  name        String    @db.VarChar(200)
+  description String?   @db.Text
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id])
+  parent    KnowledgeCategory?   @relation("KnowledgeCategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  KnowledgeCategory[]  @relation("KnowledgeCategoryTree")
+  documents KnowledgeDocument[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, parentId])
+  @@map("knowledge_categories")
+}
+
+model KnowledgeTag {
+  id        String    @id @default(uuid())
+  tenantId  String
+  name      String    @db.VarChar(100)
+  slug      String    @db.VarChar(120)
+  createdBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant    Tenant                @relation(fields: [tenantId], references: [id])
+  documents KnowledgeDocumentTag[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@map("knowledge_tags")
+}
+
+model KnowledgeSource {
+  id          String              @id @default(uuid())
+  tenantId    String
+  name        String              @db.VarChar(200)
+  sourceType  KnowledgeSourceType @default(MANUAL)
+  baseUrl     String?             @db.VarChar(1000)
+  configJson  Json?
+  isActive    Boolean             @default(true)
+  lastSyncAt  DateTime?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  deletedAt   DateTime?
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id])
+  documents KnowledgeDocument[]
+
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, sourceType])
+  @@map("knowledge_sources")
+}
+
+model KnowledgeDocument {
+  id               String                  @id @default(uuid())
+  tenantId         String
+  categoryId       String?
+  sourceId         String?
+  title            String                  @db.VarChar(500)
+  description      String?                 @db.Text
+  kind             KnowledgeDocumentKind   @default(UPLOAD)
+  status           KnowledgeDocumentStatus @default(DRAFT)
+  /// MIME of original binary when kind=UPLOAD
+  mimeType         String?                 @db.VarChar(128)
+  originalFilename String?                 @db.VarChar(500)
+  storageKey       String?                 @db.VarChar(500)
+  fileSize         Int                     @default(0)
+  /// External URL when kind=URL
+  sourceUrl        String?                 @db.VarChar(2000)
+  language         String?                 @db.VarChar(16)
+  currentVersionId String?
+  ownerUserId      String?
+  indexingError    String?                 @db.Text
+  indexedAt        DateTime?
+  publishedAt      DateTime?
+  createdBy        String?
+  updatedBy        String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  deletedAt        DateTime?
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  category    KnowledgeCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  source      KnowledgeSource?       @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  versions    KnowledgeVersion[]
+  chunks      KnowledgeChunk[]
+  tags        KnowledgeDocumentTag[]
+  permissions KnowledgePermission[]
+  feedback    KnowledgeFeedback[]
+
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, status])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, ownerUserId])
+  @@index([tenantId, createdAt])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeVersion {
+  id              String   @id @default(uuid())
+  tenantId        String
+  documentId      String
+  versionNo       Int
+  /// Markdown content of this revision (may be large)
+  markdownContent String?  @db.LongText
+  contentHash     String?  @db.VarChar(64)
+  changeSummary   String?  @db.VarChar(500)
+  createdBy       String?
+  createdAt       DateTime @default(now())
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id])
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunks   KnowledgeChunk[]
+
+  @@unique([tenantId, documentId, versionNo])
+  @@index([tenantId])
+  @@index([tenantId, documentId])
+  @@map("knowledge_versions")
+}
+
+model KnowledgeChunk {
+  id          String   @id @default(uuid())
+  tenantId    String
+  documentId  String
+  versionId   String?
+  chunkIndex  Int
+  headingPath String?  @db.VarChar(500)
+  contentMd   String   @db.LongText
+  tokenCount  Int?
+  charStart   Int?
+  charEnd     Int?
+  metadataJson Json?
+  createdAt   DateTime @default(now())
+
+  tenant     Tenant               @relation(fields: [tenantId], references: [id])
+  document   KnowledgeDocument    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version    KnowledgeVersion?    @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  embeddings KnowledgeEmbedding[]
+
+  @@unique([tenantId, documentId, chunkIndex])
+  @@index([tenantId])
+  @@index([tenantId, documentId])
+  @@index([tenantId, versionId])
+  @@map("knowledge_chunks")
+}
+
+model KnowledgeEmbedding {
+  id            String   @id @default(uuid())
+  tenantId      String
+  chunkId       String
+  /// Embedding model id (e.g. text-embedding-3-small)
+  modelId       String   @db.VarChar(120)
+  dimensions    Int
+  /// Float array as JSON (MySQL 8 — no native ANN in Wave 1)
+  vectorJson    Json
+  contentHash   String?  @db.VarChar(64)
+  createdAt     DateTime @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  chunk  KnowledgeChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, chunkId, modelId])
+  @@index([tenantId])
+  @@index([tenantId, modelId])
+  @@map("knowledge_embeddings")
+}
+
+model KnowledgeDocumentTag {
+  id         String   @id @default(uuid())
+  tenantId   String
+  documentId String
+  tagId      String
+  createdAt  DateTime @default(now())
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id])
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag      KnowledgeTag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, documentId, tagId])
+  @@index([tenantId])
+  @@index([tenantId, tagId])
+  @@map("knowledge_document_tags")
+}
+
+model KnowledgeChatSession {
+  id           String    @id @default(uuid())
+  tenantId     String
+  userId       String
+  title        String?   @db.VarChar(300)
+  /// Optional ERP context for copilot sessions
+  contextJson  Json?
+  lastMessageAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  tenant   Tenant                 @relation(fields: [tenantId], references: [id])
+  messages KnowledgeChatMessage[]
+  feedback KnowledgeFeedback[]
+
+  @@index([tenantId])
+  @@index([tenantId, userId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, lastMessageAt])
+  @@map("knowledge_chat_sessions")
+}
+
+/// Rows in knowledge_chat_history (product name); model maps to that table.
+model KnowledgeChatMessage {
+  id         String            @id @default(uuid())
+  tenantId   String
+  sessionId  String
+  role       KnowledgeChatRole
+  content    String            @db.LongText
+  /// Citations / sources blob for ASSISTANT turns
+  citationsJson Json?
+  modelId    String?           @db.VarChar(120)
+  tokenIn    Int?
+  tokenOut   Int?
+  createdAt  DateTime          @default(now())
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id])
+  session  KnowledgeChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  feedback KnowledgeFeedback[]
+
+  @@index([tenantId])
+  @@index([tenantId, sessionId])
+  @@index([tenantId, createdAt])
+  @@map("knowledge_chat_history")
+}
+
+model KnowledgeFeedback {
+  id         String                   @id @default(uuid())
+  tenantId   String
+  userId     String?
+  sessionId  String?
+  messageId  String?
+  documentId String?
+  rating     KnowledgeFeedbackRating  @default(UP)
+  score      Int?
+  comment    String?                  @db.Text
+  createdAt  DateTime                 @default(now())
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id])
+  session  KnowledgeChatSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  message  KnowledgeChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  document KnowledgeDocument?    @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, sessionId])
+  @@index([tenantId, documentId])
+  @@index([tenantId, createdAt])
+  @@map("knowledge_feedback")
+}
+
+model KnowledgePermission {
+  id             String                          @id @default(uuid())
+  tenantId       String
+  documentId     String?
+  categoryId     String?
+  principalType  KnowledgePermissionPrincipalType
+  principalId    String?                         @db.VarChar(64)
+  action         KnowledgePermissionAction       @default(VIEW)
+  createdBy      String?
+  createdAt      DateTime                        @default(now())
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id])
+  document KnowledgeDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, documentId])
+  @@index([tenantId, principalType, principalId])
+  @@map("knowledge_permissions")
+}
+
+model KnowledgeActivityLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String?
+  action     String   @db.VarChar(64)
+  entityType String?  @db.VarChar(64)
+  entityId   String?
+  message    String?  @db.VarChar(500)
+  metaJson   Json?
+  ipAddress  String?  @db.VarChar(64)
+  userAgent  String?  @db.VarChar(500)
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, action])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, createdAt])
+  @@map("knowledge_activity_logs")
 }

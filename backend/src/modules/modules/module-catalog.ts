@@ -86,6 +86,12 @@ export const TENANT_MODULE_CATALOG: TenantModuleDef[] = [
     dependsOn: [],
   },
   {
+    key: 'knowledge',
+    name: 'Knowledge Base',
+    description: 'OpenKB document intelligence, chat, copilot, and AI insights',
+    dependsOn: [],
+  },
+  {
     key: 'hrms',
     name: 'HRMS',
     description: 'Employee master, designations, and workforce identity (Phase 1)',

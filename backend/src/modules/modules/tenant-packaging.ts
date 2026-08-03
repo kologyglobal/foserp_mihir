@@ -9,7 +9,13 @@ import { TENANT_MODULE_CATALOG } from './module-catalog.js'
 export type TenantBusinessType = 'MANUFACTURING' | 'SERVICES'
 
 /** Catalog keys enabled for a SERVICES tenant (Bank & Cash lives under accounting). */
-export const SERVICES_ENABLED_MODULES = ['masters', 'crm', 'accounting', 'reports'] as const
+export const SERVICES_ENABLED_MODULES = [
+  'masters',
+  'crm',
+  'accounting',
+  'reports',
+  'knowledge',
+] as const
 
 /** Catalog keys explicitly disabled for SERVICES. */
 export const SERVICES_DISABLED_MODULES = [

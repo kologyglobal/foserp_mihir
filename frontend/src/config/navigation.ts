@@ -39,6 +39,7 @@ import {
   Clock,
   ShieldCheck,
   ScanLine,
+  Sparkles,
   Target,
   TrendingUp,
   Layers,
@@ -355,6 +356,15 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Pending Dispatch', path: '/reports/dispatch/pending-dispatch', icon: Truck },
       { label: 'Open Orders', path: '/reports/sales/open-orders', icon: ShoppingBag },
       { label: 'Barcode Traceability', path: '/reports/traceability/barcode', icon: QrCode },
+    ],
+  },
+  {
+    id: 'knowledge',
+    title: 'Knowledge',
+    items: [
+      { label: 'Workspace', path: '/knowledge', icon: LayoutDashboard, end: true, workspace: true },
+      { label: 'Documents', path: '/knowledge/documents', icon: BookOpen },
+      { label: 'Copilot', path: '/knowledge', icon: Sparkles, subNav: false },
     ],
   },
 ]

@@ -15,6 +15,7 @@ import { getStoredSession } from '../../services/api/client'
 import type { AuthSession } from '../../services/api/client'
 import { hasWorkspaceAdminRole } from './workspaceAdmin'
 import { isRouteAllowedByModules } from '../../store/tenantProfileStore'
+import { canAccessKnowledgeShell } from './knowledge'
 
 /** Primary ERP roles — legacy aliases retained for backward compatibility */
 export type ErpRole =
@@ -227,6 +228,10 @@ function isCrmShellPath(pathname: string): boolean {
 }
 
 export function canRoute(pathname: string): boolean {
+  // Knowledge — do not soft-block Super Admin / workspace admins even when module flags lag.
+  if (pathname === '/knowledge' || pathname.startsWith('/knowledge/')) {
+    return canAccessKnowledgeShell()
+  }
   if (!isRouteAllowedByModules(pathname)) return false
   if (isCrmShellPath(pathname)) {
     if (isApiMode()) {
@@ -419,3 +424,9 @@ export {
   canAccessModuleCategory,
   getUserLandingPath,
 } from './moduleCategoryAccess'
+
+export {
+  canAccessKnowledgeShell,
+  canKbPermission,
+  canUseCopilot,
+} from './knowledge'

@@ -75,3 +75,10 @@ export class DatabaseError extends AppError {
     super(500, message, 'DATABASE_ERROR')
   }
 }
+
+/** Feature reserved for a later module wave (e.g. Knowledge Base Wave 1 stubs). */
+export class NotImplementedError extends AppError {
+  constructor(message = 'Not implemented', code = 'NOT_IMPLEMENTED') {
+    super(501, message, code)
+  }
+}
