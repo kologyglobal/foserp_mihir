@@ -5,6 +5,7 @@ import {
   BarChart3,
   BookOpen,
   CalendarCheck,
+  CalendarDays,
   ClipboardList,
   FileSpreadsheet,
   FileText,
@@ -45,6 +46,10 @@ import {
   CircuitBoard,
   ShoppingBag,
   QrCode,
+  Activity,
+  LogOut,
+  Banknote,
+  UserCircle,
 } from 'lucide-react'
 
 import { buildMasterNavItems } from './masterModuleStructure'
@@ -212,9 +217,43 @@ export const moduleCategories: NavCategory[] = [
     items: [
       { label: 'Dashboard', path: '/maintenance', icon: LayoutDashboard, end: true, workspace: true },
       { label: 'Tickets', path: '/maintenance/tickets', icon: Wrench },
+      { label: 'Preventive Maintenance', path: '/maintenance/preventive', icon: CalendarCheck },
+      { label: 'Machine Health', path: '/maintenance/machine-health', icon: Activity },
       { label: 'Machine History', path: '/maintenance/machines', icon: Cog },
       { label: 'Reports', path: '/maintenance/reports', icon: BarChart3 },
       { label: 'Setup', path: '/maintenance/setup', icon: Settings2, group: 'Setup' },
+    ],
+  },
+  {
+    id: 'hrms',
+    title: 'HRMS',
+    items: [
+      { label: 'Overview', path: '/hrms', icon: LayoutDashboard, end: true, workspace: true },
+      { label: 'Employees', path: '/hrms/employees', icon: Users, group: 'People' },
+      { label: 'Departments', path: '/admin/departments', icon: Layers, group: 'People' },
+      { label: 'Designations', path: '/hrms/setup/designations', icon: Settings2, group: 'People' },
+      { label: 'Attendance', path: '/hrms/attendance', icon: Clock, group: 'Time' },
+      { label: 'Shifts', path: '/hrms/shifts', icon: Clock, group: 'Time' },
+      { label: 'Roster', path: '/hrms/roster', icon: CalendarCheck, group: 'Time' },
+      { label: 'Holidays', path: '/hrms/holidays', icon: CalendarDays, group: 'Time' },
+      { label: 'My Leave', path: '/hrms/leave', icon: CalendarDays, group: 'Leave' },
+      { label: 'Requests', path: '/hrms/leave/requests', icon: CalendarDays, group: 'Leave' },
+      { label: 'Balances', path: '/hrms/leave/balances', icon: CalendarDays, group: 'Leave' },
+      { label: 'OT Register', path: '/hrms/overtime', icon: Clock, group: 'Overtime' },
+      { label: 'Payroll Runs', path: '/hrms/payroll/runs', icon: CalendarDays, group: 'Payroll' },
+      { label: 'Payslips', path: '/hrms/payroll/payslips', icon: FileText, group: 'Payroll' },
+      { label: 'Salary Structures', path: '/hrms/payroll/setup/structures', icon: Settings2, group: 'Payroll' },
+      { label: 'Salary Components', path: '/hrms/payroll/setup/components', icon: Settings2, group: 'Payroll' },
+      { label: 'Statutory', path: '/hrms/payroll/statutory', icon: Settings2, group: 'Payroll' },
+      { label: 'Salary Payments', path: '/hrms/payroll/payments', icon: Banknote, group: 'Payroll' },
+      { label: 'Loans & Advances', path: '/hrms/loans', icon: Wallet, group: 'Finance' },
+      { label: 'Employee Exits', path: '/hrms/exits', icon: LogOut, group: 'Exit' },
+      { label: 'Full & Final', path: '/hrms/fnf', icon: Banknote, group: 'Exit' },
+      { label: 'HR Settings', path: '/hrms/setup', icon: Settings2, group: 'Setup' },
+      { label: 'Leave Types', path: '/hrms/leave/types', icon: Settings2, group: 'Setup' },
+      { label: 'My HR', path: '/hrms/my', icon: UserCircle, group: 'Self-service' },
+      { label: 'My Payslips', path: '/hrms/payroll/my-payslips', icon: FileText, group: 'Self-service' },
+      { label: 'My Loans', path: '/hrms/my-loans', icon: Wallet, group: 'Self-service' },
     ],
   },
   {
@@ -373,6 +412,7 @@ export function findActiveCategoryId(pathname: string): string | null {
   if (pathname.startsWith('/sales/leads')) return 'crm'
   if (pathname.startsWith('/logistics')) return 'dispatch'
   if (pathname.startsWith('/maintenance')) return 'maintenance'
+  if (pathname.startsWith('/hrms')) return 'hrms'
   if (pathname.startsWith('/masters') || pathname.startsWith('/settings/roles') || pathname.startsWith('/settings/permissions')) {
     return 'masters'
   }

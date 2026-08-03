@@ -4,7 +4,7 @@ import { tenantActiveFilter } from '../../../shared/index.js'
 import { ValidationError } from '../../../utils/errors.js'
 import { normalizeSalesLineForWrite } from '../shared/crm-item-resolver.js'
 import { DEFAULT_GST_PCT } from './quotation.constants.js'
-import { calcDocumentTotal, syncLineTotals } from './quotation.workflow.js'
+import { syncLineTotals, resolveDocumentCharges } from './quotation.workflow.js'
 import type {
   CreateQuotationInput,
   ListQuotationsQuery,
@@ -16,6 +16,7 @@ import { computePricing } from './quotation.types.js'
 const includeRelations = {
   documents: { where: { deletedAt: null }, orderBy: { revisionNo: 'desc' as const } },
   opportunity: { select: { opportunityCode: true } },
+  company: { select: { id: true, name: true, companyCode: true } },
 }
 
 export { includeRelations }
@@ -95,12 +96,58 @@ export async function createQuotation(
   if (!headerItemId) {
     throw new ValidationError('Quotation requires an Item (header itemId or price line itemId)')
   }
-  const freightAmount = data.freightAmount ?? 0
-  const installationAmount = data.installationAmount ?? 0
-  const customCharges = data.customCharges ?? 0
-  const totalAmount = data.priceLines?.length
-    ? calcDocumentTotal(priceLines, freightAmount, installationAmount, customCharges)
-    : pricing.grandTotal
+  const chargeFields = {
+    freightAmount: data.freightAmount ?? 0,
+    installationAmount: data.installationAmount ?? 0,
+    customCharges: data.customCharges ?? 0,
+    orderDiscountCalcType: data.orderDiscountCalcType,
+    orderDiscountValue: data.orderDiscountValue,
+    freightCalcType: data.freightCalcType,
+    freightValue: data.freightValue ?? data.freightAmount ?? 0,
+    freightIsTaxable: data.freightIsTaxable,
+    freightTaxRate: data.freightTaxRate,
+    installationCalcType: data.installationCalcType,
+    installationValue: data.installationValue ?? data.installationAmount ?? 0,
+    installationIsTaxable: data.installationIsTaxable,
+    installationTaxRate: data.installationTaxRate,
+    customChargesCalcType: data.customChargesCalcType,
+    customChargesValue: data.customChargesValue ?? data.customCharges ?? 0,
+    customChargesIsTaxable: data.customChargesIsTaxable,
+    customChargesTaxRate: data.customChargesTaxRate,
+  }
+  const { persist: chargePersist } = data.priceLines?.length
+    ? resolveDocumentCharges(priceLines, chargeFields)
+    : {
+        persist: {
+          ...chargeFields,
+          freightAmount: chargeFields.freightAmount,
+          installationAmount: chargeFields.installationAmount,
+          customCharges: chargeFields.customCharges,
+          totalAmount: pricing.grandTotal,
+          orderDiscountCalcType: (data.orderDiscountCalcType ?? 'FLAT') as string,
+          orderDiscountValue: data.orderDiscountValue ?? 0,
+          orderDiscountAmount: 0,
+          freightCalcType: (data.freightCalcType ?? 'FLAT') as string,
+          freightValue: chargeFields.freightValue,
+          freightIsTaxable: Boolean(data.freightIsTaxable),
+          freightTaxRate: data.freightTaxRate ?? 0,
+          freightTaxAmount: 0,
+          installationCalcType: (data.installationCalcType ?? 'FLAT') as string,
+          installationValue: chargeFields.installationValue,
+          installationIsTaxable: Boolean(data.installationIsTaxable),
+          installationTaxRate: data.installationTaxRate ?? 0,
+          installationTaxAmount: 0,
+          customChargesCalcType: (data.customChargesCalcType ?? 'FLAT') as string,
+          customChargesValue: chargeFields.customChargesValue,
+          customChargesIsTaxable: Boolean(data.customChargesIsTaxable),
+          customChargesTaxRate: data.customChargesTaxRate ?? 0,
+          customChargesTaxAmount: 0,
+        },
+      }
+  const freightAmount = chargePersist.freightAmount
+  const installationAmount = chargePersist.installationAmount
+  const customCharges = chargePersist.customCharges
+  const totalAmount = chargePersist.totalAmount
 
   return prisma.$transaction(async (tx) => {
     const { defaultOrgDimsForUser } = await import('../shared/crm-org-scope.js')
@@ -153,6 +200,24 @@ export async function createQuotation(
         freightAmount,
         installationAmount,
         customCharges,
+        orderDiscountCalcType: chargePersist.orderDiscountCalcType,
+        orderDiscountValue: chargePersist.orderDiscountValue,
+        orderDiscountAmount: chargePersist.orderDiscountAmount,
+        freightCalcType: chargePersist.freightCalcType,
+        freightValue: chargePersist.freightValue,
+        freightIsTaxable: chargePersist.freightIsTaxable,
+        freightTaxRate: chargePersist.freightTaxRate,
+        freightTaxAmount: chargePersist.freightTaxAmount,
+        installationCalcType: chargePersist.installationCalcType,
+        installationValue: chargePersist.installationValue,
+        installationIsTaxable: chargePersist.installationIsTaxable,
+        installationTaxRate: chargePersist.installationTaxRate,
+        installationTaxAmount: chargePersist.installationTaxAmount,
+        customChargesCalcType: chargePersist.customChargesCalcType,
+        customChargesValue: chargePersist.customChargesValue,
+        customChargesIsTaxable: chargePersist.customChargesIsTaxable,
+        customChargesTaxRate: chargePersist.customChargesTaxRate,
+        customChargesTaxAmount: chargePersist.customChargesTaxAmount,
         sections: data.sections ?? [],
         priceLines,
         commercialNotes: data.commercialNotes ?? null,
@@ -240,22 +305,65 @@ export async function updateQuotationDocument(
     const priceLines = data.priceLines
       ? await Promise.all(syncLineTotals(data.priceLines).map((line) => normalizeSalesLineForWrite(tenantId, line)))
       : undefined
-    const freightAmount = data.freightAmount ?? Number(doc.freightAmount)
-    const installationAmount = data.installationAmount ?? Number(doc.installationAmount)
-    const customCharges = data.customCharges ?? Number(doc.customCharges)
-    const lines = priceLines ?? (Array.isArray(doc.priceLines) ? (doc.priceLines as Array<{ lineTotal?: number }>) : [])
-    const totalAmount =
-      data.totalAmount ??
-      calcDocumentTotal(lines, freightAmount, installationAmount, customCharges)
+    const linesRaw =
+      priceLines ??
+      (Array.isArray(doc.priceLines)
+        ? (doc.priceLines as Array<{ qty?: number; unitPrice?: number; discountPct?: number; taxPct?: number }>)
+        : [])
+    const mergedFields = {
+      freightAmount: data.freightAmount ?? Number(doc.freightAmount),
+      installationAmount: data.installationAmount ?? Number(doc.installationAmount),
+      customCharges: data.customCharges ?? Number(doc.customCharges),
+      orderDiscountCalcType: data.orderDiscountCalcType ?? (doc as { orderDiscountCalcType?: string }).orderDiscountCalcType,
+      orderDiscountValue: data.orderDiscountValue ?? Number((doc as { orderDiscountValue?: unknown }).orderDiscountValue ?? 0),
+      freightCalcType: data.freightCalcType ?? (doc as { freightCalcType?: string }).freightCalcType,
+      freightValue: data.freightValue ?? Number((doc as { freightValue?: unknown }).freightValue ?? doc.freightAmount),
+      freightIsTaxable: data.freightIsTaxable ?? Boolean((doc as { freightIsTaxable?: boolean }).freightIsTaxable),
+      freightTaxRate: data.freightTaxRate ?? Number((doc as { freightTaxRate?: unknown }).freightTaxRate ?? 0),
+      installationCalcType: data.installationCalcType ?? (doc as { installationCalcType?: string }).installationCalcType,
+      installationValue:
+        data.installationValue ?? Number((doc as { installationValue?: unknown }).installationValue ?? doc.installationAmount),
+      installationIsTaxable:
+        data.installationIsTaxable ?? Boolean((doc as { installationIsTaxable?: boolean }).installationIsTaxable),
+      installationTaxRate:
+        data.installationTaxRate ?? Number((doc as { installationTaxRate?: unknown }).installationTaxRate ?? 0),
+      customChargesCalcType: data.customChargesCalcType ?? (doc as { customChargesCalcType?: string }).customChargesCalcType,
+      customChargesValue:
+        data.customChargesValue ?? Number((doc as { customChargesValue?: unknown }).customChargesValue ?? doc.customCharges),
+      customChargesIsTaxable:
+        data.customChargesIsTaxable ?? Boolean((doc as { customChargesIsTaxable?: boolean }).customChargesIsTaxable),
+      customChargesTaxRate:
+        data.customChargesTaxRate ?? Number((doc as { customChargesTaxRate?: unknown }).customChargesTaxRate ?? 0),
+    }
+    const { persist } = resolveDocumentCharges(linesRaw, mergedFields)
+    const totalAmount = data.totalAmount ?? persist.totalAmount
 
     await tx.crmQuotationDocument.update({
       where: { id: docId },
       data: {
         ...(data.sections !== undefined ? { sections: data.sections } : {}),
         ...(priceLines !== undefined ? { priceLines } : {}),
-        ...(data.freightAmount !== undefined ? { freightAmount: data.freightAmount } : {}),
-        ...(data.installationAmount !== undefined ? { installationAmount: data.installationAmount } : {}),
-        ...(data.customCharges !== undefined ? { customCharges: data.customCharges } : {}),
+        freightAmount: persist.freightAmount,
+        installationAmount: persist.installationAmount,
+        customCharges: persist.customCharges,
+        orderDiscountCalcType: persist.orderDiscountCalcType,
+        orderDiscountValue: persist.orderDiscountValue,
+        orderDiscountAmount: persist.orderDiscountAmount,
+        freightCalcType: persist.freightCalcType,
+        freightValue: persist.freightValue,
+        freightIsTaxable: persist.freightIsTaxable,
+        freightTaxRate: persist.freightTaxRate,
+        freightTaxAmount: persist.freightTaxAmount,
+        installationCalcType: persist.installationCalcType,
+        installationValue: persist.installationValue,
+        installationIsTaxable: persist.installationIsTaxable,
+        installationTaxRate: persist.installationTaxRate,
+        installationTaxAmount: persist.installationTaxAmount,
+        customChargesCalcType: persist.customChargesCalcType,
+        customChargesValue: persist.customChargesValue,
+        customChargesIsTaxable: persist.customChargesIsTaxable,
+        customChargesTaxRate: persist.customChargesTaxRate,
+        customChargesTaxAmount: persist.customChargesTaxAmount,
         ...(data.commercialNotes !== undefined ? { commercialNotes: data.commercialNotes } : {}),
         ...(data.technicalNotes !== undefined ? { technicalNotes: data.technicalNotes } : {}),
         ...(data.contactId !== undefined ? { contactId: data.contactId } : {}),
@@ -307,6 +415,24 @@ export async function createQuotationRevision(
         freightAmount: latest.freightAmount,
         installationAmount: latest.installationAmount,
         customCharges: latest.customCharges,
+        orderDiscountCalcType: (latest as { orderDiscountCalcType?: string }).orderDiscountCalcType ?? 'FLAT',
+        orderDiscountValue: (latest as { orderDiscountValue?: unknown }).orderDiscountValue ?? 0,
+        orderDiscountAmount: (latest as { orderDiscountAmount?: unknown }).orderDiscountAmount ?? 0,
+        freightCalcType: (latest as { freightCalcType?: string }).freightCalcType ?? 'FLAT',
+        freightValue: (latest as { freightValue?: unknown }).freightValue ?? latest.freightAmount,
+        freightIsTaxable: Boolean((latest as { freightIsTaxable?: boolean }).freightIsTaxable),
+        freightTaxRate: (latest as { freightTaxRate?: unknown }).freightTaxRate ?? 0,
+        freightTaxAmount: (latest as { freightTaxAmount?: unknown }).freightTaxAmount ?? 0,
+        installationCalcType: (latest as { installationCalcType?: string }).installationCalcType ?? 'FLAT',
+        installationValue: (latest as { installationValue?: unknown }).installationValue ?? latest.installationAmount,
+        installationIsTaxable: Boolean((latest as { installationIsTaxable?: boolean }).installationIsTaxable),
+        installationTaxRate: (latest as { installationTaxRate?: unknown }).installationTaxRate ?? 0,
+        installationTaxAmount: (latest as { installationTaxAmount?: unknown }).installationTaxAmount ?? 0,
+        customChargesCalcType: (latest as { customChargesCalcType?: string }).customChargesCalcType ?? 'FLAT',
+        customChargesValue: (latest as { customChargesValue?: unknown }).customChargesValue ?? latest.customCharges,
+        customChargesIsTaxable: Boolean((latest as { customChargesIsTaxable?: boolean }).customChargesIsTaxable),
+        customChargesTaxRate: (latest as { customChargesTaxRate?: unknown }).customChargesTaxRate ?? 0,
+        customChargesTaxAmount: (latest as { customChargesTaxAmount?: unknown }).customChargesTaxAmount ?? 0,
         sections: latest.sections ?? [],
         priceLines: latest.priceLines ?? [],
         commercialNotes: latest.commercialNotes,

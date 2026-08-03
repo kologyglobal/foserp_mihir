@@ -193,7 +193,7 @@ export function buildSalesOrderLinesFromQuotationDocument(input: {
 
 export function summarizeQuotationLinesForSo(document: QuotationDocument) {
   const lines = quotationPriceLinesForSo(document)
-  const summary = calcPriceSummary(lines, document.freightAmount, document.installationAmount, document.customCharges)
+  const summary = calcPriceSummary(lines, document)
   return {
     lineCount: lines.length,
     totalQty: lines.reduce((s, l) => s + l.qty, 0),

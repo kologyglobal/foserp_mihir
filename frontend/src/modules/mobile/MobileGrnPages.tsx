@@ -27,10 +27,13 @@ function isOpenPo(po: PurchaseOrder): boolean {
 
 export function MobileGrnListPage() {
   const navigate = useNavigate()
-  const demoPos = usePurchaseStore((s) =>
-    s.purchaseOrders.filter(
-      (p) => !['closed', 'cancelled'].includes(p.status) && p.lines.some((l) => l.receivedQty < l.qty),
-    ),
+  const purchaseOrders = usePurchaseStore((s) => s.purchaseOrders)
+  const demoPos = useMemo(
+    () =>
+      purchaseOrders.filter(
+        (p) => !['closed', 'cancelled'].includes(p.status) && p.lines.some((l) => l.receivedQty < l.qty),
+      ),
+    [purchaseOrders],
   )
   const [apiPos, setApiPos] = useState<PurchaseOrder[]>([])
   const [loading, setLoading] = useState(false)

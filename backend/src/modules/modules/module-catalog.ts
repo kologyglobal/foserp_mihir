@@ -85,6 +85,12 @@ export const TENANT_MODULE_CATALOG: TenantModuleDef[] = [
     description: 'Operational and executive reports',
     dependsOn: [],
   },
+  {
+    key: 'hrms',
+    name: 'HRMS',
+    description: 'Employee master, designations, and workforce identity (Phase 1)',
+    dependsOn: [],
+  },
 ]
 
 export function getModuleDef(key: string): TenantModuleDef | undefined {

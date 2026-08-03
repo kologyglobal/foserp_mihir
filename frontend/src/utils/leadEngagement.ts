@@ -79,3 +79,38 @@ export function filterFollowUpsForLead(
     )
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
 }
+
+/**
+ * Activities for an opportunity: direct opp link, or engagement logged on the source lead
+ * (mirror / pre-convert logs stay on lead until converted-linked).
+ */
+export function filterActivitiesForOpportunity(
+  opportunity: Pick<Opportunity, 'id' | 'leadId' | 'customerId'>,
+  activities: CrmActivity[],
+) {
+  const leadId = opportunity.leadId
+  return activities
+    .filter(
+      (a) =>
+        a.opportunityId === opportunity.id ||
+        Boolean(leadId && a.leadId === leadId) ||
+        (!a.opportunityId && !a.leadId && opportunity.customerId && a.customerId === opportunity.customerId),
+    )
+    .sort((a, b) => b.activityDate.localeCompare(a.activityDate))
+}
+
+/** Follow-ups for an opportunity including those still keyed only to the source lead. */
+export function filterFollowUpsForOpportunity(
+  opportunity: Pick<Opportunity, 'id' | 'leadId' | 'customerId'>,
+  followUps: FollowUp[],
+) {
+  const leadId = opportunity.leadId
+  return followUps
+    .filter(
+      (f) =>
+        f.opportunityId === opportunity.id ||
+        Boolean(leadId && f.leadId === leadId) ||
+        (!f.opportunityId && !f.leadId && opportunity.customerId && f.customerId === opportunity.customerId),
+    )
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+}

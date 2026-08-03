@@ -449,39 +449,60 @@ export function OrderCommercialSummary({
   const unitPrice = order.unitPrice ?? product?.standardPrice
   const subtotal = order.basicAmount ?? (unitPrice != null ? unitPrice * order.qty : null)
   const gst = order.gstAmount
+  const discPct = order.discountPct ?? 0
 
-  const rows = [
+  const moneyRows: Array<{ label: string; value: string; muted?: boolean }> = [
     { label: 'Quantity', value: formatNumber(order.qty) },
     { label: 'Unit price', value: unitPrice != null ? formatCurrency(unitPrice) : '—' },
-    ...(order.discountPct ? [{ label: 'Discount', value: `${order.discountPct}%` }] : []),
     ...(subtotal != null ? [{ label: 'Basic amount', value: formatCurrency(subtotal) }] : []),
+    ...(discPct > 0 ? [{ label: 'Discount', value: `${discPct}%`, muted: true }] : []),
     ...(gst != null ? [{ label: 'GST', value: formatCurrency(gst) }] : []),
-    { label: 'Payment terms', value: order.paymentTerms ?? '—' },
-    { label: 'Delivery terms', value: order.deliveryTerms ?? '—' },
-    { label: 'Delivery time / lead time', value: order.deliveryTime ?? '—' },
+  ]
+
+  const metaRows = [
+    { label: 'Payment terms', value: order.paymentTerms?.trim() || '—' },
+    { label: 'Delivery terms', value: order.deliveryTerms?.trim() || '—' },
+    { label: 'Delivery time', value: order.deliveryTime?.trim() || '—' },
     {
-      label: 'Quotation Number (Reference)',
+      label: 'Quotation ref',
       value: order.quotationNo
-        ? `${order.quotationNo} Rev ${order.quotationRevisionNo ?? 1}`
+        ? `${order.quotationNo} · Rev ${order.quotationRevisionNo ?? 1}`
         : '—',
     },
-    { label: 'Warranty', value: order.warrantyTerms ?? '—' },
+    ...(order.warrantyTerms?.trim()
+      ? [{ label: 'Warranty', value: order.warrantyTerms.trim() }]
+      : []),
   ]
 
   return (
     <div className="so-360-commercial">
       <p className="so-360-commercial__title">Commercial summary</p>
-      <dl className="so-360-commercial__rows">
-        {rows.map((r) => (
-          <div key={r.label} className="so-360-commercial__row">
-            <dt>{r.label}</dt>
-            <dd>{r.value}</dd>
+      <div className="so-360-commercial__body">
+        <div className="so-360-commercial__totals">
+          <dl className="so-360-commercial__rows">
+            {moneyRows.map((r) => (
+              <div
+                key={r.label}
+                className={cn('so-360-commercial__row', r.muted && 'so-360-commercial__row--muted')}
+              >
+                <dt>{r.label}</dt>
+                <dd>{r.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="so-360-commercial__total">
+            <span>Grand total</span>
+            <strong>{orderValue > 0 ? formatCurrency(orderValue) : '—'}</strong>
           </div>
-        ))}
-      </dl>
-      <div className="so-360-commercial__total">
-        <span>Grand total</span>
-        <strong>{orderValue > 0 ? formatCurrency(orderValue) : '—'}</strong>
+        </div>
+        <dl className="so-360-commercial__meta">
+          {metaRows.map((r) => (
+            <div key={r.label} className="so-360-commercial__meta-item">
+              <dt>{r.label}</dt>
+              <dd>{r.value}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </div>
   )
@@ -540,7 +561,14 @@ export function OrderLineItemsPanel({ order }: { order: SalesOrder }) {
         <span className="so-360-lines__meta">{lines.length} line{lines.length !== 1 ? 's' : ''}</span>
       </div>
       <div className="so-360-lines__table-wrap">
-        <table className="erp-table">
+        <table className="erp-table so-360-lines__table">
+          <colgroup>
+            <col className="so-360-lines__col-idx" />
+            <col />
+            <col className="so-360-lines__col-qty" />
+            <col className="so-360-lines__col-money" />
+            <col className="so-360-lines__col-money" />
+          </colgroup>
           <thead>
             <tr>
               <th>#</th>
@@ -577,11 +605,14 @@ export function OrderNextActionPanel({
   overdue,
   onConfirm,
   onTriggerMrp,
+  confirmDeniedReason,
 }: {
   status: SalesOrderStatus
   overdue: boolean
   onConfirm?: () => void
   onTriggerMrp?: () => void
+  /** When confirm is blocked (e.g. missing crm.sales_order.confirm). */
+  confirmDeniedReason?: string | null
 }) {
   if (overdue) {
     return (
@@ -610,7 +641,12 @@ export function OrderNextActionPanel({
             <ErpButton type="button" size="sm" className="mt-3" onClick={onConfirm}>
               Confirm order
             </ErpButton>
-          ) : null}
+          ) : (
+            <p className="so-360-action-card__denied mt-3 text-[12px] font-medium text-amber-800">
+              {confirmDeniedReason?.trim()
+                || 'Confirm requires permission: crm.sales_order.confirm. Ask an admin to grant it on your role.'}
+            </p>
+          )}
         </div>
       </div>
     )
@@ -627,9 +663,13 @@ export function OrderNextActionPanel({
           </p>
           {onTriggerMrp ? (
             <ErpButton type="button" size="sm" className="mt-3" onClick={onTriggerMrp}>
-              Trigger MRP
+              Production plan
             </ErpButton>
-          ) : null}
+          ) : (
+            <p className="so-360-action-card__denied mt-3 text-[12px] font-medium text-erp-muted">
+              Open Manufacturing → Production Plan to push this confirmed order into planning.
+            </p>
+          )}
         </div>
       </div>
     )

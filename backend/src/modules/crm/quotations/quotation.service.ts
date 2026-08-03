@@ -179,6 +179,29 @@ export async function submitDocumentForApproval(
     userId,
     history as unknown as import('@prisma/client').Prisma.InputJsonValue,
   )
+  // Approver resolution is limited in v1 — notify sales owner so the request is visible in bell.
+  try {
+    const q = await repo.findQuotationById(tenantId, quotationId)
+    if (q) {
+      const recipients = [q.salesOwnerId, q.createdBy].filter(Boolean) as string[]
+      const { notifyQuotationApprovalRequested } = await import(
+        '../../notifications/notification.emitters.js'
+      )
+      for (const approverId of recipients) {
+        if (approverId === userId) continue
+        notifyQuotationApprovalRequested({
+          tenantId,
+          actorUserId: userId,
+          quotationId,
+          quotationCode: q.quotationCode,
+          approverId,
+          amountLabel: `₹${Number(doc.totalAmount).toLocaleString('en-IN')}`,
+        })
+      }
+    }
+  } catch {
+    /* ignore */
+  }
   return mapQuotationWithNames(tenantId, quotation)
 }
 
@@ -196,6 +219,24 @@ export async function approveDocument(
   const userName = await getUserName(tenantId, userId)
   const history = appendApprovalHistory(doc, 'approved', userId, userName, input.remarks ?? 'Approved')
   const quotation = await repo.approveDocument(tenantId, quotationId, docId, userId, history as unknown as import('@prisma/client').Prisma.InputJsonValue)
+  try {
+    const q = await repo.findQuotationById(tenantId, quotationId)
+    if (q) {
+      const { notifyQuotationApprovedOrRejected } = await import(
+        '../../notifications/notification.emitters.js'
+      )
+      notifyQuotationApprovedOrRejected({
+        tenantId,
+        actorUserId: userId,
+        quotationId,
+        quotationCode: q.quotationCode,
+        ownerIds: [q.salesOwnerId, q.createdBy].filter(Boolean) as string[],
+        approved: true,
+      })
+    }
+  } catch {
+    /* ignore */
+  }
   return mapQuotationWithNames(tenantId, quotation)
 }
 
@@ -213,6 +254,25 @@ export async function rejectDocument(
   const userName = await getUserName(tenantId, userId)
   const history = appendApprovalHistory(doc, 'rejected', userId, userName, input.remarks ?? 'Rejected')
   const quotation = await repo.rejectDocument(tenantId, quotationId, docId, userId, input.remarks, history as unknown as import('@prisma/client').Prisma.InputJsonValue)
+  try {
+    const q = await repo.findQuotationById(tenantId, quotationId)
+    if (q) {
+      const { notifyQuotationApprovedOrRejected } = await import(
+        '../../notifications/notification.emitters.js'
+      )
+      notifyQuotationApprovedOrRejected({
+        tenantId,
+        actorUserId: userId,
+        quotationId,
+        quotationCode: q.quotationCode,
+        ownerIds: [q.salesOwnerId, q.createdBy].filter(Boolean) as string[],
+        approved: false,
+        reason: input.remarks,
+      })
+    }
+  } catch {
+    /* ignore */
+  }
   return mapQuotationWithNames(tenantId, quotation)
 }
 

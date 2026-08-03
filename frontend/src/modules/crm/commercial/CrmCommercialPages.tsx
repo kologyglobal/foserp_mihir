@@ -221,7 +221,7 @@ export function CrmInvoiceDetailPage() {
               </div>
             </ErpCardSection>
           </div>
-          <aside className="space-y-4">
+          <aside className="erp-doc-facts min-w-0 space-y-4">
             <ErpCardSection title="References">
               <ErpFieldRow label="Customer" readOnly>
                 <TableLink to={salesCustomer360Path(invoice.customerId)}>{invoice.customerName}</TableLink>

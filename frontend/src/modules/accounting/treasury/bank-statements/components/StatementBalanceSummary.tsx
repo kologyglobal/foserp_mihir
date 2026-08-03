@@ -1,6 +1,6 @@
 import type { ImportPreviewHeader } from '../api/bank-statement.types'
 import { formatCurrency } from '@/utils/formatters/currency'
-import { parseDecimal } from '../utils/bankStatementUi'
+import { DOCUMENT_TYPE_LABELS, formatBalanceDisplay, parseDecimal } from '../utils/bankStatementUi'
 
 export function StatementBalanceSummary({
   header,
@@ -16,20 +16,39 @@ export function StatementBalanceSummary({
     )
   }
 
+  const hasOpening = header.hasOpeningBalance !== false
+  const hasClosing = header.hasClosingBalance !== false
   const diff = parseDecimal(header.balanceDifference)
-  const balanced = Math.abs(diff) < 0.01
+  const balanced = hasOpening && hasClosing && Math.abs(diff) < 0.01
+  const documentLabel = header.documentType
+    ? DOCUMENT_TYPE_LABELS[header.documentType]
+    : null
 
   const items = [
     { label: 'Reference', value: header.statementReference },
+    ...(documentLabel
+      ? [{ label: 'Document', value: documentLabel + (header.isProvisional ? ' (provisional)' : '') }]
+      : []),
     { label: 'Period', value: `${header.periodStartDate} → ${header.periodEndDate}` },
-    { label: 'Opening', value: formatCurrency(parseDecimal(header.openingBalance)) },
+    {
+      label: 'Opening',
+      value: hasOpening ? formatCurrency(parseDecimal(header.openingBalance)) : formatBalanceDisplay(null, false),
+    },
     { label: 'Credits', value: formatCurrency(parseDecimal(header.totalCreditAmount)) },
     { label: 'Debits', value: formatCurrency(parseDecimal(header.totalDebitAmount)) },
-    { label: 'Closing', value: formatCurrency(parseDecimal(header.closingBalance)) },
+    {
+      label: 'Closing',
+      value: hasClosing ? formatCurrency(parseDecimal(header.closingBalance)) : formatBalanceDisplay(null, false),
+    },
     {
       label: 'Balance check',
-      value: balanced ? 'Balanced' : formatCurrency(diff),
-      tone: balanced ? 'text-emerald-700' : 'text-rose-700',
+      value: !hasOpening || !hasClosing ? 'N/A (provisional)' : balanced ? 'Balanced' : formatCurrency(diff),
+      tone:
+        !hasOpening || !hasClosing
+          ? 'text-erp-muted'
+          : balanced
+            ? 'text-emerald-700'
+            : 'text-rose-700',
     },
   ]
 

@@ -62,6 +62,24 @@ export interface QuotationDocumentDto {
   freightAmount: number
   installationAmount: number
   customCharges: number
+  orderDiscountCalcType?: string
+  orderDiscountValue?: number
+  orderDiscountAmount?: number
+  freightCalcType?: string
+  freightValue?: number
+  freightIsTaxable?: boolean
+  freightTaxRate?: number
+  freightTaxAmount?: number
+  installationCalcType?: string
+  installationValue?: number
+  installationIsTaxable?: boolean
+  installationTaxRate?: number
+  installationTaxAmount?: number
+  customChargesCalcType?: string
+  customChargesValue?: number
+  customChargesIsTaxable?: boolean
+  customChargesTaxRate?: number
+  customChargesTaxAmount?: number
   status: string
   totalAmount: number
   revisionReason: string | null
@@ -92,6 +110,8 @@ export interface QuotationDto {
   opportunityId: string | null
   opportunityNo: string | null
   customerId: string
+  /** Resolved from CRM company for list/detail consumers (mobile/web). */
+  customerName: string | null
   itemId: string
   qty: number
   revisionNo: number

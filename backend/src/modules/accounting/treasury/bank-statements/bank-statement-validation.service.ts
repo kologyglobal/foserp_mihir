@@ -10,6 +10,11 @@ export interface BankStatementHeaderInput {
   statementDate: Date
   currencyCode: string
   treasuryAccountCurrencyCode: string
+  /** Skip opening/closing continuity when provisional CAMT.052/.054 omit balances. */
+  hasOpeningBalance?: boolean
+  hasClosingBalance?: boolean
+  /** Parsed account currency from CAMT (when present). */
+  accountCurrency?: string | null
 }
 
 export interface BankStatementValidationResult {
@@ -22,16 +27,25 @@ const BALANCE_EQUATION_TOLERANCE = '0.01'
 export function validateStatementHeader(input: BankStatementHeaderInput): BankStatementValidationResult {
   const errors: string[] = []
 
-  const opening = toDecimal(input.openingBalance)
-  const credits = toDecimal(input.totalCreditAmount)
-  const debits = toDecimal(input.totalDebitAmount)
-  const closing = toDecimal(input.closingBalance)
-  const expectedClosing = subtract(sumDecimals([opening, credits]), debits)
+  const hasOpening = input.hasOpeningBalance !== false
+  const hasClosing = input.hasClosingBalance !== false
 
-  if (compare(expectedClosing, closing) !== 0 && Math.abs(Number(formatForPersistence(expectedClosing)) - Number(formatForPersistence(closing))) > Number(BALANCE_EQUATION_TOLERANCE)) {
-    errors.push(
-      `Balance equation failed: opening (${formatForPersistence(opening)}) + credits (${formatForPersistence(credits)}) - debits (${formatForPersistence(debits)}) = ${formatForPersistence(expectedClosing)}, expected closing balance ${formatForPersistence(closing)}`,
-    )
+  if (hasOpening && hasClosing) {
+    const opening = toDecimal(input.openingBalance)
+    const credits = toDecimal(input.totalCreditAmount)
+    const debits = toDecimal(input.totalDebitAmount)
+    const closing = toDecimal(input.closingBalance)
+    const expectedClosing = subtract(sumDecimals([opening, credits]), debits)
+
+    if (
+      compare(expectedClosing, closing) !== 0 &&
+      Math.abs(Number(formatForPersistence(expectedClosing)) - Number(formatForPersistence(closing))) >
+        Number(BALANCE_EQUATION_TOLERANCE)
+    ) {
+      errors.push(
+        `Balance equation failed: opening (${formatForPersistence(opening)}) + credits (${formatForPersistence(credits)}) - debits (${formatForPersistence(debits)}) = ${formatForPersistence(expectedClosing)}, expected closing balance ${formatForPersistence(closing)}`,
+      )
+    }
   }
 
   if (input.periodStartDate.getTime() > input.periodEndDate.getTime()) {
@@ -48,6 +62,15 @@ export function validateStatementHeader(input: BankStatementHeaderInput): BankSt
   if (input.currencyCode !== input.treasuryAccountCurrencyCode) {
     errors.push(
       `Statement currency (${input.currencyCode}) does not match treasury account currency (${input.treasuryAccountCurrencyCode})`,
+    )
+  }
+
+  if (
+    input.accountCurrency &&
+    input.accountCurrency.toUpperCase() !== input.treasuryAccountCurrencyCode.toUpperCase()
+  ) {
+    errors.push(
+      `CAMT account currency (${input.accountCurrency}) does not match treasury account currency (${input.treasuryAccountCurrencyCode})`,
     )
   }
 

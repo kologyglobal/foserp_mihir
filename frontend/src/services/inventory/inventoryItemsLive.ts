@@ -172,13 +172,28 @@ function dtoToInventoryItem(
   })
 }
 
+/** Balances feed item stock columns, so every page is needed (API caps page size). */
+async function listAllBalances(): Promise<InventoryStockBalance[]> {
+  const all: InventoryStockBalance[] = []
+  let page = 1
+  for (;;) {
+    const res = await listInventoryBalances({ page, limit: 200 })
+    all.push(...(res.data ?? []))
+    const meta = res.meta as { totalPages?: number } | undefined
+    if (!meta?.totalPages || page >= meta.totalPages) break
+    page += 1
+    if (page > 50) break
+  }
+  return all
+}
+
 export async function listLiveInventoryItems(filter: InventoryFilter = {}): Promise<InventoryItem[]> {
-  const [items, balancesRes, lookups] = await Promise.all([
+  const [items, balances, lookups] = await Promise.all([
     fetchItems(),
-    listInventoryBalances({ limit: 500 }).catch(() => ({ data: [] as InventoryStockBalance[] })),
+    listAllBalances().catch(() => [] as InventoryStockBalance[]),
     loadLookups(),
   ])
-  const stockByItem = aggregateBalances(balancesRes.data ?? [])
+  const stockByItem = aggregateBalances(balances)
   return items
     .map((dto) => dtoToInventoryItem(dto, stockByItem.get(dto.id), lookups))
     .filter((row) => matchesFilter(row, filter))

@@ -7,6 +7,7 @@ import type { Opportunity } from '../../types/crm'
 import { buildQuotationMergeMap, findMissingPlaceholderValues } from '../../utils/quotationEngine/placeholders'
 import { sectionCompletionStatus } from '../../utils/quotationEngine/validation'
 import { extractCommercialTermsFromSections } from '../../utils/quotationTermUtils'
+import { buildQuotationCommercialFields } from '../../utils/quotationEngine/commercialTermsDisplay'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { formatDate, isValidTimestamp } from '../../utils/dates/format'
 import { cn } from '../../utils/cn'
@@ -46,6 +47,10 @@ export function QuotationDataSourcePanel({
   const completion = useMemo(() => sectionCompletionStatus(doc), [doc])
 
   const commercialTerms = useMemo(() => extractCommercialTermsFromSections(doc.sections), [doc.sections])
+  const commercialFields = useMemo(
+    () => buildQuotationCommercialFields({ quotation, document: doc }),
+    [quotation, doc],
+  )
   const completionPct = completion.total ? (completion.complete / completion.total) * 100 : 0
   const completionTone = completion.missing.length ? 'warning' : 'success'
 
@@ -55,8 +60,11 @@ export function QuotationDataSourcePanel({
     { label: 'Opportunity', value: opportunity?.opportunityNo ?? '—', source: 'CRM Opportunity' },
     { label: 'Product', value: mergeMap.product_name, source: 'Product Master / Opp' },
     { label: 'Grand Total', value: formatCrmCurrency(doc.totalAmount), source: 'Price Table' },
-    { label: 'Payment Terms', value: commercialTerms.paymentTerms || mergeMap.payment_terms, source: 'Payment Terms Master' },
-    { label: 'Delivery Terms', value: commercialTerms.deliveryTerms || mergeMap.delivery_time, source: 'Delivery Terms Master' },
+    ...commercialFields.map((f) => ({
+      label: f.label,
+      value: f.value,
+      source: 'Quotation commercial fields',
+    })),
     { label: 'Warranty Terms', value: commercialTerms.warrantyTerms || '—', source: 'Warranty Terms Master' },
   ]
 

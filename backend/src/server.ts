@@ -10,6 +10,10 @@ import {
   startBankConnectorCronScheduler,
   stopBankConnectorCronScheduler,
 } from './modules/accounting/treasury/bank-connectors/bank-connector.scheduler.js'
+import {
+  startNotificationScheduler,
+  stopNotificationScheduler,
+} from './modules/notifications/notification.scheduler.js'
 
 async function main(): Promise<void> {
   await connectDatabase()
@@ -22,12 +26,14 @@ async function main(): Promise<void> {
     }
     startIndiaMartSyncScheduler()
     startBankConnectorCronScheduler()
+    startNotificationScheduler()
   })
 
   const shutdown = async (signal: string) => {
     logger.info(`${signal} received — shutting down`)
     stopIndiaMartSyncScheduler()
     stopBankConnectorCronScheduler()
+    stopNotificationScheduler()
     server.close(async () => {
       await disconnectDatabase()
       process.exit(0)

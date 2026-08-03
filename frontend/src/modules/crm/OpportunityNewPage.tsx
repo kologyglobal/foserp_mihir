@@ -467,9 +467,9 @@ export function OpportunityNewPage() {
 
   const hasValidLine = lines.some((l) => l.productOrItem?.trim())
   const completionItems = useMemo(() => [
-    { id: 'quick', label: 'Quick Entry', done: Boolean(customerId && opportunityName.trim()) },
+    { id: 'quick', label: 'Quick Entry', done: Boolean(customerId && opportunityName.trim() && expectedCloseDate) },
     { id: 'products', label: 'Products', done: hasValidLine },
-    { id: 'commercial', label: 'Commercial', done: dealValue > 0 && Boolean(expectedCloseDate) },
+    { id: 'commercial', label: 'Commercial', done: dealValue > 0 },
     { id: 'documents', label: 'Attachments', done: attachments.length > 0 },
   ], [customerId, opportunityName, hasValidLine, dealValue, expectedCloseDate, attachments.length])
 

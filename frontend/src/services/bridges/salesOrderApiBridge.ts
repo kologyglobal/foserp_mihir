@@ -47,13 +47,17 @@ export function salesOrderFromApi(dto: api.SalesOrderApiDto): SalesOrder {
   const raw = dto as api.SalesOrderApiDto & {
     requiredDate?: string | null
     productId?: string | null
+    itemId?: string | null
+    customerName?: string | null
     remarks?: string | null
   }
   return {
     ...dto,
     salesOrderNo: asText(raw.salesOrderNo),
     customerId: asText(raw.customerId),
-    productId: asText(raw.productId),
+    customerName: raw.customerName?.trim() || null,
+    productId: asText(raw.productId ?? raw.itemId),
+    itemId: raw.itemId ?? raw.productId ?? null,
     requiredDate: asText(raw.requiredDate),
     remarks: asText(raw.remarks),
     createdAt: asText(raw.createdAt, new Date().toISOString()),

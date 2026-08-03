@@ -1346,6 +1346,11 @@ export interface PurchaseRequisition extends PurchaseMoneyTotals, PurchaseAuditF
   maintenanceOrderNo: string
   referenceNumber: string
   purpose: string | null
+  /** API-persisted origin (e.g. MAINTENANCE) — demo may also use `source: 'maintenance'` */
+  sourceType?: string | null
+  sourceId?: string | null
+  sourceDocumentNumber?: string | null
+  maintenancePartId?: string | null
   lines: PurchaseRequisitionLine[]
   attachmentPlaceholders: PurchaseRequisitionAttachmentPlaceholder[]
   approvalIds: string[]

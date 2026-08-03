@@ -48,7 +48,12 @@ import { useInventoryPermissions } from '@/utils/permissions/inventory'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
-import { useMasterStore } from '@/store/masterStore'
+import {
+  useActiveCategories,
+  useActiveLocations,
+  useActiveWarehouses,
+  useStockableItems,
+} from '@/hooks/useMasterLists'
 import { cn } from '@/utils/cn'
 
 const COUNT_TYPES: StockCountType[] = [
@@ -97,10 +102,10 @@ export function StockCountWorkbenchPage({ mode }: { mode: 'new' | 'detail' }) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const perms = useInventoryPermissions()
-  const warehouses = useMasterStore((s) => s.warehouses.filter((w) => w.isActive))
-  const categories = useMasterStore((s) => s.categories.filter((c) => c.isActive))
-  const items = useMasterStore((s) => s.items.filter((i) => i.isStockable && i.isActive))
-  const locations = useMasterStore((s) => s.locations.filter((l) => l.isActive))
+  const warehouses = useActiveWarehouses()
+  const categories = useActiveCategories()
+  const items = useStockableItems()
+  const locations = useActiveLocations()
 
   const [count, setCount] = useState<StockCount | null>(null)
   const [scopeForm, setScopeForm] = useState<ScopeForm>(defaultScope)

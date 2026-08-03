@@ -182,8 +182,13 @@ export function QrPrintPage() {
 
 export function QrPrintBatchPage() {
   const [searchParams] = useSearchParams()
-  const ids = (searchParams.get('ids') ?? '').split(',').filter(Boolean)
-  const records = useQrStore((s) => (ids.length ? ids.map((id) => s.getQr(id)).filter(Boolean) as QrRecord[] : s.records.slice(0, 12)))
+  const idsParam = searchParams.get('ids') ?? ''
+  const allRecords = useQrStore((s) => s.records)
+  const records = useMemo(() => {
+    const ids = idsParam.split(',').filter(Boolean)
+    if (!ids.length) return allRecords.slice(0, 12)
+    return ids.map((id) => allRecords.find((r) => r.qrId === id)).filter(Boolean) as QrRecord[]
+  }, [idsParam, allRecords])
 
   return (
     <div className="space-y-6">

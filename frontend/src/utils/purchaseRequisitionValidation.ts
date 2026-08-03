@@ -32,6 +32,11 @@ export type PrEditorHeader = {
   remarks: string
   /** true = RFQ path after approval; false = Planning Sheet after approval */
   rfqRequired: boolean
+  /** Persisted API source tracing (Maintenance V1.1) */
+  sourceType?: string
+  sourceId?: string
+  sourceDocumentNumber?: string
+  maintenancePartId?: string
 }
 
 /** Department options — `value` is persisted as `departmentId` (≤36 chars). */

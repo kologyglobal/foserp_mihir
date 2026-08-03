@@ -271,7 +271,12 @@ export function InvoiceListPage() {
                         {inv.customerNameSnapshot}
                       </Link>
                     </td>
-                    <td className="px-3 py-2">{sourceTypeLabel(inv.sourceType)}</td>
+                    <td className="px-3 py-2">
+                      {sourceTypeLabel(inv.sourceType)}
+                      {inv.sourceType === 'CRM_TAX_INVOICE' ? (
+                        <div className="mt-0.5 text-[11px] font-medium text-sky-800">CRM-created</div>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(total)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {inv.status === 'POSTED' || inv.status === 'REVERSED' ? formatCurrency(outstanding) : '—'}

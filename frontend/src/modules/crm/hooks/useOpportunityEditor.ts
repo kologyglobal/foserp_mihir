@@ -71,7 +71,7 @@ const OPP_FIELD_LABELS: Record<string, string> = {
 const OPP_SECTION_BY_FIELD: Record<string, string> = {
   customerId: 'opp-section-general',
   opportunityName: 'opp-section-general',
-  expectedCloseDate: 'opp-section-commercial',
+  expectedCloseDate: 'opp-section-general',
   ownerId: 'opp-section-general',
   priority: 'opp-section-general',
   stage: 'opp-section-general',

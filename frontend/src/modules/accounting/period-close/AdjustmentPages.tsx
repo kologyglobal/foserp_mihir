@@ -9,9 +9,16 @@ import {
   getPrepaidExpenses,
   getTrialBalanceReview,
   loadPeriodCloseFilter,
+  postAccrual,
+  postFxRevaluationRun,
   previewAccrualPosting,
+  previewFxRevaluation,
+  recognisePrepaidCurrentPeriod,
+  reverseAccrual,
+  reverseFxRevaluationRun,
   updatePrepaidStatus,
 } from '@/services/accounting/periodCloseService'
+import { isApiMode } from '@/config/apiConfig'
 import type { AccrualEntry, PeriodFilterState, PrepaidExpense, TrialBalanceLine } from '@/types/periodClose'
 import { usePeriodClosePermissions } from '@/utils/permissions/periodClose'
 import { formatCurrency } from '@/utils/formatters/currency'
@@ -36,7 +43,7 @@ export function AccrualsPage() {
     }
     setLoading(true)
     try {
-      const list = await getAccruals()
+      const list = await getAccruals(filter)
       setRows(list)
       setSelectedId((prev) => prev ?? list[0]?.id ?? null)
       setError(null)
@@ -45,23 +52,27 @@ export function AccrualsPage() {
     } finally {
       setLoading(false)
     }
-  }, [perms.canView])
+  }, [perms.canView, filter])
 
   useEffect(() => {
     void load()
-  }, [load, filter.periodCode])
+  }, [load, filter.periodCode, filter.periodId])
 
   const selected = rows.find((r) => r.id === selectedId) ?? null
 
   const onPreview = async () => {
     if (!selected) return
     if (!perms.canManageAccruals) {
-      notify.error('You do not have permission to preview accruals.')
+      notify.error('You do not have permission to manage accruals.')
       return
     }
     try {
       await previewAccrualPosting(selected.id)
-      notify.info('Accounting preview prepared in demo mode. No ledger entries were posted.')
+      notify.info(
+        isApiMode()
+          ? 'Accrual marked ready to post.'
+          : 'Accounting preview prepared in demo mode. No ledger entries were posted.',
+      )
       await load()
       setWorkspace('preview')
     } catch (e) {
@@ -69,10 +80,36 @@ export function AccrualsPage() {
     }
   }
 
+  const onPost = async () => {
+    if (!selected || !perms.canManageAccruals) return
+    try {
+      await postAccrual(selected.id)
+      notify.success('Accrual posted to the general ledger.')
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Post failed')
+    }
+  }
+
+  const onReverse = async () => {
+    if (!selected || !perms.canManageAccruals) return
+    try {
+      await reverseAccrual(selected.id)
+      notify.success('Accrual reversed into the following period.')
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Reverse failed')
+    }
+  }
+
   return (
     <PeriodCloseShell
       title="Provisions & Accruals"
-      description="Month-end accruals and provisions with debit/credit preview only."
+      description={
+        isApiMode()
+          ? 'Month-end accruals post Dr expense / Cr accrued liability, then reverse into the next period.'
+          : 'Month-end accruals and provisions with debit/credit preview only.'
+      }
       periodFilter={filter}
       onPeriodChange={setFilter}
       commandBar={
@@ -188,21 +225,43 @@ export function AccrualsPage() {
                       <dt className="text-erp-muted">Start Period</dt>
                       <dd className="font-medium text-erp-text">{selected.startPeriod}</dd>
                     </div>
-                    <div className="sm:col-span-2">
+                    <div className="sm:col-span-2 flex flex-wrap gap-2">
                       <button
                         type="button"
                         className="rounded bg-erp-primary px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"
-                        disabled={!perms.canManageAccruals}
+                        disabled={!perms.canManageAccruals || selected.status === 'posted_demo' || selected.status === 'reversed_demo'}
                         onClick={() => void onPreview()}
                       >
-                        Generate Posting Preview
+                        {isApiMode() ? 'Mark Ready' : 'Generate Posting Preview'}
                       </button>
+                      {isApiMode() && (selected.status === 'ready' || selected.status === 'previewed') ? (
+                        <button
+                          type="button"
+                          className="rounded border border-erp-primary px-3 py-1.5 text-[12px] font-semibold text-erp-primary disabled:opacity-50"
+                          disabled={!perms.canManageAccruals}
+                          onClick={() => void onPost()}
+                        >
+                          Post Accrual
+                        </button>
+                      ) : null}
+                      {isApiMode() && selected.status === 'posted_demo' ? (
+                        <button
+                          type="button"
+                          className="rounded border border-rose-600 px-3 py-1.5 text-[12px] font-semibold text-rose-700 disabled:opacity-50"
+                          disabled={!perms.canManageAccruals}
+                          onClick={() => void onReverse()}
+                        >
+                          Reverse into Next Period
+                        </button>
+                      ) : null}
                     </div>
                   </dl>
                 ) : (
                   <div className="space-y-2">
                     <p className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-950">
-                      Preview only — debit and credit accounts shown without creating real postings.
+                      {isApiMode()
+                        ? 'Journal preview — posting creates real GL entries on the period end date.'
+                        : 'Preview only — debit and credit accounts shown without creating real postings.'}
                     </p>
                     <table className="w-full border-collapse text-left">
                       <thead>
@@ -251,18 +310,18 @@ export function PrepaidExpensesPage() {
     }
     setLoading(true)
     try {
-      setRows(await getPrepaidExpenses())
+      setRows(await getPrepaidExpenses(filter))
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load prepaid')
     } finally {
       setLoading(false)
     }
-  }, [perms.canView])
+  }, [perms.canView, filter])
 
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load, filter.periodCode, filter.periodId])
 
   const onStatus = async (id: string, status: PrepaidExpense['status']) => {
     if (!perms.canManagePrepaid) {
@@ -271,17 +330,39 @@ export function PrepaidExpensesPage() {
     }
     try {
       await updatePrepaidStatus(id, status)
-      notify.info('Prepaid status updated in demo mode. No posting was created.')
+      notify.info(
+        isApiMode()
+          ? `Prepaid marked ${status}.`
+          : 'Prepaid status updated in demo mode. No posting was created.',
+      )
       await load()
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Update failed')
     }
   }
 
+  const onRecognise = async (id: string) => {
+    if (!perms.canManagePrepaid) {
+      notify.error('You do not have permission to recognise prepaid expenses.')
+      return
+    }
+    try {
+      await recognisePrepaidCurrentPeriod(id)
+      notify.success('Prepaid amortisation posted for the current schedule period.')
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Recognition failed')
+    }
+  }
+
   return (
     <PeriodCloseShell
       title="Prepaid Expenses"
-      description="Recognition schedules for insurance, AMC, rent and subscriptions."
+      description={
+        isApiMode()
+          ? 'Live amortisation schedules — recognise Dr expense / Cr prepaid asset one period at a time.'
+          : 'Recognition schedules for insurance, AMC, rent and subscriptions.'
+      }
       periodFilter={filter}
       onPeriodChange={setFilter}
       commandBar={
@@ -329,33 +410,53 @@ export function PrepaidExpensesPage() {
                   </td>
                   <td className="py-1.5">
                     <div className="flex flex-wrap gap-1">
-                      <button
-                        type="button"
-                        className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold"
-                        onClick={() =>
-                          notify.info(
-                            `Posting preview: Dr ${r.expenseAccount} / Cr ${r.prepaidAccount} ${formatCurrency(r.currentPeriodExpense)} — demo only.`,
-                          )
-                        }
-                      >
-                        Generate Posting Preview
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold disabled:opacity-50"
-                        disabled={!perms.canManagePrepaid || r.status === 'suspended'}
-                        onClick={() => void onStatus(r.id, 'suspended')}
-                      >
-                        Suspend
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold disabled:opacity-50"
-                        disabled={!perms.canManagePrepaid || r.status === 'active'}
-                        onClick={() => void onStatus(r.id, 'active')}
-                      >
-                        Resume
-                      </button>
+                      {isApiMode() ? (
+                        <button
+                          type="button"
+                          className="rounded border border-erp-primary px-1.5 py-0.5 text-[11px] font-semibold text-erp-primary disabled:opacity-50"
+                          disabled={
+                            !perms.canManagePrepaid ||
+                            r.currentPeriodExpense <= 0 ||
+                            r.status === 'fully_recognized' ||
+                            r.status === 'closed'
+                          }
+                          onClick={() => void onRecognise(r.id)}
+                        >
+                          Recognise Period
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold"
+                          onClick={() =>
+                            notify.info(
+                              `Posting preview: Dr ${r.expenseAccount} / Cr ${r.prepaidAccount} ${formatCurrency(r.currentPeriodExpense)} — demo only.`,
+                            )
+                          }
+                        >
+                          Generate Posting Preview
+                        </button>
+                      )}
+                      {!isApiMode() ? (
+                        <>
+                          <button
+                            type="button"
+                            className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold disabled:opacity-50"
+                            disabled={!perms.canManagePrepaid || r.status === 'suspended'}
+                            onClick={() => void onStatus(r.id, 'suspended')}
+                          >
+                            Suspend
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold disabled:opacity-50"
+                            disabled={!perms.canManagePrepaid || r.status === 'active'}
+                            onClick={() => void onStatus(r.id, 'active')}
+                          >
+                            Resume
+                          </button>
+                        </>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -373,6 +474,7 @@ export function FxRevaluationPage() {
   const [filter, setFilter] = useState<PeriodFilterState>(() => loadPeriodCloseFilter())
   const [data, setData] = useState<Awaited<ReturnType<typeof getFxRevaluation>> | null>(null)
   const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -383,23 +485,85 @@ export function FxRevaluationPage() {
     }
     setLoading(true)
     try {
-      setData(await getFxRevaluation())
+      setData(await getFxRevaluation(filter))
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load FX')
     } finally {
       setLoading(false)
     }
-  }, [perms.canView])
+  }, [perms.canView, filter])
 
   useEffect(() => {
     void load()
   }, [load])
 
+  const onPreview = async () => {
+    setBusy(true)
+    try {
+      if (isApiMode()) {
+        setData(await previewFxRevaluation(filter))
+        notify.success('FX revaluation previewed from AR/AP open items and closing rates.')
+      } else {
+        setData(await getFxRevaluation(filter))
+        notify.info(
+          'FX revaluation preview prepared in demo mode. No unrealized gain/loss was posted to the ledger.',
+        )
+      }
+      setError(null)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Preview failed'
+      setError(msg)
+      notify.error(msg)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onPost = async () => {
+    if (!data?.runId || !isApiMode()) return
+    setBusy(true)
+    try {
+      setData(await postFxRevaluationRun(data.runId))
+      notify.success('FX revaluation posted to the ledger.')
+      setError(null)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Post failed'
+      setError(msg)
+      notify.error(msg)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onReverse = async () => {
+    if (!data?.runId || !isApiMode()) return
+    setBusy(true)
+    try {
+      setData(await reverseFxRevaluationRun(data.runId))
+      notify.success('FX revaluation reversed into the next period.')
+      setError(null)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Reverse failed'
+      setError(msg)
+      notify.error(msg)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const canPost =
+    perms.canFxPost && isApiMode() && data?.status === 'PREVIEWED' && Boolean(data.runId) && data.lines.length > 0
+  const canReverse = perms.canFxReverse && isApiMode() && data?.status === 'POSTED' && Boolean(data.runId)
+
   return (
     <PeriodCloseShell
       title="Foreign Exchange Revaluation"
-      description="Unrealized gain/loss preview using configured demo closing rates."
+      description={
+        isApiMode()
+          ? 'Unrealized gain/loss from foreign AR/AP open items using closing FX rates (MULTI_CURRENCY required).'
+          : 'Unrealized gain/loss preview using configured demo closing rates.'
+      }
       periodFilter={filter}
       onPeriodChange={setFilter}
       commandBar={
@@ -407,16 +571,29 @@ export function FxRevaluationPage() {
           inline
           sticky={false}
           secondaryActions={[
-            { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
+            { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load(), disabled: busy },
             {
               id: 'preview',
               label: 'Accounting Preview',
-              disabled: !perms.canFxPreview,
-              onClick: () =>
-                notify.info(
-                  'FX revaluation preview prepared in demo mode. No unrealized gain/loss was posted to the ledger.',
-                ),
+              disabled: !perms.canFxPreview || busy,
+              onClick: () => void onPreview(),
             },
+            ...(isApiMode()
+              ? [
+                  {
+                    id: 'post',
+                    label: 'Post Revaluation',
+                    disabled: !canPost || busy,
+                    onClick: () => void onPost(),
+                  },
+                  {
+                    id: 'reverse',
+                    label: 'Reverse',
+                    disabled: !canReverse || busy,
+                    onClick: () => void onReverse(),
+                  },
+                ]
+              : []),
           ]}
         />
       }
@@ -443,6 +620,17 @@ export function FxRevaluationPage() {
               <div className="font-medium text-erp-text">{data.reversalPeriod}</div>
             </div>
           </div>
+          {data.status || data.voucherNumber ? (
+            <p className="text-[12px] text-erp-muted">
+              Status: <span className="font-medium text-erp-text">{data.status ?? '—'}</span>
+              {data.voucherNumber ? (
+                <>
+                  {' '}
+                  · Voucher <span className="font-medium text-erp-text">{data.voucherNumber}</span>
+                </>
+              ) : null}
+            </p>
+          ) : null}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px] border-collapse text-left text-[12px]">
               <thead>
@@ -458,18 +646,26 @@ export function FxRevaluationPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.lines.map((l) => (
-                  <tr key={l.id} className="border-b border-erp-border/60">
-                    <td className="py-1.5 pr-2 font-medium text-erp-text">{l.accountOrParty}</td>
-                    <td className="py-1.5 pr-2 text-erp-muted">{l.currency}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{l.foreignAmount.toLocaleString('en-IN')}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{l.originalRate.toFixed(2)}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{l.closingRate.toFixed(2)}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{formatCurrency(l.bookValueInr)}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{formatCurrency(l.revaluedValueInr)}</td>
-                    <td className="py-1.5 text-right tabular-nums font-semibold">{formatCurrency(l.gainLoss)}</td>
+                {data.lines.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-4 text-center text-erp-muted">
+                      No FX differences yet. Set closing rates, then run Accounting Preview.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  data.lines.map((l) => (
+                    <tr key={l.id} className="border-b border-erp-border/60">
+                      <td className="py-1.5 pr-2 font-medium text-erp-text">{l.accountOrParty}</td>
+                      <td className="py-1.5 pr-2 text-erp-muted">{l.currency}</td>
+                      <td className="py-1.5 pr-2 text-right tabular-nums">{l.foreignAmount.toLocaleString('en-IN')}</td>
+                      <td className="py-1.5 pr-2 text-right tabular-nums">{l.originalRate.toFixed(2)}</td>
+                      <td className="py-1.5 pr-2 text-right tabular-nums">{l.closingRate.toFixed(2)}</td>
+                      <td className="py-1.5 pr-2 text-right tabular-nums">{formatCurrency(l.bookValueInr)}</td>
+                      <td className="py-1.5 pr-2 text-right tabular-nums">{formatCurrency(l.revaluedValueInr)}</td>
+                      <td className="py-1.5 text-right tabular-nums font-semibold">{formatCurrency(l.gainLoss)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

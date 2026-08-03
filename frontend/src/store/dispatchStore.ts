@@ -33,6 +33,7 @@ import { assertSerialDispatchReady } from './serialStore'
 import { onDispatchSerialsConfirmed } from '../utils/serialIntegration'
 import { getQualityStoreState } from './storeBridge'
 import { erpStorage, ERP_PERSIST_VERSION, ERP_STORAGE_KEYS } from './persistConfig'
+import { memoizedOnSource } from './selectors/memoizedGetters'
 
 function genId(prefix: string) {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
@@ -160,8 +161,11 @@ export const useDispatchStore = create<DispatchState>()(
       dispatches: [],
 
       getDispatch: (id) => {
-        const plan = get().dispatches.find((d) => d.id === id)
-        return plan ? normalizeDispatch(plan) : undefined
+        const dispatches = get().dispatches
+        return memoizedOnSource(dispatches, `dispatch:normalized:${id}`, () => {
+          const plan = dispatches.find((d) => d.id === id)
+          return plan ? normalizeDispatch(plan) : undefined
+        })
       },
       getDispatchesBySo: (salesOrderId) => get().dispatches.filter((d) => d.salesOrderId === salesOrderId),
 

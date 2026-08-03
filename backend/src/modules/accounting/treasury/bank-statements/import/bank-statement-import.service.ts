@@ -19,9 +19,12 @@ import {
   assertNoDuplicateFile,
   assertNoDuplicateStatement,
   computeFileChecksum,
-  isDuplicateLine,
 } from '../bank-statement-duplicate.service.js'
 import { buildStatementLineHash, buildStatementUniquenessKey } from '../bank-statement-identity.service.js'
+import {
+  markProvisionalLineSuperseded,
+  resolveLineSupersession,
+} from '../bank-statement-supersession.service.js'
 import * as readRepo from '../bank-statement-read.repository.js'
 import * as repo from '../bank-statement.repository.js'
 import { getTreasuryAccountOrThrow } from '../bank-statement-line.service.js'
@@ -77,7 +80,9 @@ async function readBatchFile(batch: { storageKey?: string | null }) {
   return readTreasuryStatementFile(batch.storageKey)
 }
 
-function extensionForResolved(format: 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053'): string {
+function extensionForResolved(
+  format: 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054',
+): string {
   switch (format) {
     case 'CSV':
       return '.csv'
@@ -86,6 +91,8 @@ function extensionForResolved(format: 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053'): st
     case 'MT940':
       return '.sta'
     case 'CAMT_053':
+    case 'CAMT_052':
+    case 'CAMT_054':
       return '.xml'
   }
 }
@@ -401,6 +408,8 @@ export async function executeImport(
     statementReference: header.statementReference,
     periodStartDate: header.periodStartDate,
     periodEndDate: header.periodEndDate,
+    documentType: header.documentType ?? 'END_OF_DAY_STATEMENT',
+    externalStatementId: header.externalStatementId ?? null,
   })
 
   await assertNoDuplicateStatement({
@@ -410,6 +419,8 @@ export async function executeImport(
     statementReference: header.statementReference,
     periodStartDate: header.periodStartDate,
     periodEndDate: header.periodEndDate,
+    documentType: header.documentType ?? 'END_OF_DAY_STATEMENT',
+    externalStatementId: header.externalStatementId ?? null,
     duplicatePolicy,
   })
 
@@ -432,12 +443,17 @@ export async function executeImport(
     importFormat: batch.importFormat,
     sourceType: 'FILE_UPLOAD',
     createdBy: req.context?.userId ?? null,
+    documentType: header.documentType ?? 'END_OF_DAY_STATEMENT',
+    hasOpeningBalance: header.hasOpeningBalance ?? true,
+    hasClosingBalance: header.hasClosingBalance ?? true,
+    externalStatementId: header.externalStatementId ?? null,
   })
 
   let lineNumber = 0
   let importedLineCount = 0
   let duplicateLineCount = 0
   let failedLineCount = 0
+  const incomingIsProvisional = header.isProvisional === true
 
   for (const row of importableRows) {
     const lineHash = buildStatementLineHash({
@@ -450,8 +466,15 @@ export async function executeImport(
       externalTransactionId: row.externalTransactionId,
     })
 
-    const dup = await isDuplicateLine(tenantId, batch.legalEntityId, lineHash)
-    if (dup.isDuplicate) {
+    const outcome = await resolveLineSupersession({
+      tenantId,
+      legalEntityId: batch.legalEntityId,
+      lineHash,
+      incomingIsProvisional,
+      sourceRowNumber: row.sourceRowNumber,
+    })
+
+    if (outcome.action === 'SKIP_DUPLICATE') {
       duplicateLineCount += 1
       preview.issues.push({
         rowNumber: row.sourceRowNumber,
@@ -463,8 +486,14 @@ export async function executeImport(
       continue
     }
 
+    if (outcome.action === 'BLOCK_ACTIVE_MATCH') {
+      preview.issues.push(outcome.issue)
+      failedLineCount += 1
+      continue
+    }
+
     lineNumber += 1
-    await repo.createStatementLine({
+    const created = await repo.createStatementLine({
       tenantId,
       legalEntityId: batch.legalEntityId,
       bankStatementId: statement.id,
@@ -487,11 +516,27 @@ export async function executeImport(
       runningBalance: row.runningBalance ?? null,
       lineHash,
       rawPayload: row.rawPayload as never,
+      isProvisional: outcome.isProvisional,
+      isExcluded: outcome.action === 'CREATE_EXCLUDED',
+      matchStatus: outcome.action === 'CREATE_EXCLUDED' ? 'EXCLUDED' : 'UNMATCHED',
+      supersededByLineId: outcome.action === 'CREATE_EXCLUDED' ? outcome.supersededByLineId : null,
     })
-    importedLineCount += 1
+
+    if (outcome.action === 'CREATE_AND_SUPERSEDE') {
+      await markProvisionalLineSuperseded({
+        provisionalLineId: outcome.provisionalLineId,
+        canonicalLineId: created.id,
+      })
+    }
+
+    if (outcome.action !== 'CREATE_EXCLUDED') {
+      importedLineCount += 1
+    } else {
+      duplicateLineCount += 1
+    }
   }
 
-  failedLineCount = preview.errorRowCount
+  failedLineCount += preview.errorRowCount
 
   await repo.updateStatement(tenantId, statement.id, {
     lineCount: importedLineCount,

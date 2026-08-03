@@ -20,6 +20,7 @@ import { APPROVAL_DOCUMENT_LABELS } from '../types/approvalMatrix'
 import { useApprovalStore } from '../store/approvalStore'
 import { useCrmStore } from '../store/crmStore'
 import { formatCrmCurrency } from './crmMetrics'
+import { quotationRevisionLabel } from './quotationEngine/revisionLabels'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -321,7 +322,7 @@ export function getUnifiedInboxData() {
       id: `crm-quo-${doc.id}`,
       kind: 'approval',
       title: `Approve CRM quotation ${doc.quotationId}`,
-      description: `Rev ${doc.revisionNo} · ${formatCrmCurrency(doc.totalAmount)}`,
+      description: `${quotationRevisionLabel(doc.revisionNo)} · ${formatCrmCurrency(doc.totalAmount)}`,
       severity: 'amber',
       href: `/crm/quotations/${doc.id}`,
       module: 'CRM',
@@ -334,7 +335,7 @@ export function getUnifiedInboxData() {
       id: `quo-${q.id}`,
       kind: 'approval',
       title: `Customer approval — ${q.quotationNo}`,
-      description: `Rev ${q.revisionNo} pending sign-off`,
+      description: `${quotationRevisionLabel(q.revisionNo)} pending sign-off`,
       severity: 'amber',
       href: crmDoc ? `/crm/quotations/${crmDoc.id}` : '/crm/quotations',
       module: 'CRM',

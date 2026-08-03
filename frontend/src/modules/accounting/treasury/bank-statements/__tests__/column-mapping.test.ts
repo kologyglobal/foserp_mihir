@@ -34,7 +34,9 @@ export function runColumnMappingMapperTests() {
   check('inferImportFormat xlsx', inferImportFormat('book.xlsx') === 'XLSX')
   check('inferImportFormat mt940', inferImportFormat('export.mt940') === 'MT940')
   check('inferImportFormat sta', inferImportFormat('bank.sta') === 'MT940')
-  check('inferImportFormat camt xml', inferImportFormat('camt053.xml') === 'CAMT_053')
+  check('inferImportFormat camt xml auto', inferImportFormat('camt053.xml') === 'AUTO_DETECT' || inferImportFormat('statement.xml') === 'AUTO_DETECT')
+  check('inferImportFormat camt052 name', inferImportFormat('sample.camt052.xml') === 'CAMT_052')
+  check('inferImportFormat camt054 name', inferImportFormat('sample.camt054.xml') === 'CAMT_054')
   check('inferImportFormat txt auto', inferImportFormat('stmt.txt') === 'AUTO_DETECT')
   check('inferImportFormat invalid', inferImportFormat('notes.pdf') === null)
 

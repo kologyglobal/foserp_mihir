@@ -341,6 +341,20 @@ export async function allocateCustomerReceipt(
       userAgent: context.userAgent ?? null,
     })
 
+    // Sync CRM tax invoices linked via CRM_TAX_INVOICE source.
+    try {
+      const { syncCrmTaxInvoicesForAllocationBatch } = await import(
+        '../source/crm-tax-invoice-ar.service.js'
+      )
+      await syncCrmTaxInvoicesForAllocationBatch(
+        context.tenantId,
+        ctx.lines.map((l) => l.invoiceId),
+        context.userId,
+      )
+    } catch {
+      // Non-fatal — AR allocation already posted; CRM sync can be retried.
+    }
+
     return buildResult(context.tenantId, batchId, false)
   } catch (err) {
     if (

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.052.001.02">
+  <BkToCstmrAcctRpt>
+    <GrpHdr>
+      <MsgId>CAMT052-MSG-001</MsgId>
+      <CreDtTm>2026-07-02T12:00:00</CreDtTm>
+    </GrpHdr>
+    <Rpt>
+      <Id>RPT-CAMT052-001</Id>
+      <CreDtTm>2026-07-02T12:00:00</CreDtTm>
+      <FrToDt>
+        <FrDtTm>2026-07-02T00:00:00</FrDtTm>
+        <ToDtTm>2026-07-02T12:00:00</ToDtTm>
+      </FrToDt>
+      <Acct>
+        <Id>
+          <Othr>
+            <Id>998877665544</Id>
+          </Othr>
+        </Id>
+        <Ccy>INR</Ccy>
+      </Acct>
+      <Bal>
+        <Tp>
+          <CdOrPrtry>
+            <Cd>ITBD</Cd>
+          </CdOrPrtry>
+        </Tp>
+        <Amt Ccy="INR">140000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+      </Bal>
+      <Ntry>
+        <Amt Ccy="INR">40000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <BookgDt>
+          <Dt>2026-07-02</Dt>
+        </BookgDt>
+        <ValDt>
+          <Dt>2026-07-02</Dt>
+        </ValDt>
+        <AcctSvcrRef>REF-C1</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <Refs>
+              <EndToEndId>E2E-C1</EndToEndId>
+              <TxId>TX-C1</TxId>
+            </Refs>
+            <RmtInf>
+              <Ustrd>Intraday NEFT credit customer ABC</Ustrd>
+            </RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+    </Rpt>
+  </BkToCstmrAcctRpt>
+</Document>

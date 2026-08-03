@@ -35,6 +35,12 @@ export function useActiveLocations() {
   return useMemo(() => locations.filter((l) => l.isActive), [locations])
 }
 
+/** Stable active item category list. */
+export function useActiveCategories() {
+  const categories = useMasterStore((s) => s.categories)
+  return useMemo(() => categories.filter((c) => c.isActive), [categories])
+}
+
 /** Leaf categories (no children). */
 export function useLeafCategories() {
   const categories = useMasterStore((s) => s.categories)

@@ -7,6 +7,7 @@ import { validateBody, validateParams, validateQuery } from '../../../middleware
 import { tenantRouteParamSchema, uuidParamSchema } from '../../../utils/pagination.js'
 import {
   accountTreeQuerySchema,
+  accountImportSchema,
   applyTemplateSchema,
   createAccountSchema,
   listAccountsQuerySchema,
@@ -26,6 +27,8 @@ router.use(
 
 router.get('/', requirePermission('finance.coa.view'), validateQuery(listAccountsQuerySchema), controller.listAccounts)
 router.get('/tree', requirePermission('finance.coa.view'), validateQuery(accountTreeQuerySchema), controller.getAccountTree)
+router.get('/import/template', requirePermission('finance.coa.view'), controller.getImportTemplate)
+router.post('/import', requirePermission('finance.coa.manage'), validateBody(accountImportSchema), controller.importAccounts)
 router.post('/apply-template', requirePermission('finance.coa.manage'), validateBody(applyTemplateSchema), controller.applyTemplate)
 router.post('/', requirePermission('finance.coa.manage'), validateBody(createAccountSchema), controller.createAccount)
 router.get('/:id', validateParams(uuidParamSchema), requirePermission('finance.coa.view'), controller.getAccount)

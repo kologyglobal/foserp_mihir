@@ -17,13 +17,18 @@ export { ConvertQuotationToSOAction } from './ConvertQuotationToSOAction'
 export { QuotationConversionDialog } from './QuotationConversionDialog'
 export { Quotation360RecordHeader } from './Quotation360RecordHeader'
 export { QuotationSummaryCard } from './QuotationSummaryCard'
+export { QuotationCommercialTermsBlock } from './QuotationCommercialTermsBlock'
 export { QuotationSmartOverviewPanel } from './QuotationSmartOverviewPanel'
 export {
   QuotationHeroCard,
   QuotationWorkflowStepper,
   QuotationCommercialSummary,
   QuotationSectionList,
+  quotationCustomerRevisionIndex,
+  quotationRevisionSuffix,
   quotationRevisionLabel,
+  quotationNoWithRevision,
+  nextQuotationRevisionLabel,
 } from './Quotation360Sections'
 export {
   QuotationCrmCard, QuotationCrmList, QuotationCrmEmptyState, QuotationPortfolioToolbar,

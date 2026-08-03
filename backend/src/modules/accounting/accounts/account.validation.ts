@@ -54,8 +54,15 @@ export const applyTemplateSchema = z.object({
   templateId: z.enum(['MANUFACTURING', 'TRADING', 'SERVICE', 'JOB_WORK']),
 })
 
+export const accountImportSchema = z.object({
+  legalEntityId: z.string().uuid(),
+  rows: z.array(z.record(z.string())).min(1).max(2000),
+  duplicateMode: z.enum(['skip', 'update', 'reject']).default('skip'),
+})
+
 export type ListAccountsQuery = z.infer<typeof listAccountsQuerySchema>
 export type AccountTreeQuery = z.infer<typeof accountTreeQuerySchema>
 export type CreateAccountInput = z.infer<typeof createAccountSchema>
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>
 export type ApplyTemplateInput = z.infer<typeof applyTemplateSchema>
+export type AccountImportInput = z.infer<typeof accountImportSchema>

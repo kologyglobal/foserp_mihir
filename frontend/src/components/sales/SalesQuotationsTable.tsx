@@ -19,6 +19,7 @@ import { BulkActionToolbar } from '../../design-system/list-page/BulkActionToolb
 import { buildEnterpriseBulkActions } from '../../design-system/list-page/buildEnterpriseBulkActions'
 import { buildAiRowActions } from '../../design-system/list-page/aiRowActions'
 import { crmQuotationPath } from '../../utils/crmQuotationNavigation'
+import { quotationNoWithRevision } from '../../utils/quotationEngine/revisionLabels'
 
 export interface SalesQuotationsTableProps {
   rows: Quotation[]
@@ -58,7 +59,7 @@ export function SalesQuotationsTable({
         meta: { columnLabel: 'Quotation' },
         cell: ({ row }) => (
           <TableLink to={crmQuotationPath(row.original.id)}>
-            <EnterpriseIdCell id={`${row.original.quotationNo} Rev ${row.original.revisionNo}`} />
+            <EnterpriseIdCell id={quotationNoWithRevision(row.original.quotationNo, row.original.revisionNo)} />
           </TableLink>
         ),
       },
@@ -84,13 +85,14 @@ export function SalesQuotationsTable({
         header: 'Company',
         meta: { columnLabel: 'Company' },
         cell: ({ row }) => {
-          const c = customers.find((x) => x.id === row.original.customerId)
+          const q = row.original
+          const c = customers.find((x) => x.id === q.customerId)
           return (
             <EnterpriseRecordCell
-              primary={c?.customerName ?? row.original.customerId}
+              primary={q.customerName?.trim() || c?.customerName || q.customerId}
               location={c?.city}
               industry={c?.industry}
-              subtitle={c?.isCustomer ? 'Customer' : 'Prospect'}
+              subtitle={c?.isCustomer ? 'Customer' : c ? 'Prospect' : undefined}
             />
           )
         },

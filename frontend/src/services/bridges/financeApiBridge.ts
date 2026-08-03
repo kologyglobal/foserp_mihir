@@ -175,6 +175,125 @@ export async function executeYearEndClose(financialYearId: string) {
   return unwrap(await api.executeYearEndClose(financialYearId))
 }
 
+export async function listPeriodAdjustments(
+  params?: Parameters<typeof api.listPeriodAdjustments>[0],
+): Promise<api.PeriodAdjustmentDto[]> {
+  if (!isApiMode()) throw new Error('Period adjustments require API mode')
+  return unwrap(await api.listPeriodAdjustments(params))
+}
+
+export async function getPeriodAdjustment(id: string): Promise<api.PeriodAdjustmentDto> {
+  if (!isApiMode()) throw new Error('Period adjustments require API mode')
+  return unwrap(await api.getPeriodAdjustment(id))
+}
+
+export async function createPeriodAdjustment(body: Record<string, unknown>): Promise<api.PeriodAdjustmentDto> {
+  if (!isApiMode()) throw new Error('Period adjustments require API mode')
+  return unwrap(await api.createPeriodAdjustment(body))
+}
+
+export async function markPeriodAdjustmentReady(id: string): Promise<api.PeriodAdjustmentDto> {
+  if (!isApiMode()) throw new Error('Period adjustments require API mode')
+  return unwrap(await api.markPeriodAdjustmentReady(id))
+}
+
+export async function postPeriodAdjustment(id: string): Promise<api.PeriodAdjustmentDto> {
+  if (!isApiMode()) throw new Error('Period adjustments require API mode')
+  return unwrap(await api.postPeriodAdjustment(id))
+}
+
+export async function reversePeriodAdjustment(
+  id: string,
+  body: { reason: string; reversalDate?: string },
+): Promise<api.PeriodAdjustmentDto> {
+  if (!isApiMode()) throw new Error('Period adjustments require API mode')
+  return unwrap(await api.reversePeriodAdjustment(id, body))
+}
+
+export async function cancelPeriodAdjustment(id: string, reason: string): Promise<api.PeriodAdjustmentDto> {
+  if (!isApiMode()) throw new Error('Period adjustments require API mode')
+  return unwrap(await api.cancelPeriodAdjustment(id, reason))
+}
+
+export async function recognisePrepaidSchedule(id: string, scheduleId: string): Promise<api.PeriodAdjustmentDto> {
+  if (!isApiMode()) throw new Error('Period adjustments require API mode')
+  return unwrap(await api.recognisePrepaidSchedule(id, scheduleId))
+}
+
+export async function listPeriodCloseCalendarEvents(periodId: string): Promise<api.PeriodCloseCalendarEventApi[]> {
+  if (!isApiMode()) throw new Error('Period close calendar requires API mode')
+  return unwrap(await api.listPeriodCloseCalendarEvents(periodId))
+}
+
+export async function generatePeriodCloseCalendar(periodId: string): Promise<api.PeriodCloseCalendarEventApi[]> {
+  if (!isApiMode()) throw new Error('Period close calendar requires API mode')
+  return unwrap(await api.generatePeriodCloseCalendar(periodId))
+}
+
+export async function listPeriodCloseTemplates(legalEntityId: string): Promise<api.PeriodCloseChecklistTemplateApi[]> {
+  if (!isApiMode()) throw new Error('Period close templates require API mode')
+  return unwrap(await api.listPeriodCloseTemplates(legalEntityId))
+}
+
+export async function listPeriodReopenRequests(
+  params?: Parameters<typeof api.listPeriodReopenRequests>[0],
+): Promise<api.PeriodReopenRequestApi[]> {
+  if (!isApiMode()) throw new Error('Period reopen requests require API mode')
+  return unwrap(await api.listPeriodReopenRequests(params))
+}
+
+export async function createPeriodReopenRequest(body: Record<string, unknown>): Promise<api.PeriodReopenRequestApi> {
+  if (!isApiMode()) throw new Error('Period reopen requests require API mode')
+  return unwrap(await api.createPeriodReopenRequest(body))
+}
+
+export async function approvePeriodReopenRequest(
+  id: string,
+  body?: { note?: string; activate?: boolean },
+): Promise<api.PeriodReopenRequestApi> {
+  if (!isApiMode()) throw new Error('Period reopen requests require API mode')
+  return unwrap(await api.approvePeriodReopenRequest(id, body))
+}
+
+export async function rejectPeriodReopenRequest(id: string, reason: string): Promise<api.PeriodReopenRequestApi> {
+  if (!isApiMode()) throw new Error('Period reopen requests require API mode')
+  return unwrap(await api.rejectPeriodReopenRequest(id, reason))
+}
+
+export async function getFxRevaluationRun(periodId: string): Promise<api.FxRevaluationRunApi | null> {
+  if (!isApiMode()) throw new Error('FX revaluation requires API mode')
+  return unwrap(await api.getFxRevaluationRun(periodId))
+}
+
+export async function previewFxRevaluation(periodId: string): Promise<api.FxRevaluationRunApi> {
+  if (!isApiMode()) throw new Error('FX revaluation requires API mode')
+  return unwrap(await api.previewFxRevaluation(periodId))
+}
+
+export async function postFxRevaluation(runId: string): Promise<api.FxRevaluationRunApi> {
+  if (!isApiMode()) throw new Error('FX revaluation requires API mode')
+  return unwrap(await api.postFxRevaluation(runId))
+}
+
+export async function reverseFxRevaluation(
+  runId: string,
+  body: { reason: string; reversalDate?: string },
+): Promise<api.FxRevaluationRunApi> {
+  if (!isApiMode()) throw new Error('FX revaluation requires API mode')
+  return unwrap(await api.reverseFxRevaluation(runId, body))
+}
+
+export async function upsertFxRate(body: {
+  legalEntityId: string
+  currencyCode: string
+  asOfDate: string
+  rate: string | number
+  notes?: string
+}): Promise<api.FxExchangeRateApi> {
+  if (!isApiMode()) throw new Error('FX rates require API mode')
+  return unwrap(await api.upsertFxRate(body))
+}
+
 export async function listPeriods(legalEntityId?: string, financialYearId?: string): Promise<AccountingPeriod[]> {
   const leId = await ensureLegalEntityId(legalEntityId)
   if (isApiMode()) {

@@ -24,13 +24,25 @@ export async function findSalesOrders(
             { salesOrderNo: { contains: query.search } },
             { quotationNo: { contains: query.search } },
             { customerPoNumber: { contains: query.search } },
+            { company: { name: { contains: query.search } } },
+            { company: { companyCode: { contains: query.search } } },
           ],
         }
       : {}),
   }
 
+  const companyInclude = {
+    company: { select: { id: true, name: true, companyCode: true } },
+  } as const
+
   const [items, total] = await Promise.all([
-    prisma.crmSalesOrder.findMany({ where, skip, take, orderBy: { createdAt: query.sortOrder } }),
+    prisma.crmSalesOrder.findMany({
+      where,
+      skip,
+      take,
+      orderBy: { createdAt: query.sortOrder },
+      include: companyInclude,
+    }),
     prisma.crmSalesOrder.count({ where }),
   ])
 
@@ -40,6 +52,7 @@ export async function findSalesOrders(
 export async function findSalesOrderById(tenantId: string, id: string) {
   return prisma.crmSalesOrder.findFirst({
     where: { id, ...tenantActiveFilter(tenantId) },
+    include: { company: { select: { id: true, name: true, companyCode: true } } },
   })
 }
 
@@ -50,7 +63,10 @@ export async function findSalesOrderByQuotationId(tenantId: string, quotationId:
 }
 
 export async function createSalesOrder(data: Prisma.CrmSalesOrderCreateInput) {
-  return prisma.crmSalesOrder.create({ data })
+  return prisma.crmSalesOrder.create({
+    data,
+    include: { company: { select: { id: true, name: true, companyCode: true } } },
+  })
 }
 
 export async function updateSalesOrder(
@@ -63,6 +79,7 @@ export async function updateSalesOrder(
   return prisma.crmSalesOrder.update({
     where: { id },
     data,
+    include: { company: { select: { id: true, name: true, companyCode: true } } },
   })
 }
 

@@ -43,6 +43,11 @@ import { salesChildBreadcrumbs } from '../../utils/salesNavigation'
 import { isApiMode } from '../../config/apiConfig'
 import { apiCreateProforma } from '../../services/bridges/crmCommercialApiBridge'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
+import {
+  calcProductPricingSummary,
+  type OrderDiscountMode,
+} from '../../utils/opportunityLineCalc'
+import { ChargeEditor, OrderAdjustmentsPanel } from '../../components/erp/OrderAdjustmentsGrid'
 
 type PiCreateMode = 'direct' | 'sales_order'
 
@@ -141,6 +146,10 @@ export function ProformaInvoiceFormPage() {
     return prefill?.customerPoNumber ?? ''
   })
   const [remarks, setRemarks] = useState('')
+  const [freightMode, setFreightMode] = useState<OrderDiscountMode>('flat')
+  const [freightAmount, setFreightAmount] = useState(0)
+  const [orderDiscountMode, setOrderDiscountMode] = useState<OrderDiscountMode>('flat')
+  const [orderDiscountInput, setOrderDiscountInput] = useState(0)
   const { locationId, setLocationId } = useDocumentLocation(
     'sales',
     initialSoId ? resolveSalesOrderProformaPrefill(initialSoId)?.locationId : null,
@@ -202,24 +211,62 @@ export function ProformaInvoiceFormPage() {
   const customer = customerId ? getCustomer(customerId) : undefined
   const lines = useMemo(() => buildLinesFromRows(lineRows, items), [lineRows, items])
   const taxable = useMemo(() => lines.reduce((s, l) => s + l.taxableValue, 0), [lines])
-  const gstPreview = useMemo(
-    () => (customer ? computeGst(taxable, customer.state) : null),
-    [taxable, customer],
-  )
 
   const pricingSummary = useMemo(() => {
     const totalQty = lines.reduce((s, l) => s + l.qty, 0)
     const basicAmount = round2(lines.reduce((s, l) => s + l.qty * l.unitPrice, 0))
-    const subtotal = round2(taxable)
-    const totalLineDiscount = round2(basicAmount - subtotal)
-    const gstByRate = new Map<number, number>()
-    for (const line of lines) {
-      gstByRate.set(line.taxPct, round2((gstByRate.get(line.taxPct) ?? 0) + line.gstAmount))
+    const totalLineDiscount = round2(basicAmount - taxable)
+    const asOppLines = lines.map((line) => ({
+      id: line.id,
+      lineNo: line.lineNo,
+      productId: null as string | null,
+      itemId: line.itemId || null,
+      itemCode: line.itemCode,
+      productOrItem: line.description,
+      description: line.description,
+      productFamily: '',
+      itemType: '',
+      qty: line.qty,
+      uom: line.uom,
+      unitPrice: line.unitPrice,
+      discountPct: line.discountPct,
+      discountAmount: 0,
+      taxableValue: line.taxableValue,
+      taxPct: line.taxPct,
+      gstAmount: line.gstAmount,
+      lineTotal: line.lineTotal,
+      expectedDeliveryDate: null as string | null,
+      remarks: '',
+    }))
+    const pricing = calcProductPricingSummary(asOppLines, {
+      freight: {
+        calculationType: freightMode,
+        value: freightAmount,
+      },
+      orderDiscountMode,
+      orderDiscountInput,
+    })
+    return {
+      totalQty,
+      basicAmount,
+      subtotal: pricing.taxableBeforeOverallDiscount,
+      totalLineDiscount,
+      gstByRate: pricing.gstByRate,
+      lineGst: pricing.totalGst,
+      orderDiscountAmount: pricing.orderDiscountAmount,
+      freightAmount: pricing.freightAmount,
+      taxableAfterDiscount: pricing.taxableAfterOverallDiscount,
+      grandTotal: pricing.grandTotal,
     }
-    const lineGst = round2(lines.reduce((s, l) => s + l.gstAmount, 0))
-    const grandTotal = gstPreview?.grandTotal ?? round2(subtotal + lineGst)
-    return { totalQty, basicAmount, subtotal, totalLineDiscount, gstByRate, lineGst, grandTotal }
-  }, [lines, taxable, gstPreview])
+  }, [lines, taxable, freightAmount, freightMode, orderDiscountInput, orderDiscountMode])
+
+  const gstPreview = useMemo(
+    () =>
+      customer
+        ? computeGst(pricingSummary.taxableAfterDiscount, customer.state)
+        : null,
+    [pricingSummary.taxableAfterDiscount, customer],
+  )
 
   const hasValidLines = lines.length > 0 && lines.every((l) => l.itemId && l.qty > 0 && l.unitPrice > 0)
 
@@ -758,69 +805,110 @@ export function ProformaInvoiceFormPage() {
           columns={1}
         >
           {lineGrid}
-          <div className="flex min-w-0 justify-end pt-2">
-            <div className="quo-editor-price__summary so-direct-order-summary">
-              <div className="quo-editor-price__summary-row">
-                <span>Total Quantity</span>
-                <span className="tabular-nums">{pricingSummary.totalQty}</span>
-              </div>
-              <div className="quo-editor-price__summary-row">
-                <span>Basic Amount</span>
-                <span className="tabular-nums">{formatCurrency(pricingSummary.basicAmount)}</span>
-              </div>
-              {pricingSummary.totalLineDiscount > 0 ? (
-                <div className="quo-editor-price__summary-row">
-                  <span>Line Discount</span>
-                  <span className="tabular-nums">−{formatCurrency(pricingSummary.totalLineDiscount)}</span>
+          <div className="so-pricing-totals so-direct-order-summary">
+            <OrderAdjustmentsPanel>
+              <ChargeEditor
+                label="Order discount"
+                mode={orderDiscountMode}
+                value={orderDiscountInput}
+                calculatedAmount={pricingSummary.orderDiscountAmount}
+                modePctLabel="% Disc."
+                amountHint={
+                  pricingSummary.orderDiscountAmount > 0
+                    ? 'off taxable (before GST)'
+                    : undefined
+                }
+                onModeChange={(m) => {
+                  setOrderDiscountMode(m)
+                  setOrderDiscountInput(0)
+                }}
+                onValueChange={setOrderDiscountInput}
+              />
+              <ChargeEditor
+                label="Freight"
+                mode={freightMode}
+                value={freightAmount}
+                calculatedAmount={pricingSummary.freightAmount}
+                onModeChange={(m) => {
+                  setFreightMode(m)
+                  setFreightAmount(0)
+                }}
+                onValueChange={setFreightAmount}
+              />
+            </OrderAdjustmentsPanel>
+
+            <aside className="so-pricing-summary" aria-label="Order summary">
+              <p className="so-pricing-summary__title">Order summary</p>
+              <div className="so-pricing-summary__rows">
+                <div className="so-pricing-summary__row">
+                  <span>Total quantity</span>
+                  <span className="tabular-nums">{pricingSummary.totalQty}</span>
                 </div>
-              ) : null}
-              <div className="quo-editor-price__summary-row">
-                <span>Taxable Amount</span>
-                <span className="tabular-nums">{formatCurrency(pricingSummary.subtotal)}</span>
-              </div>
-              {[...pricingSummary.gstByRate.entries()]
-                .sort(([a], [b]) => a - b)
-                .map(([rate, amount]) => (
-                  <div key={rate} className="quo-editor-price__summary-row">
-                    <span>GST @ {rate}%</span>
-                    <span className="tabular-nums">{formatCurrency(amount)}</span>
+                <div className="so-pricing-summary__row">
+                  <span>Basic amount</span>
+                  <span className="tabular-nums">{formatCurrency(pricingSummary.basicAmount)}</span>
+                </div>
+                {pricingSummary.totalLineDiscount > 0 ? (
+                  <div className="so-pricing-summary__row">
+                    <span>Line discount</span>
+                    <span className="tabular-nums">−{formatCurrency(pricingSummary.totalLineDiscount)}</span>
                   </div>
-                ))}
-              {gstPreview ? (
-                <>
-                  <div className="quo-editor-price__summary-row">
-                    <span>GST Scheme</span>
-                    <span>{gstSchemeLabel(gstPreview.scheme)}</span>
+                ) : null}
+                <div className="so-pricing-summary__row">
+                  <span>Taxable amount</span>
+                  <span className="tabular-nums">{formatCurrency(pricingSummary.subtotal)}</span>
+                </div>
+                <div className="so-pricing-summary__row">
+                  <span>
+                    Overall discount
+                    {orderDiscountMode === 'percent' && orderDiscountInput > 0
+                      ? ` (${orderDiscountInput}%)`
+                      : ''}
+                  </span>
+                  <span className="tabular-nums">
+                    {pricingSummary.orderDiscountAmount > 0
+                      ? `−${formatCurrency(pricingSummary.orderDiscountAmount)}`
+                      : formatCurrency(0)}
+                  </span>
+                </div>
+                {pricingSummary.orderDiscountAmount > 0 ? (
+                  <div className="so-pricing-summary__row">
+                    <span>Taxable after discount</span>
+                    <span className="tabular-nums">{formatCurrency(pricingSummary.taxableAfterDiscount)}</span>
                   </div>
-                  {gstPreview.scheme === 'cgst_sgst' ? (
-                    <>
-                      <div className="quo-editor-price__summary-row">
-                        <span>CGST</span>
-                        <span className="tabular-nums">{formatCurrency(gstPreview.cgstAmount)}</span>
-                      </div>
-                      <div className="quo-editor-price__summary-row">
-                        <span>SGST</span>
-                        <span className="tabular-nums">{formatCurrency(gstPreview.sgstAmount)}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="quo-editor-price__summary-row">
-                      <span>IGST</span>
-                      <span className="tabular-nums">{formatCurrency(gstPreview.igstAmount)}</span>
+                ) : null}
+                {[...pricingSummary.gstByRate.entries()]
+                  .sort(([a], [b]) => a - b)
+                  .map(([rate, amount]) => (
+                    <div key={rate} className="so-pricing-summary__row">
+                      <span>GST @ {rate}%</span>
+                      <span className="tabular-nums">{formatCurrency(amount)}</span>
                     </div>
-                  )}
-                </>
-              ) : (
-                <div className="quo-editor-price__summary-row">
+                  ))}
+                {gstPreview ? (
+                  <>
+                    <div className="so-pricing-summary__row">
+                      <span>GST scheme</span>
+                      <span>{gstSchemeLabel(gstPreview.scheme)}</span>
+                    </div>
+                  </>
+                ) : null}
+                <div className="so-pricing-summary__row">
                   <span>Total GST</span>
                   <span className="tabular-nums">{formatCurrency(pricingSummary.lineGst)}</span>
                 </div>
-              )}
-              <div className="quo-editor-price__summary-row quo-editor-price__summary-row--total">
-                <span>Grand Total</span>
-                <span className="tabular-nums">{formatCurrency(pricingSummary.grandTotal)}</span>
+                {pricingSummary.freightAmount > 0 ? (
+                  <div className="so-pricing-summary__row">
+                    <span>Freight</span>
+                    <span className="tabular-nums">{formatCurrency(pricingSummary.freightAmount)}</span>
+                  </div>
+                ) : null}
               </div>
-            </div>
+              <div className="so-pricing-summary__grand">
+                <span>Grand total</span>
+                <strong className="tabular-nums">{formatCurrency(pricingSummary.grandTotal)}</strong>
+              </div>
+            </aside>
           </div>
         </ErpCardSection>
         </div>

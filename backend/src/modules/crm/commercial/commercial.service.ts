@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client'
+import { prisma } from '../../../config/prisma.js'
 import { createAuditLog } from '../../../services/audit.service.js'
 import { NotFoundError, ValidationError } from '../../../utils/errors.js'
 import * as repo from './commercial.repository.js'
@@ -50,6 +51,16 @@ function resolveCustomerPlaceOfSupplyCode(
 
 function parseDate(dateStr: string): Date {
   return new Date(`${dateStr.slice(0, 10)}T00:00:00.000Z`)
+}
+
+async function resolveUserDisplayName(tenantId: string, userId: string): Promise<string | null> {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, tenantId },
+    select: { firstName: true, lastName: true, email: true },
+  })
+  if (!user) return null
+  const name = `${user.firstName} ${user.lastName}`.trim()
+  return name || user.email || null
 }
 
 function addDays(dateStr: string, days: number): string {
@@ -511,6 +522,7 @@ export async function createInvoice(
   const invoiceNo = await repo.nextDocumentNo(tenantId, 'INV-', 'invoice')
 
   const address = [company.addressLine1, company.city, company.state, company.pincode].filter(Boolean).join(', ')
+  const createdByNameSnapshot = await resolveUserDisplayName(tenantId, userId)
 
   const row = await repo.createInvoiceWithLines(
     tenantId,
@@ -521,6 +533,8 @@ export async function createInvoice(
       dueDate: parseDate(dueDate),
       status: 'draft',
       paymentStatus: 'unpaid',
+      accountingStatus: 'none',
+      createdByNameSnapshot,
       source: input.source ?? 'direct',
       companyId: company.id,
       customerNameSnapshot: company.name,
@@ -578,9 +592,15 @@ export async function postInvoice(
   if (!row) throw new NotFoundError('Tax invoice not found')
   if (row.status !== 'draft') throw new ValidationError('Only draft invoices can be posted')
 
+  const createdByNameSnapshot =
+    row.createdByNameSnapshot ?? (await resolveUserDisplayName(tenantId, row.createdBy ?? userId))
+
   const updated = await repo.updateInvoice(tenantId, id, userId, {
     status: 'posted',
     postedAt: new Date(),
+    accountingStatus: 'pending_review',
+    accountingSubmittedAt: new Date(),
+    createdByNameSnapshot,
   })
   await createAuditLog({
     tenantId,
@@ -589,7 +609,11 @@ export async function postInvoice(
     entity: 'crmTaxInvoice',
     entityId: id,
     action: 'POST',
-    newValues: { invoiceNo: row.invoiceNo },
+    newValues: {
+      invoiceNo: row.invoiceNo,
+      accountingStatus: 'pending_review',
+      createdByName: createdByNameSnapshot,
+    },
     ipAddress: audit?.ipAddress,
     userAgent: audit?.userAgent,
   })
@@ -669,6 +693,16 @@ export async function allocatePayments(
     }
     if (inv.status === 'draft' || inv.status === 'cancelled') {
       throw new ValidationError(`Invoice ${inv.invoiceNo} is not open for allocation`)
+    }
+    if (inv.accountingStatus === 'converted' || inv.salesInvoiceId) {
+      throw new ValidationError(
+        `Invoice ${inv.invoiceNo} was converted to Money In — allocate payments in Accounting → Money In`,
+      )
+    }
+    if (inv.accountingStatus === 'pending_review') {
+      throw new ValidationError(
+        `Invoice ${inv.invoiceNo} is pending Accounting review — convert in Money In before allocating`,
+      )
     }
     const already = queued.get(inv.id) ?? 0
     const balance = Number(inv.balanceDue) - already

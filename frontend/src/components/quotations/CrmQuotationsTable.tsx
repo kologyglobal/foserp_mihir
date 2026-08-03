@@ -141,7 +141,7 @@ export function CrmQuotationsTable({
         cell: ({ row }) => (
           <EnterpriseRecordCell
             primary={row.original.customerName}
-            subtitle={row.original.opportunityName ?? `R${row.original.document.revisionNo}`}
+            subtitle={row.original.opportunityName ?? quotationRevisionLabel(row.original.document.revisionNo)}
           />
         ),
       },

@@ -206,5 +206,16 @@ export async function reverseCustomerReceiptAllocation(
     userAgent: context.userAgent ?? null,
   })
 
+  try {
+    const { syncCrmTaxInvoicesForAllocationBatch } = await import('../source/crm-tax-invoice-ar.service.js')
+    await syncCrmTaxInvoicesForAllocationBatch(
+      context.tenantId,
+      reversedLines.flatMap((l) => (l.invoiceId ? [l.invoiceId] : [])),
+      context.userId,
+    )
+  } catch {
+    // Non-fatal
+  }
+
   return buildResult(context.tenantId, input.batchId, false)
 }

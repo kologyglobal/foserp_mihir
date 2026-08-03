@@ -143,7 +143,36 @@ export async function apiUpdateQuotation(id: string, patch: Record<string, unkno
 export async function apiUpdateQuotationDocument(
   quotationId: string,
   documentId: string,
-  patch: Partial<Pick<QuotationDocument, 'sections' | 'priceLines' | 'freightAmount' | 'installationAmount' | 'customCharges' | 'commercialNotes' | 'technicalNotes' | 'contactId' | 'salesOwnerId' | 'salesOwnerName' | 'locationId'>>,
+  patch: Partial<
+    Pick<
+      QuotationDocument,
+      | 'sections'
+      | 'priceLines'
+      | 'freightAmount'
+      | 'installationAmount'
+      | 'customCharges'
+      | 'orderDiscountCalcType'
+      | 'orderDiscountValue'
+      | 'freightCalcType'
+      | 'freightValue'
+      | 'freightIsTaxable'
+      | 'freightTaxRate'
+      | 'installationCalcType'
+      | 'installationValue'
+      | 'installationIsTaxable'
+      | 'installationTaxRate'
+      | 'customChargesCalcType'
+      | 'customChargesValue'
+      | 'customChargesIsTaxable'
+      | 'customChargesTaxRate'
+      | 'commercialNotes'
+      | 'technicalNotes'
+      | 'contactId'
+      | 'salesOwnerId'
+      | 'salesOwnerName'
+      | 'locationId'
+    >
+  >,
 ): Promise<StoreActionResult> {
   return withSubmitLock(lockKey('quotation:doc-update', documentId), async () => {
     try {

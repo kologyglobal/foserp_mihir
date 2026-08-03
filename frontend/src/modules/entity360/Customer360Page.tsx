@@ -12,7 +12,6 @@ import {
   Factory,
   FileText,
   LayoutDashboard,
-  Pencil,
   Plus,
   Receipt,
   ShieldCheck,
@@ -26,10 +25,10 @@ import { Entity360Panel } from '../../components/design-system/Entity360Shell'
 import { DataGrid } from '../../components/design-system/DataGrid'
 import { Timeline } from '../../components/design-system/Timeline'
 import { ActivityFeed } from '../../components/design-system/Timeline'
-import { Customer360Hero } from '../../components/entity360/Customer360Hero'
 import { DynamicsKpiRow, DynamicsKpiTile } from '../../components/dynamics/DynamicsKpiTile'
-import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
 import { ErpButton } from '../../components/erp/ErpButton'
+import { Customer360RecordHeader } from '../../components/crm/Customer360RecordHeader'
+import { Customer360SummaryCard } from '../../components/crm/Customer360SummaryCard'
 import { ActiveBadge, StatusBadge, TypeBadge } from '../../components/ui/StatusBadge'
 import { TableLink } from '../../components/ui/AppLink'
 import { useCustomer360 } from '../../utils/entity360Metrics'
@@ -65,7 +64,7 @@ import { resolveSalesOrderValue } from '../../components/sales/SalesOrder360Sect
 import { getSalesOrderFulfillmentLabel } from '../../utils/salesDashboardMetrics'
 import { useMasterStore } from '../../store/masterStore'
 import { useWorkOrderStore } from '../../store/workOrderStore'
-import { CrmCardFormShell, ENTERPRISE_FORM_DETAIL_CLASS } from '@/components/crm/CrmCardFormShell'
+import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import {
   EnterpriseFormSectionNav,
@@ -87,6 +86,7 @@ import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { useCrmCommercialStore } from '../../store/crmCommercialStore'
 import {
   CRM_TAX_INVOICE_STATUS_LABELS,
+  CRM_INVOICE_PAYMENT_STATUS_LABELS,
   CRM_PAYMENT_MODE_LABELS,
   PROFORMA_PAYMENT_STATUS_LABELS,
 } from '../../types/crmCommercial'
@@ -447,44 +447,8 @@ export function Customer360Page() {
           { label: customer.customerName },
         ]
 
-  const heroStats = [
-    {
-      label: 'Open SO',
-      value: String(data.openSo.length),
-    },
-    {
-      label: 'Pipeline',
-      value: formatCrmCurrency(crmSummary?.pipelineValue ?? 0),
-    },
-    {
-      label: 'Outstanding',
-      value: financeMoneyVisible ? formatCurrency(financeOutstanding) : '—',
-      tone: financeOutstanding > 0 ? ('warning' as const) : ('success' as const),
-    },
-    {
-      label: 'Invoiced',
-      value: financeMoneyVisible ? formatCurrency(financeInvoiced) : '—',
-    },
-    {
-      label: 'Credit days',
-      value: `${customer.creditDays || 0}d`,
-    },
-    {
-      label: 'Contacts',
-      value: String(crmContacts.length),
-    },
-  ]
-
-  const documentStrip = [
-    { label: 'Code', value: customer.customerCode, highlight: true },
-    { label: 'City', value: customer.city ?? '—' },
-    { label: 'Territory', value: customer.salesTerritory ?? '—' },
-    { label: 'Type', value: customer.customerType ?? '—' },
-    { label: 'Contact', value: customer.contactPerson ?? '—' },
-    { label: 'Open SO', value: String(data.openSo.length) },
-    { label: 'Pipeline', value: formatCrmCurrency(crmSummary?.pipelineValue ?? 0) },
-    { label: 'Outstanding', value: financeMoneyVisible ? formatCurrency(financeOutstanding) : '—', highlight: financeOutstanding > 0 },
-  ]
+  const recentFeedPreview = unifiedFeedItems.slice(0, 6)
+  const lastFeedItem = recentFeedPreview[0] ?? null
 
   const statusTone = (() => {
     const tone = companyStatus?.tone
@@ -494,79 +458,33 @@ export function Customer360Page() {
   })()
 
   const commandBar = (
-    <ErpCardCommandBar
-      inline
-      homeActions={[
-        {
-          id: 'new-opp',
-          label: 'New Opportunity',
-          icon: Plus,
-          onClick: () => navigate(`/crm/opportunities/new?customerId=${customer.id}`),
-          primary: true,
-        },
-        {
-          id: 'follow-up',
-          label: 'Quick Follow-up',
-          icon: Calendar,
-          onClick: () => setFollowUpOpen(true),
-        },
-        ...(canCrmPermission('crm.commercial.invoice.create')
-          ? [{
-              id: 'create-invoice',
-              label: 'Create Invoice',
-              icon: Banknote,
-              onClick: () =>
-                navigate(
-                  isServices
-                    ? `/accounting/money-in/invoices/new?customerId=${customer.id}`
-                    : `/sales/invoices/new?customerId=${customer.id}`,
-                ),
-            }]
-          : []),
-      ]}
-      moreActions={[
-        {
-          id: 'edit',
-          label: 'Edit Master',
-          icon: Pencil,
-          onClick: () => navigate(`/masters/companies/${customer.id}/edit`),
-        },
-        {
-          id: 'quotation',
-          label: 'Quotations',
-          icon: FileText,
-          onClick: () => setTab('quotations'),
-        },
-        {
-          id: 'so',
-          label: 'Sales Orders',
-          icon: ShoppingCart,
-          onClick: () => setTab('sales'),
-        },
-        {
-          id: 'dispatch',
-          label: 'Dispatch',
-          icon: Truck,
-          onClick: () => setTab('dispatch'),
-        },
-        {
-          id: 'alloc',
-          label: 'Payment Allocation',
-          icon: ArrowLeftRight,
-          onClick: () =>
-            navigate(
-              isServices
-                ? `/accounting/money-in/customers/${customer.id}`
-                : `/sales/payment-allocation?customerId=${customer.id}`,
-            ),
-        },
-        {
-          id: 'finance',
-          label: 'Outstanding',
-          icon: BarChart3,
-          onClick: () => setTab('outstanding'),
-        },
-      ]}
+    <Customer360RecordHeader
+      customer={customer}
+      favoritePath={favoritePath}
+      status={companyStatus}
+      canCreateInvoice={canCrmPermission('crm.commercial.invoice.create')}
+      onEdit={() => navigate(`/masters/companies/${customer.id}/edit`)}
+      onNewOpportunity={() => navigate(`/crm/opportunities/new?customerId=${customer.id}`)}
+      onScheduleActivity={() => setFollowUpOpen(true)}
+      onLogActivity={() => setLogActivityOpen(true)}
+      onOpenQuotations={() => setTab('quotations')}
+      onOpenSalesOrders={() => setTab('sales')}
+      onOpenDispatch={() => setTab('dispatch')}
+      onOpenOutstanding={() => setTab('outstanding')}
+      onCreateInvoice={() =>
+        navigate(
+          isServices
+            ? `/accounting/money-in/invoices/new?customerId=${customer.id}`
+            : `/sales/invoices/new?customerId=${customer.id}`,
+        )
+      }
+      onPaymentAllocation={() =>
+        navigate(
+          isServices
+            ? `/accounting/money-in/customers/${customer.id}`
+            : `/sales/payment-allocation?customerId=${customer.id}`,
+        )
+      }
     />
   )
 
@@ -627,7 +545,12 @@ export function Customer360Page() {
         navigate(`/masters/companies/${customer.id}/edit`)
       }}
       quickActions={[
-        { id: 'opp', label: 'Opportunity', icon: Plus, onClick: () => navigate(`/crm/opportunities/new?customerId=${customer.id}`) },
+        {
+          id: 'opp',
+          label: 'Opportunity',
+          icon: Target,
+          onClick: () => navigate(`/crm/opportunities/new?customerId=${customer.id}`),
+        },
         { id: 'follow-up', label: 'Follow-up', icon: Calendar, onClick: () => setFollowUpOpen(true) },
         { id: 'crm', label: 'CRM', icon: Activity, onClick: () => setTab('crm') },
         { id: 'sales', label: 'Orders', icon: ShoppingCart, onClick: () => setTab('sales') },
@@ -647,31 +570,54 @@ export function Customer360Page() {
     <>
       <CrmCardFormShell
         title={customer.customerName}
-        description={`${customer.customerCode} · ${customer.city}${customer.salesTerritory ? ` · ${customer.salesTerritory}` : ''}`}
-        badge={COMPANY_TERMINOLOGY.hub360}
-        className={`${ENTERPRISE_FORM_DETAIL_CLASS} enterprise-workspace--crm-smart-overview`}
+        badge="CRM"
+        className={`crm-lead-form-page crm-lead-form-page--sticky-record ${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview`}
         recordTitle={customer.customerName}
         recordNo={customer.customerCode}
         status={companyStatus?.label ?? (customer.isActive ? 'Active' : 'Inactive')}
         statusTone={statusTone}
         company={customer.customerType}
         owner={customer.contactPerson}
+        lastSaved={
+          customer.modifiedAt
+            ? `Last updated ${formatDate(customer.modifiedAt)}`
+            : customer.createdAt
+              ? `Created ${formatDate(customer.createdAt)}`
+              : undefined
+        }
         favoritePath={favoritePath}
         breadcrumbs={breadcrumbs}
         commandBar={commandBar}
-        documentStrip={documentStrip}
         factBox={factBox}
         suppressFactBoxRecord
+        workspaceRecordHeader
         collapsibleFactBox
         factBoxLabel="Smart Context"
         stickyFooter={false}
       >
-        <div className="customer-360-workspace">
-          <Customer360Hero
+        <div className="erp-form-body crm-lead-form-body customer-360-body">
+          {nextCrmFollowUp ? (
+            <div className="dyn-detail-banner">
+              Follow-up due {formatDate(nextCrmFollowUp.dueDate)}
+              {nextCrmFollowUp.assignedToName ? ` · ${nextCrmFollowUp.assignedToName}` : ''}.
+              Contact the company today.
+            </div>
+          ) : null}
+
+          <Customer360SummaryCard
             customer={customer}
             status={companyStatus}
-            stats={heroStats}
-            onEdit={() => navigate(`/masters/companies/${customer.id}/edit`)}
+            openOrders={data.openSo.length}
+            pipelineValue={crmSummary?.pipelineValue ?? 0}
+            outstanding={financeMoneyVisible ? financeOutstanding : null}
+            moneyVisible={financeMoneyVisible}
+            contactCount={crmContacts.length}
+            nextFollowUpDate={nextCrmFollowUp?.dueDate ?? crmSummary?.nextFollowUpDate ?? null}
+            lastActivityAt={lastFeedItem?.at ?? null}
+            lastActivityLabel={lastFeedItem?.title ?? null}
+            recentFeedItems={recentFeedPreview}
+            onLogActivity={canAddActivity ? () => setLogActivityOpen(true) : undefined}
+            onViewAllActivities={() => setTab('crm')}
           />
 
           <EnterpriseFormSectionNav
@@ -683,7 +629,7 @@ export function Customer360Page() {
           <div className="customer-360-tab-panel">
             <div className="customer-360-tab-body">
       {tab === 'overview' && (
-        <div className="customer-360-overview">
+        <div className="customer-360-overview space-y-4">
           {(nextCrmFollowUp || companyStatus?.label) ? (
             <div className="customer-360-insight" role="status">
               <div className="customer-360-insight__copy">
@@ -703,7 +649,7 @@ export function Customer360Page() {
               <Button
                 size="sm"
                 onClick={() => {
-                  if (nextCrmFollowUp || smartNextAction.id === 'follow_up') {
+                  if (smartNextAction.id === 'follow_up') {
                     setFollowUpOpen(true)
                     return
                   }
@@ -714,7 +660,7 @@ export function Customer360Page() {
                   navigate(`/masters/companies/${customer.id}/edit`)
                 }}
               >
-                {nextCrmFollowUp ? 'Open follow-up' : smartNextAction.ctaLabel}
+                {smartNextAction.ctaLabel}
               </Button>
             </div>
           ) : null}
@@ -1268,6 +1214,27 @@ export function Customer360Page() {
                 accessorKey: 'status',
                 header: 'Status',
                 cell: ({ row }) => CRM_TAX_INVOICE_STATUS_LABELS[row.original.status],
+              },
+              {
+                id: 'payment',
+                header: 'Payment',
+                cell: ({ row }) => CRM_INVOICE_PAYMENT_STATUS_LABELS[row.original.paymentStatus],
+              },
+              {
+                id: 'accounting',
+                header: 'Accounting',
+                cell: ({ row }) => {
+                  const status = row.original.accountingStatus ?? 'none'
+                  if (status === 'converted' && row.original.salesInvoiceId) {
+                    return (
+                      <TableLink to={`/accounting/money-in/invoices/${row.original.salesInvoiceId}`}>
+                        {row.original.salesInvoiceNumber || 'Money In'}
+                      </TableLink>
+                    )
+                  }
+                  if (status === 'pending_review') return 'Pending Accounting'
+                  return '—'
+                },
               },
               {
                 id: 'total',

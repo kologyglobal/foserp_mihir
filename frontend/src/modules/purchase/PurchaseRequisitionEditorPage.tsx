@@ -240,6 +240,10 @@ function defaultHeader(opts?: {
     purpose: '',
     remarks: '',
     rfqRequired: !(opts?.skipRfq ?? false),
+    sourceType: '',
+    sourceId: '',
+    sourceDocumentNumber: '',
+    maintenancePartId: '',
   }
 }
 
@@ -335,6 +339,8 @@ export function PurchaseRequisitionEditorPage() {
       searchParams.get('purchasePurpose') ?? searchParams.get('purpose') ?? 'MAINTENANCE spare shortage'
     const remarks = searchParams.get('remarks') ?? searchParams.get('notes') ?? ''
     const ticketRef = searchParams.get('sourceDocumentId') ?? ''
+    const sourceDocumentNumber = searchParams.get('sourceDocumentNumber') ?? ''
+    const maintenancePartId = searchParams.get('maintenancePartId') ?? ''
     setHeader((prev) => ({
       ...prev,
       source: 'maintenance',
@@ -342,6 +348,10 @@ export function PurchaseRequisitionEditorPage() {
       remarks: remarks || prev.remarks,
       maintenanceOrderNo: ticketRef || prev.maintenanceOrderNo,
       referenceNumber: ticketRef || prev.referenceNumber,
+      sourceType: 'MAINTENANCE',
+      sourceId: ticketRef || prev.sourceId,
+      sourceDocumentNumber: sourceDocumentNumber || ticketRef || prev.sourceDocumentNumber,
+      maintenancePartId: maintenancePartId || prev.maintenancePartId,
     }))
   }, [isNew, searchParams])
 
@@ -678,6 +688,10 @@ export function PurchaseRequisitionEditorPage() {
       purpose: header.purpose || null,
       remarks: header.remarks,
       rfqRequired: header.rfqRequired,
+      sourceType: header.sourceType || undefined,
+      sourceId: header.sourceId || undefined,
+      sourceDocumentNumber: header.sourceDocumentNumber || undefined,
+      maintenancePartId: header.maintenancePartId || undefined,
       attachmentPlaceholders: attachments,
       estimatedTaxPct: summary.estimatedTaxPct,
       lines: lines

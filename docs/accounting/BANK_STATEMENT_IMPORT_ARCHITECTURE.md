@@ -1,6 +1,6 @@
-# Bank Statement Import Architecture (Phase 5A2 + MT940/CAMT.053)
+# Bank Statement Import Architecture (Phase 5A2 + MT940/CAMT family)
 
-**Status:** Phase 5A2 complete. Matching / reconciliation = Phase 5A3 (shipped). Structured file ingest (MT940 / CAMT.053) shipped on the same import pipeline.
+**Status:** Phase 5A2 complete. Matching / reconciliation = Phase 5A3 (shipped). Structured file ingest (MT940 / CAMT.052 / CAMT.053 / CAMT.054) shipped on the same import pipeline.
 
 ## Principle
 
@@ -15,21 +15,32 @@ Must **not** create/modify: vouchers, GL entries, `PostingEvent`, receipts, paym
 
 ## Supported formats
 
-| Format | Operational | Column mapping |
-|--------|-------------|----------------|
-| CSV | Yes | Required |
-| XLSX | Yes | Required |
-| MT940 | Yes | Native normaliser (skip mapping UI) |
-| CAMT_053 | Yes | Native normaliser (skip mapping UI) |
-| AUTO_DETECT | Yes | Resolves on upload to CSV / XLSX / MT940 / CAMT_053 |
-| MANUAL | Yes | N/A (manual entry) |
-| BANK_API / PDF | Enum reserved — **not implemented** |
+| Format | Operational | Column mapping | Document type |
+|--------|-------------|----------------|---------------|
+| CSV | Yes | Required | End-of-day |
+| XLSX | Yes | Required | End-of-day |
+| MT940 | Yes | Native normaliser | End-of-day |
+| CAMT_053 | Yes | Native normaliser | End-of-day (canonical) |
+| CAMT_052 | Yes | Native normaliser | Intraday report (**provisional**) |
+| CAMT_054 | Yes | Native normaliser | Debit/credit notification (**provisional**) |
+| AUTO_DETECT | Yes | Resolves on upload | — |
+| MANUAL | Yes | N/A | End-of-day |
+| BANK_API / PDF | Enum reserved — connector uses BANK_API source | — |
 
 ### AUTO_DETECT
 
-1. Extension hints: `.xlsx` → XLSX; `.xml` → CAMT_053; `.sta` / `.mt940` → MT940; `.csv` → CSV; `.txt` → sniff.
-2. Content sniff: MT940 (`:20:` + `:61:` / `:60F:`); CAMT (`camt.053` / `BkToCstmrStmt`); CSV delimiters; XLSX ZIP magic.
-3. Batch stores the **resolved** format (never leaves `AUTO_DETECT` on the row).
+1. Extension hints: `.xlsx` → XLSX; `.xml` → sniff CAMT family (052/053/054); `.sta` / `.mt940` → MT940; `.csv` → CSV; `.txt` → sniff.
+2. Content sniff: MT940 (`:20:` + `:61:` / `:60F:`); CAMT namespace/root (`BkToCstmrStmt` / `BkToCstmrAcctRpt` / `BkToCstmrDbtCdtNtfctn`). Unknown CAMT families are rejected.
+3. Explicit CAMT format must match the detected root.
+4. Batch stores the **resolved** format (never leaves `AUTO_DETECT` on the row).
+
+### Provisional CAMT.052 / .054
+
+- Stored in the same `BankStatement` / `BankStatementLine` tables (`documentType`, `isProvisional`, `hasOpeningBalance` / `hasClosingBalance`).
+- Missing balances store `0` with `has*Balance=false`; UI shows **N/A**; validation skips balance continuity.
+- Later CAMT.053 lines with the same line hash **supersede** unmatched provisional lines (`EXCLUDED` + `supersededByLineId`).
+- If the provisional line already has an active reconciliation match, import raises a blocker requiring unmatch/manual resolution.
+- Excluded/superseded lines are omitted from reconciliation candidates and readiness totals.
 
 ### Structured path
 
@@ -37,7 +48,7 @@ Must **not** create/modify: vouchers, GL entries, `PostingEvent`, receipts, paym
 Upload MT940/CAMT → Inspect (sample lines, no headers) → Preview (native lines) → Import
 ```
 
-Parsers emit `NormalisedStatementHeader` + `NormalisedStatementLine[]` into the existing preview / import / validate / recon pipeline.
+Parsers emit `NormalisedStatementHeader` + `NormalisedStatementLine[]` into the existing preview / import / validate / recon pipeline. Shared helpers live in `bank-statement-camt-common.ts`.
 
 ## Flow (CSV/XLSX)
 
@@ -66,7 +77,10 @@ Select BANK TreasuryAccount
 
 | Deferred | Why | Suggested next phase |
 |----------|-----|----------------------|
-| **Bank APIs / PSD2 / H2H connectors** | No live bank connectivity; file ingest only | Bank & Cash **5D1 — Bank connectors** |
+| **Live TPP AIS download** | Needs production Open Banking TPP registration | Treasury **Live AIS** |
+| Async import workers / huge files | Sync processing only today | Import scale-out |
+| PDF statements | Not in scope for structured parsers | Later |
+
 | **FX / cross-currency treasury transfers** | No FX rate table posting on statement import or transfers | Treasury **FX Phase** (post-5C) |
 | **Intercompany dual-LE transfers** | Cross-entity cash moves need dual posting | Treasury **Intercompany Phase** |
 | CAMT.052 / CAMT.054 | Intraday / debit-credit notification — not statement | With 5D1 if needed |

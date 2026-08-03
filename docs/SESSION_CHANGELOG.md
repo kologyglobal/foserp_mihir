@@ -1,4 +1,4 @@
-﻿## 2026-08-03 — CRM SO/quotation customer-first, Customer 360, document titles
+## 2026-08-03 — CRM SO/quotation customer-first, Customer 360, document titles
 
 ### Shipped
 - Sales order / quotation create: customer first, then filtered open opportunities / unconverted quotations.
@@ -7,7 +7,381 @@
 - Merged with `origin/main` (maintenance, year-end, purchase/inventory packs through 2026-07-30).
 
 ---
-# 2026-07-30 — FIN-CLOSE-1 retro cost + deploy preparation
+
+﻿## 2026-08-03 — Quotation order adjustment charges (flat / % / tax)
+
+### Shipped
+- Shared calc service (keep FE/BE in sync): `orderAdjustmentsCalc.ts` — sequence item subtotal → line disc → taxable → overall discount → freight/install/other → GST → grand total.
+- **% charges** base on discounted taxable (after overall order discount). **Taxable** charges add to GST base; **non-taxable** added after tax (no GST).
+- DB migration `20260803120000_quotation_order_adjustments` + Prisma fields for calc type/value/tax on order discount, freight, installation, other (`customCharges*`).
+- API validation, repository create/update/revision, mapper, SO convert uses `resolveDocumentCharges`.
+- FE: `ErpProductPricingSection` charge editors (type, value, calculated amount, tax applicability); `QuotationLineItemsEditor` + store/API bridge persistence; view/print/commercial summary/`calcPriceSummary`.
+- Tests: `backend/tests/crm/order-adjustments-calc.test.ts` (8 pass); `frontend/src/utils/orderAdjustmentsCalc.test.ts` (2 pass).
+
+### Conditions
+- Run `prisma migrate deploy` + generate before API use. Legacy docs default FLAT, value = prior amount, charges non-taxable.
+- CRM commercial proforma/tax invoices remain line-driven (inherit SO totals, not full adjustment field set on those docs).
+
+---
+
+## 2026-08-03 — CRM Notification System (API-backed, initial release)
+
+### Shipped
+- **DB:** `app_notifications`, `notification_preferences`, `notification_tenant_settings` + Prisma models/enums. Migration `20260803100000_crm_notifications`.
+- **Backend:** `modules/notifications/*` — create (dedupe/escalate/preferences), list, unread-count, summary, mark read/all, resolve, dismiss, snooze; 15‑min due/risk scheduler; tenant SLA settings.
+- **Event wire:** lead assign/convert, activity create/complete, follow-up complete/reschedule, opportunity assign/win/lost/stage, quotation submit/approve/reject.
+- **Jobs:** follow-up due/overdue, unattended leads (business hours), opportunity inactive/stuck/close-date missed, quotation expiring, accepted awaiting SO.
+- **API:** `/api/v1/t/:tenantSlug/notifications/*` (+ preferences).
+- **Frontend:** API-mode bell panel + `/notifications` centre + `/notifications/settings`; polling unread every 60s. Demo mode keeps store-derived ops alerts.
+- **Tests:** `backend/tests/notifications-unit.test.ts` (dedup key, priority rank, SLA time helpers).
+
+### Conditions
+- Migrate deploy required. Email/push channels preference-only (not delivered). Meeting/SO deep integration, daily digest email, and full RBAC matrix for team escalations deferred to next increment. Approver notification for quotes notifies co-owners (no dedicated approver matrix yet).
+
+---
+
+## 2026-08-03 — Standardize overall (header) discount on taxable only
+
+### Shipped
+- **Rule:** Overall / order / invoice discount applies only to **taxable amount** (after line discounts, before tax). GST recomputed on revised taxable. Grand total = (taxable − overall disc) + taxes + non-tax charges. Never discount grand total / tax-inclusive bases.
+- FE SSoT: `frontend/src/utils/opportunityLineCalc.ts` — `computeOverallDiscountAmount`, `applyOverallDiscountToLines`, `calcProductPricingSummary`.
+- Wired: `ErpProductPricingSection`, `SalesOrderCreatePage`, demo `salesStore.createDirectSalesOrder`, purchase `VendorQuotationEditorPage.aggregateTotals` (header disc scales GST).
+- Already correct (verified): quotation `orderAdjustmentsCalc` (FE+BE), AR `allocateInvoiceDiscount` + sales invoice calc, line-level CRM/commercial discounts.
+- Summary UI order: Taxable → Overall discount → Taxable after discount → GST → charges → Grand total; hint “off taxable amount (before GST)”.
+- Tests: `frontend` `npm run test:overall-discount` (PASS); AR case in `finance-ar-calculation.test.ts` (100k @10% → grand 106200).
+
+### Conditions
+- Quotation editor overall discount remains UI-ephemeral unless document adjustments fields are set via API path.
+- Nested legacy `trailer-erp/` tree not in product path — left untouched.
+
+---
+
+## 2026-07-31 — HRMS UI/UX redesign (Zoho People–inspired)
+
+### Shipped
+- Frontend-only redesign of `/hrms/*` toward Zoho People simplicity + FOS CRM language + manufacturing practicality. **No payroll/accounting business-rule changes.**
+- Shared `Hr*` kit: `HrRegisterShell`, `HrKpiStrip`, `HrStatusChip`, `HrEmployeeCell`, `HrApprovalDrawer`, `HrMoneySummary`, `HrTimeline`, `HrStepIndicator`, `HrChecklist`, `HrPayslipDocument`, `HrSmartContext`, `HrExceptionPanel`, `hrStatusLabels` / `hrFormat` + `hrms-ui.css`.
+- Nav regrouped (Overview / People / Time / Leave / Overtime / Payroll / Finance / Exit / Setup / Self-service). New routes: home `/hrms`, employee register + 360 + form, `/hrms/my`, attendance register, salary payments register, HR settings hub.
+- People: Employees register (no bank/salary columns) + Employee 360 lazy tabs + create form without bank/statutory/salary.
+- Time: Attendance exception-first daily register + drawer; roster/shift/holiday polish.
+- Leave / OT: hub with balances + approval drawers; OT KPI + approval workspace.
+- Payroll: guided run step indicator, employee breakdown, payslip document, salary payments list; salary/statutory setup readable.
+- Loans / Exit / F&F: money summary + recovery timeline; exit progress + clearance checklist; F&F net settlement.
+- Docs: `docs/hrms/HRMS_UI_UX_REDESIGN.md`. FE `tsc -b --noEmit` PASS.
+
+### Conditions / stop
+- Manual SPA UAT (checklist in redesign doc); live screenshots not captured this pass.
+- Remaining polish: unify leftover transactional slide-ins to `HrApprovalDrawer`; dedicated Leave Approvals nav item; My HR linked-employee resolver.
+- **Verdict: HRMS UI/UX READY WITH CONDITIONS.** Do not start recruitment/ATS/performance/LMS without approval.
+
+---
+
+## 2026-07-31 — HRMS Phase 11 Exit & Full/Final Settlement
+
+### Shipped
+- Models: `HrExitClearanceTemplate`, `HrEmployeeExit`, `HrExitClearanceItem`, `HrExitClearanceLine`, `HrExitAssetLine`, `HrFullFinalSettlement`, `HrFnfComponent`. Migration `20260731060000_hrms_phase11_exit_fnf`; CodeSeries `EXIT-` / `FNF-`; mapping keys `EMPLOYEE_FNF_PAYABLE` / `EMPLOYEE_FNF_RECEIVABLE` (+ reuses existing `SALARY_BASIC_EXPENSE`, `LEAVE_ENCASHMENT_EXPENSE`, `NOTICE_PAY_EXPENSE`, `NOTICE_RECOVERY_INCOME`, `ASSET_RECOVERY_INCOME`, `EMPLOYEE_LOAN_RECEIVABLE`, `SALARY_ADVANCE_RECEIVABLE`).
+- Exit lifecycle `create→submit→approve→(auto clearance seed)→clearance/asset resolution→READY_FOR_SETTLEMENT→CLOSED`; self-approval always blocked; cancel reverts employee `ON_NOTICE→ACTIVE`; `notice.util.ts#computeNotice` reconciles served/shortfall/excess notice days (no resignation date ⇒ full requirement is shortfall).
+- `exit-clearance.service.ts`: 6-line checklist auto-seed (IT/Admin/Stores/Finance/HR/Department), clear/waive (waive requires a reason), asset lines (add/update/remove/status), `recomputeReadiness` auto-transition.
+- `fnf-calc.service.ts#calculateSettlement`: pending salary (via `computePaidDaysBreakdown`), leave encashment (`fnfSettlementAction=ENCASH` types), notice pay/recovery, loan/advance outstanding snapshot, asset non-return recovery; BLOCKER (`NO_SALARY_ASSIGNMENT`)/WARNING exceptions; always replaces components on recalculate.
+- `fnf.service.ts`: review→approve (`422 FNF_BLOCKERS_UNRESOLVED` if blockers open)→post (shared `post()`, no `partyType: EMPLOYEE` — posts directly to the payable/receivable control account; payable or receivable by net sign; **negative net auto-completes the exit at post**, no pay step)→pay (`422 AMOUNT_RECOVERABLE` for net ≤ 0). Idempotent post.
+- Perms `hrms.exit.view|create|approve|clearance`, `hrms.fnf.view|calculate|approve|post|pay`; routes + Swagger; FE `/hrms/exits*`, `/hrms/fnf*`.
+- Tests `hrms-phase11-exit-fnf.test.ts` (7 unit `computeNotice` PASS + 11 live gated on migrate); docs `HRMS_PHASE11_EXIT_FNF.md`, `HRMS_FNF_CALCULATION.md`, `HRMS_PHASE11_UAT.md`, `HRMS_PHASE11_TEST_RESULTS.md`, `HRMS_PHASE11_PERMISSION_MATRIX.md`.
+
+### Conditions / stop
+- Migrate deploy (`20260731060000_hrms_phase11_exit_fnf`) + `db:sync-permissions` + vitest live (11 skipped this session — no DB) + UAT per `HRMS_PHASE11_UAT.md`.
+- Do **not** start recruitment, ATS, performance management, LMS, or employee self-service portal filing without approval.
+
+---
+
+## 2026-07-31 — HRMS Phase 10 Employee Loans & Salary Advances
+
+### Shipped
+- Models: `HrEmployeeLoan`, `HrLoanRecoverySchedule`, `HrLoanRepayment`. Migration `20260731050000_hrms_phase10_loans_advances`; mapping keys `EMPLOYEE_LOAN_RECEIVABLE` / `SALARY_ADVANCE_RECEIVABLE`; CodeSeries `LN-` / `ADV-`.
+- Lifecycle + GL disburse/repay via shared `post()` (party snapshot only — no blocked `partyType: EMPLOYEE`); payroll calc appends `LOAN_RECOVERY`/`ADVANCE_RECOVERY`; finalize confirms schedules; accrual buckets credit receivables.
+- Perms `hrms.loan.view|create|approve|disburse|manage|repayment`; FE `/hrms/loans*`, `/hrms/my-loans`; payroll panel source codes.
+- Tests `hrms-phase10-loans-advances.test.ts` (5 unit PASS + live gated on migrate); docs `HRMS_PHASE10_*`.
+
+### Conditions / stop
+- Migrate deploy + `db:sync-permissions` + vitest live + UAT.
+- Do **not** start interest products, F&F offset, portal filing, or performance management without approval.
+
+---
+
+## 2026-07-31 — HRMS Phase 9 Payslip, Payroll Accounting & Salary Payment
+
+### Shipped
+- Models: `HrPayslip` (immutable snapshot); `HrPayrollRun` extended with `accountingStatus`/`accountingVoucherId`/`postingEventId`/`payslipGeneratedAt`/`paymentStatus`; `HrSalaryPaymentBatch`, `HrSalaryPaymentLine`.
+- Migration `20260731040000_hrms_phase9_payslip_accounting_payment`; 16 new `DefaultAccountMappingKey` values (SALARY_*, PF/ESIC/PT/TDS/LWF payable/expense).
+- `payslip.service.ts` (generate/list/get/HTML, snapshot never re-derived); `payroll-accounting.service.ts` (`buildPayrollAccrualBuckets` + `postPayrollAccounting` via shared `post()` engine, `MISSING_PAYROLL_ACCOUNT_MAPPING` guard); `salary-payment.service.ts` (batch DRAFT→READY→APPROVED→PAID, bank validation, duplicate-payment guard, CSV export, settlement voucher).
+- Perms `hrms.payslip.view|generate`, `hrms.payroll.accounting.view|post`, `hrms.salary_payment.view|create|approve|confirm|export`; routes + Swagger.
+- FE: `/hrms/payroll/payslips`, PayrollRunDetail Accounting/Payments tabs, `/hrms/payroll/my-payslips`; PDF via server HTML + `downloadElementAsPdf`.
+- Tests `hrms-phase9-payslip-accounting-payment.test.ts` (4 unit PASS + 9 live skipped pending migrate); docs `HRMS_PHASE9_*`, `HRMS_PAYROLL_ACCOUNTING.md`, `HRMS_SALARY_PAYMENT.md`. BE/FE typecheck clean.
+
+### Conditions / stop
+- Migrate deploy (`20260731040000_hrms_phase9_payslip_accounting_payment`) + `db:sync-permissions` + vitest live (9 skipped until migrate) + UAT A–M.
+- Do **not** start EPFO/ESIC/TRACES portal filing, Form 16/24Q, live bank payment APIs, full & final settlement, loans, recruitment, or performance management without approval.
+
+---
+
+## 2026-07-31 — HRMS Phase 8 Statutory (PF/ESIC/PT/TDS/LWF)
+
+### Shipped
+- Models: `HrStatutoryRule`, `HrStatutoryWageBasisLine`, `HrStatutoryPtSlab`; extended `HrEmployeeStatutoryDetail` applicability + TDS override fields.
+- Migration `20260731030000_hrms_phase8_statutory`; APIs under `/hrms/statutory/*`; `getEffectiveStatutoryRule` + payroll calc integration; registers JSON/CSV.
+- Perms `hrms.statutory.view|manage|override|reports`; FE `/hrms/payroll/statutory` + `/hrms/payroll/statutory/:kind`.
+- Tests `hrms-phase8-statutory.test.ts`; docs `HRMS_PHASE8_*`, `HRMS_STATUTORY_RULE_ENGINE.md`.
+
+### Conditions / stop
+- Migrate deploy + `db:sync-permissions` + vitest live + BE/FE typecheck + UAT A–J.
+- Do **not** start portal filing / Form 16 / payroll GL / payslip PDF / F&F without approval.
+
+---
+
+## 2026-07-31 — HRMS Phase 7 Payroll Run & Calculation
+
+### Shipped
+- Models: `HrPayrollPeriod`, `HrPayrollRun`, `HrPayrollEmployeeResult`, `HrPayrollComponentResult`, `HrPayrollException`.
+- Migration `20260731010000_hrms_phase7_payroll`; APIs under `/hrms/payroll/*`; paid-days + prorated FIXED/PERCENTAGE/OT_LINKED/LOP; review/finalize lifecycle.
+- Perms `hrms.payroll.view|create|calculate|review|finalize`; FE `/hrms/payroll/runs` + run detail.
+- Tests `hrms-phase7-payroll.test.ts`; docs `HRMS_PHASE7_*`, `HRMS_PAYROLL_CALCULATION.md`.
+
+### Conditions / stop
+- Migrate deploy + `db:sync-permissions` + vitest live + BE/FE typecheck.
+- Do **not** start statutory engine / payslip PDF / payroll GL / loans without approval.
+
+---
+
+## 2026-07-31 — Bank hardening (distributed cron lock + CAMT.052/.054)
+
+### Shipped
+- MySQL sync lease on `BankConnector` (`syncLockUntil` / `syncLockToken`); wraps manual + scheduled sync; heartbeat; `409 BANK_CONNECTOR_SYNC_IN_PROGRESS`.
+- CAMT.052 / CAMT.054 parsers via shared `bank-statement-camt-common.ts`; format detect no longer defaults all `.xml` to 053.
+- Provisional document semantics + 053 supersession of unmatched provisional lines; matched provisional blocks auto-supersede.
+- FE: import/connector format options, document badge, N/A balances, provisional/superseded flags, Sync disable while leased.
+- Migration `20260731020000_finance_bank_hardening`; tests `finance-bank-hardening.test.ts`.
+
+### Conditions / stop
+- Deploy migrate on all envs before enabling multi-instance cron.
+- Do **not** start live TPP AIS / Treasury FX / intercompany without approval.
+
+---
+
+## 2026-07-30 — HRMS Phase 6 Salary Components + Structures
+
+### Shipped
+- Models: `HrSalaryComponent`, `HrSalaryStructure`, `HrSalaryStructureVersion`, `HrSalaryStructureLine`, `HrEmployeeSalaryAssignment`.
+- Migration `20260730280000_hrms_phase6_salary_structure`; APIs under `/hrms/salary/*`; `getEffectiveSalaryStructure` + config preview (not payroll).
+- Perms `hrms.salary.component|structure|assignment.view|manage`; FE `/hrms/payroll/setup/components|structures` + employee Salary section.
+- Tests `hrms-phase6-salary-structure.test.ts`; docs `HRMS_PHASE6_*`.
+
+### Conditions / stop
+- Migrate deploy + `db:sync-permissions` + vitest live + BE/FE typecheck.
+- Do **not** start Payroll run / payslip / PF/ESIC/PT/TDS calc / payroll accounting / loans without approval.
+
+---
+
+## 2026-07-30 — HRMS Phase 5 Overtime
+
+### Shipped
+- `HrOvertimePolicy` / `HrOvertimeRecord`; attendance worked-time fields; detect → eligible → approve; punch/finalize hooks; bulk approve/reject; monthly summary.
+- Migration `20260730270000_hrms_phase5_overtime`; perms `hrms.overtime.*`; FE `/hrms/overtime`; tests `hrms-phase5-overtime.test.ts` (9/9 live); docs `HRMS_PHASE5_*`.
+
+### Conditions / stop
+- `db:sync-permissions` on all envs; FE typecheck/build confirm; UAT A–I.
+- Do **not** start Payroll / PF/ESIC/PT/TDS / loans without approval.
+
+---
+
+## 2026-07-30 — HRMS Phase 4 Leave + Attendance Sync
+
+### Shipped
+- Leave approve/cancel syncs `HrAttendanceDay` (`LEAVE` / `HALF_DAY`); punches immutable; `HrAttendanceException` on punch-on-leave.
+- Minimal attendance APIs: `/hrms/attendance/days|exceptions|punches`; `approvedByEmployeeId` on leave request; controlled `/leave/balances/accrue`.
+- Migration `20260730260000_hrms_phase4_leave_attendance_sync`; perms `hrms.attendance.view|manage`; tests `hrms-phase4-leave.test.ts`; docs `HRMS_PHASE4_*`.
+
+### Conditions / stop
+- Migrate deploy (leave + phase4) + `db:sync-permissions` + vitest.
+- Do **not** start OT / Payroll / full biometric Attendance product without approval.
+
+---
+
+## 2026-07-30 — HRMS Phase 3 Leave Management
+
+### Shipped
+- Schema + migration `20260730250000_hrms_phase3_leave`: leave types, policies, balances/adjustments, requests (draft→submit→approve/reject/cancel).
+- Day calc via Phase 2 `getEffectiveShift` / `getHoliday` + policy holiday/weekly-off exclusion; half-day 0.5; overlap block; balance pending/used.
+- APIs under `/hrms/leave/*` including `approved-days` attendance hook (no fake attendance).
+- Permissions `hrms.leave.*`; FE `/hrms/leave`, requests, balances, types, apply; OpenAPI stubs; docs `HRMS_PHASE3_*`.
+
+### Conditions / stop
+- Migrate deploy + `db:sync-permissions` + vitest Phase 3 (+ 1–2 regression) + BE/FE typecheck.
+- Do **not** start Attendance / OT / Payroll without approval.
+
+---
+
+## 2026-07-30 — HRMS Phase 2 Shift / Holiday / Roster
+
+### Shipped
+- Schema + migration `20260730240000_hrms_phase2_shift_roster`: shift templates (overnight), holiday calendars/days, roster assignments; `defaultShiftId` / `weeklyOffDay` on employees.
+- Canonical `getEffectiveShift` / `getHoliday`; APIs under `/hrms/shifts|holidays|roster`; permissions `hrms.shift|holiday|roster.*`.
+- FE routes + nav HRMS; docs under `docs/hrms/HRMS_PHASE2_*`.
+
+### Conditions / stop
+- Migrate deploy + `db:sync-permissions` + vitest Phase 2 + typechecks.
+- Do **not** start Attendance (Phase 3) without approval.
+
+---
+
+## 2026-07-30 — Period Close FX revaluation
+
+### Shipped
+- Schema/migration `20260730220000_finance_fx_revaluation`: `FxExchangeRate`, `FxRevaluationRun` / `Line`; mapping keys `UNREALIZED_FX_GAIN` / `UNREALIZED_FX_LOSS`.
+- API under `/accounting/period-close/fx-revaluation`: rates upsert, period preview, post SYSTEM journal, reverse into next period.
+- Gate: `MULTI_CURRENCY`; AR/AP foreign open items; party-tagged control lines; open-item base amount/rate update on post.
+- Permissions `finance.fx_revaluation.*` synced; FE dual-mode Period Close FX screen (preview/post/reverse in API mode).
+- Live suite `tests/finance/finance-fx-revaluation.test.ts` **4/4 PASS**.
+- Doc: [`docs/accounting/PERIOD_CLOSE_FX_REVALUATION.md`](accounting/PERIOD_CLOSE_FX_REVALUATION.md).
+
+### Conditions
+- Hostinger: migrate deploy + `db:sync-permissions`; map unrealized FX accounts; enable MULTI_CURRENCY per LE.
+- Still deferred: Treasury FX transfers, intercompany, live bank FX, realized FX on allocation.
+
+### Ops note
+- Cleared stuck `20260730200000_maintenance_v11_machine_health` (duplicate columns already present) via `migrate resolve --applied` so FX deploy could proceed.
+
+---
+
+## 2026-07-30 — HRMS Phase 0 repository audit
+
+### Shipped
+- Mandatory pre-build audit: Admin/IAM, Masters, Manufacturing, Accounting, Platform reuse vs gaps.
+- Doc: [`docs/hrms/HRMS_REPOSITORY_AUDIT.md`](hrms/HRMS_REPOSITORY_AUDIT.md).
+- Decisions: reuse LegalEntity / Branch / IAM Department / User (optional link) / CodeSeries / AuditLog / posting engine / LE·Branch scope helpers; **new** `HrEmployee` domain (User ≠ Employee); no HR models/APIs/UI created yet.
+- Module flag `hrms`, `hrms.*` permissions, salary mapping keys, Shift/Attendance/Payroll — deferred to later phases.
+
+### Conditions
+- Do **not** start Phase 1 until explicit approval.
+- Manufacturing soft `employeeId` / `shiftCode` remain placeholders until Phases 2 / 11.
+
+---
+
+## 2026-07-30 — Maintenance V2 Preventive Maintenance
+
+### Shipped
+- Schema/migration `20260730210000_maintenance_v2_preventive`: PM plans, checklist templates, ticket checklist execution, `PREVENTIVE` source + plan link.
+- Code series `PREVENTIVE_MAINTENANCE_PLAN` (`PM-`).
+- APIs: CRUD plans, create-ticket, deactivate, machine plans, PM compliance report; dashboard PM due KPIs.
+- Ticket close recalculates `lastCompletedDate` / `nextDueDate`; duplicate open PM blocked; deactivated plans blocked; PM create does not auto DOWN machine.
+- FE: Preventive list/new/detail, nav, dashboard PM strip, history kind + PM summary, reports PM Compliance, ticket checklist UI.
+- Harness: `scripts/test-maintenance-v2.ts`. Doc: `docs/maintenance/MAINTENANCE_V2_PREVENTIVE.md`.
+
+### Conditions
+- Migrate deploy + run V2 harness (+ V1/V1.1 regression) on MySQL before READY.
+
+---
+
+## 2026-07-30 — Maintenance V1.1 Machine Health & management hardening
+
+### Shipped
+- Schema/migration `20260730200000_maintenance_v11_machine_health`: `SAFETY` failure category; `rootCause` / `repairAction` / `repairEndedAt`; PR `sourceType` / `sourceId` / `sourceDocumentNumber`.
+- Machine Health read model API (`GET /maintenance/machine-health`, detail) + FE `/maintenance/machine-health`.
+- Repeat breakdown (≥3 in 30d → ATTENTION); automatic downtime/repair-time labels; TEST PASS sets `repairEndedAt`; close requires PASS.
+- Manufacturing active-ticket banner (My Work + WO detail); PR create stamps MAINTENANCE source + links `MaintenancePart.purchaseRequisitionId`.
+- Dashboard month downtime/cost KPIs; reports: contractor performance + production impact; history columns expanded.
+- Docs under `docs/maintenance/`; harness `scripts/test-maintenance-v11.ts`.
+
+### Conditions
+- Deploy migration + run V1 + V1.1 harnesses against MySQL before READY.
+- Deferred: PM scheduler, calendar, AMC, warranty, calibration, IoT, OEE, predictive AI, CAPA/FMEA.
+
+---
+
+## 2026-07-30 — Period Close calendar + reopen-request approval
+
+### Shipped
+- Schema + migration `20260730200000_finance_period_close_calendar_reopen`: checklist templates, period tasks, calendar events, reopen requests + audit events.
+- Module `period-close-ops/` under `/accounting/period-close` — instantiate templates, generate calendar, reopen request draft→submit→approve/reject (approve reopens period via existing `reopenPeriod`).
+- Permissions `finance.period.reopen_request` + `finance.period.reopen_approve` (direct `finance.period.reopen` kept for emergency).
+- FE dual-mode: Close Calendar, Reopen Requests, Setup templates; demo seed unchanged.
+- Docs: `PERIOD_CLOSE_CALENDAR_REOPEN.md`.
+
+### Evidence
+- Backend `npm run typecheck` — **PASS**; frontend `tsc -p tsconfig.app.json` — **PASS**
+- Migration `20260730200000_finance_period_close_calendar_reopen` applied locally
+- `db:sync-permissions` granted `finance.period.reopen_request` + `finance.period.reopen_approve`
+- Live suite `tests/finance/finance-period-close-calendar-reopen.test.ts` — **4/4 PASS**
+- Note: sibling migrate `20260730200000_maintenance_v11_machine_health` failed with duplicate `repairEndedAt` (pre-existing); mark resolved separately if deploy is stuck
+
+---
+
+## 2026-07-30 — Period-end accruals + prepaid (finance deferred phase)
+
+### Shipped
+- Greenfield module `backend/src/modules/accounting/period-adjustments/` — draft → ready → post → reverse (accruals) and prepaid amortisation schedules with per-period recognition.
+- Schema + migration `20260730190000_finance_period_end_adjustments` (`PeriodEndAdjustment` / `PeriodEndAdjustmentSchedule`); default mapping keys `ACCRUED_EXPENSE_LIABILITY`, `PREPAID_EXPENSE_ASSET`.
+- Permissions `finance.period_adjustment.view|manage|post|reverse`.
+- FE dual-mode: Period Close Accruals/Prepaid pages call live API when `VITE_USE_API=true`; demo seed unchanged.
+- Docs: `PERIOD_END_ADJUSTMENTS.md`, updates to `PERIOD_CLOSE_STATUS.md` / `REMAINING_WORK.md`.
+
+### Still deferred (explicit)
+- Live TPP AIS (external bank credentials), Treasury FX, Intercompany, close calendar / reopen-request, cheque print.
+
+### Evidence
+- Backend `npm run typecheck` — **PASS**; frontend `tsc -p tsconfig.app.json` — **PASS**
+- Migration `20260730190000_finance_period_end_adjustments` applied locally; `db:sync-permissions` granted `finance.period_adjustment.*`
+- Live suite `tests/finance/finance-period-end-adjustments.test.ts` — **4/4 PASS**
+
+---
+
+## 2026-07-30 — Unstable Zustand selectors ("Maximum update depth exceeded")
+
+### Fixed
+- `SerialGenealogyPanel` ran `.filter()` inside its `useSerialStore` selector, so every snapshot read allocated a new array. Under Zustand v5 (selector feeds straight into `useSyncExternalStore`, `Object.is` comparison) that re-renders forever. The `trailerNo` filter moved to a `useMemo`; the selector now returns the store's memoized array. Affected every consumer: Item/Vendor/Customer 360, WorkOrder 360, job work, dispatch, invoice, and quality pages.
+- `dispatchStore.getDispatch()` and `qualityStore.getInspection()` returned `normalizeDispatch()` / `normalizeInspection()` output — a fresh object per call — so selectors reading them looped too. Both now go through `memoizedOnSource`, matching the pattern already used by `listSerials` / `getByKind` / `listRequests`.
+- The Item 360 crash only surfaced today because `/masters/items` had been failing with `P2022 ColumnNotFound`; once masters hydrated again the page got past its "Item not found" guard and mounted the panel for the first time.
+- Pre-existing typecheck break: `CrmPendingInvoicesPage` passed a `label` prop that `LoadingState` does not accept.
+- `test:serial-genealogy` was missing `--tsconfig tsconfig.app.json` and could not resolve `@/` aliases, so it never ran.
+
+### Guardrail
+- `frontend/scripts/scan-unstable-store-selectors.mjs` (`npm run test:store-selectors`, now first in `npm test`) flags selectors that allocate: trailing `.filter/.map/.sort/.slice/...`, array/object literals, `?? []` fallbacks, and store getters that build new values. Getter resolution is scoped per store hook, since names like `getRequest` exist in several stores.
+
+### Evidence
+- `npm run test:store-selectors` — **0 HARD, 0 CHECK** (verified non-vacuous against three synthetic bad selectors)
+- Frontend `npm run typecheck` — **PASS**; `oxlint` on changed files — **PASS**
+- `npm run test:serial-genealogy` — **14/14 PASS**; `npm run test:dispatch` — **17/17 PASS**
+- `npm run test:quality` — 26 passed / 2 failed; identical result with `qualityStore.ts` stashed, so those two are pre-existing.
+
+---
+
+## 2026-07-30 — List `limit` contract fix (Machine History "Validation failed")
+
+### Fixed
+- Shared `paginationSchema` capped `limit` at 100 while many pages requested 200, so every such list returned `Validation failed` and rendered an empty state. Raised the shared cap to 200 (already the per-module cap in costing, WIP movements, corrections, store workbench, QC kiosk).
+- Maintenance → Machine History / Reports / Report Breakdown and Routing Detail now load machines through `listAllMachines()`, which walks pages instead of asking for one oversized page (also removes silent truncation past the cap).
+- Live inventory items loaded balances with `limit: 500`; now paginated.
+- Typecheck fix in the CRM bridge reversal sync (`invoiceId` is nullable on allocation lines).
+
+### Evidence
+- Frontend `tsc --noEmit` — **PASS**; backend `tsc --noEmit` — **PASS**
+- `tests/crm-tax-invoice-ar-bridge.test.ts` — **2/2 PASS** (previously skipped, MySQL now reachable)
+- Full backend `vitest run` — 1325 passed / 47 failed; the failures reproduce identically with these changes stashed, so they are pre-existing (schema drift in manufacturing settings, sales-order item eligibility, AR master reuse).
+
+---
+
+## 2026-07-30 — CRM Tax Invoice → Money In bridge
+
+### Shipped
+- Schema: `SalesInvoiceSourceType.CRM_TAX_INVOICE`; CRM `accountingStatus` / `salesInvoiceId` / creator snapshot; migration backfills posted CRM invoices to `pending_review`.
+- CRM post → Accounting review queue; Money In `/accounting/money-in/crm-pending` → Convert → `/invoices/new` prefill; SI create links CRM invoice.
+- AR receipt allocation (+ reverse) syncs payment status back to CRM tax invoice (Sales + Customer 360).
+- Doc: `docs/accounting/CRM_TAX_INVOICE_MONEY_IN_BRIDGE.md`.
+
+### Ops
+- Deploy migration `20260730160000_crm_tax_invoice_ar_bridge` on stage (`npx tsx scripts/prisma-cli.ts migrate deploy`).
+
+---
+
+## 2026-07-30 — FIN-CLOSE-1 retro cost + deploy preparation
 
 ### Shipped
 - GRN-linked Vendor Invoice price delta now splits between remaining inventory value and PPV through the existing Inventory Costing engine.

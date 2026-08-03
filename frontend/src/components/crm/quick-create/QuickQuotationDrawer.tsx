@@ -13,7 +13,6 @@ import { filterAllowedQuotationTemplates } from '../../../utils/quotationEngine/
 import { CrmDrawerShell } from '../CrmDrawerShell'
 import { FormField } from '../../forms/FormField'
 import { Input, Select } from '../../forms/Inputs'
-import { Button } from '../../ui/Button'
 import { ErpButton, ErpButtonGroup } from '../../erp/ErpButton'
 import { SELECT_PLACEHOLDER } from '../../forms/selectStandards'
 
@@ -135,15 +134,23 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
     <CrmDrawerShell
       open={open}
       placement="modal"
+      size="lg"
+      icon={FileText}
+      accent="primary"
       title="Quick Quotation"
       subtitle="Customer + one line — open the full editor for sections and revisions"
       onClose={onClose}
-      width="lg"
+      closeDisabled={submitting}
       footer={
         savedIds ? null : (
-          <Button type="submit" form="crm-quick-quote-form" className="w-full" disabled={submitting}>
-            {submitting ? 'Creating…' : 'Create Draft Quote'}
-          </Button>
+          <div className="crm-popup-footer__actions">
+            <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+              Cancel
+            </ErpButton>
+            <ErpButton type="submit" form="crm-quick-quote-form" variant="primary" disabled={submitting}>
+              {submitting ? 'Creating…' : 'Create Draft Quote'}
+            </ErpButton>
+          </div>
         )
       }
     >

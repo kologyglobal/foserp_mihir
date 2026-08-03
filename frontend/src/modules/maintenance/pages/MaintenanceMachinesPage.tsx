@@ -7,7 +7,7 @@ import { StatusDot } from '@/components/design-system/StatusDot'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { Input } from '@/components/forms/Inputs'
-import { listMachines } from '@/services/api/manufacturingApi'
+import { listAllMachines } from '@/services/api/manufacturingApi'
 import { notify } from '@/store/toastStore'
 import type { Machine } from '@/types/manufacturingSetup'
 import { MAINTENANCE_BREADCRUMB } from '../maintenanceUi'
@@ -21,8 +21,7 @@ export function MaintenanceMachinesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await listMachines({ limit: 200, isActive: true })
-      setRows(res.data)
+      setRows(await listAllMachines({ isActive: true }))
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load machines')
       setRows([])

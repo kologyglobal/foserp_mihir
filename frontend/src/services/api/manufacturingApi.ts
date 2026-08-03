@@ -136,6 +136,22 @@ export async function listMachines(params?: Record<string, string | number | boo
   return apiRequest<Machine[]>(`${tenantPath('/manufacturing/machines')}${buildQuery(params)}`)
 }
 
+/** Lookup helper for machine pickers — the API caps page size, so walk the pages. */
+export async function listAllMachines(
+  params?: Record<string, string | number | boolean | undefined>,
+): Promise<Machine[]> {
+  const all: Machine[] = []
+  let page = 1
+  for (;;) {
+    const res = await listMachines({ ...params, page, limit: 100 })
+    all.push(...(res.data ?? []))
+    if (!res.meta || page >= res.meta.totalPages) break
+    page += 1
+    if (page > 50) break
+  }
+  return all
+}
+
 export async function getMachine(id: string) {
   return apiRequest<Machine>(tenantPath(`/manufacturing/machines/${id}`))
 }

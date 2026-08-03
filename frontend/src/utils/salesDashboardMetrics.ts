@@ -330,7 +330,11 @@ export function sortSalesOrders(
       sorted.sort((a, b) => resolveValue(b) - resolveValue(a))
       break
     case 'customer':
-      sorted.sort((a, b) => resolveCustomerName(a.customerId).localeCompare(resolveCustomerName(b.customerId)))
+      sorted.sort((a, b) => {
+        const an = a.customerName?.trim() || resolveCustomerName(a.customerId)
+        const bn = b.customerName?.trim() || resolveCustomerName(b.customerId)
+        return an.localeCompare(bn)
+      })
       break
     case 'status':
       sorted.sort((a, b) => statusRank(a.status) - statusRank(b.status))

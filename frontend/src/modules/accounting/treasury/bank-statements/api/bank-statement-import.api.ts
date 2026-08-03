@@ -14,7 +14,7 @@ function unwrap<T>(res: { data: T }): T {
 
 export async function uploadImportBatch(input: {
   treasuryAccountId: string
-  importFormat: 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'AUTO_DETECT'
+  importFormat: 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054' | 'AUTO_DETECT'
   mappingTemplateId?: string
   file: File
 }): Promise<ImportBatchDto> {

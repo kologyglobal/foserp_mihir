@@ -23,7 +23,7 @@ import { QuotationApprovalPanel } from './QuotationApprovalPanel'
 import { QuotationRevisionHistory } from './QuotationRevisionHistory'
 import { QuotationDataSourcePanel } from './QuotationDataSourcePanel'
 import { quotationStatusLabel, quotationStatusTone } from './QuotationCrmCard'
-import { quotationRevisionLabel } from './Quotation360Sections'
+import { quotationRevisionLabel, quotationNoWithRevision } from './Quotation360Sections'
 import { resolveQuotationRevisionPolicy } from '../../utils/quotationRevisionPolicy'
 import { LiveStatusBadge } from '../premium/LiveStatusBadge'
 import { DocumentFooterActions } from '../../design-system'
@@ -220,7 +220,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
 
   function handlePrice(
     lines: QuotationPriceLine[],
-    extras: { freightAmount: number; installationAmount: number; customCharges: number },
+    extras: import('./QuotationLineItemsEditor').QuotationLineExtras,
   ) {
     updatePriceTable(documentId, lines, extras)
     flashSaved()
@@ -358,7 +358,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
       <DynamicsKpiRow columns={5}>
         <DynamicsKpiTile label="Grand Total" value={formatCrmCurrency(doc.totalAmount)} tone="primary" />
         <DynamicsKpiTile label="Completion" value={`${completion.complete}/${completion.total}`} tone={completion.missing.length ? 'warning' : 'success'} />
-        <DynamicsKpiTile label="Revision" value={`R${doc.revisionNo}`} tone="neutral" helper={doc.revisionReason ?? 'Current document'} />
+        <DynamicsKpiTile label="Revision" value={quotationRevisionLabel(doc.revisionNo)} tone="neutral" helper={doc.revisionReason ?? 'Current document'} />
         <DynamicsKpiTile label="Sections" value={doc.sections.length} tone="neutral" />
         <DynamicsKpiTile label="Max Discount" value={`${maxDiscount}%`} tone={maxDiscount > 10 ? 'warning' : 'neutral'} helper={doc.salesOwnerName ?? 'Unassigned'} />
       </DynamicsKpiRow>
@@ -415,15 +415,15 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                 <p className="quo-editor-document__eyebrow">Quotation document</p>
                 <h2 className="quo-editor-document__title">{customer?.customerName ?? 'Customer quotation'}</h2>
                 <p className="quo-editor-document__meta">
-                  {quotation.quotationNo} · Rev {doc.revisionNo}
+                  {quotationNoWithRevision(quotation.quotationNo, doc.revisionNo)}
                   {quotation.validityDate ? ` · Valid till ${formatDate(quotation.validityDate)}` : ''}
                 </p>
               </div>
               <DynamicsStatusChip label={locked ? 'Locked' : 'Editable'} tone={locked ? 'warning' : 'success'} />
             </header>
 
-            <section className="quo-editor-commercial-fields" aria-label="Commercial terms">
-              <p className="quo-editor-outline__title">Commercial</p>
+            <section className="quo-editor-commercial-fields" aria-label="General">
+              <p className="quo-editor-outline__title">General</p>
               <ErpFormGrid columns={2} dense>
                 <ErpFieldRow
                   label="Client / Company"
@@ -440,7 +440,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                 <ErpFieldRow label="Quotation date" readOnly>
                   <Input type="date" value={quotationDate} readOnly className="erp-input" />
                 </ErpFieldRow>
-                <ErpFieldRow label="Valid until" required>
+                <ErpFieldRow label="Valid Until" required>
                   <Input
                     type="date"
                     value={validUntil}
@@ -449,7 +449,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                     className="erp-input"
                   />
                 </ErpFieldRow>
-                <ErpFieldRow label="Validity period">
+                <ErpFieldRow label="Validity Period">
                   <Select
                     native
                     value={validityPeriodValue}
@@ -469,6 +469,12 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                 <ErpFieldRow label="Currency" readOnly>
                   <Input value="INR" readOnly className="erp-input" />
                 </ErpFieldRow>
+              </ErpFormGrid>
+            </section>
+
+            <section className="quo-editor-commercial-fields" aria-label="Commercial terms">
+              <p className="quo-editor-outline__title">Commercial</p>
+              <ErpFormGrid columns={2} dense>
                 <ErpFieldRow label="Payment terms" required colSpan={2}>
                   <CommercialTermSelect
                     termType="payment"
@@ -515,6 +521,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                   freightAmount={doc.freightAmount}
                   installationAmount={doc.installationAmount}
                   customCharges={doc.customCharges}
+                  documentExtras={doc}
                   probability={opportunity?.probability ?? 0}
                   readOnly={!canEdit}
                   showFreightExtras

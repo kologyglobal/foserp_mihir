@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { CalendarClock } from 'lucide-react'
 import type { FollowUp, FollowUpType, OpportunityPriority } from '../../types/crm'
 import { useCrmStore } from '../../store/crmStore'
 import { useSalesStore } from '../../store/salesStore'
@@ -19,7 +20,8 @@ import { notify } from '../../store/toastStore'
 import { CrmDrawerShell } from './CrmDrawerShell'
 import { FormField } from '../forms/FormField'
 import { Input, Select, Textarea } from '../forms/Inputs'
-import { Button } from '../ui/Button'
+import { ErpButton } from '../erp/ErpButton'
+import { SELECT_PLACEHOLDER } from '../forms/selectStandards'
 
 const FALLBACK_FOLLOW_UP_TYPES: { id: FollowUpType; label: string }[] = [
   { id: 'call', label: 'Call' },
@@ -236,29 +238,42 @@ export function QuickFollowUpDrawer({ open, onClose, context, onCreated, followU
     <CrmDrawerShell
       open={open}
       placement="modal"
+      size="md"
+      icon={CalendarClock}
+      accent="primary"
       title={isEdit ? 'Edit Follow-up' : 'Quick Follow-up'}
-      subtitle={context?.leadName ?? (isEdit ? 'Update this follow-up' : 'Schedule the next customer touchpoint')}
+      subtitle={isEdit ? 'Update this scheduled touchpoint' : 'Schedule the next customer touchpoint'}
       onClose={onClose}
+      closeDisabled={submitting}
       footer={
-        <div className="flex w-full gap-2">
-          <Button type="submit" form="crm-quick-followup-form" className="flex-1" disabled={submitting}>
-            {isEdit ? 'Save Follow-up' : 'Schedule Follow-up'}
-          </Button>
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </ErpButton>
           {!isEdit && outcomeMode && lastFollowUpId ? (
-            <Button type="button" variant="secondary" onClick={handleComplete}>
+            <ErpButton type="button" variant="secondary" onClick={handleComplete}>
               Mark Done
-            </Button>
+            </ErpButton>
           ) : null}
+          <ErpButton type="submit" form="crm-quick-followup-form" variant="primary" disabled={submitting}>
+            {submitting ? 'Saving…' : isEdit ? 'Save Follow-up' : 'Schedule Follow-up'}
+          </ErpButton>
         </div>
       }
     >
-      <form id="crm-quick-followup-form" onSubmit={handleSubmit} className="crm-drawer-form">
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <form id="crm-quick-followup-form" onSubmit={handleSubmit} className="crm-popup-form">
+        {context?.leadName ? (
+          <div className="crm-popup-context-pill" title={context.leadName}>
+            <CalendarClock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>{context.leadName}</span>
+          </div>
+        ) : null}
+        {error ? <p className="crm-popup-alert" role="alert">{error}</p> : null}
         {!isEdit && !contextLocksRelated ? (
           <>
             <FormField label="Company">
               <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                <option value="">Select company…</option>
+                <option value="">{SELECT_PLACEHOLDER}</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>{c.customerName}</option>
                 ))}

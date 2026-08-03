@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Download, Plus, Save, Upload } from 'lucide-react'
+import { Activity, Bell, Download, Plus, Save, Table2, Upload } from 'lucide-react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { SaveViewDialog } from '../../components/design-system/SaveViewDialog'
 import { EnterpriseRegisterTableShell } from '../../design-system/list-page/EnterpriseRegisterTableShell'
@@ -12,6 +12,7 @@ import { DeleteLeadModal } from '../../components/crm/DeleteLeadModal'
 import { AssignOwnerDialog } from '../../components/crm/AssignOwnerDialog'
 import { LeadHistoryDrawer } from '../../components/crm/LeadHistoryDrawer'
 import { LeadImportDialog } from '../../components/crm/LeadImportDialog'
+import { CrmFollowUpsPanel, CrmActivitiesPanel, CrmWorkspaceViewToggle } from '../../components/crm'
 import { useSalesStore } from '../../store/salesStore'
 import { resolveStoreAction } from '../../store/storeAction'
 import { useCrmStore } from '../../store/crmStore'
@@ -60,10 +61,39 @@ import { leadListBreadcrumbs } from '../../utils/crmLeadNavigation'
 import { getLeadUser } from '../../data/crm/leadUsers'
 import { syncLeadsFromApi } from '../../services/bridges/crmApiBridge'
 
+type LeadWorkspaceView = 'list' | 'follow-ups' | 'activities'
+
+const LEAD_VIEW_TABS = [
+  { id: 'list' as const, label: 'List', icon: Table2 },
+  { id: 'follow-ups' as const, label: 'Follow-ups', icon: Bell },
+  { id: 'activities' as const, label: 'Activities', icon: Activity },
+]
+
+function useLeadWorkspaceView(): [LeadWorkspaceView, (view: LeadWorkspaceView) => void] {
+  const [params, setSearchParams] = useSearchParams()
+  const viewParam = params.get('view')
+  const view: LeadWorkspaceView =
+    viewParam === 'follow-ups' ? 'follow-ups'
+    : viewParam === 'activities' ? 'activities'
+    : 'list'
+
+  function setView(next: LeadWorkspaceView) {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (next === 'list') p.delete('view')
+      else p.set('view', next)
+      return p
+    }, { replace: true })
+  }
+
+  return [view, setView]
+}
+
 export function CrmLeadListPage() {
   const apiMode = useApiMode()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [view, setView] = useLeadWorkspaceView()
   const routes = useLeadRoutes()
   const leads = useSalesStore((s) => s.leads)
   const quotations = useSalesStore((s) => s.quotations)
@@ -427,6 +457,14 @@ export function CrmLeadListPage() {
         variant="dynamics"
         autoBreadcrumbs={false}
         breadcrumbs={leadListBreadcrumbs(routes)}
+        actions={
+          <CrmWorkspaceViewToggle
+            tabs={LEAD_VIEW_TABS}
+            value={view}
+            onChange={setView}
+            ariaLabel="Leads view"
+          />
+        }
         commandBar={
           <ErpCommandBar
             inline
@@ -450,8 +488,14 @@ export function CrmLeadListPage() {
             ]}
           />
         }
-        kpiStrip={leadKpiStrip}
+        kpiStrip={view === 'list' ? leadKpiStrip : undefined}
       >
+        <div className="crm-opp-workspace">
+          {view === 'follow-ups' ? (
+            <CrmFollowUpsPanel scope="lead" />
+          ) : view === 'activities' ? (
+            <CrmActivitiesPanel scope="lead" />
+          ) : (
         <EnterpriseRegisterTableShell>
           <CrmLeadsTable
             rows={enrichedRows}
@@ -584,6 +628,8 @@ export function CrmLeadListPage() {
             onBulkEmail={bulkEmailLeads}
           />
         </EnterpriseRegisterTableShell>
+          )}
+        </div>
       </OperationalPageShell>
 
       <LeadImportDialog

@@ -4,6 +4,7 @@ import type { SalesOrder } from '../types/mrp'
 import type { ReceivableRow } from '../types/invoice'
 import type { DashboardFeedItem, DashboardQuickView } from '../types/dashboardInteraction'
 import { formatCrmCurrency } from './crmMetrics'
+import { quotationRevisionLabel } from './quotationEngine/revisionLabels'
 import { formatCurrency } from './formatters/currency'
 import { formatDate } from './dates/format'
 type CustomerResolver = (id: string) => string
@@ -43,7 +44,7 @@ function leadQuickView(lead: Lead, customerName: string): DashboardQuickView {
 
 function quotationQuickView(doc: QuotationDocument, customerName: string, oppName?: string): DashboardQuickView {
   return {
-    title: `${doc.quotationId} · Rev ${doc.revisionNo}`,
+    title: `${doc.quotationId} · ${quotationRevisionLabel(doc.revisionNo)}`,
     subtitle: customerName,
     badge: doc.status.replace(/_/g, ' '),
     badgeTone: doc.status === 'pending_approval' ? 'warning' : doc.status === 'approved' ? 'success' : 'neutral',

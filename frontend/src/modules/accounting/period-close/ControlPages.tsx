@@ -459,7 +459,7 @@ export function ReopenRequestsPage() {
         riskExplanation: form.riskExplanation,
         approver: 'Rajesh Patel',
       })
-      notify.success('Reopen request submitted in demo mode.')
+      notify.success(isApiMode() ? 'Reopen request submitted for approval.' : 'Reopen request submitted in demo mode.')
       setShowForm(false)
       await load()
     } catch (e) {
@@ -474,7 +474,11 @@ export function ReopenRequestsPage() {
     }
     try {
       await updateReopenStatus(id, status, getSessionUser().name || 'Approver')
-      notify.info(`Reopen request ${status} in demo mode.`)
+      notify.info(
+        isApiMode()
+          ? `Reopen request ${status}${status === 'approved' ? ' — period reopened temporarily.' : '.'}`
+          : `Reopen request ${status} in demo mode.`,
+      )
       await load()
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Update failed')

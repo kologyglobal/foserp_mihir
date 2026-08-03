@@ -49,34 +49,6 @@ export async function syncLeadOpportunityStage(
   const targetStage = resolveTargetStage(pipeline.stages, targetSlug)
   if (!targetStage) return null
 
-  const existing = await prisma.crmOpportunity.findFirst({
-    where: { tenantId, leadId: lead.id, deletedAt: null },
-    orderBy: { createdAt: 'asc' },
-  })
-
-  if (existing) {
-    if (existing.stageId === targetStage.id) return existing.id
-    await prisma.crmOpportunity.update({
-      where: { id: existing.id },
-      data: {
-        stageId: targetStage.id,
-        probability: targetStage.probability,
-        updatedBy: userId,
-        lastActivityAt: new Date(),
-      },
-    })
-    const { recordStageHistory } = await import('../opportunities/opportunity.repository.js')
-    await recordStageHistory(
-      tenantId,
-      existing.id,
-      existing.stageId,
-      targetStage.id,
-      userId,
-      `Lead stage: ${lead.stage}`,
-    )
-    return existing.id
-  }
-
   let companyId = lead.companyId
   if (!companyId) {
     companyId = await ensureLeadCompany(prisma, tenantId, lead, userId)
@@ -84,6 +56,51 @@ export async function syncLeadOpportunityStage(
       where: { id: lead.id },
       data: { companyId, updatedBy: userId },
     })
+  }
+
+  /** Keep mirror commercial fields in step with lead edits (product, value, FU, contact…). */
+  const commercialFromLead = {
+    name: lead.companyName ?? lead.prospectName,
+    companyId,
+    contactId: lead.contactId ?? undefined,
+    ownerId: lead.assignedTo ?? lead.ownerId ?? undefined,
+    amount: lead.expectedValue,
+    expectedCloseDate: lead.expectedCloseDate ?? undefined,
+    requirement: lead.productRequirement ?? undefined,
+    priority: lead.priority || 'medium',
+    nextFollowUpAt: lead.nextFollowUpAt ?? undefined,
+    locationId: lead.locationId ?? undefined,
+    updatedBy: userId,
+  }
+
+  const existing = await prisma.crmOpportunity.findFirst({
+    where: { tenantId, leadId: lead.id, deletedAt: null },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  if (existing) {
+    const stageChanged = existing.stageId !== targetStage.id
+    await prisma.crmOpportunity.update({
+      where: { id: existing.id },
+      data: {
+        ...commercialFromLead,
+        stageId: targetStage.id,
+        probability: stageChanged ? targetStage.probability : existing.probability,
+        lastActivityAt: new Date(),
+      },
+    })
+    if (stageChanged) {
+      const { recordStageHistory } = await import('../opportunities/opportunity.repository.js')
+      await recordStageHistory(
+        tenantId,
+        existing.id,
+        existing.stageId,
+        targetStage.id,
+        userId,
+        `Lead stage: ${lead.stage}`,
+      )
+    }
+    return existing.id
   }
 
   const { nextCode } = await import('../../../services/codeSeries.service.js')
@@ -103,8 +120,19 @@ export async function syncLeadOpportunityStage(
     probability: targetStage.probability,
     expectedCloseDate: lead.expectedCloseDate ? lead.expectedCloseDate.toISOString() : null,
     productRequirement: lead.productRequirement ?? undefined,
+    priority: lead.priority || 'medium',
+    locationId: lead.locationId ?? null,
     status: 'open',
   })
+
+  // nextFollowUpAt is not on CreateOpportunityInput — set after create so list/360 pick it up.
+  if (lead.nextFollowUpAt) {
+    await prisma.crmOpportunity.update({
+      where: { id: created.id },
+      data: { nextFollowUpAt: lead.nextFollowUpAt, updatedBy: userId },
+    })
+  }
+
   return created.id
 }
 
@@ -128,30 +156,23 @@ export async function syncLeadOpportunityStageSafely(
 }
 
 /**
- * Creates/updates opportunity mirrors for open leads that are missing one.
- * Safe to call from Opportunities list (page 1) so historical leads appear under New/Qualified.
+ * Creates/updates opportunity mirrors for open leads.
+ * Also re-syncs commercial fields on existing mirrors (product, value, FU, contact…)
+ * so Opportunities list/360 stay aligned with Lead data.
  */
 export async function backfillMissingLeadOpportunityMirrors(
   tenantId: string,
   userId: string,
   limit = 50,
 ): Promise<number> {
-  const alreadyLinked = await prisma.crmOpportunity.findMany({
-    where: { tenantId, deletedAt: null, leadId: { not: null } },
-    select: { leadId: true },
-    distinct: ['leadId'],
-  })
-  const linkedIds = alreadyLinked.map((r) => r.leadId!).filter(Boolean)
-
   const leads = await prisma.crmLead.findMany({
     where: {
       tenantId,
       deletedAt: null,
       opportunityId: null,
       stage: { in: OPEN_MIRROR_STAGES },
-      ...(linkedIds.length ? { id: { notIn: linkedIds } } : {}),
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { updatedAt: 'desc' },
     take: limit,
   })
 

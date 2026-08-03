@@ -3,7 +3,7 @@ import { prisma } from '../../config/prisma.js'
 import { NotFoundError } from '../../utils/errors.js'
 import type { ListTicketsQuery } from './ticket.schemas.js'
 
-const OPEN_STATUSES: MaintenanceTicketStatus[] = [
+export const OPEN_STATUSES: MaintenanceTicketStatus[] = [
   'REPORTED',
   'IN_REPAIR',
   'WAITING_FOR_PART',
@@ -23,8 +23,10 @@ export const ticketInclude = {
     },
   },
   contractor: { select: { id: true, code: true, name: true } },
+  pmPlan: { select: { id: true, planNumber: true, name: true, nextDueDate: true } },
   parts: { where: { deletedAt: null }, orderBy: { createdAt: 'asc' as const } },
   photos: { where: { deletedAt: null }, orderBy: { uploadedAt: 'desc' as const } },
+  checklistItems: { orderBy: { sequence: 'asc' as const } },
 } satisfies Prisma.MaintenanceTicketInclude
 
 export async function listTickets(tenantId: string, query: ListTicketsQuery) {

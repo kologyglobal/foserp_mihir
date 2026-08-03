@@ -16,7 +16,9 @@ export function PeriodClosePreviewBanner({ dense }: { dense?: boolean }) {
           <span className="font-semibold">Period Close Phase 1 (API).</span> Dashboard, checklist, and period locking
           use real <code className="text-[10px]">finance.period.*</code> close/reopen and readiness from shipped
           finance (AP close gate, unposted journals, bank recon). Manufacturing / inventory close KPIs use live
-          accounting event workspaces when available; accruals and year-end remain demo scaffolding.
+          accounting event workspaces when available; accruals/prepaid and close calendar / reopen
+          requests are live via <code className="text-[10px]">finance.period*</code>. FX revaluation
+          remains demo scaffolding.
         </p>
       </div>
     )

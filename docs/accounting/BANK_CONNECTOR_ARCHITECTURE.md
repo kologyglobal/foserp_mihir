@@ -1,13 +1,26 @@
 # Bank Connector Architecture
 
-**Phase:** 5D1 scaffold + 5D2 sandbox/REST + 5D3 live SFTP + Open Banking consent + **5D4 SIMULATED AIS + scheduleCron** (2026-07-30)  
-**Status:** Sandbox FS, allow-listed REST, live SFTP, and **SIMULATED Open Banking AIS** can ingest MT940/CAMT as `BANK_API` statements. Live TPP / production bank AIS download remains deferred.
+**Phase:** 5D1–5D4 + **Bank hardening** (distributed sync lease + CAMT.052/.054)  
+**Status:** Sandbox FS, allow-listed REST, live SFTP, and **SIMULATED Open Banking AIS** can ingest MT940/CAMT.052/.053/.054 as `BANK_API` statements. Multi-instance sync is guarded by a MySQL lease on `BankConnector`. Live TPP / production bank AIS download remains deferred.
 
 ## Purpose
 
-Pull bank statements into the existing 5A2 import pipeline (MT940 / CAMT.053 parsers) without inventing balances or inventing “connected” success without a probe.
+Pull bank statements into the existing import pipeline (MT940 / CAMT family parsers) without inventing balances or inventing “connected” success without a probe.
 
 Manual file upload remains fully supported.
+
+## Distributed sync lease (hardening)
+
+| Layer | Detail |
+|-------|--------|
+| **Columns** | `BankConnector.syncLockUntil`, `BankConnector.syncLockToken` (IndiaMART pattern; no separate lease table) |
+| **TTL** | 10 minutes; expired leases are stealable for crash recovery |
+| **Acquire** | Atomic `updateMany` where lock is null/expired; used by **manual and scheduled** sync |
+| **Heartbeat** | Extended during multi-file sync; lost ownership aborts before further ingest |
+| **Scheduler** | Lease contention counted as `skippedLocked` (not failure); `tickInProgress` remains local only |
+| **API** | Manual Sync → `409 BANK_CONNECTOR_SYNC_IN_PROGRESS` + `syncLeaseUntil`; DTO exposes `syncInProgress` / `syncLeaseUntil` (never the token) |
+
+Deployment: migrate schema → deploy all app instances → enable `BANK_CONNECTOR_CRON_ENABLED`.
 
 ## What 5D1–5D3 shipped
 
@@ -54,9 +67,9 @@ Manual file upload remains fully supported.
 
 1. Real bank AIS statement download / production TPP OAuth  
 2. Circuit breaker / rate limits beyond fetch timeout  
-3. CAMT.052 / .054  
-4. SSH agent / interactive host-key prompts  
-5. Distributed / multi-instance cron lock (current worker is single-process)
+3. SSH agent / interactive host-key prompts  
+
+CAMT.052 / .054 and multi-instance cron lock are **shipped** (bank hardening).
 
 ## Related docs
 

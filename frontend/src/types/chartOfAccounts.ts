@@ -267,8 +267,10 @@ export interface AccountImportPreview {
   errorRows: number
   warningRows: number
   rows: AccountImportPreviewRow[]
-  /** UI-only — never claimed as permanently imported */
-  isDemoPreview: true
+  /** true = browser mock store only; false = live API validate/import path */
+  isDemoPreview: boolean
+  /** Parsed CSV rows for live API import body */
+  rawRows?: Array<Record<string, string>>
 }
 
 export interface AccountLedgerPreviewLine {

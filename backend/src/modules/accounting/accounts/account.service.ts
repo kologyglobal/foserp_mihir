@@ -1,7 +1,15 @@
 import type { Request } from 'express'
 import { auditFromRequest, createAuditLog } from '../../../services/audit.service.js'
-import type { AccountTreeQuery, ApplyTemplateInput, CreateAccountInput, ListAccountsQuery, UpdateAccountInput } from './account.validation.js'
+import type {
+  AccountImportInput,
+  AccountTreeQuery,
+  ApplyTemplateInput,
+  CreateAccountInput,
+  ListAccountsQuery,
+  UpdateAccountInput,
+} from './account.validation.js'
 import * as repo from './account.repository.js'
+import * as importService from './account-import.service.js'
 
 function auditMeta(req: Request) {
   return auditFromRequest(req)
@@ -109,4 +117,35 @@ export async function applyTemplateRecord(req: Request, tenantId: string, input:
     userAgent: audit.userAgent,
   })
   return { accountCount: count, templateId: input.templateId }
+}
+
+export function accountImportTemplateCsv() {
+  return importService.accountImportTemplateCsv()
+}
+
+export async function importAccountsRecord(req: Request, tenantId: string, input: AccountImportInput) {
+  const audit = auditMeta(req)
+  const userId = req.context?.userId ?? ''
+  const summary = await importService.importAccounts(tenantId, userId, {
+    legalEntityId: input.legalEntityId,
+    rows: input.rows,
+    duplicateMode: input.duplicateMode,
+  })
+  await createAuditLog({
+    tenantId,
+    userId: audit.userId,
+    module: 'finance',
+    entity: 'account',
+    entityId: input.legalEntityId,
+    action: 'IMPORT',
+    newValues: {
+      imported: summary.imported,
+      updated: summary.updated,
+      skipped: summary.skipped,
+      failed: summary.failed,
+    },
+    ipAddress: audit.ipAddress,
+    userAgent: audit.userAgent,
+  })
+  return summary
 }

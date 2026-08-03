@@ -47,6 +47,14 @@ const DEFAULT_PREFIX: Record<CodeSeriesEntity, string> = {
   INVENTORY_ADJUSTMENT: 'IADJ',
   MANUFACTURING_ROUTING: 'RT',
   MAINTENANCE_TICKET: 'MT',
+  PREVENTIVE_MAINTENANCE_PLAN: 'PM',
+  EMPLOYEE: 'EMP',
+  PAYSLIP: 'PS',
+  SALARY_PAYMENT_BATCH: 'SPB',
+  EMPLOYEE_LOAN: 'LN',
+  SALARY_ADVANCE: 'ADV',
+  EMPLOYEE_EXIT: 'EXIT',
+  FULL_FINAL_SETTLEMENT: 'FNF',
 }
 
 export async function ensureCodeSeries(
@@ -155,6 +163,13 @@ export async function initTenantCodeSeries(tenantId: string, tx?: Prisma.Transac
     'INVENTORY_STOCK_COUNT',
     'INVENTORY_ADJUSTMENT',
     'MANUFACTURING_ROUTING',
+    'EMPLOYEE',
+    'PAYSLIP',
+    'SALARY_PAYMENT_BATCH',
+    'EMPLOYEE_LOAN',
+    'SALARY_ADVANCE',
+    'EMPLOYEE_EXIT',
+    'FULL_FINAL_SETTLEMENT',
   ]
   for (const entityType of types) {
     await ensureCodeSeries(tenantId, entityType, tx)

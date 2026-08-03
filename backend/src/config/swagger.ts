@@ -2,7 +2,7 @@
  * OpenAPI 3.0 spec for Swagger UI at `/api/docs` (development).
  * Hand-written paths below are authoritative; missing routes are filled from
  * `swagger.generated-paths.ts` (run `npm run swagger:generate`).
- * Last aligned: 2026-07-27 — OpenAPI 1.5.0 + inventory costing + expanded auto stubs (admin/security/gate/executive).
+ * Last aligned: 2026-07-31 — OpenAPI 1.6.0 + maintenance V1.1/V2 + HRMS + full stub regen.
  */
 
 import { generatedSwaggerPaths, generatedSwaggerTags } from './swagger.generated-paths.js'
@@ -271,26 +271,28 @@ function importTemplateAndPost(tag: string, basePath: string, entity: string) {
   }
 }
 
-const swaggerSpecDraft = {
+/** Hand-written OpenAPI draft — also imported by `scripts/generate-swagger-paths.ts` (skip list). */
+export const swaggerSpecDraft = {
   openapi: '3.0.3',
   info: {
     title: 'FOS ERP API',
-    version: '1.5.0',
+    version: '1.6.0',
     description: [
-      'Multi-tenant ERP backend — Auth, RBAC, CRM, masters, lookups, imports/exports, finance, manufacturing, purchase, inventory (incl. valuation costing), quality, dispatch, gate, executive, and ops reports.',
+      'Multi-tenant ERP backend — Auth, RBAC, CRM, masters, lookups, imports/exports, finance, manufacturing, maintenance, HRMS, purchase, inventory (incl. valuation costing), quality, dispatch, gate, executive, and ops reports.',
       '',
       '**Tenant routes:** prefer `/api/v1/t/{tenantSlug}/…` (frontend default). Equivalent UUID form: `/api/v1/tenants/{tenantId}/…`.',
       '',
       '**Auth:** `Authorization: Bearer <accessToken>`. Never send `tenantId` in request bodies.',
       '',
-      '**Shipped (API):** Auth, users/roles/security/modules, CRM (+ quotations/templates/sales orders/commercial), masters, finance (journals, AR/AP, bank & cash),',
-      'manufacturing (setup → WO → materials → job work → corrections → plans → costing flag-gated), inventory + inventory costing (FIFO/average/standard/specific), purchase (PR→PO→GRN→invoice),',
+      '**Shipped (API):** Auth, users/roles/security/modules, CRM (+ quotations/templates/sales orders/commercial), masters, finance (journals, AR/AP, bank & cash, period close),',
+      'manufacturing (setup → WO → materials → job work → corrections → plans → costing flag-gated), maintenance (breakdown + machine health + preventive), HRMS (employees → payroll → statutory → loans),',
+      'inventory + inventory costing (FIFO/average/standard/specific), purchase (PR→PO→GRN→invoice),',
       'quality inspections/plans, dispatch fulfilment/pick/pack/challan, gate, executive dashboard, ops reports / exceptions.',
       '',
       '**Docs note:** Paths with description “Auto-generated stub…” were produced from Express route modules.',
       'Hand-written entries in this file override stubs for the same method+path. Regenerate stubs with `npm run swagger:generate`.',
       '',
-      '**Aligned:** 2026-07-27 — OpenAPI 1.5.0 merges hand-written coverage (incl. Inventory Costing) with regenerated stubs for remaining modules.',
+      '**Aligned:** 2026-07-31 — OpenAPI 1.6.0 refreshes stubs for all mounted modules (incl. maintenance + HRMS) and expands hand-written Maintenance / Money In CRM bridge paths.',
     ].join('\n'),
   },
   servers: [{ url: '/api/v1', description: 'API v1' }],
@@ -348,6 +350,8 @@ const swaggerSpecDraft = {
     { name: 'Inventory Costing' },
     { name: 'Inventory Setup' },
     { name: 'Purchase Requisitions' },
+    { name: 'Maintenance' },
+    { name: 'HRMS' },
   ],
   components: {
     securitySchemes: {
@@ -1643,6 +1647,44 @@ const swaggerSpecDraft = {
           201: { description: 'Draft created with calculated totals and allowedActions' },
           422: { description: 'SALES_INVOICE_DRAFT_CALCULATION_FAILED / SALES_ORDER_*' },
         },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/invoices/crm-pending': {
+      get: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'List CRM tax invoices pending Money In conversion',
+        description:
+          'Permission: `finance.ar.invoice.view`. CRM commercial tax invoices with `accountingStatus=pending_review`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Paginated CRM pending tax invoices' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/invoices/prefill-from-crm-tax-invoice': {
+      post: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'Prefill sales invoice draft from CRM tax invoice',
+        description:
+          'Permission: `finance.ar.invoice.create`. Body: `{ crmTaxInvoiceId }`. Soft-links CRM invoice when draft is created.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Prefill payload for Money In invoice form' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/invoices/invoice-ready': {
+      get: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'List dispatch/source documents ready to invoice',
+        description: 'Permission: `finance.ar.invoice.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Invoice-ready source rows' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/invoices/prefill-from-dispatch': {
+      post: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'Prefill sales invoice draft from dispatch',
+        description: 'Permission: `finance.ar.invoice.create`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Prefill payload' } },
       },
     },
     '/t/{tenantSlug}/accounting/receivables/invoices/{id}': {
@@ -3229,9 +3271,130 @@ const swaggerSpecDraft = {
       get: {
         tags: ['Maintenance'],
         summary: 'Maintenance operational dashboard',
-        description: 'Permission: `maintenance.view`. Module flag: `maintenance`.',
+        description:
+          'Permission: `maintenance.view`. Module flag: `maintenance`. Includes breakdown KPIs plus PM due today/week/overdue.',
         parameters: [tenantSlugParam],
         responses: { 200: { description: 'Dashboard KPIs + needs attention' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/machine-health': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Machine Health register (V1.1)',
+        description: 'Permission: `maintenance.view`. Read model: status, open ticket, downtime, MTTR/MTBF signals.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Paginated machine health rows' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/machine-health/{machineId}': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Machine Health detail',
+        description: 'Permission: `maintenance.view`.',
+        parameters: [
+          tenantSlugParam,
+          {
+            name: 'machineId',
+            in: 'path' as const,
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: { 200: { description: 'Machine health detail' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/active-ticket': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Active open ticket for a machine',
+        description: 'Permission: `maintenance.view`. Query: `machineId`. Used by manufacturing banners.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Open ticket or null' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/machines/{machineId}/history': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Machine maintenance history',
+        description: 'Permission: `maintenance.view`. Breakdown + preventive tickets for the machine.',
+        parameters: [
+          tenantSlugParam,
+          {
+            name: 'machineId',
+            in: 'path' as const,
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: { 200: { description: 'History payload' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/machines/{machineId}/preventive': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'PM plans for a machine',
+        description: 'Permission: `maintenance.view`.',
+        parameters: [
+          tenantSlugParam,
+          {
+            name: 'machineId',
+            in: 'path' as const,
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: { 200: { description: 'PM plans for machine' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/preventive': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'List preventive maintenance plans (V2)',
+        description: 'Permission: `maintenance.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Paginated PM plans' } },
+      },
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Create preventive maintenance plan',
+        description: 'Permission: `maintenance.create`. Does not take the machine down.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/preventive/{id}': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Get preventive maintenance plan',
+        description: 'Permission: `maintenance.view`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'PM plan detail' } },
+      },
+      patch: {
+        tags: ['Maintenance'],
+        summary: 'Update preventive maintenance plan',
+        description: 'Permission: `maintenance.update`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Updated' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/preventive/{id}/deactivate': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Deactivate PM plan',
+        description: 'Permission: `maintenance.update`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Deactivated' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/preventive/{id}/create-ticket': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Generate ticket from PM plan',
+        description:
+          'Permission: `maintenance.create`. Creates `MaintenanceTicket` with `sourceType=PREVENTIVE`. Does not set machine OUT_OF_SERVICE until start-repair.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 201: { description: 'Ticket created' } },
       },
     },
     '/t/{tenantSlug}/maintenance/tickets': {
@@ -3245,7 +3408,8 @@ const swaggerSpecDraft = {
       post: {
         tags: ['Maintenance'],
         summary: 'Report breakdown (create ticket)',
-        description: 'Permission: `maintenance.create`. Sets machine to OUT_OF_SERVICE.',
+        description:
+          'Permission: `maintenance.create`. BREAKDOWN source sets machine to OUT_OF_SERVICE. PREVENTIVE tickets are created via `/preventive/{id}/create-ticket`.',
         parameters: [tenantSlugParam],
         responses: { 201: { description: 'Created' } },
       },
@@ -3260,8 +3424,9 @@ const swaggerSpecDraft = {
       },
       patch: {
         tags: ['Maintenance'],
-        summary: 'Update repair / service / cost fields',
-        description: 'Permission: `maintenance.update`. Totals recomputed server-side.',
+        summary: 'Update repair / service / cost / checklist fields',
+        description:
+          'Permission: `maintenance.update`. Totals recomputed server-side. Supports rootCause/repairAction and PM checklist items.',
         parameters: [tenantSlugParam, idParam],
         responses: { 200: { description: 'Updated' } },
       },
@@ -3275,6 +3440,51 @@ const swaggerSpecDraft = {
         responses: { 200: { description: 'Repair started' } },
       },
     },
+    '/t/{tenantSlug}/maintenance/tickets/{id}/hold': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Hold ticket',
+        description: 'Permission: `maintenance.update`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'On hold' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/tickets/{id}/resume': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Resume ticket from hold',
+        description: 'Permission: `maintenance.update`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Resumed' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/tickets/{id}/parts': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Add part line to ticket',
+        description: 'Permission: `maintenance.update`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 201: { description: 'Part added' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/tickets/{id}/link-part-pr': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Link purchase requisition to ticket parts',
+        description: 'Permission: `maintenance.update`. Sets PR sourceType=MAINTENANCE.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'PR linked' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/tickets/{id}/photos': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Upload ticket photo',
+        description: 'Permission: `maintenance.update`. Multipart `file` + category BEFORE|DURING|AFTER|OTHER.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Photo uploaded' } },
+      },
+    },
     '/t/{tenantSlug}/maintenance/tickets/{id}/test': {
       post: {
         tags: ['Maintenance'],
@@ -3284,11 +3494,21 @@ const swaggerSpecDraft = {
         responses: { 200: { description: 'Test recorded' } },
       },
     },
+    '/t/{tenantSlug}/maintenance/tickets/{id}/close-readiness': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Close readiness checklist',
+        description: 'Permission: `maintenance.view`. PM tickets soften photo/operator rules; checklist required.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Readiness gates' } },
+      },
+    },
     '/t/{tenantSlug}/maintenance/tickets/{id}/close': {
       post: {
         tags: ['Maintenance'],
         summary: 'Close ticket after PASS test',
-        description: 'Permission: `maintenance.close`. Machine → AVAILABLE if no other open ticket.',
+        description:
+          'Permission: `maintenance.close`. Machine → AVAILABLE if no other open ticket. PREVENTIVE close recalculates plan nextDueDate.',
         parameters: [tenantSlugParam, idParam],
         responses: { 200: { description: 'Closed' } },
       },
@@ -3300,6 +3520,15 @@ const swaggerSpecDraft = {
         description: 'Permission: `maintenance.report.view`.',
         parameters: [tenantSlugParam],
         responses: { 200: { description: 'Report payload' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/reports/pm-compliance': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Preventive maintenance compliance report',
+        description: 'Permission: `maintenance.report.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'PM compliance rows' } },
       },
     },
 
@@ -4774,6 +5003,1014 @@ const swaggerSpecDraft = {
         description: 'Permission: `dispatch.challan.view`. Does not post stock.',
         parameters: [tenantSlugParam],
         responses: { 200: { description: 'Ready-for-dispatch queue' } },
+      },
+    },
+
+    // ─── HRMS Phase 3 — Leave ─────────────────────────────────────────────
+    '/t/{tenantSlug}/hrms/leave/types': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List leave types',
+        description: 'Permission: `hrms.leave.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Leave types' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create leave type',
+        description: 'Permission: `hrms.leave.type.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/policies': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List leave policies',
+        description: 'Permission: `hrms.leave.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Policies' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create leave policy',
+        description: 'Permission: `hrms.leave.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/balances': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List leave balances',
+        description: 'Permission: `hrms.leave.balance.view`. Available = opening+accrued+adjusted−pending−used.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Balances' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Initialize / upsert leave balance',
+        description: 'Permission: `hrms.leave.balance.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Balance saved' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/balances/adjust': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Audited leave balance adjustment',
+        description: 'Permission: `hrms.leave.balance.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Adjusted' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/preview': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Preview requested leave days',
+        description: 'Permission: `hrms.leave.apply`. Uses Phase 2 shift/holiday resolvers + policy.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Days, available, balance after' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/requests': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Leave register',
+        description: 'Permission: `hrms.leave.view`. Supports mine / pendingApprovals filters.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Requests' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create draft leave request',
+        description: 'Permission: `hrms.leave.apply`.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Draft created' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/requests/{requestId}/submit': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Submit leave (pending balance)',
+        description: 'Permission: `hrms.leave.apply`.',
+        parameters: [tenantSlugParam, { name: 'requestId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Submitted' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/requests/{requestId}/approve': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Approve leave (pending → used)',
+        description: 'Permission: `hrms.leave.approve`. Manager or `hrms.leave.manage`.',
+        parameters: [tenantSlugParam, { name: 'requestId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Approved' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/requests/{requestId}/reject': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Reject leave (release pending)',
+        description: 'Permission: `hrms.leave.approve`.',
+        parameters: [tenantSlugParam, { name: 'requestId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Rejected' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/requests/{requestId}/cancel': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Cancel leave (restore pending/used)',
+        description: 'Permission: `hrms.leave.apply` (+ manage for approved when not owner).',
+        parameters: [tenantSlugParam, { name: 'requestId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Cancelled' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/approved-days': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Approved leave source for Attendance',
+        description: 'Permission: `hrms.leave.view`. Canonical leave days — no fake attendance rows.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'employeeId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'from', in: 'query', required: true, schema: { type: 'string', format: 'date' } },
+          { name: 'to', in: 'query', required: true, schema: { type: 'string', format: 'date' } },
+        ],
+        responses: { 200: { description: 'Approved leave items' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/leave/balances/accrue': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Controlled leave accrual posting',
+        description: 'Permission: `hrms.leave.balance.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Accrual posted' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/attendance/days': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Attendance day read model',
+        description: 'Permission: `hrms.attendance.view`. Leave sync writes LEAVE / HALF_DAY.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Days' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/attendance/exceptions': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Attendance exceptions (e.g. punch on leave)',
+        description: 'Permission: `hrms.attendance.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Exceptions' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/attendance/punches': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Record attendance punch (immutable)',
+        description: 'Permission: `hrms.attendance.manage`. Never deletes punches; raises exception if day is leave.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Punch recorded' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/overtime': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List overtime records',
+        description: 'Permission: `hrms.overtime.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'OT rows' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create manual OT (pending approval)',
+        description: 'Permission: `hrms.overtime.create`.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/overtime/{otId}/approve': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Approve OT (approvedMinutes ≤ eligible unless override)',
+        description: 'Permission: `hrms.overtime.approve`.',
+        parameters: [tenantSlugParam, { name: 'otId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Approved' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/overtime/bulk-approve': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Bulk approve eligible OT minutes',
+        description: 'Permission: `hrms.overtime.approve`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Bulk result' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/overtime/summary/monthly': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Monthly OT summary (payroll input later)',
+        description: 'Permission: `hrms.overtime.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Summary rows' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/salary/components': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List salary components',
+        description: 'Permission: `hrms.salary.component.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Component rows' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create salary component',
+        description: 'Permission: `hrms.salary.component.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/salary/structures': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List salary structures',
+        description: 'Permission: `hrms.salary.structure.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Structure rows' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create salary structure',
+        description: 'Permission: `hrms.salary.structure.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/salary/structures/{structureId}/versions': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create draft structure version',
+        description: 'Permission: `hrms.salary.structure.manage`. Optional copyFromVersionId.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'structureId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 201: { description: 'Draft version created' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/salary/versions/{versionId}/activate': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Activate draft structure version',
+        description: 'Permission: `hrms.salary.structure.manage`. Supersedes overlapping ACTIVE versions.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'versionId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Activated' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/salary/assignments': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List employee salary assignments',
+        description: 'Permission: `hrms.salary.assignment.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Assignment rows' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Assign salary structure to employee',
+        description: 'Permission: `hrms.salary.assignment.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/salary/employees/{employeeId}/effective': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Effective salary structure for employee on date',
+        description: 'Permission: `hrms.salary.assignment.view`. Payroll Phase 7 input.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'employeeId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'date', in: 'query', required: false, schema: { type: 'string', format: 'date' } },
+        ],
+        responses: { 200: { description: 'Effective structure + lines' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/salary/preview': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Preview monthly component amounts',
+        description: 'Permission: `hrms.salary.structure.view`. FIXED + PERCENTAGE only.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Preview breakdown' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/periods': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List payroll periods',
+        description: 'Permission: `hrms.payroll.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Period rows' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Open a payroll period for a legal entity + month',
+        description: 'Permission: `hrms.payroll.create`. Derives calendar-month start/end; blocks duplicate LE/year/month.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/periods/{periodId}/close': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Close a payroll period',
+        description: 'Permission: `hrms.payroll.finalize`. Blocked while any run is DRAFT/CALCULATED/REVIEWED.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'periodId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Closed' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List payroll runs',
+        description: 'Permission: `hrms.payroll.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Run rows' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create a payroll run for an OPEN period',
+        description: 'Permission: `hrms.payroll.create`. Auto-generates PR-YYYYMM-### code when omitted.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created (DRAFT)' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Get payroll run (summary + exception counts)',
+        description: 'Permission: `hrms.payroll.view`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Run detail' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}/calculate': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Calculate / recalculate a payroll run',
+        description:
+          'Permission: `hrms.payroll.calculate`. Idempotent for DRAFT/CALCULATED/REVIEWED; blocked for FINALIZED/CANCELLED.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Calculated' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}/review': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Move a CALCULATED run to REVIEWED',
+        description: 'Permission: `hrms.payroll.review`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Reviewed' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}/finalize': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Finalize a REVIEWED run (freezes employee results)',
+        description:
+          'Permission: `hrms.payroll.finalize`. Blocked by unresolved BLOCKER exceptions, ERROR results, or pending OT.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Finalized' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}/cancel': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Cancel a DRAFT or CALCULATED run',
+        description: 'Permission: `hrms.payroll.create`. Frees employee slots for the period.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Cancelled' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}/employees': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List payroll employee results for a run',
+        description: 'Permission: `hrms.payroll.view`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Employee result rows' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}/employees/{employeeResultId}': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Employee payroll result detail (components + paid-days breakdown)',
+        description: 'Permission: `hrms.payroll.view`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'employeeResultId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Employee result detail' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}/exceptions': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List payroll exceptions (BLOCKER/WARNING) for a run',
+        description: 'Permission: `hrms.payroll.view`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Exception rows' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}/payslips/generate': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Generate immutable payslips for a FINALIZED run',
+        description:
+          'Permission: `hrms.payslip.generate`. Snapshots each FINALIZED employee result (header/attendance/earnings/deductions/employer-contributions/totals) into `HrPayslip.snapshotJson` — never recalculated from live salary masters afterwards. Idempotent: employee results that already have a payslip are skipped, so re-running reports `generatedCount: 0`. 422 when the run is not FINALIZED.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          200: { description: '{ runId, generatedCount, totalPayslips, payslipIds }' },
+          422: { description: 'Run is not FINALIZED' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payslips': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List payslips (finance/HR view)',
+        description: 'Permission: `hrms.payslip.view`. Filters: `year`, `month`, `employeeId`, `legalEntityId`, `branchId`, `departmentId`, `paymentStatus`, `payrollRunId`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'year', in: 'query', required: false, schema: { type: 'integer' } },
+          { name: 'month', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 12 } },
+          { name: 'employeeId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' } },
+          { name: 'payrollRunId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' } },
+          {
+            name: 'paymentStatus',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['UNPAID', 'PARTIAL', 'PAID', 'FAILED'] },
+          },
+        ],
+        responses: { 200: { description: 'Payslip summary rows' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payslips/mine': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List the logged-in employee\u2019s own payslips',
+        description: 'No HR permission required — resolves the caller\u2019s linked `HrEmployee` from `req.context.userId`. 404 if no employee profile is linked.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Own payslip summary rows' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payslips/{payslipId}': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Get payslip detail (includes parsed snapshot)',
+        description: 'Permission: `hrms.payslip.view`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'payslipId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Payslip + parsed snapshot JSON' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payslips/{payslipId}/html': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Render the payslip as a printable HTML document',
+        description: 'Permission: `hrms.payslip.view`. Returns `text/html` (no PDF generation in Phase 9).',
+        parameters: [
+          tenantSlugParam,
+          { name: 'payslipId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'HTML document', content: { 'text/html': {} } } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}/accounting': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Get payroll accrual accounting status for a run',
+        description: 'Permission: `hrms.payroll.accounting.view`. Returns `accountingStatus` (`NOT_POSTED`/`POSTED`/`FAILED`), the linked voucher (if posted), and the last `accountingError`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Accounting status' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/runs/{runId}/accounting/post': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Post the payroll accrual journal (Dr salary/employer expense, Cr salary/statutory payable)',
+        description:
+          'Permission: `hrms.payroll.accounting.post`. Builds balanced Dr/Cr GL buckets from the FINALIZED run\u2019s components, resolves each non-zero bucket against `DefaultAccountMapping` for the run\u2019s legal entity, then posts one JOURNAL voucher via the shared accounting `post()` engine (idempotent per run via a deterministic `eventKey`). 422 `PAYROLL_NOT_FINALIZED` if the run is not FINALIZED; 422 `MISSING_PAYROLL_ACCOUNT_MAPPING` (with `missingKeys[]`) if any required mapping key is unconfigured; 422 `PAYROLL_ENTRY_UNBALANCED` if Dr \u2260 Cr; 422 `NO_OPEN_ACCOUNTING_PERIOD` if the posting date falls outside an open accounting period; re-calling after a successful post returns the existing result (idempotent), calling again after a distinct prior POSTED state without a `postingEventId` returns 422 `PAYROLL_ALREADY_POSTED`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          200: { description: 'Accounting posted (or already-posted result returned idempotently)' },
+          422: { description: 'PAYROLL_NOT_FINALIZED | MISSING_PAYROLL_ACCOUNT_MAPPING | PAYROLL_ENTRY_UNBALANCED | NO_OPEN_ACCOUNTING_PERIOD | PAYROLL_ALREADY_POSTED' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payment-batches': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List salary payment batches',
+        description: 'Permission: `hrms.salary_payment.view`. Filters: `payrollRunId`, `legalEntityId`, `branchId`, `status`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'payrollRunId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' } },
+          {
+            name: 'status',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['DRAFT', 'READY', 'APPROVED', 'PAID', 'CANCELLED'] },
+          },
+        ],
+        responses: { 200: { description: 'Batch rows' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create a DRAFT salary payment batch',
+        description:
+          'Permission: `hrms.salary_payment.create`. Selects UNPAID/FAILED payslips (optionally filtered to `employeeIds`) for a FINALIZED run whose accounting is `POSTED`; snapshots each employee\u2019s primary bank details onto the batch line (masked for display). 422 `PAYROLL_NOT_FINALIZED` / `PAYROLL_ACCOUNTING_NOT_POSTED` if prerequisites are unmet; 422 `INVALID_EMPLOYEE_BANK_DETAILS` (with `invalidEmployees[]`) unless `skipInvalidEmployees: true`; 400 if all candidates are already batched on this run (duplicate-payment guard) or none are eligible.',
+        parameters: [tenantSlugParam],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['payrollRunId', 'treasuryAccountId', 'paymentDate'],
+                properties: {
+                  payrollRunId: { type: 'string', format: 'uuid' },
+                  treasuryAccountId: { type: 'string', format: 'uuid' },
+                  paymentDate: { type: 'string', format: 'date' },
+                  reference: { type: 'string', maxLength: 120 },
+                  employeeIds: { type: 'array', items: { type: 'string', format: 'uuid' } },
+                  skipInvalidEmployees: { type: 'boolean' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: { description: 'Created (DRAFT) with lines' },
+          422: { description: 'PAYROLL_NOT_FINALIZED | PAYROLL_ACCOUNTING_NOT_POSTED | INVALID_EMPLOYEE_BANK_DETAILS' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payment-batches/{batchId}': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Get salary payment batch detail (with lines)',
+        description: 'Permission: `hrms.salary_payment.view`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'batchId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Batch + lines' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payment-batches/{batchId}/ready': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Move a DRAFT batch to READY',
+        description: 'Permission: `hrms.salary_payment.create`. Re-validates bank details + that line totals match the batch total. 422 if the batch is not DRAFT.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'batchId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'READY' }, 422: { description: 'Not DRAFT, or bank/total mismatch' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payment-batches/{batchId}/approve': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Approve a READY batch',
+        description: 'Permission: `hrms.salary_payment.approve`. 422 if the batch is not READY.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'batchId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'APPROVED' }, 422: { description: 'Not READY' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payment-batches/{batchId}/confirm': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Confirm payment results for an APPROVED batch',
+        description:
+          'Permission: `hrms.salary_payment.confirm`. Marks selected lines PAID (default: all PENDING/READY lines, or `lineIds`) / FAILED (`failedLineIds` with a reason each), posts one settlement voucher for the paid total (Dr `SALARY_PAYABLE`, Cr the treasury account\u2019s GL account), and syncs payslip + run payment status. Statutory liability accounts (PF/ESIC/PT/TDS/LWF) are never touched here. 422 if the batch is not APPROVED; 400 if no lines were confirmed as paid or failed.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'batchId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  lineIds: { type: 'array', items: { type: 'string', format: 'uuid' } },
+                  failedLineIds: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['id', 'reason'],
+                      properties: { id: { type: 'string', format: 'uuid' }, reason: { type: 'string', maxLength: 500 } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Batch + lines after confirmation' }, 422: { description: 'Not APPROVED' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payment-batches/{batchId}/export': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Export the batch as a bank upload CSV',
+        description: 'Permission: `hrms.salary_payment.export`. Columns: Employee Code, Name, Account Number, IFSC, Amount, Reference.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'batchId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'CSV file', content: { 'text/csv': {} } } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/payroll/payment-batches/{batchId}/cancel': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Cancel a batch (DRAFT/READY/APPROVED)',
+        description: 'Permission: `hrms.salary_payment.create`. PENDING/READY lines move to SKIPPED. 422 if the batch is already PAID or CANCELLED.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'batchId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'CANCELLED' }, 422: { description: 'Already PAID or CANCELLED' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/statutory/rules': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List statutory rules (PF/ESIC/PT/TDS/LWF/BONUS/GRATUITY)',
+        description: 'Permission: `hrms.statutory.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Rule rows' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create a DRAFT statutory rule',
+        description: 'Permission: `hrms.statutory.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created (DRAFT)' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/statutory/rules/{ruleId}': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Get a statutory rule (with wage-basis lines / PT slabs)',
+        description: 'Permission: `hrms.statutory.view`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'ruleId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Rule detail' } },
+      },
+      patch: {
+        tags: ['HRMS'],
+        summary: 'Update a DRAFT statutory rule',
+        description: 'Permission: `hrms.statutory.manage`. Only DRAFT rules can be edited.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'ruleId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Updated' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/statutory/rules/{ruleId}/activate': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Activate a DRAFT statutory rule',
+        description:
+          'Permission: `hrms.statutory.manage`. Supersedes overlapping ACTIVE rules of the same type/legalEntity/stateCode.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'ruleId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Activated' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/statutory/rules/{ruleId}/wage-basis': {
+      put: {
+        tags: ['HRMS'],
+        summary: 'Replace wage-basis lines for a DRAFT statutory rule',
+        description: 'Permission: `hrms.statutory.manage`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'ruleId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Saved' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/statutory/rules/{ruleId}/pt-slabs': {
+      put: {
+        tags: ['HRMS'],
+        summary: 'Replace PT slabs for a DRAFT PROFESSIONAL_TAX rule',
+        description: 'Permission: `hrms.statutory.manage`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'ruleId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Saved' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/statutory/employees/{employeeId}/profile': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Get employee statutory profile (applicability + TDS declaration)',
+        description: 'Permission: `hrms.statutory.view`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'employeeId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Profile' } },
+      },
+      patch: {
+        tags: ['HRMS'],
+        summary: 'Update employee statutory profile / applicability overrides',
+        description:
+          'Permission: `hrms.statutory.manage` or `hrms.statutory.override`. overrideReason is required when changing *Applicable flags or tdsManualMonthly.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'employeeId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Updated' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/statutory/resolve': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Resolve the effective statutory rule for an employee on a date',
+        description: 'Permission: `hrms.statutory.view`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'type', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'employeeId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'date', in: 'query', required: false, schema: { type: 'string', format: 'date' } },
+        ],
+        responses: { 200: { description: 'Effective rule + resolution context' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/statutory/registers/{kind}': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'PF/ESIC/PT/TDS/LWF statutory register for a payroll period',
+        description: 'Permission: `hrms.statutory.reports`. kind: pf | esic | pt | tds | lwf.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'kind', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'payrollPeriodId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' } },
+          { name: 'legalEntityId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' } },
+          { name: 'branchId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Register rows' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/statutory/registers/{kind}/export.csv': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Export a statutory register as CSV',
+        description: 'Permission: `hrms.statutory.reports`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'kind', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'payrollPeriodId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'CSV file' } },
+      },
+    },
+
+    // ─── Phase 10 — Employee Loans & Salary Advances ────────────────────────
+
+    '/t/{tenantSlug}/hrms/loans': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'List employee loans/advances',
+        description: 'Permission: `hrms.loan.view`. Filters: type, status, employeeId, legalEntityId, branchId.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Loan rows' } },
+      },
+      post: {
+        tags: ['HRMS'],
+        summary: 'Create a DRAFT loan or salary advance request',
+        description:
+          'Permission: `hrms.loan.create`. employeeId defaults to the caller\'s own linked employee record when omitted. Auto-generates LN-###### / ADV-###### code.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created (DRAFT)' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/mine': {
+      get: {
+        tags: ['HRMS'],
+        summary: "List the caller's own loans/advances",
+        description: 'No loan permission required — scoped to the employee record linked to the caller\'s user account.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Loan rows' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Get loan/advance detail (with recovery schedule + repayments)',
+        description: 'Permission: `hrms.loan.view`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Loan detail' } },
+      },
+      patch: {
+        tags: ['HRMS'],
+        summary: 'Update a DRAFT loan/advance',
+        description: 'Permission: `hrms.loan.create`. Only DRAFT loans/advances can be edited.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Updated' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}/submit': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Submit a DRAFT loan/advance for approval',
+        description: 'Permission: `hrms.loan.create`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Submitted' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}/approve': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Approve a SUBMITTED loan/advance and set the recovery plan',
+        description:
+          'Permission: `hrms.loan.approve`. Requires installmentAmount and/or installmentCount plus recoveryStartYear/Month. The reporting manager or an `hrms.loan.manage` holder may approve — self-approval is always blocked.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Approved' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}/reject': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Reject a SUBMITTED loan/advance',
+        description: 'Permission: `hrms.loan.approve`. Same approver rules as approve; self-approval/rejection is blocked.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Rejected' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}/disburse': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Disburse an APPROVED loan/advance and generate its recovery schedule',
+        description:
+          'Permission: `hrms.loan.disburse`. Posts Dr employee-loan/advance receivable · Cr treasury bank, then generates the installment schedule. Idempotent per loan via a deterministic eventKey. Known limitation: the shared GL posting engine does not yet support the EMPLOYEE party type, so this currently fails with `PARTY_TYPE_NOT_SUPPORTED` (422) even with a fully configured chart of accounts — tracked for a future posting-engine phase.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Disbursed' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}/cancel': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Cancel a DRAFT, SUBMITTED, or APPROVED loan/advance',
+        description:
+          'Permission: `hrms.loan.create`. APPROVED cancellation requires `hrms.loan.manage` or ownership. Cannot cancel once disbursed.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Cancelled' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}/close': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Close a fully recovered loan/advance',
+        description: 'Permission: `hrms.loan.manage`. Requires zero outstanding balance and no pending installments.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Closed' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}/schedules/{scheduleId}/skip': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Skip a PENDING recovery installment',
+        description: 'Permission: `hrms.loan.manage`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'scheduleId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Skipped' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}/schedules/{scheduleId}/partial': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Manually record a partial/full recovery against one installment',
+        description: 'Permission: `hrms.loan.manage`. Amount cannot exceed the due installment.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'scheduleId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Recovered' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}/repayments': {
+      post: {
+        tags: ['HRMS'],
+        summary: 'Record an early/lump-sum repayment against a disbursed loan/advance',
+        description:
+          'Permission: `hrms.loan.repayment`. Requires treasuryAccountId to post to accounting; amount cannot exceed the outstanding balance. Cancels/shrinks future PENDING installments from the end. Same GL limitation as disburse — see disburse endpoint note.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 201: { description: 'Repayment recorded' } },
+      },
+    },
+    '/t/{tenantSlug}/hrms/loans/{loanId}/accounting': {
+      get: {
+        tags: ['HRMS'],
+        summary: 'Loan/advance accounting summary (disbursement voucher + repayments)',
+        description: 'Permission: `hrms.loan.view`. status filter: POSTED | PENDING (by repayment voucher presence).',
+        parameters: [
+          tenantSlugParam,
+          { name: 'loanId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'status', in: 'query', required: false, schema: { type: 'string', enum: ['POSTED', 'PENDING'] } },
+        ],
+        responses: { 200: { description: 'Accounting summary' } },
       },
     },
   },

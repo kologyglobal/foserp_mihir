@@ -10,7 +10,6 @@ import {
 import { CrmDrawerShell } from '../CrmDrawerShell'
 import { FormField } from '../../forms/FormField'
 import { Input, Textarea } from '../../forms/Inputs'
-import { Button } from '../../ui/Button'
 import { ErpButton, ErpButtonGroup } from '../../erp/ErpButton'
 import { useActiveLocations } from '../../../hooks/useMasterLists'
 
@@ -118,14 +117,23 @@ export function QuickRfqDrawer({ open, onClose }: QuickRfqDrawerProps) {
     <CrmDrawerShell
       open={open}
       placement="modal"
+      size="md"
+      icon={FileText}
+      accent="primary"
       title="Quick RFQ"
       subtitle="Draft header now — complete vendors and lines in the editor"
       onClose={onClose}
+      closeDisabled={submitting}
       footer={
         savedId ? null : (
-          <Button type="submit" form="crm-quick-rfq-form" className="w-full" disabled={submitting}>
-            Create Draft RFQ
-          </Button>
+          <div className="crm-popup-footer__actions">
+            <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+              Cancel
+            </ErpButton>
+            <ErpButton type="submit" form="crm-quick-rfq-form" variant="primary" disabled={submitting}>
+              {submitting ? 'Creating…' : 'Create Draft RFQ'}
+            </ErpButton>
+          </div>
         )
       }
     >

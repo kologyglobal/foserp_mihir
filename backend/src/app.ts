@@ -10,6 +10,7 @@ import { prisma } from './config/prisma.js'
 import { errorMiddleware } from './middleware/error.middleware.js'
 import authRoutes from './modules/auth/auth.routes.js'
 import crmRoutes from './modules/crm/crm.routes.js'
+import notificationRoutes from './modules/notifications/notification.routes.js'
 import departmentRoutes from './modules/departments/department.routes.js'
 import {
   responsibilityRoutes,
@@ -34,6 +35,7 @@ import accountingRoutes from './modules/accounting/accounting.routes.js'
 import organisationRoutes from './modules/organisation/organisation.routes.js'
 import manufacturingRoutes from './modules/manufacturing/manufacturing.routes.js'
 import maintenanceRoutes from './modules/maintenance/maintenance.routes.js'
+import hrmsRoutes from './modules/hrms/hrms.routes.js'
 import inventoryRoutes from './modules/inventory/inventory.routes.js'
 import qualityRoutes from './modules/quality/quality.routes.js'
 import dispatchRoutes from './modules/dispatch/dispatch.routes.js'
@@ -62,6 +64,11 @@ export function createApp() {
           'http://127.0.0.1:5173',
           'http://localhost:5174',
           'http://127.0.0.1:5174',
+          // Expo web (Metro) + common Expo ports
+          'http://localhost:8081',
+          'http://127.0.0.1:8081',
+          'http://localhost:19006',
+          'http://127.0.0.1:19006',
         ]),
       ]
     : [env.FRONTEND_URL]
@@ -70,9 +77,19 @@ export function createApp() {
       origin(origin, callback) {
         if (!origin || corsOrigins.includes(origin)) {
           callback(null, origin ?? corsOrigins[0])
-        } else {
-          callback(null, false)
+          return
         }
+        // Dev: allow private LAN hosts talking to the API (Expo web/device)
+        if (
+          env.isDev &&
+          /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$/i.test(
+            origin,
+          )
+        ) {
+          callback(null, origin)
+          return
+        }
+        callback(null, false)
       },
       credentials: true,
     }),
@@ -142,6 +159,7 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/modules', moduleRoutes)
   app.use('/api/v1/tenants/:tenantId/roles', roleRoutes)
   app.use('/api/v1/tenants/:tenantId/crm', crmRoutes)
+  app.use('/api/v1/tenants/:tenantId/notifications', notificationRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/items', itemRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/vendors', vendorRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/imports', masterImportRoutes)
@@ -158,6 +176,7 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/organisation', organisationRoutes)
   app.use('/api/v1/tenants/:tenantId/manufacturing', manufacturingRoutes)
   app.use('/api/v1/tenants/:tenantId/maintenance', maintenanceRoutes)
+  app.use('/api/v1/tenants/:tenantId/hrms', hrmsRoutes)
   app.use('/api/v1/tenants/:tenantId/purchase', purchaseRoutes)
   app.use('/api/v1/tenants/:tenantId/quality', qualityRoutes)
   app.use('/api/v1/tenants/:tenantId/dispatch', dispatchRoutes)
@@ -180,6 +199,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/modules', moduleRoutes)
   app.use('/api/v1/t/:tenantSlug/roles', roleRoutes)
   app.use('/api/v1/t/:tenantSlug/crm', crmRoutes)
+  app.use('/api/v1/t/:tenantSlug/notifications', notificationRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/items', itemRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/vendors', vendorRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/imports', masterImportRoutes)
@@ -194,6 +214,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/organisation', organisationRoutes)
   app.use('/api/v1/t/:tenantSlug/manufacturing', manufacturingRoutes)
   app.use('/api/v1/t/:tenantSlug/maintenance', maintenanceRoutes)
+  app.use('/api/v1/t/:tenantSlug/hrms', hrmsRoutes)
   app.use('/api/v1/t/:tenantSlug/purchase', purchaseRoutes)
   app.use('/api/v1/t/:tenantSlug/quality', qualityRoutes)
   app.use('/api/v1/t/:tenantSlug/dispatch', dispatchRoutes)

@@ -151,11 +151,15 @@ function aggregateTotals(
 ) {
   const subtotal = lines.reduce((s, l) => s + l.quantity * l.rate, 0)
   const lineDiscount = lines.reduce((s, l) => s + l.discountAmount, 0)
-  const discount = headerDiscount + lineDiscount
-  const taxableAmount = lines.reduce((s, l) => s + l.taxableAmount, 0)
-  const cgst = lines.reduce((s, l) => s + l.cgst, 0)
-  const sgst = lines.reduce((s, l) => s + l.sgst, 0)
-  const igst = lines.reduce((s, l) => s + l.igst, 0)
+  const taxableBeforeHeader = lines.reduce((s, l) => s + l.taxableAmount, 0)
+  // Header overall discount applies only to taxable (pre-tax); never to tax-inclusive totals.
+  const cappedHeaderDiscount = Math.min(Math.max(0, headerDiscount), Math.max(0, taxableBeforeHeader))
+  const taxableAmount = Number((taxableBeforeHeader - cappedHeaderDiscount).toFixed(2))
+  const taxScale = taxableBeforeHeader > 0 ? taxableAmount / taxableBeforeHeader : 0
+  const cgst = lines.reduce((s, l) => s + l.cgst, 0) * taxScale
+  const sgst = lines.reduce((s, l) => s + l.sgst, 0) * taxScale
+  const igst = lines.reduce((s, l) => s + l.igst, 0) * taxScale
+  const discount = cappedHeaderDiscount + lineDiscount
   const lineFreight = lines.reduce((s, l) => s + l.freightAllocation, 0)
   const lineOther = lines.reduce((s, l) => s + l.otherCharges, 0)
   const freight = headerFreight + lineFreight

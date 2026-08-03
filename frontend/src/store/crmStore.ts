@@ -59,6 +59,7 @@ import { useMasterStore } from './masterStore'
 import { canUseItemInSales } from '../utils/opportunityItemOptions'
 import { resolveQuotationRevisionPolicy } from '../utils/quotationRevisionPolicy'
 import { nextDocumentNo } from '../utils/documentNumbers'
+import { quotationNoWithRevision, quotationRevisionLabel } from '../utils/quotationEngine/revisionLabels'
 import { assertPermission } from '../utils/permissions'
 import { useSalesStore } from './salesStore'
 import { ERP_STORAGE_KEYS, erpStorage } from './persistConfig'
@@ -278,7 +279,7 @@ interface CrmState {
 
   createQuotationDocumentFromTemplate: (quotationId: string, templateId: string, opportunityId?: string | null) => StoreAction<StoreActionResult & { documentId?: string }>
   updateQuotationDocumentSections: (documentId: string, sections: QuotationSection[]) => StoreAction<StoreActionResult>
-  updateQuotationDocumentPriceTable: (documentId: string, priceLines: QuotationPriceLine[], extras?: { freightAmount?: number; installationAmount?: number; customCharges?: number }) => StoreAction<StoreActionResult>
+  updateQuotationDocumentPriceTable: (documentId: string, priceLines: QuotationPriceLine[], extras?: Partial<import('../components/quotations/QuotationLineItemsEditor').QuotationLineExtras> & { freightAmount?: number; installationAmount?: number; customCharges?: number }) => StoreAction<StoreActionResult>
   createQuotationRevision: (documentId: string, reason: string) => StoreAction<StoreActionResult & { documentId?: string }>
   deleteQuotation: (quotationId: string) => StoreAction<StoreActionResult>
   markQuotationDocumentSent: (documentId: string) => StoreAction<StoreActionResult>
@@ -522,6 +523,21 @@ export const useCrmStore = create<CrmState>()(
           const lead = useSalesStore.getState().getLead(input.leadId)
           const gate = resolveLeadConvertToOpportunityGate(lead)
           if (!gate.ok) return { ok: false, error: gate.reason }
+          // Prefer form input, fall back to lead commercial fields.
+          if (lead) {
+            input = {
+              ...input,
+              productRequirement: input.productRequirement || lead.productRequirement || '',
+              value: input.value > 0 ? input.value : (lead.expectedValue ?? 0),
+              expectedCloseDate: input.expectedCloseDate || lead.expectedCloseDate || '',
+              priority: input.priority || lead.priority,
+              nextFollowUpDate: input.nextFollowUpDate || lead.nextFollowUpDate || null,
+              contactId: input.contactId || lead.contactId || null,
+              customerId: input.customerId || lead.customerId || '',
+              ownerId: input.ownerId || lead.leadOwnerId,
+              ownerName: input.ownerName || lead.leadOwnerName,
+            }
+          }
         }
         const audit = stampCreated()
         const syncedLines = syncOpportunityLines(input.lines ?? [])
@@ -568,6 +584,19 @@ export const useCrmStore = create<CrmState>()(
           const link = useSalesStore.getState().linkLeadToOpportunity(input.leadId, opp.id)
           if (link instanceof Promise) return { ok: false, error: 'Lead link failed' }
           if (!link.ok) return link
+          // Link prior lead engagement so opportunity 360 shows the full history.
+          set((s) => ({
+            activities: s.activities.map((a) =>
+              a.leadId === input.leadId && !a.opportunityId
+                ? { ...a, opportunityId: opp.id }
+                : a,
+            ),
+            followUps: s.followUps.map((f) =>
+              f.leadId === input.leadId && !f.opportunityId
+                ? { ...f, opportunityId: opp.id }
+                : f,
+            ),
+          }))
         }
         const lineNote = syncedLines.length
           ? `Opportunity created with ${syncedLines.length} item line${syncedLines.length === 1 ? '' : 's'} worth ₹${computedValue.toLocaleString('en-IN')}.`
@@ -592,32 +621,51 @@ export const useCrmStore = create<CrmState>()(
         const targetStage = LEAD_STAGE_TO_OPPORTUNITY_STAGE[lead.stage]
         if (!targetStage) return
 
+        const commercialPatch = {
+          customerId: lead.customerId ?? '',
+          contactId: lead.contactId ?? null,
+          opportunityName: lead.prospectName,
+          productRequirement: lead.productRequirement ?? '',
+          value: lead.expectedValue ?? 0,
+          expectedCloseDate: lead.expectedCloseDate ?? '',
+          ownerId: lead.leadOwnerId,
+          ownerName: lead.leadOwnerName,
+          priority: lead.priority,
+          nextFollowUpDate: lead.nextFollowUpDate ?? null,
+          locationId: lead.locationId ?? null,
+        }
+
         const existing = get().opportunities.find((o) => o.leadId === lead.id)
         if (existing) {
-          if (existing.stage === targetStage) return
+          const stageChanged = existing.stage !== targetStage
           const prevStage = existing.stage
           set((s) => ({
             opportunities: s.opportunities.map((o) =>
               o.id === existing.id
                 ? mergeAudit(o, {
+                    ...commercialPatch,
                     stage: targetStage,
-                    probability: getStageProbability(targetStage) ?? o.probability,
+                    probability: stageChanged
+                      ? (getStageProbability(targetStage) ?? o.probability)
+                      : o.probability,
                     ...stampModified(o),
                   })
                 : o,
             ),
           }))
-          logActivity(get, set, {
-            type: 'stage_change',
-            subject: `Stage: ${opportunityStageLabel(prevStage)} → ${opportunityStageLabel(targetStage)}`,
-            description: `Synced from lead stage: ${leadStageLabel(lead.stage)}.`,
-            customerId: existing.customerId,
-            contactId: existing.contactId,
-            opportunityId: existing.id,
-            leadId: lead.id,
-            ownerId: existing.ownerId,
-            ownerName: existing.ownerName,
-          })
+          if (stageChanged) {
+            logActivity(get, set, {
+              type: 'stage_change',
+              subject: `Stage: ${opportunityStageLabel(prevStage)} → ${opportunityStageLabel(targetStage)}`,
+              description: `Synced from lead stage: ${leadStageLabel(lead.stage)}.`,
+              customerId: existing.customerId || commercialPatch.customerId,
+              contactId: commercialPatch.contactId ?? existing.contactId,
+              opportunityId: existing.id,
+              leadId: lead.id,
+              ownerId: commercialPatch.ownerId || existing.ownerId,
+              ownerName: commercialPatch.ownerName || existing.ownerName,
+            })
+          }
           return
         }
 
@@ -625,19 +673,11 @@ export const useCrmStore = create<CrmState>()(
         const opp: Opportunity = {
           id: genId('opp'),
           opportunityNo: nextDocumentNo('OPP', get().opportunities.map((o) => o.opportunityNo)),
-          customerId: lead.customerId ?? '',
-          contactId: lead.contactId ?? null,
           productId: null,
-          opportunityName: lead.prospectName,
-          productRequirement: lead.productRequirement ?? '',
+          ...commercialPatch,
           lines: [],
           stage: targetStage,
-          value: lead.expectedValue ?? 0,
           probability: getStageProbability(targetStage) ?? lead.probability ?? 0,
-          expectedCloseDate: lead.expectedCloseDate ?? '',
-          ownerId: lead.leadOwnerId,
-          ownerName: lead.leadOwnerName,
-          priority: lead.priority,
           status: 'open',
           lostReason: null,
           healthScore: 60,
@@ -646,8 +686,6 @@ export const useCrmStore = create<CrmState>()(
           salesOrderId: null,
           leadId: lead.id,
           lastActivityAt: audit.createdAt,
-          nextFollowUpDate: lead.nextFollowUpDate ?? null,
-          locationId: lead.locationId ?? null,
           ...audit,
         }
         set((s) => ({ opportunities: [opp, ...s.opportunities] }))
@@ -1151,35 +1189,65 @@ export const useCrmStore = create<CrmState>()(
         if (!doc) return { ok: false, error: 'Document not found' }
         const sellable = assertSellableItemIds(priceLines.map((l) => l.itemId))
         if (!sellable.ok) return sellable
+        const lines = syncLineTotals(priceLines)
+        const chargePayload = {
+          freightAmount: extras?.freightAmount ?? doc.freightAmount,
+          installationAmount: extras?.installationAmount ?? doc.installationAmount,
+          customCharges: extras?.customCharges ?? doc.customCharges,
+          orderDiscountCalcType: extras?.orderDiscountCalcType ?? doc.orderDiscountCalcType,
+          orderDiscountValue: extras?.orderDiscountValue ?? doc.orderDiscountValue,
+          freightCalcType: extras?.freightCalcType ?? doc.freightCalcType,
+          freightValue: extras?.freightValue ?? doc.freightValue ?? extras?.freightAmount ?? doc.freightAmount,
+          freightIsTaxable: extras?.freightIsTaxable ?? doc.freightIsTaxable,
+          freightTaxRate: extras?.freightTaxRate ?? doc.freightTaxRate,
+          installationCalcType: extras?.installationCalcType ?? doc.installationCalcType,
+          installationValue:
+            extras?.installationValue ?? doc.installationValue ?? extras?.installationAmount ?? doc.installationAmount,
+          installationIsTaxable: extras?.installationIsTaxable ?? doc.installationIsTaxable,
+          installationTaxRate: extras?.installationTaxRate ?? doc.installationTaxRate,
+          customChargesCalcType: extras?.customChargesCalcType ?? doc.customChargesCalcType,
+          customChargesValue:
+            extras?.customChargesValue ?? doc.customChargesValue ?? extras?.customCharges ?? doc.customCharges,
+          customChargesIsTaxable: extras?.customChargesIsTaxable ?? doc.customChargesIsTaxable,
+          customChargesTaxRate: extras?.customChargesTaxRate ?? doc.customChargesTaxRate,
+        }
         if (isApiMode()) {
-          const lines = syncLineTotals(priceLines)
-          const freight = extras?.freightAmount ?? doc.freightAmount
-          const installation = extras?.installationAmount ?? doc.installationAmount
-          const custom = extras?.customCharges ?? doc.customCharges
           return import('../services/bridges/crmApiBridge').then((m) =>
             m.apiUpdateQuotationDocument(doc.quotationId, documentId, {
               priceLines: lines,
-              freightAmount: freight,
-              installationAmount: installation,
-              customCharges: custom,
+              ...chargePayload,
             }),
           )
         }
         if (doc.locked) return { ok: false, error: 'Approved or sent quotation is locked' }
-        const lines = syncLineTotals(priceLines)
-        const freight = extras?.freightAmount ?? doc.freightAmount
-        const installation = extras?.installationAmount ?? doc.installationAmount
-        const custom = extras?.customCharges ?? doc.customCharges
-        const total = calcPriceSummary(lines, freight, installation, custom).grandTotal
+        const summary = calcPriceSummary(lines, chargePayload)
         set((s) => ({
           quotationDocuments: s.quotationDocuments.map((d) =>
             d.id === documentId
               ? mergeAudit(d, {
                   priceLines: lines,
-                  freightAmount: freight,
-                  installationAmount: installation,
-                  customCharges: custom,
-                  totalAmount: total,
+                  freightAmount: summary.freightAmount,
+                  installationAmount: summary.installationAmount,
+                  customCharges: summary.customCharges,
+                  orderDiscountCalcType: summary.totals.orderDiscount.calculationType,
+                  orderDiscountValue: summary.totals.orderDiscount.value,
+                  orderDiscountAmount: summary.totals.orderDiscount.calculatedAmount,
+                  freightCalcType: summary.totals.freight.calculationType,
+                  freightValue: summary.totals.freight.value,
+                  freightIsTaxable: summary.totals.freight.isTaxable,
+                  freightTaxRate: summary.totals.freight.taxRate,
+                  freightTaxAmount: summary.totals.freight.taxAmount,
+                  installationCalcType: summary.totals.installation.calculationType,
+                  installationValue: summary.totals.installation.value,
+                  installationIsTaxable: summary.totals.installation.isTaxable,
+                  installationTaxRate: summary.totals.installation.taxRate,
+                  installationTaxAmount: summary.totals.installation.taxAmount,
+                  customChargesCalcType: summary.totals.otherCharges.calculationType,
+                  customChargesValue: summary.totals.otherCharges.value,
+                  customChargesIsTaxable: summary.totals.otherCharges.isTaxable,
+                  customChargesTaxRate: summary.totals.otherCharges.taxRate,
+                  customChargesTaxAmount: summary.totals.otherCharges.taxAmount,
+                  totalAmount: summary.grandTotal,
                   ...stampModified(d),
                 })
               : d,
@@ -1293,7 +1361,7 @@ export const useCrmStore = create<CrmState>()(
         logActivity(get, set, {
           type: 'quotation_sent',
           subject: 'Quotation sent to customer',
-          description: `Rev ${doc.revisionNo}`,
+          description: quotationRevisionLabel(doc.revisionNo),
           quotationId: doc.quotationId,
           opportunityId: doc.opportunityId ?? undefined,
           ownerId: doc.createdById,
@@ -1947,7 +2015,7 @@ export const useCrmStore = create<CrmState>()(
 
         const line = primaryPriceLine(doc)
         const lines = syncLineTotals(doc.priceLines).filter((l) => !l.isOptional)
-        const summary = calcPriceSummary(lines, doc.freightAmount, doc.installationAmount, doc.customCharges)
+        const summary = calcPriceSummary(lines, doc)
         const soLines = buildSalesOrderLinesFromQuotationDocument({
           document: doc,
           opportunity,
@@ -2036,7 +2104,7 @@ export const useCrmStore = create<CrmState>()(
           subject: alreadyWon ? `Sales order ${soNo} linked` : 'CRM handover complete',
           description: alreadyWon
             ? `Quotation ${salesQuo?.quotationNo ?? doc.quotationId} converted to ${soNo} (opportunity was already Won).`
-            : `Quotation ${salesQuo?.quotationNo ?? doc.quotationId} Rev ${doc.revisionNo} converted to Sales Order ${soNo}.`,
+            : `Quotation ${quotationNoWithRevision(salesQuo?.quotationNo ?? doc.quotationId, doc.revisionNo)} converted to Sales Order ${soNo}.`,
           quotationId: doc.quotationId,
           opportunityId: doc.opportunityId ?? undefined,
           customerId: salesQuo?.customerId,
