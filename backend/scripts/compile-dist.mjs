@@ -41,8 +41,7 @@ function collectEntryPoints(dir, base = dir) {
 const entryPoints = collectEntryPoints(srcDir)
 console.log(`[compile-dist] Transpiling ${entryPoints.length} files with esbuild…`)
 
-const result = await esbuild.build({
-  entryPoints,
+const buildOptions = {
   outdir: outDir,
   outbase: srcDir,
   platform: 'node',
@@ -50,11 +49,18 @@ const result = await esbuild.build({
   target: 'node20',
   packages: 'external',
   logLevel: 'warning',
-})
+}
 
-if (result.errors.length) {
-  console.error('[compile-dist] esbuild failed')
-  process.exit(1)
+const BATCH_SIZE = 200
+for (let i = 0; i < entryPoints.length; i += BATCH_SIZE) {
+  const batch = entryPoints.slice(i, i + BATCH_SIZE)
+  const label = `${i + 1}-${Math.min(i + batch.length, entryPoints.length)}`
+  console.log(`[compile-dist] Batch ${label}/${entryPoints.length}…`)
+  const result = await esbuild.build({ ...buildOptions, entryPoints: batch })
+  if (result.errors.length) {
+    console.error('[compile-dist] esbuild failed')
+    process.exit(1)
+  }
 }
 
 console.log('[compile-dist] Done.')

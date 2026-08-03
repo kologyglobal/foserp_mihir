@@ -8,16 +8,22 @@ const server = join(backend, 'dist', 'server.js')
 const frontend = join(backend, 'public')
 
 if (!existsSync(server)) {
-  throw new Error(`Backend build is missing: ${server}. Hostinger must run npm run deploy:build before start.`)
+  throw new Error(
+    `Backend build is missing: ${server}. Run npm run build in backend (Hostinger deploy build).`,
+  )
 }
 const prismaModule = join(backend, 'dist', 'config', 'prisma.js')
 if (!existsSync(prismaModule)) {
   throw new Error(
-    `Backend build is incomplete: ${prismaModule} is missing. Delete dist/ and tsconfig.tsbuildinfo, then run npm run deploy:build and confirm dist/config/prisma.js exists before restart.`,
+    `Backend build is incomplete: ${prismaModule} is missing. Re-run npm run build and confirm dist/config/prisma.js exists.`,
   )
 }
 if (!existsSync(join(frontend, 'index.html'))) {
-  throw new Error(`Frontend build is missing: ${frontend}. Hostinger must run npm run deploy:build before start.`)
+  console.warn(
+    '[hostinger-start] No public/index.html — API-only mode. Set SKIP_FRONTEND=1 on stage API hosts or run full deploy with frontend/.',
+  )
+} else {
+  console.log('[hostinger-start] SPA available at public/')
 }
 
 process.chdir(backend)
@@ -41,7 +47,7 @@ if (runMigrateOnStart) {
     )
   }
 } else {
-  console.log('[hostinger-start] Migrations run at deploy:build time; skipping startup migrate.')
+  console.log('[hostinger-start] Skipping startup migrate (run build:with-migrate or RUN_MIGRATE_ON_START when DB is ready).')
 }
 
 await import(pathToFileURL(server).href)

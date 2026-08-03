@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "npm run build:app",
+    "build": "node scripts/build-hostinger-deploy.mjs",
     "build:app": "prisma generate && node scripts/clean-dist.mjs && node scripts/compile-dist.mjs && node scripts/verify-dist-critical.mjs",
     "build:app:tsc": "prisma generate && node scripts/clean-dist.mjs --keep-tsbuildinfo && node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.build.json && node scripts/verify-dist-critical.mjs",
     "build:with-migrate": "node scripts/migrate-deploy.mjs && npm run build:app",
