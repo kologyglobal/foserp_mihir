@@ -202,23 +202,31 @@ export function HrmsHomePage() {
 
   return (
     <OperationalPageShell
-      title="HRMS"
+      variant="dynamics"
+      layout="enterprise"
+      badge="HRMS"
+      title="Overview"
       description="Workforce overview — employees, time, leave, payroll, and exits."
-      breadcrumbs={[{ label: 'HRMS' }]}
+      breadcrumbs={[{ label: 'HRMS', to: '/hrms' }, { label: 'Overview' }]}
+      autoBreadcrumbs={false}
+      favoritePath="/hrms"
+      commandBar={
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={
+            perms.canCreateEmployee
+              ? { id: 'add-employee', label: 'Add Employee', icon: Plus, onClick: () => navigate('/hrms/employees/new') }
+              : undefined
+          }
+          secondaryActions={
+            perms.canCreatePayroll
+              ? [{ id: 'run-payroll', label: 'Run Payroll', icon: Banknote, onClick: () => navigate('/hrms/payroll/runs') }]
+              : []
+          }
+        />
+      }
     >
-      <ErpCommandBar
-        primaryAction={
-          perms.canCreateEmployee
-            ? { id: 'add-employee', label: 'Add Employee', icon: Plus, onClick: () => navigate('/hrms/employees/new') }
-            : undefined
-        }
-        secondaryActions={
-          perms.canCreatePayroll
-            ? [{ id: 'run-payroll', label: 'Run Payroll', icon: Banknote, onClick: () => navigate('/hrms/payroll/runs') }]
-            : []
-        }
-      />
-
       <div className="mb-4">
         <HrKpiStrip items={kpiItems} />
       </div>
