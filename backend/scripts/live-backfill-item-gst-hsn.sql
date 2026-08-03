@@ -42,7 +42,7 @@ WHERE tenantId = @tenantId AND deletedAt IS NULL
 ORDER BY code
 LIMIT 50;
 
-/* ── 2) Backfill hsnId + gstGroupId from existing hsnCode text ── */
+/* ── 2) Backfill hsnId + gstGroupId from exact hsnCode match ── */
 UPDATE master_items i
 INNER JOIN master_hsn_codes h
   ON h.tenantId = i.tenantId
@@ -62,6 +62,30 @@ WHERE i.tenantId = @tenantId
     OR i.gstGroupId IS NULL OR i.gstGroupId = ''
     OR i.gstGroupId <> h.gstGroupId
   );
+
+/* ── 2b) Prefix match short legacy codes (e.g. 7208 → 721070) when unique ── */
+UPDATE master_items i
+INNER JOIN master_hsn_codes h
+  ON h.tenantId = i.tenantId
+ AND h.deletedAt IS NULL
+ AND h.status = 'ACTIVE'
+ AND h.code LIKE CONCAT(i.hsnCode, '%')
+SET
+  i.hsnId = h.id,
+  i.gstGroupId = h.gstGroupId,
+  i.hsnCode = h.code,
+  i.updatedAt = NOW(3)
+WHERE i.tenantId = @tenantId
+  AND i.deletedAt IS NULL
+  AND i.hsnCode IS NOT NULL
+  AND i.hsnCode <> ''
+  AND LENGTH(i.hsnCode) >= 4
+  AND (i.hsnId IS NULL OR i.hsnId = '' OR i.gstGroupId IS NULL OR i.gstGroupId = '')
+  AND (
+    SELECT COUNT(*) FROM master_hsn_codes hx
+    WHERE hx.tenantId = i.tenantId AND hx.deletedAt IS NULL AND hx.status = 'ACTIVE'
+      AND hx.code LIKE CONCAT(i.hsnCode, '%')
+  ) = 1;
 
 /* ── 3) Fix items that have hsnId but wrong/missing gstGroupId ── */
 UPDATE master_items i

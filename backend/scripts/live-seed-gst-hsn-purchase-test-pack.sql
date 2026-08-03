@@ -88,6 +88,18 @@ INSERT INTO master_hsn_codes (id, tenantId, code, gstGroupId, description, statu
 SELECT 'b2010101-0001-4001-8001-000000000009', @tenantId, '4016', g.id, 'Articles of vulcanised rubber — seals, gaskets', 'ACTIVE', NOW(3), NOW(3)
 FROM master_gst_groups g WHERE g.tenantId=@tenantId AND g.code='GST18-GOODS' AND @tenantId IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM master_hsn_codes WHERE tenantId=@tenantId AND code='4016');
+INSERT INTO master_hsn_codes (id, tenantId, code, gstGroupId, description, status, createdAt, updatedAt)
+SELECT 'b2010101-0001-4001-8001-000000000010', @tenantId, '7311', g.id, 'Compressed gas containers — air tanks', 'ACTIVE', NOW(3), NOW(3)
+FROM master_gst_groups g WHERE g.tenantId=@tenantId AND g.code='GST18-GOODS' AND @tenantId IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM master_hsn_codes WHERE tenantId=@tenantId AND code='7311');
+INSERT INTO master_hsn_codes (id, tenantId, code, gstGroupId, description, status, createdAt, updatedAt)
+SELECT 'b2010101-0001-4001-8001-000000000011', @tenantId, '4011', g.id, 'New pneumatic tyres', 'ACTIVE', NOW(3), NOW(3)
+FROM master_gst_groups g WHERE g.tenantId=@tenantId AND g.code='GST18-GOODS' AND @tenantId IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM master_hsn_codes WHERE tenantId=@tenantId AND code='4011');
+INSERT INTO master_hsn_codes (id, tenantId, code, gstGroupId, description, status, createdAt, updatedAt)
+SELECT 'b2010101-0001-4001-8001-000000000012', @tenantId, '3814', g.id, 'Organic composite solvents and thinners', 'ACTIVE', NOW(3), NOW(3)
+FROM master_gst_groups g WHERE g.tenantId=@tenantId AND g.code='GST18-GOODS' AND @tenantId IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM master_hsn_codes WHERE tenantId=@tenantId AND code='3814');
 
 UPDATE master_hsn_codes h
 JOIN master_gst_groups g ON g.tenantId=h.tenantId AND g.deletedAt IS NULL
@@ -97,7 +109,7 @@ SET h.gstGroupId = CASE h.code
   ELSE (SELECT id FROM master_gst_groups WHERE tenantId=@tenantId AND code='GST18-GOODS' LIMIT 1)
 END,
 h.status='ACTIVE', h.deletedAt=NULL, h.updatedAt=NOW(3)
-WHERE h.tenantId=@tenantId AND h.code IN ('871639','730890','732690','848180','721070','8708','3208','8311','4016');
+WHERE h.tenantId=@tenantId AND h.code IN ('871639','730890','732690','848180','721070','8708','3208','8311','4016','7311','4011','3814');
 
 /* ---- GST rates (Gujarat intra + common inter-state) ---- */
 INSERT INTO master_gst_rates (id, tenantId, code, gstGroupId, fromState, locationStateCode, dateFrom, sgst, cgst, igst, applicableFor, status, createdAt, updatedAt)

@@ -72,6 +72,66 @@ function emptyToPositiveNumber(fallback: number) {
   }
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_RE.test(value)
+}
+
+/** Drop stale demo/non-UUID FK values so Zod does not show generic "Invalid input". */
+function optionalUuidFormValue(value: string | null | undefined): string {
+  if (!value) return ''
+  return isUuid(value) ? value : ''
+}
+
+function preprocessOptionalUuid(value: unknown): string | null {
+  if (value === '' || value == null) return null
+  const s = String(value)
+  return isUuid(s) ? s : null
+}
+
+const optionalUuidField = z.preprocess(
+  preprocessOptionalUuid,
+  z.string().uuid().nullable().optional(),
+)
+
+function resolveItemTaxFields(
+  existing: Pick<Item, 'hsnId' | 'gstGroupId' | 'hsnCode'>,
+  lookup: {
+    getHsn: (id: string) => { id: string; code: string; gstGroupId: string } | undefined
+    getHsnByCode: (code: string) => { id: string; code: string; gstGroupId: string } | undefined
+  },
+): { hsnId: string; gstGroupId: string; hsnCode: string } {
+  let hsnId = optionalUuidFormValue(existing.hsnId)
+  let gstGroupId = optionalUuidFormValue(existing.gstGroupId)
+  let hsnCode = (existing.hsnCode ?? '').trim()
+
+  if (hsnId) {
+    const hsn = lookup.getHsn(hsnId)
+    if (hsn) {
+      hsnCode = hsn.code
+      if (!gstGroupId && isUuid(hsn.gstGroupId)) gstGroupId = hsn.gstGroupId
+    } else {
+      hsnId = ''
+    }
+  }
+
+  if (!hsnId && hsnCode) {
+    const normalized = hsnCode.replace(/\D/g, '')
+    const hsn =
+      lookup.getHsnByCode(hsnCode)
+      ?? (normalized ? lookup.getHsnByCode(normalized) : undefined)
+    if (hsn) {
+      hsnId = hsn.id
+      hsnCode = hsn.code
+      if (!gstGroupId && isUuid(hsn.gstGroupId)) gstGroupId = hsn.gstGroupId
+    }
+  }
+
+  return { hsnId, gstGroupId, hsnCode }
+}
+
 const schema = z.object({
   productType: z.enum(['boi', 'raw_material', 'sub_assembly', 'assembly_product', 'finish_product', 'scrap', 'service']),
   itemCode: z.string().min(1).max(30),
@@ -83,24 +143,24 @@ const schema = z.object({
   isBlocked: z.boolean(),
   baseUomId: z.string().min(1),
   quantityPerUom: z.coerce.number().min(0),
-  purchaseUomId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
+  purchaseUomId: optionalUuidField,
   purchaseQtyPerUom: z.preprocess(emptyToPositiveNumber(1), z.coerce.number().positive()),
   uomConversionFactor: z.preprocess(emptyToPositiveNumber(1), z.coerce.number().positive()),
-  receivingToleranceId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
+  receivingToleranceId: optionalUuidField,
   receivingTolerancePercentage: z.coerce.number().min(0).max(100).optional(),
   receiptEntryMode: z.enum(['UNIT_ONLY', 'WEIGHT_ONLY', 'UNIT_AND_WEIGHT']).optional(),
   standardWeightPerBaseUnit: z.coerce.number().min(0).optional(),
-  weightUomId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
+  weightUomId: optionalUuidField,
   requireWeightAtReceipt: z.boolean().optional(),
-  hsnId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
+  hsnId: optionalUuidField,
   hsnCode: z.string().default(''),
-  gstGroupId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
+  gstGroupId: optionalUuidField,
   materialGrade: z.string().default(''),
   reorderLevel: z.coerce.number().min(0),
   reorderQty: z.coerce.number().min(0),
   standardRate: z.coerce.number().min(0),
   salesDescription: z.string().optional(),
-  salesUomId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
+  salesUomId: optionalUuidField,
   defaultSalesRate: z.coerce.number().min(0),
   salesLeadDays: z.coerce.number().int().min(0),
   salesAllowed: z.boolean(),
@@ -125,6 +185,12 @@ const schema = z.object({
   const mappedType = mapProductTypeToItemType(data.productType)
   if (mappedType === 'sub_assembly' && !data.subAssemblyRule) {
     ctx.addIssue({ code: 'custom', message: 'Sub-assembly rule required', path: ['subAssemblyRule'] })
+  }
+  if (!data.gstGroupId) {
+    ctx.addIssue({ code: 'custom', message: 'GST group is required', path: ['gstGroupId'] })
+  }
+  if (!data.hsnId) {
+    ctx.addIssue({ code: 'custom', message: 'HSN code is required', path: ['hsnId'] })
   }
 })
 
@@ -158,9 +224,20 @@ function buildItemFormDefaults(
   existing: Item | undefined,
   leafCategories: ItemCategory[],
   uoms: Uom[],
+  taxLookup?: {
+    getHsn: (id: string) => { id: string; code: string; gstGroupId: string } | undefined
+    getHsnByCode: (code: string) => { id: string; code: string; gstGroupId: string } | undefined
+  },
 ): FormData {
   if (existing) {
     const productType = existing.productType ?? 'raw_material'
+    const tax = taxLookup
+      ? resolveItemTaxFields(existing, taxLookup)
+      : {
+          hsnCode: existing.hsnCode ?? '',
+          hsnId: optionalUuidFormValue(existing.hsnId),
+          gstGroupId: optionalUuidFormValue(existing.gstGroupId),
+        }
     return {
       ...existing,
       productType,
@@ -168,10 +245,10 @@ function buildItemFormDefaults(
       itemName2: existing.itemName2 ?? '',
       itemDescription: existing.itemDescription ?? '',
       materialGrade: existing.materialGrade ?? '',
-      hsnCode: existing.hsnCode ?? '',
-      hsnId: existing.hsnId ?? '',
-      gstGroupId: existing.gstGroupId ?? '',
-      purchaseUomId: existing.purchaseUomId ?? existing.baseUomId,
+      hsnCode: tax.hsnCode,
+      hsnId: tax.hsnId,
+      gstGroupId: tax.gstGroupId,
+      purchaseUomId: optionalUuidFormValue(existing.purchaseUomId) || existing.baseUomId,
       qualityTestGroupCode: existing.qualityTestGroupCode ?? '',
       productionBomId: existing.productionBomId ?? '',
       routingNo: existing.routingNo ?? '',
@@ -182,14 +259,14 @@ function buildItemFormDefaults(
       quantityPerUom: existing.quantityPerUom ?? 1,
       purchaseQtyPerUom: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
       uomConversionFactor: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
-      receivingToleranceId: existing.receivingToleranceId ?? '',
+      receivingToleranceId: optionalUuidFormValue(existing.receivingToleranceId),
       receivingTolerancePercentage: existing.receivingTolerancePercentage ?? 0,
       receiptEntryMode: existing.receiptEntryMode ?? 'UNIT_ONLY',
       standardWeightPerBaseUnit: existing.standardWeightPerBaseUnit ?? 0,
-      weightUomId: existing.weightUomId ?? '',
+      weightUomId: optionalUuidFormValue(existing.weightUomId),
       requireWeightAtReceipt: existing.requireWeightAtReceipt ?? false,
       salesDescription: existing.salesDescription ?? '',
-      salesUomId: existing.salesUomId ?? existing.baseUomId,
+      salesUomId: optionalUuidFormValue(existing.salesUomId) || existing.baseUomId,
       defaultSalesRate: existing.defaultSalesRate ?? 0,
       salesLeadDays: existing.salesLeadDays ?? 0,
       salesAllowed: existing.salesAllowed ?? defaultSalesAllowedForProductType(productType),
@@ -352,6 +429,9 @@ export function ItemFormPage() {
   const leafCategories = useLeafCategories()
   const uoms = useActiveUoms()
   const getHsn = useMasterStore((s) => s.getHsn)
+  const getHsnByCode = useMasterStore((s) => s.getHsnByCode)
+  const hsnMasters = useMasterStore((s) => s.hsnMasters)
+  const gstGroups = useMasterStore((s) => s.gstGroups)
   const receivingToleranceRows = useMasterStore((s) => s.receivingTolerances)
   const receivingTolerances = useMemo(
     () => receivingToleranceRows.filter((r) => r.isActive),
@@ -376,9 +456,19 @@ export function ItemFormPage() {
     }
   }, [hash])
 
+  useEffect(() => {
+    if (!isApiMode()) return
+    void import('../../../services/bridges/masterBatchApiBridge').then((m) => m.syncBatchMastersFromApi())
+  }, [])
+
+  const taxLookup = useMemo(
+    () => ({ getHsn, getHsnByCode }),
+    [getHsn, getHsnByCode],
+  )
+
   const formDefaults = useMemo(
-    () => buildItemFormDefaults(existing, leafCategories, uoms),
-    [existing, leafCategories, uoms],
+    () => buildItemFormDefaults(existing, leafCategories, uoms, taxLookup),
+    [existing, leafCategories, uoms, taxLookup, hsnMasters.length, gstGroups.length],
   )
 
   const { register, handleSubmit, control, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
@@ -388,8 +478,8 @@ export function ItemFormPage() {
 
   useEffect(() => {
     if (!existing) return
-    reset(buildItemFormDefaults(existing, leafCategories, uoms))
-  }, [existing?.id, existing?.updatedAt, leafCategories, uoms, reset])
+    reset(buildItemFormDefaults(existing, leafCategories, uoms, taxLookup))
+  }, [existing?.id, existing?.updatedAt, leafCategories, uoms, taxLookup, hsnMasters.length, gstGroups.length, reset])
 
   const watched = useWatch({ control })
   const productType = watch('productType')

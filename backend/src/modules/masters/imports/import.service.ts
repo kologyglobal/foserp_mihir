@@ -141,8 +141,15 @@ export async function importItems(
       const baseUomId = await resolveUomId(tenantId, baseUomCode)
       const gstGroupCode = rowValue(row, 'GST Group Code', 'gst_group_code')
       const hsnCode = rowValue(row, 'HSN Code', 'hsn_code')
-      const gstGroupId = gstGroupCode ? await resolveGstGroupId(tenantId, gstGroupCode) : undefined
+      let gstGroupId = gstGroupCode ? await resolveGstGroupId(tenantId, gstGroupCode) : undefined
       const hsnId = hsnCode ? await resolveHsnId(tenantId, hsnCode) : undefined
+      if (hsnId && !gstGroupId) {
+        const hsn = await prisma.masterHsnCode.findFirst({
+          where: { id: hsnId, tenantId, deletedAt: null },
+          select: { gstGroupId: true },
+        })
+        gstGroupId = hsn?.gstGroupId
+      }
 
       const data = {
         code,
