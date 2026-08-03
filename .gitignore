@@ -33,6 +33,7 @@ __MACOSX/
 
 # Logs
 *.log
+backend/*.out
 
 # OS
 .DS_Store
