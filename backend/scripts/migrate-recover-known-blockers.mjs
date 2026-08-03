@@ -44,6 +44,12 @@ async function hasTable(c, db, table) {
   return Number(rows[0].c) > 0
 }
 
+async function addColumnIfMissing(c, db, table, column, definition) {
+  if (await hasColumn(c, db, table, column)) return false
+  await c.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`)
+  return true
+}
+
 async function markMigrationApplied(c, migrationName) {
   const cs = migrationChecksum(migrationName)
   await c.query(
@@ -183,9 +189,122 @@ async function recoverCrmPhase9NotNull(c, db) {
   console.log(`[migrate-recover] Marked ${migration} as applied`)
 }
 
+async function recoverPurchaseMultiUnitUom(c, db) {
+  const migration = '20260727180000_purchase_multi_unit_uom'
+  console.log(`[migrate-recover] Recovering ${migration}…`)
+
+  await addColumnIfMissing(
+    c,
+    db,
+    'master_items',
+    'uomConversionFactor',
+    'DECIMAL(18, 4) NOT NULL DEFAULT 1',
+  )
+  await c.query(`
+    UPDATE master_items
+    SET uomConversionFactor = CASE
+      WHEN purchaseQtyPerUom IS NULL OR purchaseQtyPerUom <= 0 THEN 1
+      ELSE purchaseQtyPerUom
+    END
+    WHERE uomConversionFactor = 1
+      AND purchaseQtyPerUom IS NOT NULL
+      AND purchaseQtyPerUom > 0
+  `)
+
+  await addColumnIfMissing(c, db, 'purchase_order_lines', 'uomQuantity', 'DECIMAL(18, 4) NOT NULL DEFAULT 0')
+  await addColumnIfMissing(
+    c,
+    db,
+    'purchase_order_lines',
+    'uomConversionFactor',
+    'DECIMAL(18, 4) NOT NULL DEFAULT 1',
+  )
+  await addColumnIfMissing(
+    c,
+    db,
+    'purchase_order_lines',
+    'unitCostPrimary',
+    'DECIMAL(18, 4) NOT NULL DEFAULT 0',
+  )
+  await c.query(`
+    UPDATE purchase_order_lines
+    SET
+      uomQuantity = CASE WHEN uomQuantity = 0 THEN quantity ELSE uomQuantity END,
+      uomConversionFactor = CASE WHEN uomConversionFactor <= 0 THEN 1 ELSE uomConversionFactor END,
+      unitCostPrimary = CASE WHEN unitCostPrimary = 0 THEN rate ELSE unitCostPrimary END
+  `)
+
+  await addColumnIfMissing(
+    c,
+    db,
+    'goods_receipt_lines',
+    'uomConversionFactor',
+    'DECIMAL(18, 4) NOT NULL DEFAULT 1',
+  )
+  await addColumnIfMissing(
+    c,
+    db,
+    'goods_receipt_lines',
+    'unitCostPrimary',
+    'DECIMAL(18, 4) NOT NULL DEFAULT 0',
+  )
+  await addColumnIfMissing(
+    c,
+    db,
+    'goods_receipt_lines',
+    'orderedUomQuantity',
+    'DECIMAL(18, 4) NOT NULL DEFAULT 0',
+  )
+  await addColumnIfMissing(
+    c,
+    db,
+    'goods_receipt_lines',
+    'receivedUomQuantity',
+    'DECIMAL(18, 4) NOT NULL DEFAULT 0',
+  )
+  await addColumnIfMissing(
+    c,
+    db,
+    'goods_receipt_lines',
+    'acceptedUomQuantity',
+    'DECIMAL(18, 4) NOT NULL DEFAULT 0',
+  )
+  await addColumnIfMissing(
+    c,
+    db,
+    'goods_receipt_lines',
+    'rejectedUomQuantity',
+    'DECIMAL(18, 4) NOT NULL DEFAULT 0',
+  )
+  await c.query(`
+    UPDATE goods_receipt_lines
+    SET
+      uomConversionFactor = CASE WHEN uomConversionFactor <= 0 THEN 1 ELSE uomConversionFactor END,
+      unitCostPrimary = CASE WHEN unitCostPrimary = 0 THEN rate ELSE unitCostPrimary END,
+      orderedUomQuantity = CASE WHEN orderedUomQuantity = 0 THEN orderedQuantity ELSE orderedUomQuantity END,
+      receivedUomQuantity = CASE WHEN receivedUomQuantity = 0 THEN receivedQuantity ELSE receivedUomQuantity END,
+      acceptedUomQuantity = CASE WHEN acceptedUomQuantity = 0 THEN acceptedQuantity ELSE acceptedUomQuantity END,
+      rejectedUomQuantity = CASE WHEN rejectedUomQuantity = 0 THEN rejectedQuantity ELSE rejectedUomQuantity END
+  `)
+
+  await addColumnIfMissing(c, db, 'inventory_stock_movements', 'uomQuantity', 'DECIMAL(18, 4) NULL')
+  await addColumnIfMissing(c, db, 'inventory_stock_movements', 'uomId', 'VARCHAR(191) NULL')
+  await addColumnIfMissing(
+    c,
+    db,
+    'inventory_stock_movements',
+    'uomConversionFactor',
+    'DECIMAL(18, 4) NULL',
+  )
+
+  await markMigrationApplied(c, migration)
+  console.log(`[migrate-recover] Marked ${migration} as applied`)
+}
+
 const RECOVERERS = {
   '20260727160000_admin_module_administrators': recoverAdminModuleAdministrators,
   '20260727180000_crm_product_to_item_phase9_not_null': recoverCrmPhase9NotNull,
+  '20260727180000_purchase_multi_unit_uom': recoverPurchaseMultiUnitUom,
 }
 
 export async function recoverKnownMigrationBlockers(connectionConfig) {

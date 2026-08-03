@@ -101,17 +101,34 @@ await recoverKnownMigrationBlockers({
   database: target.database,
 })
 
-console.log('[migrate-deploy] Applying pending Prisma migrations…')
-
 const prismaBin = join(backend, 'node_modules', 'prisma', 'build', 'index.js')
-const result = spawnSync(process.execPath, [prismaBin, 'migrate', 'deploy'], {
-  cwd: backend,
-  env: {
-    ...process.env,
-    NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=768',
-  },
-  stdio: 'inherit',
-})
+const connectionConfig = {
+  host: target.host,
+  port: Number(target.port),
+  user: target.user,
+  password: dbPassword,
+  database: target.database,
+}
+
+function runMigrateDeploy() {
+  console.log('[migrate-deploy] Applying pending Prisma migrations…')
+  return spawnSync(process.execPath, [prismaBin, 'migrate', 'deploy'], {
+    cwd: backend,
+    env: {
+      ...process.env,
+      NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=768',
+    },
+    stdio: 'inherit',
+  })
+}
+
+let result = runMigrateDeploy()
+
+if (result.status !== 0 && !result.error?.message?.includes('Killed') && result.signal !== 'SIGKILL') {
+  console.warn('[migrate-deploy] Migrate failed — running post-failure auto-recovery and retrying once…')
+  await recoverKnownMigrationBlockers(connectionConfig)
+  result = runMigrateDeploy()
+}
 
 if (result.error?.message?.includes('Killed') || result.signal === 'SIGKILL') {
   console.error('[migrate-deploy] Process was Killed (likely OOM on shared hosting).')
@@ -124,10 +141,9 @@ if (result.error?.message?.includes('Killed') || result.signal === 'SIGKILL') {
 if (result.status !== 0) {
   console.error('[migrate-deploy] Failed — deploy cannot continue with a schema mismatch.')
   console.error('[migrate-deploy] Recovery scripts (phpMyAdmin or PC with live DB_* env):')
-  console.error('  P3009: backend/scripts/live-fix-p3009-admin-module-administrators.sql')
-  console.error('         npm run db:recover-live-p3009')
-  console.error('  P3018: backend/scripts/live-fix-p3018-crm-phase9-product-id.sql')
-  console.error('         npm run db:recover-live-p3018')
+  console.error('  CRM phase9: backend/scripts/live-fix-p3018-crm-phase9-product-id.sql')
+  console.error('  Multi-unit UOM: backend/scripts/live-deploy-purchase-multi-unit-uom.sql')
+  console.error('  Admin module: backend/scripts/live-fix-p3009-admin-module-administrators.sql')
   process.exit(result.status ?? 1)
 }
 
