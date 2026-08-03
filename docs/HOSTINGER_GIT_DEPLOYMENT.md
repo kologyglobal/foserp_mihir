@@ -60,19 +60,39 @@ Requires hPanel **`DB_HOST`**, **`DB_NAME`**, **`DB_USER`**, **`DB_PASS`**
 
 ### Failed legacy migrations (one-time)
 
+Prisma **P3009** blocks deploy until the failed row is reconciled once.
+
+**Where to run recovery**
+
+| Route | When to use |
+|-------|-------------|
+| **Hostinger SSH** | `DB_HOST=127.0.0.1` in hPanel — MySQL is on the same server. Run inside the deployed `backend/` folder. |
+| **phpMyAdmin** | SSH unavailable, or SSH shell lacks `DB_*` env vars. Paste `backend/scripts/live-fix-p3018-crm-phase10-drop-product-id.sql`. |
+| **Your PC** | Only if Hostinger **Remote MySQL** is enabled and you use the **remote hostname** — not `127.0.0.1`. |
+
+`127.0.0.1` from your PC is your own machine, not Hostinger.
+
+**SSH sequence** (export `DB_*` in the shell if hPanel vars are not injected):
+
 ```bash
-cd backend
-npx prisma migrate status
-npm run db:recover-known          # emergency only
+cd ~/domains/.../backend   # deployed backend path
+export DB_HOST=127.0.0.1 DB_NAME=... DB_USER=... DB_PASS=...
+npm run db:recover-known
 npm run db:migrate:deploy
+npx prisma migrate status
 ```
 
-Or Prisma official path when schema already matches:
+Recovery verifies schema before updating `_prisma_migrations` (e.g. phase10 checks
+that `productId` columns are gone). Then redeploy with **`npm run build`**.
+
+Alternative when schema already matches `migration.sql`:
 
 ```bash
 npx prisma migrate resolve --applied <migration_name>
 npx prisma migrate deploy
 ```
+
+Never use `prisma migrate reset` on live.
 
 ## What the build does
 

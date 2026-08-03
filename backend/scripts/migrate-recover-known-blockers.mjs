@@ -1,6 +1,6 @@
 /**
- * Auto-recover known Prisma P3009/P3018 blockers before migrate deploy.
- * Safe to run every build — no-ops when nothing is failed.
+ * One-time emergency repair for known Prisma P3009/P3018 failed migrations.
+ * Explicit only: npm run db:recover-known — never wired into normal deploy/build.
  */
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -312,7 +312,10 @@ async function recoverCrmPhase10DropProductId(c, db) {
   const migration = '20260727190000_crm_product_to_item_phase10_drop_product_id'
   console.log(`[migrate-recover] Recovering ${migration}…`)
 
-  if (await hasColumn(c, db, 'dispatch_requirements', 'productId')) {
+  if (
+    (await hasColumn(c, db, 'dispatch_requirements', 'productId'))
+    && (await hasColumn(c, db, 'dispatch_requirements', 'itemId'))
+  ) {
     await c.query(`
       UPDATE dispatch_requirements dr
       INNER JOIN master_products p ON p.id = dr.productId
@@ -321,6 +324,12 @@ async function recoverCrmPhase10DropProductId(c, db) {
         AND p.fgItemId IS NOT NULL
         AND p.fgItemId <> ''
     `)
+  }
+
+  if (
+    (await hasTable(c, db, 'dispatch_requirements'))
+    && (await hasColumn(c, db, 'dispatch_requirements', 'itemId'))
+  ) {
     await c.query(`
       UPDATE dispatch_requirements dr
       INNER JOIN crm_sales_orders so ON so.id = dr.salesOrderId
@@ -341,6 +350,19 @@ async function recoverCrmPhase10DropProductId(c, db) {
       console.log(`[migrate-recover] Dropped ${table}.productId`)
     }
   }
+
+  const leftover = await c.query(
+    `SELECT TABLE_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND COLUMN_NAME = 'productId'
+       AND TABLE_NAME IN ('crm_opportunity_lines', 'crm_quotations', 'crm_sales_orders', 'dispatch_requirements')`,
+    [db],
+  )
+  if (leftover.length > 0) {
+    throw new Error(
+      `[migrate-recover] productId still present on: ${leftover.map((r) => r.TABLE_NAME).join(', ')}`,
+    )
+  }
+  console.log('[migrate-recover] Verified: no productId columns on phase10 tables')
 
   await markMigrationApplied(c, migration)
   console.log(`[migrate-recover] Marked ${migration} as applied`)
@@ -376,8 +398,7 @@ export async function recoverKnownMigrationBlockers(connectionConfig) {
   try {
     mariadb = (await import('mariadb')).default
   } catch {
-    console.warn('[migrate-recover] mariadb driver unavailable — skipping auto-recovery')
-    return
+    throw new Error('[migrate-recover] mariadb driver unavailable — run npm ci in backend')
   }
 
   const db = connectionConfig.database
@@ -399,17 +420,26 @@ export async function recoverKnownMigrationBlockers(connectionConfig) {
       return
     }
 
+    const unknown = []
     for (const row of failed) {
       const name = row.migration_name
       const recover = RECOVERERS[name]
       if (!recover) {
+        unknown.push(name)
         console.warn(`[migrate-recover] Unknown failed migration: ${name} (manual fix required)`)
         continue
       }
       await recover(c, db)
     }
+
+    if (unknown.length > 0) {
+      throw new Error(
+        `[migrate-recover] Unhandled failed migrations: ${unknown.join(', ')}`,
+      )
+    }
   } catch (err) {
-    console.warn('[migrate-recover] Auto-recovery failed (migrate deploy may still fail):', err.message)
+    console.error('[migrate-recover] Recovery failed:', err.message)
+    throw err
   } finally {
     if (c) await c.end()
   }
@@ -459,6 +489,13 @@ if (isCli) {
     process.exit(1)
   }
   console.warn('[migrate-recover] EMERGENCY repair — not for routine deploys.')
-  await recoverKnownMigrationBlockers(cfg)
-  console.log('[migrate-recover] Done. Verify schema, then: npx prisma migrate status && npm run db:migrate:deploy')
+  try {
+    await recoverKnownMigrationBlockers(cfg)
+    console.log(
+      '[migrate-recover] Done. Next run: npx prisma migrate status && npm run db:migrate:deploy',
+    )
+  } catch {
+    console.error('[migrate-recover] Recovery did not complete.')
+    process.exit(1)
+  }
 }
