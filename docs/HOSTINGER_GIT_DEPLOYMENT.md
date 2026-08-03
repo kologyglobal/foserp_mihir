@@ -22,7 +22,7 @@ In **Websites → Node.js Web App → Settings & Redeploy**:
 | Framework | Other / Express |
 | Node.js | 22.x (20.x minimum) |
 | Install command | `npm ci` |
-| Build command | `npm run deploy:build` (repo root) |
+| Build command | `npm run build` (backend `package.json` — Hostinger dropdown) |
 | Output directory | `backend` |
 | Entry file | `hostinger-start.mjs` |
 
@@ -39,7 +39,7 @@ Variables. Never place their values in Git.
 
 ## Database migrations (automatic)
 
-Pending migrations run **once during deploy build** (`npm run deploy:build`):
+Pending migrations run during **backend `npm run build`** (Hostinger dropdown):
 
 1. `prisma migrate deploy` via `backend/scripts/migrate-deploy.mjs`
 2. `prisma generate` + TypeScript compile
@@ -51,10 +51,9 @@ Build logs must show:
 [migrate-deploy] Database schema is up to date.
 ```
 
-`npm run build` (CI / local) compiles only — **no database access**.
+Repo-root `npm run build` (GitHub CI) compiles frontend + backend via `build:app` — **no database access**.
 
-`hostinger-start.mjs` starts the server only. Migrations do not run on restart unless
-`RUN_MIGRATE_ON_START=true` (not recommended when build already migrates).
+Local backend compile without migrate: `npm run build:app`.
 
 Requires hPanel **`DB_HOST`**, **`DB_NAME`**, **`DB_USER`**, **`DB_PASS`**
 (or `DATABASE_URL`) for **Build** and **Runtime**.
@@ -77,12 +76,13 @@ npx prisma migrate deploy
 
 ## What the build does
 
-`npm run deploy:build` calls `scripts/build-hostinger.mjs --with-migrate`:
+`npm run build` in repo root calls `scripts/build-hostinger.mjs` (CI — no migrate).
 
-1. `npm ci` in `frontend/`
-2. `npm ci` in `backend/`
-3. Builds Vite in API mode
-4. `backend/deploy:build` — migrate deploy, then Prisma client + TypeScript compile
+Hostinger backend `npm run build` calls migrate + compile directly.
+
+1. `npm ci` in `frontend/` and `backend/` (root build only)
+2. Vite frontend build
+3. Backend `build:app` (root CI) or `build` = migrate + compile (Hostinger)
 5. Copies `frontend/dist` to `backend/public`
 6. Writes `backend/public/build-meta.json` with the deployed Git revision
 

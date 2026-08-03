@@ -57,17 +57,6 @@ run(['ci'], frontend)
 console.log('Installing deterministic backend dependencies')
 run(['ci'], backend)
 
-const withMigrate =
-  process.argv.includes('--with-migrate') ||
-  process.env.RUN_MIGRATE_ON_BUILD === 'true' ||
-  process.env.RUN_MIGRATE_ON_BUILD === '1'
-
-if (withMigrate) {
-  console.log('Deploy build: prisma migrate deploy runs inside backend deploy:build')
-} else {
-  console.log('Compile-only build: no database migrations (use npm run deploy:build on Hostinger)')
-}
-
 console.log('Building Vite frontend in API mode')
 run(
   ['run', 'build'],
@@ -80,8 +69,8 @@ run(
   },
 )
 
-console.log('Building Express backend')
-run(['run', withMigrate ? 'deploy:build' : 'build'], backend)
+console.log('Building Express backend (compile only — migrations run via backend npm run build on Hostinger)')
+run(['run', 'build:app'], backend)
 
 assertFile(join(frontendDist, 'index.html'), 'Vite did not produce index.html')
 assertFile(join(backend, 'dist', 'server.js'), 'Backend did not produce dist/server.js')

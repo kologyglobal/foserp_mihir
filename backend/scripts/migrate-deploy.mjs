@@ -1,7 +1,7 @@
 /**
  * Production migration step — runs `prisma migrate deploy` only.
  *
- * Normal path: `npm run deploy:build` (Hostinger) or `npm run db:deploy:hostinger`.
+ * Invoked from backend `npm run build` (Hostinger) or `npm run db:deploy:hostinger`.
  * Emergency one-time repair: `npm run db:recover-known` — never called from here.
  *
  * Env: DATABASE_URL or DB_HOST + DB_NAME + DB_USER + DB_PASS (+ optional DB_PORT)
