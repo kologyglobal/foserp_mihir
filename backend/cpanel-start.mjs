@@ -63,8 +63,13 @@ async function shouldSeed() {
 }
 
 async function main() {
-  if (process.env.RUN_MIGRATE_ON_START !== 'false') {
+  if (
+    process.env.RUN_MIGRATE_ON_START === 'true' ||
+    process.env.RUN_MIGRATE_ON_START === '1'
+  ) {
     run('npx', ['prisma', 'migrate', 'deploy'])
+  } else {
+    console.log('[cpanel-start] Migrations run at deploy:build time; skipping startup migrate.')
   }
 
   if (await shouldSeed()) {
@@ -74,8 +79,8 @@ async function main() {
   }
 
   if (!distLooksComplete()) {
-    console.log('[cpanel-start] dist/ missing or incomplete — running npm run build…')
-    run('npm', ['run', 'build'])
+    console.log('[cpanel-start] dist/ missing or incomplete — running npm run deploy:build…')
+    run('npm', ['run', 'deploy:build'])
   }
 
   const distServer = path.join(__dirname, 'dist', 'server.js')

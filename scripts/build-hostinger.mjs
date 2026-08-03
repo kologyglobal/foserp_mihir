@@ -57,22 +57,15 @@ run(['ci'], frontend)
 console.log('Installing deterministic backend dependencies')
 run(['ci'], backend)
 
-const skipMigrate =
-  process.env.RUN_MIGRATE_ON_BUILD === 'false' ||
-  process.env.RUN_MIGRATE_ON_BUILD === '0'
+const withMigrate =
+  process.argv.includes('--with-migrate') ||
+  process.env.RUN_MIGRATE_ON_BUILD === 'true' ||
+  process.env.RUN_MIGRATE_ON_BUILD === '1'
 
-if (!skipMigrate) {
-  console.log('Applying pending Prisma migrations against deploy database')
-  execFileSync(process.execPath, [join(backend, 'scripts', 'migrate-deploy.mjs')], {
-    cwd: backend,
-    env: {
-      ...process.env,
-      RUN_MIGRATE_ON_BUILD: 'true',
-    },
-    stdio: 'inherit',
-  })
+if (withMigrate) {
+  console.log('Deploy build: prisma migrate deploy runs inside backend deploy:build')
 } else {
-  console.warn('RUN_MIGRATE_ON_BUILD=false — skipping prisma migrate deploy during build')
+  console.log('Compile-only build: no database migrations (use npm run deploy:build on Hostinger)')
 }
 
 console.log('Building Vite frontend in API mode')
@@ -88,7 +81,7 @@ run(
 )
 
 console.log('Building Express backend')
-run(['run', 'build'], backend)
+run(['run', withMigrate ? 'deploy:build' : 'build'], backend)
 
 assertFile(join(frontendDist, 'index.html'), 'Vite did not produce index.html')
 assertFile(join(backend, 'dist', 'server.js'), 'Backend did not produce dist/server.js')

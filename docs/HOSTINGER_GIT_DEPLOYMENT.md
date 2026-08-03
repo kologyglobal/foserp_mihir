@@ -22,7 +22,7 @@ In **Websites → Node.js Web App → Settings & Redeploy**:
 | Framework | Other / Express |
 | Node.js | 22.x (20.x minimum) |
 | Install command | `npm ci` |
-| Build command | `npm run build` (repo root) **or** ensure backend build runs migrate — see note below |
+| Build command | `npm run deploy:build` (repo root) |
 | Output directory | `backend` |
 | Entry file | `hostinger-start.mjs` |
 
@@ -39,45 +39,50 @@ Variables. Never place their values in Git.
 
 ## Database migrations (automatic)
 
-Pending migrations apply in **two** places (same script: `backend/scripts/migrate-deploy.mjs`):
+Pending migrations run **once during deploy build** (`npm run deploy:build`):
 
-1. **During `npm run build`** — after `backend/npm ci`, before Vite/backend compile.
-   Build logs must show:
-   ```text
-   Applying pending Prisma migrations against deploy database
-   [migrate-deploy] Target database: user@host:3306/your_db
-   [migrate-deploy] Database schema is up to date.
-   ```
-2. **On app restart** — `hostinger-start.mjs` runs migrate again before loading
-   `dist/server.js` (safety net if build skipped migrate).
+1. `prisma migrate deploy` via `backend/scripts/migrate-deploy.mjs`
+2. `prisma generate` + TypeScript compile
 
-Requires hPanel **`DB_HOST`**, **`DB_NAME`**, **`DB_USER`**, **`DB_PASS`**
-(or `DATABASE_URL`) to be set for **Build** and **Runtime** — not only runtime.
-
-If your Hostinger log shows only `fos-erp-backend@1.0.0 build` (backend-only),
-migrations run inside **`backend/package.json` `build`** after `prisma generate`.
-You must still provide **`DB_*` during the build step** in hPanel.
-
-Emergency bypass (manual SQL already applied):
+Build logs must show:
 
 ```text
-RUN_MIGRATE_ON_BUILD=false
-RUN_MIGRATE_ON_START=false
+[migrate-deploy] Target database: user@host:3306/your_db
+[migrate-deploy] Database schema is up to date.
 ```
 
-If migrate is **Killed** during build, use **GitHub Actions → Database migrate**
-(with `STAGE_DB_*` / `PROD_DB_*` secrets) or phpMyAdmin:
-`backend/scripts/live-deploy-receiving-tolerance-master.sql` and peers under
-`backend/scripts/live-deploy-*.sql`.
+`npm run build` (CI / local) compiles only — **no database access**.
+
+`hostinger-start.mjs` starts the server only. Migrations do not run on restart unless
+`RUN_MIGRATE_ON_START=true` (not recommended when build already migrates).
+
+Requires hPanel **`DB_HOST`**, **`DB_NAME`**, **`DB_USER`**, **`DB_PASS`**
+(or `DATABASE_URL`) for **Build** and **Runtime**.
+
+### Failed legacy migrations (one-time)
+
+```bash
+cd backend
+npx prisma migrate status
+npm run db:recover-known          # emergency only
+npm run db:migrate:deploy
+```
+
+Or Prisma official path when schema already matches:
+
+```bash
+npx prisma migrate resolve --applied <migration_name>
+npx prisma migrate deploy
+```
 
 ## What the build does
 
-`npm run build` calls `scripts/build-hostinger.mjs`:
+`npm run deploy:build` calls `scripts/build-hostinger.mjs --with-migrate`:
 
 1. `npm ci` in `frontend/`
 2. `npm ci` in `backend/`
 3. Builds Vite in API mode
-4. Generates Prisma client and compiles the backend
+4. `backend/deploy:build` — migrate deploy, then Prisma client + TypeScript compile
 5. Copies `frontend/dist` to `backend/public`
 6. Writes `backend/public/build-meta.json` with the deployed Git revision
 

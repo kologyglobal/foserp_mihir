@@ -8,45 +8,40 @@ const server = join(backend, 'dist', 'server.js')
 const frontend = join(backend, 'public')
 
 if (!existsSync(server)) {
-  throw new Error(`Backend build is missing: ${server}. Hostinger must run npm run build before start.`)
+  throw new Error(`Backend build is missing: ${server}. Hostinger must run npm run deploy:build before start.`)
 }
 const prismaModule = join(backend, 'dist', 'config', 'prisma.js')
 if (!existsSync(prismaModule)) {
   throw new Error(
-    `Backend build is incomplete: ${prismaModule} is missing. Delete dist/ and tsconfig.tsbuildinfo, then run npm run build and confirm dist/config/prisma.js exists before restart.`,
+    `Backend build is incomplete: ${prismaModule} is missing. Delete dist/ and tsconfig.tsbuildinfo, then run npm run deploy:build and confirm dist/config/prisma.js exists before restart.`,
   )
 }
 if (!existsSync(join(frontend, 'index.html'))) {
-  throw new Error(`Frontend build is missing: ${frontend}. Hostinger must run npm run build before start.`)
+  throw new Error(`Frontend build is missing: ${frontend}. Hostinger must run npm run deploy:build before start.`)
 }
 
-// Hostinger launches this file from the selected backend output directory.
-// Keep dotenv and all relative backend paths stable.
 process.chdir(backend)
 process.env.FRONTEND_DIST = process.env.FRONTEND_DIST ?? resolve(frontend)
 
-const skipMigrate =
-  process.env.RUN_MIGRATE_ON_START === 'false' ||
-  process.env.RUN_MIGRATE_ON_START === '0'
+const runMigrateOnStart =
+  process.env.RUN_MIGRATE_ON_START === 'true' ||
+  process.env.RUN_MIGRATE_ON_START === '1'
 
-if (!skipMigrate) {
-  console.log('[hostinger-start] Running prisma migrate deploy before server start…')
+if (runMigrateOnStart) {
+  console.log('[hostinger-start] RUN_MIGRATE_ON_START=true — running migrate deploy before server start…')
   const migrateScript = join(backend, 'scripts', 'migrate-deploy.mjs')
   const migrate = spawnSync(process.execPath, [migrateScript], {
     cwd: backend,
-    env: {
-      ...process.env,
-      HOSTINGER_STARTUP: '1',
-    },
+    env: process.env,
     stdio: 'inherit',
   })
   if (migrate.status !== 0) {
     throw new Error(
-      'Prisma migrate deploy failed on startup. Set RUN_MIGRATE_ON_START=false only for emergency bypass; fix migrations or apply live SQL scripts.',
+      'Prisma migrate deploy failed on startup. Fix migrations or run npm run db:recover-known once, then redeploy.',
     )
   }
 } else {
-  console.warn('[hostinger-start] RUN_MIGRATE_ON_START=false — skipping migrate deploy.')
+  console.log('[hostinger-start] Migrations run at deploy:build time; skipping startup migrate.')
 }
 
 await import(pathToFileURL(server).href)

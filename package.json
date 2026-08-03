@@ -8,7 +8,8 @@
   },
   "scripts": {
     "build": "node scripts/build-hostinger.mjs",
-    "build:all": "node scripts/build-hostinger.mjs",
+    "deploy:build": "node scripts/build-hostinger.mjs --with-migrate",
+    "build:all": "node scripts/build-hostinger.mjs --with-migrate",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "npm --prefix backend run build",
     "start": "node backend/hostinger-start.mjs",

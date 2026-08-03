@@ -1,15 +1,15 @@
 /**
- * Apply pending Prisma migrations (Hostinger build + startup + CI).
- * Invoked from backend `npm run build` and hostinger-start.mjs.
+ * Production migration step — runs `prisma migrate deploy` only.
  *
- * Env: DATABASE_URL or DB_HOST / DB_USER / DB_PASS / DB_NAME / DB_PORT
- * Opt-out: RUN_MIGRATE_ON_BUILD=false or RUN_MIGRATE_ON_START=false
+ * Normal path: `npm run deploy:build` (Hostinger) or `npm run db:deploy:hostinger`.
+ * Emergency one-time repair: `npm run db:recover-known` — never called from here.
+ *
+ * Env: DATABASE_URL or DB_HOST + DB_NAME + DB_USER + DB_PASS (+ optional DB_PORT)
  */
 import { config } from 'dotenv'
 import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { recoverKnownMigrationBlockers } from './migrate-recover-known-blockers.mjs'
 
 const backend = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -17,16 +17,17 @@ config({ path: join(backend, '.env') })
 
 function buildDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL
-  const host = process.env.DB_HOST ?? 'localhost'
+
+  const host = process.env.DB_HOST
   const port = process.env.DB_PORT ?? '3306'
-  const name = process.env.DB_NAME ?? 'fos_erp'
-  const user = process.env.DB_USER ?? 'root'
+  const name = process.env.DB_NAME
+  const user = process.env.DB_USER
   const pass = encodeURIComponent(process.env.DB_PASS ?? '')
+
+  if (!host || !name || !user) return null
+
   return `mysql://${user}:${pass}@${host}:${port}/${name}`
 }
-
-const databaseUrl = buildDatabaseUrl()
-process.env.DATABASE_URL = databaseUrl
 
 function parseDbTarget(url) {
   try {
@@ -42,43 +43,26 @@ function parseDbTarget(url) {
   }
 }
 
-process.env.HOSTINGER_STARTUP = process.env.HOSTINGER_STARTUP ?? '0'
+const databaseUrl = buildDatabaseUrl()
 
-const skipMigrate =
-  (process.env.npm_lifecycle_event === 'build' &&
-    (process.env.RUN_MIGRATE_ON_BUILD === 'false' || process.env.RUN_MIGRATE_ON_BUILD === '0')) ||
-  (process.env.HOSTINGER_STARTUP === '1' &&
-    (process.env.RUN_MIGRATE_ON_START === 'false' || process.env.RUN_MIGRATE_ON_START === '0'))
-
-if (skipMigrate) {
-  console.warn('[migrate-deploy] Skipped (RUN_MIGRATE_ON_BUILD or RUN_MIGRATE_ON_START=false)')
-  process.exit(0)
+if (!databaseUrl) {
+  console.error('[migrate-deploy] Live database environment is missing.')
+  console.error('[migrate-deploy] Set DATABASE_URL or DB_HOST, DB_NAME, DB_USER, DB_PASS in hPanel (Build + Runtime).')
+  process.exit(1)
 }
+
+process.env.DATABASE_URL = databaseUrl
 
 const target = parseDbTarget(databaseUrl)
-const isDeployContext = Boolean(
-  process.env.HOSTINGER_GIT_COMMIT ||
-    process.env.RUN_MIGRATE_ON_BUILD === 'true' ||
-    process.env.npm_lifecycle_event === 'build' ||
-    process.env.NODE_ENV === 'production',
-)
-
-if (!databaseUrl.includes('@') || !target.database) {
-  console.error('[migrate-deploy] DATABASE_URL / DB_* not configured.')
-  process.exit(isDeployContext ? 1 : 0)
-}
-
 const usingDefaultLocalTarget =
   (target.host === 'localhost' || target.host === '127.0.0.1') &&
   (target.database === 'fos_erp' || !process.env.DB_NAME)
 
-if (isDeployContext && usingDefaultLocalTarget) {
+if (usingDefaultLocalTarget && !process.env.ALLOW_LOCAL_MIGRATE) {
   console.error(
-    `[migrate-deploy] Refusing default local DB ${target.user}@${target.host}/${target.database} during deploy/build.`,
+    `[migrate-deploy] Refusing default local DB ${target.user}@${target.host}/${target.database}.`,
   )
-  console.error(
-    '[migrate-deploy] Set DB_HOST, DB_NAME, DB_USER, DB_PASS in hPanel for Build AND Runtime (not runtime only).',
-  )
+  console.error('[migrate-deploy] Set real DB_* for deploy, or ALLOW_LOCAL_MIGRATE=1 for local migrate.')
   process.exit(1)
 }
 
@@ -86,64 +70,32 @@ console.log(
   `[migrate-deploy] Target database: ${target.user}@${target.host}:${target.port}/${target.database}`,
 )
 
-let dbPassword = ''
-try {
-  dbPassword = decodeURIComponent(new URL(databaseUrl).password)
-} catch {
-  dbPassword = process.env.DB_PASS ?? ''
-}
-
-await recoverKnownMigrationBlockers({
-  host: target.host,
-  port: Number(target.port),
-  user: target.user,
-  password: dbPassword,
-  database: target.database,
-})
-
 const prismaBin = join(backend, 'node_modules', 'prisma', 'build', 'index.js')
-const connectionConfig = {
-  host: target.host,
-  port: Number(target.port),
-  user: target.user,
-  password: dbPassword,
-  database: target.database,
-}
 
-function runMigrateDeploy() {
-  console.log('[migrate-deploy] Applying pending Prisma migrations…')
-  return spawnSync(process.execPath, [prismaBin, 'migrate', 'deploy'], {
-    cwd: backend,
-    env: {
-      ...process.env,
-      NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=768',
-    },
-    stdio: 'inherit',
-  })
-}
+console.log('[migrate-deploy] Applying pending Prisma migrations…')
 
-let result = runMigrateDeploy()
-
-if (result.status !== 0 && !result.error?.message?.includes('Killed') && result.signal !== 'SIGKILL') {
-  console.warn('[migrate-deploy] Migrate failed — running post-failure auto-recovery and retrying once…')
-  await recoverKnownMigrationBlockers(connectionConfig)
-  result = runMigrateDeploy()
-}
+const result = spawnSync(process.execPath, [prismaBin, 'migrate', 'deploy'], {
+  cwd: backend,
+  env: {
+    ...process.env,
+    NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=768',
+  },
+  stdio: 'inherit',
+})
 
 if (result.error?.message?.includes('Killed') || result.signal === 'SIGKILL') {
   console.error('[migrate-deploy] Process was Killed (likely OOM on shared hosting).')
   console.error(
-    '[migrate-deploy] Apply backend/scripts/live-deploy-receiving-tolerance-master.sql in phpMyAdmin, then redeploy.',
+    '[migrate-deploy] Apply pending SQL manually in phpMyAdmin, then use prisma migrate resolve or redeploy.',
   )
   process.exit(1)
 }
 
 if (result.status !== 0) {
-  console.error('[migrate-deploy] Failed — deploy cannot continue with a schema mismatch.')
-  console.error('[migrate-deploy] Recovery scripts (phpMyAdmin or PC with live DB_* env):')
-  console.error('  CRM phase9: backend/scripts/live-fix-p3018-crm-phase9-product-id.sql')
-  console.error('  Multi-unit UOM: backend/scripts/live-deploy-purchase-multi-unit-uom.sql')
-  console.error('  Admin module: backend/scripts/live-fix-p3009-admin-module-administrators.sql')
+  console.error('[migrate-deploy] Migration failed. Deployment stopped.')
+  console.error('[migrate-deploy] Inspect: npx prisma migrate status')
+  console.error('[migrate-deploy] One-time emergency repair: npm run db:recover-known')
+  console.error('[migrate-deploy] Manual SQL (phpMyAdmin): backend/scripts/live-fix-*.sql')
   process.exit(result.status ?? 1)
 }
 
