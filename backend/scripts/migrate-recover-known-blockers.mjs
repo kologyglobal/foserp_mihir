@@ -53,6 +53,39 @@ async function addColumnIfMissing(c, db, table, column, definition) {
 
 async function dropColumnIfExists(c, db, table, column) {
   if (!(await hasColumn(c, db, table, column))) return false
+
+  // Drop FKs / indexes that block column drop (common on partially applied CRM migrations).
+  const fks = await c.query(
+    `SELECT DISTINCT CONSTRAINT_NAME AS name
+     FROM information_schema.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?
+       AND REFERENCED_TABLE_NAME IS NOT NULL`,
+    [db, table, column],
+  )
+  for (const fk of fks) {
+    try {
+      await c.query(`ALTER TABLE \`${table}\` DROP FOREIGN KEY \`${fk.name}\``)
+    } catch {
+      // constraint may already be gone
+    }
+  }
+
+  const idxs = await c.query(
+    `SELECT DISTINCT INDEX_NAME AS name
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?
+       AND INDEX_NAME <> 'PRIMARY'`,
+    [db, table, column],
+  )
+  for (const idx of idxs) {
+    // Multi-column indexes that only partially involve this column: drop whole index if safe.
+    try {
+      await c.query(`ALTER TABLE \`${table}\` DROP INDEX \`${idx.name}\``)
+    } catch {
+      // index may be shared / already dropped with FK
+    }
+  }
+
   await c.query(`ALTER TABLE \`${table}\` DROP COLUMN \`${column}\``)
   return true
 }
@@ -312,32 +345,40 @@ async function recoverCrmPhase10DropProductId(c, db) {
   const migration = '20260727190000_crm_product_to_item_phase10_drop_product_id'
   console.log(`[migrate-recover] Recovering ${migration}…`)
 
-  if (
-    (await hasColumn(c, db, 'dispatch_requirements', 'productId'))
-    && (await hasColumn(c, db, 'dispatch_requirements', 'itemId'))
-  ) {
-    await c.query(`
-      UPDATE dispatch_requirements dr
-      INNER JOIN master_products p ON p.id = dr.productId
-      SET dr.itemId = p.fgItemId
-      WHERE (dr.itemId IS NULL OR dr.itemId = '')
-        AND p.fgItemId IS NOT NULL
-        AND p.fgItemId <> ''
-    `)
+  const hasDispatch = await hasTable(c, db, 'dispatch_requirements')
+  const dispatchHasItemId =
+    hasDispatch && (await hasColumn(c, db, 'dispatch_requirements', 'itemId'))
+  const dispatchHasProductId =
+    hasDispatch && (await hasColumn(c, db, 'dispatch_requirements', 'productId'))
+
+  if (dispatchHasProductId && dispatchHasItemId && (await hasTable(c, db, 'master_products'))) {
+    try {
+      await c.query(`
+        UPDATE dispatch_requirements dr
+        INNER JOIN master_products p ON p.id = dr.productId
+        SET dr.itemId = p.fgItemId
+        WHERE (dr.itemId IS NULL OR dr.itemId = '')
+          AND p.fgItemId IS NOT NULL
+          AND p.fgItemId <> ''
+      `)
+    } catch (err) {
+      console.warn(`[migrate-recover] dispatch product→item backfill skipped: ${err.message}`)
+    }
   }
 
-  if (
-    (await hasTable(c, db, 'dispatch_requirements'))
-    && (await hasColumn(c, db, 'dispatch_requirements', 'itemId'))
-  ) {
-    await c.query(`
-      UPDATE dispatch_requirements dr
-      INNER JOIN crm_sales_orders so ON so.id = dr.salesOrderId
-      SET dr.itemId = so.itemId
-      WHERE (dr.itemId IS NULL OR dr.itemId = '')
-        AND so.itemId IS NOT NULL
-        AND so.itemId <> ''
-    `)
+  if (dispatchHasItemId && (await hasTable(c, db, 'crm_sales_orders'))) {
+    try {
+      await c.query(`
+        UPDATE dispatch_requirements dr
+        INNER JOIN crm_sales_orders so ON so.id = dr.salesOrderId
+        SET dr.itemId = so.itemId
+        WHERE (dr.itemId IS NULL OR dr.itemId = '')
+          AND so.itemId IS NOT NULL
+          AND so.itemId <> ''
+      `)
+    } catch (err) {
+      console.warn(`[migrate-recover] dispatch SO→item backfill skipped: ${err.message}`)
+    }
   }
 
   for (const table of [
@@ -346,8 +387,13 @@ async function recoverCrmPhase10DropProductId(c, db) {
     'crm_sales_orders',
     'dispatch_requirements',
   ]) {
-    if (await dropColumnIfExists(c, db, table, 'productId')) {
-      console.log(`[migrate-recover] Dropped ${table}.productId`)
+    if (!(await hasTable(c, db, table))) continue
+    try {
+      if (await dropColumnIfExists(c, db, table, 'productId')) {
+        console.log(`[migrate-recover] Dropped ${table}.productId`)
+      }
+    } catch (err) {
+      console.warn(`[migrate-recover] Could not drop ${table}.productId: ${err.message}`)
     }
   }
 
