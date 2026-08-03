@@ -132,7 +132,7 @@ export interface NormalizedSalesInvoiceBody {
   legalEntityId?: string
   branchId?: string | null
   customerId: string
-  sourceType: 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'PROFORMA_INVOICE'
+  sourceType: 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'PROFORMA_INVOICE' | 'CRM_TAX_INVOICE'
   sourceDocumentId?: string | null
   invoiceDate: string
   postingDate: string
@@ -214,6 +214,13 @@ export const createSalesInvoiceSchema = salesInvoiceDraftFieldsSchema
       ctx.addIssue({
         code: 'custom',
         message: 'sourceDocumentId (proforma invoice id) is required when sourceType is PROFORMA_INVOICE',
+        path: ['sourceDocumentId'],
+      })
+    }
+    if (body.sourceType === 'CRM_TAX_INVOICE' && !body.sourceDocumentId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'sourceDocumentId (CRM tax invoice id) is required when sourceType is CRM_TAX_INVOICE',
         path: ['sourceDocumentId'],
       })
     }
@@ -306,6 +313,21 @@ export const prefillFromDispatchSchema = z.object({
 })
 
 export type PrefillFromDispatchInput = z.infer<typeof prefillFromDispatchSchema>
+
+export const listCrmPendingTaxInvoicesQuerySchema = z.object({
+  companyId: z.string().uuid().optional(),
+  search: z.string().max(200).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+})
+
+export type ListCrmPendingTaxInvoicesQueryInput = z.infer<typeof listCrmPendingTaxInvoicesQuerySchema>
+
+export const prefillFromCrmTaxInvoiceSchema = z.object({
+  crmTaxInvoiceId: z.string().uuid(),
+})
+
+export type PrefillFromCrmTaxInvoiceInput = z.infer<typeof prefillFromCrmTaxInvoiceSchema>
 
 export const salesInvoiceIdParamSchema = z.object({
   id: z.string().uuid(),
