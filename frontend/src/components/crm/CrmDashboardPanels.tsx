@@ -27,6 +27,7 @@ import {
   type RescheduleFollowUpTarget,
 } from './RescheduleFollowUpModal'
 import { cn } from '../../utils/cn'
+import { quotationRevisionLabel } from '../../utils/quotationEngine/revisionLabels'
 
 const FOLLOW_UP_ICONS: Record<string, typeof Phone> = {
   call: Phone,
@@ -391,7 +392,7 @@ export function CrmQuotationApprovalPanel({
                   <div className="crm-approval-row-top">
                     <div>
                       <p className="crm-card-title">
-                        {titleCode} · Rev {d.revisionNo}
+                        {titleCode} · {quotationRevisionLabel(d.revisionNo)}
                       </p>
                       <p className="crm-helper-text">{d.customerName ?? cust?.customerName ?? 'Customer'}</p>
                     </div>

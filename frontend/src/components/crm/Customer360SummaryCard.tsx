@@ -5,16 +5,15 @@ import {
   MessageSquare,
   Sparkles,
 } from 'lucide-react'
-import type { Opportunity } from '@/types/crm'
-import { AppLink } from '@/components/ui/AppLink'
+import type { Customer } from '@/types/master'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import { ErpViewField, ErpViewPhone, ErpViewEmail } from '@/components/erp/card-form'
 import { ErpButton } from '@/components/erp/ErpButton'
-import { entity360CustomerPath } from '@/config/entity360Routes'
+import { CompanyCustomerBadge } from '@/components/masters/CompanyCustomerBadge'
+import { formatCurrency } from '@/utils/formatters/currency'
 import { formatCrmCurrency } from '@/utils/crmMetrics'
 import { formatDate, formatDateTime } from '@/utils/dates/format'
-import { opportunityPriorityLabel, opportunityStageLabel } from '@/utils/opportunityUtils'
-import { opportunityRequirementDisplay } from '@/utils/leadRequirementLines'
+import type { CrmCompanyStatus } from '@/utils/crmCompanyStatus'
 import type { UnifiedFeedItem, UnifiedFeedKind } from '@/utils/crmUnifiedFeed'
 import { cn } from '@/utils/cn'
 
@@ -27,30 +26,20 @@ const KIND_ICON: Record<UnifiedFeedKind, LucideIcon> = {
   system: Sparkles,
 }
 
-export interface OpportunitySummaryCardProps {
-  opportunity: Opportunity
-  customerName?: string | null
-  customerId?: string | null
-  contactName?: string | null
-  contactPhone?: string | null
-  contactEmail?: string | null
-  city?: string | null
-  productName?: string | null
+export interface Customer360SummaryCardProps {
+  customer: Customer
+  status?: CrmCompanyStatus
+  openOrders?: number
+  pipelineValue?: number
+  outstanding?: number | null
+  moneyVisible?: boolean
+  contactCount?: number
+  nextFollowUpDate?: string | null
   lastActivityAt?: string | null
   lastActivityLabel?: string | null
-  dealValueLabel?: string
-  dealValueHint?: string
-  dealValue?: number
   recentFeedItems?: UnifiedFeedItem[]
   onLogActivity?: () => void
   onViewAllActivities?: () => void
-}
-
-function stageTone(stage: string): 'neutral' | 'info' | 'success' | 'warning' | 'critical' | 'pending' {
-  if (stage === 'won') return 'success'
-  if (stage === 'lost') return 'critical'
-  if (stage === 'on_hold') return 'warning'
-  return 'info'
 }
 
 function formatFeedWhen(at: string): string {
@@ -63,41 +52,57 @@ function formatFeedWhen(at: string): string {
   }
 }
 
-export function OpportunitySummaryCard({
-  opportunity,
-  customerName,
-  customerId,
-  contactName,
-  contactPhone,
-  contactEmail,
-  city,
-  productName,
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+}
+
+export function Customer360SummaryCard({
+  customer,
+  status,
+  openOrders = 0,
+  pipelineValue = 0,
+  outstanding = null,
+  moneyVisible = true,
+  contactCount = 0,
+  nextFollowUpDate,
   lastActivityAt,
   lastActivityLabel,
-  dealValueLabel = 'Deal Value',
-  dealValueHint,
-  dealValue,
   recentFeedItems = [],
   onLogActivity,
   onViewAllActivities,
-}: OpportunitySummaryCardProps) {
-  const nextFollowUp = opportunity.nextFollowUpDate
-    ? formatDate(opportunity.nextFollowUpDate)
-    : null
+}: Customer360SummaryCardProps) {
+  const location = [customer.city, customer.state].filter(Boolean).join(', ')
+  const nextFollowUp = nextFollowUpDate ? formatDate(nextFollowUpDate) : null
   const lastActivityDisplay = lastActivityAt
     ? `${formatDateTime(lastActivityAt)}${lastActivityLabel ? ` · ${lastActivityLabel}` : ''}`
     : null
-  const resolvedCustomerId = customerId ?? opportunity.customerId
   const activityCount = recentFeedItems.length
+  const creditLimit =
+    customer.creditLimit && customer.creditLimit > 0 ? customer.creditLimit : null
 
   return (
-    <section className="lead-summary-card" id="opp-section-summary" aria-label="Opportunity Summary">
+    <section
+      className="lead-summary-card contact-summary-card"
+      id="company-section-summary"
+      aria-label="Company Summary"
+    >
       <header className="lead-summary-card__head">
-        <div>
-          <h2 className="lead-summary-card__title">Opportunity Summary</h2>
-          <p className="lead-summary-card__subtitle">
-            Customer, contact, ownership, status, and recent activity.
-          </p>
+        <div className="contact-summary-card__identity">
+          <div className="contact-summary-card__avatar" aria-hidden>
+            {initials(customer.customerName)}
+          </div>
+          <div>
+            <h2 className="lead-summary-card__title">Company Summary</h2>
+            <p className="lead-summary-card__subtitle">
+              Profile, commercial position, ownership, and recent activity.
+            </p>
+          </div>
         </div>
         {onLogActivity ? (
           <ErpButton
@@ -117,51 +122,59 @@ export function OpportunitySummaryCard({
         <div className="lead-summary-card__main">
           <div className="lead-summary-card__fields">
             <ErpViewField
-              label="Opportunity Name"
-              value={opportunity.opportunityName}
+              label="Company"
+              value={customer.customerName}
               emptyLabel={EMPTY}
               className="lead-summary-card__field--primary"
             />
-            <ErpViewField label="Customer" emptyLabel={EMPTY}>
-              {resolvedCustomerId && customerName ? (
-                <AppLink to={entity360CustomerPath(resolvedCustomerId)} className="erp-view-field__link">
-                  {customerName}
-                </AppLink>
-              ) : undefined}
+            <ErpViewField label="Code" value={customer.customerCode} emptyLabel={EMPTY} />
+            <ErpViewField label="Party status" emptyLabel={EMPTY}>
+              <CompanyCustomerBadge company={customer} />
             </ErpViewField>
-            <ErpViewField label="City" value={city} emptyLabel={EMPTY} />
+            <ErpViewField label="Industry / type" value={customer.customerType} emptyLabel={EMPTY} />
+            <ErpViewField label="Location" value={location} emptyLabel={EMPTY} />
+            <ErpViewField label="Territory" value={customer.salesTerritory} emptyLabel={EMPTY} />
+            <ErpViewField label="GSTIN" value={customer.gstin} emptyLabel={EMPTY} />
+
+            <ErpViewField label="Primary contact" value={customer.contactPerson} emptyLabel={EMPTY} />
+            <ErpViewPhone label="Phone" value={customer.contactPhone} emptyLabel={EMPTY} />
+            <ErpViewEmail label="Email" value={customer.contactEmail} emptyLabel={EMPTY} />
+
             <ErpViewField
-              label="Product Requirement"
-              value={opportunityRequirementDisplay(opportunity.productRequirement)}
+              label="Credit limit"
+              value={creditLimit != null ? formatCurrency(creditLimit) : null}
               emptyLabel={EMPTY}
             />
-            {productName ? (
-              <ErpViewField label="Linked Product" value={productName} emptyLabel={EMPTY} />
-            ) : null}
-
-            <ErpViewField label="Contact Person" value={contactName} emptyLabel={EMPTY} />
-            <ErpViewPhone label="Mobile" value={contactPhone} emptyLabel={EMPTY} />
-            <ErpViewEmail label="Email" value={contactEmail} emptyLabel={EMPTY} />
-
-            <ErpViewField label="Owner" value={opportunity.ownerName} emptyLabel={EMPTY} />
-            <ErpViewField label="Priority" value={opportunityPriorityLabel(opportunity.priority)} emptyLabel={EMPTY} />
-            <ErpViewField label="Created Date" value={formatDate(opportunity.createdAt)} emptyLabel={EMPTY} />
             <ErpViewField
-              label={dealValueLabel}
-              value={formatCrmCurrency(dealValue ?? opportunity.value)}
-              hint={dealValueHint}
+              label="Credit days"
+              value={customer.creditDays != null && customer.creditDays > 0 ? String(customer.creditDays) : null}
               emptyLabel={EMPTY}
             />
+            <ErpViewField label="Open sales orders" value={String(openOrders)} emptyLabel={EMPTY} />
+            <ErpViewField
+              label="Pipeline"
+              value={formatCrmCurrency(pipelineValue)}
+              emptyLabel={EMPTY}
+            />
+            <ErpViewField
+              label="Outstanding"
+              value={moneyVisible && outstanding != null ? formatCurrency(outstanding) : null}
+              emptyLabel={moneyVisible ? EMPTY : '—'}
+            />
+            <ErpViewField label="CRM contacts" value={String(contactCount)} emptyLabel={EMPTY} />
 
-            <ErpViewField label="Stage" emptyLabel={EMPTY}>
-              <DynamicsStatusChip
-                label={opportunityStageLabel(opportunity.stage)}
-                tone={stageTone(opportunity.stage)}
-              />
+            <ErpViewField label="Status" emptyLabel={EMPTY}>
+              {status ? (
+                <DynamicsStatusChip label={status.label} tone={status.tone} />
+              ) : (
+                <DynamicsStatusChip
+                  label={customer.isActive === false ? 'Inactive' : 'Active'}
+                  tone={customer.isActive === false ? 'neutral' : 'success'}
+                />
+              )}
             </ErpViewField>
-            <ErpViewField label="Status" value={opportunity.status} emptyLabel={EMPTY} />
-            <ErpViewField label="Next Follow-up" value={nextFollowUp} emptyLabel={EMPTY} />
-            <ErpViewField label="Last Activity" value={lastActivityDisplay} emptyLabel={EMPTY} />
+            <ErpViewField label="Next follow-up" value={nextFollowUp} emptyLabel={EMPTY} />
+            <ErpViewField label="Last activity" value={lastActivityDisplay} emptyLabel={EMPTY} />
           </div>
         </div>
 
@@ -184,7 +197,7 @@ export function OpportunitySummaryCard({
 
           {activityCount === 0 ? (
             <div className="lead-summary-card__activities-empty">
-              <p>No recent activities. Log a call, meeting, or follow-up to start the timeline.</p>
+              <p>No recent activities. Log a call, meeting, or follow-up for this company.</p>
             </div>
           ) : (
             <ol className="lead-summary-card__timeline">
@@ -232,7 +245,7 @@ export function OpportunitySummaryCard({
           {onViewAllActivities && activityCount > 0 ? (
             <footer className="lead-summary-card__activities-foot">
               <button type="button" className="lead-summary-card__view-all" onClick={onViewAllActivities}>
-                View full timeline
+                View CRM timeline
               </button>
             </footer>
           ) : null}

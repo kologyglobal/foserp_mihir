@@ -1,4 +1,4 @@
-import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
+import { CrmDeleteConfirmModal } from './CrmDeleteConfirmModal'
 
 interface DeleteLeadModalProps {
   open: boolean
@@ -11,33 +11,23 @@ interface DeleteLeadModalProps {
 
 export function DeleteLeadModal({
   open,
+  leadLabel,
   blockReason,
   onCancel,
   onConfirm,
   isDeleting,
 }: DeleteLeadModalProps) {
-  if (!open) return null
-
   return (
-    <div className="erp-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="delete-lead-title">
-      <div className="erp-modal-panel max-w-md">
-        <h2 id="delete-lead-title" className="text-[16px] font-semibold text-erp-text">
-          Delete Lead?
-        </h2>
-        <p className="mt-2 text-[13px] text-erp-muted">
-          {blockReason ?? 'This action will remove the lead from active records. You can keep history for audit.'}
-        </p>
-        <ErpButtonGroup className="mt-5 justify-end">
-          <ErpButton type="button" variant="secondary" onClick={onCancel} disabled={isDeleting}>
-            Cancel
-          </ErpButton>
-          {!blockReason ? (
-            <ErpButton type="button" variant="primary" onClick={onConfirm} disabled={isDeleting}>
-              {isDeleting ? 'Deleting…' : 'Delete Lead'}
-            </ErpButton>
-          ) : null}
-        </ErpButtonGroup>
-      </div>
-    </div>
+    <CrmDeleteConfirmModal
+      open={open}
+      title="Delete Lead?"
+      description="This action will remove the lead from active records. You can keep history for audit."
+      detail={leadLabel || null}
+      blockReason={blockReason}
+      confirmLabel="Delete Lead"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      isDeleting={isDeleting}
+    />
   )
 }

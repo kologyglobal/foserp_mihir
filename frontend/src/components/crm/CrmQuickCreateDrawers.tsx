@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
+import { Activity, Calendar, FileText, Mail, MapPin, MessageCircle, Phone, UserPlus } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { reserveCode, confirmCode } from '../../services/codeSeriesService'
 import { useNavigate } from 'react-router-dom'
 import { useCrmStore } from '../../store/crmStore'
@@ -13,20 +15,34 @@ import { buildOpportunityLineFromItem } from '../../utils/opportunityLineCalc'
 import { CrmDrawerShell } from './CrmDrawerShell'
 import { FormField } from '../forms/FormField'
 import { Input, Select, Textarea, MobileInput } from '../forms/Inputs'
-import { Button } from '../ui/Button'
+import { ErpButton } from '../erp/ErpButton'
 import { notify } from '../../store/toastStore'
 import { buildContactSchema } from '../../utils/validation/crmSchemas/contactSchema'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
 import { handleInvalidSubmit } from '../../utils/formValidation'
+import { SELECT_PLACEHOLDER } from '../forms/selectStandards'
 
-const FALLBACK_ACTIVITY_TYPES: { id: CrmActivityType; label: string }[] = [
-  { id: 'call', label: 'Call' },
-  { id: 'email', label: 'Email' },
-  { id: 'whatsapp', label: 'WhatsApp' },
-  { id: 'meeting', label: 'Meeting' },
-  { id: 'site_visit', label: 'Site Visit' },
-  { id: 'note', label: 'Note' },
+const FALLBACK_ACTIVITY_TYPES: { id: CrmActivityType; label: string; icon: LucideIcon }[] = [
+  { id: 'call', label: 'Call', icon: Phone },
+  { id: 'email', label: 'Email', icon: Mail },
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
+  { id: 'meeting', label: 'Meeting', icon: Calendar },
+  { id: 'site_visit', label: 'Site Visit', icon: MapPin },
+  { id: 'note', label: 'Note', icon: FileText },
 ]
+
+const ACTIVITY_TYPE_ICONS: Partial<Record<CrmActivityType, LucideIcon>> = {
+  call: Phone,
+  email: Mail,
+  whatsapp: MessageCircle,
+  meeting: Calendar,
+  site_visit: MapPin,
+  note: FileText,
+}
+
+function activityTypeIcon(id: CrmActivityType): LucideIcon {
+  return ACTIVITY_TYPE_ICONS[id] ?? Activity
+}
 
 export function NewContactDrawer({
   open,
@@ -146,11 +162,20 @@ export function NewContactDrawer({
       open={open}
       title="New Contact"
       subtitle="Add a contact to a company record"
+      icon={UserPlus}
+      placement="modal"
+      size="md"
       onClose={onClose}
+      closeDisabled={submitting}
       footer={
-        <Button type="submit" form="crm-new-contact-form" className="w-full" disabled={submitting}>
-          {submitting ? 'Creating…' : 'Create Contact'}
-        </Button>
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </ErpButton>
+          <ErpButton type="submit" form="crm-new-contact-form" variant="primary" disabled={submitting}>
+            {submitting ? 'Creating…' : 'Create Contact'}
+          </ErpButton>
+        </div>
       }
     >
       <form id="crm-new-contact-form" onSubmit={submit} className="crm-drawer-form">
@@ -344,12 +369,19 @@ export function NewOpportunityDrawer({
       open={open}
       title="Quick Opportunity"
       subtitle="Company + name first — products and value when the deal is serious"
+      icon={Activity}
+      placement="modal"
+      size="lg"
       onClose={onClose}
-      width="lg"
       footer={
-        <Button type="submit" form="crm-new-opp-form" className="w-full">
-          Create Opportunity
-        </Button>
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </ErpButton>
+          <ErpButton type="submit" form="crm-new-opp-form" variant="primary">
+            Create Opportunity
+          </ErpButton>
+        </div>
       }
     >
       <form id="crm-new-opp-form" onSubmit={submit} className="crm-drawer-form">
@@ -468,7 +500,11 @@ export function LogActivityDrawer({
   const activityTypeOptions = useActivityTypeOptions()
   const activityTypes = useMemo(
     () => (activityTypeOptions.length > 0
-      ? activityTypeOptions.map((t) => ({ id: t.value as CrmActivityType, label: t.label }))
+      ? activityTypeOptions.map((t) => ({
+          id: t.value as CrmActivityType,
+          label: t.label,
+          icon: activityTypeIcon(t.value as CrmActivityType),
+        }))
       : FALLBACK_ACTIVITY_TYPES),
     [activityTypeOptions],
   )
@@ -482,6 +518,7 @@ export function LogActivityDrawer({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const isLeadContext = Boolean(context?.leadId || activity?.leadId)
+  const TypeIcon = activityTypeIcon(type)
 
   useEffect(() => {
     if (!open) return
@@ -525,7 +562,8 @@ export function LogActivityDrawer({
                 description: description || subject,
                 customerId: customerId || null,
                 contactId: context?.contactId ?? null,
-                opportunityId: isLeadContext ? null : opportunityId || null,
+                // Keep both links when logging from a lead-sourced opportunity.
+                opportunityId: opportunityId || context?.opportunityId || null,
                 leadId: context?.leadId ?? null,
                 ownerId: user.id,
                 ownerName: user.name,
@@ -552,29 +590,64 @@ export function LogActivityDrawer({
     <CrmDrawerShell
       open={open}
       placement="modal"
+      size="md"
+      icon={TypeIcon}
+      accent="primary"
       title={isEdit ? 'Edit Activity' : 'Log Activity'}
-      subtitle={context?.leadName ?? (isEdit ? 'Update this logged activity' : 'Record a call, meeting, or note')}
+      subtitle={isEdit ? 'Update this engagement on the record' : 'Capture the touchpoint while it is fresh'}
       onClose={onClose}
+      closeDisabled={submitting}
       footer={
-        <Button type="submit" form="crm-log-activity-form" className="w-full" disabled={submitting}>
-          {isEdit ? 'Save Activity' : 'Log Activity'}
-        </Button>
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </ErpButton>
+          <ErpButton type="submit" form="crm-log-activity-form" variant="primary" disabled={submitting}>
+            {submitting ? 'Saving…' : isEdit ? 'Save Activity' : 'Log Activity'}
+          </ErpButton>
+        </div>
       }
     >
-      <form id="crm-log-activity-form" onSubmit={submit} className="crm-drawer-form">
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <FormField label="Activity type">
-          <Select value={type} onChange={(e) => setType(e.target.value as CrmActivityType)}>
-            {activityTypes.map((t) => (
-              <option key={t.id} value={t.id}>{t.label}</option>
-            ))}
-          </Select>
-        </FormField>
+      <form id="crm-log-activity-form" onSubmit={submit} className="crm-popup-form">
+        {context?.leadName ? (
+          <div className="crm-popup-context-pill" title={context.leadName}>
+            <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>{context.leadName}</span>
+          </div>
+        ) : null}
+
+        {error ? <p className="crm-popup-alert" role="alert">{error}</p> : null}
+
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
+            Activity type
+          </p>
+          <div className="crm-activity-type-grid" role="radiogroup" aria-label="Activity type">
+            {activityTypes.map((t) => {
+              const Icon = t.icon
+              const active = type === t.id
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  className={`crm-activity-type-chip${active ? ' crm-activity-type-chip--active' : ''}`}
+                  onClick={() => setType(t.id)}
+                >
+                  <Icon className="crm-activity-type-chip__icon" aria-hidden />
+                  {t.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         {!isLeadContext && !isEdit ? (
-          <>
-            <FormField label="Customer">
+          <div className="crm-popup-field-pair">
+            <FormField label="Company">
               <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                <option value="">—</option>
+                <option value="">{SELECT_PLACEHOLDER}</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>{c.customerName}</option>
                 ))}
@@ -582,7 +655,7 @@ export function LogActivityDrawer({
             </FormField>
             <FormField label="Opportunity">
               <Select value={opportunityId} onChange={(e) => setOpportunityId(e.target.value)}>
-                <option value="">—</option>
+                <option value="">{SELECT_PLACEHOLDER}</option>
                 {opportunities
                   .filter((o) => !customerId || o.customerId === customerId)
                   .slice(0, 50)
@@ -591,27 +664,31 @@ export function LogActivityDrawer({
                   ))}
               </Select>
             </FormField>
-          </>
+          </div>
         ) : null}
+
         <FormField label="Subject" required>
           <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Brief summary" required />
         </FormField>
+
         <FormField label="Description">
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            rows={4}
+            rows={3}
             placeholder="What was discussed?"
           />
         </FormField>
-        <FormField label="Outcome" hint="Optional result of this activity">
+
+        <FormField label="Outcome" hint="Optional — result or next step">
           <Input
             value={outcome}
             onChange={(e) => setOutcome(e.target.value)}
-            placeholder="e.g. Customer interested"
+            placeholder="e.g. Customer interested · call back Friday"
           />
         </FormField>
       </form>
     </CrmDrawerShell>
   )
 }
+

@@ -25,9 +25,10 @@ import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpl
 import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttachmentsPanel'
 import { LostDealFields } from '../../components/crm'
 import { CrmDeleteConfirmModal } from '../../components/crm/CrmDeleteConfirmModal'
+import { CrmDrawerShell } from '../../components/crm/CrmDrawerShell'
 import { Input, Select, Textarea } from '../../components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '../../components/forms/selectStandards'
-import { ErpButton, ErpButtonGroup } from '../../components/erp/ErpButton'
+import { ErpButton } from '../../components/erp/ErpButton'
 import { useApiMode } from '../../hooks/useApiMode'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { formatDate } from '../../utils/dates/format'
@@ -127,9 +128,9 @@ export function OpportunityEditPage() {
   } = form
 
   const completionItems = useMemo(() => [
-    { id: 'general', label: 'General', done: Boolean(opportunityName.trim()) },
+    { id: 'general', label: 'General', done: Boolean(opportunityName.trim()) && Boolean(expectedCloseDate) },
     { id: 'products', label: 'Products', done: hasValidLine },
-    { id: 'commercial', label: 'Commercial', done: dealValue > 0 && Boolean(expectedCloseDate) },
+    { id: 'commercial', label: 'Commercial', done: dealValue > 0 },
     { id: 'documents', label: 'Attachments', done: attachments.length > 0 },
   ], [opportunityName, hasValidLine, dealValue, expectedCloseDate, attachments.length])
 
@@ -320,7 +321,7 @@ export function OpportunityEditPage() {
       <CrmCardFormShell
         title="Edit Opportunity"
         badge="CRM"
-        className={`${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview`}
+        className={`${ENTERPRISE_FORM_CLASS} crm-lead-form-page enterprise-workspace--crm-smart-overview`}
         recordNo={opp.opportunityNo}
         recordTitle={opportunityName || opp.opportunityName}
         status="Open"
@@ -413,9 +414,22 @@ export function OpportunityEditPage() {
               ))}
             </Select>
           </ErpFieldRow>
+<<<<<<< HEAD
           {showLocationField ? (
             <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
           ) : null}
+=======
+          <ErpFieldRow
+            label="Expected Close Date"
+            required
+            dataField="expectedCloseDate"
+            fieldState={!expectedCloseDate && validationErrors.length ? 'error' : 'idle'}
+            fieldError={!expectedCloseDate ? validationErrors.find((e) => /close/i.test(e)) : undefined}
+          >
+            <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} required className="erp-input" />
+          </ErpFieldRow>
+          <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
+>>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
         </ErpCardSection>
 
         <ErpProductPricingSection
@@ -486,6 +500,7 @@ export function OpportunityEditPage() {
           <ErpViewField label="Product Subtotal" value={formatCrmCurrency(summary.basicAmount)} hint="Sum of qty × unit price before discount" />
           <ErpViewField label="Discount" value={summary.totalDiscount > 0 ? formatCrmCurrency(summary.totalDiscount) : '—'} />
           <ErpViewField label="Tax" value={formatCrmCurrency(summary.gstAmount)} hint="GST from product lines" />
+<<<<<<< HEAD
           <ErpFieldRow
             label="Expected Close Date"
             dataField="expectedCloseDate"
@@ -494,6 +509,8 @@ export function OpportunityEditPage() {
           >
             <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} className="erp-input" />
           </ErpFieldRow>
+=======
+>>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
           <ErpViewField label="Currency" value="INR (₹)" />
         </ErpCardSection>
 
@@ -520,46 +537,76 @@ export function OpportunityEditPage() {
       </CrmCardFormShell>
 
       {dialog?.type === 'discard' ? (
-        <div className="erp-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="opp-discard-title">
-          <div className="erp-modal-panel max-w-md">
-            <h2 id="opp-discard-title" className="text-[16px] font-semibold text-erp-text">Discard unsaved changes?</h2>
-            <p className="mt-2 text-[13px] text-erp-muted">Your edits will be lost if you leave this page.</p>
-            <ErpButtonGroup className="mt-5 justify-end">
+        <CrmDrawerShell
+          open
+          placement="modal"
+          size="sm"
+          accent="warning"
+          icon={Archive}
+          title="Discard unsaved changes?"
+          subtitle="Your edits will be lost if you leave this page"
+          onClose={closeDialog}
+          footer={
+            <div className="crm-popup-footer__actions">
               <ErpButton type="button" variant="secondary" onClick={closeDialog}>Keep editing</ErpButton>
               <ErpButton type="button" variant="primary" onClick={confirmDiscard}>Discard</ErpButton>
-            </ErpButtonGroup>
-          </div>
-        </div>
+            </div>
+          }
+        >
+          <p className="text-[13px] text-erp-muted">Leave without saving only if you no longer need these edits.</p>
+        </CrmDrawerShell>
       ) : null}
 
       {dialog?.type === 'open360' ? (
-        <div className="erp-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="opp-360-title">
-          <div className="erp-modal-panel max-w-md">
-            <h2 id="opp-360-title" className="text-[16px] font-semibold text-erp-text">Unsaved changes</h2>
-            <p className="mt-2 text-[13px] text-erp-muted">Save before opening Opportunity 360?</p>
-            <ErpButtonGroup className="mt-5 justify-end">
-              <ErpButton type="button" variant="ghost" onClick={closeDialog}>Cancel</ErpButton>
+        <CrmDrawerShell
+          open
+          placement="modal"
+          size="sm"
+          accent="primary"
+          icon={History}
+          title="Unsaved changes"
+          subtitle="Save before opening Opportunity 360?"
+          onClose={closeDialog}
+          footer={
+            <div className="crm-popup-footer__actions">
+              <ErpButton type="button" variant="secondary" onClick={closeDialog}>Cancel</ErpButton>
               <ErpButton type="button" variant="secondary" onClick={() => void confirmOpen360('discard')}>
                 Open Without Saving
               </ErpButton>
               <ErpButton type="button" variant="primary" disabled={isSaving} onClick={() => void confirmOpen360('save')}>
                 {isSaving ? 'Saving…' : 'Save & Open'}
               </ErpButton>
-            </ErpButtonGroup>
-          </div>
-        </div>
+            </div>
+          }
+        >
+          <p className="text-[13px] text-erp-muted">Opening 360 mid-edit can lose uncommitted field changes.</p>
+        </CrmDrawerShell>
       ) : null}
 
       {dialog?.type === 'moveStage' ? (
-        <div className="crm-opp-move-modal">
-          <div className="crm-opp-move-modal__panel">
-            <h3 className="crm-opp-move-modal__title">Move deal stage</h3>
-            <p className="crm-opp-move-modal__deal">{opportunityName || opp.opportunityName}</p>
+        <CrmDrawerShell
+          open
+          placement="modal"
+          size="sm"
+          accent="primary"
+          icon={ArrowRightLeft}
+          title="Move deal stage"
+          subtitle={opportunityName || opp.opportunityName}
+          onClose={closeDialog}
+          footer={
+            <div className="crm-popup-footer__actions">
+              <ErpButton type="button" variant="secondary" onClick={closeDialog}>Cancel</ErpButton>
+              <ErpButton type="button" variant="primary" onClick={() => void confirmMoveStage()}>
+                Confirm
+              </ErpButton>
+            </div>
+          }
+        >
+          <div className="crm-popup-form">
             <label className="block text-sm">
-              <span className="font-medium text-erp-text">New stage</span>
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-erp-muted">New stage</span>
               <Select
                 native
-                wrapClassName="mt-1"
                 value={targetStage}
                 onChange={(e) => setTargetStage(e.target.value as OpportunityStage)}
                 className="erp-input"
@@ -578,34 +625,36 @@ export function OpportunityEditPage() {
                 Manual win approval
               </label>
             ) : null}
-            <div className="crm-opp-move-modal__actions">
-              <button type="button" className="crm-opp-move-modal__btn" onClick={closeDialog}>Cancel</button>
-              <button type="button" className="crm-opp-move-modal__btn crm-opp-move-modal__btn--primary" onClick={() => void confirmMoveStage()}>
-                Confirm
-              </button>
-            </div>
           </div>
-        </div>
+        </CrmDrawerShell>
       ) : null}
 
       {dialog?.type === 'existingQuotation' ? (
-        <div className="erp-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="opp-quote-title">
-          <div className="erp-modal-panel max-w-md">
-            <h2 id="opp-quote-title" className="text-[16px] font-semibold text-erp-text">Quotation already linked</h2>
-            <p className="mt-2 text-[13px] text-erp-muted">
-              This opportunity already has an active quotation. Open it, or create another from the opportunity.
-            </p>
-            <ErpButtonGroup className="mt-5 justify-end">
-              <ErpButton type="button" variant="ghost" onClick={closeDialog}>Cancel</ErpButton>
+        <CrmDrawerShell
+          open
+          placement="modal"
+          size="sm"
+          accent="primary"
+          icon={FileText}
+          title="Quotation already linked"
+          subtitle="This opportunity already has an active quotation"
+          onClose={closeDialog}
+          footer={
+            <div className="crm-popup-footer__actions">
+              <ErpButton type="button" variant="secondary" onClick={closeDialog}>Cancel</ErpButton>
               <ErpButton type="button" variant="secondary" onClick={() => confirmExistingQuotation('createNew')}>
                 Create new
               </ErpButton>
               <ErpButton type="button" variant="primary" onClick={() => confirmExistingQuotation('openExisting')}>
                 Open existing
               </ErpButton>
-            </ErpButtonGroup>
-          </div>
-        </div>
+            </div>
+          }
+        >
+          <p className="text-[13px] text-erp-muted">
+            Open the existing quote, or create another from this opportunity.
+          </p>
+        </CrmDrawerShell>
       ) : null}
 
       <CrmDeleteConfirmModal

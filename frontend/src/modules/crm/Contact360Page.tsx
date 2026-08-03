@@ -320,7 +320,7 @@ export function Contact360Page() {
         title={contact.name}
         description={`${contact.designation}${customer ? ` · ${customer.customerName}` : ''}`}
         badge={contact.isPrimary ? 'Primary Contact' : 'CRM'}
-        className={`${ENTERPRISE_FORM_DETAIL_CLASS} enterprise-workspace--crm-smart-overview contact-360-page`}
+        className={`${ENTERPRISE_FORM_DETAIL_CLASS} crm-lead-form-page enterprise-workspace--crm-smart-overview contact-360-page`}
         recordTitle={contact.name}
         status={contact.isPrimary ? 'Primary' : contact.isActive === false ? 'Inactive' : 'Active'}
         statusTone={contact.isPrimary ? 'success' : contact.isActive === false ? 'neutral' : 'info'}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ErpButton, ErpButtonGroup } from '../../erp/ErpButton'
+import { ErpButton } from '../../erp/ErpButton'
 import { Input, Select, Textarea } from '../../forms/Inputs'
 import { ErpRichTextEditor } from '../../forms/ErpRichTextEditor'
 import { CrmDrawerShell } from '../CrmDrawerShell'
@@ -178,18 +178,19 @@ export function CrmMasterEditorDrawer({
     <CrmDrawerShell
       open={open}
       onClose={handleClose}
+      placement="modal"
+      size="md"
       title={isEdit ? `Edit ${catalog.title}` : `New ${catalog.title}`}
       subtitle={catalog.purpose ?? catalog.description}
-      width="md"
       footer={(
-        <ErpButtonGroup className="justify-end">
-          <ErpButton type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting}>
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={handleClose} disabled={isSubmitting}>
             Cancel
           </ErpButton>
           <ErpButton type="button" variant="primary" disabled={isSubmitting} onClick={handleSubmit}>
             {isSubmitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create'}
           </ErpButton>
-        </ErpButtonGroup>
+        </div>
       )}
     >
       <div className="space-y-3">

@@ -34,6 +34,7 @@ import { OpportunitySummaryCard } from '../../components/crm/OpportunitySummaryC
 import { CrmStageNotes } from '../../components/crm/shared/CrmStageNotes'
 import { OPPORTUNITY_NOTE_STAGE_OPTIONS } from '../../utils/crmNoteStageOptions'
 import { OpportunitySmartOverviewPanel } from '../../components/crm/OpportunitySmartOverviewPanel'
+import { quotationRevisionLabel } from '@/utils/quotationEngine/revisionLabels'
 import { useCrmStore } from '../../store/crmStore'
 import { filterAllowedQuotationTemplates } from '../../utils/quotationEngine/builtinTemplateSync'
 import { resolveStoreAction } from '../../store/storeAction'
@@ -77,7 +78,8 @@ import {
 import { resolveOpportunityCreateQuotationGate } from '../../utils/opportunityCreateQuotationGate'
 import { findFeaturedQuotationTemplate } from '../../utils/quotationTemplates'
 import { crmBreadcrumbs } from '../../utils/crmNavigation'
-import { sanitizeOpportunityScopeNotes } from '../../utils/leadRequirementLines'
+import { opportunityRequirementDisplay, sanitizeOpportunityScopeNotes } from '../../utils/leadRequirementLines'
+import { filterActivitiesForOpportunity, filterFollowUpsForOpportunity } from '../../utils/leadEngagement'
 import { OpportunityQuotationValueMismatchBanner } from '../../components/crm/OpportunityQuotationValueMismatchBanner'
 import { notify } from '../../store/toastStore'
 import {
@@ -108,6 +110,7 @@ export function Opportunity360Page() {
   const products = useMasterStore((s) => s.products)
   const items = useMasterStore((s) => s.items)
   const uoms = useMasterStore((s) => s.uoms)
+  const getLead = useSalesStore((s) => s.getLead)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const attachmentItems = useOpportunityAttachmentStore((s) => s.items)
   const { options: productOptions, pickMap } = useProductMasterOptionMap(
@@ -150,13 +153,18 @@ export function Opportunity360Page() {
   const [activeAdditionalSection, setActiveAdditionalSection] = useState<string | null>('products')
   const stageOptions = useResolvedOpportunityStages()
 
+  const sourceLead = useMemo(
+    () => (opportunity?.leadId ? getLead(opportunity.leadId) : undefined),
+    [opportunity?.leadId, getLead],
+  )
+
   const oppActivities = useMemo(
-    () => (id ? activities.filter((a) => a.opportunityId === id).sort((a, b) => b.activityDate.localeCompare(a.activityDate)) : []),
-    [activities, id],
+    () => (opportunity ? filterActivitiesForOpportunity(opportunity, activities) : []),
+    [activities, opportunity],
   )
   const oppFollowUps = useMemo(
-    () => (id ? followUps.filter((f) => f.opportunityId === id).sort((a, b) => a.dueDate.localeCompare(b.dueDate)) : []),
-    [followUps, id],
+    () => (opportunity ? filterFollowUpsForOpportunity(opportunity, followUps) : []),
+    [followUps, opportunity],
   )
   const nextFollowUp = useMemo(
     () => oppFollowUps.find((f) => f.status === 'pending' || f.status === 'overdue') ?? null,
@@ -166,8 +174,21 @@ export function Opportunity360Page() {
     () => demoNotesFromTexts([
       {
         label: 'Product requirement',
-        text: sanitizeOpportunityScopeNotes(opportunity?.productRequirement),
+        text:
+          sanitizeOpportunityScopeNotes(opportunity?.productRequirement)
+          || opportunityRequirementDisplay(opportunity?.productRequirement)
+          || opportunityRequirementDisplay(sourceLead?.productRequirement),
         createdAt: opportunity?.modifiedAt ?? opportunity?.createdAt,
+      },
+      {
+        label: 'Lead remarks',
+        text: sourceLead?.remarks,
+        createdAt: sourceLead?.modifiedAt ?? sourceLead?.createdAt ?? opportunity?.createdAt,
+      },
+      {
+        label: 'Lead follow-up notes',
+        text: sourceLead?.followUpNotes,
+        createdAt: sourceLead?.modifiedAt ?? sourceLead?.createdAt ?? opportunity?.createdAt,
       },
       {
         label: 'Lost reason',
@@ -175,7 +196,17 @@ export function Opportunity360Page() {
         createdAt: opportunity?.modifiedAt ?? opportunity?.createdAt,
       },
     ]),
-    [opportunity?.productRequirement, opportunity?.lostReason, opportunity?.modifiedAt, opportunity?.createdAt],
+    [
+      opportunity?.productRequirement,
+      opportunity?.lostReason,
+      opportunity?.modifiedAt,
+      opportunity?.createdAt,
+      sourceLead?.productRequirement,
+      sourceLead?.remarks,
+      sourceLead?.followUpNotes,
+      sourceLead?.modifiedAt,
+      sourceLead?.createdAt,
+    ],
   )
   /** API entity notes reported by the Notes card — merged into the unified feed. */
   const [entityNotes, setEntityNotes] = useState<CrmEntityNoteDto[]>([])
@@ -220,10 +251,22 @@ export function Opportunity360Page() {
   const productLineCount = useMemo(() => {
     if (!opportunity) return 0
     const product = products.find((p) => p.id === opportunity.productId)
-    return resolveOpportunityLines(opportunity, product).filter((l) => l.productOrItem?.trim()).length
-  }, [opportunity, products])
+    const hydrated = {
+      ...opportunity,
+      productRequirement:
+        opportunity.productRequirement
+        || sourceLead?.productRequirement
+        || '',
+      value: opportunity.value > 0 ? opportunity.value : (sourceLead?.expectedValue ?? 0),
+    }
+    return resolveOpportunityLines(hydrated, product).filter((l) => l.productOrItem?.trim()).length
+  }, [opportunity, products, sourceLead?.productRequirement, sourceLead?.expectedValue])
 
-  const commercialDone = Boolean(opportunity && opportunity.value > 0 && opportunity.expectedCloseDate)
+  const commercialDone = Boolean(
+    opportunity
+    && ((opportunity.value > 0) || (sourceLead?.expectedValue ?? 0) > 0)
+    && (opportunity.expectedCloseDate || sourceLead?.expectedCloseDate),
+  )
   const additionalSectionItems = useMemo(() => {
     if (!opportunity) return []
     return [
@@ -304,21 +347,61 @@ export function Opportunity360Page() {
   }
 
   const opp = opportunity
+  const lead = sourceLead
 
   const customer = customers.find((c) => c.id === opp.customerId)
-  const contact = opp.contactId ? contacts.find((c) => c.id === opp.contactId) : null
-  const contactPhone = contact?.phone || customer?.contactPhone || ''
-  const contactEmail = contact?.email || customer?.contactEmail || ''
+    ?? (lead?.customerId ? customers.find((c) => c.id === lead.customerId) : undefined)
+  const contact =
+    (opp.contactId ? contacts.find((c) => c.id === opp.contactId) : null)
+    ?? (lead?.contactId ? contacts.find((c) => c.id === lead.contactId) : null)
+  const contactName =
+    contact?.name
+    || lead?.contactPerson
+    || customer?.contactPerson
+    || null
+  const contactPhone =
+    contact?.phone
+    || lead?.mobile
+    || customer?.contactPhone
+    || ''
+  const contactEmail =
+    contact?.email
+    || lead?.email
+    || customer?.contactEmail
+    || ''
   const product = products.find((p) => p.id === opp.productId)
   const salesQuo = opp.quotationId ? getQuotation(opp.quotationId) : undefined
   const latestDoc = oppDocs[0]
   const isOpen = opp.status === 'open'
-  const oppLines = resolveOpportunityLines(opp, product)
-  const commercial = buildOpportunityCommercialBreakdown(opp.value, opp.probability, oppLines)
+  const displayOpportunity = {
+    ...opp,
+    productRequirement:
+      opp.productRequirement
+      || lead?.productRequirement
+      || '',
+    value: opp.value > 0 ? opp.value : (lead?.expectedValue ?? 0),
+    nextFollowUpDate:
+      opp.nextFollowUpDate
+      || lead?.nextFollowUpDate
+      || null,
+    priority: opp.priority || lead?.priority || 'medium',
+    expectedCloseDate:
+      opp.expectedCloseDate
+      || lead?.expectedCloseDate
+      || '',
+    contactId: opp.contactId || lead?.contactId || null,
+    customerId: opp.customerId || lead?.customerId || '',
+  }
+  const oppLines = resolveOpportunityLines(displayOpportunity, product)
+  const commercial = buildOpportunityCommercialBreakdown(
+    displayOpportunity.value,
+    displayOpportunity.probability,
+    oppLines,
+  )
   const weighted = commercial.weightedForecast
   const overdueFu =
-    opp.nextFollowUpDate
-    && opp.nextFollowUpDate.slice(0, 10) < new Date().toISOString().slice(0, 10)
+    displayOpportunity.nextFollowUpDate
+    && displayOpportunity.nextFollowUpDate.slice(0, 10) < new Date().toISOString().slice(0, 10)
   const pipeline = buildOpportunityPipelineStages(opp.stage, stageOptions)
   const dealStatusLabel = opportunityStageLabel(opp.stage)
   const pipelineTone = opp.stage === 'lost' ? 'lost' as const : 'default' as const
@@ -502,19 +585,19 @@ export function Opportunity360Page() {
 
   const smartOverviewInput = {
     opportunityName: opportunity.opportunityName,
-    customerName: customer?.customerName ?? '',
-    customerId: opportunity.customerId,
+    customerName: customer?.customerName ?? lead?.prospectName ?? '',
+    customerId: displayOpportunity.customerId,
     stage: opportunity.stage,
-    priority: opportunity.priority,
+    priority: displayOpportunity.priority,
     status: opportunity.status,
-    ownerName: opportunity.ownerName,
-    dealValue: opportunity.value,
+    ownerName: opportunity.ownerName || lead?.leadOwnerName || '',
+    dealValue: displayOpportunity.value,
     weightedValue: weighted,
     probability: opportunity.probability,
     lineCount: oppLines.length,
     hasValidLine: oppLines.some((l) => l.productOrItem?.trim()),
-    expectedCloseDate: opportunity.expectedCloseDate,
-    nextFollowUpDate: opportunity.nextFollowUpDate,
+    expectedCloseDate: displayOpportunity.expectedCloseDate,
+    nextFollowUpDate: displayOpportunity.nextFollowUpDate,
     quotationId: opportunity.quotationId,
     salesOrderId: opportunity.salesOrderId,
     healthScore: opportunity.healthScore,
@@ -668,6 +751,7 @@ export function Opportunity360Page() {
               </ul>
             </nav>
 
+<<<<<<< HEAD
             <div className="crm-lead-zoho-canvas crm-opp-zoho-canvas">
               <div className="dyn-detail-pipeline">
                 <Enterprise360Pipeline
@@ -694,6 +778,44 @@ export function Opportunity360Page() {
                   }
                 />
               </div>
+=======
+          <OpportunitySummaryCard
+            opportunity={{
+              ...opportunity,
+              productRequirement: displayOpportunity.productRequirement,
+              value: displayOpportunity.value,
+              nextFollowUpDate: displayOpportunity.nextFollowUpDate,
+              priority: displayOpportunity.priority as typeof opportunity.priority,
+              expectedCloseDate: displayOpportunity.expectedCloseDate,
+            }}
+            customerName={customer?.customerName ?? lead?.prospectName}
+            customerId={customer?.id ?? lead?.customerId}
+            contactName={contactName}
+            contactPhone={contactPhone}
+            contactEmail={contactEmail}
+            city={customer?.city}
+            productName={
+              product?.productName
+              || oppLines.find((l) => l.productOrItem?.trim())?.productOrItem
+              || null
+            }
+            lastActivityAt={lastActivity?.activityDate ?? opportunity.lastActivityAt ?? opportunity.modifiedAt}
+            lastActivityLabel={lastActivity?.subject ?? null}
+            dealValueLabel={commercial.dealValueLabel}
+            dealValueHint={commercial.dealValueHint}
+            dealValue={commercial.estimatedDealValue}
+            recentFeedItems={unifiedFeedItems}
+            onLogActivity={
+              canAddActivity
+                ? () => {
+                    setEditingActivity(null)
+                    setLogActivityOpen(true)
+                  }
+                : undefined
+            }
+            onViewAllActivities={() => selectAdditionalSection('activities')}
+          />
+>>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
 
               <OpportunitySummaryCard
                 opportunity={opportunity}
@@ -850,7 +972,7 @@ export function Opportunity360Page() {
                           <div>
                             <p className="opp-360-quote-card__title">
                               {salesQuo?.quotationNo ?? d.quotationId}
-                              <span className="opp-360-quote-card__rev">Rev {d.revisionNo}</span>
+                              <span className="opp-360-quote-card__rev">{quotationRevisionLabel(d.revisionNo)}</span>
                             </p>
                             <DynamicsStatusChip
                               label={d.status}
@@ -881,9 +1003,10 @@ export function Opportunity360Page() {
           setEditingFollowUp(null)
         }}
         context={{
-          customerId: opportunity.customerId,
-          contactId: opportunity.contactId,
+          customerId: displayOpportunity.customerId,
+          contactId: displayOpportunity.contactId,
           opportunityId: opportunity.id,
+          leadId: opportunity.leadId,
           assignedTo: opportunity.ownerId,
           assignedToName: opportunity.ownerName,
         }}
@@ -895,7 +1018,12 @@ export function Opportunity360Page() {
           setLogActivityOpen(false)
           setEditingActivity(null)
         }}
-        context={{ customerId: opportunity.customerId, contactId: opportunity.contactId, opportunityId: opportunity.id }}
+        context={{
+          customerId: displayOpportunity.customerId,
+          contactId: displayOpportunity.contactId,
+          opportunityId: opportunity.id,
+          leadId: opportunity.leadId,
+        }}
         activity={editingActivity}
       />
       <CrmDeleteConfirmModal
