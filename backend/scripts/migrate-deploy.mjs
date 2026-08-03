@@ -106,6 +106,15 @@ if (result.error?.message?.includes('Killed') || result.signal === 'SIGKILL') {
 
 if (result.status !== 0) {
   console.error('[migrate-deploy] Failed — deploy cannot continue with a schema mismatch.')
+  console.error(
+    '[migrate-deploy] If error is P3009 (failed migration), run in phpMyAdmin:',
+  )
+  console.error(
+    '  backend/scripts/live-fix-p3009-admin-module-administrators.sql',
+  )
+  console.error(
+    '  Or from your PC: cd backend && npm run db:recover-live-p3009 (with live DB_* env)',
+  )
   process.exit(result.status ?? 1)
 }
 
