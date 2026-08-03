@@ -94,8 +94,8 @@ if (result.error?.message?.includes('Killed') || result.signal === 'SIGKILL') {
 if (result.status !== 0) {
   console.error('[migrate-deploy] Migration failed. Deployment stopped.')
   console.error('[migrate-deploy] Inspect: npx prisma migrate status')
-  console.error('[migrate-deploy] One-time emergency repair: npm run db:recover-known')
-  console.error('[migrate-deploy] Manual SQL (phpMyAdmin): backend/scripts/live-fix-*.sql')
+  console.error('[migrate-deploy] One-time P3009 fix (SSH): node scripts/resolve-phase10-p3009.mjs')
+  console.error('[migrate-deploy] Or phpMyAdmin: scripts/live-fix-p3018-crm-phase10-drop-product-id.sql')
   process.exit(result.status ?? 1)
 }
 

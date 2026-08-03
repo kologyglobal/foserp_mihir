@@ -62,11 +62,12 @@ SET @sql := (SELECT IF(
 ));
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
-/* ── 3) Mark failed migration as applied ── */
+/* ── 3) Mark failed migration as applied (with checksum for Prisma) ── */
 UPDATE `_prisma_migrations`
 SET
   `finished_at` = COALESCE(`finished_at`, NOW(3)),
   `applied_steps_count` = GREATEST(`applied_steps_count`, 1),
+  `checksum` = '718d8dfa30dbb3430bdcf207454f3a6e457b10aabcabf6a495ea637b38ee9cac',
   `logs` = NULL,
   `rolled_back_at` = NULL
 WHERE `migration_name` = '20260727190000_crm_product_to_item_phase10_drop_product_id'
