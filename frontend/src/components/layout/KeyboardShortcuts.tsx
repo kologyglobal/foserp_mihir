@@ -56,7 +56,7 @@ export function KeyboardShortcuts() {
       window.removeEventListener('keydown', onKeyDown)
       resetG()
     }
-  }, [navigate, setSearchOpen, toggleCopilot])
+  }, [navigate, setSearchOpen])
 
   return null
 }

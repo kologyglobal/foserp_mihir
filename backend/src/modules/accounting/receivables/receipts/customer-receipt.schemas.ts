@@ -17,7 +17,7 @@ export const customerReceiptAllocationIdSchema = z.string().uuid('allocationId m
 
 export const customerReceiptStatusSchema = z.enum(['DRAFT', 'READY_TO_POST', 'POSTED', 'CANCELLED'])
 export { customerReceiptPaymentMethodSchema }
-export const customerReceiptSourceTypeSchema = z.enum(['DIRECT', 'BANK_IMPORT'])
+export const customerReceiptSourceTypeSchema = z.enum(['DIRECT', 'BANK_IMPORT', 'CRM_PAYMENT_RECEIPT'])
 export const customerReceiptAllocationStatusSchema = z.enum(['DRAFT', 'POSTED', 'REVERSED'])
 
 export const positiveDecimalAmountSchema = decimalAmountSchema.refine(
@@ -72,7 +72,7 @@ export interface NormalizedCustomerReceiptBody {
   legalEntityId?: string
   branchId?: string | null
   customerId: string
-  sourceType: 'DIRECT' | 'BANK_IMPORT'
+  sourceType: 'DIRECT' | 'BANK_IMPORT' | 'CRM_PAYMENT_RECEIPT'
   sourceDocumentId?: string | null
   sourceDocumentNumber?: string | null
   receiptDate: string

@@ -61,14 +61,16 @@ import {
   CRM_PAYMENT_MODE_LABELS,
   CRM_TAX_INVOICE_STATUS_LABELS,
   CRM_INVOICE_PAYMENT_STATUS_LABELS,
+  CRM_TAX_INVOICE_ACCOUNTING_STATUS_LABELS,
+  CRM_RECEIPT_MIGRATION_STATUS_LABELS,
 } from '../../../types/crmCommercial'
 import { computeProformaLineTotals } from '../../../utils/proformaInvoiceLines'
 import { computeGst, gstSchemeLabel } from '../../../utils/gstEngine'
 import {
   blankTaxInvoiceLine,
+  ensureTaxInvoiceFromProforma,
+  ensureTaxInvoiceFromSalesOrder,
   resolveTaxInvoiceFromCustomer,
-  resolveTaxInvoiceFromProforma,
-  resolveTaxInvoiceFromSalesOrder,
   type TaxInvoicePrefill,
 } from '../../../utils/taxInvoicePrefill'
 import { SalesTaxInvoiceListPage } from '../../sales/SalesTaxInvoiceListPage'
@@ -140,14 +142,29 @@ export function CrmInvoiceDetailPage() {
                         isApiMode() ? apiPostInvoice(invoice.id) : postInvoice(invoice.id),
                       ),
                   }
-                : invoice.balanceDue > 0 && invoice.status !== 'cancelled' && invoice.status !== 'draft'
+                : invoice.balanceDue > 0 &&
+                    invoice.status !== 'cancelled' &&
+                    invoice.status !== 'draft' &&
+                    !invoice.salesInvoiceId &&
+                    invoice.accountingStatus !== 'pending_review' &&
+                    invoice.accountingStatus !== 'converted'
                   ? {
                       id: 'alloc',
                       label: 'Allocate Payment',
                       icon: ArrowLeftRight,
                       onClick: () => navigate(`/sales/payment-allocation?customerId=${invoice.customerId}&invoiceId=${invoice.id}`),
                     }
-                  : undefined
+                  : invoice.salesInvoiceId
+                    ? {
+                        id: 'money-in-pay',
+                        label: 'Record Payment in Money In',
+                        icon: Banknote,
+                        onClick: () =>
+                          navigate(
+                            `/accounting/money-in/receipts/new?customerId=${invoice.customerId}&salesInvoiceId=${invoice.salesInvoiceId}`,
+                          ),
+                      }
+                    : undefined
             }
             secondaryActions={[
               ...(invoice.status === 'draft' && canCrmPermission('crm.commercial.invoice.cancel')
@@ -161,6 +178,25 @@ export function CrmInvoiceDetailPage() {
                       ),
                   }]
                 : []),
+              ...(invoice.salesInvoiceId
+                ? [
+                    {
+                      id: 'open-si',
+                      label: 'Open in Money In',
+                      icon: FileText,
+                      onClick: () => navigate(`/accounting/money-in/invoices/${invoice.salesInvoiceId}`),
+                    },
+                  ]
+                : invoice.accountingStatus === 'pending_review'
+                  ? [
+                      {
+                        id: 'crm-pending',
+                        label: 'Accounting Queue',
+                        icon: ClipboardList,
+                        onClick: () => navigate('/accounting/money-in/crm-pending'),
+                      },
+                    ]
+                  : []),
               { id: 'customer', label: 'Customer 360', icon: FileText, onClick: () => navigate(salesCustomer360Path(invoice.customerId)) },
             ]}
           />
@@ -174,6 +210,84 @@ export function CrmInvoiceDetailPage() {
       >
         <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
           <div className="space-y-4">
+            {(invoice.accountingStatus && invoice.accountingStatus !== 'none') || invoice.salesInvoiceId ? (
+              <ErpCardSection title="Accounting (Money In)">
+                <div className="col-span-2 space-y-2 text-[13px]">
+                  <p className="rounded border border-erp-border bg-erp-surface-muted/40 px-3 py-2 text-erp-muted">
+                    Payment status is controlled by Accounting after conversion. CRM values below are read-only mirrors.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <div className="text-erp-muted">Accounting status</div>
+                      <div className="font-medium">
+                        {CRM_TAX_INVOICE_ACCOUNTING_STATUS_LABELS[invoice.accountingStatus ?? 'none']}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-erp-muted">Accounting invoice</div>
+                      <div className="font-medium">
+                        {invoice.salesInvoiceId ? (
+                          <TableLink to={`/accounting/money-in/invoices/${invoice.salesInvoiceId}`}>
+                            {invoice.salesInvoiceNumber || invoice.salesInvoiceId}
+                          </TableLink>
+                        ) : (
+                          '—'
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-erp-muted">Amount paid</div>
+                      <div className="font-medium">{formatCurrency(invoice.amountPaid)}</div>
+                    </div>
+                    <div>
+                      <div className="text-erp-muted">Balance due</div>
+                      <div className="font-medium">{formatCurrency(invoice.balanceDue)}</div>
+                    </div>
+                    <div>
+                      <div className="text-erp-muted">Payment status</div>
+                      <div className="font-medium">
+                        {CRM_INVOICE_PAYMENT_STATUS_LABELS[invoice.paymentStatus]}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-erp-muted">Last payment date</div>
+                      <div className="font-medium">
+                        {invoice.lastPaymentDate ? formatDate(invoice.lastPaymentDate) : '—'}
+                      </div>
+                    </div>
+                  </div>
+                  {invoice.salesInvoiceId ? (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        className="rounded border border-erp-border px-3 py-1.5 text-[12px] font-semibold hover:border-erp-accent"
+                        onClick={() => navigate(`/accounting/money-in/invoices/${invoice.salesInvoiceId}`)}
+                      >
+                        Open in Money In
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-erp-border px-3 py-1.5 text-[12px] font-semibold hover:border-erp-accent"
+                        onClick={() =>
+                          navigate(`/accounting/money-in/receipts/new?customerId=${invoice.customerId}`)
+                        }
+                      >
+                        Record Payment in Money In
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-erp-border px-3 py-1.5 text-[12px] font-semibold hover:border-erp-accent"
+                        onClick={() =>
+                          navigate(`/accounting/money-in/invoices/${invoice.salesInvoiceId}`)
+                        }
+                      >
+                        View Accounting Allocations
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </ErpCardSection>
+            ) : null}
             <ErpCardSection title="Invoice lines">
               <div className="col-span-2 overflow-x-auto">
                 <table className="w-full text-left text-[13px]">
@@ -318,6 +432,9 @@ export function CrmInvoiceCreatePage() {
   const [prefill, setPrefill] = useState<TaxInvoicePrefill | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [prefillLoading, setPrefillLoading] = useState(
+    Boolean(salesOrderId || proformaId || customerIdParam),
+  )
 
   const isDirect = sourceType === 'direct' || prefill?.source === 'direct'
 
@@ -377,7 +494,8 @@ export function CrmInvoiceCreatePage() {
     prefill &&
       activeLines.length > 0 &&
       activeLines.every((l) => l.itemId || l.itemCode) &&
-      !creating,
+      !creating &&
+      !prefillLoading,
   )
 
   const sourceDone = Boolean(
@@ -403,48 +521,73 @@ export function CrmInvoiceCreatePage() {
     setPrefill(null)
   }
 
-  function loadFromSalesOrder(soId: string) {
+  async function loadFromSalesOrder(soId: string, opts?: { announceSuccess?: boolean }) {
     if (!soId) {
       clearLoaded()
       setError(null)
+      setPrefillLoading(false)
       return
     }
-    const result = resolveTaxInvoiceFromSalesOrder(soId)
-    if (!result.ok) {
-      clearLoaded()
-      setError(result.error)
-      return
-    }
-    setPrefill(result.data)
+    setPrefillLoading(true)
     setError(null)
+    try {
+      const result = await ensureTaxInvoiceFromSalesOrder(soId)
+      if (!result.ok) {
+        clearLoaded()
+        setError(result.error)
+        notify.error(result.error)
+        return
+      }
+      setPrefill(result.data)
+      setError(null)
+      if (opts?.announceSuccess) {
+        notify.success(`Filled from sales order ${result.data.salesOrderNo ?? soId}`)
+      }
+    } finally {
+      setPrefillLoading(false)
+    }
   }
 
-  function loadFromProforma(piId: string) {
+  async function loadFromProforma(piId: string, opts?: { announceSuccess?: boolean }) {
     if (!piId) {
       clearLoaded()
       setError(null)
+      setPrefillLoading(false)
       return
     }
-    const result = resolveTaxInvoiceFromProforma(piId)
-    if (!result.ok) {
-      clearLoaded()
-      setError(result.error)
-      return
-    }
-    setPrefill(result.data)
+    setPrefillLoading(true)
     setError(null)
+    try {
+      const result = await ensureTaxInvoiceFromProforma(piId)
+      if (!result.ok) {
+        clearLoaded()
+        setError(result.error)
+        notify.error(result.error)
+        return
+      }
+      setPrefill(result.data)
+      setError(null)
+      if (opts?.announceSuccess) {
+        notify.success(`Filled from proforma ${result.data.proformaNo ?? piId}`)
+      }
+    } finally {
+      setPrefillLoading(false)
+    }
   }
 
   function loadFromCustomer(customerId: string) {
     if (!customerId) {
       clearLoaded()
       setError(null)
+      setPrefillLoading(false)
       return
     }
+    setPrefillLoading(false)
     const result = resolveTaxInvoiceFromCustomer(customerId)
     if (!result.ok) {
       clearLoaded()
       setError(result.error)
+      notify.error(result.error)
       return
     }
     setSelectedSo('')
@@ -456,6 +599,7 @@ export function CrmInvoiceCreatePage() {
     setSourceType(next)
     clearLoaded()
     setError(null)
+    setPrefillLoading(false)
     if (next !== 'sales_order') setSelectedSo('')
     if (next !== 'proforma') setSelectedPi('')
     if (next !== 'direct') setSelectedCustomer('')
@@ -494,9 +638,10 @@ export function CrmInvoiceCreatePage() {
   }
 
   useEffect(() => {
-    if (salesOrderId) loadFromSalesOrder(salesOrderId)
-    else if (proformaId) loadFromProforma(proformaId)
+    if (salesOrderId) void loadFromSalesOrder(salesOrderId)
+    else if (proformaId) void loadFromProforma(proformaId)
     else if (customerIdParam) loadFromCustomer(customerIdParam)
+    else setPrefillLoading(false)
     // Initial deep-link preload only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -681,9 +826,17 @@ export function CrmInvoiceCreatePage() {
       footer={(
         <FormActionBar
           sticky
-          busy={creating}
-          disabled={!canCreate}
-          disabledReason={!sourceDone ? (isDirect ? 'Select a customer' : 'Select a source document') : !linesDone ? 'Add at least one product line' : undefined}
+          busy={creating || prefillLoading}
+          disabled={!canCreate || prefillLoading}
+          disabledReason={
+            prefillLoading
+              ? 'Loading source document…'
+              : !sourceDone
+                ? (isDirect ? 'Select a customer' : 'Select a source document')
+                : !linesDone
+                  ? 'Add at least one product line'
+                  : undefined
+          }
           dirty={Boolean(selectedSo || selectedPi || selectedCustomer || prefill)}
           saveLabel="Create Draft Invoice"
           onCancel={() => navigate('/sales/invoices')}
@@ -730,6 +883,15 @@ export function CrmInvoiceCreatePage() {
           </nav>
 
           <div className="crm-lead-form-flow crm-lead-zoho-canvas">
+      {prefillLoading ? (
+        <div
+          className="mb-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[13px] text-sky-900"
+          role="status"
+          aria-live="polite"
+        >
+          Loading source document details…
+        </div>
+      ) : null}
       <div id="ti-section-source" className="crm-lead-quick-entry crm-lead-zoho-block">
       <ErpFieldGroup label="Tax Invoice Information" columns={4} className="crm-lead-zoho-section">
         <ErpFieldRow label="Create from" colSpan={3} horizontal={false}>
@@ -774,11 +936,17 @@ export function CrmInvoiceCreatePage() {
               onChange={(v) => {
                 const id = v ?? ''
                 setSelectedSo(id)
-                loadFromSalesOrder(id)
+                void loadFromSalesOrder(id, { announceSuccess: true })
               }}
-              placeholder="Search sales order no, customer…"
+              placeholder={prefillLoading ? 'Loading sales order…' : 'Search sales order no, customer…'}
               appearance="dropdown"
               emptyMessage="No confirmed sales orders available."
+              disabled={prefillLoading}
+              resolveOrphanLabel={(id) =>
+                prefill?.salesOrderId === id
+                  ? prefill.salesOrderNo ?? undefined
+                  : salesOrders.find((s) => s.id === id)?.salesOrderNo
+              }
             />
           </ErpFieldRow>
         ) : null}
@@ -797,11 +965,17 @@ export function CrmInvoiceCreatePage() {
               onChange={(v) => {
                 const id = v ?? ''
                 setSelectedPi(id)
-                loadFromProforma(id)
+                void loadFromProforma(id, { announceSuccess: true })
               }}
-              placeholder="Search proforma no, customer…"
+              placeholder={prefillLoading ? 'Loading proforma…' : 'Search proforma no, customer…'}
               appearance="dropdown"
               emptyMessage="No issued proformas available."
+              disabled={prefillLoading}
+              resolveOrphanLabel={(id) =>
+                prefill?.proformaInvoiceId === id
+                  ? prefill.proformaNo ?? undefined
+                  : proformas.find((p) => p.id === id)?.proformaNo
+              }
             />
           </ErpFieldRow>
         ) : null}
@@ -828,7 +1002,7 @@ export function CrmInvoiceCreatePage() {
           </ErpFieldRow>
         ) : null}
 
-        {!prefill && !error ? (
+        {!prefill && !error && !prefillLoading ? (
           <div className="col-span-full">
             <p className="pi-create-mode-hint">
               <PenLine className="h-4 w-4 shrink-0" aria-hidden />
@@ -1368,6 +1542,11 @@ export function CrmReceiptDetailPage() {
     receipt ? s.customers.find((c) => c.id === receipt.customerId) : undefined,
   )
   const navigate = useNavigate()
+  const migrationStatus = receipt?.accountingMigrationStatus ?? 'UNREVIEWED'
+  const accountingControlled =
+    Boolean(receipt?.accountingReceiptId) ||
+    migrationStatus === 'DRAFT_CREATED' ||
+    migrationStatus === 'MIGRATED'
 
   async function handleDownloadPdf() {
     if (!receipt) return
@@ -1416,12 +1595,31 @@ export function CrmReceiptDetailPage() {
       commandBar={(
         <ErpCommandBar
           sticky={false}
-          primaryAction={{
-            id: 'alloc',
-            label: 'Allocate',
-            icon: ArrowLeftRight,
-            onClick: () => navigate(`/sales/payment-allocation?customerId=${receipt.customerId}`),
-          }}
+          primaryAction={
+            accountingControlled && receipt.accountingReceiptId
+              ? {
+                  id: 'open-ar',
+                  label: migrationStatus === 'MIGRATED' ? 'Open Posted Receipt' : 'Open Accounting Draft',
+                  icon: FileText,
+                  onClick: () => navigate(`/accounting/money-in/receipts/${receipt.accountingReceiptId}`),
+                }
+              : canCrmPermission('crm.commercial.receipt.accounting_draft.create')
+                ? {
+                    id: 'record-mi',
+                    label: 'Record in Money In',
+                    icon: Banknote,
+                    onClick: () =>
+                      navigate(
+                        `/accounting/money-in/receipts/new?customerId=${receipt.customerId}&crmPaymentReceiptId=${receipt.id}`,
+                      ),
+                  }
+                : {
+                    id: 'alloc',
+                    label: 'Allocate',
+                    icon: ArrowLeftRight,
+                    onClick: () => navigate(`/sales/payment-allocation?customerId=${receipt.customerId}`),
+                  }
+          }
           secondaryActions={[
             {
               id: 'print',
@@ -1443,9 +1641,22 @@ export function CrmReceiptDetailPage() {
       insights={[
         { label: 'Amount', value: formatCurrency(receipt.amount), accent: 'blue' },
         { label: 'Unallocated', value: formatCurrency(receipt.unallocatedAmount), accent: 'amber' },
-        { label: 'Date', value: formatDate(receipt.receiptDate), accent: 'slate' },
+        {
+          label: 'Books',
+          value: CRM_RECEIPT_MIGRATION_STATUS_LABELS[migrationStatus],
+          accent: migrationStatus === 'MIGRATED' ? 'green' : 'slate',
+        },
       ]}
     >
+      <div className="mb-4 rounded border border-erp-border bg-erp-surface-muted/30 px-3 py-2 text-[13px]">
+        <span className="font-semibold text-erp-text">
+          {CRM_RECEIPT_MIGRATION_STATUS_LABELS[migrationStatus]}
+        </span>
+        <span className="text-erp-muted">
+          {' '}
+          — CRM receipts never post GL. Use Money In for statutory customer receipts and allocations.
+        </span>
+      </div>
       <ErpCardSection title="Receipt details">
         <ErpFieldRow label="Customer" readOnly>
           <TableLink to={salesCustomer360Path(receipt.customerId)}>{receipt.customerName}</TableLink>
@@ -1459,10 +1670,27 @@ export function CrmReceiptDetailPage() {
         <ErpFieldRow label="Remarks" readOnly>{receipt.remarks || '—'}</ErpFieldRow>
         <ErpFieldRow label="Attachment" readOnly>{receipt.attachmentName || '—'}</ErpFieldRow>
       </ErpCardSection>
+      <ErpCardSection title="Accounting handoff" className="mt-4">
+        <ErpFieldRow label="Migration status" readOnly>
+          {CRM_RECEIPT_MIGRATION_STATUS_LABELS[migrationStatus]}
+        </ErpFieldRow>
+        <ErpFieldRow label="Accounting receipt" readOnly>
+          {receipt.accountingReceiptId ? (
+            <TableLink to={`/accounting/money-in/receipts/${receipt.accountingReceiptId}`}>
+              {receipt.accountingReceiptId}
+            </TableLink>
+          ) : (
+            '—'
+          )}
+        </ErpFieldRow>
+        <ErpFieldRow label="Migration error" readOnly>
+          {receipt.accountingMigrationError || '—'}
+        </ErpFieldRow>
+      </ErpCardSection>
       <ErpCardSection title="Allocations" className="mt-4">
         <div className="col-span-2 space-y-2">
           {allocations.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">Not allocated to any invoice yet.</p>
+            <p className="text-[13px] text-erp-muted">Not allocated to any commercial invoice yet.</p>
           ) : (
             allocations.map((a) => (
               <div key={a.id} className="flex justify-between rounded border border-erp-border px-3 py-2 text-[13px]">

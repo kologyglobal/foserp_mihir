@@ -2202,6 +2202,18 @@ enum CrmProformaSource {
   sales_order
 }
 
+/// CRM commercial receipt → optional Money In handoff metadata (no GL from CRM).
+enum CrmPaymentReceiptAccountingMigrationStatus {
+  UNREVIEWED
+  NON_ACCOUNTING
+  READY_TO_MIGRATE
+  DRAFT_CREATED
+  MIGRATED
+  DUPLICATE
+  REJECTED
+  FAILED
+}
+
 model CrmPaymentReceipt {
   id                   String                   @id @default(uuid())
   tenantId             String
@@ -2217,6 +2229,14 @@ model CrmPaymentReceipt {
   unallocatedAmount    Decimal                  @db.Decimal(18, 2)
   remarks              String?                  @db.Text
   attachmentName       String?                  @db.VarChar(255)
+  /// Soft link to Accounting CustomerReceipt (no Prisma FK).
+  accountingReceiptId  String?
+  accountingMigrationStatus CrmPaymentReceiptAccountingMigrationStatus @default(UNREVIEWED)
+  accountingMigrationError  String?             @db.Text
+  accountingMigratedAt      DateTime?
+  accountingMigratedBy      String?
+  /// True until user explicitly records the receipt in Money In (or marks non-accounting).
+  commercialOnly            Boolean             @default(true)
   createdBy            String?
   updatedBy            String?
   createdAt            DateTime                 @default(now())
@@ -2229,9 +2249,14 @@ model CrmPaymentReceipt {
   allocations     CrmPaymentAllocation[]
 
   @@unique([tenantId, receiptNo])
+  @@unique([tenantId, accountingReceiptId])
   @@index([tenantId])
   @@index([tenantId, companyId])
   @@index([tenantId, proformaInvoiceId])
+  @@index([tenantId, accountingReceiptId])
+  @@index([tenantId, accountingMigrationStatus])
+  @@index([tenantId, receiptDate])
+  @@index([tenantId, transactionRef])
   @@index([tenantId, deletedAt])
   @@map("crm_payment_receipts")
 }
@@ -2364,6 +2389,8 @@ model CrmTaxInvoice {
   salesInvoiceNumber    String?                       @db.VarChar(64)
   accountingSubmittedAt DateTime?
   accountingConvertedAt DateTime?
+  /// Last AR-synced payment date (mirror only; written by Accounting sync).
+  lastPaymentDate       DateTime?                     @db.Date
   createdByNameSnapshot String?                       @db.VarChar(200)
   postedAt              DateTime?
   cancelledAt           DateTime?
@@ -5865,6 +5892,8 @@ enum CustomerReceiptPaymentMethod {
 enum CustomerReceiptSourceType {
   DIRECT
   BANK_IMPORT
+  /// Soft link to CrmPaymentReceipt via sourceDocumentId (draft handoff; no auto-post).
+  CRM_PAYMENT_RECEIPT
 }
 
 enum CustomerReceiptAllocationStatus {
@@ -6024,11 +6053,14 @@ model CustomerReceipt {
 
   @@unique([legalEntityId, receiptNumber], map: "cust_rcpt_le_number_key")
   @@unique([legalEntityId, draftReference], map: "cust_rcpt_le_draft_ref_key")
+  /// Idempotent CRM → Money In draft handoff (nullable sourceDocumentId allows multiple DIRECT rows).
+  @@unique([tenantId, sourceType, sourceDocumentId], map: "cust_rcpt_tenant_source_key")
   @@index([tenantId])
   @@index([tenantId, legalEntityId])
   @@index([legalEntityId, status])
   @@index([legalEntityId, customerId])
   @@index([legalEntityId, receiptDate])
+  @@index([tenantId, sourceType, sourceDocumentId], map: "cust_rcpt_src_doc_idx")
   @@index([financialYearId])
   @@index([bankCashAccountId])
   @@index([createdBy])

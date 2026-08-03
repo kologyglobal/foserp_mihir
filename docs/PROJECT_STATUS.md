@@ -441,7 +441,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | Money In/Out live in API mode. Period Close lock/readiness + **year-end wizard posts P&L→RE**. Accruals/prepaid/FX/calendar still demo. Journals + Approvals + Bank & Cash UAT. |
+| Frontend | ⚠️ | Money In/Out live in API mode. **CRM payment receipts can hand off to Money In drafts** (not auto-post); commercial allocation blocked after TI convert. Period Close lock/readiness + **year-end wizard posts P&L→RE**. Accruals/prepaid/FX/calendar still demo. Journals + Approvals + Bank & Cash UAT. |
 | Backend | ⚠️ | Phase 1–5D + AR/AP reverse + journal reverse + **year-end close** + FY lock hardened |
 | DB | ⚠️ | + `YearEndCloseRun` (`year_end_close_runs`); AR/AP open items + allocation tables as before |
 | API | ⚠️ | + `GET/POST …/financial-years/:id/year-end-preview\|year-end-close`; FY close requires year-end run + all periods CLOSED |

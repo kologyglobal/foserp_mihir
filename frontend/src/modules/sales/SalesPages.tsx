@@ -91,10 +91,12 @@ import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSele
 import { useQuickCreate } from '../../hooks/useQuickCreate'
 import { usePendingCustomerApprovals } from '../../hooks/useStableStoreData'
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
+import { resolveCatalogProductLabel } from '../../utils/catalogProductLabel'
 
 function useMasterLabels() {
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
+  const items = useMasterStore((s) => s.items)
   const customerName = useCallback(
     (id: string | null | undefined, snapshot?: string | null) => {
       if (!id && !snapshot) return '—'
@@ -104,10 +106,10 @@ function useMasterLabels() {
   )
   const productName = useCallback(
     (id: string | null | undefined) =>
-      id ? (products.find((p) => p.id === id)?.productName ?? id) : '—',
-    [products],
+      id ? resolveCatalogProductLabel(id, { items, products }) : '—',
+    [items, products],
   )
-  return { customerName, productName, customers, products }
+  return { customerName, productName, customers, products, items }
 }
 
 function PipelineStep({

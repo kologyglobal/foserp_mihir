@@ -322,6 +322,21 @@ export async function syncCrmTaxInvoicePaymentFromSalesInvoice(
 
   const nextStatus = invoiceStatusFromPayment(paymentStatus, crm.status)
 
+  // Latest posted receipt allocation date on this SI (mirror only).
+  let lastPaymentDate: Date | null = null
+  if (amountPaid > 0) {
+    const latestAlloc = await prisma.customerReceiptAllocation.findFirst({
+      where: {
+        tenantId,
+        invoiceId: salesInvoiceId,
+        status: 'POSTED',
+      },
+      orderBy: { allocationDate: 'desc' },
+      select: { allocationDate: true },
+    })
+    lastPaymentDate = latestAlloc?.allocationDate ?? null
+  }
+
   await prisma.crmTaxInvoice.updateMany({
     where: { id: crm.id, tenantId, deletedAt: null },
     data: {
@@ -330,6 +345,7 @@ export async function syncCrmTaxInvoicePaymentFromSalesInvoice(
       paymentStatus,
       status: nextStatus,
       salesInvoiceNumber: si.invoiceNumber ?? crm.salesInvoiceNumber,
+      lastPaymentDate,
       updatedBy: userId ?? undefined,
     },
   })
@@ -340,16 +356,20 @@ export async function syncCrmTaxInvoicePaymentFromSalesInvoice(
     module: 'crm',
     entity: 'crmTaxInvoice',
     entityId: crm.id,
-    action: 'AR_PAYMENT_SYNC',
+    action: 'ACCOUNTING_PAYMENT_SYNCED_TO_CRM',
     newValues: {
       salesInvoiceId,
       amountPaid,
       balanceDue,
       paymentStatus,
       status: nextStatus,
+      lastPaymentDate: lastPaymentDate ? dateOnly(lastPaymentDate) : null,
     },
   })
 }
+
+/** Alias for syncCrmTaxInvoicePaymentFromSalesInvoice — centralized naming. */
+export const syncAccountingPaymentStateToCrmTaxInvoice = syncCrmTaxInvoicePaymentFromSalesInvoice
 
 /** Sync all CRM-linked invoices touched by an allocation batch. */
 export async function syncCrmTaxInvoicesForAllocationBatch(

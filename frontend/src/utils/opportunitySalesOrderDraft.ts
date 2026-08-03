@@ -15,7 +15,6 @@ export const CREATE_SALES_ORDER_LOCKED_REASON = 'Complete commercial details on 
 
 const REASON_NO_QUOTATION = 'Create a quotation before converting to a sales order.'
 const REASON_EXPIRED = 'Quotation validity has expired.'
-const REASON_NO_OPPORTUNITY = 'Link this quotation to an opportunity before creating a sales order.'
 const REASON_LOST = 'Lost or cancelled opportunities cannot be converted to a sales order.'
 const REASON_PERMISSION = 'You do not have permission to convert quotations to sales orders.'
 const REASON_REJECTED = 'Rejected quotations cannot be converted — create a new revision first.'
@@ -77,10 +76,10 @@ export function isOpportunitySalesOrderStage(
  * - user has crm.quotation.convert + crm.sales_order.create (not owner-gated)
  * - quotation exists and commercial checks pass (lines, terms, validity, customer)
  * - send / internal approval / customer approval are optional (not required)
- * - opportunity linked and not Lost/Archived (Won is OK — convert links SO)
+ * - opportunity is optional; when linked it must not be Lost/Archived (Won is OK — convert links SO)
  * - no sales order linked yet
  *
- * Conversion itself marks the opportunity Won — stageReady is informational only.
+ * Conversion marks a linked opportunity Won when present — stageReady is informational only.
  */
 export function resolveOpportunityCreateSalesOrderGate(
   opportunityId?: string | null,
@@ -101,16 +100,13 @@ export function resolveOpportunityCreateSalesOrderGate(
 
   const hasConvertPerm = canConvertQuotationToSalesOrderPermission()
 
+  // Quotation without opportunity — still convert via commercial gate (no hard opportunity requirement).
+  if (!opportunityId && quotationDocumentId) {
+    return resolveCreateSalesOrderGateForQuotationDocument(quotationDocumentId)
+  }
+
   const prefill = resolveOpportunitySalesOrderPrefill(opportunityId, quotationDocumentId)
   if (!prefill) {
-    if (quotationDocumentId) {
-      return {
-        ...empty,
-        showCreate: hasConvertPerm,
-        disabledReason: hasConvertPerm ? REASON_NO_OPPORTUNITY : REASON_PERMISSION,
-        quotationDocumentId,
-      }
-    }
     return empty
   }
 
@@ -204,26 +200,118 @@ export function resolveOpportunityCreateSalesOrderGate(
   }
 }
 
-/** Same Create SO gate, resolved from a quotation document id. */
+/** Same Create SO gate, resolved from a quotation document id (opportunity optional). */
 export function resolveCreateSalesOrderGateForQuotationDocument(
   documentId: string,
 ): OpportunityCreateSalesOrderGate {
-  const doc = useCrmStore.getState().getQuotationDocument(documentId)
-  if (!doc) {
+  const empty: OpportunityCreateSalesOrderGate = {
+    showCreate: false,
+    enabled: false,
+    disabledReason: CREATE_SALES_ORDER_LOCKED_REASON,
+    salesOrderId: null,
+    quotationDocumentId: documentId,
+    hasQuotation: false,
+    quotationApproved: false,
+    customerAccepted: false,
+    commercialComplete: false,
+    stageReady: false,
+  }
+
+  const crm = useCrmStore.getState()
+  const doc = crm.getQuotationDocument(documentId)
+  if (!doc) return empty
+
+  const hasConvertPerm = canConvertQuotationToSalesOrderPermission()
+  const salesQuo = useSalesStore.getState().getQuotation(doc.quotationId)
+  const existingSoId =
+    doc.salesOrderId
+    ?? salesQuo?.salesOrderId
+    ?? null
+
+  if (existingSoId) {
     return {
-      showCreate: false,
-      enabled: false,
-      disabledReason: CREATE_SALES_ORDER_LOCKED_REASON,
-      salesOrderId: null,
-      quotationDocumentId: documentId,
-      hasQuotation: false,
-      quotationApproved: false,
-      customerAccepted: false,
-      commercialComplete: false,
-      stageReady: false,
+      ...empty,
+      showCreate: hasConvertPerm || canCrmPermission('crm.sales_order.view'),
+      salesOrderId: existingSoId,
+      hasQuotation: true,
     }
   }
-  return resolveOpportunityCreateSalesOrderGate(doc.opportunityId, doc.id)
+
+  if (!hasConvertPerm) {
+    return {
+      ...empty,
+      showCreate: false,
+      disabledReason: REASON_PERMISSION,
+      hasQuotation: true,
+    }
+  }
+
+  const opportunity = doc.opportunityId ? crm.getOpportunity(doc.opportunityId) : undefined
+  // Only block when the store knows the opportunity is lost. Missing local hydrate is not a hard stop —
+  // API convert validates opportunity server-side when linked.
+  if (opportunity && (opportunity.stage === 'lost' || opportunity.status === 'lost')) {
+    return {
+      ...empty,
+      showCreate: true,
+      disabledReason: REASON_LOST,
+      hasQuotation: true,
+    }
+  }
+
+  const masters = useMasterStore.getState()
+  const customer = masters.getCustomer(
+    salesQuo?.customerId ?? opportunity?.customerId ?? '',
+  )
+  const contact = doc.contactId ? crm.getContact(doc.contactId) : undefined
+  const product = salesQuo?.productId ? masters.getProduct(salesQuo.productId) : undefined
+  const validation = validateQuotationForSoConversion({
+    document: doc,
+    latestDocument: crm.getLatestQuotationDocument(doc.quotationId),
+    salesQuotation: salesQuo,
+    customer,
+    customerId: salesQuo?.customerId ?? opportunity?.customerId,
+    contactName: contact?.name,
+    opportunityName: opportunity?.opportunityName,
+    productName: product?.productName,
+  })
+
+  const rejected =
+    doc.status === 'rejected'
+    || doc.status === 'superseded'
+    || salesQuo?.customerApproval === 'rejected'
+  const expired = isQuotationExpired(salesQuo)
+  const quotationSent = Boolean(
+    doc.status === 'sent' || doc.status === 'converted'
+    || salesQuo?.status === 'sent' || salesQuo?.status === 'converted',
+  )
+  const customerAccepted = salesQuo?.customerApproval === 'approved'
+  const commercialComplete = validation.canConvert
+  const stageReady = opportunity
+    ? isOpportunitySalesOrderStage(opportunity.stage, opportunity.status)
+    : true
+  const enabled = !rejected && !expired
+
+  let disabledReason: string | null = null
+  if (!enabled) {
+    if (rejected) disabledReason = REASON_REJECTED
+    else if (expired) disabledReason = REASON_EXPIRED
+    else disabledReason = CREATE_SALES_ORDER_LOCKED_REASON
+  } else if (!commercialComplete) {
+    disabledReason = validation.disabledReason?.trim() || null
+  }
+
+  return {
+    showCreate: true,
+    enabled,
+    disabledReason,
+    salesOrderId: null,
+    quotationDocumentId: doc.id,
+    hasQuotation: true,
+    quotationApproved: quotationSent && customerAccepted,
+    customerAccepted,
+    commercialComplete,
+    stageReady,
+  }
 }
 
 function addDays(isoDate: string, days: number): string {

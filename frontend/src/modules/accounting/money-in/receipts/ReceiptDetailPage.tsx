@@ -249,6 +249,22 @@ export function ReceiptDetailPage() {
         <div className="mb-3 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-900">{statusBanner}</div>
       )}
 
+      {receipt.sourceType === 'CRM_PAYMENT_RECEIPT' && receipt.sourceDocumentId ? (
+        <div className="mb-3 rounded border border-erp-border bg-slate-50 px-3 py-2 text-[12px]">
+          <div className="font-semibold text-erp-text">Source: CRM Payment Receipt</div>
+          <div className="mt-1 text-erp-muted">
+            CRM document: {receipt.sourceDocumentNumberSnapshot || receipt.sourceDocumentId}
+            {' · '}
+            <Link
+              className="font-semibold text-erp-accent hover:underline"
+              to={`/sales/receipts/${receipt.sourceDocumentId}`}
+            >
+              Open CRM Receipt
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <ErpStatusChip label={RECEIPT_STATUS_LABELS[receipt.status]} tone={receiptStatusTone(receipt.status)} />
         <span className="text-[13px] text-erp-muted">{receipt.customerNameSnapshot}</span>

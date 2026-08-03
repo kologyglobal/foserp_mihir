@@ -896,9 +896,9 @@ export const swaggerSpecDraft = {
     '/t/{tenantSlug}/crm/quotations/{id}/convert-to-sales-order': {
       post: {
         tags: ['CRM Quotations'],
-        summary: 'Convert approved quotation → sales order',
+        summary: 'Convert quotation → sales order',
         description:
-          'Requires crm.quotation.convert + crm.sales_order.create. Document/quotation must be approved with customerApproval=approved (Accepted), commercial/line checks, active customer, and latest revision. Creates SO status=open (not confirmed). Marks linked opportunity Won (or links SO if already Won; blocks Lost/Archived). Idempotent: already-converted returns 409 with existing salesOrderId/salesOrderNo. Company config for Sent shortcuts is not implemented — require-approved defaults to Yes.',
+          'Requires crm.quotation.convert + crm.sales_order.create. Commercial/line checks, active customer, and latest revision required. Send / internal approval / customer approval / opportunity are optional. Blocks superseded, rejected (internal or customer), expired validity, already-converted, inactive customer, and linked Lost/Archived opportunity. Creates SO status=open (not confirmed). When an opportunity is linked, marks it Won (or links SO if already Won). Idempotent: already-converted returns 409 with existing salesOrderId/salesOrderNo.',
         parameters: [tenantSlugParam, idParam],
         responses: {
           201: { description: 'Sales order created' },

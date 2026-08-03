@@ -3,6 +3,7 @@ import { useUIStore } from '../../store/uiStore'
 
 /**
  * Always-on Copilot entry. Shown even if suite-bar chrome is missed or HMR lags.
+ * Icon-only FAB; positioned above sticky form action bars via CSS.
  */
 export function KnowledgeCopilotFab() {
   const open = useUIStore((s) => s.copilotOpen)
@@ -17,8 +18,7 @@ export function KnowledgeCopilotFab() {
       aria-label="Open Copilot"
       title="Copilot (Ctrl+.)"
     >
-      <Sparkles className="h-5 w-5" strokeWidth={2} aria-hidden />
-      <span>Copilot</span>
+      <Sparkles className="h-4 w-4" strokeWidth={2} aria-hidden />
     </button>
   )
 }

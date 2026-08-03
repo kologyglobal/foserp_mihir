@@ -15,11 +15,23 @@ export interface QuotationListItem {
   customerName: string
   customerId?: string | null
   opportunityName?: string
+  opportunityId?: string | null
+  opportunityNo?: string | null
+  opportunityStage?: string | null
   customerApproval?: CustomerApprovalStatus
   revisionCount: number
   quotationDate: string
   expiryDate: string
   ownerName: string
+  /** Display currency; falls back to INR when omitted. */
+  currencyCode?: string | null
+  taxAmount?: number | null
+  subtotalAmount?: number | null
+  qty?: number | null
+  paymentTerms?: string | null
+  deliveryTime?: string | null
+  salesOrderNo?: string | null
+  lastModified?: string | null
 }
 
 function statusTone(status: QuotationDocumentStatus): 'live' | 'healthy' | 'warning' | 'critical' {

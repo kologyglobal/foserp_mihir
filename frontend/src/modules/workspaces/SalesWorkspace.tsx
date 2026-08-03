@@ -82,6 +82,7 @@ import {
 } from '../../utils/dashboardLiveFeed'
 import { FioriSegmentedView, FioriToolbarShell } from '../../components/fiori'
 import type { LiveActivityEvent, LiveAlert } from '../../components/live-erp/types'
+import { resolveCatalogProductLabel } from '../../utils/catalogProductLabel'
 
 const VIEW_MODES: SalesDashboardView[] = ['overview', 'pipeline', 'execution', 'billing']
 
@@ -95,6 +96,7 @@ export function SalesWorkspacePage() {
   const inspections = useQualityStore((s) => s.inspections)
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
+  const items = useMasterStore((s) => s.items)
   const opportunities = useCrmStore((s) => s.opportunities)
   const followUps = useCrmStore((s) => s.followUps)
   const activities = useCrmStore((s) => s.activities)
@@ -110,8 +112,8 @@ export function SalesWorkspacePage() {
     [customers],
   )
   const productName = useMemo(
-    () => (id: string) => products.find((p) => p.id === id)?.productName ?? id,
-    [products],
+    () => (id: string) => resolveCatalogProductLabel(id, { items, products }),
+    [items, products],
   )
   const lookup = useMemo(
     () => ({ customerName, productName: (id: string) => productName(id) }),

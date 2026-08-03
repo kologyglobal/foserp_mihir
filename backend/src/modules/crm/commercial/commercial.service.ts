@@ -2,6 +2,9 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../../../config/prisma.js'
 import { createAuditLog } from '../../../services/audit.service.js'
 import { NotFoundError, ValidationError } from '../../../utils/errors.js'
+import {
+  assertCrmTaxInvoiceAllowsCommercialAllocation,
+} from '../../accounting/receivables/source/crm-payment-receipt-ar.service.js'
 import * as repo from './commercial.repository.js'
 import {
   computePaymentStatus,
@@ -694,16 +697,7 @@ export async function allocatePayments(
     if (inv.status === 'draft' || inv.status === 'cancelled') {
       throw new ValidationError(`Invoice ${inv.invoiceNo} is not open for allocation`)
     }
-    if (inv.accountingStatus === 'converted' || inv.salesInvoiceId) {
-      throw new ValidationError(
-        `Invoice ${inv.invoiceNo} was converted to Money In — allocate payments in Accounting → Money In`,
-      )
-    }
-    if (inv.accountingStatus === 'pending_review') {
-      throw new ValidationError(
-        `Invoice ${inv.invoiceNo} is pending Accounting review — convert in Money In before allocating`,
-      )
-    }
+    assertCrmTaxInvoiceAllowsCommercialAllocation(inv)
     const already = queued.get(inv.id) ?? 0
     const balance = Number(inv.balanceDue) - already
     if (row.amount > balance + 0.009) {
@@ -783,6 +777,25 @@ export async function reverseAllocation(
   const receipt = await repo.findReceiptById(tenantId, alloc.receiptId)
   const invoice = await repo.findInvoiceById(tenantId, alloc.invoiceId)
   if (!receipt || !invoice) throw new NotFoundError('Linked receipt or invoice not found')
+
+  if (invoice.salesInvoiceId || invoice.accountingStatus === 'converted' || invoice.accountingStatus === 'pending_review') {
+    await createAuditLog({
+      tenantId,
+      userId,
+      module: 'crm',
+      entity: 'crmPaymentAllocation',
+      entityId: id,
+      action: 'CRM_ALLOCATION_BLOCKED_ACCOUNTING_CONTROL',
+      newValues: {
+        invoiceNo: invoice.invoiceNo,
+        salesInvoiceId: invoice.salesInvoiceId,
+        accountingStatus: invoice.accountingStatus,
+      },
+      ipAddress: audit?.ipAddress,
+      userAgent: audit?.userAgent,
+    })
+    assertCrmTaxInvoiceAllowsCommercialAllocation(invoice)
+  }
 
   const amount = Number(alloc.amount)
   const amountPaid = Math.max(0, Number(invoice.amountPaid) - amount)

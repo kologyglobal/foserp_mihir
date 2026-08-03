@@ -108,6 +108,16 @@ export async function syncCommercialFromApi(): Promise<void> {
   }
 }
 
+export async function apiFetchProforma(id: string): Promise<{ ok: boolean; error?: string; proforma?: ProformaInvoice }> {
+  try {
+    const res = await api.fetchCommercialProforma(id)
+    upsertProforma(res.data)
+    return { ok: true, proforma: res.data }
+  } catch (err) {
+    return { ok: false, error: formatApiError(err) }
+  }
+}
+
 export async function apiCreateProforma(
   input: ProformaInvoiceInput & { salesOrderId?: string | null; salesOrderNo?: string | null; source?: string },
 ): Promise<{ ok: boolean; error?: string; id?: string }> {

@@ -301,7 +301,15 @@ export function ErpProductPricingPanel({
                   </td>
                   <td className="so-pricing-td so-pricing-td--product">
                     {readOnly ? (
-                      <p className="text-[13px] font-medium text-erp-text">{line.productOrItem || '—'}</p>
+                      <p className="text-[13px] font-medium text-erp-text">
+                        {item
+                          ? (item.itemCode ? `${item.itemCode} — ${item.itemName}` : item.itemName)
+                          : (line.itemCode?.trim()
+                            ? (line.productOrItem?.trim() && line.productOrItem !== line.itemCode
+                              ? `${line.itemCode} — ${line.productOrItem}`
+                              : line.itemCode)
+                            : (line.productOrItem || '—'))}
+                      </p>
                     ) : (
                       <ErpSmartSelect
                         options={productOptions}
@@ -311,6 +319,26 @@ export function ErpProductPricingPanel({
                         appearance="dropdown"
                         dropdownMinWidth={360}
                         emptyMessage="No sellable items match. Enable Sales allowed on the Item master."
+                        resolveOrphanLabel={(id) => {
+                          const orphan = productPickMap.get(id)?.item
+                          if (orphan) {
+                            return orphan.itemCode
+                              ? `${orphan.itemCode} — ${orphan.itemName}`
+                              : orphan.itemName
+                          }
+                          // Prefer line snapshots over raw UUID display
+                          if (line.itemId === id) {
+                            if (line.itemCode?.trim()) {
+                              return line.productOrItem?.trim() && line.productOrItem !== line.itemCode
+                                ? `${line.itemCode} — ${line.productOrItem}`
+                                : line.itemCode
+                            }
+                            if (line.productOrItem?.trim() && !/^[0-9a-f-]{32,36}$/i.test(line.productOrItem.trim())) {
+                              return line.productOrItem.trim()
+                            }
+                          }
+                          return undefined
+                        }}
                       />
                     )}
                     {item && !isItemSellable(item) ? (

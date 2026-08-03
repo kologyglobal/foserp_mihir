@@ -123,6 +123,19 @@ export const allocatePaymentsSchema = z.object({
     .min(1),
 })
 
+export const createAccountingDraftBodySchema = z.object({
+  legalEntityId: z.string().uuid().optional().nullable(),
+  branchId: z.string().uuid().optional().nullable(),
+  bankCashAccountId: z.string().uuid(),
+  customerReceivableAccountId: z.string().uuid().optional().nullable(),
+  overrideDuplicate: z.boolean().optional(),
+  overrideReason: z.string().trim().max(500).optional().nullable(),
+})
+
+export const markNonAccountingBodySchema = z.object({
+  reason: z.string().trim().max(500).optional().nullable(),
+})
+
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>
 export type CreateProformaInput = z.infer<typeof createProformaSchema>
@@ -132,3 +145,4 @@ export type ListReceiptsQuery = z.infer<typeof listReceiptsQuerySchema>
 export type ListInvoicesQuery = z.infer<typeof listInvoicesQuerySchema>
 export type ListProformasQuery = z.infer<typeof listProformasQuerySchema>
 export type ListAllocationsQuery = z.infer<typeof listAllocationsQuerySchema>
+export type CreateAccountingDraftBody = z.infer<typeof createAccountingDraftBodySchema>

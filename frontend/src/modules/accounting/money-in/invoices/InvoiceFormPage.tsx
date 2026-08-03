@@ -39,7 +39,7 @@ import { gstStateCodeFromGstin } from '@/utils/customerUtils'
 import { cn } from '@/utils/cn'
 import type { DispatchInvoicePrefillState, CrmTaxInvoicePrefillState } from './invoicePrefillState'
 import { useTenantProfileStore } from '@/store/tenantProfileStore'
-import { resolveTaxInvoiceFromProforma, type TaxInvoicePrefill } from '@/utils/taxInvoicePrefill'
+import { ensureTaxInvoiceFromProforma, type TaxInvoicePrefill } from '@/utils/taxInvoicePrefill'
 
 const CURRENCY_OPTIONS = [
   { value: 'INR', label: 'INR — Indian Rupee' },
@@ -319,29 +319,41 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   /** Sales → Proforma Invoices → ⋯ → Create Tax Invoice: full detail carry-over (Money-In / services tenants). */
   useEffect(() => {
     if (mode !== 'create' || !proformaId || proformaSource) return
-    const result = resolveTaxInvoiceFromProforma(proformaId)
-    if (!result.ok) {
-      notify.error(result.error)
-      return
+    let cancelled = false
+    setLoading(true)
+    void ensureTaxInvoiceFromProforma(proformaId)
+      .then((result) => {
+        if (cancelled) return
+        if (!result.ok) {
+          notify.error(result.error)
+          return
+        }
+        const data = result.data
+        setProformaSource(data)
+        applyCustomerDefaults(data.customerId)
+        if (data.customerPoNumber) form.setValue('customerPoNumber', data.customerPoNumber, { shouldDirty: true })
+        if (data.remarks) form.setValue('narration', data.remarks, { shouldDirty: true })
+        form.setValue(
+          'lines',
+          data.lines.map((l) => ({
+            itemId: l.itemId || '',
+            description: l.description,
+            quantity: String(l.qty),
+            unitPrice: String(l.unitPrice),
+            hsnCode: l.hsnCode || '',
+            uom: l.uom || '',
+          })),
+          { shouldDirty: true },
+        )
+        if (data.salesOrderId) setSalesOrderId(data.salesOrderId)
+        setSourceMode('PROFORMA_INVOICE')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-    const data = result.data
-    setProformaSource(data)
-    applyCustomerDefaults(data.customerId)
-    if (data.customerPoNumber) form.setValue('customerPoNumber', data.customerPoNumber, { shouldDirty: true })
-    if (data.remarks) form.setValue('narration', data.remarks, { shouldDirty: true })
-    form.setValue(
-      'lines',
-      data.lines.map((l) => ({
-        itemId: l.itemId || '',
-        description: l.description,
-        quantity: String(l.qty),
-        unitPrice: String(l.unitPrice),
-        hsnCode: l.hsnCode || '',
-        uom: l.uom || '',
-      })),
-      { shouldDirty: true },
-    )
-    setSourceMode('PROFORMA_INVOICE')
   }, [applyCustomerDefaults, form, mode, proformaId, proformaSource])
 
   useEffect(() => {

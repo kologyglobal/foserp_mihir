@@ -3228,27 +3228,48 @@
 }
 
 /* ── Knowledge Copilot sheet (Wave 5) ── */
+/* Small icon-only FAB — keep clear of sticky form Save footers */
 .kb-copilot-fab {
+  --kb-copilot-fab-size: 2.25rem;
+  --kb-copilot-fab-gap: 0.75rem;
+  --kb-copilot-fab-footer-clearance: 4.25rem;
   position: fixed;
-  right: 1.25rem;
-  bottom: 1.25rem;
-  z-index: 70;
+  right: var(--kb-copilot-fab-gap);
+  bottom: calc(var(--kb-copilot-fab-gap) + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.65rem 1rem;
+  justify-content: center;
+  width: var(--kb-copilot-fab-size);
+  height: var(--kb-copilot-fab-size);
+  padding: 0;
   border: 1px solid #0284c7;
   border-radius: 999px;
   background: #0369a1;
   color: #fff;
-  font-size: 0.875rem;
-  font-weight: 600;
-  box-shadow: 0 8px 24px rgb(3 105 161 / 0.35);
+  box-shadow: 0 2px 8px rgb(15 23 42 / 0.14);
   cursor: pointer;
 }
 
 .kb-copilot-fab:hover {
   background: #075985;
+}
+
+.kb-copilot-fab:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+}
+
+/* Lift above sticky document / form action bars (Save, Save & Close) */
+body:has(.erp-card-form-page__footer-sticky) .kb-copilot-fab,
+body:has(.erp-form-footer-sticky) .kb-copilot-fab,
+body:has(.erp-drawer-form-footer) .kb-copilot-fab,
+body:has(.sales-invoice-zoho-form__sticky-footer) .kb-copilot-fab,
+body:has(.vendor-invoice-zoho-form__sticky-footer) .kb-copilot-fab,
+body:has(.hr-form-sticky-footer) .kb-copilot-fab {
+  bottom: calc(
+    var(--kb-copilot-fab-footer-clearance) + env(safe-area-inset-bottom, 0px)
+  );
 }
 
 .kb-copilot-backdrop {

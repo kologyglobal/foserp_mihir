@@ -68,6 +68,62 @@ export const createReceipt = asyncHandler(async (req: Request, res: Response) =>
   sendCreated(res, 'Receipt created', data)
 })
 
+export const getReceiptAccountingStatus = asyncHandler(async (req: Request, res: Response) => {
+  const { getCrmPaymentReceiptAccountingStatus } = await import(
+    '../../accounting/receivables/source/crm-payment-receipt-ar.service.js'
+  )
+  const data = await getCrmPaymentReceiptAccountingStatus(getTenantId(req), getRouteParam(req, 'id'))
+  sendSuccess(res, 'Receipt accounting status retrieved', data)
+})
+
+export const checkReceiptAccountingDuplicates = asyncHandler(async (req: Request, res: Response) => {
+  const { checkCrmPaymentReceiptDuplicates } = await import(
+    '../../accounting/receivables/source/crm-payment-receipt-ar.service.js'
+  )
+  const data = await checkCrmPaymentReceiptDuplicates(getTenantId(req), getRouteParam(req, 'id'))
+  sendSuccess(res, 'Duplicate check completed', data)
+})
+
+export const createReceiptAccountingDraft = asyncHandler(async (req: Request, res: Response) => {
+  const { createAccountingDraftFromCrmPaymentReceipt } = await import(
+    '../../accounting/receivables/source/crm-payment-receipt-ar.service.js'
+  )
+  const data = await createAccountingDraftFromCrmPaymentReceipt(
+    req,
+    getTenantId(req),
+    getRouteParam(req, 'id'),
+    req.body,
+  )
+  sendCreated(res, 'Accounting draft receipt created', data)
+})
+
+export const retryReceiptAccountingDraft = asyncHandler(async (req: Request, res: Response) => {
+  const { createAccountingDraftFromCrmPaymentReceipt } = await import(
+    '../../accounting/receivables/source/crm-payment-receipt-ar.service.js'
+  )
+  const data = await createAccountingDraftFromCrmPaymentReceipt(
+    req,
+    getTenantId(req),
+    getRouteParam(req, 'id'),
+    req.body,
+    { isRetry: true },
+  )
+  sendSuccess(res, 'Accounting draft retry completed', data)
+})
+
+export const markReceiptNonAccounting = asyncHandler(async (req: Request, res: Response) => {
+  const { markCrmPaymentReceiptNonAccounting } = await import(
+    '../../accounting/receivables/source/crm-payment-receipt-ar.service.js'
+  )
+  const data = await markCrmPaymentReceiptNonAccounting(
+    req,
+    getTenantId(req),
+    getRouteParam(req, 'id'),
+    req.body?.reason,
+  )
+  sendSuccess(res, 'Receipt marked non-accounting', data)
+})
+
 export const listInvoices = asyncHandler(async (req: Request, res: Response) => {
   const result = await service.listInvoices(getTenantId(req), req.query as never)
   sendPaginated(res, 'Invoices retrieved', result.items, buildPaginationMeta(result.total, result.page, result.limit))

@@ -1,3 +1,4 @@
+import { isApiMode } from '../config/apiConfig'
 import type { CrmCommercialLine, CrmCommercialSource } from '../types/crmCommercial'
 import type { GstBreakdown } from '../types/invoice'
 import { DEFAULT_GST_RATE } from '../types/invoice'
@@ -142,10 +143,10 @@ export function resolveTaxInvoiceFromSalesOrder(
       customerAddress: formatCustomerBillingAddress(customer),
       billingAddress: so.billingAddress ?? formatCustomerBillingAddress(customer),
       shippingAddress: so.shippingAddress ?? resolveCustomerShippingAddress(customer),
-      paymentTerms: so.paymentTerms ?? '30% advance, balance before dispatch',
-      deliveryTerms: so.deliveryTerms ?? 'Ex-works Pune',
+      paymentTerms: so.paymentTerms ?? '',
+      deliveryTerms: so.deliveryTerms ?? '',
       customerPoNumber: so.customerPoNumber ?? null,
-      remarks: so.internalRemarks ?? '',
+      remarks: (so.internalRemarks ?? so.remarks ?? '').trim(),
       salesOrderId: so.id,
       salesOrderNo: so.salesOrderNo,
       quotationId: so.quotationId ?? null,
@@ -200,8 +201,8 @@ export function resolveTaxInvoiceFromCustomer(customerId: string): TaxInvoicePre
       customerAddress: formatCustomerBillingAddress(customer),
       billingAddress: formatCustomerBillingAddress(customer),
       shippingAddress: resolveCustomerShippingAddress(customer),
-      paymentTerms: '30% advance, balance before dispatch',
-      deliveryTerms: 'Ex-works Pune',
+      paymentTerms: '',
+      deliveryTerms: '',
       customerPoNumber: null,
       remarks: '',
       salesOrderId: null,
@@ -274,6 +275,38 @@ export function resolveTaxInvoiceFromProforma(
       gst: buildGst(lines, pi.customerState),
     },
   }
+}
+
+/**
+ * Load sales order (API get-by-id when needed) then map remaining invoiceable qty.
+ */
+export async function ensureTaxInvoiceFromSalesOrder(
+  salesOrderId: string,
+  lineQtys?: Record<string, number>,
+): Promise<TaxInvoicePrefillResult> {
+  if (!salesOrderId.trim()) return { ok: false, error: 'Select a sales order.' }
+  if (isApiMode()) {
+    const { apiFetchSalesOrder } = await import('../services/bridges/salesOrderApiBridge')
+    const res = await apiFetchSalesOrder(salesOrderId)
+    if (!res.ok) return { ok: false, error: res.error ?? 'Failed to load sales order.' }
+  }
+  return resolveTaxInvoiceFromSalesOrder(salesOrderId, lineQtys)
+}
+
+/**
+ * Load proforma (API get-by-id when needed) then map TI prefill.
+ */
+export async function ensureTaxInvoiceFromProforma(
+  proformaId: string,
+  lineQtys?: Record<string, number>,
+): Promise<TaxInvoicePrefillResult> {
+  if (!proformaId.trim()) return { ok: false, error: 'Select a proforma invoice.' }
+  if (isApiMode()) {
+    const { apiFetchProforma } = await import('../services/bridges/crmCommercialApiBridge')
+    const res = await apiFetchProforma(proformaId)
+    if (!res.ok) return { ok: false, error: res.error ?? 'Failed to load proforma invoice.' }
+  }
+  return resolveTaxInvoiceFromProforma(proformaId, lineQtys)
 }
 
 /** Map editable preview qtys into the createInvoiceFrom* lineQtys payload. */

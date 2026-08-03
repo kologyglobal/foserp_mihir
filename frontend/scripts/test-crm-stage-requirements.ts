@@ -79,7 +79,8 @@ check(
 check(
   19,
   'getMissingStageFields uses opp map for qualified without lead keys',
-  getMissingStageFields({ opportunityName: 'X', productRequirement: '' }, 'qualified').some((m) => m.field === 'expectedCloseDate'),
+  getMissingStageFields({ opportunityName: 'X', productRequirement: '' }, 'qualified').some((m) => m.field === 'priority')
+    && !getMissingStageFields({ opportunityName: 'X', productRequirement: '' }, 'qualified').some((m) => m.field === 'expectedCloseDate'),
 )
 check(
   19b,

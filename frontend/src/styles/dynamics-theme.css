@@ -417,6 +417,7 @@ html {
     padding: 0.25rem 0.5rem 0.25rem 0.25rem;
     border-radius: var(--d365-radius);
     transition: background 0.1s ease;
+  }
 
   .d365-suite-notify {
     position: relative;

@@ -670,6 +670,17 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
           if (inv.status === 'draft' || inv.status === 'cancelled') {
             return { ok: false, error: `Invoice ${inv.invoiceNo} is not open for allocation.` }
           }
+          if (
+            inv.salesInvoiceId ||
+            inv.accountingStatus === 'pending_review' ||
+            inv.accountingStatus === 'converted'
+          ) {
+            return {
+              ok: false,
+              error:
+                'This invoice is managed by Accounting Money In. Record and allocate the payment through Money In.',
+            }
+          }
           const alreadyQueued = invoicePatches.get(inv.id) ?? 0
           if (row.amount > inv.balanceDue - alreadyQueued + 0.009) {
             return { ok: false, error: `Amount exceeds outstanding on ${inv.invoiceNo}.` }
