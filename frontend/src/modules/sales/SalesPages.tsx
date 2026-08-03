@@ -98,7 +98,7 @@ function useMasterLabels() {
   const customerName = useCallback(
     (id: string | null | undefined, snapshot?: string | null) => {
       if (!id && !snapshot) return '—'
-      return customers.find((c) => c.id === id)?.customerName ?? snapshot?.trim() || id || '—'
+      return customers.find((c) => c.id === id)?.customerName ?? (snapshot?.trim() || id || '—')
     },
     [customers],
   )

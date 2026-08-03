@@ -177,6 +177,16 @@ export async function winOpportunity(tenantId: string, id: string, userId: strin
     reason: input.winReason,
     subjectPrefix: 'Deal won',
   })
+  const { notifyOpportunityWonLost } = await import('../../notifications/notification.emitters.js')
+  notifyOpportunityWonLost({
+    tenantId,
+    actorUserId: userId,
+    opportunityId: id,
+    opportunityCode: existing.opportunityCode,
+    opportunityName: existing.name,
+    ownerId: existing.ownerId,
+    outcome: 'won',
+  })
   return mapOpportunityWithNames(tenantId, opportunity)
 }
 
@@ -216,6 +226,17 @@ export async function loseOpportunity(tenantId: string, id: string, userId: stri
     reason: input.lostReason,
     subjectPrefix: 'Deal lost',
   })
+  const { notifyOpportunityWonLost } = await import('../../notifications/notification.emitters.js')
+  notifyOpportunityWonLost({
+    tenantId,
+    actorUserId: userId,
+    opportunityId: id,
+    opportunityCode: existing.opportunityCode,
+    opportunityName: existing.name,
+    ownerId: existing.ownerId,
+    outcome: 'lost',
+    lostReasonMissing: !String(input.lostReason ?? '').trim(),
+  })
   return mapOpportunityWithNames(tenantId, opportunity)
 }
 
@@ -241,6 +262,17 @@ export async function assignOpportunity(tenantId: string, id: string, userId: st
   const { assertUserInTenant } = await import('../crm.tenant-refs.js')
   await assertUserInTenant(tenantId, input.ownerId)
   const opportunity = await repo.assignOpportunity(tenantId, id, userId, input.ownerId, input.notes)
+  if (input.ownerId && input.ownerId !== existing.ownerId) {
+    const { notifyOpportunityAssigned } = await import('../../notifications/notification.emitters.js')
+    notifyOpportunityAssigned({
+      tenantId,
+      actorUserId: userId,
+      opportunityId: id,
+      opportunityCode: existing.opportunityCode,
+      opportunityName: existing.name,
+      newOwnerId: input.ownerId,
+    })
+  }
   return mapOpportunityWithNames(tenantId, opportunity)
 }
 
@@ -261,7 +293,7 @@ export async function moveOpportunityStage(
       pipelineId: existing.pipelineId,
       deletedAt: null,
     },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, name: true },
   })
   if (!targetStage) {
     throw new ValidationError('Pipeline stage not found', [{ field: 'stageId', message: 'Invalid stage' }])
@@ -270,6 +302,24 @@ export async function moveOpportunityStage(
   assertOpportunityStageRequirements(opportunityEntityForStageGate(existing), targetStage.slug)
 
   const opportunity = await repo.moveOpportunityStage(tenantId, id, userId, input.stageId, input.reason)
+  if (existing.stageId !== input.stageId && existing.ownerId) {
+    try {
+      const { notifyOpportunityStageChanged } = await import('../../notifications/notification.emitters.js')
+      notifyOpportunityStageChanged({
+        tenantId,
+        actorUserId: userId,
+        opportunityId: id,
+        opportunityCode: existing.opportunityCode,
+        opportunityName: existing.name,
+        ownerId: existing.ownerId,
+        toStage: targetStage.slug || targetStage.name,
+      })
+      const { resolveRelated } = await import('../../notifications/notification.service.js')
+      await resolveRelated(tenantId, 'opportunity', id, ['OPPORTUNITY_STUCK', 'OPPORTUNITY_INACTIVE'])
+    } catch {
+      /* never block stage move */
+    }
+  }
   return mapOpportunityWithNames(tenantId, opportunity)
 }
 

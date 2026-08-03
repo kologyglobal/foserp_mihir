@@ -67,6 +67,7 @@ import {
   resolveSalesOrderDetailPath,
 } from '../../utils/crmSalesOrderNavigation'
 import { buildSalesOrderLinesFromQuotationDocument } from '../../utils/crmQuotationSoLines'
+import { quotationNoWithRevision } from '../../utils/quotationEngine/revisionLabels'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { locationDisplayLabel } from '../../utils/locationUtils'
@@ -77,6 +78,11 @@ import {
 } from '../../components/sales/SalesOrderCreateModeChooser'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { cn } from '../../utils/cn'
+import {
+  calcProductPricingSummary,
+  type OrderDiscountMode,
+} from '../../utils/opportunityLineCalc'
+import { ChargeEditor, OrderAdjustmentsPanel } from '../../components/erp/OrderAdjustmentsGrid'
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
 
@@ -243,7 +249,8 @@ export function SalesOrderNewPage() {
   const showFreight = !isServices
   const [internalRemarks, setInternalRemarks] = useState(opportunityPrefill?.internalRemarks ?? '')
   const [freightAmount, setFreightAmount] = useState(0)
-  const [orderDiscountMode, setOrderDiscountMode] = useState<'flat' | 'percent'>('flat')
+  const [freightMode, setFreightMode] = useState<OrderDiscountMode>('flat')
+  const [orderDiscountMode, setOrderDiscountMode] = useState<OrderDiscountMode>('flat')
   const [orderDiscountInput, setOrderDiscountInput] = useState(0)
   const [attachments, setAttachments] = useState<SoAttachment[]>([])
 
@@ -253,6 +260,7 @@ export function SalesOrderNewPage() {
 
   /** Pending approved quotes for SO create — exclude already converted / already linked SOs. */
   const quotationOptions = useMemo(() => {
+    if (!customerId) return []
     const latestByQuotation = new Map<string, (typeof quotationDocuments)[0]>()
     for (const doc of quotationDocuments) {
       const cur = latestByQuotation.get(doc.quotationId)
@@ -273,22 +281,22 @@ export function SalesOrderNewPage() {
       .map((doc) => {
         const q = getQuotation(doc.quotationId)
         const cust = q ? customers.find((c) => c.id === q.customerId) : undefined
-        const quotationNo = q?.quotationNo ?? doc.quotationId
+        if (!q || q.customerId !== customerId) return null
+        const quotationNo = q.quotationNo ?? doc.quotationId
         const companyName = cust?.customerName?.trim() || 'Unknown company'
         const companyBits = [
           companyName,
           cust?.customerCode,
           [cust?.city, cust?.state].filter(Boolean).join(', ') || null,
-          cust?.gstin ? `GSTIN ${cust.gstin}` : null,
         ].filter(Boolean)
         const total =
           (doc.totalAmount > 0 ? doc.totalAmount : null)
-          ?? (q?.pricing?.grandTotal && q.pricing.grandTotal > 0 ? q.pricing.grandTotal : null)
+          ?? (q.pricing?.grandTotal && q.pricing.grandTotal > 0 ? q.pricing.grandTotal : null)
           ?? 0
         const owner = doc.salesOwnerName?.trim()
         return {
           value: doc.id,
-          label: `${quotationNo} · Rev ${doc.revisionNo}`,
+          label: quotationNoWithRevision(quotationNo, doc.revisionNo),
           subtitle: companyBits.join(' · '),
           trailing: total > 0 ? formatCurrency(total) : '—',
           badge: owner ? `Pending SO · ${owner}` : 'Pending SO',
@@ -298,7 +306,6 @@ export function SalesOrderNewPage() {
             cust?.customerCode,
             cust?.city,
             cust?.state,
-            cust?.gstin,
             owner,
             String(total),
           ]
@@ -307,6 +314,7 @@ export function SalesOrderNewPage() {
             .toLowerCase(),
         }
       })
+      .filter((opt): opt is NonNullable<typeof opt> => opt != null)
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [quotationDocuments, getQuotation, customers, customerId])
 
@@ -334,34 +342,52 @@ export function SalesOrderNewPage() {
   )
 
   const orderSummary = useMemo(() => {
-    const effectiveFreight = showFreight ? freightAmount : 0
-    const totalQty = computedLines.reduce((s, l) => s + l.qty, 0)
-    const basicAmount = round2(computedLines.reduce((s, l) => s + l.qty * l.unitPrice, 0))
-    const subtotal = round2(computedLines.reduce((s, l) => s + l.taxableValue, 0))
-    const totalLineDiscount = round2(basicAmount - subtotal)
-    const gstByRate = new Map<number, number>()
-    for (const line of computedLines) {
-      gstByRate.set(line.taxPct, round2((gstByRate.get(line.taxPct) ?? 0) + line.gstAmount))
-    }
-    const totalGst = round2([...gstByRate.values()].reduce((s, v) => s + v, 0))
-    const discountBase = round2(subtotal + totalGst)
-    const orderDiscountAmount =
-      orderDiscountMode === 'percent'
-        ? round2(discountBase * (Math.min(100, Math.max(0, orderDiscountInput)) / 100))
-        : round2(Math.min(Math.max(0, orderDiscountInput), discountBase + effectiveFreight))
-    const grandTotal = round2(subtotal + totalGst + effectiveFreight - orderDiscountAmount)
+    const asOppLines = computedLines.map((line, idx) => ({
+      id: line.key,
+      lineNo: idx + 1,
+      productId: null as string | null,
+      itemId: line.itemId || null,
+      itemCode: '',
+      productOrItem: line.productName,
+      description: '',
+      productFamily: '',
+      itemType: '',
+      qty: line.qty,
+      uom: 'Nos',
+      unitPrice: line.unitPrice,
+      discountPct: line.discountPct,
+      discountAmount: 0,
+      taxableValue: line.taxableValue,
+      taxPct: line.taxPct,
+      gstAmount: line.gstAmount,
+      lineTotal: line.lineTotal,
+      expectedDeliveryDate: null as string | null,
+      remarks: '',
+    }))
+    const pricing = calcProductPricingSummary(asOppLines, {
+      freight: showFreight
+        ? {
+            calculationType: freightMode,
+            value: freightAmount,
+          }
+        : undefined,
+      orderDiscountMode,
+      orderDiscountInput,
+    })
     return {
-      totalQty,
-      basicAmount,
-      subtotal,
-      totalLineDiscount,
-      gstByRate,
-      totalGst,
-      orderDiscountAmount,
-      grandTotal,
-      freightAmount: effectiveFreight,
+      totalQty: pricing.totalQty,
+      basicAmount: pricing.basicAmount,
+      subtotal: pricing.subtotal,
+      taxableBeforeOverallDiscount: pricing.taxableBeforeOverallDiscount,
+      taxableAfterOverallDiscount: pricing.taxableAfterOverallDiscount,
+      totalLineDiscount: pricing.totalLineDiscount,
+      gstByRate: pricing.gstByRate,
+      totalGst: pricing.totalGst,
+      orderDiscountAmount: pricing.orderDiscountAmount,
+      grandTotal: pricing.grandTotal,
+      freightAmount: pricing.freightAmount,
     }
-  }, [computedLines, freightAmount, orderDiscountInput, orderDiscountMode, showFreight])
+  }, [computedLines, freightAmount, freightMode, orderDiscountInput, orderDiscountMode, showFreight])
 
   function applyQuotation(docId: string) {
     if (!docId) return
@@ -402,15 +428,15 @@ export function SalesOrderNewPage() {
 
   /** Customer-first flow: changing customer clears an incompatible quotation selection. */
   function handleCustomerChange(nextCustomerId: string) {
+    if (nextCustomerId === customerId) return
     setCustomerId(nextCustomerId)
-    if (!quotationDocumentId) return
+    if (createMode !== 'quotation' || !quotationDocumentId) return
     const doc = getQuotationDocument(quotationDocumentId)
     const q = doc ? getQuotation(doc.quotationId) : undefined
     if (!nextCustomerId || !q || q.customerId !== nextCustomerId) {
       setQuotationDocumentId('')
-      if (createMode === 'quotation' && directSoReason.startsWith('Approved quotation handover')) {
-        setDirectSoReason('')
-      }
+      if (directSoReason.startsWith('Approved quotation handover')) setDirectSoReason('')
+      setFreightAmount(0)
     }
   }
 
@@ -611,7 +637,7 @@ export function SalesOrderNewPage() {
           quotationRevisionNo: linkedDoc?.revisionNo ?? linkedQuo?.revisionNo ?? null,
           quotationDocumentId: quotationDocumentId || null,
           customerPoDate: customerPoDate || undefined,
-          freightAmount: showFreight ? freightAmount : 0,
+          freightAmount: showFreight ? orderSummary.freightAmount : 0,
           orderDiscountAmount: orderSummary.orderDiscountAmount,
           lines: lines.map((l) => ({
             itemId: l.itemId,
@@ -731,22 +757,26 @@ export function SalesOrderNewPage() {
   )
   const canSave = !isSubmitting && hasValidLines && !gateBlocked
 
-  const nextSmartAction = createMode === 'quotation' && !quotationDocumentId && !opportunityPrefill?.quotationDocumentId
+  const nextSmartAction = !customerId
     ? {
-        id: 'quotation',
-        title: 'Select quotation',
-        description: 'Search an approved quotation to auto-fill customer, lines, and terms.',
-        ctaLabel: 'Choose quotation',
-        focusField: 'quotationDocumentId',
+        id: 'customer',
+        title: 'Select customer',
+        description: createMode === 'quotation'
+          ? 'Choose the bill-to company first — then pick one of their approved quotations.'
+          : 'Choose the bill-to company for this sales order.',
+        ctaLabel: 'Go to customer',
+        focusField: 'customerId',
         sectionId: 'quick',
       }
-    : !customerId
+    : createMode === 'quotation' && !quotationDocumentId && !opportunityPrefill?.quotationDocumentId
       ? {
-          id: 'customer',
-          title: 'Select customer',
-          description: 'Choose the bill-to company for this sales order.',
-          ctaLabel: 'Go to customer',
-          focusField: 'customerId',
+          id: 'quotation',
+          title: quotationOptions.length === 0 ? 'No quotations for this customer' : 'Select quotation',
+          description: quotationOptions.length === 0
+            ? 'This company has no approved quotations ready to convert. Change customer or use a direct sales order.'
+            : 'Pick an approved quotation for this customer to fill lines and commercial terms.',
+          ctaLabel: quotationOptions.length === 0 ? 'Review customer' : 'Choose quotation',
+          focusField: quotationOptions.length === 0 ? 'customerId' : 'quotationDocumentId',
           sectionId: 'quick',
         }
       : !customerPoNumber.trim()
@@ -1029,82 +1059,38 @@ export function SalesOrderNewPage() {
       </div>
 
       <div className="so-pricing-totals">
-        <div className="so-pricing-adjust">
-          <p className="so-pricing-adjust__title">Order adjustments</p>
-          <div className="so-pricing-charges">
-            {showFreight ? (
-              <label className="so-pricing-charge">
-                <span className="so-pricing-charge__label">Freight</span>
-                <div className="so-pricing-charge__control">
-                  <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
-                  <Input
-                    type="number"
-                    min={0}
-                    className="so-pricing-input so-pricing-input--num"
-                    value={freightAmount}
-                    onChange={(e) => setFreightAmount(Math.max(0, Number(e.target.value) || 0))}
-                  />
-                </div>
-              </label>
-            ) : null}
-            <div className="so-pricing-charge">
-              <div className="so-pricing-charge__label-row">
-                <span className="so-pricing-charge__label">Order discount</span>
-                <div className="so-pricing-discount-mode" role="group" aria-label="Discount type">
-                  <button
-                    type="button"
-                    className={`so-pricing-discount-mode__btn${orderDiscountMode === 'flat' ? ' so-pricing-discount-mode__btn--active' : ''}`}
-                    aria-pressed={orderDiscountMode === 'flat'}
-                    onClick={() => {
-                      if (orderDiscountMode === 'flat') return
-                      setOrderDiscountMode('flat')
-                      setOrderDiscountInput(0)
-                    }}
-                  >
-                    Flat ₹
-                  </button>
-                  <button
-                    type="button"
-                    className={`so-pricing-discount-mode__btn${orderDiscountMode === 'percent' ? ' so-pricing-discount-mode__btn--active' : ''}`}
-                    aria-pressed={orderDiscountMode === 'percent'}
-                    onClick={() => {
-                      if (orderDiscountMode === 'percent') return
-                      setOrderDiscountMode('percent')
-                      setOrderDiscountInput(0)
-                    }}
-                  >
-                    % Discount
-                  </button>
-                </div>
-              </div>
-              <label className="so-pricing-charge__control">
-                <span className="so-pricing-charge__prefix" aria-hidden>
-                  {orderDiscountMode === 'percent' ? '%' : '₹'}
-                </span>
-                <Input
-                  type="number"
-                  min={0}
-                  max={orderDiscountMode === 'percent' ? 100 : undefined}
-                  step={orderDiscountMode === 'percent' ? 0.5 : 1}
-                  className="so-pricing-input so-pricing-input--num"
-                  value={orderDiscountInput}
-                  onChange={(e) => {
-                    const raw = Math.max(0, Number(e.target.value) || 0)
-                    setOrderDiscountInput(
-                      orderDiscountMode === 'percent' ? Math.min(100, raw) : raw,
-                    )
-                  }}
-                  aria-label={orderDiscountMode === 'percent' ? 'Order discount percent' : 'Order discount amount'}
-                />
-              </label>
-              {orderDiscountMode === 'percent' && orderDiscountInput > 0 ? (
-                <p className="so-pricing-charge__hint">
-                  Equals {formatCurrency(orderSummary.orderDiscountAmount)} off taxable + GST
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </div>
+        <OrderAdjustmentsPanel>
+          {showFreight ? (
+            <ChargeEditor
+              label="Freight"
+              mode={freightMode}
+              value={freightAmount}
+              calculatedAmount={orderSummary.freightAmount}
+              onModeChange={(m) => {
+                setFreightMode(m)
+                setFreightAmount(0)
+              }}
+              onValueChange={setFreightAmount}
+            />
+          ) : null}
+          <ChargeEditor
+            label="Order discount"
+            mode={orderDiscountMode}
+            value={orderDiscountInput}
+            calculatedAmount={orderSummary.orderDiscountAmount}
+            modePctLabel="% Disc."
+            amountHint={
+              orderSummary.orderDiscountAmount > 0
+                ? 'off taxable (before GST)'
+                : undefined
+            }
+            onModeChange={(m) => {
+              setOrderDiscountMode(m)
+              setOrderDiscountInput(0)
+            }}
+            onValueChange={setOrderDiscountInput}
+          />
+        </OrderAdjustmentsPanel>
 
         <aside className="so-pricing-summary" aria-label="Order summary">
           <p className="so-pricing-summary__title">Order summary</p>
@@ -1125,8 +1111,27 @@ export function SalesOrderNewPage() {
             ) : null}
             <div className="so-pricing-summary__row">
               <span>Taxable amount</span>
-              <span className="tabular-nums">{formatCurrency(orderSummary.subtotal)}</span>
+              <span className="tabular-nums">{formatCurrency(orderSummary.taxableBeforeOverallDiscount)}</span>
             </div>
+            <div className="so-pricing-summary__row">
+              <span>
+                Overall discount
+                {orderDiscountMode === 'percent' && orderDiscountInput > 0
+                  ? ` (${orderDiscountInput}%)`
+                  : ''}
+              </span>
+              <span className="tabular-nums">
+                {orderSummary.orderDiscountAmount > 0
+                  ? `−${formatCurrency(orderSummary.orderDiscountAmount)}`
+                  : formatCurrency(0)}
+              </span>
+            </div>
+            {orderSummary.orderDiscountAmount > 0 ? (
+              <div className="so-pricing-summary__row">
+                <span>Taxable after discount</span>
+                <span className="tabular-nums">{formatCurrency(orderSummary.taxableAfterOverallDiscount)}</span>
+              </div>
+            ) : null}
             {[...orderSummary.gstByRate.entries()]
               .sort(([a], [b]) => a - b)
               .map(([rate, amount]) => (
@@ -1145,19 +1150,6 @@ export function SalesOrderNewPage() {
                 <span className="tabular-nums">{formatCurrency(orderSummary.freightAmount)}</span>
               </div>
             ) : null}
-            <div className="so-pricing-summary__row">
-              <span>
-                Order discount
-                {orderDiscountMode === 'percent' && orderDiscountInput > 0
-                  ? ` (${orderDiscountInput}%)`
-                  : ''}
-              </span>
-              <span className="tabular-nums">
-                {orderSummary.orderDiscountAmount > 0
-                  ? `−${formatCurrency(orderSummary.orderDiscountAmount)}`
-                  : formatCurrency(0)}
-              </span>
-            </div>
           </div>
           <div className="so-pricing-summary__grand">
             <span>Grand total</span>
@@ -1263,7 +1255,9 @@ export function SalesOrderNewPage() {
             <div>
               <p className="so-customer-card__empty-title">No customer selected</p>
               <p className="so-customer-card__empty-copy">
-                Search and select a bill-to company to load GSTIN, credit terms, and contact details.
+                {createMode === 'quotation'
+                  ? 'Select the bill-to company first — approved quotations for that company appear next.'
+                  : 'Search and select a bill-to company to load GSTIN, credit terms, and contact details.'}
               </p>
             </div>
           </div>
@@ -1295,9 +1289,11 @@ export function SalesOrderNewPage() {
             allowEmpty
             disabled={!customerId}
             placeholder={
-              customerId
-                ? 'Search pending quotation no, amount…'
-                : 'Select a customer first…'
+              !customerId
+                ? 'Select a customer first…'
+                : quotationOptions.length === 0
+                  ? 'No quotations for this customer'
+                  : 'Search pending quotation no, amount…'
             }
             dropdownMinWidth={480}
           />
@@ -1328,7 +1324,6 @@ export function SalesOrderNewPage() {
       </ErpFieldGroup>
     </>
   )
-
   const linesSection = (
     <ErpCardSection
       nbaTarget="lines"

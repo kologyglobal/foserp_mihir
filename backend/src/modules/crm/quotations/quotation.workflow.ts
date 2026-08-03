@@ -1,13 +1,11 @@
 import type { CrmQuotation, CrmQuotationDocument } from '@prisma/client'
 import { InvalidStateError, ValidationError } from '../../../utils/errors.js'
+import type { QuotationApprovalEntryDto } from './quotation.types.js'
+import type { UpdateQuotationDocumentInput, UpdateQuotationInput } from './quotation.validation.js'
 import {
   adjustmentsFromDocumentFields,
   calcOrderDocumentTotals,
-  type OrderDocumentTotals,
-  type PriceLineForAdjustCalc,
 } from './orderAdjustmentsCalc.js'
-import type { QuotationApprovalEntryDto } from './quotation.types.js'
-import type { UpdateQuotationDocumentInput, UpdateQuotationInput } from './quotation.validation.js'
 
 /**
  * Quotation document lifecycle (enforced):
@@ -152,92 +150,108 @@ export function appendApprovalHistory(
 }
 
 export function calcDocumentTotal(
-  priceLines: Array<{ lineTotal?: number }>,
+  priceLines: Array<{ qty?: number; unitPrice?: number; discountPct?: number; taxPct?: number; lineTotal?: number }>,
   freightAmount: number,
   installationAmount: number,
   customCharges: number,
+  opts?: {
+    orderDiscountCalcType?: string
+    orderDiscountValue?: number
+    freightCalcType?: string
+    freightValue?: number
+    freightIsTaxable?: boolean
+    freightTaxRate?: number
+    installationCalcType?: string
+    installationValue?: number
+    installationIsTaxable?: boolean
+    installationTaxRate?: number
+    customChargesCalcType?: string
+    customChargesValue?: number
+    customChargesIsTaxable?: boolean
+    customChargesTaxRate?: number
+  },
 ): number {
-  const linesTotal = priceLines.reduce((sum, line) => sum + (line.lineTotal ?? 0), 0)
-  return linesTotal + freightAmount + installationAmount + customCharges
-}
-
-export function syncLineTotals<T extends { qty: number; unitPrice: number; discountPct?: number; taxPct?: number; lineTotal?: number }>(
-  lines: T[],
-): T[] {
-  return lines.map((line) => {
-    const discountPct = line.discountPct ?? 0
-    const taxPct = line.taxPct ?? 0
-    const base = line.qty * line.unitPrice * (1 - discountPct / 100)
-    const lineTotal = base * (1 + taxPct / 100)
-    return { ...line, lineTotal }
-  })
-}
-
-export type DocumentChargeFields = {
-  freightAmount?: number | null
-  installationAmount?: number | null
-  customCharges?: number | null
-  orderDiscountCalcType?: string | null
-  orderDiscountValue?: number | null
-  freightCalcType?: string | null
-  freightValue?: number | null
-  freightIsTaxable?: boolean | null
-  freightTaxRate?: number | null
-  installationCalcType?: string | null
-  installationValue?: number | null
-  installationIsTaxable?: boolean | null
-  installationTaxRate?: number | null
-  customChargesCalcType?: string | null
-  customChargesValue?: number | null
-  customChargesIsTaxable?: boolean | null
-  customChargesTaxRate?: number | null
-}
-
-export type DocumentChargePersist = {
-  freightAmount: number
-  installationAmount: number
-  customCharges: number
-  totalAmount: number
-  orderDiscountCalcType: string
-  orderDiscountValue: number
-  orderDiscountAmount: number
-  freightCalcType: string
-  freightValue: number
-  freightIsTaxable: boolean
-  freightTaxRate: number
-  freightTaxAmount: number
-  installationCalcType: string
-  installationValue: number
-  installationIsTaxable: boolean
-  installationTaxRate: number
-  installationTaxAmount: number
-  customChargesCalcType: string
-  customChargesValue: number
-  customChargesIsTaxable: boolean
-  customChargesTaxRate: number
-  customChargesTaxAmount: number
-}
-
-/** Resolve document-level adjustments into persisted amounts + total breakdown. */
-export function resolveDocumentCharges(
-  lines: Array<Partial<PriceLineForAdjustCalc> & { qty?: number; unitPrice?: number }>,
-  chargeFields: DocumentChargeFields,
-): { persist: DocumentChargePersist; totals: OrderDocumentTotals } {
-  const priceLines: PriceLineForAdjustCalc[] = (Array.isArray(lines) ? lines : []).map((line) => ({
-    qty: Number(line.qty ?? 0),
-    unitPrice: Number(line.unitPrice ?? 0),
-    discountPct: Number(line.discountPct ?? 0),
-    taxPct: Number(line.taxPct ?? 0),
+  const lines = priceLines.map((l) => ({
+    qty: Number(l.qty ?? 0),
+    unitPrice: Number(l.unitPrice ?? 0),
+    discountPct: Number(l.discountPct ?? 0),
+    taxPct: Number(l.taxPct ?? 0),
   }))
-  const adjustments = adjustmentsFromDocumentFields(chargeFields)
-  const totals = calcOrderDocumentTotals(priceLines, adjustments)
+  const hasLineBases = lines.some((l) => l.qty > 0 || l.unitPrice > 0)
+  if (!hasLineBases) {
+    const linesTotal = priceLines.reduce((sum, line) => sum + (line.lineTotal ?? 0), 0)
+    return linesTotal + freightAmount + installationAmount + customCharges
+  }
+  const totals = calcOrderDocumentTotals(
+    lines,
+    adjustmentsFromDocumentFields({
+      freightAmount,
+      installationAmount,
+      customCharges,
+      ...opts,
+      freightValue: opts?.freightValue ?? freightAmount,
+      installationValue: opts?.installationValue ?? installationAmount,
+      customChargesValue: opts?.customChargesValue ?? customCharges,
+    }),
+  )
+  return totals.grandTotal
+}
 
+/** Compute persisted charge rows + grand total from lines and document adjustment fields. */
+export function resolveDocumentCharges(
+  priceLines: Array<{ qty?: number; unitPrice?: number; discountPct?: number; taxPct?: number }>,
+  fields: {
+    freightAmount?: number
+    installationAmount?: number
+    customCharges?: number
+    orderDiscountCalcType?: string
+    orderDiscountValue?: number
+    freightCalcType?: string
+    freightValue?: number
+    freightIsTaxable?: boolean
+    freightTaxRate?: number
+    installationCalcType?: string
+    installationValue?: number
+    installationIsTaxable?: boolean
+    installationTaxRate?: number
+    customChargesCalcType?: string
+    customChargesValue?: number
+    customChargesIsTaxable?: boolean
+    customChargesTaxRate?: number
+  },
+) {
+  const lines = priceLines.map((l) => ({
+    qty: Number(l.qty ?? 0),
+    unitPrice: Number(l.unitPrice ?? 0),
+    discountPct: Number(l.discountPct ?? 0),
+    taxPct: Number(l.taxPct ?? 0),
+  }))
+  const bundle = adjustmentsFromDocumentFields({
+    freightAmount: fields.freightAmount ?? 0,
+    installationAmount: fields.installationAmount ?? 0,
+    customCharges: fields.customCharges ?? 0,
+    orderDiscountCalcType: fields.orderDiscountCalcType,
+    orderDiscountValue: fields.orderDiscountValue,
+    freightCalcType: fields.freightCalcType,
+    freightValue: fields.freightValue ?? fields.freightAmount ?? 0,
+    freightIsTaxable: fields.freightIsTaxable,
+    freightTaxRate: fields.freightTaxRate,
+    installationCalcType: fields.installationCalcType,
+    installationValue: fields.installationValue ?? fields.installationAmount ?? 0,
+    installationIsTaxable: fields.installationIsTaxable,
+    installationTaxRate: fields.installationTaxRate,
+    customChargesCalcType: fields.customChargesCalcType,
+    customChargesValue: fields.customChargesValue ?? fields.customCharges ?? 0,
+    customChargesIsTaxable: fields.customChargesIsTaxable,
+    customChargesTaxRate: fields.customChargesTaxRate,
+  })
+  const totals = calcOrderDocumentTotals(lines, bundle)
   return {
     totals,
     persist: {
-      freightAmount: totals.freightAmount,
-      installationAmount: totals.installationAmount,
-      customCharges: totals.customCharges,
+      freightAmount: totals.freight.calculatedAmount,
+      installationAmount: totals.installation.calculatedAmount,
+      customCharges: totals.otherCharges.calculatedAmount,
       totalAmount: totals.grandTotal,
       orderDiscountCalcType: totals.orderDiscount.calculationType,
       orderDiscountValue: totals.orderDiscount.value,
@@ -259,4 +273,16 @@ export function resolveDocumentCharges(
       customChargesTaxAmount: totals.otherCharges.taxAmount,
     },
   }
+}
+
+export function syncLineTotals<T extends { qty: number; unitPrice: number; discountPct?: number; taxPct?: number; lineTotal?: number }>(
+  lines: T[],
+): T[] {
+  return lines.map((line) => {
+    const discountPct = line.discountPct ?? 0
+    const taxPct = line.taxPct ?? 0
+    const base = line.qty * line.unitPrice * (1 - discountPct / 100)
+    const lineTotal = base * (1 + taxPct / 100)
+    return { ...line, lineTotal }
+  })
 }

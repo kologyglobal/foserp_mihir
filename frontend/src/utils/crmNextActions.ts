@@ -6,6 +6,7 @@ import { useCrmStore } from '../store/crmStore'
 import { useMasterStore } from '../store/masterStore'
 import { useSalesStore } from '../store/salesStore'
 import { formatCrmCurrency } from './crmMetrics'
+import { quotationNoWithRevision } from './quotationEngine/revisionLabels'
 import { opportunityStageLabel } from './opportunityUtils'
 
 export interface CrmNextAction {
@@ -73,7 +74,7 @@ export function buildCrmNextActions(limit = 10): CrmNextAction[] {
     actions.push({
       id: `quo-approval-${d.id}`,
       title: `Review ${formatCrmCurrency(d.totalAmount)} quotation pending approval`,
-      reason: `${q?.quotationNo ?? d.quotationId} Rev ${d.revisionNo} awaiting manager sign-off`,
+      reason: `${quotationNoWithRevision(q?.quotationNo ?? d.quotationId, d.revisionNo)} awaiting manager sign-off`,
       quotationNo: q?.quotationNo ?? d.quotationId,
       valueImpact: formatCrmCurrency(d.totalAmount),
       ownerName: d.salesOwnerName ?? undefined,

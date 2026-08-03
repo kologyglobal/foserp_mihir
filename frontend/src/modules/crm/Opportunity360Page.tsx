@@ -751,7 +751,6 @@ export function Opportunity360Page() {
               </ul>
             </nav>
 
-<<<<<<< HEAD
             <div className="crm-lead-zoho-canvas crm-opp-zoho-canvas">
               <div className="dyn-detail-pipeline">
                 <Enterprise360Pipeline
@@ -778,59 +777,42 @@ export function Opportunity360Page() {
                   }
                 />
               </div>
-=======
-          <OpportunitySummaryCard
-            opportunity={{
-              ...opportunity,
-              productRequirement: displayOpportunity.productRequirement,
-              value: displayOpportunity.value,
-              nextFollowUpDate: displayOpportunity.nextFollowUpDate,
-              priority: displayOpportunity.priority as typeof opportunity.priority,
-              expectedCloseDate: displayOpportunity.expectedCloseDate,
-            }}
-            customerName={customer?.customerName ?? lead?.prospectName}
-            customerId={customer?.id ?? lead?.customerId}
-            contactName={contactName}
-            contactPhone={contactPhone}
-            contactEmail={contactEmail}
-            city={customer?.city}
-            productName={
-              product?.productName
-              || oppLines.find((l) => l.productOrItem?.trim())?.productOrItem
-              || null
-            }
-            lastActivityAt={lastActivity?.activityDate ?? opportunity.lastActivityAt ?? opportunity.modifiedAt}
-            lastActivityLabel={lastActivity?.subject ?? null}
-            dealValueLabel={commercial.dealValueLabel}
-            dealValueHint={commercial.dealValueHint}
-            dealValue={commercial.estimatedDealValue}
-            recentFeedItems={unifiedFeedItems}
-            onLogActivity={
-              canAddActivity
-                ? () => {
-                    setEditingActivity(null)
-                    setLogActivityOpen(true)
-                  }
-                : undefined
-            }
-            onViewAllActivities={() => selectAdditionalSection('activities')}
-          />
->>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
 
               <OpportunitySummaryCard
-                opportunity={opportunity}
-                customerName={customer?.customerName}
-                customerId={customer?.id}
-                contactName={contact?.name ?? customer?.contactPerson}
+                opportunity={{
+                  ...opportunity,
+                  productRequirement: displayOpportunity.productRequirement,
+                  value: displayOpportunity.value,
+                  nextFollowUpDate: displayOpportunity.nextFollowUpDate,
+                  priority: displayOpportunity.priority as typeof opportunity.priority,
+                  expectedCloseDate: displayOpportunity.expectedCloseDate,
+                }}
+                customerName={customer?.customerName ?? lead?.prospectName}
+                customerId={customer?.id ?? lead?.customerId}
+                contactName={contactName}
                 contactPhone={contactPhone}
                 contactEmail={contactEmail}
                 city={customer?.city}
-                productName={product?.productName}
+                productName={
+                  product?.productName
+                  || oppLines.find((l) => l.productOrItem?.trim())?.productOrItem
+                  || null
+                }
                 lastActivityAt={lastActivity?.activityDate ?? opportunity.lastActivityAt ?? opportunity.modifiedAt}
                 lastActivityLabel={lastActivity?.subject ?? null}
                 dealValueLabel={commercial.dealValueLabel}
                 dealValueHint={commercial.dealValueHint}
                 dealValue={commercial.estimatedDealValue}
+                recentFeedItems={unifiedFeedItems}
+                onLogActivity={
+                  canAddActivity
+                    ? () => {
+                        setEditingActivity(null)
+                        setLogActivityOpen(true)
+                      }
+                    : undefined
+                }
+                onViewAllActivities={() => selectAdditionalSection('activities')}
               />
 
               <CrmStageNotes

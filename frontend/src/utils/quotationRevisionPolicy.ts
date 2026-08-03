@@ -11,7 +11,7 @@ export interface QuotationRevisionPolicyInput {
 export interface QuotationRevisionPolicy {
   /** Edit the current document in place (draft path). */
   canDirectEdit: boolean
-  /** Create Q(n+1) from this document. */
+  /** Create the next customer revision (R1 after original) from this document. */
   canCreateRevision: boolean
   /** Short stage label for banners / steppers. */
   stageTitle: string
@@ -87,7 +87,7 @@ export function resolveQuotationRevisionPolicy(
       canCreateRevision: true,
       stageTitle: 'Internally rejected',
       guidance: [
-        'New Revision available — create Q(n+1) to address feedback.',
+        'New Revision available — create R1 or a later revision to address feedback.',
         'You may also edit this rejected draft and resubmit for approval.',
       ],
       disabledReason: null,

@@ -7,8 +7,11 @@ import { amountInWordsINR } from '../../utils/quotationEngine/amountInWords'
 import {
   opportunityLineUnitPriceDomId,
   opportunityLineUnitPriceFieldKey,
+  opportunityLinesToQuotationPriceLines,
+  quotationPriceLinesToOpportunityLines,
   UNIT_PRICE_REQUIRED_MESSAGE,
 } from '../../utils/opportunityLineCalc'
+import { opportunityRequirementDisplay } from '../../utils/leadRequirementLines'
 import { cn } from '../../utils/cn'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
 
@@ -33,7 +36,10 @@ export function QuotationPriceTable({
 }: QuotationPriceTableProps) {
   const showFreight = !useTenantProfileStore((s) => s.isServices())
   const freightAmount = showFreight ? freightProp : 0
-  const synced = syncLineTotals(lines)
+  // Decode accidental <!--fos-lead-lines--> blobs stored as productOrItem/description.
+  const synced = syncLineTotals(
+    opportunityLinesToQuotationPriceLines(quotationPriceLinesToOpportunityLines(lines)),
+  )
   const summary = calcPriceSummary(synced, freightAmount, installationAmount, customCharges)
 
   const lineDetail = (line: QuotationPriceLine) => {
@@ -103,12 +109,12 @@ export function QuotationPriceTable({
                 <td className="erp-line-items-grid__sticky-product">
                   {editable ? (
                     <input className="quo-editor-price__input" value={line.productOrItem} onChange={(e) => updateLine(line.id, { productOrItem: e.target.value })} />
-                  ) : line.productOrItem}
+                  ) : opportunityRequirementDisplay(line.productOrItem)}
                 </td>
                 <td>
                   {editable ? (
                     <input className="quo-editor-price__input" value={line.description} onChange={(e) => updateLine(line.id, { description: e.target.value })} />
-                  ) : line.description}
+                  ) : opportunityRequirementDisplay(line.description)}
                 </td>
                 <td className="text-right">
                   {editable ? (

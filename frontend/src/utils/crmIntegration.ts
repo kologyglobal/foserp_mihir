@@ -13,7 +13,7 @@ export function primaryPriceLine(doc: QuotationDocument) {
 
 export function documentGrandTotal(doc: QuotationDocument): number {
   const lines = syncLineTotals(doc.priceLines)
-  return calcPriceSummary(lines, doc.freightAmount, doc.installationAmount, doc.customCharges).grandTotal
+  return calcPriceSummary(lines, doc).grandTotal
 }
 
 export function populateDocumentFromOpportunity(

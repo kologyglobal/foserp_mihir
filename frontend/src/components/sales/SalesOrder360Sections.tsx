@@ -576,11 +576,13 @@ export function OrderNextActionPanel({
   status,
   overdue,
   onConfirm,
+  confirmDeniedReason,
   onTriggerMrp,
 }: {
   status: SalesOrderStatus
   overdue: boolean
   onConfirm?: () => void
+  confirmDeniedReason?: string | null
   onTriggerMrp?: () => void
 }) {
   if (overdue) {
@@ -610,6 +612,8 @@ export function OrderNextActionPanel({
             <ErpButton type="button" size="sm" className="mt-3" onClick={onConfirm}>
               Confirm order
             </ErpButton>
+          ) : confirmDeniedReason ? (
+            <p className="mt-2 text-xs text-erp-muted">{confirmDeniedReason}</p>
           ) : null}
         </div>
       </div>

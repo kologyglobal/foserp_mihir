@@ -302,6 +302,9 @@ export async function convertLead(
       expectedCloseDate: input.expectedCloseDate ? new Date(input.expectedCloseDate) : lead.expectedCloseDate,
       probability: lead.probability,
       requirement: lead.productRequirement,
+      priority: lead.priority || 'medium',
+      nextFollowUpAt: lead.nextFollowUpAt ?? undefined,
+      locationId: lead.locationId ?? undefined,
       updatedBy: userId,
     }
 
@@ -314,6 +317,26 @@ export async function convertLead(
     if (input.lines?.length) {
       await createOpportunityLines(tx, tenantId, opportunity.id, input.lines)
     }
+
+    // Surface lead engagement on the deal (activities / FUs logged against the lead only).
+    await tx.crmActivity.updateMany({
+      where: {
+        tenantId,
+        leadId: lead.id,
+        opportunityId: null,
+        deletedAt: null,
+      },
+      data: { opportunityId: opportunity.id, updatedBy: userId },
+    })
+    await tx.crmFollowUp.updateMany({
+      where: {
+        tenantId,
+        leadId: lead.id,
+        opportunityId: null,
+        deletedAt: null,
+      },
+      data: { opportunityId: opportunity.id, updatedBy: userId },
+    })
 
     const updatedLead = await tx.crmLead.update({
       where: { id, tenantId },

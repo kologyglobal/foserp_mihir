@@ -147,7 +147,19 @@ export async function assignLead(tenantId: string, id: string, userId: string, i
   assertLeadAssignable(existing)
   await assertUserInTenant(tenantId, input.leadOwnerId, 'Lead owner')
   const lead = await repo.assignLead(tenantId, id, userId, input)
-  return (await mapLeadWithNames(tenantId, lead))!
+  const mapped = (await mapLeadWithNames(tenantId, lead))!
+  if (input.leadOwnerId && input.leadOwnerId !== (existing.assignedTo ?? existing.ownerId)) {
+    const { notifyLeadAssigned } = await import('../../notifications/notification.emitters.js')
+    notifyLeadAssigned({
+      tenantId,
+      actorUserId: userId,
+      leadId: lead.id,
+      leadCode: lead.leadCode,
+      leadName: lead.prospectName,
+      newOwnerId: input.leadOwnerId,
+    })
+  }
+  return mapped
 }
 
 export async function qualifyLead(tenantId: string, id: string, userId: string, input: QualifyLeadInput) {
@@ -269,6 +281,22 @@ export async function convertLead(tenantId: string, id: string, userId: string, 
     where: { id: result.opportunity.id },
     include: { stage: true, lines: true },
   })
+
+  try {
+    const { notifyLeadConverted } = await import('../../notifications/notification.emitters.js')
+    const ownerId = result.lead.assignedTo ?? result.lead.ownerId
+    notifyLeadConverted({
+      tenantId,
+      actorUserId: userId,
+      leadId: result.lead.id,
+      leadName: result.lead.prospectName,
+      ownerId,
+      opportunityId: result.opportunity.id,
+      opportunityCode: result.opportunity.opportunityCode,
+    })
+  } catch {
+    /* never block convert */
+  }
 
   return {
     lead: (await mapLeadWithNames(tenantId, result.lead))!,

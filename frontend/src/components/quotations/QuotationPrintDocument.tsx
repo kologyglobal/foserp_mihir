@@ -16,10 +16,13 @@ import {
   printLayoutStyleVars,
   sectionHasPageBreak,
 } from '../../utils/quotationEngine/printLayout'
+import { formatDate } from '../../utils/dates/format'
 import { cn } from '../../utils/cn'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { KologyProposalPrintDocument } from './KologyProposalPrintDocument'
 import { resolveCustomerDetailsPrintContent } from '../../utils/quotationEngine/customerDetails'
+import { quotationRevisionLabel } from '../../utils/quotationEngine/revisionLabels'
+import { QuotationCommercialTermsBlock } from './QuotationCommercialTermsBlock'
 
 export type QuotationSectionFieldChange = (sectionId: string, field: 'title' | 'content', value: string) => void
 export type QuotationSpecRowFieldChange = (
@@ -201,12 +204,12 @@ function QuotationLetterhead({
           </div>
           <div>
             <dt>Revision</dt>
-            <dd>R{revisionNo}</dd>
+            <dd>{quotationRevisionLabel(revisionNo)}</dd>
           </div>
           {validityDate ? (
             <div>
-              <dt>Valid till</dt>
-              <dd>{validityDate}</dd>
+              <dt>Valid until</dt>
+              <dd>{formatDate(validityDate)}</dd>
             </div>
           ) : null}
         </dl>
@@ -237,8 +240,8 @@ export function QuotationPrintDocument({
   )
   const sorted = useMemo(() => [...doc.sections].sort((a, b) => a.sequenceNo - b.sequenceNo), [doc.sections])
   const lines = syncLineTotals(doc.priceLines)
-  const freightAmount = showFreight ? doc.freightAmount : 0
-  const summary = calcPriceSummary(lines, freightAmount, doc.installationAmount, doc.customCharges)
+  const effectiveDoc: QuotationDocument = showFreight ? doc : { ...doc, freightAmount: 0 }
+  const summary = calcPriceSummary(lines, effectiveDoc)
   const layoutClass = printLayoutClassNames(printLayout)
   const isVfWord = printLayout.printSkin === 'vf_word'
 
@@ -283,6 +286,12 @@ export function QuotationPrintDocument({
           {map.contact_email !== '—' ? <p>Email: {map.contact_email}</p> : null}
         </section>
       ) : null}
+
+      <QuotationCommercialTermsBlock
+        quotation={quotation}
+        document={doc}
+        variant="print"
+      />
 
       {sorted.map((sec) => {
         const pageBreak = sectionHasPageBreak(sec.sectionType, printLayout)
@@ -406,6 +415,40 @@ export function QuotationPrintDocument({
                   <span>Total Basic Price</span>
                   <span>{formatCrmCurrency(summary.basicAmount)}</span>
                 </div>
+                {summary.discountAmount > 0 ? (
+                  <div className="quo-print-summary__row">
+                    <span>Line discount</span>
+                    <span>−{formatCrmCurrency(summary.discountAmount)}</span>
+                  </div>
+                ) : null}
+                <div className="quo-print-summary__row">
+                  <span>Taxable amount</span>
+                  <span>{formatCrmCurrency(summary.taxableValue)}</span>
+                </div>
+                {summary.orderDiscountAmount > 0 ? (
+                  <div className="quo-print-summary__row">
+                    <span>Overall discount</span>
+                    <span>−{formatCrmCurrency(summary.orderDiscountAmount)}</span>
+                  </div>
+                ) : null}
+                {summary.freightAmount > 0 ? (
+                  <div className="quo-print-summary__row">
+                    <span>Freight{doc.freightIsTaxable ? ' (taxable)' : ''}</span>
+                    <span>{formatCrmCurrency(summary.freightAmount)}</span>
+                  </div>
+                ) : null}
+                {summary.installationAmount > 0 ? (
+                  <div className="quo-print-summary__row">
+                    <span>Installation{doc.installationIsTaxable ? ' (taxable)' : ''}</span>
+                    <span>{formatCrmCurrency(summary.installationAmount)}</span>
+                  </div>
+                ) : null}
+                {summary.customCharges > 0 ? (
+                  <div className="quo-print-summary__row">
+                    <span>Other charges{doc.customChargesIsTaxable ? ' (taxable)' : ''}</span>
+                    <span>{formatCrmCurrency(summary.customCharges)}</span>
+                  </div>
+                ) : null}
                 <div className="quo-print-summary__row">
                   <span>GST</span>
                   <span>{formatCrmCurrency(summary.gstAmount)}</span>

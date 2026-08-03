@@ -414,22 +414,9 @@ export function OpportunityEditPage() {
               ))}
             </Select>
           </ErpFieldRow>
-<<<<<<< HEAD
           {showLocationField ? (
             <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
           ) : null}
-=======
-          <ErpFieldRow
-            label="Expected Close Date"
-            required
-            dataField="expectedCloseDate"
-            fieldState={!expectedCloseDate && validationErrors.length ? 'error' : 'idle'}
-            fieldError={!expectedCloseDate ? validationErrors.find((e) => /close/i.test(e)) : undefined}
-          >
-            <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} required className="erp-input" />
-          </ErpFieldRow>
-          <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
->>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
         </ErpCardSection>
 
         <ErpProductPricingSection
@@ -500,17 +487,15 @@ export function OpportunityEditPage() {
           <ErpViewField label="Product Subtotal" value={formatCrmCurrency(summary.basicAmount)} hint="Sum of qty × unit price before discount" />
           <ErpViewField label="Discount" value={summary.totalDiscount > 0 ? formatCrmCurrency(summary.totalDiscount) : '—'} />
           <ErpViewField label="Tax" value={formatCrmCurrency(summary.gstAmount)} hint="GST from product lines" />
-<<<<<<< HEAD
           <ErpFieldRow
             label="Expected Close Date"
+            required
             dataField="expectedCloseDate"
-            fieldState={validationErrors.some((e) => /close/i.test(e)) ? 'error' : 'idle'}
-            fieldError={validationErrors.find((e) => /close/i.test(e))}
+            fieldState={!expectedCloseDate && validationErrors.length ? 'error' : 'idle'}
+            fieldError={!expectedCloseDate ? validationErrors.find((e) => /close/i.test(e)) : undefined}
           >
-            <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} className="erp-input" />
+            <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} required className="erp-input" />
           </ErpFieldRow>
-=======
->>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
           <ErpViewField label="Currency" value="INR (₹)" />
         </ErpCardSection>
 

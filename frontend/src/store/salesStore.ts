@@ -28,6 +28,7 @@ import { useMasterStore } from './masterStore'
 import { useCrmStore } from './crmStore'
 import { formatCustomerBillingAddress, resolveCustomerShippingAddress } from '../utils/customerUtils'
 import { canUseItemInSales } from '../utils/opportunityItemOptions'
+import { quotationNoWithRevision, quotationRevisionLabel } from '../utils/quotationEngine/revisionLabels'
 import { normalizeLead, mapLifecycleToStage, mapStageToLifecycle, deriveLifecycleFromStage, leadStageLabel } from '../utils/leadUtils'
 import { filterLeadPatchForPolicy, resolveLeadEditPolicy } from '../utils/leadEditPolicy'
 import { getLeadUser } from '../data/crm/leadUsers'
@@ -995,7 +996,7 @@ export const useSalesStore = create<SalesState>()(
           itemId: lineItemId ?? null,
           qty: lineQty,
           requiredDate: crm?.expectedDeliveryDate ?? inquiry?.deliveryExpectation ?? quo.validityDate,
-          remarks: `${quo.quotationNo} Rev ${quo.revisionNo} — CRM doc Rev ${crm?.quotationDocumentRevisionNo ?? 0}`,
+          remarks: `${quotationNoWithRevision(quo.quotationNo, quo.revisionNo)} · doc ${quotationRevisionLabel(crm?.quotationDocumentRevisionNo ?? quo.revisionNo)}`,
           quotationId: quo.id,
           quotationNo: quo.quotationNo,
           quotationRevisionNo: quo.revisionNo,
@@ -1098,11 +1099,17 @@ export const useSalesStore = create<SalesState>()(
         const primary = builtLines[0]
         if (!primary?.itemId) return { ok: false, error: 'At least one item line is required' }
 
-        const basicAmount = Math.round(builtLines.reduce((s, l) => s + l.taxableValue, 0) * 100) / 100
-        const gstAmount = Math.round(builtLines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100
+        const taxableBefore = Math.round(builtLines.reduce((s, l) => s + l.taxableValue, 0) * 100) / 100
+        const gstBefore = Math.round(builtLines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100
         const freight = input.freightAmount ?? 0
-        const orderDisc = input.orderDiscountAmount ?? 0
-        const grandTotal = Math.round((basicAmount + gstAmount + freight - orderDisc) * 100) / 100
+        // Overall discount applies to taxable only; GST is recomputed on revised taxable.
+        const orderDisc = Math.min(Math.max(0, input.orderDiscountAmount ?? 0), taxableBefore)
+        const taxableAfter = Math.round((taxableBefore - orderDisc) * 100) / 100
+        const gstAmount =
+          taxableBefore > 0
+            ? Math.round(gstBefore * (taxableAfter / taxableBefore) * 100) / 100
+            : 0
+        const grandTotal = Math.round((taxableAfter + gstAmount + freight) * 100) / 100
         const totalQty = builtLines.reduce((s, l) => s + l.qty, 0)
 
         const mrp = useMrpStore.getState()
@@ -1133,7 +1140,7 @@ export const useSalesStore = create<SalesState>()(
           locationId: input.locationId ?? null,
           billingAddress: formatCustomerBillingAddress(customer),
           shippingAddress: resolveCustomerShippingAddress(customer),
-          basicAmount,
+          basicAmount: taxableBefore,
           gstAmount,
           internalRemarks: input.internalRemarks,
           directSoReason: input.directSoReason?.trim() || null,

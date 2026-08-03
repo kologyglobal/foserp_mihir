@@ -444,13 +444,8 @@ export function SalesOrder360Page() {
   })
 
   const formMetrics = [
-<<<<<<< HEAD
-    { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', accent: 'green' as const, hint: customer?.customerName ?? 'Customer' },
-    { label: 'Quantity', value: formatNumber(so.qty), accent: 'blue' as const, hint: product?.productName ?? productLabel },
-=======
     { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', accent: 'green' as const, hint: customerDisplayName ?? 'Customer' },
-    { label: 'Quantity', value: formatNumber(so.qty), accent: 'blue' as const, hint: product?.productName ?? 'Product' },
->>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
+    { label: 'Quantity', value: formatNumber(so.qty), accent: 'blue' as const, hint: product?.productName ?? productLabel },
     { label: 'Required', value: formatDate(so.requiredDate), accent: overdue ? 'amber' as const : 'blue' as const, hint: overdue ? 'Overdue' : 'On schedule' },
     ...(showMfgPanels
       ? [{ label: 'Work Orders', value: String(orderWos.length), accent: 'blue' as const, hint: `${orderDispatches.length} dispatch` }]
@@ -460,13 +455,8 @@ export function SalesOrder360Page() {
   const documentStrip = [
     { label: 'SO No.', value: so.salesOrderNo, highlight: true },
     { label: 'Status', value: salesOrderStatusLabel(so.status) },
-<<<<<<< HEAD
-    { label: 'Customer', value: customer?.customerName ?? '—', highlight: Boolean(customer) },
-    { label: productLabel, value: product?.productName ?? '—' },
-=======
     { label: 'Customer', value: customerDisplayName ?? '—', highlight: Boolean(customerDisplayName) },
-    { label: 'Product', value: product?.productName ?? '—' },
->>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
+    { label: productLabel, value: product?.productName ?? '—' },
     { label: 'Qty', value: formatNumber(so.qty) },
     { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: displayValue > 0 },
     { label: 'Required', value: formatDate(so.requiredDate) },
@@ -483,11 +473,7 @@ export function SalesOrder360Page() {
           ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
           : []),
         ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit', icon: Pencil, onClick: () => navigate(editPath) }] : []),
-<<<<<<< HEAD
         ...(!crmMode && showMfgPanels && so.status === 'confirmed'
-=======
-        ...((so.status === 'confirmed')
->>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
           ? [{ id: 'plan', label: 'Production Plan', icon: Play, onClick: () => navigate('/manufacturing/production-plan') }]
           : []),
         ...(so.status !== 'open' && !activeProforma ? [{ id: 'proforma', label: 'Create Proforma', icon: Receipt, onClick: () => navigate(buildProformaNewUrl(so.id)) }] : []),
@@ -536,8 +522,9 @@ export function SalesOrder360Page() {
           label: 'Suggested Next',
           value:
             so.status === 'open'
-<<<<<<< HEAD
-              ? 'Confirm order'
+              ? canConfirmSalesOrder
+                ? 'Confirm order'
+                : 'Request confirm permission'
               : showMfgPanels && !crmMode && pendingMrp
                 ? 'Open production plan'
                 : overdue
@@ -546,17 +533,6 @@ export function SalesOrder360Page() {
                     ? 'Create invoice or proforma'
                     : 'Monitor production',
           tone: so.status === 'open' || (showMfgPanels && !crmMode && pendingMrp) || overdue ? 'warning' as const : 'info' as const,
-=======
-              ? canConfirmSalesOrder
-                ? 'Confirm order'
-                : 'Request confirm permission'
-              : pendingMrp
-                ? 'Open production plan'
-                : overdue
-                  ? 'Expedite delivery'
-                  : 'Monitor production',
-          tone: so.status === 'open' || pendingMrp || overdue ? 'warning' as const : 'info' as const,
->>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
         },
       ]}
     >
@@ -566,8 +542,7 @@ export function SalesOrder360Page() {
         actionsTitle="Quick Actions"
         summary={[
           { label: 'Status', value: salesOrderStatusLabel(so.status) },
-<<<<<<< HEAD
-          { label: 'Customer', value: customer?.customerName ?? '—' },
+          { label: 'Customer', value: customerDisplayName ?? '—' },
           { label: productLabel, value: product?.productName ?? '—' },
           { label: 'Qty', value: formatNumber(so.qty) },
           { label: 'Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: true },
@@ -577,26 +552,13 @@ export function SalesOrder360Page() {
                 { label: 'Dispatches', value: String(orderDispatches.length) },
               ]
             : []),
-          { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
-=======
-          { label: 'Customer', value: customerDisplayName ?? '—' },
-          { label: 'Product', value: product?.productName ?? '—' },
-          { label: 'Qty', value: formatNumber(so.qty) },
-          { label: 'Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: true },
-          { label: 'Work Orders', value: String(orderWos.length) },
-          { label: 'Dispatches', value: String(orderDispatches.length) },
           { label: 'Quotation', value: so.quotationNo ? quotationNoWithRevision(so.quotationNo, so.quotationRevisionNo ?? 1) : '—' },
->>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
         ]}
         actions={[
           ...(so.status === 'open' && canConfirmSalesOrder
             ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
             : []),
-<<<<<<< HEAD
           ...(showMfgPanels && !crmMode && so.status === 'confirmed'
-=======
-          ...((so.status === 'confirmed')
->>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
             ? [{ id: 'plan', label: 'Production Plan', icon: Play, primary: true, onClick: openProductionPlan }]
             : []),
           ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit Draft', icon: Pencil, onClick: () => navigate(editPath) }] : []),
