@@ -2722,6 +2722,7 @@ export type GrnInput = {
     expiryDate?: IsoDate | null
     warehouseId?: string
     warehouseName?: string
+    storageLocationId?: string | null
     bin?: string
     binId?: string | null
     allowExcess?: boolean
