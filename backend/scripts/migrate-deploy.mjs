@@ -69,9 +69,11 @@ function connectionConfigFromUrl(url) {
   }
 }
 
+const prismaSchema = join(backend, 'prisma', 'schema.prisma')
+
 function runMigrateDeploy() {
   const prismaBin = join(backend, 'node_modules', 'prisma', 'build', 'index.js')
-  return spawnSync(process.execPath, [prismaBin, 'migrate', 'deploy'], {
+  return spawnSync(process.execPath, [prismaBin, 'migrate', 'deploy', '--schema', prismaSchema], {
     cwd: backend,
     env: {
       ...process.env,

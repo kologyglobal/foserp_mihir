@@ -52,14 +52,18 @@ function assertFile(path, message) {
 }
 
 console.log('Installing deterministic frontend dependencies')
-run(['ci'], frontend)
+run(['ci', '--include=dev'], frontend, {
+  ...process.env,
+  NPM_CONFIG_PRODUCTION: 'false',
+  NODE_ENV: 'development',
+})
 
 console.log('Installing deterministic backend dependencies')
 run(['ci'], backend)
 
 console.log('Building Vite frontend in API mode (vite only — no tsc on Hostinger)')
 run(
-  ['run', 'build:hostinger'],
+  ['exec', '--', 'vite', 'build'],
   frontend,
   {
     ...process.env,

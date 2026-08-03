@@ -5,6 +5,7 @@
  */
 import { execFileSync } from 'node:child_process'
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -43,23 +44,52 @@ function gitRevision() {
 }
 
 const skipFrontend =
-  process.env.SKIP_FRONTEND === '1' || process.env.SKIP_FRONTEND === 'true'
+  process.env.SKIP_FRONTEND === '1'
+  || process.env.SKIP_FRONTEND === 'true'
+  || /[\\/]stageapi[\\/]/i.test(backend)
+  || /stageapi/i.test(process.env.HOSTINGER_DOMAIN ?? process.env.DOMAIN ?? '')
+
+function frontendInstallEnv() {
+  // Hostinger often sets NODE_ENV=production during npm ci — vite lives in devDependencies.
+  return {
+    ...process.env,
+    NPM_CONFIG_PRODUCTION: 'false',
+    NODE_ENV: 'development',
+  }
+}
+
+const prismaSchema = join(backend, 'prisma', 'schema.prisma')
+if (!existsSync(prismaSchema)) {
+  throw new Error(
+    `[build-hostinger] Missing ${prismaSchema}. Hostinger project root must be the repo (/) or backend/ must include prisma/ from Git.`,
+  )
+}
+
+console.log('[build-hostinger] Installing backend dependencies (npm ci)…')
+runNpm(['ci'], backend)
 
 console.log('[build-hostinger] Backend compile (esbuild, no migrations)…')
 runNpm(['run', 'build:app'], backend)
 
+for (const entry of ['hostinger-start.mjs', 'start.sh']) {
+  const path = join(backend, entry)
+  if (existsSync(path)) chmodSync(path, 0o755)
+}
+
 if (skipFrontend) {
-  console.log('[build-hostinger] SKIP_FRONTEND=1 — SPA publish skipped (API-only).')
+  console.log(
+    '[build-hostinger] SKIP_FRONTEND — SPA publish skipped (API-only host or SKIP_FRONTEND=1).',
+  )
 } else if (existsSync(join(frontend, 'package.json'))) {
   console.log('[build-hostinger] Building Vite frontend…')
-  runNpm(['ci'], frontend)
+  runNpm(['ci', '--include=dev'], frontend, frontendInstallEnv())
   const viteEnv = {
-    ...process.env,
+    ...frontendInstallEnv(),
     VITE_USE_API: process.env.VITE_USE_API ?? 'true',
     VITE_API_BASE_URL: process.env.VITE_API_BASE_URL ?? '/api/v1',
     VITE_TENANT_SLUG: process.env.VITE_TENANT_SLUG ?? 'vasant-trailers',
   }
-  runNpm(['run', 'build:hostinger'], frontend, viteEnv)
+  runNpm(['exec', '--', 'vite', 'build'], frontend, viteEnv)
 
   const frontendDist = join(frontend, 'dist')
   if (!existsSync(join(frontendDist, 'index.html'))) {

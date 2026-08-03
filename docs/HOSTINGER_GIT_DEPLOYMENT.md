@@ -5,7 +5,7 @@ This repository deploys as one Hostinger Node.js application:
 - Express API from `backend/dist`
 - Vite SPA generated from `frontend/src`
 - Published SPA copied to `backend/public`
-- Runtime entry: `backend/hostinger-start.mjs`
+- Runtime entry: `backend/start.sh` (or `backend/hostinger-start.mjs`)
 
 `frontend/dist`, `backend/dist`, and `backend/public` are generated during
 deployment and remain gitignored. A Git pull alone is not a deployment.
@@ -21,10 +21,10 @@ In **Websites → Node.js Web App → Settings & Redeploy**:
 | Project/root directory | repository root (`/`) |
 | Framework | Other / Express |
 | Node.js | 22.x (20.x minimum) |
-| Install command | `npm ci` |
-| Build command | `npm run build` (backend `package.json` — Hostinger dropdown) |
+| Install command | `npm ci --prefix backend` (API-only) or `npm ci` at repo root for full SPA deploy |
+| Build command | `npm run build --prefix backend` |
 | Output directory | `backend` |
-| Entry file | `hostinger-start.mjs` |
+| Entry file | `start.sh` (preferred) or `hostinger-start.mjs` |
 
 Required frontend build variables:
 
@@ -34,29 +34,25 @@ VITE_API_BASE_URL=/api/v1
 VITE_TENANT_SLUG=vasant-trailers
 ```
 
+**API-only hosts** (e.g. `stageapi.dhurandharcrm.com`): set `SKIP_FRONTEND=1` in
+Environment Variables, or rely on auto-detect from deploy path. No Vite build runs;
+frontend is served from the main stage/prod SPA host.
+
 Backend database/JWT variables remain configured in Hostinger Environment
 Variables. Never place their values in Git.
 
-## Database migrations (automatic)
+## Database migrations
 
-Pending migrations run during **backend `npm run build`** (Hostinger dropdown):
+Build does **not** run migrations by default (avoids blocking compile on DB errors).
 
-1. `prisma migrate deploy` via `backend/scripts/migrate-deploy.mjs`
-2. `prisma generate` + TypeScript compile
-
-Build logs must show:
-
-```text
-[migrate-deploy] Target database: user@host:3306/your_db
-[migrate-deploy] Database schema is up to date.
-```
-
-Repo-root `npm run build` (GitHub CI) compiles frontend + backend via `build:app` — **no database access**.
-
-Local backend compile without migrate: `npm run build:app`.
+| When | How |
+|------|-----|
+| **Startup** (recommended) | Set `RUN_MIGRATE_ON_START=1` in hPanel Runtime env — `hostinger-start.mjs` runs `migrate-deploy.mjs` before loading the server. |
+| **Build time** | Set `RUN_MIGRATE_ON_BUILD=1` or use `npm run build:with-migrate` locally before deploy. |
+| **SSH one-off** | `cd backend && npm run db:deploy:hostinger` |
 
 Requires hPanel **`DB_HOST`**, **`DB_NAME`**, **`DB_USER`**, **`DB_PASS`**
-(or `DATABASE_URL`) for **Build** and **Runtime**.
+(or `DATABASE_URL`) for **Build** (if migrate-on-build) and **Runtime**.
 
 ### Failed legacy migrations (one-time)
 
@@ -94,23 +90,61 @@ npx prisma migrate deploy
 
 Never use `prisma migrate reset` on live.
 
+## Troubleshooting failed deploys
+
+### `Could not find Prisma Schema`
+
+Prisma was invoked outside `backend/` or the deploy tree is missing `backend/prisma/schema.prisma`.
+
+1. hPanel **Project/root directory** must be the **repository root** (`/`), not `backend/`.
+2. **Build command** must be `npm run build --prefix backend` (runs from repo root into `backend/`).
+3. Redeploy after pushing the latest `backend/package.json` (`prisma.schema` + explicit `--schema` flags).
+
+Do **not** paste npm error logs into SSH — run commands one at a time.
+
+### `hostinger-start.mjs: Permission denied`
+
+Hostinger executes the entry file directly (not via `node`). Use **`start.sh`** as the entry file, or after SSH:
+
+```bash
+chmod +x ~/domains/YOUR_DOMAIN/backend/start.sh
+chmod +x ~/domains/YOUR_DOMAIN/backend/hostinger-start.mjs
+```
+
+The build script sets execute bits automatically on redeploy.
+
+### Manual start (SSH)
+
+```bash
+cd ~/domains/stageapi.dhurandharcrm.com/backend   # adjust path
+export DB_HOST=127.0.0.1 DB_NAME=... DB_USER=... DB_PASS=...
+node hostinger-start.mjs
+```
+
 ## What the build does
 
 `npm run build` in repo root calls `scripts/build-hostinger.mjs` (CI — no migrate).
 
-Hostinger backend `npm run build` calls migrate + compile directly.
+Hostinger backend `npm run build` (`build-hostinger-deploy.mjs`):
 
-1. `npm ci` in `frontend/` and `backend/` (root build only)
-2. Vite frontend build
-3. Backend `build:app` (root CI) or `build` = migrate + compile (Hostinger)
-5. Copies `frontend/dist` to `backend/public`
-6. Writes `backend/public/build-meta.json` with the deployed Git revision
+1. `npm ci` in `backend/`
+2. `prisma generate` + esbuild compile → `backend/dist/`
+3. Optional Vite frontend → `backend/public/` (skipped when `SKIP_FRONTEND=1` or stage API host)
+4. Sets execute bit on `start.sh` / `hostinger-start.mjs`
 
-Step 2b (after backend `npm ci`): **`migrate deploy`** against the deploy DB.
+Repo-root `npm run build` (GitHub CI) compiles frontend + backend via `build:app` — **no database access**.
 
-The publish step occurs only after builds pass and migrations succeed. `npm start`
-launches `backend/hostinger-start.mjs`, which runs migrate again then loads
-`dist/server.js`.
+Local backend compile without migrate: `npm run build:app`.
+
+With `RUN_MIGRATE_ON_START=1`, startup logs must show:
+
+```text
+[migrate-deploy] Target database: user@host:3306/your_db
+[migrate-deploy] Database schema is up to date.
+```
+
+The publish step occurs only after builds pass. Entry file `start.sh` loads
+`hostinger-start.mjs`, which optionally migrates then imports `dist/server.js`.
 
 ## Verification after every deployment
 
