@@ -7,10 +7,11 @@ import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { getStoredSession } from '@/services/api/client'
-import { listMachines } from '@/services/api/manufacturingApi'
+import { listAllMachines } from '@/services/api/manufacturingApi'
 import {
   createMaintenanceTicket,
   MAX_MAINTENANCE_PHOTOS,
+  type MaintenanceFailureCategory,
   type MaintenancePriority,
   type MaintenanceSourceType,
   uploadMaintenancePhoto,
@@ -21,6 +22,15 @@ import { MAINTENANCE_BREADCRUMB } from '../maintenanceUi'
 import type { Machine } from '@/types/manufacturingSetup'
 
 const PRIORITIES: MaintenancePriority[] = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL']
+const FAILURE_CATEGORIES: MaintenanceFailureCategory[] = [
+  'MECHANICAL',
+  'ELECTRICAL',
+  'HYDRAULIC',
+  'PNEUMATIC',
+  'CONTROL',
+  'SAFETY',
+  'OTHER',
+]
 
 type GpsState = {
   status: 'idle' | 'pending' | 'ready' | 'denied' | 'unavailable'
@@ -44,6 +54,7 @@ export function ReportBreakdownPage() {
   const [machineId, setMachineId] = useState(params.get('machineId') ?? '')
   const [problem, setProblem] = useState('')
   const [priority, setPriority] = useState<MaintenancePriority>('NORMAL')
+  const [failureCategory, setFailureCategory] = useState<MaintenanceFailureCategory | ''>('')
   const [remarks, setRemarks] = useState('')
   const [operatorName, setOperatorName] = useState(defaultOperator)
   const [photos, setPhotos] = useState<File[]>([])
@@ -68,8 +79,7 @@ export function ReportBreakdownPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await listMachines({ limit: 200, isActive: true })
-        setMachines(res.data)
+        setMachines(await listAllMachines({ isActive: true }))
       } catch (e) {
         notify.error(e instanceof Error ? e.message : 'Failed to load machines')
       } finally {
@@ -131,6 +141,7 @@ export function ReportBreakdownPage() {
         machineId,
         problem: problem.trim(),
         priority,
+        failureCategory: failureCategory || undefined,
         remarks: remarks.trim() || undefined,
         operatorName: operatorName.trim(),
         reportedLatitude: gps.latitude,
@@ -294,6 +305,21 @@ export function ReportBreakdownPage() {
                   {PRIORITIES.map((p) => (
                     <option key={p} value={p}>
                       {p.charAt(0) + p.slice(1).toLowerCase()}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Failure Category" hint="Optional — classify the symptom area">
+                <Select
+                  value={failureCategory}
+                  onChange={(e) => setFailureCategory(e.target.value as MaintenanceFailureCategory | '')}
+                  className="min-h-11"
+                >
+                  <option value="">{SELECT_PLACEHOLDER}</option>
+                  {FAILURE_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c.charAt(0) + c.slice(1).toLowerCase()}
                     </option>
                   ))}
                 </Select>

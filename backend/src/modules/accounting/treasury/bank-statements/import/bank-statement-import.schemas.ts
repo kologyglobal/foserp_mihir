@@ -6,7 +6,7 @@ import {
 
 export const createImportBatchBodySchema = z.object({
   treasuryAccountId: z.string().uuid(),
-  importFormat: z.enum(['CSV', 'XLSX', 'MT940', 'CAMT_053', 'AUTO_DETECT']),
+  importFormat: z.enum(['CSV', 'XLSX', 'MT940', 'CAMT_053', 'CAMT_052', 'CAMT_054', 'AUTO_DETECT']),
   mappingTemplateId: z.string().uuid().optional(),
 })
 

@@ -76,6 +76,26 @@ describe('Finance Phase 3A2 — sales invoice calculation', () => {
     expect(alloc2.gt(alloc1)).toBe(true)
   })
 
+  it('applies invoice (overall) discount on taxable only and recomputes GST', () => {
+    // Taxable 100_000 @ 18%; 10% invoice discount → revised taxable 90_000; GST 16_200; grand 106_200
+    const result = calculateSalesInvoice(
+      baseInput({
+        lines: [{ lineNumber: 1, quantity: '1', unitPrice: '100000', gstRate: '18' }],
+        invoiceDiscountType: 'PERCENTAGE',
+        invoiceDiscountValue: '10',
+      }),
+    )
+    expect(result.valid).toBe(true)
+    expect(result.invoiceDiscountAmount).toBe('10000.0000')
+    expect(result.lines[0]!.taxableAmount).toBe('90000.0000')
+    const line = result.lines[0]!
+    const tax = toDecimal(line.cgstAmount ?? '0')
+      .add(toDecimal(line.sgstAmount ?? '0'))
+      .add(toDecimal(line.igstAmount ?? '0'))
+    expect(tax.toFixed(4)).toBe('16200.0000')
+    expect(result.totalAmount).toBe('106200.0000')
+  })
+
   it('applies line percentage discount before invoice discount', () => {
     const result = calculateSalesInvoice(
       baseInput({

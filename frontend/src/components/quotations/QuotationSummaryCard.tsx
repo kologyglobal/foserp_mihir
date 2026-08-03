@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Banknote, Building2, CalendarClock, UserRound } from 'lucide-react'
+import { Banknote, Building2, CalendarClock, ClipboardList, UserRound } from 'lucide-react'
 import type { QuotationDocument } from '@/types/crm'
 import type { Quotation } from '@/types/sales'
 import { AppLink } from '@/components/ui/AppLink'
@@ -9,7 +9,9 @@ import { ErpViewField, ErpViewPhone, ErpViewEmail } from '@/components/erp/card-
 import { entity360CustomerPath } from '@/config/entity360Routes'
 import { formatCrmCurrency } from '@/utils/crmMetrics'
 import { formatDate, formatDateTime } from '@/utils/dates/format'
+import { buildQuotationCommercialFields } from '@/utils/quotationEngine/commercialTermsDisplay'
 import { quotationStatusLabel } from './QuotationCrmCard'
+import { quotationRevisionLabel } from '@/utils/quotationEngine/revisionLabels'
 
 const EMPTY = '—'
 
@@ -80,6 +82,7 @@ export function QuotationSummaryCard({
     ? `${formatDateTime(lastActivityAt)}${lastActivityLabel ? ` · ${lastActivityLabel}` : ''}`
     : null
   const resolvedCustomerId = customerId ?? quotation.customerId
+  const commercialFields = buildQuotationCommercialFields({ quotation, document })
 
   return (
     <section className="lead-summary-card" id="quo-section-summary" aria-label="Quotation Summary">
@@ -128,7 +131,7 @@ export function QuotationSummaryCard({
 
         <SummaryGroup title="Ownership" icon={Banknote}>
           <ErpViewField label="Owner" value={document.salesOwnerName} emptyLabel={EMPTY} />
-          <ErpViewField label="Revision" value={`R${document.revisionNo}`} emptyLabel={EMPTY} />
+          <ErpViewField label="Revision" value={quotationRevisionLabel(document.revisionNo)} emptyLabel={EMPTY} />
           <ErpViewField label="Created Date" value={formatDate(quotation.createdAt)} emptyLabel={EMPTY} />
           <ErpViewField label="Grand Total" value={formatCrmCurrency(document.totalAmount)} emptyLabel={EMPTY} />
         </SummaryGroup>
@@ -152,6 +155,20 @@ export function QuotationSummaryCard({
           />
           <ErpViewField label="Last Activity" value={lastActivityDisplay} emptyLabel={EMPTY} />
         </SummaryGroup>
+
+        {commercialFields.length > 0 ? (
+          <SummaryGroup title="Commercial Terms" icon={ClipboardList}>
+            {commercialFields.map((f) => (
+              <ErpViewField
+                key={f.key}
+                label={f.label}
+                value={f.value}
+                emptyLabel={EMPTY}
+                className={f.multiline ? 'lead-summary-card__field--multiline' : undefined}
+              />
+            ))}
+          </SummaryGroup>
+        ) : null}
       </div>
     </section>
   )

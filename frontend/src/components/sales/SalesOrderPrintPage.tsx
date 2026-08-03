@@ -66,6 +66,16 @@ export function SalesOrderPrintPage() {
   const customer = useMasterStore((s) =>
     order ? s.customers.find((c) => c.id === order.customerId) : undefined,
   )
+  const resolvedCustomerName = order?.customerName?.trim() || customer?.customerName
+  const customerForPrint =
+    customer ??
+    (order && resolvedCustomerName
+      ? ({
+          id: order.customerId,
+          customerName: resolvedCustomerName,
+          customerCode: order.customerCode ?? '',
+        } as NonNullable<typeof customer>)
+      : undefined)
   const product = useMasterStore((s) =>
     order ? s.products.find((p) => p.id === order.productId) : undefined,
   )
@@ -165,7 +175,7 @@ export function SalesOrderPrintPage() {
       <div className="so-print-stage">
         <SalesOrderPrintDocument
           order={order}
-          customer={customer}
+          customer={customerForPrint}
           product={product}
           products={products}
           locations={locations}

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { Download, FileSpreadsheet, Upload, X } from 'lucide-react'
-import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
+import { Download, FileSpreadsheet, Upload } from 'lucide-react'
+import { ErpButton } from '../erp/ErpButton'
 import { useSalesStore } from '../../store/salesStore'
 import {
   downloadLeadImportTemplate,
@@ -15,6 +15,7 @@ import { cn } from '../../utils/cn'
 import { isApiMode } from '../../config/apiConfig'
 import { importLeadsApi } from '../../services/api/crmApi'
 import { syncAllCrmFromApi } from '../../services/bridges/crmApiBridge'
+import { CrmDrawerShell } from './CrmDrawerShell'
 
 interface LeadImportDialogProps {
   open: boolean
@@ -31,8 +32,6 @@ export function LeadImportDialog({ open, onClose, onImported }: LeadImportDialog
   const [importing, setImporting] = useState(false)
   const [resultMessage, setResultMessage] = useState<string | null>(null)
   const fieldGuide = getLeadImportFieldGuide()
-
-  if (!open) return null
 
   function reset() {
     setRows([])
@@ -126,23 +125,33 @@ export function LeadImportDialog({ open, onClose, onImported }: LeadImportDialog
   const errorCount = rows.length - validCount
 
   return (
-    <div className="erp-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="lead-import-title">
-      <div className="erp-modal-panel max-w-4xl">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 id="lead-import-title" className="text-[16px] font-semibold text-erp-text">
-              Import Leads
-            </h2>
-            <p className="mt-1 text-[13px] text-erp-muted">
-              Download the CSV template, fill in your leads, then upload the file. Rows are validated before import.
-            </p>
-          </div>
-          <button type="button" onClick={handleClose} className="rounded p-1 text-erp-muted hover:bg-erp-surface-alt" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
+    <CrmDrawerShell
+      open={open}
+      placement="modal"
+      size="xl"
+      icon={Upload}
+      accent="primary"
+      title="Import Leads"
+      subtitle="Download the CSV template, fill in your leads, then upload. Rows are validated before import."
+      onClose={handleClose}
+      closeDisabled={importing}
+      footer={
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={handleClose} disabled={importing}>
+            Close
+          </ErpButton>
+          <ErpButton
+            type="button"
+            variant="primary"
+            onClick={handleImport}
+            disabled={importing || validCount === 0}
+          >
+            {importing ? 'Importing…' : `Import ${validCount} Lead${validCount === 1 ? '' : 's'}`}
+          </ErpButton>
         </div>
-
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      }
+    >
+        <div className="grid gap-4 lg:grid-cols-2">
           <section className="rounded-lg border border-erp-border bg-erp-surface-alt/40 p-4">
             <div className="flex items-start gap-3">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-erp-primary text-[12px] font-bold text-white">1</span>
@@ -275,21 +284,6 @@ export function LeadImportDialog({ open, onClose, onImported }: LeadImportDialog
             {resultMessage}
           </p>
         ) : null}
-
-        <ErpButtonGroup className="mt-5 justify-end">
-          <ErpButton type="button" variant="secondary" onClick={handleClose} disabled={importing}>
-            Close
-          </ErpButton>
-          <ErpButton
-            type="button"
-            variant="primary"
-            onClick={handleImport}
-            disabled={importing || validCount === 0}
-          >
-            {importing ? 'Importing…' : `Import ${validCount} Lead${validCount === 1 ? '' : 's'}`}
-          </ErpButton>
-        </ErpButtonGroup>
-      </div>
-    </div>
+    </CrmDrawerShell>
   )
 }

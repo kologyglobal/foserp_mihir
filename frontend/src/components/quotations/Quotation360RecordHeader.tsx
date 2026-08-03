@@ -219,7 +219,9 @@ export function Quotation360RecordHeader({
           </button>
         </div>
         <div className="crm-sticky-record-header__meta">
+          {quotationRevisionLabel(revisionNo) !== 'Original' ? (
           <span className="crm-sticky-record-header__id">{quotationRevisionLabel(revisionNo)}</span>
+          ) : null}
           <StatusBadge label={statusLabel} status={documentStatus} />
           {customerName ? (
             <span className="crm-sticky-record-header__owner">

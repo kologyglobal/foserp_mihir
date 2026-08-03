@@ -21,6 +21,7 @@ import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { salesCustomer360Path } from '../../config/entity360Routes'
 import { buildSalesOrderNewUrl } from '../../utils/crmSalesOrderNavigation'
+import { quotationRevisionLabel } from '../../utils/quotationEngine/revisionLabels'
 
 interface Lookup {
   customerName: (id: string) => string
@@ -286,7 +287,7 @@ export function SalesQuotationApprovalsPanel({
               return (
                 <tr key={doc.id}>
                   <td>
-                    <TableLink to={`/crm/quotations/${doc.quotationId}`}>Rev {doc.revisionNo}</TableLink>
+                    <TableLink to={`/crm/quotations/${doc.quotationId}`}>{quotationRevisionLabel(doc.revisionNo)}</TableLink>
                   </td>
                   <td>{cust?.customerName ?? '—'}</td>
                   <td>{opp?.opportunityName ?? '—'}</td>

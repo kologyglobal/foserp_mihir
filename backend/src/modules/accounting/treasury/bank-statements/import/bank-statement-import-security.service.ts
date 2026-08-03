@@ -12,12 +12,21 @@ import {
   BANK_STATEMENT_MAX_FILE_BYTES,
   BANK_STATEMENT_MAX_ROWS,
 } from './bank-statement-limits.js'
-import { looksLikeCamt053, looksLikeMt940 } from './bank-statement-format-detect.service.js'
+import { looksLikeCamtFamily, looksLikeMt940 } from './bank-statement-format-detect.service.js'
+import { isCamtFamilyFormat } from './bank-statement-camt-common.js'
 
 const BLOCKED_EXTENSIONS = new Set(['.xlsm', '.xlsb', '.xltm', '.zip', '.rar', '.7z'])
 const ALLOWED_EXTENSIONS = new Set(['.csv', '.xlsx', '.txt', '.sta', '.mt940', '.xml'])
 
-export type UploadImportFormat = 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'AUTO_DETECT' | 'MANUAL'
+export type UploadImportFormat =
+  | 'CSV'
+  | 'XLSX'
+  | 'MT940'
+  | 'CAMT_053'
+  | 'CAMT_052'
+  | 'CAMT_054'
+  | 'AUTO_DETECT'
+  | 'MANUAL'
 
 export function sanitiseFileName(originalName: string): string {
   const base = path.basename(originalName).replace(/[^\w.\-() ]+/g, '_').slice(0, 200)
@@ -47,8 +56,8 @@ export function validateUploadBasics(
   if (importFormat === 'MT940' && !['.sta', '.mt940', '.txt'].includes(ext)) {
     throw new BankStatementFileTypeRejectedError('MT940 import requires a .sta, .mt940, or .txt file')
   }
-  if (importFormat === 'CAMT_053' && ext !== '.xml') {
-    throw new BankStatementFileTypeRejectedError('CAMT.053 import requires an .xml file')
+  if (isCamtFamilyFormat(importFormat) && ext !== '.xml') {
+    throw new BankStatementFileTypeRejectedError(`${importFormat.replace('_', '.')} import requires an .xml file`)
   }
   if (importFormat === 'AUTO_DETECT') {
     if (!ALLOWED_EXTENSIONS.has(ext)) {
@@ -70,7 +79,7 @@ function mimeForFormat(importFormat: UploadImportFormat, ext: string): string {
   if (importFormat === 'XLSX' || ext === '.xlsx') {
     return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   }
-  if (importFormat === 'CAMT_053' || ext === '.xml') return 'application/xml'
+  if (isCamtFamilyFormat(importFormat) || ext === '.xml') return 'application/xml'
   if (importFormat === 'MT940' || ext === '.sta' || ext === '.mt940') return 'application/octet-stream'
   return 'text/plain'
 }
@@ -101,12 +110,12 @@ function assertMagicBytes(buffer: Buffer, importFormat: UploadImportFormat, ext:
     return
   }
 
-  if (importFormat === 'CAMT_053' || ext === '.xml') {
+  if (isCamtFamilyFormat(importFormat) || ext === '.xml') {
     if (/<!DOCTYPE/i.test(textHead) || /<!ENTITY/i.test(textHead)) {
-      throw new BankStatementFileSecurityRejectedError('CAMT.053 XML with DTD/ENTITY declarations is not allowed')
+      throw new BankStatementFileSecurityRejectedError('CAMT XML with DTD/ENTITY declarations is not allowed')
     }
-    if (!looksLikeCamt053(buffer.toString('utf8').slice(0, 8000)) && !/<Document[\s>]/i.test(textHead)) {
-      throw new BankStatementFileSecurityRejectedError('File does not look like CAMT.053 XML')
+    if (!looksLikeCamtFamily(buffer.toString('utf8').slice(0, 12_000)) && !/<Document[\s>]/i.test(textHead)) {
+      throw new BankStatementFileSecurityRejectedError('File does not look like CAMT.052 / CAMT.053 / CAMT.054 XML')
     }
     return
   }

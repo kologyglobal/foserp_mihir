@@ -26,7 +26,7 @@ import type { InventoryTransfer, TransferLine, TransferType } from '@/types/inve
 import { TRANSFER_STATUS_LABELS, TRANSFER_TYPE_LABELS } from '@/utils/inventoryMovementLabels'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
-import { useMasterStore } from '@/store/masterStore'
+import { useActiveWarehouses, useStockableItems } from '@/hooks/useMasterLists'
 import { notify } from '@/store/toastStore'
 import { BatchSelector } from '@/components/inventory/BatchSelector'
 import { SerialSelector } from '@/components/inventory/SerialSelector'
@@ -42,8 +42,8 @@ export function TransferEditorPage() {
   const isNew = !id
   const navigate = useNavigate()
   const perms = useInventoryPermissions()
-  const warehouses = useMasterStore((s) => s.warehouses.filter((w) => w.isActive))
-  const items = useMasterStore((s) => s.items.filter((i) => i.isStockable && i.isActive))
+  const warehouses = useActiveWarehouses()
+  const items = useStockableItems()
 
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)

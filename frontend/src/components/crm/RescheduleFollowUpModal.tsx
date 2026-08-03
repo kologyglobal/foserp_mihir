@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
+import { useEffect, useState } from 'react'
+import { CalendarClock } from 'lucide-react'
+import { ErpButton } from '../erp/ErpButton'
 import { FormField } from '../forms/FormField'
 import { Input, Textarea } from '../forms/Inputs'
 import {
@@ -7,6 +8,7 @@ import {
   getTimeInputMin,
   validateFollowUpAt,
 } from '../../utils/validation/crmDatePolicy'
+import { CrmDrawerShell } from './CrmDrawerShell'
 
 /** Product default: reschedule reason is optional. Set true to require it. */
 export const RESCHEDULE_FOLLOW_UP_REASON_REQUIRED = false
@@ -72,7 +74,6 @@ export function RescheduleFollowUpModal({
   onClose,
   onReschedule,
 }: RescheduleFollowUpModalProps) {
-  const panelRef = useRef<HTMLDivElement>(null)
   const [dueDate, setDueDate] = useState('')
   const [dueTime, setDueTime] = useState('10:00')
   const [reason, setReason] = useState('')
@@ -93,26 +94,8 @@ export function RescheduleFollowUpModal({
     setSubmitting(false)
   }, [open, followUp])
 
-  useEffect(() => {
-    if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !submitting) onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    requestAnimationFrame(() => {
-      panelRef.current?.querySelector<HTMLElement>('input:not([readonly]), textarea, button')?.focus()
-    })
-    return () => {
-      document.body.style.overflow = prev
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [open, onClose, submitting])
-
-  if (!open || !followUp) return null
-
   async function handleSubmit() {
+    if (!followUp) return
     if (RESCHEDULE_FOLLOW_UP_REASON_REQUIRED && !reason.trim()) {
       setError('Reason is required')
       return
@@ -146,28 +129,29 @@ export function RescheduleFollowUpModal({
   }
 
   return (
-    <div
-      className="erp-modal-backdrop"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !submitting) onClose()
-      }}
+    <CrmDrawerShell
+      open={open && Boolean(followUp)}
+      placement="modal"
+      size="sm"
+      icon={CalendarClock}
+      accent="warning"
+      title="Reschedule Follow-up"
+      subtitle={followUp?.label ?? 'Pick a new date and time'}
+      onClose={onClose}
+      closeDisabled={submitting}
+      footer={
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </ErpButton>
+          <ErpButton type="button" variant="primary" onClick={() => void handleSubmit()} disabled={submitting}>
+            {submitting ? 'Rescheduling…' : 'Reschedule'}
+          </ErpButton>
+        </div>
+      }
     >
-      <div
-        ref={panelRef}
-        className="erp-modal-panel max-w-md"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="reschedule-follow-up-title"
-      >
-        <h2 id="reschedule-follow-up-title" className="text-[16px] font-semibold text-erp-text">
-          Reschedule Follow-up
-        </h2>
-        {followUp.label ? (
-          <p className="mt-1 text-[13px] text-erp-muted">{followUp.label}</p>
-        ) : null}
-
-        <div className="mt-4 space-y-3">
+      {followUp ? (
+        <div className="crm-popup-form">
           <FormField label="Current Date & Time">
             <Input
               readOnly
@@ -176,7 +160,7 @@ export function RescheduleFollowUpModal({
             />
           </FormField>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="crm-popup-field-pair">
             <FormField label="New Date" required error={error && !dueDate ? error : undefined}>
               <Input
                 type="date"
@@ -223,21 +207,12 @@ export function RescheduleFollowUpModal({
           </FormField>
 
           {error ? (
-            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800" role="alert">
+            <p className="crm-popup-alert" role="alert">
               {error}
             </p>
           ) : null}
         </div>
-
-        <ErpButtonGroup className="mt-5 justify-end">
-          <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
-            Cancel
-          </ErpButton>
-          <ErpButton type="button" variant="primary" onClick={() => void handleSubmit()} disabled={submitting}>
-            {submitting ? 'Rescheduling…' : 'Reschedule'}
-          </ErpButton>
-        </ErpButtonGroup>
-      </div>
-    </div>
+      ) : null}
+    </CrmDrawerShell>
   )
 }

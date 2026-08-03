@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  Plus, FileText, Download, Bookmark, Pencil, Eye, ArrowLeft, LayoutGrid, Table2, Save,
+  Plus, FileText, Download, Bookmark, Pencil, Eye, ArrowLeft, LayoutGrid, Table2, Save, Bell, Activity,
 } from 'lucide-react'
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
 import { crmChildBreadcrumbs, crmModuleBreadcrumbs } from '../../utils/crmNavigation'
@@ -30,9 +30,9 @@ import { useSavedViews } from '../../hooks/useSavedViews'
 import { QUOTATION_REGISTER_PRESETS } from '../../config/savedViewPresets'
 import {
   QuotationBuilder, QuotationPreview, QuotationRevisionHistory,
-  quotationStatusLabel,
+  quotationStatusLabel, quotationRevisionLabel,
 } from '@/components/quotations'
-import { QuickFollowUpDrawer } from '@/components/crm'
+import { QuickFollowUpDrawer, CrmFollowUpsPanel, CrmActivitiesPanel, CrmWorkspaceViewToggle } from '@/components/crm'
 import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
 import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import { resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
@@ -55,6 +55,34 @@ import { QuotationConversionDialog } from '@/components/quotations/QuotationConv
 import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
 import { canCrmPermission } from '@/utils/permissions/crm'
 import { isQuotationDeletableStatus } from '@/utils/quotationDeletePolicy'
+
+type QuotationWorkspaceView = 'list' | 'follow-ups' | 'activities'
+
+const QUOTATION_VIEW_TABS = [
+  { id: 'list' as const, label: 'List', icon: Table2 },
+  { id: 'follow-ups' as const, label: 'Follow-ups', icon: Bell },
+  { id: 'activities' as const, label: 'Activities', icon: Activity },
+]
+
+function useQuotationWorkspaceView(): [QuotationWorkspaceView, (view: QuotationWorkspaceView) => void] {
+  const [params, setSearchParams] = useSearchParams()
+  const viewParam = params.get('view')
+  const view: QuotationWorkspaceView =
+    viewParam === 'follow-ups' ? 'follow-ups'
+    : viewParam === 'activities' ? 'activities'
+    : 'list'
+
+  function setView(next: QuotationWorkspaceView) {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (next === 'list') p.delete('view')
+      else p.set('view', next)
+      return p
+    }, { replace: true })
+  }
+
+  return [view, setView]
+}
 
 const QUOTATION_FILTER_FIELDS: CrmFilterField[] = [
   {
@@ -85,6 +113,7 @@ const QUOTATION_FILTER_FIELDS: CrmFilterField[] = [
 export function CrmQuotationListPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [view, setView] = useQuotationWorkspaceView()
   const openDetailPanel = useUIStore((s) => s.openDetailPanel)
   const quotationDocuments = useCrmStore((s) => s.quotationDocuments)
   const conversion = useQuotationConversion()
@@ -313,14 +342,14 @@ export function CrmQuotationListPage() {
               ? 'Customer Approved'
               : quotationStatusLabel(d.status),
         },
-        { label: 'Revision', value: `R${d.revisionNo} (${item.revisionCount} total)` },
+        { label: 'Revision', value: `${quotationRevisionLabel(d.revisionNo)} (${item.revisionCount} total)` },
         { label: 'Total', value: formatCrmCurrency(d.totalAmount) },
         { label: 'Last Modified', value: d.modifiedAt ? new Date(d.modifiedAt).toLocaleDateString('en-IN') : '—' },
       ],
       timeline: [
         {
           id: 'revision',
-          label: `Revision ${d.revisionNo}`,
+          label: quotationRevisionLabel(d.revisionNo),
           time: d.modifiedAt ?? d.createdAt,
           status: 'current',
         },
@@ -462,6 +491,14 @@ export function CrmQuotationListPage() {
       variant="dynamics"
       autoBreadcrumbs={false}
       breadcrumbs={crmModuleBreadcrumbs('Quotations', '/crm/quotations')}
+      actions={
+        <CrmWorkspaceViewToggle
+          tabs={QUOTATION_VIEW_TABS}
+          value={view}
+          onChange={setView}
+          ariaLabel="Quotations view"
+        />
+      }
       commandBar={
         <ErpCommandBar
           inline
@@ -481,8 +518,14 @@ export function CrmQuotationListPage() {
           ]}
         />
       }
-      kpiStrip={quotationKpiStrip}
+      kpiStrip={view === 'list' ? quotationKpiStrip : undefined}
     >
+      <div className="crm-opp-workspace">
+        {view === 'follow-ups' ? (
+          <CrmFollowUpsPanel scope="quotation" />
+        ) : view === 'activities' ? (
+          <CrmActivitiesPanel scope="quotation" />
+        ) : (
       <EnterpriseRegisterTableShell>
         <CrmQuotationsTable
           rows={sorted}
@@ -656,6 +699,8 @@ export function CrmQuotationListPage() {
           canDelete={canDelete}
         />
       </EnterpriseRegisterTableShell>
+        )}
+      </div>
       <QuotationConversionDialog
         conversion={conversion}
         onViewSalesOrder={(salesOrderId) => navigate(resolveSalesOrderDetailPath(salesOrderId, true))}

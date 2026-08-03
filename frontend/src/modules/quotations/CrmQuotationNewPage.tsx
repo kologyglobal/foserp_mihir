@@ -397,7 +397,7 @@ export function CrmQuotationNewPage() {
         customerId: 'quote-section-quick',
         opportunityId: 'quote-section-quick',
         templateId: 'quote-section-quick',
-        validUntil: 'quote-section-commercial',
+        validUntil: 'quote-section-quick',
         paymentTerms: 'quote-section-commercial',
         deliveryTerms: 'quote-section-commercial',
         deliveryTime: 'quote-section-commercial',
@@ -530,10 +530,11 @@ export function CrmQuotationNewPage() {
         lower.includes('payment')
         || lower.includes('delivery')
         || lower.includes('commercial')
-        || lower.includes('valid-until')
-        || lower.includes('validity')
       ) {
         ids.add('commercial')
+      }
+      if (lower.includes('valid-until') || lower.includes('validity') || lower.includes('quotation date')) {
+        ids.add('quick')
       }
     }
     if (Object.keys(rowErrors).length) ids.add('products')
@@ -904,6 +905,50 @@ export function CrmQuotationNewPage() {
               : 'Select a customer to continue.'}
           </p>
         )}
+
+        <ErpFieldRow label="Quotation date" required horizontal={false}>
+          <Input
+            type="date"
+            value={quotationDate}
+            onChange={(e) => handleQuotationDateChange(e.target.value)}
+            className="erp-input"
+          />
+        </ErpFieldRow>
+        <ErpFieldRow label="Validity Period" required horizontal={false}>
+          <Select
+            native
+            value={validityPeriodDays === 'custom' ? 'custom' : String(validityPeriodDays)}
+            onChange={(e) => handleValidityPeriodChange(e.target.value)}
+            className="erp-input"
+          >
+            {VALIDITY_PERIOD_OPTIONS.map((d) => (
+              <option key={d} value={d}>{d} days</option>
+            ))}
+            <option value="custom">Custom date</option>
+          </Select>
+        </ErpFieldRow>
+        <ErpFieldRow
+          label="Valid until"
+          required
+          horizontal={false}
+          dataField="validUntil"
+          hint={
+            validityPeriodDays === 'custom'
+              ? 'Pick an expiry date'
+              : `Quotation date + ${validityPeriodDays} days`
+          }
+        >
+          <Input
+            type="date"
+            value={validUntil}
+            onChange={(e) => handleValidUntilChange(e.target.value)}
+            readOnly={validityPeriodDays !== 'custom'}
+            className="erp-input"
+          />
+        </ErpFieldRow>
+        <ErpFieldRow label="Currency" readOnly horizontal={false}>
+          <Input value="INR" readOnly className="erp-input" />
+        </ErpFieldRow>
       </ErpFieldGroup>
       </div>
 
@@ -964,57 +1009,13 @@ export function CrmQuotationNewPage() {
       <div id="quote-section-commercial">
       <ErpCardSection
         title="Commercial terms"
-        subtitle="Validity, payment, and delivery."
+        subtitle="Payment, delivery, and quoted total."
         icon={Banknote}
         collapsible
         defaultOpen
         className="!max-w-none quote-create-commercial"
         columns={1}
       >
-        <ErpFieldGroup label="Validity" columns={4}>
-          <ErpFieldRow label="Quotation date" required>
-            <Input
-              type="date"
-              value={quotationDate}
-              onChange={(e) => handleQuotationDateChange(e.target.value)}
-              className="erp-input"
-            />
-          </ErpFieldRow>
-          <ErpFieldRow label="Validity period" required>
-            <Select
-              native
-              value={validityPeriodDays === 'custom' ? 'custom' : String(validityPeriodDays)}
-              onChange={(e) => handleValidityPeriodChange(e.target.value)}
-              className="erp-input"
-            >
-              {VALIDITY_PERIOD_OPTIONS.map((d) => (
-                <option key={d} value={d}>{d} days</option>
-              ))}
-              <option value="custom">Custom date</option>
-            </Select>
-          </ErpFieldRow>
-          <ErpFieldRow
-            label="Valid until"
-            required
-            dataField="validUntil"
-            hint={
-              validityPeriodDays === 'custom'
-                ? 'Pick an expiry date'
-                : `Quotation date + ${validityPeriodDays} days`
-            }
-          >
-            <Input
-              type="date"
-              value={validUntil}
-              onChange={(e) => handleValidUntilChange(e.target.value)}
-              readOnly={validityPeriodDays !== 'custom'}
-              className="erp-input"
-            />
-          </ErpFieldRow>
-          <ErpFieldRow label="Currency" readOnly>
-            <Input value="INR" readOnly className="erp-input" />
-          </ErpFieldRow>
-        </ErpFieldGroup>
         <ErpFieldGroup label="Commercial" columns={4}>
           <ErpFieldRow label="Payment terms" required dataField="paymentTerms">
             <CommercialTermSelect

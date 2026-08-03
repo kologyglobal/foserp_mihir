@@ -64,6 +64,12 @@ export function mapTicket(row: Awaited<ReturnType<typeof repo.getTicket>>) {
   const mins =
     row.downtimeMinutes ??
     (row.reportedAt ? downtimeMinutes(row.reportedAt, end) : null)
+  const repairEnd =
+    row.repairEndedAt ??
+    (row.testResult === 'PASS' ? row.testedAt : null) ??
+    (row.status === 'CLOSED' ? row.closedAt : null)
+  const repairMins =
+    row.repairStartedAt && repairEnd ? downtimeMinutes(row.repairStartedAt, repairEnd) : null
   return {
     ...row,
     partsCost: dec(row.partsCost),
@@ -75,6 +81,13 @@ export function mapTicket(row: Awaited<ReturnType<typeof repo.getTicket>>) {
     reportedAccuracyM: row.reportedAccuracyM == null ? null : dec(row.reportedAccuracyM),
     downtimeMinutes: mins,
     downtimeLabel: mins == null ? null : formatDowntime(mins),
+    repairMinutes: repairMins,
+    repairLabel: repairMins == null ? null : formatDowntime(repairMins),
+    pmScheduledDueDate: row.pmScheduledDueDate
+      ? row.pmScheduledDueDate.toISOString().slice(0, 10)
+      : null,
+    scheduledDate: row.scheduledDate ? row.scheduledDate.toISOString().slice(0, 10) : null,
+    ticketKind: row.sourceType === 'PREVENTIVE' ? 'PREVENTIVE' : 'BREAKDOWN',
     parts: row.parts.map((p) => ({
       ...p,
       qty: dec(p.qty),
@@ -82,14 +95,23 @@ export function mapTicket(row: Awaited<ReturnType<typeof repo.getTicket>>) {
       totalCost: dec(p.totalCost),
       shortageQty: p.shortageQty == null ? null : dec(p.shortageQty),
     })),
+    checklistItems: (row.checklistItems ?? []).map((c) => ({
+      id: c.id,
+      sequence: c.sequence,
+      text: c.text,
+      isDone: c.isDone,
+      remark: c.remark,
+    })),
   }
 }
 
-function formatDowntime(mins: number) {
-  const h = Math.floor(mins / 60)
+export function formatDowntime(mins: number) {
+  const d = Math.floor(mins / (60 * 24))
+  const h = Math.floor((mins % (60 * 24)) / 60)
   const m = mins % 60
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`
   if (h <= 0) return `${m}m`
-  return `${h}h ${m}m`
+  return m > 0 ? `${h}h ${m}m` : `${h}h`
 }
 
 /**
@@ -122,12 +144,39 @@ export async function getTicket(tenantId: string, id: string) {
 
 export async function getDashboard(tenantId: string) {
   const d = await repo.dashboardCounts(tenantId)
+  const now = new Date()
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  const monthTickets = await prisma.maintenanceTicket.findMany({
+    where: {
+      tenantId,
+      deletedAt: null,
+      reportedAt: { gte: monthStart },
+    },
+    select: { downtimeMinutes: true, totalCost: true, status: true, reportedAt: true, closedAt: true, downtimeEndedAt: true },
+  })
+  const downtimeThisMonth = monthTickets.reduce((s, t) => {
+    if (t.downtimeMinutes != null) return s + t.downtimeMinutes
+    const end = t.downtimeEndedAt ?? t.closedAt ?? now
+    return s + downtimeMinutes(t.reportedAt, end)
+  }, 0)
+  const costThisMonth = monthTickets.reduce((s, t) => s + Number(t.totalCost), 0)
+
+  const { getDashboardPmCounts } = await import('./pm.service.js')
+  const pm = await getDashboardPmCounts(tenantId)
+
   return {
     openTickets: d.openTickets,
     machinesDown: d.machinesDown,
     underRepair: d.underRepair,
     waitingForParts: d.waitingForParts,
     closedThisMonth: d.closedThisMonth,
+    downtimeThisMonth,
+    downtimeThisMonthLabel: formatDowntime(downtimeThisMonth),
+    maintenanceCostThisMonth: Math.round(costThisMonth * 100) / 100,
+    pmDueToday: pm.pmDueToday,
+    pmDueThisWeek: pm.pmDueThisWeek,
+    pmOverdue: pm.pmOverdue,
+    pmNeedsAttention: pm.pmNeedsAttention,
     needsAttention: d.needsAttention.map(mapTicket),
     recent: d.recent.map(mapTicket),
   }
@@ -207,14 +256,15 @@ export async function createTicket(req: Request, tenantId: string, input: Create
         inventoryPostingPending: false,
         createdBy: userId || null,
         updatedBy: userId || null,
-        // Optional create remarks append to problem context — never seed repairDetails
         ...(input.remarks?.trim()
           ? { problem: `${input.problem.trim()}\n\nRemarks: ${input.remarks.trim()}` }
           : {}),
       },
     })
-    // Business DOWN → OUT_OF_SERVICE
-    await setMachineStatus(tx, tenantId, machine.id, 'OUT_OF_SERVICE', userId)
+    // Breakdown report → OUT_OF_SERVICE. Preventive create leaves machine available until start.
+    if (input.sourceType !== 'PREVENTIVE') {
+      await setMachineStatus(tx, tenantId, machine.id, 'OUT_OF_SERVICE', userId)
+    }
     return created
   })
 
@@ -266,24 +316,39 @@ export async function updateRepair(req: Request, tenantId: string, id: string, i
   const otherCost = input.otherCost != null ? input.otherCost : dec(before.otherCost)
   const totals = recomputeTotals(dec(before.partsCost), serviceCost, otherCost)
 
-  const updated = await prisma.maintenanceTicket.update({
-    where: { id },
-    data: {
-      ...(input.repairDetails !== undefined ? { repairDetails: input.repairDetails } : {}),
-      ...(input.failureCategory !== undefined ? { failureCategory: input.failureCategory } : {}),
-      ...(input.serviceDescription !== undefined ? { serviceDescription: input.serviceDescription } : {}),
-      ...(input.invoiceNumber !== undefined ? { invoiceNumber: input.invoiceNumber } : {}),
-      ...(input.invoiceDate !== undefined
-        ? { invoiceDate: input.invoiceDate ? new Date(input.invoiceDate) : null }
-        : {}),
-      ...(input.technicianName !== undefined ? { technicianName: input.technicianName } : {}),
-      ...(input.contractorId !== undefined ? { contractorId: input.contractorId } : {}),
-      ...(input.operatorName !== undefined ? { operatorName: input.operatorName } : {}),
-      ...totals,
-      updatedBy: userId || null,
-    },
+  await prisma.$transaction(async (tx) => {
+    if (input.checklistItems?.length) {
+      for (const item of input.checklistItems) {
+        await tx.maintenanceTicketChecklistItem.updateMany({
+          where: { id: item.id, ticketId: id, tenantId },
+          data: {
+            isDone: item.isDone,
+            remark: item.remark === undefined ? undefined : item.remark,
+          },
+        })
+      }
+    }
+    await tx.maintenanceTicket.update({
+      where: { id },
+      data: {
+        ...(input.repairDetails !== undefined ? { repairDetails: input.repairDetails } : {}),
+        ...(input.rootCause !== undefined ? { rootCause: input.rootCause } : {}),
+        ...(input.repairAction !== undefined ? { repairAction: input.repairAction } : {}),
+        ...(input.failureCategory !== undefined ? { failureCategory: input.failureCategory } : {}),
+        ...(input.serviceDescription !== undefined ? { serviceDescription: input.serviceDescription } : {}),
+        ...(input.invoiceNumber !== undefined ? { invoiceNumber: input.invoiceNumber } : {}),
+        ...(input.invoiceDate !== undefined
+          ? { invoiceDate: input.invoiceDate ? new Date(input.invoiceDate) : null }
+          : {}),
+        ...(input.technicianName !== undefined ? { technicianName: input.technicianName } : {}),
+        ...(input.contractorId !== undefined ? { contractorId: input.contractorId } : {}),
+        ...(input.operatorName !== undefined ? { operatorName: input.operatorName } : {}),
+        ...totals,
+        updatedBy: userId || null,
+      },
+    })
   })
-  await audit(req, tenantId, id, 'UPDATE_REPAIR', before, updated)
+  await audit(req, tenantId, id, 'UPDATE_REPAIR', before, { ...input })
   return getTicket(tenantId, id)
 }
 
@@ -463,7 +528,8 @@ export async function testMachine(req: Request, tenantId: string, id: string, in
     throw new InvalidStateError(`Cannot test from status ${before.status}`)
   }
   if (!before.repairStartedAt) throw new ValidationError('Start repair before testing')
-  if (!before.repairDetails?.trim()) throw new ValidationError('Enter repair details before testing')
+  const hasRepairNotes = Boolean(before.repairAction?.trim() || before.repairDetails?.trim())
+  if (!hasRepairNotes) throw new ValidationError('Enter repair action (or repair details) before testing')
 
   const testedAt = input.testedAt ? new Date(input.testedAt) : new Date()
   if (input.result === 'FAIL') {
@@ -475,6 +541,7 @@ export async function testMachine(req: Request, tenantId: string, id: string, in
         testedByUserId: userId || null,
         testedAt,
         testRemarks: input.remarks,
+        repairEndedAt: null,
         updatedBy: userId || null,
       },
     })
@@ -490,6 +557,7 @@ export async function testMachine(req: Request, tenantId: string, id: string, in
       testResult: 'PASS',
       testedByUserId: userId || null,
       testedAt,
+      repairEndedAt: testedAt,
       testRemarks: input.remarks,
       updatedBy: userId || null,
     },
@@ -500,10 +568,16 @@ export async function testMachine(req: Request, tenantId: string, id: string, in
 
 export function closeReadiness(ticket: Awaited<ReturnType<typeof getTicket>>) {
   const photoCount = ticket.photos?.length ?? 0
+  const isPm = ticket.sourceType === 'PREVENTIVE'
+  const checklist = ticket.checklistItems ?? []
+  const checklistComplete =
+    checklist.length === 0 || checklist.every((c: { isDone: boolean }) => c.isDone)
   const hasPartsOrService =
     (ticket.parts?.length ?? 0) > 0 ||
     Boolean(ticket.serviceDescription?.trim()) ||
-    Boolean(ticket.repairDetails?.trim())
+    Boolean(ticket.repairAction?.trim()) ||
+    Boolean(ticket.repairDetails?.trim()) ||
+    (isPm && checklistComplete && checklist.length > 0)
   const amountCaptured = dec(ticket.serviceCost) > 0 || dec(ticket.partsCost) > 0 || dec(ticket.otherCost) > 0
 
   const checks: Array<{ code: string; ok: boolean; message: string }> = [
@@ -514,8 +588,8 @@ export function closeReadiness(ticket: Awaited<ReturnType<typeof getTicket>>) {
     },
     {
       code: 'PHOTOS',
-      ok: photoCount >= 1,
-      message: 'At least one photo uploaded (max 4)',
+      ok: isPm ? true : photoCount >= 1,
+      message: isPm ? 'Photos optional for preventive' : 'At least one photo uploaded (max 4)',
     },
     {
       code: 'TECHNICIAN',
@@ -529,8 +603,18 @@ export function closeReadiness(ticket: Awaited<ReturnType<typeof getTicket>>) {
     },
     {
       code: 'OPERATOR',
-      ok: Boolean(ticket.operatorName?.trim()),
-      message: 'Operator name captured',
+      ok: isPm ? true : Boolean(ticket.operatorName?.trim()),
+      message: isPm ? 'Operator optional for preventive' : 'Operator name captured',
+    },
+    {
+      code: 'REPAIR_ACTION',
+      ok: Boolean(ticket.repairAction?.trim() || ticket.repairDetails?.trim()) || (isPm && checklistComplete),
+      message: isPm ? 'Repair action or completed checklist' : 'Repair action documented',
+    },
+    {
+      code: 'CHECKLIST',
+      ok: !isPm || checklistComplete,
+      message: 'PM checklist completed',
     },
     {
       code: 'PARTS_OR_SERVICE',
@@ -538,13 +622,22 @@ export function closeReadiness(ticket: Awaited<ReturnType<typeof getTicket>>) {
       message: 'Parts changed and/or service performed details',
     },
     {
+      code: 'TEST_PASS',
+      ok: ticket.testResult === 'PASS' && ticket.status === 'TESTING',
+      message: 'Machine test PASS required before close',
+    },
+    {
       code: 'INVOICE',
-      ok: Boolean(ticket.invoiceNumber?.trim()),
-      message: 'Invoice number',
+      ok: Boolean(ticket.invoiceNumber?.trim()) || ticket.technicianType === 'INTERNAL' || isPm,
+      message: 'Invoice number (required for external service)',
     },
     {
       code: 'AMOUNT',
-      ok: amountCaptured || (Boolean(ticket.invoiceNumber?.trim()) && Boolean(ticket.invoiceDate)),
+      ok:
+        amountCaptured ||
+        ticket.technicianType === 'INTERNAL' ||
+        isPm ||
+        (Boolean(ticket.invoiceNumber?.trim()) && Boolean(ticket.invoiceDate)),
       message: 'Service amount / total maintenance cost',
     },
   ]
@@ -584,7 +677,21 @@ export async function closeTicket(req: Request, tenantId: string, id: string, in
       },
     })
     if (!otherOpen) {
+      // For PREVENTIVE that never set OUT_OF_SERVICE, still safe to set AVAILABLE after start→close.
       await setMachineStatus(tx, tenantId, before.machineId, 'AVAILABLE', userId)
+    }
+    if (before.sourceType === 'PREVENTIVE' && before.preventiveMaintenancePlanId) {
+      const { onPmTicketClosed } = await import('./pm.service.js')
+      await onPmTicketClosed(
+        tx,
+        tenantId,
+        {
+          id: row.id,
+          preventiveMaintenancePlanId: before.preventiveMaintenancePlanId,
+          closedAt,
+        },
+        userId,
+      )
     }
     return row
   })
@@ -642,21 +749,33 @@ export async function getReports(tenantId: string, query: ReportQuery) {
 
   const contractors = new Map<
     string,
-    { contractorId: string; code: string; name: string; jobs: number; totalCost: number; avgRepairMinutes: number }
+    {
+      contractorId: string
+      code: string
+      name: string
+      jobs: number
+      closedJobs: number
+      totalCost: number
+      avgRepairMinutes: number
+    }
   >()
   for (const t of tickets.filter((x) => x.contractorId && x.contractor)) {
-    const key = t.contractorId!
     const repairMins =
-      t.repairStartedAt && t.closedAt ? downtimeMinutes(t.repairStartedAt, t.closedAt) : t.downtimeMinutes ?? 0
+      t.repairStartedAt && (t.repairEndedAt ?? t.closedAt)
+        ? downtimeMinutes(t.repairStartedAt, (t.repairEndedAt ?? t.closedAt)!)
+        : t.downtimeMinutes ?? 0
+    const key = t.contractorId!
     const cur = contractors.get(key) ?? {
       contractorId: key,
       code: t.contractor!.code,
       name: t.contractor!.name,
       jobs: 0,
+      closedJobs: 0,
       totalCost: 0,
       avgRepairMinutes: 0,
     }
     cur.jobs += 1
+    if (t.status === 'CLOSED') cur.closedJobs += 1
     cur.totalCost += Number(t.totalCost)
     cur.avgRepairMinutes += repairMins
     contractors.set(key, cur)
@@ -664,6 +783,27 @@ export async function getReports(tenantId: string, query: ReportQuery) {
   for (const c of contractors.values()) {
     c.avgRepairMinutes = c.jobs ? Math.round(c.avgRepairMinutes / c.jobs) : 0
   }
+
+  const productionImpactByMachine = [...byMachine.values()]
+    .map((m) => {
+      const mt = tickets.filter((t) => t.machineId === m.machineId)
+      const affectedWos = new Set(mt.map((t) => t.workOrderId).filter(Boolean))
+      const affectedJcs = new Set(mt.map((t) => t.jobCardId).filter(Boolean))
+      const productionDowntime = mt
+        .filter((t) => t.workOrderId || t.jobCardId)
+        .reduce((s, t) => s + (t.downtimeMinutes ?? 0), 0)
+      return {
+        machineId: m.machineId,
+        code: m.code,
+        name: m.name,
+        breakdowns: m.breakdowns,
+        affectedWorkOrders: affectedWos.size,
+        affectedJobCards: affectedJcs.size,
+        productionDowntimeMinutes: productionDowntime,
+      }
+    })
+    .filter((r) => r.affectedWorkOrders > 0 || r.affectedJobCards > 0)
+    .sort((a, b) => b.productionDowntimeMinutes - a.productionDowntimeMinutes)
 
   return {
     summary: {
@@ -674,6 +814,7 @@ export async function getReports(tenantId: string, query: ReportQuery) {
     downtimeByMachine: [...byMachine.values()].sort((a, b) => b.downtimeMinutes - a.downtimeMinutes),
     costByMachine: [...byMachine.values()].sort((a, b) => b.cost - a.cost),
     breakdownFrequency: [...byMachine.values()].sort((a, b) => b.breakdowns - a.breakdowns),
+    productionImpactByMachine,
     contractors: [...contractors.values()],
     tickets: tickets.map((t) => ({
       id: t.id,
@@ -682,10 +823,95 @@ export async function getReports(tenantId: string, query: ReportQuery) {
       machineName: t.machine.name,
       status: t.status,
       failureCategory: t.failureCategory,
+      sourceType: t.sourceType,
+      ticketKind: t.sourceType === 'PREVENTIVE' ? 'PREVENTIVE' : 'BREAKDOWN',
       downtimeMinutes: t.downtimeMinutes,
       totalCost: Number(t.totalCost),
       reportedAt: t.reportedAt,
       closedAt: t.closedAt,
+      workOrderId: t.workOrderId,
+      jobCardId: t.jobCardId,
+      jobCardCode: t.jobCardCode,
+      operationCode: t.operationCode,
+      operationName: t.operationName,
+      rootCause: t.rootCause,
+      repairAction: t.repairAction,
+      repairMinutes:
+        t.repairStartedAt && (t.repairEndedAt ?? t.closedAt)
+          ? downtimeMinutes(t.repairStartedAt, (t.repairEndedAt ?? t.closedAt)!)
+          : null,
     })),
+    pmCompliance: await (async () => {
+      const { getPmCompliance } = await import('./pm.service.js')
+      return getPmCompliance(tenantId, {
+        from: query.from,
+        to: query.to,
+        machineId: query.machineId,
+        workCentreId: query.workCentreId,
+      })
+    })(),
   }
+}
+
+/** Active (non-closed) ticket for a machine — Manufacturing banner. */
+export async function getActiveTicketForMachine(tenantId: string, machineId: string) {
+  const open = await repo.findOpenTicketForMachine(tenantId, machineId)
+  if (!open) return null
+  return getTicket(tenantId, open.id)
+}
+
+/** Link a shortage part line to a Purchase Requisition (backlink). */
+export async function linkPartToPurchaseRequisition(
+  req: Request,
+  tenantId: string,
+  ticketId: string,
+  input: { partId: string; purchaseRequisitionId: string },
+) {
+  const userId = req.context?.userId ?? ''
+  const ticket = await repo.getTicket(tenantId, ticketId)
+  const part = ticket.parts.find((p) => p.id === input.partId)
+  if (!part) throw new ValidationError('Part line not found on ticket')
+
+  const pr = await prisma.purchaseRequisition.findFirst({
+    where: { id: input.purchaseRequisitionId, tenantId, deletedAt: null },
+    select: { id: true, requisitionNumber: true, sourceType: true, sourceId: true },
+  })
+  if (!pr) throw new ValidationError('Purchase requisition not found')
+
+  await prisma.$transaction(async (tx) => {
+    await tx.maintenancePart.update({
+      where: { id: part.id },
+      data: { purchaseRequisitionId: pr.id, updatedBy: userId || null },
+    })
+    // Stamp PR source if not already set
+    if (!pr.sourceType || !pr.sourceId) {
+      await tx.purchaseRequisition.update({
+        where: { id: pr.id },
+        data: {
+          sourceType: 'MAINTENANCE',
+          sourceId: ticketId,
+          sourceDocumentNumber: ticket.ticketNumber,
+          updatedById: userId || null,
+        },
+      })
+    }
+    // Put ticket in waiting-for-part when linking shortage PR
+    if (ticket.status !== 'WAITING_FOR_PART' && !['CLOSED', 'CANCELLED'].includes(ticket.status)) {
+      await tx.maintenanceTicket.update({
+        where: { id: ticketId },
+        data: {
+          status: 'WAITING_FOR_PART',
+          holdReason: `Waiting for part via ${pr.requisitionNumber}`,
+          updatedBy: userId || null,
+        },
+      })
+    }
+  })
+
+  await audit(req, tenantId, ticketId, 'LINK_PART_PR', ticket, {
+    partId: part.id,
+    purchaseRequisitionId: pr.id,
+    requisitionNumber: pr.requisitionNumber,
+  })
+  return getTicket(tenantId, ticketId)
 }

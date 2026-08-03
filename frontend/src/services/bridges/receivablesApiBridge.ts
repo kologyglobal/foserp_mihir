@@ -751,6 +751,35 @@ export async function prefillInvoiceFromDispatch(
   throw new Error('Invoice prefill from dispatch requires API mode')
 }
 
+export async function listCrmPendingTaxInvoices(params?: {
+  companyId?: string
+  search?: string
+  page?: number
+  limit?: number
+}): Promise<import('@/types/moneyIn').CrmPendingTaxInvoiceDto[]> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.listCrmPendingTaxInvoices(params))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  return []
+}
+
+export async function prefillInvoiceFromCrmTaxInvoice(
+  crmTaxInvoiceId: string,
+): Promise<import('@/types/moneyIn').InvoicePrefillFromCrmTaxInvoiceDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.prefillInvoiceFromCrmTaxInvoice(crmTaxInvoiceId))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  throw new Error('Invoice prefill from CRM tax invoice requires API mode')
+}
+
 // ─── AR disputes (Wave 5) ───────────────────────────────────────────────────
 
 export async function listArDisputes(

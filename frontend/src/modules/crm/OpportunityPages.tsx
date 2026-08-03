@@ -21,15 +21,13 @@ import {
   CrmActivitiesPanel,
   QuickFollowUpDrawer,
   LogActivityDrawer,
+  CrmWorkspaceViewToggle,
 } from '../../components/crm'
 import { CrmOpportunitiesTable } from '../../components/crm/CrmOpportunitiesTable'
-import type { EnterpriseKpiItem } from '../../design-system/enterprise/enterpriseKpiTypes'
-import { formatCompactCurrency } from '../../utils/formatters/currency'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { exportRowsToCsv } from '../../utils/exportCsv'
 import { runCrmExport } from '../../utils/crmServerExport'
 import { opportunityStageLabel, sortOpportunities, hasActiveOpportunityFilters, type OpportunitySortKey } from '../../utils/opportunityUtils'
-import { KPI_ICON_PRESETS } from '../../design-system/enterprise'
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
 import { crmModuleBreadcrumbs } from '../../utils/crmNavigation'
 import { CrmDeleteConfirmModal } from '../../components/crm/CrmDeleteConfirmModal'
@@ -228,61 +226,6 @@ export function OpportunityPipelinePage() {
     [filtered, sortBy],
   )
 
-  const kpis = useMemo(() => {
-    const open = opportunities.filter((o) => o.status === 'open')
-    const won = opportunities.filter((o) => o.stage === 'won')
-    const pipeline = open.reduce((s, o) => s + o.value, 0)
-    const weighted = open.reduce((s, o) => s + o.value * (o.probability / 100), 0)
-    const winRate = opportunities.length > 0 ? Math.round((won.length / opportunities.length) * 100) : 0
-    return { total: opportunities.length, open: open.length, pipeline, weighted, winRate }
-  }, [opportunities])
-
-  const oppKpiStrip = useMemo<EnterpriseKpiItem[]>(
-    () => [
-      {
-        id: 'open',
-        label: 'Open Deals',
-        value: kpis.open,
-        icon: KPI_ICON_PRESETS.open,
-        accent: 'blue' as const,
-        context: `${formatCompactCurrency(kpis.pipeline)} pipeline`,
-        trend: { direction: 'up' as const, label: `${kpis.open} active`, tone: 'positive' as const },
-        updatedAt: Date.now(),
-      },
-      {
-        id: 'pipeline',
-        label: 'Pipeline Value',
-        value: formatCompactCurrency(kpis.pipeline),
-        icon: KPI_ICON_PRESETS.pipeline,
-        accent: 'green' as const,
-        context: `${kpis.open} open opportunities`,
-        updatedAt: Date.now(),
-      },
-      {
-        id: 'weighted',
-        label: 'Weighted Forecast',
-        value: formatCompactCurrency(kpis.weighted),
-        icon: KPI_ICON_PRESETS.revenue,
-        accent: 'amber' as const,
-        context: 'Probability-adjusted',
-        updatedAt: Date.now(),
-      },
-      {
-        id: 'win-rate',
-        label: 'Win Rate',
-        value: `${kpis.winRate}%`,
-        icon: KPI_ICON_PRESETS.qualified,
-        accent: 'slate' as const,
-        context: `${kpis.total} total deals`,
-        trend: kpis.winRate >= 30
-          ? { direction: 'up' as const, label: 'Healthy', tone: 'positive' as const }
-          : { direction: 'flat' as const, label: 'Monitor', tone: 'neutral' as const },
-        updatedAt: Date.now(),
-      },
-    ],
-    [kpis],
-  )
-
   function openOpportunityPreview(opp: Opportunity) {
     const customer = customers.find((c) => c.id === opp.customerId)
     openDetailPanel({
@@ -376,23 +319,12 @@ export function OpportunityPipelinePage() {
   }
 
   const viewToggle = (
-    <div className="crm-opp-view-toggle" role="group" aria-label="Pipeline view">
-      {VIEW_TABS.map((tab) => {
-        const Icon = tab.icon
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            aria-pressed={view === tab.id}
-            title={tab.label}
-            onClick={() => setView(tab.id)}
-          >
-            <Icon className="crm-opp-view-toggle__icon" aria-hidden />
-            <span className="crm-opp-view-toggle__label">{tab.label}</span>
-          </button>
-        )
-      })}
-    </div>
+    <CrmWorkspaceViewToggle
+      tabs={VIEW_TABS}
+      value={view}
+      onChange={setView}
+      ariaLabel="Pipeline view"
+    />
   )
 
   return (
@@ -455,7 +387,6 @@ export function OpportunityPipelinePage() {
             )}
           />
         ) : undefined}
-        kpiStrip={oppKpiStrip}
       >
         <div className="crm-opp-workspace">
           {view === 'kanban' ? (

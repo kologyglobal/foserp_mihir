@@ -45,6 +45,8 @@ export interface SalesOrder {
   id: string
   salesOrderNo: string
   customerId: string
+  /** Resolved server-side from CRM company (list/detail DTO). */
+  customerName?: string | null
   productId: string
   itemId?: string | null
   qty: number

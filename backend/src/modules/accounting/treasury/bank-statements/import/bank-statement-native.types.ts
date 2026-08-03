@@ -4,7 +4,7 @@ import type {
   NormalisedStatementLine,
 } from '../bank-statement.types.js'
 
-export type StructuredBankStatementFormat = 'MT940' | 'CAMT_053'
+export type StructuredBankStatementFormat = 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054'
 
 export interface NativeStatementParseResult {
   format: StructuredBankStatementFormat
@@ -16,5 +16,10 @@ export interface NativeStatementParseResult {
 export function isStructuredImportFormat(
   format: string,
 ): format is StructuredBankStatementFormat {
-  return format === 'MT940' || format === 'CAMT_053'
+  return (
+    format === 'MT940' ||
+    format === 'CAMT_053' ||
+    format === 'CAMT_052' ||
+    format === 'CAMT_054'
+  )
 }

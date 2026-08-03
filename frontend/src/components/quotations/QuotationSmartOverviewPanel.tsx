@@ -8,6 +8,7 @@ import {
   type QuotationSmartOverviewInput,
 } from '@/utils/quotationSmartOverview'
 import type { CrmSmartNextAction } from '@/components/crm/CrmSmartOverviewPanel'
+import { quotationRevisionLabel } from '@/utils/quotationEngine/revisionLabels'
 
 export interface QuotationSmartOverviewPanelProps {
   input: QuotationSmartOverviewInput
@@ -78,7 +79,7 @@ export function QuotationSmartOverviewPanel({
   }
 
   const contextLine = [
-    `R${revisionNo}`,
+    quotationRevisionLabel(revisionNo),
     input.ownerName?.trim() || 'Unassigned',
   ].join(' · ')
 

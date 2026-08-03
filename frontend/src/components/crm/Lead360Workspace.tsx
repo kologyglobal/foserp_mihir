@@ -656,6 +656,19 @@ export function Lead360Workspace() {
           designation={contactDesignation}
           lastActivityAt={lastActivity?.activityDate ?? currentLead.modifiedAt ?? null}
           lastActivityLabel={lastActivity?.subject ?? null}
+          recentFeedItems={unifiedFeedItems}
+          onLogActivity={
+            canAddActivity
+              ? () => {
+                  setEditingActivity(null)
+                  setLogActivityOpen(true)
+                }
+              : undefined
+          }
+          onViewAllActivities={() => {
+            if (!showAdditionalDetails) setShowAdditionalDetails(true)
+            selectAdditionalSection('activities')
+          }}
         />
 
         <ErpAdditionalInfoToggle

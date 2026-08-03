@@ -1,4 +1,29 @@
 import type { QuotationPriceLine } from '../types/crm'
+import {
+  adjustmentsFromDocumentFields,
+  calcOrderDocumentTotals,
+  type OrderDocumentTotals,
+} from './orderAdjustmentsCalc'
+
+export type QuotationChargeDocFields = {
+  freightAmount?: number | null
+  installationAmount?: number | null
+  customCharges?: number | null
+  orderDiscountCalcType?: string | null
+  orderDiscountValue?: number | null
+  freightCalcType?: string | null
+  freightValue?: number | null
+  freightIsTaxable?: boolean | null
+  freightTaxRate?: number | null
+  installationCalcType?: string | null
+  installationValue?: number | null
+  installationIsTaxable?: boolean | null
+  installationTaxRate?: number | null
+  customChargesCalcType?: string | null
+  customChargesValue?: number | null
+  customChargesIsTaxable?: boolean | null
+  customChargesTaxRate?: number | null
+}
 
 export function calcLineTotal(line: Pick<QuotationPriceLine, 'qty' | 'unitPrice' | 'discountPct' | 'taxPct'>): number {
   const base = line.qty * line.unitPrice * (1 - line.discountPct / 100)
@@ -6,30 +31,60 @@ export function calcLineTotal(line: Pick<QuotationPriceLine, 'qty' | 'unitPrice'
   return Math.round((base + tax) * 100) / 100
 }
 
+/**
+ * Document price summary — shared order-adjustment rules (flat/%, taxable charges).
+ * Prefer passing full document charge fields; amount-only args remain for legacy call sites.
+ */
 export function calcPriceSummary(
   lines: QuotationPriceLine[],
-  freightAmount: number,
-  installationAmount: number,
-  customCharges: number,
-) {
-  const basicAmount = lines.reduce((s, l) => s + l.qty * l.unitPrice, 0)
-  const discountAmount = lines.reduce((s, l) => s + l.qty * l.unitPrice * (l.discountPct / 100), 0)
-  const taxableValue = basicAmount - discountAmount
-  const gstAmount = lines.reduce((s, l) => {
-    const base = l.qty * l.unitPrice * (1 - l.discountPct / 100)
-    return s + base * (l.taxPct / 100)
-  }, 0)
-  const grandTotal = Math.round((taxableValue + gstAmount + freightAmount + installationAmount + customCharges) * 100) / 100
+  freightAmount: number | QuotationChargeDocFields = 0,
+  installationAmount = 0,
+  customCharges = 0,
+  moreFields?: QuotationChargeDocFields,
+): ReturnType<typeof toLegacySummary> {
+  const fields: QuotationChargeDocFields =
+    typeof freightAmount === 'object' && freightAmount !== null
+      ? freightAmount
+      : {
+          freightAmount,
+          installationAmount,
+          customCharges,
+          ...moreFields,
+        }
+
+  const totals = calcOrderDocumentTotals(
+    (lines ?? []).map((l) => ({
+      qty: l.qty,
+      unitPrice: l.unitPrice,
+      discountPct: l.discountPct,
+      taxPct: l.taxPct,
+    })),
+    adjustmentsFromDocumentFields(fields),
+  )
+  return toLegacySummary(totals)
+}
+
+function toLegacySummary(totals: OrderDocumentTotals) {
   return {
-    basicAmount: Math.round(basicAmount * 100) / 100,
-    discountAmount: Math.round(discountAmount * 100) / 100,
-    taxableValue: Math.round(taxableValue * 100) / 100,
-    gstAmount: Math.round(gstAmount * 100) / 100,
-    freightAmount,
-    installationAmount,
-    customCharges,
-    grandTotal,
+    basicAmount: totals.basicAmount,
+    discountAmount: totals.itemDiscountAmount,
+    taxableValue: totals.taxableAmount,
+    gstAmount: totals.gstAmount,
+    freightAmount: totals.freightAmount,
+    installationAmount: totals.installationAmount,
+    customCharges: totals.customCharges,
+    grandTotal: totals.grandTotal,
+    orderDiscountAmount: totals.orderDiscount.calculatedAmount,
+    discountedTaxableAmount: totals.discountedTaxableAmount,
+    totals,
   }
+}
+
+export function calcPriceSummaryFromDocument(
+  lines: QuotationPriceLine[],
+  doc: QuotationChargeDocFields,
+) {
+  return calcPriceSummary(lines, doc)
 }
 
 export function syncLineTotals(lines: QuotationPriceLine[]): QuotationPriceLine[] {

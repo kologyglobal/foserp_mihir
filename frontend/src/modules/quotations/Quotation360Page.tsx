@@ -31,6 +31,7 @@ import {
   QuotationRevisionHistory,
   QuotationWorkflowStepper,
   QuotationCommercialSummary,
+  QuotationCommercialTermsBlock,
   QuotationSectionList,
   quotationStatusLabel,
   quotationRevisionLabel,
@@ -738,6 +739,7 @@ export function Quotation360Page() {
                     freightAmount={quoDoc.freightAmount}
                     installationAmount={quoDoc.installationAmount}
                     customCharges={quoDoc.customCharges}
+                    documentExtras={quoDoc}
                     probability={opportunity?.probability ?? 0}
                     readOnly
                     showFreightExtras
@@ -746,6 +748,7 @@ export function Quotation360Page() {
                 ),
                 commercial: (
                   <div className="space-y-4">
+                    <QuotationCommercialTermsBlock quotation={quo} document={quoDoc} />
                     <QuotationCommercialSummary document={quoDoc} />
                     {(quoDoc.commercialNotes || quoDoc.technicalNotes) ? (
                       <div className="grid gap-4 lg:grid-cols-2">

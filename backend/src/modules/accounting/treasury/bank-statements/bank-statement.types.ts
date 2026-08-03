@@ -107,6 +107,11 @@ export interface NormalisedStatementLine {
   rawPayload?: Record<string, unknown>
 }
 
+export type BankStatementDocumentType =
+  | 'END_OF_DAY_STATEMENT'
+  | 'INTRADAY_REPORT'
+  | 'DEBIT_CREDIT_NOTIFICATION'
+
 export interface NormalisedStatementHeader {
   statementReference: string
   statementDate: Date
@@ -117,6 +122,13 @@ export interface NormalisedStatementHeader {
   totalCreditAmount: string
   totalDebitAmount: string
   balanceDifference: string
+  /** Defaults to END_OF_DAY_STATEMENT for tabular/MT940 imports. */
+  documentType?: BankStatementDocumentType
+  hasOpeningBalance?: boolean
+  hasClosingBalance?: boolean
+  externalStatementId?: string | null
+  accountCurrency?: string | null
+  isProvisional?: boolean
 }
 
 export interface ImportIssueInput {

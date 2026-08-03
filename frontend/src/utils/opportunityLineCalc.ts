@@ -5,6 +5,16 @@ import { PRODUCT_FAMILY_LABELS } from '../types/productMaster'
 import { useMasterStore } from '../store/masterStore'
 import { canUseItemInSales } from './opportunityItemOptions'
 import { assertProductSellableForSales } from './productMaster'
+import {
+  isEncodedLeadRequirementPayload,
+  opportunityRequirementDisplay,
+  sanitizeOpportunityLines,
+} from './leadRequirementLines'
+import {
+  calcOrderDocumentTotals,
+  type AdjustmentCalcType,
+  type OrderDocumentTotals,
+} from './orderAdjustmentsCalc'
 
 export function taxCategoryToPct(tax: TaxCategory | string | undefined): number {
   if (tax === 'gst_12') return 12
@@ -67,16 +77,33 @@ export function calcOpportunityLinesSummary(lines: OpportunityLine[]): Opportuni
 
 export type OrderDiscountMode = 'flat' | 'percent'
 
+export type ChargeAdjustmentInput = {
+  calculationType?: AdjustmentCalcType | OrderDiscountMode
+  /** Flat amount or percentage (0–100). */
+  value?: number
+  isTaxable?: boolean
+  taxRate?: number
+}
+
 export interface ProductPricingAdjustments {
+  /** @deprecated Prefer freight.value + freight.calculationType */
   freightAmount?: number
   orderDiscountMode?: OrderDiscountMode
   orderDiscountInput?: number
-  /** Quotation extras that add to grand total (legacy charges). */
+  /** @deprecated Prefer installation.value */
   installationAmount?: number
+  /** @deprecated Prefer otherCharges / customCharges input */
   customCharges?: number
+  freight?: ChargeAdjustmentInput
+  installation?: ChargeAdjustmentInput
+  otherCharges?: ChargeAdjustmentInput
 }
 
 export interface ProductPricingSummary extends OpportunityLinesSummary {
+  /** Taxable before overall (order/header) discount — same as line sum after line discounts. */
+  taxableBeforeOverallDiscount: number
+  /** Taxable after overall discount (base for GST). */
+  taxableAfterOverallDiscount: number
   subtotal: number
   totalLineDiscount: number
   gstByRate: Map<number, number>
@@ -85,47 +112,194 @@ export interface ProductPricingSummary extends OpportunityLinesSummary {
   orderDiscountAmount: number
   installationAmount: number
   customCharges: number
+  orderTotals: OrderDocumentTotals
+}
+
+function modeToCalcType(mode: OrderDiscountMode | AdjustmentCalcType | undefined): AdjustmentCalcType {
+  if (!mode) return 'FLAT'
+  if (mode === 'percent' || mode === 'PERCENTAGE') return 'PERCENTAGE'
+  return 'FLAT'
+}
+
+function chargeSpec(
+  partial: ChargeAdjustmentInput | undefined,
+  legacyAmount: number | undefined,
+): { calculationType: AdjustmentCalcType; value: number; isTaxable: boolean; taxRate?: number } {
+  const calculationType = modeToCalcType(partial?.calculationType)
+  const value =
+    partial?.value != null && Number.isFinite(partial.value)
+      ? partial.value
+      : legacyAmount ?? 0
+  return {
+    calculationType,
+    value,
+    isTaxable: Boolean(partial?.isTaxable),
+    taxRate: partial?.taxRate,
+  }
 }
 
 function round2(n: number) {
   return Math.round(n * 100) / 100
 }
 
-/** Line totals + freight / order discount / optional quotation extras (Sales Order–style). */
+/**
+ * Document / order / overall discount — applied **only** to taxable amount (pre-tax).
+ * Never on grand total or tax-inclusive totals.
+ *
+ * Grand total = (taxable − overall discount) + GST(on revised taxable) + non-tax charges.
+ */
+export function computeOverallDiscountAmount(
+  taxableBeforeOverall: number,
+  mode: OrderDiscountMode,
+  discountInput: number,
+): number {
+  const taxable = Math.max(0, round2(taxableBeforeOverall))
+  const input = Math.max(0, discountInput)
+  if (taxable <= 0 || input <= 0) return 0
+  if (mode === 'percent') {
+    return round2(taxable * (Math.min(100, input) / 100))
+  }
+  return round2(Math.min(input, taxable))
+}
+
+/**
+ * Recompute GST by rate after reducing taxable proportionally (multi-rate safe).
+ * Remainder of overall discount is applied on the last positive-taxable line so totals stay exact.
+ */
+export function applyOverallDiscountToLines(
+  lines: OpportunityLine[],
+  orderDiscountAmount: number,
+): {
+  taxableAfter: number
+  gstAmount: number
+  gstByRate: Map<number, number>
+  discountedLines: Array<OpportunityLine & { overallDiscountShare: number }>
+} {
+  const synced = syncOpportunityLines(lines)
+  const taxableBefore = round2(synced.reduce((s, l) => s + l.taxableValue, 0))
+  const disc = round2(Math.min(Math.max(0, orderDiscountAmount), taxableBefore))
+
+  if (disc <= 0 || taxableBefore <= 0) {
+    const gstByRate = new Map<number, number>()
+    for (const line of synced) {
+      gstByRate.set(line.taxPct, round2((gstByRate.get(line.taxPct) ?? 0) + line.gstAmount))
+    }
+    return {
+      taxableAfter: taxableBefore,
+      gstAmount: round2(synced.reduce((s, l) => s + l.gstAmount, 0)),
+      gstByRate,
+      discountedLines: synced.map((l) => ({ ...l, overallDiscountShare: 0 })),
+    }
+  }
+
+  const eligible = synced.filter((l) => l.taxableValue > 0)
+  const last = eligible[eligible.length - 1]
+  let allocated = 0
+  const shares = new Map<string, number>()
+
+  for (const line of synced) {
+    if (!last || line.id === last.id || line.taxableValue <= 0) {
+      shares.set(line.id, 0)
+      continue
+    }
+    const share = round2(disc * (line.taxableValue / taxableBefore))
+    shares.set(line.id, share)
+    allocated = round2(allocated + share)
+  }
+  if (last) {
+    shares.set(last.id, round2(disc - allocated))
+  }
+
+  const gstByRate = new Map<number, number>()
+  let taxableAfter = 0
+  let gstAmount = 0
+  const discountedLines = synced.map((line) => {
+    const overallDiscountShare = shares.get(line.id) ?? 0
+    const taxableValue = round2(Math.max(0, line.taxableValue - overallDiscountShare))
+    const gstLine = round2(taxableValue * (line.taxPct / 100))
+    const lineTotal = round2(taxableValue + gstLine)
+    taxableAfter = round2(taxableAfter + taxableValue)
+    gstAmount = round2(gstAmount + gstLine)
+    gstByRate.set(line.taxPct, round2((gstByRate.get(line.taxPct) ?? 0) + gstLine))
+    return {
+      ...line,
+      overallDiscountShare,
+      taxableValue,
+      gstAmount: gstLine,
+      lineTotal,
+    }
+  })
+
+  // Keep summed taxable exact to (before − disc)
+  const expectedTaxable = round2(taxableBefore - disc)
+  if (Math.abs(taxableAfter - expectedTaxable) >= 0.01 && discountedLines.length) {
+    const dust = round2(expectedTaxable - taxableAfter)
+    const target = discountedLines[discountedLines.length - 1]!
+    target.taxableValue = round2(target.taxableValue + dust)
+    target.gstAmount = round2(target.taxableValue * (target.taxPct / 100))
+    target.lineTotal = round2(target.taxableValue + target.gstAmount)
+    taxableAfter = expectedTaxable
+    gstAmount = round2(discountedLines.reduce((s, l) => s + l.gstAmount, 0))
+    gstByRate.clear()
+    for (const line of discountedLines) {
+      gstByRate.set(line.taxPct, round2((gstByRate.get(line.taxPct) ?? 0) + line.gstAmount))
+    }
+  }
+
+  return { taxableAfter, gstAmount, gstByRate, discountedLines }
+}
+
+/** Line totals + freight / overall discount / charge adjustments (shared orderAdjustmentsCalc). */
 export function calcProductPricingSummary(
   lines: OpportunityLine[],
   adjustments: ProductPricingAdjustments = {},
 ): ProductPricingSummary {
   const base = calcOpportunityLinesSummary(lines)
-  const synced = syncOpportunityLines(lines)
-  const gstByRate = new Map<number, number>()
-  for (const line of synced) {
-    gstByRate.set(line.taxPct, round2((gstByRate.get(line.taxPct) ?? 0) + line.gstAmount))
-  }
-  const freightAmount = Math.max(0, adjustments.freightAmount ?? 0)
-  const installationAmount = Math.max(0, adjustments.installationAmount ?? 0)
-  const customCharges = Math.max(0, adjustments.customCharges ?? 0)
   const mode = adjustments.orderDiscountMode ?? 'flat'
   const discountInput = Math.max(0, adjustments.orderDiscountInput ?? 0)
-  const discountBase = round2(base.taxableAmount + base.gstAmount)
-  const orderDiscountAmount =
-    mode === 'percent'
-      ? round2(discountBase * (Math.min(100, discountInput) / 100))
-      : round2(Math.min(discountInput, discountBase + freightAmount + installationAmount + customCharges))
-  const grandTotal = round2(
-    base.taxableAmount + base.gstAmount + freightAmount + installationAmount + customCharges - orderDiscountAmount,
+  const freight = chargeSpec(adjustments.freight, adjustments.freightAmount)
+  const installation = chargeSpec(adjustments.installation, adjustments.installationAmount)
+  const otherCharges = chargeSpec(adjustments.otherCharges, adjustments.customCharges)
+
+  const orderTotals = calcOrderDocumentTotals(
+    lines.map((l) => ({
+      qty: l.qty,
+      unitPrice: l.unitPrice,
+      discountPct: l.discountPct,
+      taxPct: l.taxPct,
+    })),
+    {
+      orderDiscount: {
+        calculationType: modeToCalcType(mode),
+        value: discountInput,
+      },
+      freight,
+      installation,
+      otherCharges,
+    },
   )
+
+  const gstByRate = new Map<number, number>()
+  for (const row of orderTotals.gstByRate) {
+    gstByRate.set(row.rate, row.amount)
+  }
+
   return {
     ...base,
-    subtotal: base.taxableAmount,
-    totalLineDiscount: base.totalDiscount,
+    taxableAmount: orderTotals.discountedTaxableAmount,
+    gstAmount: orderTotals.gstAmount,
+    grandTotal: orderTotals.grandTotal,
+    taxableBeforeOverallDiscount: orderTotals.taxableAmount,
+    taxableAfterOverallDiscount: orderTotals.discountedTaxableAmount,
+    subtotal: orderTotals.taxableAmount,
+    totalLineDiscount: orderTotals.itemDiscountAmount,
     gstByRate,
-    totalGst: base.gstAmount,
-    freightAmount,
-    orderDiscountAmount,
-    installationAmount,
-    customCharges,
-    grandTotal,
+    totalGst: orderTotals.gstAmount,
+    freightAmount: orderTotals.freightAmount,
+    orderDiscountAmount: orderTotals.orderDiscount.calculatedAmount,
+    installationAmount: orderTotals.installationAmount,
+    customCharges: orderTotals.customCharges,
+    orderTotals,
   }
 }
 
@@ -354,14 +528,25 @@ export function validateOpportunityLines(
 
 /** Resolve lines for legacy opportunities without stored lines */
 export function resolveOpportunityLines(opportunity: Opportunity, product?: Product): OpportunityLine[] {
-  if (opportunity.lines?.length) return syncOpportunityLines(opportunity.lines)
+  if (opportunity.lines?.length) {
+    const cleaned = sanitizeOpportunityLines(opportunity.lines, opportunity.productRequirement)
+    if (cleaned.length) return cleaned
+  }
+
+  if (isEncodedLeadRequirementPayload(opportunity.productRequirement)) {
+    const hydrated = sanitizeOpportunityLines([], opportunity.productRequirement)
+    if (hydrated.length) return hydrated
+  }
+
   if (!opportunity.productId && !opportunity.value) return []
+  const displayReq =
+    opportunityRequirementDisplay(opportunity.productRequirement) || opportunity.opportunityName
   return syncOpportunityLines([
     createEmptyOpportunityLine(1, {
       productId: opportunity.productId,
-      productOrItem: product?.productName ?? (opportunity.productRequirement || opportunity.opportunityName),
+      productOrItem: product?.productName ?? displayReq,
       itemCode: product?.productCode ?? '',
-      description: opportunity.productRequirement || opportunity.opportunityName,
+      description: displayReq,
       productFamily: product ? (PRODUCT_FAMILY_LABELS[product.productFamily] ?? product.productFamily) : '',
       qty: 1,
       unitPrice: opportunity.value > 0 ? Math.round(opportunity.value / 1.18) : 0,
@@ -385,7 +570,7 @@ export function getOpportunityItemSummary(opportunity: Opportunity, product?: Pr
 }
 
 export function opportunityLinesToQuotationPriceLines(lines: OpportunityLine[]) {
-  return syncOpportunityLines(lines).map((l) => ({
+  return sanitizeOpportunityLines(lines).map((l) => ({
     id: `pl-${l.id}`,
     productOrItem: l.productOrItem,
     description: l.description,
@@ -405,7 +590,7 @@ export function opportunityLinesToQuotationPriceLines(lines: OpportunityLine[]) 
 
 /** Map quotation price lines back to opportunity line shape for ErpLineItemsGrid editing. */
 export function quotationPriceLinesToOpportunityLines(priceLines: QuotationPriceLine[]): OpportunityLine[] {
-  return syncOpportunityLines(
+  return sanitizeOpportunityLines(
     priceLines.map((l, idx) => ({
       id: l.id.startsWith('pl-') ? l.id.slice(3) : `qpl-${l.id}`,
       lineNo: idx + 1,

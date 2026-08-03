@@ -8,6 +8,7 @@ import { useOpenOpportunities } from '../../hooks/useStableStoreData'
 import { useMasterStore } from '../../store/masterStore'
 import { opportunityStageLabel } from '../../utils/opportunityUtils'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
+import { quotationRevisionLabel } from '../../utils/quotationEngine/revisionLabels'
 import { normalizeLead } from '../../utils/leadUtils'
 import { getSessionUser } from '../../utils/permissions'
 import { MobilePageTitle } from '../../components/mobile'
@@ -135,7 +136,7 @@ export function MobileCrmQuotationsPage() {
           >
             <p className="font-medium">{salesNo}</p>
             <p className="text-sm text-muted-foreground capitalize">
-              Rev {doc.revisionNo} · {doc.status.replace(/_/g, ' ')} · {formatCrmCurrency(doc.totalAmount)}
+              {quotationRevisionLabel(doc.revisionNo)} · {doc.status.replace(/_/g, ' ')} · {formatCrmCurrency(doc.totalAmount)}
             </p>
           </button>
         ))

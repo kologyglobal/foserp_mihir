@@ -173,23 +173,34 @@ export function parseDecimal(value: string | number | null | undefined): number 
 }
 
 export const IMPORT_FORMAT_LABELS: Record<
-  'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'AUTO_DETECT',
+  'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054' | 'AUTO_DETECT',
   string
 > = {
   CSV: 'CSV',
   XLSX: 'Excel (XLSX)',
   MT940: 'SWIFT MT940',
   CAMT_053: 'ISO 20022 CAMT.053',
+  CAMT_052: 'ISO 20022 CAMT.052 (intraday)',
+  CAMT_054: 'ISO 20022 CAMT.054 (notification)',
   AUTO_DETECT: 'Auto-detect',
 }
 
 export const IMPORT_FILE_ACCEPT =
   '.csv,.xlsx,.xls,.sta,.mt940,.txt,.xml'
 
+export const DOCUMENT_TYPE_LABELS: Record<
+  'END_OF_DAY_STATEMENT' | 'INTRADAY_REPORT' | 'DEBIT_CREDIT_NOTIFICATION',
+  string
+> = {
+  END_OF_DAY_STATEMENT: 'End-of-day',
+  INTRADAY_REPORT: 'Intraday',
+  DEBIT_CREDIT_NOTIFICATION: 'Debit/credit notification',
+}
+
 export function isStructuredImportFormat(
   format: string,
-): format is 'MT940' | 'CAMT_053' {
-  return format === 'MT940' || format === 'CAMT_053'
+): format is 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054' {
+  return format === 'MT940' || format === 'CAMT_053' || format === 'CAMT_052' || format === 'CAMT_054'
 }
 
 export function formatNeedsColumnMapping(format: string): boolean {
@@ -198,14 +209,25 @@ export function formatNeedsColumnMapping(format: string): boolean {
 
 export function inferImportFormat(
   fileName: string,
-): 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'AUTO_DETECT' | null {
+): 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054' | 'AUTO_DETECT' | null {
   const lower = fileName.toLowerCase()
   if (lower.endsWith('.csv')) return 'CSV'
   if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) return 'XLSX'
   if (lower.endsWith('.sta') || lower.endsWith('.mt940')) return 'MT940'
-  if (lower.endsWith('.xml')) return 'CAMT_053'
+  if (lower.includes('camt052') || lower.includes('camt.052')) return 'CAMT_052'
+  if (lower.includes('camt054') || lower.includes('camt.054')) return 'CAMT_054'
+  if (lower.endsWith('.xml')) return 'AUTO_DETECT'
   if (lower.endsWith('.txt')) return 'AUTO_DETECT'
   return null
+}
+
+export function formatBalanceDisplay(
+  amount: string | number | null | undefined,
+  hasBalance: boolean | null | undefined,
+): string {
+  if (hasBalance === false) return 'N/A'
+  if (amount == null || amount === '') return '—'
+  return String(amount)
 }
 
 export function defaultMappingForHeaders(headers: string[]) {

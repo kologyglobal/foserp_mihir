@@ -13,6 +13,7 @@ import {
   ShoppingCart,
   Tag,
   User,
+  Users,
   Warehouse,
   Wrench,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ export const SIDEBAR_ICON_MENU: {
   { categoryId: 'production', label: 'Manufacturing', icon: Factory },
   { categoryId: 'quality', label: 'Quality', icon: ShieldCheck },
   { categoryId: 'maintenance', label: 'Maintenance', icon: Wrench },
+  { categoryId: 'hrms', label: 'HRMS', icon: Users },
   { categoryId: 'inventory', label: 'Inventory & Warehouse', icon: Warehouse },
   { categoryId: 'dispatch', label: 'Logistics', icon: Box },
   { categoryId: 'gate', label: 'Gate & Security', icon: HardHat },
@@ -55,7 +57,7 @@ export const SIDEBAR_GROUPS = [
   {
     id: 'operations',
     label: 'Operations',
-    categoryIds: ['purchase', 'production', 'quality', 'maintenance', 'dispatch', 'gate', 'inventory'],
+    categoryIds: ['purchase', 'production', 'quality', 'maintenance', 'hrms', 'dispatch', 'gate', 'inventory'],
   },
   {
     id: 'engineering',

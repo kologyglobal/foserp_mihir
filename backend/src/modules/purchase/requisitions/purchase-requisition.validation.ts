@@ -65,6 +65,12 @@ export const createPurchaseRequisitionSchema = z.object({
     invalid_type_error: PURCHASE_ERROR_MESSAGES[PURCHASE_ERROR_CODE.PR_RFQ_REQUIRED_SELECTION],
   }).optional(),
   remarks: z.string().trim().optional().nullable(),
+  /** Originating module — e.g. MAINTENANCE */
+  sourceType: z.string().trim().max(40).optional().nullable(),
+  sourceId: z.string().uuid().optional().nullable(),
+  sourceDocumentNumber: z.string().trim().max(64).optional().nullable(),
+  /** When creating from maintenance shortage — link back to MaintenancePart */
+  maintenancePartId: z.string().uuid().optional().nullable(),
   lines: z.array(purchaseRequisitionLineInputSchema).optional().default([]),
 })
 

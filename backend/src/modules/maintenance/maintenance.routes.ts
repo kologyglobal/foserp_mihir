@@ -18,12 +18,16 @@ import { NotFoundError, ValidationError } from '../../utils/errors.js'
 import { prisma } from '../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../services/audit.service.js'
 import * as controller from './ticket.controller.js'
+import * as pmController from './pm.controller.js'
 import {
   addPartSchema,
   closeTicketSchema,
   createTicketSchema,
   holdTicketSchema,
+  linkPartPrSchema,
   listTicketsQuerySchema,
+  machineHealthQuerySchema,
+  activeTicketByMachineQuerySchema,
   MAX_MAINTENANCE_PHOTOS,
   reportQuerySchema,
   resumeTicketSchema,
@@ -31,6 +35,13 @@ import {
   testMachineSchema,
   updateRepairSchema,
 } from './ticket.schemas.js'
+import {
+  createPmPlanSchema,
+  createPmTicketSchema,
+  listPmPlansQuerySchema,
+  pmComplianceQuerySchema,
+  updatePmPlanSchema,
+} from './pm.schemas.js'
 
 const uploadRoot = process.env.MAINTENANCE_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'maintenance')
 
@@ -81,6 +92,77 @@ router.use(
 router.get('/dashboard', requirePermission('maintenance.view'), controller.dashboard)
 router.get('/reports', requirePermission('maintenance.report.view'), validateQuery(reportQuerySchema), controller.reports)
 router.get(
+  '/reports/pm-compliance',
+  requirePermission('maintenance.report.view'),
+  validateQuery(pmComplianceQuerySchema),
+  pmController.pmCompliance,
+)
+
+router.get(
+  '/preventive',
+  requirePermission('maintenance.view'),
+  validateQuery(listPmPlansQuerySchema),
+  pmController.listPlans,
+)
+router.post(
+  '/preventive',
+  requirePermission('maintenance.create'),
+  validateBody(createPmPlanSchema),
+  pmController.createPlan,
+)
+router.get(
+  '/preventive/:id',
+  validateParams(uuidParamSchema),
+  requirePermission('maintenance.view'),
+  pmController.getPlan,
+)
+router.patch(
+  '/preventive/:id',
+  validateParams(uuidParamSchema),
+  requirePermission('maintenance.update'),
+  validateBody(updatePmPlanSchema),
+  pmController.updatePlan,
+)
+router.post(
+  '/preventive/:id/deactivate',
+  validateParams(uuidParamSchema),
+  requirePermission('maintenance.update'),
+  pmController.deactivatePlan,
+)
+router.post(
+  '/preventive/:id/create-ticket',
+  validateParams(uuidParamSchema),
+  requirePermission('maintenance.create'),
+  validateBody(createPmTicketSchema),
+  pmController.createTicketFromPlan,
+)
+router.get(
+  '/machines/:machineId/preventive',
+  validateParams(machineHistoryParamsSchema),
+  requirePermission('maintenance.view'),
+  pmController.machinePlans,
+)
+
+router.get(
+  '/machine-health',
+  requirePermission('maintenance.view'),
+  validateQuery(machineHealthQuerySchema),
+  controller.machineHealth,
+)
+router.get(
+  '/machine-health/:machineId',
+  validateParams(machineHistoryParamsSchema),
+  requirePermission('maintenance.view'),
+  validateQuery(machineHealthQuerySchema),
+  controller.machineHealthDetail,
+)
+router.get(
+  '/active-ticket',
+  requirePermission('maintenance.view'),
+  validateQuery(activeTicketByMachineQuerySchema),
+  controller.activeTicketForMachine,
+)
+router.get(
   '/machines/:machineId/history',
   validateParams(machineHistoryParamsSchema),
   requirePermission('maintenance.view'),
@@ -124,6 +206,13 @@ router.post(
   requirePermission('maintenance.update'),
   validateBody(addPartSchema),
   controller.addPart,
+)
+router.post(
+  '/tickets/:id/link-part-pr',
+  validateParams(uuidParamSchema),
+  requirePermission('maintenance.update'),
+  validateBody(linkPartPrSchema),
+  controller.linkPartPr,
 )
 router.post(
   '/tickets/:id/test',

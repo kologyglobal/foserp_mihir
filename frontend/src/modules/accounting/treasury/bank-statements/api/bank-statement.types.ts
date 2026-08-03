@@ -23,8 +23,15 @@ export type BankStatementImportFormat =
   | 'XLSX'
   | 'MT940'
   | 'CAMT_053'
+  | 'CAMT_052'
+  | 'CAMT_054'
   | 'AUTO_DETECT'
   | 'MANUAL'
+
+export type BankStatementDocumentType =
+  | 'END_OF_DAY_STATEMENT'
+  | 'INTRADAY_REPORT'
+  | 'DEBIT_CREDIT_NOTIFICATION'
 export type BankStatementLineDirection = 'CREDIT' | 'DEBIT'
 export type BankStatementAmountMode = 'DEBIT_CREDIT_COLUMNS' | 'SIGNED_AMOUNT' | 'AMOUNT_WITH_DIRECTION'
 
@@ -135,8 +142,11 @@ export interface BankStatementListItem {
   periodStartDate: string
   periodEndDate: string
   currencyCode: string
+  documentType?: BankStatementDocumentType
   openingBalance: string
   closingBalance: string
+  hasOpeningBalance?: boolean
+  hasClosingBalance?: boolean
   totalCreditAmount: string
   totalDebitAmount: string
   balanceDifference: string
@@ -168,6 +178,9 @@ export interface BankStatementLineDto {
   counterpartyAccountMasked?: string | null
   runningBalance?: string | null
   matchStatus?: string
+  isProvisional?: boolean
+  isExcluded?: boolean
+  supersededByLineId?: string | null
 }
 
 export interface BankStatementDetail {
@@ -209,6 +222,10 @@ export interface ImportPreviewHeader {
   totalCreditAmount: string
   totalDebitAmount: string
   balanceDifference: string
+  documentType?: BankStatementDocumentType
+  hasOpeningBalance?: boolean
+  hasClosingBalance?: boolean
+  isProvisional?: boolean
 }
 
 export interface ImportPreviewResult {

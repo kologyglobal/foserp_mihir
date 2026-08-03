@@ -5,11 +5,15 @@ import type { Opportunity } from '../../types/crm'
 import { calcPriceSummary, syncLineTotals } from '../crmQuotationCalc'
 import { formatCurrency } from '../formatters/currency'
 import { amountInWordsINR } from './amountInWords'
-import { getActiveCompanyProfile } from './companyProfile'
-import { sectionContent } from '../crmIntegration'
+import { QUOTATION_COMPANY } from './companyProfile'
 import { formatDate } from '../dates/format'
 import { opportunityRequirementDisplay } from '../leadRequirementLines'
-import { useTenantProfileStore } from '../../store/tenantProfileStore'
+import {
+  buildQuotationCommercialFields,
+  daysBetweenDates,
+  formatQuotationCurrencyDisplay,
+  formatValidityPeriodLabel,
+} from './commercialTermsDisplay'
 
 export interface QuotationMergeContext {
   document: QuotationDocument
@@ -39,8 +43,13 @@ export const QUOTATION_PLACEHOLDERS = [
   'grand_total',
   'amount_in_words',
   'payment_terms',
+  'delivery_terms',
   'delivery_time',
   'validity_days',
+  'validity_date',
+  'validity_period',
+  'currency',
+  'commercial_validity',
   'authorized_person',
   'designation',
   'company_name',
@@ -60,18 +69,28 @@ function fmtMoney(n: number) {
 
 export function buildQuotationMergeMap(ctx: QuotationMergeContext): Record<QuotationPlaceholderKey, string> {
   const { document, quotation, customer, opportunity, contact, contactName } = ctx
-  const company = getActiveCompanyProfile()
   const lines = syncLineTotals(document.priceLines)
-  const freightAmount = useTenantProfileStore.getState().isServices() ? 0 : document.freightAmount
-  const summary = calcPriceSummary(lines, freightAmount, document.installationAmount, document.customCharges)
+  const summary = calcPriceSummary(lines, document)
   const primary = lines.find((l) => !l.isOptional) ?? lines[0]
-  const payment = sectionContent(document, 'payment')
-  const delivery = sectionContent(document, 'delivery')
-  const validityMatch = sectionContent(document, 'commercial').match(/(\d+)\s*days/i)
+
+  const commercial = quotation
+    ? buildQuotationCommercialFields({ quotation, document })
+    : []
+  const byKey = Object.fromEntries(commercial.map((f) => [f.key, f.value])) as Partial<
+    Record<(typeof commercial)[number]['key'], string>
+  >
+
+  const quotationDate = quotation?.createdAt ?? document.createdAt
+  const validUntil = quotation?.validityDate ?? ''
+  const periodDays =
+    quotationDate && validUntil ? daysBetweenDates(quotationDate.slice(0, 10), validUntil.slice(0, 10)) : null
+  const validityPeriod = byKey.validityPeriod || formatValidityPeriodLabel(periodDays)
+  // Numeric days for {{validity_days}} only when derived from saved dates — never invent "30"
+  const validityDays = periodDays != null ? String(periodDays) : ''
 
   return {
     quotation_no: quotation?.quotationNo ?? document.quotationId,
-    quotation_date: fmtDate(quotation?.createdAt ?? document.createdAt),
+    quotation_date: fmtDate(quotationDate),
     reference_no: opportunity?.opportunityNo ?? quotation?.inquiryNo ?? '—',
     customer_name: customer?.customerName ?? '—',
     customer_address: customer ? [customer.addressLine1, customer.city, customer.state, customer.pincode].filter(Boolean).join(', ') : '—',
@@ -86,18 +105,23 @@ export function buildQuotationMergeMap(ctx: QuotationMergeContext): Record<Quota
       || '—',
     quantity: primary ? String(primary.qty) : '1',
     basic_price: fmtMoney(summary.basicAmount),
-    gst_rate: primary ? `${primary.taxPct}%` : '18%',
+    gst_rate: primary ? `${primary.taxPct}%` : '',
     gst_amount: fmtMoney(summary.gstAmount),
     grand_total: fmtMoney(summary.grandTotal),
     amount_in_words: amountInWordsINR(summary.grandTotal),
-    payment_terms: payment || quotation?.paymentTerms || 'As per commercial terms',
-    delivery_time: delivery || quotation?.deliveryTerms || 'As agreed',
-    // Prefer explicit "N days" from commercial copy; never dump a raw validity Date into a days slot
-    validity_days: validityMatch?.[1] ?? '30',
-    authorized_person: company.authorizedPerson,
-    designation: company.designation,
-    company_name: company.legalName,
-    company_gstin: company.gstin || '—',
+    // Always from saved quotation commercial fields (header preferred over section body)
+    payment_terms: byKey.paymentTerms ?? '',
+    delivery_terms: byKey.deliveryTerms ?? '',
+    delivery_time: byKey.deliveryTime ?? '',
+    validity_days: validityDays,
+    validity_date: byKey.validUntil ?? (validUntil ? fmtDate(validUntil) : ''),
+    validity_period: validityPeriod,
+    currency: byKey.currency ?? formatQuotationCurrencyDisplay((quotation as { currencyCode?: string } | undefined)?.currencyCode),
+    commercial_validity: byKey.commercialValidity ?? '',
+    authorized_person: QUOTATION_COMPANY.authorizedPerson,
+    designation: QUOTATION_COMPANY.designation,
+    company_name: QUOTATION_COMPANY.legalName,
+    company_gstin: QUOTATION_COMPANY.gstin,
   }
 }
 

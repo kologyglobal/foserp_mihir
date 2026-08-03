@@ -3,6 +3,9 @@ import legalEntityRoutes from './legal-entities/legal-entity.routes.js'
 import branchRoutes, { nestedBranchRouter } from './branches/branch.routes.js'
 import financialYearRoutes from './financial-years/financial-year.routes.js'
 import accountingPeriodRoutes from './accounting-periods/accounting-period.routes.js'
+import periodAdjustmentRoutes from './period-adjustments/period-adjustment.routes.js'
+import periodCloseOpsRoutes from './period-close-ops/period-close-ops.routes.js'
+import fxRevaluationRoutes from './fx-revaluation/fx-revaluation.routes.js'
 import accountRoutes from './accounts/account.routes.js'
 import defaultMappingRoutes from './default-mappings/default-mapping.routes.js'
 import financeSettingsRoutes, { activateRouter, setupStatusRouter } from './finance-settings/finance-settings.routes.js'
@@ -31,6 +34,9 @@ router.use('/legal-entities/:legalEntityId/branches', nestedBranchRouter)
 router.use('/branches', branchRoutes)
 router.use('/financial-years', financialYearRoutes)
 router.use('/periods', accountingPeriodRoutes)
+router.use('/period-adjustments', periodAdjustmentRoutes)
+router.use('/period-close', periodCloseOpsRoutes)
+router.use('/period-close/fx-revaluation', fxRevaluationRoutes)
 router.use('/accounts', accountRoutes)
 router.use('/default-mappings', defaultMappingRoutes)
 router.use('/settings', financeSettingsRoutes)

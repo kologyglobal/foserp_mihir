@@ -31,7 +31,7 @@ import {
   type MaintenanceTestResult,
 } from '@/services/api/maintenanceApi'
 import { notify } from '@/store/toastStore'
-import { useMasterStore } from '@/store/masterStore'
+import { useActiveWarehouses, useStockableItems } from '@/hooks/useMasterLists'
 import { useMaintenancePermissions } from '@/utils/permissions/maintenance'
 import {
   MAINTENANCE_BREADCRUMB,
@@ -58,6 +58,8 @@ export function MaintenanceTicketDetailPage() {
   const [technicianName, setTechnicianName] = useState('')
   const [operatorName, setOperatorName] = useState('')
   const [repairDetails, setRepairDetails] = useState('')
+  const [rootCause, setRootCause] = useState('')
+  const [repairAction, setRepairAction] = useState('')
   const [failureCategory, setFailureCategory] = useState<MaintenanceFailureCategory | ''>('')
   const [serviceCost, setServiceCost] = useState('')
   const [otherCost, setOtherCost] = useState('')
@@ -78,9 +80,12 @@ export function MaintenanceTicketDetailPage() {
   const [partRemarks, setPartRemarks] = useState('')
   const [photoCategory, setPhotoCategory] = useState<MaintenancePhotoCategory>('BEFORE')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [checklistDraft, setChecklistDraft] = useState<
+    Array<{ id: string; text: string; isDone: boolean; remark: string }>
+  >([])
 
-  const stockableItems = useMasterStore((s) => s.items.filter((i) => i.isStockable && i.isActive))
-  const warehouses = useMasterStore((s) => s.warehouses.filter((w) => w.isActive))
+  const stockableItems = useStockableItems()
+  const warehouses = useActiveWarehouses()
   const selectedPartItem = useMemo(
     () => stockableItems.find((i) => i.id === partItemId) ?? null,
     [stockableItems, partItemId],
@@ -93,7 +98,17 @@ export function MaintenanceTicketDetailPage() {
       const res = await getMaintenanceTicket(id)
       setTicket(res.data)
       setRepairDetails(res.data.repairDetails ?? '')
+      setRootCause(res.data.rootCause ?? '')
+      setRepairAction(res.data.repairAction ?? '')
       setFailureCategory(res.data.failureCategory ?? '')
+      setChecklistDraft(
+        (res.data.checklistItems ?? []).map((c) => ({
+          id: c.id,
+          text: c.text,
+          isDone: c.isDone,
+          remark: c.remark ?? '',
+        })),
+      )
       setServiceCost(String(res.data.serviceCost ?? 0))
       setOtherCost(String(res.data.otherCost ?? 0))
       setServiceDescription(res.data.serviceDescription ?? '')
@@ -297,14 +312,84 @@ export function MaintenanceTicketDetailPage() {
             />
             <Field label="Repair Started" value={ticket.repairStartedAt ? formatDateTime(ticket.repairStartedAt) : '—'} />
             <Field label="Failure Category" value={ticket.failureCategory ?? '—'} />
-            <Field label="Repair Details" value={ticket.repairDetails ?? '—'} />
+            <Field label="Root Cause" value={ticket.rootCause ?? '—'} />
+            <Field label="Repair Action" value={ticket.repairAction ?? ticket.repairDetails ?? '—'} />
+            <Field label="Downtime" value={ticket.downtimeLabel ?? '—'} />
+            <Field label="Repair Time" value={ticket.repairLabel ?? '—'} />
             <Field label="Service Performed" value={ticket.serviceDescription ?? '—'} />
             <Field label="Invoice Number" value={ticket.invoiceNumber ?? '—'} />
             <Field label="Invoice Date" value={ticket.invoiceDate ? ticket.invoiceDate.slice(0, 10) : '—'} />
             <Field label="Test Result" value={ticket.testResult ?? '—'} />
             <Field label="Tested At" value={ticket.testedAt ? formatDateTime(ticket.testedAt) : '—'} />
+            {ticket.pmPlan ? (
+              <Field
+                label="PM Plan"
+                value={`${ticket.pmPlan.planNumber} — ${ticket.pmPlan.name}`}
+              />
+            ) : null}
+            {ticket.ticketKind === 'PREVENTIVE' || ticket.sourceType === 'PREVENTIVE' ? (
+              <Field label="Kind" value="PREVENTIVE" />
+            ) : (
+              <Field label="Kind" value="BREAKDOWN" />
+            )}
           </dl>
         </Section>
+
+        {checklistDraft.length > 0 ? (
+          <Section title="PM Checklist">
+            <ul className="space-y-2">
+              {checklistDraft.map((c, idx) => (
+                <li key={c.id} className="flex flex-wrap items-start gap-2 rounded border border-erp-border px-3 py-2 text-sm">
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={c.isDone}
+                      disabled={['CLOSED', 'CANCELLED'].includes(ticket.status) || !perms.canUpdate}
+                      onChange={(e) => {
+                        const next = [...checklistDraft]
+                        next[idx] = { ...c, isDone: e.target.checked }
+                        setChecklistDraft(next)
+                      }}
+                    />
+                    <span>{c.text}</span>
+                  </label>
+                  <Input
+                    className="ml-auto max-w-xs"
+                    placeholder="Remark"
+                    value={c.remark}
+                    disabled={['CLOSED', 'CANCELLED'].includes(ticket.status) || !perms.canUpdate}
+                    onChange={(e) => {
+                      const next = [...checklistDraft]
+                      next[idx] = { ...c, remark: e.target.value }
+                      setChecklistDraft(next)
+                    }}
+                  />
+                </li>
+              ))}
+            </ul>
+            {perms.canUpdate && !['CLOSED', 'CANCELLED'].includes(ticket.status) ? (
+              <button
+                type="button"
+                className="mt-2 rounded-md border border-erp-border px-3 py-1.5 text-sm"
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    await updateMaintenanceTicket(id, {
+                      checklistItems: checklistDraft.map((c) => ({
+                        id: c.id,
+                        isDone: c.isDone,
+                        remark: c.remark || null,
+                      })),
+                    })
+                    notify.success('Checklist saved')
+                  })
+                }
+              >
+                Save Checklist
+              </button>
+            ) : null}
+          </Section>
+        ) : null}
 
         <Section title="Parts Changed">
           {ticket.inventoryPostingPending ? (
@@ -347,9 +432,16 @@ export function MaintenanceTicketDetailPage() {
                           : 'Ticket only'}
                     </td>
                     <td className="px-3 py-2">
-                      {p.shortageQty && p.shortageQty > 0 ? (
+                      {p.purchaseRequisitionId ? (
                         <Link
-                          to={`/purchase/requisitions/new?source=MAINTENANCE&sourceDocumentId=${encodeURIComponent(ticket.id)}&purchasePurpose=${encodeURIComponent(`MAINTENANCE · ${ticket.ticketNumber}`)}&remarks=${encodeURIComponent(`sourceType:MAINTENANCE | maintenanceTicketId:${ticket.id} | ${ticket.ticketNumber} · ${p.description}`)}`}
+                          to={`/purchase/requisitions/${p.purchaseRequisitionId}`}
+                          className="text-erp-primary hover:underline"
+                        >
+                          Open PR
+                        </Link>
+                      ) : p.shortageQty && p.shortageQty > 0 ? (
+                        <Link
+                          to={`/purchase/requisitions/new?source=MAINTENANCE&sourceDocumentId=${encodeURIComponent(ticket.id)}&sourceDocumentNumber=${encodeURIComponent(ticket.ticketNumber)}&maintenancePartId=${encodeURIComponent(p.id)}&purchasePurpose=${encodeURIComponent(`MAINTENANCE · ${ticket.ticketNumber}`)}&remarks=${encodeURIComponent(`${ticket.ticketNumber} · ${ticket.machine?.code ?? ''} · ${p.description}`)}`}
                           className="text-erp-primary hover:underline"
                         >
                           Part Shortage — Create PR
@@ -505,7 +597,9 @@ export function MaintenanceTicketDetailPage() {
               onClick={() =>
                 void run(async () => {
                   await updateMaintenanceTicket(id, {
-                    repairDetails,
+                    repairDetails: repairDetails || repairAction || undefined,
+                    rootCause: rootCause || null,
+                    repairAction: repairAction || null,
                     failureCategory: failureCategory || null,
                     serviceDescription: serviceDescription || null,
                     serviceCost: perms.canManageCost ? Number(serviceCost || 0) : undefined,
@@ -515,6 +609,11 @@ export function MaintenanceTicketDetailPage() {
                     technicianName: technicianName || null,
                     contractorId: contractorId || null,
                     operatorName: operatorName || null,
+                    checklistItems: checklistDraft.map((c) => ({
+                      id: c.id,
+                      isDone: c.isDone,
+                      remark: c.remark || null,
+                    })),
                   })
                   notify.success('Ticket updated')
                 })
@@ -529,13 +628,32 @@ export function MaintenanceTicketDetailPage() {
           <FormField label="Operator Name">
             <Input value={operatorName} onChange={(e) => setOperatorName(e.target.value)} />
           </FormField>
-          <FormField label="Repair Details" required>
-            <Textarea value={repairDetails} onChange={(e) => setRepairDetails(e.target.value)} rows={4} placeholder="What was wrong? What was done?" />
+          <FormField label="Root Cause" hint="Technician diagnosis — not asked of the operator">
+            <Textarea
+              value={rootCause}
+              onChange={(e) => setRootCause(e.target.value)}
+              rows={2}
+              placeholder="Example: Drive-side bearing failed"
+            />
+          </FormField>
+          <FormField label="Repair Action" required hint="What was done to restore the machine">
+            <Textarea
+              value={repairAction}
+              onChange={(e) => {
+                setRepairAction(e.target.value)
+                if (!repairDetails) setRepairDetails(e.target.value)
+              }}
+              rows={3}
+              placeholder="Example: Bearing replaced and shaft alignment corrected"
+            />
+          </FormField>
+          <FormField label="Notes (optional)">
+            <Textarea value={repairDetails} onChange={(e) => setRepairDetails(e.target.value)} rows={2} />
           </FormField>
           <FormField label="Failure Category">
             <Select value={failureCategory} onChange={(e) => setFailureCategory(e.target.value as MaintenanceFailureCategory | '')}>
               <option value="">{SELECT_PLACEHOLDER}</option>
-              {['MECHANICAL', 'ELECTRICAL', 'HYDRAULIC', 'PNEUMATIC', 'CONTROL', 'OTHER'].map((c) => (
+              {['MECHANICAL', 'ELECTRICAL', 'HYDRAULIC', 'PNEUMATIC', 'CONTROL', 'SAFETY', 'OTHER'].map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>

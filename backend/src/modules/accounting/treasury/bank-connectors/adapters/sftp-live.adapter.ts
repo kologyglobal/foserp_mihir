@@ -33,7 +33,7 @@ function formatHint(
   provider: string,
   expected?: string,
 ): BankConnectorStatementFormatHint {
-  if (expected === 'MT940' || expected === 'CAMT053' || expected === 'CSV' || expected === 'OTHER') {
+  if (expected === 'MT940' || expected === 'CAMT053' || expected === 'CAMT052' || expected === 'CAMT054' || expected === 'CSV' || expected === 'OTHER') {
     return expected
   }
   if (provider === 'CAMT_SFTP') return 'CAMT053'

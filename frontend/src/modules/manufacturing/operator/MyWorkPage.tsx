@@ -23,6 +23,7 @@ import { ProductionEmptyState, ProductionPageHeader } from '../ui'
 import { OperatorTaskCard } from './OperatorTaskCard'
 import { ProductionCompletionSheet } from './ProductionCompletionSheet'
 import { QuickIssueSheet } from './QuickIssueSheet'
+import { ManufacturingActiveMaintenanceBanner } from '../components/ManufacturingActiveMaintenanceBanner'
 
 /** Operator My Work — mobile-first assignment queue (API mode only). */
 export function MyWorkPage() {
@@ -125,6 +126,9 @@ export function MyWorkPage() {
       ) : null}
       {!loading && activeCards.length > 0 ? (
         <div className="mx-auto flex max-w-xl flex-col gap-3 pb-8">
+          {[...new Set(activeCards.map((a) => a.machineId).filter(Boolean))].map((machineId) => (
+            <ManufacturingActiveMaintenanceBanner key={machineId!} machineId={machineId} />
+          ))}
           {activeCards.map((assignment) => (
             <OperatorTaskCard
               key={assignment.id}

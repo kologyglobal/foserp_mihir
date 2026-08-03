@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef } from 'react'
-import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
+import { AlertTriangle } from 'lucide-react'
+import { ErpButton } from '../erp/ErpButton'
+import { CrmDrawerShell } from './CrmDrawerShell'
 
 interface CrmDeleteConfirmModalProps {
   open: boolean
@@ -25,53 +26,19 @@ export function CrmDeleteConfirmModal({
   onConfirm,
   isDeleting,
 }: CrmDeleteConfirmModalProps) {
-  const titleId = useId()
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isDeleting) onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    requestAnimationFrame(() => {
-      panelRef.current?.querySelector<HTMLElement>('button')?.focus()
-    })
-    return () => {
-      document.body.style.overflow = prev
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [open, onCancel, isDeleting])
-
-  if (!open) return null
-
   return (
-    <div
-      className="erp-modal-backdrop"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !isDeleting) onCancel()
-      }}
-    >
-      <div
-        ref={panelRef}
-        className="erp-modal-panel max-w-md"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-      >
-        <h2 id={titleId} className="text-[16px] font-semibold text-erp-text">
-          {title}
-        </h2>
-        <p className="mt-2 text-[13px] text-erp-muted">
-          {blockReason ?? description}
-        </p>
-        {!blockReason && detail ? (
-          <p className="mt-1 text-[13px] font-medium text-erp-text">{detail}</p>
-        ) : null}
-        <ErpButtonGroup className="mt-5 justify-end">
+    <CrmDrawerShell
+      open={open}
+      placement="modal"
+      size="sm"
+      accent={blockReason ? 'warning' : 'danger'}
+      icon={AlertTriangle}
+      title={title}
+      subtitle={blockReason ? 'This action is blocked' : 'This cannot be undone from the list'}
+      onClose={onCancel}
+      closeDisabled={Boolean(isDeleting)}
+      footer={
+        <div className="crm-popup-footer__actions">
           <ErpButton type="button" variant="secondary" onClick={onCancel} disabled={isDeleting}>
             Cancel
           </ErpButton>
@@ -80,8 +47,17 @@ export function CrmDeleteConfirmModal({
               {isDeleting ? 'Deleting…' : confirmLabel}
             </ErpButton>
           ) : null}
-        </ErpButtonGroup>
-      </div>
-    </div>
+        </div>
+      }
+    >
+      <p className="text-[13px] leading-relaxed text-erp-text">
+        {blockReason ?? description}
+      </p>
+      {!blockReason && detail ? (
+        <div className="crm-popup-context-pill mt-3" title={detail}>
+          <span>{detail}</span>
+        </div>
+      ) : null}
+    </CrmDrawerShell>
   )
 }

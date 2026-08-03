@@ -52,6 +52,21 @@ export async function getActivity(tenantId: string, id: string) {
 
 export async function createActivity(tenantId: string, userId: string, input: CreateActivityInput) {
   const activity = await repo.createActivity(tenantId, userId, input)
+  const assigneeId = input.ownerId ?? activity.assignedTo
+  if (assigneeId && assigneeId !== userId) {
+    const { notifyActivityAssigned } = await import('../../notifications/notification.emitters.js')
+    notifyActivityAssigned({
+      tenantId,
+      actorUserId: userId,
+      activityId: activity.id,
+      subject: activity.subject,
+      assigneeId,
+    })
+  }
+  if (input.leadId) {
+    const { resolveLeadUnattended } = await import('../../notifications/notification.emitters.js')
+    resolveLeadUnattended(tenantId, input.leadId)
+  }
   return mapActivityToDto(activity)
 }
 
@@ -66,6 +81,11 @@ export async function completeActivity(tenantId: string, id: string, userId: str
   const existing = await repo.findActivityById(tenantId, id)
   if (!existing) throw new NotFoundError('Activity not found')
   const activity = await repo.completeActivity(tenantId, id, userId, input)
+  const { resolveActivityNotifications, resolveLeadUnattended } = await import(
+    '../../notifications/notification.emitters.js'
+  )
+  resolveActivityNotifications(tenantId, id)
+  if (activity.leadId) resolveLeadUnattended(tenantId, activity.leadId)
   return mapActivityWithNames(tenantId, activity)
 }
 

@@ -156,7 +156,7 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
     }
   }
 
-  const summary = calcPriceSummary(lines, document.freightAmount, document.installationAmount, document.customCharges)
+  const summary = calcPriceSummary(lines, document)
   if (summary.grandTotal <= 0) {
     issues.push({ id: 'no-total', message: 'Grand total must be greater than zero.', blocking: true })
   }
@@ -164,9 +164,9 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
     issues.push({ id: 'no-gst', message: 'GST amount could not be calculated.', blocking: true })
   }
 
-  const paymentTerms = sectionContent(document, 'payment') || salesQuotation?.paymentTerms
-  const deliveryTerms = sectionContent(document, 'delivery') || salesQuotation?.deliveryTerms
-  const deliveryTime = (salesQuotation as { deliveryTime?: string } | undefined)?.deliveryTime
+  const paymentTerms = salesQuotation?.paymentTerms?.trim() || sectionContent(document, 'payment')
+  const deliveryTerms = salesQuotation?.deliveryTerms?.trim() || sectionContent(document, 'delivery')
+  const deliveryTime = (salesQuotation as { deliveryTime?: string } | undefined)?.deliveryTime?.trim() || ''
   if (!paymentTerms?.trim()) {
     issues.push({ id: 'no-payment', message: 'Payment terms are required.', blocking: true })
   }
@@ -216,10 +216,12 @@ export function buildSoConversionPreview(ctx: QuotationSoConversionContext) {
     basicAmount: priced.summary.taxableValue,
     gstAmount: priced.summary.gstAmount,
     grandTotal: priced.summary.grandTotal,
-    paymentTerms: sectionContent(document, 'payment') || salesQuotation?.paymentTerms || '—',
-    deliveryTerms: sectionContent(document, 'delivery') || salesQuotation?.deliveryTerms || '—',
-    deliveryTime: (salesQuotation as { deliveryTime?: string } | undefined)?.deliveryTime || '—',
-    validTill: salesQuotation?.validityDate ?? '—',
+    paymentTerms: salesQuotation?.paymentTerms?.trim() || sectionContent(document, 'payment') || '',
+    deliveryTerms: salesQuotation?.deliveryTerms?.trim() || sectionContent(document, 'delivery') || '',
+    deliveryTime: (salesQuotation as { deliveryTime?: string } | undefined)?.deliveryTime?.trim() || '',
+    validTill: salesQuotation?.validityDate
+      ? salesQuotation.validityDate
+      : '',
     salesOwner: document.salesOwnerName ?? '—',
     lines: priced.lines.map((l) => ({
       productOrItem: l.productOrItem,

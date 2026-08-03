@@ -65,10 +65,21 @@ function workflowIndex(
   return Math.max(0, WORKFLOW_STEPS.findIndex((s) => s.id === id))
 }
 
-/** Display label Q1, Q2… — revision numbers are 1-based (API + new creates). Legacy 0 maps to Q1. */
-export function quotationRevisionLabel(revisionNo: number): string {
-  return `Q${revisionNo < 1 ? 1 : revisionNo}`
-}
+/**
+ * Internal revisionNo is 1-based (API + create): 1 = original document, 2 = first revise, …
+ * Customer-facing labels start only after revise (R1, R2…). Original has no R suffix.
+ * Legacy revision 0 is treated as original.
+ */
+export {
+  quotationCustomerRevisionIndex,
+  quotationRevisionSuffix,
+  quotationRevisionLabel,
+  quotationNoWithRevision,
+  nextQuotationRevisionLabel,
+} from '../../utils/quotationEngine/revisionLabels'
+import {
+  quotationRevisionLabel,
+} from '../../utils/quotationEngine/revisionLabels'
 
 function initials(name: string) {
   return name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
@@ -113,7 +124,9 @@ export function QuotationHeroCard({
           <div className="min-w-0 flex-1">
             <div className="quotation-360-hero__badges">
               <LiveStatusBadge label={quotationStatusLabel(doc.status)} tone={quotationStatusTone(doc.status)} size="md" pulse={false} />
-              <span className="quotation-360-hero__rev">{quotationRevisionLabel(doc.revisionNo)}</span>
+              {quotationRevisionLabel(doc.revisionNo) !== 'Original' ? (
+                <span className="quotation-360-hero__rev">{quotationRevisionLabel(doc.revisionNo)}</span>
+              ) : null}
               {doc.locked ? (
                 <span className="quotation-360-hero__flag quotation-360-hero__flag--warn">
                   <Lock className="h-3 w-3" aria-hidden />
@@ -350,17 +363,39 @@ export function QuotationWorkflowStepper({
 
 export function QuotationCommercialSummary({ document: doc }: { document: QuotationDocument }) {
   const showFreight = !useTenantProfileStore((s) => s.isServices())
-  const freightAmount = showFreight ? doc.freightAmount : 0
-  const summary = calcPriceSummary(doc.priceLines, freightAmount, doc.installationAmount, doc.customCharges)
+  const effectiveDoc: QuotationDocument = showFreight ? doc : { ...doc, freightAmount: 0 }
+  const summary = calcPriceSummary(effectiveDoc.priceLines, effectiveDoc)
+  const t = summary.totals
 
   const rows = [
     { label: 'Basic amount', value: summary.basicAmount },
-    { label: 'Discount', value: -summary.discountAmount, muted: true },
-    { label: 'Taxable value', value: summary.taxableValue },
+    { label: 'Line discount', value: -summary.discountAmount, muted: true },
+    { label: 'Taxable amount', value: summary.taxableValue },
+    ...(t.orderDiscount.calculatedAmount > 0
+      ? [{ label: 'Overall discount', value: -t.orderDiscount.calculatedAmount, muted: true } as const]
+      : []),
+    ...(t.orderDiscount.calculatedAmount > 0
+      ? [{ label: 'Taxable after discount', value: t.discountedTaxableAmount }]
+      : []),
+    ...(summary.freightAmount > 0
+      ? [{
+          label: `Freight${doc.freightIsTaxable ? ' (taxable)' : ''}`,
+          value: summary.freightAmount,
+        }]
+      : []),
+    ...(summary.installationAmount > 0
+      ? [{
+          label: `Installation${doc.installationIsTaxable ? ' (taxable)' : ''}`,
+          value: summary.installationAmount,
+        }]
+      : []),
+    ...(summary.customCharges > 0
+      ? [{
+          label: `Other charges${doc.customChargesIsTaxable ? ' (taxable)' : ''}`,
+          value: summary.customCharges,
+        }]
+      : []),
     { label: 'GST', value: summary.gstAmount },
-    ...(showFreight && freightAmount > 0 ? [{ label: 'Freight', value: freightAmount }] : []),
-    ...(doc.installationAmount > 0 ? [{ label: 'Installation', value: doc.installationAmount }] : []),
-    ...(doc.customCharges > 0 ? [{ label: 'Custom charges', value: doc.customCharges }] : []),
   ]
 
   return (

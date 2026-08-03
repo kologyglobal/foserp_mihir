@@ -3,6 +3,7 @@ import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
 import { Modal } from '../../design-system/components'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { formatDate } from '../../utils/dates/format'
+import { quotationNoWithRevision } from '../../utils/quotationEngine/revisionLabels'
 import type { useQuotationConversion } from '../../modules/crm/hooks/useQuotationConversion'
 
 type ConversionApi = ReturnType<typeof useQuotationConversion>
@@ -116,7 +117,7 @@ export function QuotationConversionDialog({
               <div>
                 <dt className="text-[var(--dyn-text-muted)]">Quotation</dt>
                 <dd className="font-medium text-[var(--dyn-text)]">
-                  {preview.quotationNo} Rev {preview.revisionNo}
+                  {quotationNoWithRevision(preview.quotationNo, preview.revisionNo)}
                 </dd>
               </div>
               <div>
@@ -146,11 +147,25 @@ export function QuotationConversionDialog({
                 </dd>
               </div>
               <div className="col-span-2">
-                <dt className="text-[var(--dyn-text-muted)]">Payment / Delivery</dt>
-                <dd className="font-medium text-[var(--dyn-text)]">
-                  {preview.paymentTerms} · {preview.deliveryTerms}
+                <dt className="text-[var(--dyn-text-muted)]">Payment Terms</dt>
+                <dd className="font-medium text-[var(--dyn-text)] whitespace-pre-wrap">
+                  {preview.paymentTerms || '—'}
                 </dd>
               </div>
+              <div className="col-span-2">
+                <dt className="text-[var(--dyn-text-muted)]">Delivery Terms</dt>
+                <dd className="font-medium text-[var(--dyn-text)] whitespace-pre-wrap">
+                  {preview.deliveryTerms || '—'}
+                </dd>
+              </div>
+              {preview.deliveryTime ? (
+                <div className="col-span-2">
+                  <dt className="text-[var(--dyn-text-muted)]">Delivery Time</dt>
+                  <dd className="font-medium text-[var(--dyn-text)] whitespace-pre-wrap">
+                    {preview.deliveryTime}
+                  </dd>
+                </div>
+              ) : null}
             </dl>
 
             {blockingIssues.length > 0 ? (

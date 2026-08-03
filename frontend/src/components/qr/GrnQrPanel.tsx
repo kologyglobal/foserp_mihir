@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Printer, GitBranch, QrCode } from 'lucide-react'
 import { useQrStore } from '../../store/qrStore'
@@ -12,12 +13,15 @@ interface GrnQrPanelProps {
 
 /** Shows auto-generated GRN / material lot QRs — keyed by grnId, not line id */
 export function GrnQrPanel({ grnId, grnNo, className }: GrnQrPanelProps) {
-  const qrs = useQrStore((s) =>
-    s.records.filter(
-      (r) =>
-        r.metadata.grnId === grnId &&
-        (r.entityType === 'MATERIAL_LOT' || (r.entityType === 'GRN_LINE' && r.entityId === grnId)),
-    ),
+  const records = useQrStore((s) => s.records)
+  const qrs = useMemo(
+    () =>
+      records.filter(
+        (r) =>
+          r.metadata.grnId === grnId &&
+          (r.entityType === 'MATERIAL_LOT' || (r.entityType === 'GRN_LINE' && r.entityId === grnId)),
+      ),
+    [records, grnId],
   )
   const headerQr = qrs.find((r) => r.entityType === 'GRN_LINE' && r.entityId === grnId)
   const lotQrs = qrs.filter((r) => r.entityType === 'MATERIAL_LOT')

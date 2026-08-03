@@ -52,7 +52,7 @@ export function ApiBankStatementImportPage() {
   const [mappingTemplateId, setMappingTemplateId] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [importFormat, setImportFormat] = useState<
-    'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'AUTO_DETECT'
+    'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054' | 'AUTO_DETECT'
   >('AUTO_DETECT')
   const [batch, setBatch] = useState<ImportBatchDto | null>(null)
   const [headers, setHeaders] = useState<string[]>([])
@@ -117,7 +117,7 @@ export function ApiBankStatementImportPage() {
       })
       setBatch(uploaded)
       // Structured formats skip sheet/header + column mapping
-      if (isStructuredImportFormat(uploaded.importFormat) || importFormat === 'MT940' || importFormat === 'CAMT_053') {
+      if (isStructuredImportFormat(uploaded.importFormat) || isStructuredImportFormat(importFormat)) {
         setStep(3)
         // Inspect then jump toward preview path
         const res = await inspectBatch(uploaded.id, { expectedUpdatedAt: uploaded.updatedAt })
@@ -280,7 +280,7 @@ export function ApiBankStatementImportPage() {
                 value={importFormat}
                 onChange={(e) =>
                   setImportFormat(
-                    e.target.value as 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'AUTO_DETECT',
+                    e.target.value as 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054' | 'AUTO_DETECT',
                   )
                 }
               >

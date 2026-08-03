@@ -45,6 +45,8 @@ export function runImportWizardUxTests() {
   const ui = read('src/modules/accounting/treasury/bank-statements/utils/bankStatementUi.ts')
   check('UI has MT940 format label', ui.includes("MT940: 'SWIFT MT940'"))
   check('UI has CAMT.053 format label', ui.includes("CAMT_053: 'ISO 20022 CAMT.053'"))
+  check('UI has CAMT.052 format label', ui.includes("CAMT_052:"))
+  check('UI has CAMT.054 format label', ui.includes("CAMT_054:"))
   check('UI accept includes .sta/.mt940/.xml', ui.includes('.sta,.mt940') && ui.includes('.xml'))
 
   const listPage = read('src/modules/accounting/treasury/bank-statements/pages/BankStatementListPage.api.tsx')

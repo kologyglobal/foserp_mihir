@@ -1,5 +1,7 @@
 import type { BankStatementImportFormat } from '../bank-statement.types.js'
+import { parseCamt052Buffer } from './bank-statement-camt052-parser.service.js'
 import { parseCamt053Buffer } from './bank-statement-camt053-parser.service.js'
+import { parseCamt054Buffer } from './bank-statement-camt054-parser.service.js'
 import { parseMt940Buffer } from './bank-statement-mt940-parser.service.js'
 import type { NativeStatementParseResult } from './bank-statement-native.types.js'
 import { isStructuredImportFormat } from './bank-statement-native.types.js'
@@ -11,6 +13,8 @@ export function parseStructuredStatementFile(
 ): NativeStatementParseResult {
   if (importFormat === 'MT940') return parseMt940Buffer(buffer)
   if (importFormat === 'CAMT_053') return parseCamt053Buffer(buffer)
+  if (importFormat === 'CAMT_052') return parseCamt052Buffer(buffer)
+  if (importFormat === 'CAMT_054') return parseCamt054Buffer(buffer)
   throw new BankStatementFileTypeRejectedError(`Not a structured statement format: ${importFormat}`)
 }
 

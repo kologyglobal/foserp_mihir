@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { Download, FileSpreadsheet, Upload, X } from 'lucide-react'
-import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
+import { Download, FileSpreadsheet, Upload } from 'lucide-react'
+import { ErpButton } from '../erp/ErpButton'
 import { useCrmMasterStore } from '../../store/crmMasterStore'
 import type { CrmMasterCatalogItem, CrmMasterEntry, CrmMasterKind } from '../../types/crmMasters'
 import {
@@ -12,6 +12,7 @@ import {
   type CrmMasterImportPreviewRow,
 } from '../../utils/crmMasterImport'
 import { cn } from '../../utils/cn'
+import { CrmDrawerShell } from './CrmDrawerShell'
 
 interface CrmMasterImportDialogProps {
   open: boolean
@@ -41,8 +42,6 @@ export function CrmMasterImportDialog({
   const [resultMessage, setResultMessage] = useState<string | null>(null)
   const fieldGuide = getCrmMasterImportFieldGuide(catalog)
   const headers = getCrmMasterImportHeaders(catalog)
-
-  if (!open) return null
 
   function reset() {
     setRows([])
@@ -98,23 +97,33 @@ export function CrmMasterImportDialog({
   const errorCount = rows.length - validCount
 
   return (
-    <div className="erp-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="crm-master-import-title">
-      <div className="erp-modal-panel max-w-4xl">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 id="crm-master-import-title" className="text-[16px] font-semibold text-erp-text">
-              Import — {catalog.title}
-            </h2>
-            <p className="mt-1 text-[13px] text-erp-muted">
-              Download the CSV template for this master, fill in rows, then upload. Duplicate codes are skipped.
-            </p>
-          </div>
-          <button type="button" onClick={handleClose} className="rounded p-1 text-erp-muted hover:bg-erp-surface-alt" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
+    <CrmDrawerShell
+      open={open}
+      placement="modal"
+      size="xl"
+      icon={Upload}
+      accent="primary"
+      title={`Import — ${catalog.title}`}
+      subtitle="Download the CSV template for this master, fill in rows, then upload. Duplicate codes are skipped."
+      onClose={handleClose}
+      closeDisabled={importing}
+      footer={
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={handleClose} disabled={importing}>
+            Close
+          </ErpButton>
+          <ErpButton
+            type="button"
+            variant="primary"
+            onClick={handleImport}
+            disabled={importing || validCount === 0}
+          >
+            {importing ? 'Importing…' : `Import ${validCount} Record${validCount === 1 ? '' : 's'}`}
+          </ErpButton>
         </div>
-
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      }
+    >
+        <div className="grid gap-4 lg:grid-cols-2">
           <section className="rounded-lg border border-erp-border bg-erp-surface-alt/40 p-4">
             <div className="flex items-start gap-3">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-erp-primary text-[12px] font-bold text-white">1</span>
@@ -267,21 +276,6 @@ export function CrmMasterImportDialog({
             {resultMessage}
           </p>
         ) : null}
-
-        <ErpButtonGroup className="mt-5 justify-end">
-          <ErpButton type="button" variant="secondary" onClick={handleClose} disabled={importing}>
-            Close
-          </ErpButton>
-          <ErpButton
-            type="button"
-            variant="primary"
-            onClick={handleImport}
-            disabled={importing || validCount === 0}
-          >
-            {importing ? 'Importing…' : `Import ${validCount} Record${validCount === 1 ? '' : 's'}`}
-          </ErpButton>
-        </ErpButtonGroup>
-      </div>
-    </div>
+    </CrmDrawerShell>
   )
 }

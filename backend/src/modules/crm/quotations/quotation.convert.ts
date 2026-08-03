@@ -6,7 +6,7 @@ import { findWonStage } from '../opportunities/opportunity.repository.js'
 import { normalizeSalesLineForWrite } from '../shared/crm-item-resolver.js'
 import { DEFAULT_VALIDITY_DAYS } from './quotation.constants.js'
 import { includeRelations } from './quotation.repository.js'
-import { calcDocumentTotal, syncLineTotals } from './quotation.workflow.js'
+import { resolveDocumentCharges, syncLineTotals } from './quotation.workflow.js'
 import type { ConvertQuotationToSalesOrderInput } from '../sales-orders/sales-order.validation.js'
 import type { QuotationPriceLineDto, QuotationSectionDto } from './quotation.types.js'
 import type { SalesOrderLineDto } from '../sales-orders/sales-order.types.js'
@@ -39,10 +39,37 @@ function addDaysDateOnly(from: Date, days: number): Date {
 async function buildSoLines(
   tenantId: string,
   priceLines: QuotationPriceLineDto[],
-  freightAmount: number,
-  installationAmount: number,
-  customCharges: number,
-): Promise<{ lines: SalesOrderLineDto[]; summary: { taxableValue: number; gstAmount: number; grandTotal: number } }> {
+  chargeFields: {
+    freightAmount?: number
+    installationAmount?: number
+    customCharges?: number
+    orderDiscountCalcType?: string
+    orderDiscountValue?: number
+    freightCalcType?: string
+    freightValue?: number
+    freightIsTaxable?: boolean
+    freightTaxRate?: number
+    installationCalcType?: string
+    installationValue?: number
+    installationIsTaxable?: boolean
+    installationTaxRate?: number
+    customChargesCalcType?: string
+    customChargesValue?: number
+    customChargesIsTaxable?: boolean
+    customChargesTaxRate?: number
+  },
+): Promise<{
+  lines: SalesOrderLineDto[]
+  summary: {
+    taxableValue: number
+    gstAmount: number
+    grandTotal: number
+    freightAmount: number
+    installationAmount: number
+    customCharges: number
+    orderDiscountAmount: number
+  }
+}> {
   const synced = syncLineTotals(priceLines.filter((l) => !l.isOptional))
   let lineNo = 0
   const linesRaw: SalesOrderLineDto[] = synced.map((line) => {
@@ -71,17 +98,18 @@ async function buildSoLines(
     }
   })
   const lines = await Promise.all(linesRaw.map((line) => normalizeSalesLineForWrite(tenantId, line)))
-
-  const taxableValue = lines.reduce((s, l) => s + l.taxableValue, 0)
-  const gstAmount = lines.reduce((s, l) => s + l.gstAmount, 0)
-  const grandTotal = calcDocumentTotal(lines, freightAmount, installationAmount, customCharges)
+  const { totals } = resolveDocumentCharges(synced, chargeFields)
 
   return {
     lines,
     summary: {
-      taxableValue: Math.round(taxableValue * 100) / 100,
-      gstAmount: Math.round(gstAmount * 100) / 100,
-      grandTotal: Math.round(grandTotal * 100) / 100,
+      taxableValue: totals.discountedTaxableAmount,
+      gstAmount: totals.gstAmount,
+      grandTotal: totals.grandTotal,
+      freightAmount: totals.freightAmount,
+      installationAmount: totals.installationAmount,
+      customCharges: totals.customCharges,
+      orderDiscountAmount: totals.orderDiscount.calculatedAmount,
     },
   }
 }
@@ -198,8 +226,8 @@ export async function convertQuotationToSalesOrder(
     }
   }
 
-  const paymentTerms = sectionContent(doc.sections, 'payment') || quotation.paymentTerms?.trim()
-  const deliveryTerms = sectionContent(doc.sections, 'delivery') || quotation.deliveryTerms?.trim()
+  const paymentTerms = quotation.paymentTerms?.trim() || sectionContent(doc.sections, 'payment')
+  const deliveryTerms = quotation.deliveryTerms?.trim() || sectionContent(doc.sections, 'delivery')
   const deliveryTime = quotation.deliveryTime?.trim() || null
   if (!paymentTerms) throw new ValidationError('Payment terms are required')
   if (!deliveryTerms) throw new ValidationError('Delivery terms are required')
@@ -221,11 +249,28 @@ export async function convertQuotationToSalesOrder(
     throw new ValidationError('Contact person is required')
   }
 
-  const freightAmount = Number(doc.freightAmount)
-  const installationAmount = Number(doc.installationAmount)
-  const customCharges = Number(doc.customCharges)
-  // Server-side totals only — never trust FE totals.
-  const { lines, summary } = await buildSoLines(tenantId, activeLines, freightAmount, installationAmount, customCharges)
+  const d = doc as CrmQuotationDocument & Record<string, unknown>
+  // Server-side totals only — never trust FE totals. Preserve adjustment calc type/value/tax from document.
+  const chargeFields = {
+    freightAmount: Number(doc.freightAmount),
+    installationAmount: Number(doc.installationAmount),
+    customCharges: Number(doc.customCharges),
+    orderDiscountCalcType: String(d.orderDiscountCalcType ?? 'FLAT'),
+    orderDiscountValue: Number(d.orderDiscountValue ?? 0),
+    freightCalcType: String(d.freightCalcType ?? 'FLAT'),
+    freightValue: Number(d.freightValue ?? doc.freightAmount),
+    freightIsTaxable: Boolean(d.freightIsTaxable),
+    freightTaxRate: Number(d.freightTaxRate ?? 0),
+    installationCalcType: String(d.installationCalcType ?? 'FLAT'),
+    installationValue: Number(d.installationValue ?? doc.installationAmount),
+    installationIsTaxable: Boolean(d.installationIsTaxable),
+    installationTaxRate: Number(d.installationTaxRate ?? 0),
+    customChargesCalcType: String(d.customChargesCalcType ?? 'FLAT'),
+    customChargesValue: Number(d.customChargesValue ?? doc.customCharges),
+    customChargesIsTaxable: Boolean(d.customChargesIsTaxable),
+    customChargesTaxRate: Number(d.customChargesTaxRate ?? 0),
+  }
+  const { lines, summary } = await buildSoLines(tenantId, activeLines, chargeFields)
   if (summary.grandTotal <= 0) throw new ValidationError('Grand total must be greater than zero')
 
   const primaryLine = lines[0]
@@ -248,7 +293,7 @@ export async function convertQuotationToSalesOrder(
       }
 
       const salesOrderNo = await nextCode(tenantId, 'SALES_ORDER', tx)
-      const remarks = `${quotation.quotationCode} Rev ${quotation.revisionNo} — CRM doc Rev ${doc.revisionNo}`
+      const remarks = `${quotation.quotationCode}${quotation.revisionNo > 1 ? ` · R${quotation.revisionNo - 1}` : ''} · CRM doc ${doc.revisionNo > 1 ? `R${doc.revisionNo - 1}` : 'Original'}`
       const now = new Date()
 
       const soItemId = primaryLine.itemId ?? quotation.itemId
@@ -285,7 +330,11 @@ export async function convertQuotationToSalesOrder(
           deliveryTerms,
           deliveryTime,
           warrantyTerms,
-          commercialNotes: doc.commercialNotes ?? (sectionContent(doc.sections, 'commercial') || null),
+          commercialNotes:
+            quotation.terms?.trim()
+            || doc.commercialNotes
+            || sectionContent(doc.sections, 'commercial')
+            || null,
           technicalNotes: doc.technicalNotes ?? (sectionContent(doc.sections, 'technical') || null),
           customerCode: company.companyCode,
           customerPoNumber: input.customerPoNumber ?? null,
@@ -317,6 +366,7 @@ export async function convertQuotationToSalesOrder(
           createdBy: userId,
           updatedBy: userId,
         },
+        include: { company: { select: { id: true, name: true, companyCode: true } } },
       })
 
       await tx.crmQuotationDocument.update({

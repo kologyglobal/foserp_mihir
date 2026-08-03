@@ -23,7 +23,9 @@ export async function runAutoMatch(
   const settings = await getEffectiveMatchingSettings(tenantId, statement.treasuryAccountId)
   const matchRun = await repo.createMatchRun(tenantId, statement.legalEntityId, session.id, context.userId, settings)
 
-  const lines = (await readRepo.listStatementLines(tenantId, statement.id)).filter((l) => l.matchStatus === 'UNMATCHED')
+  const lines = (await readRepo.listStatementLines(tenantId, statement.id)).filter(
+    (l) => l.matchStatus === 'UNMATCHED' && !l.isExcluded,
+  )
 
   let matchesCreated = 0
   let ambiguousLines = 0

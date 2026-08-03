@@ -380,7 +380,7 @@ export function CrmContactFormPage() {
     <>
       <CrmCardFormShell
         title={isEdit ? 'Edit Contact' : 'New Contact'}
-        className={`${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview`}
+        className={`${ENTERPRISE_FORM_CLASS} crm-lead-form-page enterprise-workspace--crm-smart-overview`}
         recordNo={isEdit ? existing?.id.slice(-8).toUpperCase() : 'New'}
         recordTitle={recordTitle}
         status={watched.isActive ? 'Active' : 'Inactive'}

@@ -7,7 +7,7 @@ export type BankConnectorProvider =
 
 export type BankConnectorStatus = 'DISABLED' | 'ENABLED' | 'ERROR'
 
-export type BankConnectorExpectedFormat = 'MT940' | 'CAMT053' | 'CSV' | 'OTHER'
+export type BankConnectorExpectedFormat = 'MT940' | 'CAMT053' | 'CAMT052' | 'CAMT054' | 'CSV' | 'OTHER'
 
 export interface BankConnectorConfigJson {
   mode?: 'SANDBOX' | 'LIVE'
@@ -66,6 +66,9 @@ export interface BankConnectorDto {
   lastSyncAt: string | null
   lastSyncStatus: string | null
   lastSyncMessage: string | null
+  /** True when another app instance holds an unexpired sync lease. */
+  syncInProgress?: boolean
+  syncLeaseUntil?: string | null
   createdBy: string | null
   updatedBy: string | null
   createdAt: string

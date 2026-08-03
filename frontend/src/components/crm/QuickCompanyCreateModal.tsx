@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Building2, ChevronDown, X } from 'lucide-react'
+import { Building2, ChevronDown } from 'lucide-react'
 import { FormField } from '../forms/FormField'
 import { Input, Select, Checkbox, MobileInput } from '../forms/Inputs'
 import { StateSelect, CitySelect, CountrySelect, MasterEnumSelect } from '../masters/GeographySelects'
-import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
+import { ErpButton } from '../erp/ErpButton'
 import { COMPANY_TERMINOLOGY } from '../../utils/companyLabels'
 import { saveQuickCreateEntity } from '../../utils/quickCreateService'
 import { isApiMode } from '../../config/apiConfig'
@@ -20,6 +19,7 @@ import { useIndustryOptions, useTerritoryOptions } from '../../hooks/useCrmMaste
 import type { QuickCreateResult } from '../../types/quickCreate'
 import type { Customer, CustomerType, SalesTerritory } from '../../types/master'
 import { cn } from '../../utils/cn'
+import { CrmDrawerShell } from './CrmDrawerShell'
 
 /** Company names: text only — letters, spaces, and common name punctuation (no digits). */
 function sanitizeCompanyName(raw: string): string {
@@ -239,7 +239,7 @@ export function QuickCompanyCreateModal({
       notify.warning(msg)
       // Defer focus until touched errors paint
       window.requestAnimationFrame(() => {
-        const root = document.getElementById('quick-company-modal-title')?.closest('.erp-modal-panel')
+        const root = document.querySelector('.crm-popup-panel')
         const invalid = root?.querySelector<HTMLElement>(
           '[aria-invalid="true"], .erp-field-row--error input, input.erp-input--error, textarea.erp-input--error',
         )
@@ -312,46 +312,29 @@ export function QuickCompanyCreateModal({
     }
   }
 
-  if (!open) return null
-
-  // Portal outside the lead page <form> — nested forms break Create Company submit.
-  return createPortal(
-    <div
-      className="erp-modal-backdrop crm-form-surface"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="quick-company-modal-title"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !submitting) onClose()
-      }}
+  // Portal shell sits outside the lead page <form> — nested forms break Create Company submit.
+  return (
+    <CrmDrawerShell
+      open={open}
+      placement="modal"
+      size="xl"
+      icon={Building2}
+      accent="primary"
+      title={COMPANY_TERMINOLOGY.addQuick}
+      subtitle="Quick account capture — open master details only when needed"
+      onClose={onClose}
+      closeDisabled={submitting}
+      footer={
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </ErpButton>
+          <ErpButton type="button" variant="primary" disabled={submitting} onClick={() => void handleSubmit()}>
+            {submitting ? 'Saving…' : `Create ${COMPANY_TERMINOLOGY.singular}`}
+          </ErpButton>
+        </div>
+      }
     >
-      <div className="erp-modal-panel max-h-[90vh] max-w-4xl overflow-y-auto p-0">
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-erp-border bg-white px-5 py-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-erp-primary-soft text-erp-primary">
-              <Building2 className="h-4 w-4" />
-            </span>
-            <div className="min-w-0">
-              <h2 id="quick-company-modal-title" className="text-[16px] font-semibold text-erp-text">
-                {COMPANY_TERMINOLOGY.addQuick}
-              </h2>
-              <p className="mt-0.5 text-[12px] text-erp-muted">
-                Quick account capture — open master details only when needed.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="rounded-md p-1.5 text-erp-muted hover:bg-erp-surface-alt hover:text-erp-text"
-            onClick={onClose}
-            disabled={submitting}
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-
-        <div className="px-5 py-4">
           {error ? (
             <p
               role="alert"
@@ -651,18 +634,6 @@ export function QuickCompanyCreateModal({
               </section>
             </div>
           ) : null}
-
-          <ErpButtonGroup className="sticky bottom-0 justify-end border-t border-erp-border bg-white py-4">
-            <ErpButton type="button" variant="ghost" onClick={onClose} disabled={submitting}>
-              Cancel
-            </ErpButton>
-            <ErpButton type="button" variant="primary" disabled={submitting} onClick={() => void handleSubmit()}>
-              {submitting ? 'Saving…' : `Create ${COMPANY_TERMINOLOGY.singular}`}
-            </ErpButton>
-          </ErpButtonGroup>
-        </div>
-      </div>
-    </div>,
-    document.body,
+    </CrmDrawerShell>
   )
 }

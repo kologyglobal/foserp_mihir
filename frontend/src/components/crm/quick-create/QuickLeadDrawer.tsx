@@ -12,9 +12,8 @@ import { CompanyProspectSelect } from '../CompanyProspectSelect'
 import { CrmDrawerShell } from '../CrmDrawerShell'
 import { FormField } from '../../forms/FormField'
 import { Input, Select, MobileInput } from '../../forms/Inputs'
-import { Button } from '../../ui/Button'
 import { ErpButton, ErpButtonGroup } from '../../erp/ErpButton'
-import { Calendar, Eye, Route } from 'lucide-react'
+import { Calendar, Eye, Route, UserPlus } from 'lucide-react'
 import { validateMobileForCountry } from '../../../utils/validation/mobilePhone'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../../config/countries'
 import { useMasterStore } from '../../../store/masterStore'
@@ -219,14 +218,23 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
     <CrmDrawerShell
       open={open}
       placement="modal"
+      size="md"
+      icon={UserPlus}
+      accent="primary"
       title="Quick Lead"
       subtitle="Minimum capture — add qualification details when the deal is serious"
       onClose={onClose}
+      closeDisabled={submitting}
       footer={
         savedLeadId ? null : (
-          <Button type="submit" form="crm-quick-lead-form" className="w-full" disabled={submitting}>
-            Save Lead
-          </Button>
+          <div className="crm-popup-footer__actions">
+            <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+              Cancel
+            </ErpButton>
+            <ErpButton type="submit" form="crm-quick-lead-form" variant="primary" disabled={submitting}>
+              {submitting ? 'Saving…' : 'Save Lead'}
+            </ErpButton>
+          </div>
         )
       }
     >

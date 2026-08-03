@@ -86,8 +86,22 @@ export function hasPeriodClosePermission(permission: PeriodClosePermission, role
         hasFinancePermission('finance.period.reopen')
       )
     }
-    if (permission === 'accounting.period_close.reopen_request' || permission === 'accounting.period_close.approve_reopen') {
-      return hasFinancePermission('finance.period.reopen')
+    if (permission === 'accounting.period_close.reopen_request') {
+      return hasFinancePermission('finance.period.reopen_request') || hasWorkspaceAdminRole()
+    }
+    if (permission === 'accounting.period_close.approve_reopen') {
+      return (
+        hasFinancePermission('finance.period.reopen_approve') ||
+        hasFinancePermission('finance.period.reopen') ||
+        hasWorkspaceAdminRole()
+      )
+    }
+    if (permission === 'accounting.period_close.manage_accruals' || permission === 'accounting.period_close.manage_prepaid') {
+      return (
+        hasFinancePermission('finance.period_adjustment.manage') ||
+        hasFinancePermission('finance.period_adjustment.post') ||
+        hasWorkspaceAdminRole()
+      )
     }
     return hasFinancePermission('finance.period.view')
   }
@@ -105,21 +119,42 @@ export function usePeriodClosePermissions() {
       const canManage = hasFinancePermission('finance.period.manage') || hasWorkspaceAdminRole()
       const canClose = hasFinancePermission('finance.period.close') || hasWorkspaceAdminRole()
       const canReopen = hasFinancePermission('finance.period.reopen') || hasWorkspaceAdminRole()
+      const canManageAdjustments =
+        hasFinancePermission('finance.period_adjustment.manage') ||
+        hasFinancePermission('finance.period_adjustment.post') ||
+        hasWorkspaceAdminRole()
+      const canReopenRequest =
+        hasFinancePermission('finance.period.reopen_request') || hasWorkspaceAdminRole()
+      const canApproveReopen =
+        hasFinancePermission('finance.period.reopen_approve') ||
+        hasFinancePermission('finance.period.reopen') ||
+        hasWorkspaceAdminRole()
       return {
         role,
         can: (p: PeriodClosePermission) => hasPeriodClosePermission(p, role),
-        canView,
+        canView:
+          canView ||
+          hasFinancePermission('finance.period_adjustment.view') ||
+          hasFinancePermission('finance.fx_revaluation.view') ||
+          hasWorkspaceAdminRole(),
         canManageChecklist: canManage || canClose,
         canReconcile: canView,
-        canManageAccruals: false,
-        canManagePrepaid: false,
-        canFxPreview: false,
+        canManageAccruals: canManageAdjustments,
+        canManagePrepaid: canManageAdjustments,
+        canFxPreview:
+          hasFinancePermission('finance.fx_revaluation.preview') ||
+          hasFinancePermission('finance.fx_revaluation.post') ||
+          hasWorkspaceAdminRole(),
+        canFxPost:
+          hasFinancePermission('finance.fx_revaluation.post') || hasWorkspaceAdminRole(),
+        canFxReverse:
+          hasFinancePermission('finance.fx_revaluation.reverse') || hasWorkspaceAdminRole(),
         canLock: canManage || canClose,
         canClosePeriod: canClose,
         canReopenPeriod: canReopen,
         canMarkUnderReview: canManage,
-        canReopenRequest: canReopen,
-        canApproveReopen: canReopen,
+        canReopenRequest,
+        canApproveReopen,
         canYearEndPreview:
           canView ||
           hasFinancePermission('finance.financial_year.view') ||
@@ -144,6 +179,8 @@ export function usePeriodClosePermissions() {
       canManageAccruals: can('accounting.period_close.manage_accruals'),
       canManagePrepaid: can('accounting.period_close.manage_prepaid'),
       canFxPreview: can('accounting.period_close.fx_preview'),
+      canFxPost: can('accounting.period_close.fx_preview'),
+      canFxReverse: can('accounting.period_close.fx_preview'),
       canLock: can('accounting.period_close.lock'),
       canClosePeriod: can('accounting.period_close.lock'),
       canReopenPeriod: can('accounting.period_close.approve_reopen'),

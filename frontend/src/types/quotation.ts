@@ -52,6 +52,8 @@ export interface Quotation extends AuditTrail {
   opportunityId?: string | null
   opportunityNo?: string | null
   customerId: string
+  /** Resolved server-side from CRM company (list/detail DTO). */
+  customerName?: string | null
   productId: string
   itemId?: string | null
   qty: number
@@ -70,6 +72,8 @@ export interface Quotation extends AuditTrail {
   /** Lead-time commitment from Delivery Time master (e.g. "6 weeks") */
   deliveryTime?: string
   validityDate: string
+  /** Optional display currency; defaults to INR in commercial display when omitted */
+  currencyCode?: string | null
   pricing: QuotationPricing
   changeHistory: QuotationChangeRecord[]
   salesOrderId: string | null
@@ -162,6 +166,24 @@ export interface QuotationDocument extends AuditTrail {
   freightAmount: number
   installationAmount: number
   customCharges: number
+  orderDiscountCalcType?: 'FLAT' | 'PERCENTAGE'
+  orderDiscountValue?: number
+  orderDiscountAmount?: number
+  freightCalcType?: 'FLAT' | 'PERCENTAGE'
+  freightValue?: number
+  freightIsTaxable?: boolean
+  freightTaxRate?: number
+  freightTaxAmount?: number
+  installationCalcType?: 'FLAT' | 'PERCENTAGE'
+  installationValue?: number
+  installationIsTaxable?: boolean
+  installationTaxRate?: number
+  installationTaxAmount?: number
+  customChargesCalcType?: 'FLAT' | 'PERCENTAGE'
+  customChargesValue?: number
+  customChargesIsTaxable?: boolean
+  customChargesTaxRate?: number
+  customChargesTaxAmount?: number
   status: QuotationDocumentStatus
   totalAmount: number
   revisionReason: string | null

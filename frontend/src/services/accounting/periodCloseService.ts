@@ -120,8 +120,31 @@ export async function getPeriodCloseReadiness(filter?: PeriodFilterState): Promi
 
 export async function getCloseCalendar(periodCode?: string): Promise<CloseCalendarEvent[]> {
   if (isApiMode()) {
-    // Phase 2 — calendar remains demo-only scaffolding in API mode
-    return []
+    const resolved = await resolveApiPeriodFilter(
+      periodCode ? { ...periodFilter, periodCode } : periodFilter,
+    )
+    const { listPeriodCloseCalendarEvents, generatePeriodCloseCalendar } = await import(
+      '@/services/bridges/financeApiBridge'
+    )
+    let rows = await listPeriodCloseCalendarEvents(resolved.period.id)
+    if (rows.length === 0) {
+      // Auto-generate once from checklist tasks + lock milestone when empty.
+      try {
+        rows = await generatePeriodCloseCalendar(resolved.period.id)
+      } catch {
+        // Templates may not exist yet — return empty.
+      }
+    }
+    const periodCodeOut = resolved.filter.periodCode
+    return rows.map((e) => ({
+      id: e.id,
+      periodCode: periodCodeOut,
+      title: e.title,
+      category: e.category.toLowerCase() as CloseCalendarEvent['category'],
+      dueDate: e.dueDate,
+      owner: e.ownerLabel ?? '—',
+      status: e.status.toLowerCase() as CloseCalendarEvent['status'],
+    }))
   }
   await delay()
   const code = periodCode ?? periodFilter.periodCode
@@ -334,17 +357,113 @@ export async function getGstTdsCloseSummary() {
   return { ...SEED_GST_TDS }
 }
 
-export async function getAccruals(): Promise<AccrualEntry[]> {
+function mapAccrualStatus(status: string): AccrualEntry['status'] {
+  switch (status) {
+    case 'DRAFT':
+      return 'draft'
+    case 'READY_TO_POST':
+      return 'ready'
+    case 'POSTED':
+      return 'posted_demo'
+    case 'REVERSED':
+      return 'reversed_demo'
+    case 'CANCELLED':
+      return 'cancelled'
+    default:
+      return 'previewed'
+  }
+}
+
+function mapPrepaidStatus(status: string): PrepaidStatus {
+  switch (status) {
+    case 'FULLY_RECOGNISED':
+      return 'fully_recognized'
+    case 'CANCELLED':
+      return 'closed'
+    case 'PARTIALLY_RECOGNISED':
+    case 'POSTED':
+      return 'active'
+    default:
+      return 'active'
+  }
+}
+
+function mapDtoToAccrual(dto: import('@/services/api/financeApi').PeriodAdjustmentDto): AccrualEntry {
+  return {
+    id: dto.id,
+    accrualNumber: dto.adjustmentNumber,
+    accrualType: dto.description,
+    accountCode: dto.expenseAccount.accountCode,
+    accountName: dto.expenseAccount.accountName,
+    department: dto.departmentReference ?? undefined,
+    costCentre: dto.costCentre?.code,
+    amount: Number(dto.totalAmount),
+    startPeriod: dto.period.startDate.slice(0, 7),
+    reversalDate: dto.reversalPeriod?.startDate ?? dto.period.endDate,
+    source: 'Period adjustment',
+    status: mapAccrualStatus(dto.status),
+    debitAccount: `${dto.expenseAccount.accountCode} ${dto.expenseAccount.accountName}`,
+    creditAccount: `${dto.balanceSheetAccount.accountCode} ${dto.balanceSheetAccount.accountName}`,
+    narration: dto.narration ?? dto.description,
+  }
+}
+
+function mapDtoToPrepaid(dto: import('@/services/api/financeApi').PeriodAdjustmentDto): PrepaidExpense {
+  const pending = dto.schedules.find((s) => s.status === 'PENDING')
+  return {
+    id: dto.id,
+    name: dto.description,
+    category: 'Prepaid',
+    originalAmount: Number(dto.totalAmount),
+    startDate: dto.period.startDate,
+    endDate: dto.schedules[dto.schedules.length - 1]?.periodEndDate ?? dto.period.endDate,
+    numberOfPeriods: dto.numberOfPeriods ?? dto.schedules.length,
+    amountRecognized: Number(dto.recognisedAmount),
+    remainingBalance: Number(dto.remainingAmount),
+    currentPeriodExpense: pending ? Number(pending.amount) : 0,
+    status: mapPrepaidStatus(dto.status),
+    expenseAccount: `${dto.expenseAccount.accountCode} ${dto.expenseAccount.accountName}`,
+    prepaidAccount: `${dto.balanceSheetAccount.accountCode} ${dto.balanceSheetAccount.accountName}`,
+  }
+}
+
+export async function getAccruals(filter?: PeriodFilterState): Promise<AccrualEntry[]> {
+  if (isApiMode()) {
+    const resolved = await resolveApiPeriodFilter(filter ?? periodFilter)
+    const { listPeriodAdjustments } = await import('@/services/bridges/financeApiBridge')
+    const rows = await listPeriodAdjustments({
+      kind: 'ACCRUAL',
+      legalEntityId: resolved.le.id,
+      periodId: resolved.period.id,
+      limit: 100,
+    })
+    return rows.map(mapDtoToAccrual)
+  }
   await delay()
   return accruals.map((a) => ({ ...a }))
 }
 
 export async function getAccrualById(id: string): Promise<AccrualEntry | null> {
+  if (isApiMode()) {
+    const { getPeriodAdjustment } = await import('@/services/bridges/financeApiBridge')
+    try {
+      const dto = await getPeriodAdjustment(id)
+      if (dto.kind !== 'ACCRUAL') return null
+      return mapDtoToAccrual(dto)
+    } catch {
+      return null
+    }
+  }
   await delay()
   return accruals.find((a) => a.id === id) ?? null
 }
 
+/** Demo: mark previewed. API: mark ready for posting. */
 export async function previewAccrualPosting(id: string): Promise<AccrualEntry> {
+  if (isApiMode()) {
+    const { markPeriodAdjustmentReady } = await import('@/services/bridges/financeApiBridge')
+    return mapDtoToAccrual(await markPeriodAdjustmentReady(id))
+  }
   await delay()
   const idx = accruals.findIndex((a) => a.id === id)
   if (idx < 0) throw new Error('Accrual not found')
@@ -352,12 +471,41 @@ export async function previewAccrualPosting(id: string): Promise<AccrualEntry> {
   return { ...accruals[idx] }
 }
 
-export async function getPrepaidExpenses(): Promise<PrepaidExpense[]> {
+export async function postAccrual(id: string): Promise<AccrualEntry> {
+  if (!isApiMode()) throw new Error('Post accrual requires API mode')
+  const { postPeriodAdjustment } = await import('@/services/bridges/financeApiBridge')
+  return mapDtoToAccrual(await postPeriodAdjustment(id))
+}
+
+export async function reverseAccrual(id: string, reason = 'Period-close auto-reversal'): Promise<AccrualEntry> {
+  if (!isApiMode()) throw new Error('Reverse accrual requires API mode')
+  const { reversePeriodAdjustment } = await import('@/services/bridges/financeApiBridge')
+  return mapDtoToAccrual(await reversePeriodAdjustment(id, { reason }))
+}
+
+export async function getPrepaidExpenses(filter?: PeriodFilterState): Promise<PrepaidExpense[]> {
+  if (isApiMode()) {
+    const resolved = await resolveApiPeriodFilter(filter ?? periodFilter)
+    const { listPeriodAdjustments } = await import('@/services/bridges/financeApiBridge')
+    const rows = await listPeriodAdjustments({
+      kind: 'PREPAID',
+      legalEntityId: resolved.le.id,
+      limit: 100,
+    })
+    return rows.map(mapDtoToPrepaid)
+  }
   await delay()
   return prepaid.map((p) => ({ ...p }))
 }
 
 export async function updatePrepaidStatus(id: string, status: PrepaidStatus): Promise<PrepaidExpense> {
+  if (isApiMode()) {
+    if (status === 'suspended' || status === 'closed') {
+      const { cancelPeriodAdjustment } = await import('@/services/bridges/financeApiBridge')
+      return mapDtoToPrepaid(await cancelPeriodAdjustment(id, `Marked ${status} from period close`))
+    }
+    throw new Error('Resume is not supported for live prepaid schedules — recognise the next period instead')
+  }
   await delay()
   const idx = prepaid.findIndex((p) => p.id === id)
   if (idx < 0) throw new Error('Prepaid expense not found')
@@ -365,26 +513,105 @@ export async function updatePrepaidStatus(id: string, status: PrepaidStatus): Pr
   return { ...prepaid[idx] }
 }
 
-export async function getFxRevaluation(): Promise<{
+/** Recognise the next PENDING prepaid schedule row (API mode). */
+export async function recognisePrepaidCurrentPeriod(id: string): Promise<PrepaidExpense> {
+  if (!isApiMode()) throw new Error('Recognise prepaid requires API mode')
+  const { getPeriodAdjustment, recognisePrepaidSchedule } = await import('@/services/bridges/financeApiBridge')
+  const dto = await getPeriodAdjustment(id)
+  const pending = dto.schedules.find((s) => s.status === 'PENDING')
+  if (!pending) throw new Error('No pending prepaid schedule row to recognise')
+  return mapDtoToPrepaid(await recognisePrepaidSchedule(id, pending.id))
+}
+
+export async function getFxRevaluation(filter?: PeriodFilterState): Promise<{
+  runId: string | null
+  status: string | null
   lines: FxRevaluationLine[]
   totalGain: number
   totalLoss: number
   exchangeGainAccount: string
   exchangeLossAccount: string
   reversalPeriod: string
+  voucherNumber: string | null
 }> {
+  if (isApiMode()) {
+    const resolved = await resolveApiPeriodFilter(filter ?? periodFilter)
+    const { getFxRevaluationRun } = await import('@/services/bridges/financeApiBridge')
+    const run = await getFxRevaluationRun(resolved.period.id)
+    if (!run) {
+      return {
+        runId: null,
+        status: null,
+        lines: [],
+        totalGain: 0,
+        totalLoss: 0,
+        exchangeGainAccount: '— map UNREALIZED_FX_GAIN —',
+        exchangeLossAccount: '— map UNREALIZED_FX_LOSS —',
+        reversalPeriod: '—',
+        voucherNumber: null,
+      }
+    }
+    return {
+      runId: run.id,
+      status: run.status,
+      lines: run.lines.map((l) => ({
+        id: l.id,
+        accountOrParty: l.accountOrParty,
+        currency: l.currency,
+        foreignAmount: l.foreignAmount,
+        originalRate: l.originalRate,
+        closingRate: l.closingRate,
+        bookValueInr: l.bookValueInr,
+        revaluedValueInr: l.revaluedValueInr,
+        gainLoss: l.gainLoss,
+      })),
+      totalGain: Number(run.totalGain),
+      totalLoss: Number(run.totalLoss),
+      exchangeGainAccount: run.exchangeGainAccount ?? '—',
+      exchangeLossAccount: run.exchangeLossAccount ?? '—',
+      reversalPeriod: run.reversalPeriod?.name ?? '—',
+      voucherNumber: run.voucherNumber,
+    }
+  }
   await delay()
   const lines = SEED_FX.map((l) => ({ ...l }))
   const totalGain = lines.filter((l) => l.gainLoss > 0).reduce((s, l) => s + l.gainLoss, 0)
   const totalLoss = lines.filter((l) => l.gainLoss < 0).reduce((s, l) => s + Math.abs(l.gainLoss), 0)
   return {
+    runId: 'seed-fx',
+    status: 'PREVIEWED',
     lines,
     totalGain,
     totalLoss,
     exchangeGainAccount: '4810 Foreign Exchange Gain',
     exchangeLossAccount: '5810 Foreign Exchange Loss',
     reversalPeriod: '2026-08',
+    voucherNumber: null,
   }
+}
+
+export async function previewFxRevaluation(filter?: PeriodFilterState) {
+  if (!isApiMode()) {
+    return getFxRevaluation(filter)
+  }
+  const resolved = await resolveApiPeriodFilter(filter ?? periodFilter)
+  const { previewFxRevaluation: preview } = await import('@/services/bridges/financeApiBridge')
+  const run = await preview(resolved.period.id)
+  return getFxRevaluation({ ...periodFilter, ...(filter ?? {}), periodId: run.periodId })
+}
+
+export async function postFxRevaluationRun(runId: string) {
+  if (!isApiMode()) throw new Error('Post FX revaluation requires API mode')
+  const { postFxRevaluation } = await import('@/services/bridges/financeApiBridge')
+  await postFxRevaluation(runId)
+  return getFxRevaluation()
+}
+
+export async function reverseFxRevaluationRun(runId: string, reason = 'Period-close FX reversal') {
+  if (!isApiMode()) throw new Error('Reverse FX revaluation requires API mode')
+  const { reverseFxRevaluation } = await import('@/services/bridges/financeApiBridge')
+  await reverseFxRevaluation(runId, { reason })
+  return getFxRevaluation()
 }
 
 export async function getTrialBalanceReview(): Promise<TrialBalanceLine[]> {
@@ -442,8 +669,73 @@ export async function updateModuleLock(
   return { ...locks[idx] }
 }
 
-export async function getReopenRequests(): Promise<ReopenRequest[]> {
-  if (isApiMode()) return []
+function mapReopenStatus(status: string): ReopenRequestStatus {
+  switch (status) {
+    case 'DRAFT':
+      return 'draft'
+    case 'PENDING_APPROVAL':
+      return 'pending_approval'
+    case 'APPROVED':
+      return 'approved'
+    case 'REJECTED':
+      return 'rejected'
+    case 'OPEN_TEMPORARILY':
+      return 'open_temporarily'
+    case 'EXPIRED':
+      return 'expired'
+    case 'CLOSED':
+    case 'CANCELLED':
+      return 'closed'
+    default:
+      return 'draft'
+  }
+}
+
+function mapDtoToReopen(dto: import('@/services/api/financeApi').PeriodReopenRequestApi): ReopenRequest {
+  const reasonLabels: Record<string, string> = {
+    INCORRECT_ACCOUNT: 'Incorrect Account',
+    INCORRECT_AMOUNT: 'Incorrect Amount',
+    DUPLICATE_ENTRY: 'Duplicate Entry',
+    WRONG_PARTY: 'Wrong Party',
+    WRONG_POSTING_DATE: 'Wrong Posting Date',
+    CANCELLED_TRANSACTION: 'Cancelled Transaction',
+    OTHER: 'Other',
+  }
+  return {
+    id: dto.id,
+    periodCode: dto.periodName,
+    module: dto.moduleLabel,
+    reason: reasonLabels[dto.reasonCode] ?? dto.reasonCode,
+    documentRef: dto.documentRef ?? undefined,
+    requestedBy: dto.requestedBy ?? 'User',
+    requestedUntil: dto.requestedUntil,
+    riskExplanation: dto.riskExplanation,
+    status: mapReopenStatus(dto.status),
+    approver: dto.approvedBy ?? dto.rejectedBy ?? undefined,
+    audit: dto.audit.map((a) => ({ at: a.at, by: a.by, action: a.action, note: a.note })),
+  }
+}
+
+const REASON_TO_CODE: Record<string, string> = {
+  'Incorrect Account': 'INCORRECT_ACCOUNT',
+  'Incorrect Amount': 'INCORRECT_AMOUNT',
+  'Duplicate Entry': 'DUPLICATE_ENTRY',
+  'Wrong Party': 'WRONG_PARTY',
+  'Wrong Posting Date': 'WRONG_POSTING_DATE',
+  'Cancelled Transaction': 'CANCELLED_TRANSACTION',
+  Other: 'OTHER',
+}
+
+export async function getReopenRequests(filter?: PeriodFilterState): Promise<ReopenRequest[]> {
+  if (isApiMode()) {
+    const resolved = await resolveApiPeriodFilter(filter ?? periodFilter)
+    const { listPeriodReopenRequests } = await import('@/services/bridges/financeApiBridge')
+    const rows = await listPeriodReopenRequests({
+      legalEntityId: resolved.le.id,
+      limit: 100,
+    })
+    return rows.map(mapDtoToReopen)
+  }
   await delay()
   return reopenRequests.map((r) => ({ ...r, audit: r.audit.map((a) => ({ ...a })) }))
 }
@@ -452,7 +744,23 @@ export async function submitReopenRequest(
   input: Omit<ReopenRequest, 'id' | 'status' | 'audit'>,
 ): Promise<ReopenRequest> {
   if (isApiMode()) {
-    throw new Error('Reopen request workflow is Phase 2. Use Period Locking → Reopen with a reason (finance.period.reopen).')
+    const resolved = await resolveApiPeriodFilter({
+      ...periodFilter,
+      periodCode: input.periodCode || periodFilter.periodCode,
+    })
+    const { createPeriodReopenRequest } = await import('@/services/bridges/financeApiBridge')
+    const dto = await createPeriodReopenRequest({
+      legalEntityId: resolved.le.id,
+      periodId: resolved.period.id,
+      moduleLabel: input.module,
+      reasonCode: REASON_TO_CODE[input.reason] ?? 'OTHER',
+      reasonDetail: input.reason,
+      documentRef: input.documentRef,
+      riskExplanation: input.riskExplanation,
+      requestedUntil: input.requestedUntil,
+      submit: true,
+    })
+    return mapDtoToReopen(dto)
   }
   await delay()
   const row: ReopenRequest = {
@@ -477,7 +785,18 @@ export async function updateReopenStatus(
   by: string,
   note?: string,
 ): Promise<ReopenRequest> {
-  if (isApiMode()) throw new Error('Reopen request workflow is Phase 2.')
+  if (isApiMode()) {
+    const { approvePeriodReopenRequest, rejectPeriodReopenRequest } = await import(
+      '@/services/bridges/financeApiBridge'
+    )
+    if (status === 'approved') {
+      return mapDtoToReopen(await approvePeriodReopenRequest(id, { note, activate: true }))
+    }
+    if (status === 'rejected') {
+      return mapDtoToReopen(await rejectPeriodReopenRequest(id, note ?? 'Rejected'))
+    }
+    throw new Error(`API mode does not support status transition to ${status} from this screen`)
+  }
   await delay()
   const idx = reopenRequests.findIndex((r) => r.id === id)
   if (idx < 0) throw new Error('Reopen request not found')

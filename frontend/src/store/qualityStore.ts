@@ -46,6 +46,7 @@ import {
 } from '../utils/qualityEngine'
 import { erpStorage, ERP_PERSIST_VERSION, ERP_STORAGE_KEYS } from './persistConfig'
 import { normalizeQualityPersisted, normalizeInspection, type QualityPersistSlice } from '../utils/documentNormalize'
+import { memoizedOnSource } from './selectors/memoizedGetters'
 import { useWorkOrderStore } from './workOrderStore'
 import { registerQualityStore } from './storeBridge'
 import { moveFromWipOnOperationComplete } from '../utils/woWipActions'
@@ -288,8 +289,11 @@ export const useQualityStore = create<QualityState>()(
       })),
 
       getInspection: (id) => {
-        const insp = get().inspections.find((i) => i.id === id)
-        return insp ? normalizeInspection(insp) : undefined
+        const inspections = get().inspections
+        return memoizedOnSource(inspections, `quality:inspection:${id}`, () => {
+          const insp = inspections.find((i) => i.id === id)
+          return insp ? normalizeInspection(insp) : undefined
+        })
       },
       getInspectionsForWo: (woId) => get().inspections.filter((i) => i.workOrderId === woId),
       getPendingInspections: () => get().inspections.filter((i) => i.status === 'pending'),

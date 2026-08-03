@@ -1,8 +1,8 @@
 /**
- * Production migration step — runs `prisma migrate deploy` only.
+ * Production migration step — runs `prisma migrate deploy`.
  *
  * Invoked from backend `npm run build` (Hostinger) or `npm run db:deploy:hostinger`.
- * Emergency one-time repair: `npm run db:recover-known` — never called from here.
+ * On known P3009/P3018 blockers, runs one-shot recover + single redeploy retry.
  *
  * Env: DATABASE_URL or DB_HOST + DB_NAME + DB_USER + DB_PASS (+ optional DB_PORT)
  */
@@ -10,10 +10,19 @@ import { config } from 'dotenv'
 import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  recoverKnownMigrationBlockers,
+} from './migrate-recover-known-blockers.mjs'
 
 const backend = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 config({ path: join(backend, '.env') })
+
+// Temporary opt-out (SSH/manual migration workflow). Set SKIP_MIGRATE_DEPLOY=1
+if (process.env.SKIP_MIGRATE_DEPLOY === '1' || process.env.SKIP_MIGRATE_DEPLOY === 'true') {
+  console.warn('[migrate-deploy] SKIP_MIGRATE_DEPLOY is set — skipping prisma migrate deploy.')
+  process.exit(0)
+}
 
 function buildDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL
@@ -43,6 +52,35 @@ function parseDbTarget(url) {
   }
 }
 
+function connectionConfigFromUrl(url) {
+  const u = new URL(url)
+  let password = ''
+  try {
+    password = decodeURIComponent(u.password)
+  } catch {
+    password = u.password
+  }
+  return {
+    host: u.hostname,
+    port: Number(u.port || 3306),
+    user: u.username,
+    password,
+    database: u.pathname.replace(/^\//, ''),
+  }
+}
+
+function runMigrateDeploy() {
+  const prismaBin = join(backend, 'node_modules', 'prisma', 'build', 'index.js')
+  return spawnSync(process.execPath, [prismaBin, 'migrate', 'deploy'], {
+    cwd: backend,
+    env: {
+      ...process.env,
+      NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=768',
+    },
+    stdio: 'inherit',
+  })
+}
+
 const databaseUrl = buildDatabaseUrl()
 
 if (!databaseUrl) {
@@ -70,18 +108,9 @@ console.log(
   `[migrate-deploy] Target database: ${target.user}@${target.host}:${target.port}/${target.database}`,
 )
 
-const prismaBin = join(backend, 'node_modules', 'prisma', 'build', 'index.js')
-
 console.log('[migrate-deploy] Applying pending Prisma migrations…')
 
-const result = spawnSync(process.execPath, [prismaBin, 'migrate', 'deploy'], {
-  cwd: backend,
-  env: {
-    ...process.env,
-    NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=768',
-  },
-  stdio: 'inherit',
-})
+let result = runMigrateDeploy()
 
 if (result.error?.message?.includes('Killed') || result.signal === 'SIGKILL') {
   console.error('[migrate-deploy] Process was Killed (likely OOM on shared hosting).')
@@ -92,10 +121,26 @@ if (result.error?.message?.includes('Killed') || result.signal === 'SIGKILL') {
 }
 
 if (result.status !== 0) {
+  console.warn(
+    '[migrate-deploy] migrate deploy failed — attempting one-shot known P3009/P3018 recovery…',
+  )
+  try {
+    await recoverKnownMigrationBlockers(connectionConfigFromUrl(databaseUrl))
+    console.log('[migrate-deploy] Recovery finished — retrying migrate deploy once…')
+    result = runMigrateDeploy()
+  } catch (err) {
+    console.error('[migrate-deploy] Known-blocker recovery failed:', err?.message ?? err)
+  }
+}
+
+if (result.status !== 0) {
   console.error('[migrate-deploy] Migration failed. Deployment stopped.')
   console.error('[migrate-deploy] Inspect: npx prisma migrate status')
-  console.error('[migrate-deploy] One-time P3009 fix (SSH): node scripts/resolve-phase10-p3009.mjs')
-  console.error('[migrate-deploy] Or phpMyAdmin: scripts/live-fix-p3018-crm-phase10-drop-product-id.sql')
+  console.error('[migrate-deploy] One-time emergency repair: npm run db:recover-known')
+  console.error('[migrate-deploy] One-time P3009 fix (SSH): npm run db:resolve-phase10')
+  console.error(
+    '[migrate-deploy] Manual SQL (phpMyAdmin): backend/scripts/live-fix-p3018-crm-phase10-drop-product-id.sql',
+  )
   process.exit(result.status ?? 1)
 }
 

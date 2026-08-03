@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
+import { useEffect, useMemo, useState } from 'react'
+import { UserRound } from 'lucide-react'
+import { ErpButton } from '../erp/ErpButton'
 import { ErpSmartSelect, type ErpSmartSelectOption } from '../erp/ErpSmartSelect'
 import { useCrmOwnerOptions } from '../../hooks/useCrmMasters'
+import { CrmDrawerShell } from './CrmDrawerShell'
 
 export type AssignOwnerEntityKind = 'lead' | 'opportunity' | 'contact' | 'company' | 'quotation'
 
@@ -46,7 +48,6 @@ export function AssignOwnerDialog({
   currentOwnerName,
   onAssign,
 }: AssignOwnerDialogProps) {
-  const panelRef = useRef<HTMLDivElement>(null)
   const ownerOptions = useCrmOwnerOptions()
   const [ownerId, setOwnerId] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -80,26 +81,6 @@ export function AssignOwnerDialog({
     setOwnerId(initial)
   }, [open, currentOwnerId, ownerOptions])
 
-  useEffect(() => {
-    if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !submitting) onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    // Focus first control after paint (matches other ERP dialogs — Escape + aria-modal)
-    requestAnimationFrame(() => {
-      panelRef.current?.querySelector<HTMLElement>('input, button')?.focus()
-    })
-    return () => {
-      document.body.style.overflow = prev
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [open, onClose, submitting])
-
-  if (!open) return null
-
   const selected = ownerOptions.find((o) => o.value === ownerId)
   const subtitle = `Assign owner to ${entityCountLabel(entityKind, count)}`
   const showCurrent = count === 1 && Boolean(currentOwnerName || currentOwnerId)
@@ -126,22 +107,44 @@ export function AssignOwnerDialog({
   }
 
   return (
-    <div className="erp-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="assign-owner-title">
-      <div ref={panelRef} className="erp-modal-panel max-w-md">
-        <h2 id="assign-owner-title" className="text-[16px] font-semibold text-erp-text">
-          Assign owner
-        </h2>
-        <p className="mt-1 text-[13px] text-erp-muted">{subtitle}</p>
-
+    <CrmDrawerShell
+      open={open}
+      placement="modal"
+      size="sm"
+      icon={UserRound}
+      accent="primary"
+      title="Assign owner"
+      subtitle={subtitle}
+      onClose={onClose}
+      closeDisabled={submitting}
+      footer={
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </ErpButton>
+          <ErpButton
+            type="button"
+            variant="primary"
+            onClick={() => void handleAssign()}
+            disabled={submitting || !ownerId || selectOptions.length === 0}
+          >
+            {submitting ? 'Assigning…' : 'Assign'}
+          </ErpButton>
+        </div>
+      }
+    >
+      <div className="crm-popup-form">
         {showCurrent ? (
-          <p className="mt-3 text-[13px] text-erp-text">
-            Current owner:{' '}
-            <span className="font-medium">{currentOwnerName?.trim() || 'Unassigned'}</span>
-          </p>
+          <div className="crm-popup-context-pill">
+            <UserRound className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>
+              Current: <strong className="font-semibold">{currentOwnerName?.trim() || 'Unassigned'}</strong>
+            </span>
+          </div>
         ) : null}
 
-        <label className="mt-4 block">
-          <span className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-erp-muted">
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
             New owner
           </span>
           <ErpSmartSelect
@@ -160,25 +163,11 @@ export function AssignOwnerDialog({
         </label>
 
         {error ? (
-          <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800" role="alert">
+          <p className="crm-popup-alert" role="alert">
             {error}
           </p>
         ) : null}
-
-        <ErpButtonGroup className="mt-5 justify-end">
-          <ErpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
-            Cancel
-          </ErpButton>
-          <ErpButton
-            type="button"
-            variant="primary"
-            onClick={() => void handleAssign()}
-            disabled={submitting || !ownerId || selectOptions.length === 0}
-          >
-            {submitting ? 'Assigning…' : 'Assign'}
-          </ErpButton>
-        </ErpButtonGroup>
       </div>
-    </div>
+    </CrmDrawerShell>
   )
 }

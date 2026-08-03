@@ -105,3 +105,39 @@ export const reports = asyncHandler(async (req: Request, res: Response) => {
   const data = await service.getReports(tenantId, req.query as unknown as ReportQuery)
   return sendSuccess(res, 'Maintenance reports', data)
 })
+
+export const activeTicketForMachine = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const machineId = String(req.query.machineId ?? '')
+  const item = await service.getActiveTicketForMachine(tenantId, machineId)
+  return sendSuccess(res, 'Active maintenance ticket for machine', item)
+})
+
+export const linkPartPr = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const item = await service.linkPartToPurchaseRequisition(
+    req,
+    tenantId,
+    getRouteParam(req, 'id'),
+    req.body as { partId: string; purchaseRequisitionId: string },
+  )
+  return sendSuccess(res, 'Part linked to purchase requisition', item)
+})
+
+export const machineHealth = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const { listMachineHealth } = await import('./machine-health.service.js')
+  const data = await listMachineHealth(tenantId, req.query as never)
+  return sendSuccess(res, 'Machine health', data)
+})
+
+export const machineHealthDetail = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const { getMachineHealthDetail } = await import('./machine-health.service.js')
+  const data = await getMachineHealthDetail(tenantId, getRouteParam(req, 'machineId'), req.query as never)
+  if (!data) {
+    const { NotFoundError } = await import('../../utils/errors.js')
+    throw new NotFoundError('Machine not found')
+  }
+  return sendSuccess(res, 'Machine health detail', data)
+})

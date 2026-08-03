@@ -20,6 +20,10 @@ import { useMasterStore } from '../../store/masterStore'
 import { cn } from '../../utils/cn'
 import { isItemSellable, itemNotSellableForSalesMessage } from '../../utils/opportunityItemOptions'
 import { notify } from '../../store/toastStore'
+import {
+  opportunityRequirementDisplay,
+  sanitizeOpportunityLines,
+} from '../../utils/leadRequirementLines'
 
 interface ErpLineItemsGridProps {
   lines: OpportunityLine[]
@@ -53,7 +57,9 @@ export function ErpLineItemsGrid({
 }: ErpLineItemsGridProps) {
   const warehouses = useMasterStore((s) => s.warehouses)
   const categories = useMasterStore((s) => s.categories)
-  const synced = syncOpportunityLines(lines)
+  // Expand accidental <!--fos-lead-lines--> blobs into real product rows before render.
+  const sanitizedSource = sanitizeOpportunityLines(lines)
+  const synced = syncOpportunityLines(sanitizedSource)
   const summary = calcOpportunityLinesSummary(synced)
   const weighted = calcWeightedValue(summary.grandTotal, probability)
   const isOpportunity = variant === 'opportunity'
@@ -225,7 +231,9 @@ export function ErpLineItemsGrid({
                       <td className="erp-line-items-grid__sticky-product">
                         <div className="erp-line-items-grid__product-stack">
                           {readOnly ? (
-                            <p className="erp-line-items-grid__product-name">{line.productOrItem || '—'}</p>
+                            <p className="erp-line-items-grid__product-name">
+                              {opportunityRequirementDisplay(line.productOrItem) || '—'}
+                            </p>
                           ) : (
                             <ErpSmartSelect
                               options={productOptions}
@@ -247,7 +255,9 @@ export function ErpLineItemsGrid({
                       {isOpportunity ? (
                         <td className="erp-line-items-grid__col-desc erp-line-items-grid__col--desktop">
                           {readOnly ? (
-                            <p className="erp-line-items-grid__desc-text">{line.description || '—'}</p>
+                            <p className="erp-line-items-grid__desc-text">
+                              {opportunityRequirementDisplay(line.description) || '—'}
+                            </p>
                           ) : (
                             <input
                               className="quo-editor-price__input"

@@ -14,7 +14,7 @@ export const PRESET_CRM_USER: readonly string[] = [
   'crm.pipeline.view',
   'crm.opportunity.view', 'crm.opportunity.create', 'crm.opportunity.update',
   'crm.quotation.view', 'crm.quotation.create', 'crm.quotation.update', 'crm.quotation.convert',
-  'crm.sales_order.view', 'crm.sales_order.create', 'crm.sales_order.update',
+  'crm.sales_order.view', 'crm.sales_order.create', 'crm.sales_order.update', 'crm.sales_order.confirm',
   'crm.commercial.view',
   'crm.commercial.receipt.view', 'crm.commercial.receipt.create',
   'crm.commercial.invoice.view', 'crm.commercial.invoice.create', 'crm.commercial.invoice.post', 'crm.commercial.invoice.cancel',

@@ -44,6 +44,7 @@ import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { locationDisplayLabel } from '../../utils/locationUtils'
 import { resolveSalesOrderValue } from '../../components/sales/SalesOrder360Sections'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
+import { quotationNoWithRevision } from '../../utils/quotationEngine/revisionLabels'
 
 export { SalesOrderNewPage } from './SalesOrderCreatePage'
 
@@ -259,7 +260,7 @@ export function SalesOrderEditPage() {
       />
       {so.quotationNo ? (
         <p className="mt-3 rounded-lg border border-erp-border bg-erp-surface-alt/60 p-3 text-[12px] text-erp-muted">
-          Quotation <strong className="text-erp-text">{so.quotationNo}</strong> Rev {so.quotationRevisionNo ?? 1} is locked for this draft.
+          Quotation <strong className="text-erp-text">{quotationNoWithRevision(so.quotationNo, so.quotationRevisionNo ?? 1)}</strong> is locked for this draft.
         </p>
       ) : null}
     </EnterpriseBusinessFactBox>
@@ -282,7 +283,7 @@ export function SalesOrderEditPage() {
       <SalesCardFormShell
         title="Edit Sales Order"
         badge={fromCrm ? 'CRM' : 'Sales'}
-        className={`${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview`}
+        className={`${ENTERPRISE_FORM_CLASS} crm-lead-form-page enterprise-workspace--crm-smart-overview`}
         recordNo={so.salesOrderNo}
         recordTitle={customer?.customerName ?? so.salesOrderNo}
         status="Draft"

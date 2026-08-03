@@ -1035,7 +1035,7 @@ export function ProformaInvoiceDetailPage() {
               </ErpCardSection>
             ) : null}
           </div>
-          <aside className="space-y-4">
+          <aside className="erp-doc-facts min-w-0 space-y-4">
             {paymentSummary ? (
               <ErpCardSection title="Payment summary" columns={1}>
                 <ErpFieldRow label="Proforma Amount" readOnly>{formatCurrency(paymentSummary.totalAmount)}</ErpFieldRow>

@@ -160,7 +160,7 @@ export function SalesOrderPrintDocument({
       <div className="so-print-parties">
         <section className="so-print-party">
           <p className="so-print-party__label">Bill to</p>
-          <p className="so-print-party__name">{customer?.customerName ?? '—'}</p>
+          <p className="so-print-party__name">{customer?.customerName ?? order.customerName ?? '—'}</p>
           <p className="so-print-party__line">Code: {order.customerCode ?? customer?.customerCode ?? '—'}</p>
           <p className="so-print-party__line">GSTIN: {customer?.gstin || '—'}</p>
           <p className="so-print-party__line">{billTo}</p>
@@ -178,7 +178,7 @@ export function SalesOrderPrintDocument({
         ) : (
           <section className="so-print-party">
             <p className="so-print-party__label">Ship to</p>
-            <p className="so-print-party__name">{customer?.customerName ?? '—'}</p>
+            <p className="so-print-party__name">{customer?.customerName ?? order.customerName ?? '—'}</p>
             <p className="so-print-party__line">{shipTo}</p>
             {deliveryLocationLabel ? (
               <p className="so-print-party__line">Location: {deliveryLocationLabel}</p>

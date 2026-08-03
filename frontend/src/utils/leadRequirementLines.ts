@@ -111,3 +111,46 @@ export function opportunityRequirementDisplay(raw: string | null | undefined): s
   if (isEncodedLeadRequirementPayload(text)) return leadRequirementDisplayText(text)
   return text.trim()
 }
+
+/**
+ * Expand accidental storage of the full <!--fos-lead-lines--> blob into productOrItem/description
+ * (or hydrate lines from productRequirement) into proper line rows.
+ */
+export function sanitizeOpportunityLines(
+  lines: OpportunityLine[] | null | undefined,
+  productRequirement?: string | null,
+): OpportunityLine[] {
+  const input = Array.isArray(lines) ? lines : []
+
+  if (input.some((l) => isEncodedLeadRequirementPayload(l.productOrItem) || isEncodedLeadRequirementPayload(l.description))) {
+    const blob =
+      input.find((l) => isEncodedLeadRequirementPayload(l.productOrItem))?.productOrItem
+      ?? input.find((l) => isEncodedLeadRequirementPayload(l.description))?.description
+      ?? ''
+    if (blob) {
+      const { lines: decoded } = decodeLeadRequirementLines(blob)
+      if (hasLeadRequirementLines(decoded)) return decoded
+    }
+  }
+
+  if (input.length > 0) {
+    return syncOpportunityLines(
+      input.map((l) => ({
+        ...l,
+        productOrItem: isEncodedLeadRequirementPayload(l.productOrItem)
+          ? opportunityRequirementDisplay(l.productOrItem)
+          : l.productOrItem,
+        description: isEncodedLeadRequirementPayload(l.description)
+          ? opportunityRequirementDisplay(l.description)
+          : l.description,
+      })),
+    )
+  }
+
+  if (isEncodedLeadRequirementPayload(productRequirement)) {
+    const { lines: decoded } = decodeLeadRequirementLines(String(productRequirement))
+    if (hasLeadRequirementLines(decoded)) return decoded
+  }
+
+  return []
+}

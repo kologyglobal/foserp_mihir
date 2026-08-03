@@ -193,8 +193,9 @@ export async function validateStatement(req: Request, tenantId: string, id: stri
   if (existing.updatedAt.toISOString() !== input.expectedUpdatedAt) throw new BankStatementStaleVersionError()
 
   const lines = await readRepo.getStatementLines(tenantId, id)
+  const activeLines = lines.filter((l) => !l.isExcluded && l.matchStatus !== 'EXCLUDED')
   const lineTotals = computeLineTotals({
-    lines: lines.map((l) => ({ direction: l.direction, amount: formatForPersistence(l.amount) })),
+    lines: activeLines.map((l) => ({ direction: l.direction, amount: formatForPersistence(l.amount) })),
   })
   const openingBalance = formatForPersistence(existing.openingBalance)
   const closingBalance = formatForPersistence(existing.closingBalance)
@@ -223,8 +224,12 @@ export async function validateStatement(req: Request, tenantId: string, id: stri
       statementDate: refreshed.statementDate,
       currencyCode: refreshed.currencyCode,
       treasuryAccountCurrencyCode: refreshed.treasuryAccount.currencyCode,
+      hasOpeningBalance: refreshed.hasOpeningBalance,
+      hasClosingBalance: refreshed.hasClosingBalance,
     },
-    lines: lines.map((l) => ({ direction: l.direction, amount: formatForPersistence(l.amount) })),
+    lines: lines
+      .filter((l) => !l.isExcluded && l.matchStatus !== 'EXCLUDED')
+      .map((l) => ({ direction: l.direction, amount: formatForPersistence(l.amount) })),
   })
 
   const updated = await repo.markStatementValidated(

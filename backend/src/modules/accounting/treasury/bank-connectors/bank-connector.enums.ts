@@ -24,7 +24,14 @@ export const BANK_CONNECTOR_PROBE_STATUSES = [
 
 export type BankConnectorProbeStatusCode = (typeof BANK_CONNECTOR_PROBE_STATUSES)[number]
 
-export const BANK_CONNECTOR_EXPECTED_FORMATS = ['MT940', 'CAMT053', 'CSV', 'OTHER'] as const
+export const BANK_CONNECTOR_EXPECTED_FORMATS = [
+  'MT940',
+  'CAMT053',
+  'CAMT052',
+  'CAMT054',
+  'CSV',
+  'OTHER',
+] as const
 
 export type BankConnectorExpectedFormat = (typeof BANK_CONNECTOR_EXPECTED_FORMATS)[number]
 

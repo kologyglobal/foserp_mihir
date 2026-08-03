@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Paperclip } from 'lucide-react'
 import { ErpButton } from '../../erp/ErpButton'
 import { ErpSmartSelect } from '../../erp/ErpSmartSelect'
 import {
@@ -15,6 +16,7 @@ import {
   parseAllowedFileTypes,
 } from '../../../utils/crmDocumentUploadUtils'
 import { CRM_MAX_ATTACHMENT_BYTES } from '../../../hooks/useEntityAttachments'
+import { CrmDrawerShell } from '../CrmDrawerShell'
 
 interface AttachmentUploadDialogProps {
   open: boolean
@@ -66,7 +68,12 @@ export function AttachmentUploadDialog({
     [documentTypeOptions],
   )
 
-  if (!open) return null
+  const handleClose = () => {
+    setDocumentTypeCode('')
+    setStaged([])
+    setError(null)
+    onClose()
+  }
 
   const handleUpload: DocumentUploadHandler = async ({ file, onProgress }) => {
     if (!selectedType) {
@@ -83,18 +90,29 @@ export function AttachmentUploadDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-lg border border-erp-border bg-erp-surface p-4 shadow-lg">
-        <h3 className="text-[15px] font-semibold text-erp-text">Upload attachment</h3>
-        <p className="mt-1 text-[13px] text-erp-muted">
-          Choose attachment type from master, then upload. Max{' '}
-          {Math.round(CRM_MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB platform limit.
-        </p>
-
-        <div className="mt-4 space-y-3">
-          <label className="block text-[12px] font-medium text-erp-muted">
-            Attachment type <span className="text-red-600">*</span>
-          </label>
+    <CrmDrawerShell
+      open={open}
+      placement="modal"
+      size="md"
+      icon={Paperclip}
+      accent="primary"
+      title="Upload attachment"
+      subtitle={`Max ${Math.round(CRM_MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB · type required first`}
+      onClose={handleClose}
+      closeDisabled={pending}
+      footer={
+        <div className="crm-popup-footer__actions">
+          <ErpButton type="button" variant="secondary" onClick={handleClose} disabled={pending}>
+            Cancel
+          </ErpButton>
+        </div>
+      }
+    >
+      <div className="crm-popup-form">
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
+            Attachment type *
+          </span>
           <ErpSmartSelect
             options={typeSelectOptions}
             value={documentTypeCode}
@@ -108,68 +126,51 @@ export function AttachmentUploadDialog({
             disabled={pending}
             allowEmpty
           />
-          {selectedType ? (
-            <p className="text-[12px] text-erp-muted">{documentTypeUploadHint(selectedType)}</p>
-          ) : (
-            <p className="text-[12px] text-erp-muted">
-              Select a type to enable upload. Managed under CRM → Document Type Master.
-            </p>
-          )}
+        </label>
+        {selectedType ? (
+          <p className="text-[12px] text-erp-muted">{documentTypeUploadHint(selectedType)}</p>
+        ) : (
+          <p className="text-[12px] text-erp-muted">
+            Select a type to enable upload. Managed under CRM → Document Type Master.
+          </p>
+        )}
 
-          <ErpDocumentUpload
-            category={category?.code || documentTypeCode || 'general_document'}
-            acceptedMimeTypes={acceptedMimeTypes}
-            acceptedExtensions={allowedExtensions}
-            maxFileSizeMb={maxFileSizeMb}
-            maxFiles={1}
-            allowPreview
-            allowRemove
-            allowDownload
-            allowRetry
-            files={staged}
-            onChange={(next) => {
-              setStaged(next)
-              if (next.some((f) => f.uploadStatus === 'uploaded')) {
-                setDocumentTypeCode('')
-                setError(null)
-                // Defer close so ErpDocumentUpload can finish status patch.
-                queueMicrotask(() => onClose())
-              }
-            }}
-            onUpload={selectedType ? handleUpload : undefined}
-            disabled={pending || !selectedType}
-            documentTypeCode={selectedType?.code}
-            documentTypeName={selectedType?.name}
-            error={error}
-            hideDropzoneWhenFull
-            dropzoneTitle={
-              selectedType ? 'Drag and drop or click to upload' : 'Select document type first'
-            }
-            hint={
-              selectedType
-                ? documentTypeUploadHint(selectedType)
-                : 'Select a document type to enable upload'
-            }
-          />
-        </div>
-
-        <div className="mt-4 flex justify-end">
-          <ErpButton
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => {
+        <ErpDocumentUpload
+          category={category?.code || documentTypeCode || 'general_document'}
+          acceptedMimeTypes={acceptedMimeTypes}
+          acceptedExtensions={allowedExtensions}
+          maxFileSizeMb={maxFileSizeMb}
+          maxFiles={1}
+          allowPreview
+          allowRemove
+          allowDownload
+          allowRetry
+          files={staged}
+          onChange={(next) => {
+            setStaged(next)
+            if (next.some((f) => f.uploadStatus === 'uploaded')) {
               setDocumentTypeCode('')
-              setStaged([])
               setError(null)
-              onClose()
-            }}
-            disabled={pending}
-          >
-            Cancel
-          </ErpButton>
-        </div>
+              // Defer close so ErpDocumentUpload can finish status patch.
+              queueMicrotask(() => onClose())
+            }
+          }}
+          onUpload={selectedType ? handleUpload : undefined}
+          disabled={pending || !selectedType}
+          documentTypeCode={selectedType?.code}
+          documentTypeName={selectedType?.name}
+          error={error}
+          hideDropzoneWhenFull
+          dropzoneTitle={
+            selectedType ? 'Drag and drop or click to upload' : 'Select document type first'
+          }
+          hint={
+            selectedType
+              ? documentTypeUploadHint(selectedType)
+              : 'Select a document type to enable upload'
+          }
+        />
       </div>
-    </div>
+    </CrmDrawerShell>
   )
 }

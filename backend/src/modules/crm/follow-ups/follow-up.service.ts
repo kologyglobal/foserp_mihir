@@ -79,6 +79,8 @@ export async function completeFollowUp(tenantId: string, id: string, userId: str
   const existing = await repo.findFollowUpById(tenantId, id)
   if (!existing) throw new NotFoundError('Follow-up not found')
   const followUp = await repo.completeFollowUp(tenantId, id, userId, input)
+  const { resolveFollowUpNotifications } = await import('../../notifications/notification.emitters.js')
+  resolveFollowUpNotifications(tenantId, id)
   return mapWithNames(tenantId, { ...followUp, status: 'completed' })
 }
 
@@ -87,6 +89,8 @@ export async function rescheduleFollowUp(tenantId: string, id: string, userId: s
   if (!existing) throw new NotFoundError('Follow-up not found')
   assertFollowUpInFuture(input.dueDate, input.dueTime)
   const followUp = await repo.rescheduleFollowUp(tenantId, id, userId, input)
+  const { resolveFollowUpNotifications } = await import('../../notifications/notification.emitters.js')
+  resolveFollowUpNotifications(tenantId, id)
   return mapWithNames(tenantId, { ...followUp, status: deriveFollowUpStatus(followUp.dueDate, followUp.status) })
 }
 

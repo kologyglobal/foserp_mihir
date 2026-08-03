@@ -1,4 +1,5 @@
 import type { Request } from 'express'
+import { randomUUID } from 'node:crypto'
 import { prisma } from '../../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../../services/audit.service.js'
 import { getLegalEntityOrThrow } from '../../shared/finance.helpers.js'
@@ -18,12 +19,13 @@ import {
   BankConnectorNotImplementedError,
   BankConnectorProbeFailedError,
   BankConnectorProviderDisabledError,
+  BankConnectorSyncInProgressError,
   BankConnectorValidationError,
 } from './bank-connector.errors.js'
 import type { BankConnectorAdapter, BankConnectorAdapterContext } from './bank-connector.interface.js'
 import * as repo from './bank-connector.repository.js'
 import { assertSafeCredentialEnvKey, isSandboxConnectorsEnabled } from './bank-connector.secrets.js'
-import { isValidScheduleCron } from './bank-connector-cron.js'
+import { isConnectorDueForCron, isValidScheduleCron } from './bank-connector-cron.js'
 import type {
   BankConnectorLifecycleInput,
   CreateBankConnectorInput,
@@ -359,6 +361,7 @@ export type SyncBankConnectorAudit = {
 /**
  * Core sync used by HTTP and the scheduled cron worker.
  * OPEN_BANKING requires AUTHORIZED consent; SIMULATED AIS pulls from sandbox drop folder.
+ * Acquires a distributed MySQL lease so multi-instance cron/manual sync cannot overlap.
  */
 export async function syncBankConnectorCore(params: {
   tenantId: string
@@ -370,136 +373,181 @@ export async function syncBankConnectorCore(params: {
   const { tenantId, connectorId: id, userId } = params
   const audit = params.audit ?? { userId }
   const trigger = params.trigger ?? 'MANUAL'
-  const row = await repo.getConnector(tenantId, id)
-  const config = readConfig(row)
+  const lockToken = randomUUID()
 
-  if (row.status === 'DISABLED') {
-    await repo.updateConnector(tenantId, id, {
-      lastSyncAt: new Date(),
-      lastSyncStatus: 'PROVIDER_DISABLED',
-      lastSyncMessage: 'Connector is disabled — sync skipped',
-      updatedBy: userId,
-      expectedUpdatedAt: row.updatedAt,
-    })
-    throw new BankConnectorProviderDisabledError('Bank connector is disabled — sync is not available')
+  const acquired = await repo.tryAcquireSyncLock(id, lockToken)
+  if (!acquired) {
+    const current = await repo.getConnector(tenantId, id)
+    throw new BankConnectorSyncInProgressError(
+      'Bank connector sync is already in progress on another instance',
+      current.syncLockUntil?.toISOString() ?? null,
+    )
   }
 
-  if (row.provider === 'OPEN_BANKING') {
-    await assertOpenBankingConsentAuthorized(tenantId, id)
-  }
-
-  const adapter = resolveAdapter(row.status, row.provider, config)
-  if (!adapter.listRemoteFiles || !adapter.fetchStatementFile) {
-    await repo.updateConnector(tenantId, id, {
-      lastSyncAt: new Date(),
-      lastSyncStatus: 'NOT_IMPLEMENTED',
-      lastSyncMessage: 'Provider does not support statement sync',
-      updatedBy: userId,
-      expectedUpdatedAt: row.updatedAt,
-    })
-    throw new BankConnectorNotImplementedError('Provider does not support statement sync yet')
-  }
-
-  const ctx = toAdapterContext(row)
-  let files
   try {
-    files = await adapter.listRemoteFiles(ctx)
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Failed to list remote files'
-    await repo.updateConnector(tenantId, id, {
-      lastSyncAt: new Date(),
-      lastSyncStatus: 'ERROR',
-      lastSyncMessage: message.slice(0, 500),
-      updatedBy: userId,
-      expectedUpdatedAt: row.updatedAt,
-    })
-    throw new BankConnectorProbeFailedError(message)
-  }
+    let row = await repo.getConnector(tenantId, id)
 
-  if (files.length === 0) {
+    if (trigger === 'SCHEDULED') {
+      if (
+        !row.scheduleCron ||
+        !isConnectorDueForCron({
+          scheduleCron: row.scheduleCron,
+          lastSyncAt: row.lastSyncAt,
+        })
+      ) {
+        return {
+          ok: true,
+          code: 'OK',
+          message: 'Connector no longer due after lock acquisition — skipped',
+          connectorId: id,
+          statementsCreated: 0,
+          statementsSkipped: 0,
+          filesProcessed: [],
+        }
+      }
+    }
+
+    const config = readConfig(row)
+
+    if (row.status === 'DISABLED') {
+      await repo.updateConnector(tenantId, id, {
+        lastSyncAt: new Date(),
+        lastSyncStatus: 'PROVIDER_DISABLED',
+        lastSyncMessage: 'Connector is disabled — sync skipped',
+        updatedBy: userId,
+        expectedUpdatedAt: row.updatedAt,
+      })
+      throw new BankConnectorProviderDisabledError('Bank connector is disabled — sync is not available')
+    }
+
+    if (row.provider === 'OPEN_BANKING') {
+      await assertOpenBankingConsentAuthorized(tenantId, id)
+    }
+
+    const adapter = resolveAdapter(row.status, row.provider, config)
+    if (!adapter.listRemoteFiles || !adapter.fetchStatementFile) {
+      await repo.updateConnector(tenantId, id, {
+        lastSyncAt: new Date(),
+        lastSyncStatus: 'NOT_IMPLEMENTED',
+        lastSyncMessage: 'Provider does not support statement sync',
+        updatedBy: userId,
+        expectedUpdatedAt: row.updatedAt,
+      })
+      throw new BankConnectorNotImplementedError('Provider does not support statement sync yet')
+    }
+
+    const ctx = toAdapterContext(row)
+    let files
+    try {
+      files = await adapter.listRemoteFiles(ctx)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to list remote files'
+      row = await repo.getConnector(tenantId, id)
+      await repo.updateConnector(tenantId, id, {
+        lastSyncAt: new Date(),
+        lastSyncStatus: 'ERROR',
+        lastSyncMessage: message.slice(0, 500),
+        updatedBy: userId,
+        expectedUpdatedAt: row.updatedAt,
+      })
+      throw new BankConnectorProbeFailedError(message)
+    }
+
+    if (files.length === 0) {
+      row = await repo.getConnector(tenantId, id)
+      await repo.updateConnector(tenantId, id, {
+        lastSyncAt: new Date(),
+        lastSyncStatus: 'OK',
+        lastSyncMessage: 'No remote statement files found',
+        updatedBy: userId,
+        expectedUpdatedAt: row.updatedAt,
+      })
+      return {
+        ok: true,
+        code: 'OK',
+        message: 'No remote statement files found',
+        connectorId: id,
+        statementsCreated: 0,
+        statementsSkipped: 0,
+        filesProcessed: [],
+      }
+    }
+
+    const filesProcessed: NonNullable<BankConnectorProbeResult['filesProcessed']> = []
+    let statementsCreated = 0
+    let statementsSkipped = 0
+
+    for (const remote of files) {
+      const stillOwned = await repo.heartbeatSyncLock(id, lockToken)
+      if (!stillOwned) {
+        throw new BankConnectorSyncInProgressError(
+          'Bank connector sync lease was lost during file processing',
+          null,
+        )
+      }
+      const fetched = await adapter.fetchStatementFile(ctx, remote.path)
+      const ingested = await ingestConnectorFetchedFile({
+        tenantId,
+        legalEntityId: row.legalEntityId,
+        treasuryAccountId: row.treasuryAccountId,
+        connectorId: id,
+        uploadedBy: userId,
+        file: fetched,
+      })
+      if (ingested.skippedDuplicate) {
+        statementsSkipped += 1
+        filesProcessed.push({
+          fileName: fetched.fileName,
+          statementId: ingested.statementId || undefined,
+          skippedDuplicate: true,
+          lineCount: ingested.lineCount,
+        })
+      } else {
+        statementsCreated += 1
+        filesProcessed.push({
+          fileName: fetched.fileName,
+          statementId: ingested.statementId,
+          skippedDuplicate: false,
+          lineCount: ingested.lineCount,
+        })
+      }
+    }
+
+    const message = `Sync complete — created ${statementsCreated}, skipped ${statementsSkipped}`
+    const refreshed = await repo.getConnector(tenantId, id)
     await repo.updateConnector(tenantId, id, {
       lastSyncAt: new Date(),
       lastSyncStatus: 'OK',
-      lastSyncMessage: 'No remote statement files found',
+      lastSyncMessage: message.slice(0, 500),
+      lastTestAt: refreshed.lastTestAt ?? new Date(),
+      lastTestStatus: refreshed.lastTestStatus === 'OK' ? 'OK' : refreshed.lastTestStatus,
       updatedBy: userId,
-      expectedUpdatedAt: row.updatedAt,
+      expectedUpdatedAt: refreshed.updatedAt,
     })
+
+    await createAuditLog({
+      tenantId,
+      userId: audit.userId,
+      module: 'finance',
+      entity: 'bank_connector',
+      entityId: id,
+      action: trigger === 'SCHEDULED' ? 'SYNC_SCHEDULED' : 'SYNC',
+      newValues: { statementsCreated, statementsSkipped, filesProcessed, trigger },
+      ipAddress: audit.ipAddress ?? null,
+      userAgent: audit.userAgent ?? null,
+    })
+
     return {
       ok: true,
       code: 'OK',
-      message: 'No remote statement files found',
+      message,
       connectorId: id,
-      statementsCreated: 0,
-      statementsSkipped: 0,
-      filesProcessed: [],
+      statementsCreated,
+      statementsSkipped,
+      filesProcessed,
     }
-  }
-
-  const filesProcessed: NonNullable<BankConnectorProbeResult['filesProcessed']> = []
-  let statementsCreated = 0
-  let statementsSkipped = 0
-
-  for (const remote of files) {
-    const fetched = await adapter.fetchStatementFile(ctx, remote.path)
-    const ingested = await ingestConnectorFetchedFile({
-      tenantId,
-      legalEntityId: row.legalEntityId,
-      treasuryAccountId: row.treasuryAccountId,
-      connectorId: id,
-      uploadedBy: userId,
-      file: fetched,
-    })
-    if (ingested.skippedDuplicate) {
-      statementsSkipped += 1
-      filesProcessed.push({
-        fileName: fetched.fileName,
-        statementId: ingested.statementId || undefined,
-        skippedDuplicate: true,
-        lineCount: ingested.lineCount,
-      })
-    } else {
-      statementsCreated += 1
-      filesProcessed.push({
-        fileName: fetched.fileName,
-        statementId: ingested.statementId,
-        skippedDuplicate: false,
-        lineCount: ingested.lineCount,
-      })
-    }
-  }
-
-  const message = `Sync complete — created ${statementsCreated}, skipped ${statementsSkipped}`
-  const refreshed = await repo.getConnector(tenantId, id)
-  await repo.updateConnector(tenantId, id, {
-    lastSyncAt: new Date(),
-    lastSyncStatus: 'OK',
-    lastSyncMessage: message.slice(0, 500),
-    lastTestAt: refreshed.lastTestAt ?? new Date(),
-    lastTestStatus: refreshed.lastTestStatus === 'OK' ? 'OK' : refreshed.lastTestStatus,
-    updatedBy: userId,
-    expectedUpdatedAt: refreshed.updatedAt,
-  })
-
-  await createAuditLog({
-    tenantId,
-    userId: audit.userId,
-    module: 'finance',
-    entity: 'bank_connector',
-    entityId: id,
-    action: trigger === 'SCHEDULED' ? 'SYNC_SCHEDULED' : 'SYNC',
-    newValues: { statementsCreated, statementsSkipped, filesProcessed, trigger },
-    ipAddress: audit.ipAddress ?? null,
-    userAgent: audit.userAgent ?? null,
-  })
-
-  return {
-    ok: true,
-    code: 'OK',
-    message,
-    connectorId: id,
-    statementsCreated,
-    statementsSkipped,
-    filesProcessed,
+  } finally {
+    await repo.releaseSyncLock(id, lockToken)
   }
 }
 

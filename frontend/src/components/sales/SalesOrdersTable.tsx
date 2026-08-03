@@ -129,13 +129,14 @@ export function SalesOrdersTable({
         header: 'Customer',
         meta: { columnLabel: 'Customer' },
         cell: ({ row }) => {
-          const c = customers.find((x) => x.id === row.original.customerId)
+          const so = row.original
+          const c = customers.find((x) => x.id === so.customerId)
           return (
             <EnterpriseRecordCell
-              primary={c?.customerName ?? row.original.customerId}
+              primary={so.customerName?.trim() || c?.customerName || so.customerId}
               location={c?.city}
               industry={c?.industry}
-              subtitle={c?.isCustomer ? 'Customer' : 'Prospect'}
+              subtitle={c?.isCustomer ? 'Customer' : c ? 'Prospect' : undefined}
             />
           )
         },

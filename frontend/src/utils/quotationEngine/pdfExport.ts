@@ -1,5 +1,6 @@
 import { useDmsStore } from '../../store/dmsStore'
 import { downloadPrintDocumentPdf, type DocumentPdfResult } from '../documentPdfDownload'
+import { quotationNoWithRevision, quotationRevisionLabel, quotationRevisionSuffix } from './revisionLabels'
 
 /** Browser print dialog (Save as PDF still available from the system print UI). */
 export function printQuotationDocument(options?: { fileName?: string }): void {
@@ -21,10 +22,10 @@ export function printQuotationDocument(options?: { fileName?: string }): void {
   })
 }
 
-/** Suggested PDF file name for print / download dialogs. */
+/** Suggested PDF file name for print / download dialogs. Original create has no R suffix. */
 export function quotationPdfFileName(quotationNo: string, revisionNo?: number): string {
-  const rev = revisionNo != null ? `-R${revisionNo}` : ''
-  return `${quotationNo}${rev}.pdf`
+  const rev = revisionNo != null ? quotationRevisionSuffix(revisionNo) : ''
+  return rev ? `${quotationNo}-${rev}.pdf` : `${quotationNo}.pdf`
 }
 
 /** Download a real PDF that matches the on-screen quotation letterhead preview. */
@@ -44,10 +45,11 @@ export function saveQuotationPdfToDms(input: {
   documentId: string
   customerId?: string
 }): { ok: boolean; error?: string; documentId?: string } {
+  const revLabel = quotationRevisionLabel(input.revisionNo)
   const content = [
     'QUOTATION PDF EXPORT',
-    `Quotation: ${input.quotationNo}`,
-    `Revision: R${input.revisionNo}`,
+    `Quotation: ${quotationNoWithRevision(input.quotationNo, input.revisionNo)}`,
+    `Revision: ${revLabel}`,
     `Generated: ${new Date().toISOString()}`,
     'Use Download PDF on the quotation preview for the formatted customer document.',
   ].join('\n')
@@ -57,12 +59,12 @@ export function saveQuotationPdfToDms(input: {
     : undefined
 
   return useDmsStore.getState().uploadDocument({
-    title: `${input.quotationNo} Rev ${input.revisionNo}`,
+    title: quotationNoWithRevision(input.quotationNo, input.revisionNo),
     fileName: quotationPdfFileName(input.quotationNo, input.revisionNo),
     category: 'sales_attachment',
     mimeType: 'application/pdf',
     fileContent: content,
-    revision: `R${input.revisionNo}`,
+    revision: revLabel,
     remarks: 'Quotation PDF generated from CRM quotation builder',
     entityLinks,
   })

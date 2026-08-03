@@ -98,13 +98,14 @@ export function buildQuotationFormSectionCompletion(
   const hasDeliveryTime = Boolean(input.deliveryTime?.trim())
   const sourceComplete =
     input.createMode === 'opportunity' ? input.opportunitySelected : true
-  // Customer section = linked company only. Validity / terms live under Commercial.
-  const customerComplete = hasCustomer
+  // Validity dates live in Quotation Information (top) with customer/template.
+  const customerComplete = hasCustomer && hasValidity
   const commercialComplete =
-    input.grandTotal > 0 && hasValidity && hasPayment && hasDelivery && hasDeliveryTime
+    input.grandTotal > 0 && hasPayment && hasDelivery && hasDeliveryTime
   const commercialStarted =
-    input.grandTotal > 0 || hasValidity || hasPayment || hasDelivery || hasDeliveryTime
+    input.grandTotal > 0 || hasPayment || hasDelivery || hasDeliveryTime
   const productsStarted = input.lineCount > 0 || input.hasValidLine
+  const customerStarted = hasCustomer || hasValidity
 
   const sections: QuotationFormSectionCompletion[] = [
     {
@@ -125,8 +126,8 @@ export function buildQuotationFormSectionCompletion(
       done: customerComplete,
       status: mandatoryStatus({
         complete: customerComplete,
-        started: false,
-        hasError: errorSet.has('customer'),
+        started: customerStarted && !customerComplete,
+        hasError: errorSet.has('customer') || errorSet.has('quick'),
       }),
     },
     {
