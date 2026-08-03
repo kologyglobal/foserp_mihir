@@ -33,17 +33,24 @@ interface TenantProfileState {
   hydrated: boolean
   businessType: TenantBusinessType
   displayTerminology: Record<string, string>
+  /** Display name of the logged-in tenant (from /auth/me). */
+  tenantName: string | null
   /** Data-driven letterhead / print profile from the tenant's default Legal Entity (null in demo mode). */
   companyProfile: TenantCompanyProfile | null
   hydrate: () => Promise<void>
   setProfile: (p: {
     businessType?: TenantBusinessType
     displayTerminology?: Record<string, string>
+    tenantName?: string | null
     companyProfile?: TenantCompanyProfile | null
   }) => void
   isServices: () => boolean
   term: (key: string, fallback: string) => string
 }
+
+/** Demo / fall-back workspace name when API profile is not yet loaded. */
+export const DEFAULT_TENANT_DISPLAY_NAME = 'Veer International'
+export const APP_BRAND_FALLBACK = 'FOS ERP'
 
 const DEFAULT_SERVICES_TERMS: Record<string, string> = {
   product: 'Service',
@@ -59,22 +66,31 @@ export const useTenantProfileStore = create<TenantProfileState>()((set, get) => 
   hydrated: !isApiMode(),
   businessType: 'MANUFACTURING',
   displayTerminology: {},
+  tenantName: isApiMode() ? null : DEFAULT_TENANT_DISPLAY_NAME,
   companyProfile: null,
   setProfile: (p) =>
     set((s) => ({
       businessType: p.businessType ?? s.businessType,
       displayTerminology: p.displayTerminology ?? s.displayTerminology,
+      tenantName: p.tenantName !== undefined ? p.tenantName : s.tenantName,
       companyProfile: p.companyProfile !== undefined ? p.companyProfile : s.companyProfile,
       hydrated: true,
     })),
   hydrate: async () => {
     if (!isApiMode()) {
-      set({ hydrated: true, businessType: 'MANUFACTURING', displayTerminology: {}, companyProfile: null })
+      set({
+        hydrated: true,
+        businessType: 'MANUFACTURING',
+        displayTerminology: {},
+        tenantName: DEFAULT_TENANT_DISPLAY_NAME,
+        companyProfile: null,
+      })
       return
     }
     try {
       const me = await apiRequest<{
         tenant?: {
+          name?: string
           businessType?: TenantBusinessType
           displayTerminology?: Record<string, string>
           companyProfile?: TenantCompanyProfile | null
@@ -88,11 +104,18 @@ export const useTenantProfileStore = create<TenantProfileState>()((set, get) => 
             ? DEFAULT_SERVICES_TERMS
             : {}
       const companyProfile = me.data.tenant?.companyProfile ?? null
-      set({ businessType, displayTerminology, companyProfile, hydrated: true })
+      const tenantName =
+        me.data.tenant?.name?.trim()
+        || companyProfile?.tradeName?.trim()
+        || companyProfile?.legalName?.trim()
+        || null
+      set({ businessType, displayTerminology, companyProfile, tenantName, hydrated: true })
       try {
         const mods = await fetchAdminModulesApi()
         useTenantModulesStore.getState().setEnabledKeys(mods.data.enabledKeys)
-        // businessType comes from /auth/me only on this branch (modules API has no businessType).
+        if (mods.data.businessType === 'SERVICES' || mods.data.businessType === 'MANUFACTURING') {
+          set({ businessType: mods.data.businessType })
+        }
       } catch {
         /* module.view may be missing — flags stay fail-open */
       }
@@ -103,6 +126,38 @@ export const useTenantProfileStore = create<TenantProfileState>()((set, get) => 
   isServices: () => get().businessType === 'SERVICES',
   term: (key, fallback) => get().displayTerminology[key] ?? fallback,
 }))
+
+/**
+ * Resolve the workspace/tenant name for browser chrome (document title, etc.).
+ * Preference: explicit tenant name → trade/legal name → brand fallback.
+ */
+export function resolveTenantDisplayName(options?: {
+  sessionTenantName?: string | null
+  sessionTenantSlug?: string | null
+}): string {
+  const state = useTenantProfileStore.getState()
+  const fromProfile = state.tenantName?.trim()
+  if (fromProfile) return fromProfile
+
+  const trade = state.companyProfile?.tradeName?.trim()
+  if (trade) return trade
+  const legal = state.companyProfile?.legalName?.trim()
+  if (legal) return legal
+
+  const fromSession = options?.sessionTenantName?.trim()
+  if (fromSession) return fromSession
+
+  const slug = options?.sessionTenantSlug?.trim()
+  if (slug) {
+    return slug
+      .split(/[-_]/)
+      .filter(Boolean)
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join(' ')
+  }
+
+  return isApiMode() ? APP_BRAND_FALLBACK : DEFAULT_TENANT_DISPLAY_NAME
+}
 
 /** Path prefixes that require a catalog module key to be enabled. */
 export const ROUTE_MODULE_GATES: Array<{ prefix: string; moduleKey: string }> = [

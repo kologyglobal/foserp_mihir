@@ -9,10 +9,11 @@
 | Attribute | Value |
 |-----------|-------|
 | **Product name** | FOS ERP (frontend package: `trailer-erp`) |
-| **Target market** | Indian manufacturing companies (trailers, fabrication, discrete manufacturing) |
+| **Target market** | Indian manufacturing companies (trailers, fabrication, discrete manufacturing) **and** service businesses (`Tenant.businessType=SERVICES`, e.g. Kology) |
 | **Target company turnover** | Approximately ₹5 crore to ₹100 crore |
 | **Architecture** | React SPA + Node.js/Express API + MySQL 8 |
 | **Tenancy** | Multi-tenant SaaS — shared database, shared schema |
+| **Tenant packaging** | `businessType` + `TenantModuleFlag` + display terminology — **no** CRM/Sales/Accounting forks by slug |
 | **Tenant scope** | Every tenant-owned record scoped by `tenantId` |
 | **Current backend scope** | Auth, RBAC, CRM, masters; finance (Phase 1–**5D4 Bank & Cash** live API for internal UAT / controlled pilot — SIMULATED AIS + cron shipped; **live TPP AIS / FX / intercompany** deferred; Budgeting Phase 1, Fixed Assets 1–4, AR/AP through credit-note allocation); manufacturing 1–2B + **materials 3C** + **7A** + planning/costing/accounting 6B–7E + **live multilevel BOM combined-CSV import**; inventory 3A + inventory accounting events; **Purchase** PR + Planning + RFQ/VQ/comparison/award→PO + GRN + Setup full persistence + Invoice/QI/Return; **quality 4A/4B**; **Dispatch 7C0–7C5**; **Maintenance V1** (ticket lifecycle + machine status sync + spare ISSUE_TO_MAINTENANCE) |
 | **Deferred backend** | Dispatch client production hardening (manual UAT sign-off); Bank & Cash **live TPP AIS**, **FX**, **intercompany**; cheque print; **live NIC** GST portal (e-invoice / e-Way currently **SIMULATED** adapter); FA physical verification API; Budgeting Phase 2+; SO MRP beyond Phase 1; Maintenance PM scheduler |

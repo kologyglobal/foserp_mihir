@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Download, Paperclip, Trash2, Upload } from 'lucide-react'
+import { Download, Paperclip, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { useEntityAttachments } from '../../../hooks/useEntityAttachments'
 import { canCrmPermission } from '../../../utils/permissions/crm'
 import type { CrmEntityTypeApi } from '../../../types/crmEntity'
@@ -32,8 +32,10 @@ export function EntityAttachmentsPanel({
     attachments,
     loading,
     error,
+    isOffline,
     pending,
     uploadProgress,
+    refresh,
     uploadFile,
     deleteAttachment,
     downloadAttachment,
@@ -81,9 +83,25 @@ export function EntityAttachmentsPanel({
       </div>
 
       {loading ? <p className="text-[13px] text-erp-muted">Loading attachments…</p> : null}
-      {error ? <p className="text-[13px] text-red-600">{error}</p> : null}
+      {error ? (
+        <div
+          className={`ent-360-docs__notice flex flex-wrap items-center gap-2 text-[13px] ${
+            isOffline ? 'text-erp-muted' : 'text-red-600'
+          }`}
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 font-semibold text-erp-primary hover:underline"
+            onClick={() => void refresh()}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry
+          </button>
+        </div>
+      ) : null}
 
-      {!loading && attachments.length === 0 ? (
+      {!loading && !error && attachments.length === 0 ? (
         <div
           className="ent-360-docs__dropzone"
           onClick={canCreate ? () => setUploadOpen(true) : undefined}
@@ -95,7 +113,9 @@ export function EntityAttachmentsPanel({
           <p className="font-medium text-erp-text">No documents yet</p>
           <p className="text-[13px] text-erp-muted">Select an attachment type, then upload files</p>
         </div>
-      ) : (
+      ) : null}
+
+      {attachments.length > 0 ? (
         <ul className="ent-360-docs__list">
           {attachments.map((doc) => {
             const typeLabel = resolveTypeLabel(doc.documentType, doc.documentTypeName)
@@ -144,7 +164,7 @@ export function EntityAttachmentsPanel({
             )
           })}
         </ul>
-      )}
+      ) : null}
 
       <AttachmentUploadDialog
         open={uploadOpen}

@@ -97,6 +97,7 @@ export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: Permissio
   { prefix: '/m/material-return', permission: 'inventory.post', pageName: 'Mobile Material Return' },
   { prefix: '/m/warehouse-transfer', permission: 'inventory.post', pageName: 'Mobile Warehouse Transfer' },
   { prefix: '/m/stock-count', permission: 'inventory.view', pageName: 'Mobile Stock Count' },
+  { prefix: '/home', permission: 'reports.view', pageName: 'Home' },
   { prefix: '/executive', permission: 'reports.view', pageName: 'CEO Dashboard' },
   { prefix: '/inbox', permission: 'reports.view', pageName: 'Inbox' },
   { prefix: '/operations/exceptions', permission: 'reports.view', pageName: 'Exception Centre' },
@@ -293,11 +294,8 @@ export const ROLE_PERMISSION_MATRIX: Record<ErpRole, PermissionKey[] | '*'> = {
 }
 
 export function resolveRoutePermission(pathname: string): PermissionKey | null {
-  // Own profile + role home are available to every authenticated user.
+  // Own profile is available to every authenticated user.
   if (pathname === '/settings/profile' || pathname.startsWith('/settings/profile/')) {
-    return null
-  }
-  if (pathname === '/' || pathname === '/home' || pathname.startsWith('/home/')) {
     return null
   }
   const sorted = [...ROUTE_PERMISSION_MAP].sort((a, b) => b.prefix.length - a.prefix.length)
@@ -312,9 +310,6 @@ export function resolveRoutePermission(pathname: string): PermissionKey | null {
 export function resolveRoutePageName(pathname: string): string {
   if (pathname === '/settings/profile' || pathname.startsWith('/settings/profile/')) {
     return 'My Profile'
-  }
-  if (pathname === '/' || pathname === '/home' || pathname.startsWith('/home/')) {
-    return 'Home'
   }
   const sorted = [...ROUTE_PERMISSION_MAP].sort((a, b) => b.prefix.length - a.prefix.length)
   for (const entry of sorted) {

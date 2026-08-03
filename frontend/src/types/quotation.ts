@@ -197,8 +197,8 @@ export type QuotationPageSize = 'A4' | 'Letter'
 
 export type QuotationHeaderStyle = 'standard' | 'minimal' | 'cover'
 
-/** Visual print theme — `vf_word` is the Vasant Fabricators letter-style quotation layout (sans-serif). */
-export type QuotationPrintSkin = 'default' | 'vf_word'
+/** Visual print theme — `vf_word` is VF letter-style; `kology_proposal` is the SERVICES outbound proposal layout. */
+export type QuotationPrintSkin = 'default' | 'vf_word' | 'kology_proposal'
 
 export interface QuotationPrintLayout {
   pageSize: QuotationPageSize
@@ -214,6 +214,12 @@ export interface QuotationPrintLayout {
   pageBreakBefore: QuotationSectionType[]
   /** Optional print/PDF visual skin (CSS modifier) */
   printSkin?: QuotationPrintSkin
+  /**
+   * Visual-editor text overrides keyed by stable field id (e.g. `hero.title`).
+   * Used by skins that render mostly hard-coded copy (e.g. `kology_proposal`)
+   * so the WYSIWYG preview editor can persist edits without a schema change.
+   */
+  contentOverrides?: Record<string, string>
 }
 
 export type QuotationTemplateSection = Omit<QuotationSection, 'id' | 'specRows'> & {

@@ -808,3 +808,61 @@ export async function transitionArDispute(
     rethrowMapped(e)
   }
 }
+
+// ─── Recurring sales invoice schedules (Money In) ──────────────────────────
+// API-only — mirrors AR disputes above; recurring schedules are not modelled
+// in the demo store.
+
+export async function listRecurringSchedules(
+  filters?: Partial<api.ListRecurringSchedulesQuery>,
+): Promise<api.RecurringInvoiceScheduleDto[]> {
+  if (!isApiMode()) throw new Error('Recurring invoices require API mode')
+  try {
+    const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
+    return unwrap(await api.listRecurringSchedules({ legalEntityId, ...filters }))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function createRecurringSchedule(
+  input: Omit<api.CreateRecurringScheduleInput, 'legalEntityId'> & { legalEntityId?: string },
+): Promise<api.RecurringInvoiceScheduleDto> {
+  if (!isApiMode()) throw new Error('Recurring invoices require API mode')
+  try {
+    const legalEntityId = await ensureLegalEntityId(input.legalEntityId)
+    return unwrap(await api.createRecurringSchedule({ ...input, legalEntityId }))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function cancelRecurringSchedule(id: string, reason?: string | null): Promise<api.RecurringInvoiceScheduleDto> {
+  if (!isApiMode()) throw new Error('Recurring invoices require API mode')
+  try {
+    return unwrap(await api.cancelRecurringSchedule(id, reason))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function listUpcomingInvoices(
+  filters?: Partial<api.ListUpcomingInvoicesQuery>,
+): Promise<api.UpcomingSalesInvoiceDto[]> {
+  if (!isApiMode()) throw new Error('Recurring invoices require API mode')
+  try {
+    const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
+    return unwrap(await api.listUpcomingInvoices({ legalEntityId, ...filters }))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function approveUpcomingInvoice(scheduleId: string, executionId: string): Promise<SalesInvoiceDto> {
+  if (!isApiMode()) throw new Error('Recurring invoices require API mode')
+  try {
+    return unwrap(await api.approveUpcomingInvoice(scheduleId, executionId))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}

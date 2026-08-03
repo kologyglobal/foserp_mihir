@@ -80,6 +80,8 @@ import { useSalesOrderCommercialPosition } from '../../hooks/useCommercialPositi
 import { useInvoiceStore } from '../../store/invoiceStore'
 import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { buildProformaNewUrl } from '../../utils/proformaInvoicePrefill'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
+import { useTenantModulesStore } from '../../store/tenantModulesStore'
 import {
   SalesOrderConfirmDialog,
   type SalesOrderConfirmValues,
@@ -136,6 +138,12 @@ export function SalesOrder360Page() {
   const { pathname } = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const crmMode = pathname.startsWith('/crm/sales-orders')
+  const isServices = useTenantProfileStore((s) => s.isServices())
+  const productLabel = useTenantProfileStore((s) => s.term('product', 'Product'))
+  const showMfgPanels =
+    !isServices && useTenantModulesStore.getState().isModuleEnabled('manufacturing')
+  const showDispatchPanels =
+    !isServices && useTenantModulesStore.getState().isModuleEnabled('dispatch')
   const listPath = crmMode ? CRM_SALES_ORDERS_PATH : '/sales/orders'
   const detailPath = id ? resolveSalesOrderDetailPath(id, crmMode) : listPath
   const editPath = id ? buildSalesOrderEditUrl(id, { fromCrm: crmMode }) : listPath
@@ -415,36 +423,42 @@ export function SalesOrder360Page() {
 
   const sectionNavItems = [
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
-    { id: 'production', label: 'Production', icon: Factory, done: orderWos.length > 0 },
-    { id: 'dispatch', label: 'Dispatch', icon: Truck, done: orderDispatches.length > 0 },
+    ...(showMfgPanels
+      ? [{ id: 'production' as const, label: 'Production', icon: Factory, done: orderWos.length > 0 }]
+      : []),
+    ...(showDispatchPanels
+      ? [{ id: 'dispatch' as const, label: 'Dispatch', icon: Truck, done: orderDispatches.length > 0 }]
+      : []),
     { id: 'commercial', label: 'Commercial', icon: Banknote },
   ]
 
   const healthFactors = buildSalesOrderHealthFactors({
     status: so.status,
     overdue,
-    workOrderCount: orderWos.length,
-    dispatchCount: orderDispatches.length,
-    pendingMrp,
-    qcHold,
+    workOrderCount: showMfgPanels ? orderWos.length : 0,
+    dispatchCount: showDispatchPanels ? orderDispatches.length : 0,
+    pendingMrp: showMfgPanels && pendingMrp,
+    qcHold: showMfgPanels && qcHold,
   })
 
   const formMetrics = [
     { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', accent: 'green' as const, hint: customer?.customerName ?? 'Customer' },
-    { label: 'Quantity', value: formatNumber(so.qty), accent: 'blue' as const, hint: product?.productName ?? 'Product' },
+    { label: 'Quantity', value: formatNumber(so.qty), accent: 'blue' as const, hint: product?.productName ?? productLabel },
     { label: 'Required', value: formatDate(so.requiredDate), accent: overdue ? 'amber' as const : 'blue' as const, hint: overdue ? 'Overdue' : 'On schedule' },
-    { label: 'Work Orders', value: String(orderWos.length), accent: 'blue' as const, hint: `${orderDispatches.length} dispatch` },
+    ...(showMfgPanels
+      ? [{ label: 'Work Orders', value: String(orderWos.length), accent: 'blue' as const, hint: `${orderDispatches.length} dispatch` }]
+      : [{ label: 'Invoicing', value: so.status === 'confirmed' ? 'Ready' : salesOrderStatusLabel(so.status), accent: 'blue' as const, hint: 'Service order' }]),
   ]
 
   const documentStrip = [
     { label: 'SO No.', value: so.salesOrderNo, highlight: true },
     { label: 'Status', value: salesOrderStatusLabel(so.status) },
     { label: 'Customer', value: customer?.customerName ?? '—', highlight: Boolean(customer) },
-    { label: 'Product', value: product?.productName ?? '—' },
+    { label: productLabel, value: product?.productName ?? '—' },
     { label: 'Qty', value: formatNumber(so.qty) },
     { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: displayValue > 0 },
     { label: 'Required', value: formatDate(so.requiredDate) },
-    { label: 'Work Orders', value: String(orderWos.length) },
+    ...(showMfgPanels ? [{ label: 'Work Orders', value: String(orderWos.length) }] : []),
   ]
 
   const printPath = resolveSalesOrderPrintPath(so.id, pathname)
@@ -457,12 +471,22 @@ export function SalesOrder360Page() {
           ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
           : []),
         ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit', icon: Pencil, onClick: () => navigate(editPath) }] : []),
-        ...(!crmMode && so.status === 'confirmed'
+        ...(!crmMode && showMfgPanels && so.status === 'confirmed'
           ? [{ id: 'plan', label: 'Production Plan', icon: Play, onClick: () => navigate('/manufacturing/production-plan') }]
           : []),
         ...(so.status !== 'open' && !activeProforma ? [{ id: 'proforma', label: 'Create Proforma', icon: Receipt, onClick: () => navigate(buildProformaNewUrl(so.id)) }] : []),
-        ...(so.status !== 'open' && canCrmPermission('crm.commercial.invoice.create')
-          ? [{ id: 'invoice', label: 'Create Invoice', icon: Banknote, onClick: () => navigate(`/sales/invoices/new?salesOrderId=${so.id}`) }]
+        ...(so.status !== 'open' && (canCrmPermission('crm.commercial.invoice.create') || isServices)
+          ? [{
+              id: 'invoice',
+              label: 'Create Invoice',
+              icon: Banknote,
+              onClick: () =>
+                navigate(
+                  isServices
+                    ? `/accounting/money-in/invoices/new?salesOrderId=${so.id}`
+                    : `/sales/invoices/new?salesOrderId=${so.id}`,
+                ),
+            }]
           : []),
         { id: 'preview', label: 'Preview', icon: Printer, pin: true, onClick: () => navigate(printPath) },
         {
@@ -477,8 +501,12 @@ export function SalesOrder360Page() {
         ...(activeProforma ? [{ id: 'view-proforma', label: `Proforma ${activeProforma.proformaNo}`, icon: Receipt, onClick: () => navigate(`/sales/proforma-invoices/${activeProforma.id}`) }] : []),
         ...(quo ? [{ id: 'quotation', label: 'Quotation', icon: FileText, onClick: () => navigate(crmQuotationPath(quo.id)) }] : []),
         ...(crmDoc ? [{ id: 'quote-360', label: 'CRM Quote 360', icon: ExternalLink, onClick: () => navigate(`/crm/quotations/${so.quotationId}`) }] : []),
-        { id: 'production', label: 'Work Orders', icon: Factory, onClick: () => selectSection('production') },
-        { id: 'dispatch', label: 'Dispatch', icon: Truck, onClick: () => selectSection('dispatch') },
+        ...(showMfgPanels
+          ? [{ id: 'production', label: 'Work Orders', icon: Factory, onClick: () => selectSection('production') }]
+          : []),
+        ...(showDispatchPanels
+          ? [{ id: 'dispatch', label: 'Dispatch', icon: Truck, onClick: () => selectSection('dispatch') }]
+          : []),
         ...(customer ? [{ id: 'company', label: 'Company 360', icon: ExternalLink, onClick: () => navigate(resolveCompany360Path(customer.id, pathname)) }] : []),
       ]}
     />
@@ -493,12 +521,14 @@ export function SalesOrder360Page() {
           value:
             so.status === 'open'
               ? 'Confirm order'
-              : !crmMode && pendingMrp
+              : showMfgPanels && !crmMode && pendingMrp
                 ? 'Open production plan'
                 : overdue
                   ? 'Expedite delivery'
-                  : 'Monitor production',
-          tone: so.status === 'open' || (!crmMode && pendingMrp) || overdue ? 'warning' as const : 'info' as const,
+                  : isServices
+                    ? 'Create invoice or proforma'
+                    : 'Monitor production',
+          tone: so.status === 'open' || (showMfgPanels && !crmMode && pendingMrp) || overdue ? 'warning' as const : 'info' as const,
         },
       ]}
     >
@@ -509,18 +539,22 @@ export function SalesOrder360Page() {
         summary={[
           { label: 'Status', value: salesOrderStatusLabel(so.status) },
           { label: 'Customer', value: customer?.customerName ?? '—' },
-          { label: 'Product', value: product?.productName ?? '—' },
+          { label: productLabel, value: product?.productName ?? '—' },
           { label: 'Qty', value: formatNumber(so.qty) },
           { label: 'Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: true },
-          { label: 'Work Orders', value: String(orderWos.length) },
-          { label: 'Dispatches', value: String(orderDispatches.length) },
+          ...(showMfgPanels
+            ? [
+                { label: 'Work Orders', value: String(orderWos.length) },
+                { label: 'Dispatches', value: String(orderDispatches.length) },
+              ]
+            : []),
           { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
         ]}
         actions={[
           ...(so.status === 'open' && canConfirmSalesOrder
             ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
             : []),
-          ...(!crmMode && so.status === 'confirmed'
+          ...(showMfgPanels && !crmMode && so.status === 'confirmed'
             ? [{ id: 'plan', label: 'Production Plan', icon: Play, primary: true, onClick: openProductionPlan }]
             : []),
           ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit Draft', icon: Pencil, onClick: () => navigate(editPath) }] : []),
@@ -665,7 +699,7 @@ export function SalesOrder360Page() {
           </div>
         )}
 
-        {tab === 'production' && (
+        {tab === 'production' && showMfgPanels && (
           <Entity360Panel
             title="Work orders"
             subtitle={`${orderWos.length} manufacturing order${orderWos.length !== 1 ? 's' : ''} for ${so.salesOrderNo}`}
@@ -702,7 +736,7 @@ export function SalesOrder360Page() {
           </Entity360Panel>
         )}
 
-        {tab === 'dispatch' && (
+        {tab === 'dispatch' && showDispatchPanels && (
           <Entity360Panel
             title={isApiMode() ? 'Fulfilment & dispatch' : 'Dispatch plans'}
             subtitle={

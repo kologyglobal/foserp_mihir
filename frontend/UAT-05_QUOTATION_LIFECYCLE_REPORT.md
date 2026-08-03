@@ -1,7 +1,7 @@
 # UAT-05 — Quotation Lifecycle
 
-**Date:** 2026-07-11
-**Overall:** ✅ PASS (69/69)
+**Date:** 2026-07-29
+**Overall:** ❌ FAIL (50/64)
 
 ## Critical path
 
@@ -20,14 +20,14 @@ Opportunity → Quotation → Approval → Revision → Approved Quotation → S
 | UAT-05.9 | Backend | Duplicate opportunity quotation blocked | PASS |  |
 | UAT-05.10 | UI | Approval panel shows threshold warnings | PASS |  |
 | UAT-05.11 | UI | Revision history marks Latest revision | PASS |  |
-| UAT-05.12 | UI | Convert to SO action component | PASS |  |
+| UAT-05.12 | UI | Convert to SO action component | FAIL |  |
 | UAT-05.13 | Tax/discount/totals | Line total = qty × price × (1-discount) + GST | PASS | 224200 |
 | UAT-05.14 | Tax/discount/totals | Line total matches expected ₹2,24,200 | PASS |  |
 | UAT-05.15 | Tax/discount/totals | Summary taxable value after discount | PASS |  |
 | UAT-05.16 | Tax/discount/totals | Summary GST amount | PASS |  |
 | UAT-05.17 | Tax/discount/totals | Grand total includes freight/install/custom | PASS |  |
 | UAT-05.18 | Tax/discount/totals | calcPriceSummary exported from crmQuotationCalc | PASS |  |
-| UAT-05.19 | Create quotation | Quotation created from opportunity | PASS | quo-c4ea98b0 |
+| UAT-05.19 | Create quotation | Quotation created from opportunity | PASS | quo-b9df5980 |
 | UAT-05.20 | Create quotation | Opportunity linked to quotation | PASS |  |
 | UAT-05.21 | Create quotation | Sales header quotation exists | PASS |  |
 | UAT-05.22 | Line items | Document has at least one price line | PASS | 1 lines |
@@ -36,48 +36,43 @@ Opportunity → Quotation → Approval → Revision → Approved Quotation → S
 | UAT-05.25 | Draft state | New document status is draft | PASS |  |
 | UAT-05.26 | Draft state | Draft document is not locked | PASS |  |
 | UAT-05.27 | Draft state | Draft quotation cannot convert to SO | PASS |  |
-| UAT-05.28 | Draft state | Convert button hidden for draft | PASS |  |
+| UAT-05.28 | Draft state | Convert button hidden for draft | FAIL |  |
 | UAT-05.29 | Approval restrictions | Amount threshold defined (₹50L) | PASS |  |
 | UAT-05.30 | Approval restrictions | Discount threshold defined (10%) | PASS |  |
 | UAT-05.30b | Approval restrictions | Backend discount threshold matches frontend (10%) | PASS |  |
 | UAT-05.31 | Approval restrictions | Sales manager can approve | PASS |  |
 | UAT-05.32 | Approval restrictions | High-value submit → pending_approval | PASS | pending_approval |
 | UAT-05.33 | Approval restrictions | Shop floor cannot approve quotation | PASS | Requires sales → approve — your role (Shop Floor Operator) does not have this permission |
-| UAT-05.34 | Reject/revise | Rejected document status | PASS |  |
+| UAT-05.34 | Reject/revise | Rejected document status | FAIL |  |
 | UAT-05.35 | Reject/revise | Rejected quotation cannot convert | PASS |  |
-| UAT-05.36 | Revision numbering | New revision number increments | PASS | rev 1 |
+| UAT-05.36 | Revision numbering | New revision number increments | PASS | rev 2 |
 | UAT-05.37 | Revision numbering | New revision starts as draft | PASS |  |
 | UAT-05.38 | Original preserved | Original revision locked after revise | PASS |  |
-| UAT-05.39 | Original preserved | Original revision status unchanged (rejected) | PASS |  |
+| UAT-05.39 | Original preserved | Original revision status unchanged (rejected) | FAIL |  |
 | UAT-05.40 | Original preserved | Both revisions exist for quotation | PASS |  |
 | UAT-05.41 | Approved version | Latest document is approved | PASS | approved |
 | UAT-05.42 | Approved version | getLatestQuotationDocument returns highest revision | PASS |  |
 | UAT-05.43 | Approved version | Approval history contains approved action | PASS |  |
 | UAT-05.44 | Approved version | Convert button visible for latest approved | PASS |  |
 | UAT-05.45 | Approved version | Old revision convert button hidden | PASS |  |
-| UAT-05.46 | Invalid conversion | Approved quotation passes validation | PASS |  |
+| UAT-05.46 | Invalid conversion | Approved quotation passes validation | FAIL |  |
 | UAT-05.47 | Invalid conversion | Expired quotation blocked | PASS |  |
 | UAT-05.48 | Invalid conversion | Validation checks approval history | PASS |  |
-| UAT-05.49 | Invalid conversion | Non-latest revision blocked | PASS | Only latest approved quotation revision can be converted to Sales Order. |
-| UAT-05.50 | Sales Order | Approved quotation converts to SO | PASS | so-372b583e |
-| UAT-05.51 | Sales Order | Document status becomes converted | PASS |  |
-| UAT-05.52 | Sales Order | Document links salesOrderId | PASS |  |
-| UAT-05.53 | Sales Order | Opportunity marked won | PASS |  |
-| UAT-05.54 | Sales Order | SO exists in MRP store | PASS |  |
-| UAT-05.55 | Double conversion | Second conversion rejected | PASS | Quotation is already converted to a Sales Order. |
-| UAT-05.56 | Double conversion | Validation blocks already-converted | PASS |  |
-| UAT-05.57 | Double conversion | Convert button hidden after conversion | PASS |  |
+| UAT-05.49 | Invalid conversion | Non-latest revision blocked | PASS | Only the latest quotation revision can be converted to a Sales Order. |
+| UAT-05.50 | Sales Order | Approved quotation converts to SO | FAIL |  |
+| UAT-05.51 | Sales Order / double conversion | Conversion step | FAIL | Select an Item for 45 m³ tipper trailer. |
+| UAT-05.52 | Sales Order / double conversion | Conversion step | FAIL | Select an Item for 45 m³ tipper trailer. |
+| UAT-05.53 | Sales Order / double conversion | Conversion step | FAIL | Select an Item for 45 m³ tipper trailer. |
+| UAT-05.54 | Sales Order / double conversion | Conversion step | FAIL | Select an Item for 45 m³ tipper trailer. |
+| UAT-05.55 | Sales Order / double conversion | Conversion step | FAIL | Select an Item for 45 m³ tipper trailer. |
+| UAT-05.56 | Sales Order / double conversion | Conversion step | FAIL | Select an Item for 45 m³ tipper trailer. |
+| UAT-05.57 | Sales Order / double conversion | Conversion step | FAIL | Select an Item for 45 m³ tipper trailer. |
 | UAT-05.58 | Backend workflow | assertDocumentSubmittable blocks locked non-draft | PASS |  |
 | UAT-05.59 | Backend workflow | assertDocumentApprovable checks status | PASS |  |
 | UAT-05.60 | Live API | Login for quotation tests | PASS | Login successful |
 | UAT-05.61 | Live API | List quotations endpoint | PASS | HTTP 200 |
-| UAT-05.62 | Live API | Fetch open opportunity for quotation | PASS | e06b1d83-400d-40de-8263-f340934772d3 |
-| UAT-05.63 | Live API | Create quotation | PASS | Quotation created |
-| UAT-05.64 | Live API | Submit for approval | PASS | HTTP 200 |
-| UAT-05.65 | Live API | Document status after submit | PASS | approved |
-| UAT-05.66 | Live API | Approve quotation document | PASS | auto-approved |
-| UAT-05.67 | Live API | Create quotation revision | PASS | Quotation revision created |
-| UAT-05.68 | Live API | Duplicate opportunity quotation rejected | PASS | HTTP 400 |
+| UAT-05.62 | Live API | Fetch open opportunity for quotation | PASS | 7545f5a2-4935-42c5-9833-66c77f92d580 |
+| UAT-05.63 | Live API | Create quotation | FAIL | Validation failed |
 
 ## Findings
 

@@ -4,11 +4,13 @@ import {
   Activity,
   ArrowRight,
   Banknote,
+  Check,
   ClipboardList,
   FileText,
   Paperclip,
   Target,
 } from 'lucide-react'
+import { cn } from '../../utils/cn'
 import { Select } from '../../components/forms/Inputs'
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
 import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
@@ -270,6 +272,15 @@ export function Opportunity360Page() {
     oppDocs.length,
   ])
 
+  const oppRailItems = useMemo(
+    () => [
+      { id: 'summary', label: 'Overview', done: true },
+      ...additionalSectionItems.map((s) => ({ id: s.id, label: s.label, done: s.tone === 'ok' })),
+      { id: 'notes', label: 'Notes', done: entityNotes.length > 0 || oppDemoNotes.length > 0 },
+    ],
+    [additionalSectionItems, entityNotes.length, oppDemoNotes.length],
+  )
+
   const recordReady = Boolean(opportunity)
   const { showLoader, showNotFound } = useCrmRecordLoadState(recordReady)
 
@@ -454,6 +465,19 @@ export function Opportunity360Page() {
     }, 40)
   }
 
+  /** Zoho-style section rail — jumps directly to Overview / Notes, or into the tabbed panel below. */
+  function goToRailSection(sectionId: string) {
+    if (sectionId === 'summary') {
+      document.getElementById('opp-section-summary')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    if (sectionId === 'notes') {
+      document.getElementById('opp-section-notes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    selectAdditionalSection(sectionId)
+  }
+
   function scrollToSection(sectionId: string) {
     const mapped =
       sectionId === 'general' || sectionId === 'summary' ? 'summary'
@@ -561,7 +585,7 @@ export function Opportunity360Page() {
       <CrmCardFormShell
         title={opportunity.opportunityName}
         badge="CRM"
-        className={`crm-opp-form-page crm-lead-form-page crm-lead-form-page--sticky-record ${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview`}
+        className={`crm-opp-form-page crm-opp-360-zoho crm-lead-form-page crm-lead-form-page--zoho crm-lead-form-page--sticky-record ${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview`}
         recordTitle={opportunity.opportunityName}
         status={opportunity.status}
         statusTone={statusTone}
@@ -622,74 +646,96 @@ export function Opportunity360Page() {
             />
           ) : null}
 
-          <div className="dyn-detail-pipeline">
-            <Enterprise360Pipeline
-              title="Sales Stage"
-              currentStageLabel={dealStatusLabel}
-              recordStatusLabel={dealStatusLabel}
-              recordStatusKey="Deal stage"
-              statusNote={pipelineStatusNote}
-              tone={pipelineTone}
-              stages={pipeline}
-              variant="stepper"
-              actions={
-                canChangeOppStage ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="lead-change-stage__trigger"
-                    onClick={() => openMoveStage(opportunity.stage)}
-                  >
-                    Change Stage
-                  </Button>
-                ) : null
-              }
-            />
-          </div>
+          <div className="crm-lead-zoho-layout crm-opp-zoho-layout">
+            <nav className="crm-lead-zoho-rail" aria-label="Opportunity sections">
+              <p className="crm-lead-zoho-rail__eyebrow">Opportunity</p>
+              <p className="crm-lead-zoho-rail__title">Sections</p>
+              <ul className="crm-lead-zoho-rail__list">
+                {oppRailItems.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className={cn('crm-lead-zoho-rail__item', item.done && 'is-done')}
+                      onClick={() => goToRailSection(item.id)}
+                    >
+                      <span className="crm-lead-zoho-rail__marker" aria-hidden>
+                        {item.done ? <Check size={12} strokeWidth={2.5} /> : null}
+                      </span>
+                      <span className="crm-lead-zoho-rail__label">{item.label}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
 
-          <OpportunitySummaryCard
-            opportunity={opportunity}
-            customerName={customer?.customerName}
-            customerId={customer?.id}
-            contactName={contact?.name ?? customer?.contactPerson}
-            contactPhone={contactPhone}
-            contactEmail={contactEmail}
-            city={customer?.city}
-            productName={product?.productName}
-            lastActivityAt={lastActivity?.activityDate ?? opportunity.lastActivityAt ?? opportunity.modifiedAt}
-            lastActivityLabel={lastActivity?.subject ?? null}
-            dealValueLabel={commercial.dealValueLabel}
-            dealValueHint={commercial.dealValueHint}
-            dealValue={commercial.estimatedDealValue}
-          />
+            <div className="crm-lead-zoho-canvas crm-opp-zoho-canvas">
+              <div className="dyn-detail-pipeline">
+                <Enterprise360Pipeline
+                  title="Sales Stage"
+                  currentStageLabel={dealStatusLabel}
+                  recordStatusLabel={dealStatusLabel}
+                  recordStatusKey="Deal stage"
+                  statusNote={pipelineStatusNote}
+                  tone={pipelineTone}
+                  stages={pipeline}
+                  variant="stepper"
+                  actions={
+                    canChangeOppStage ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="lead-change-stage__trigger"
+                        onClick={() => openMoveStage(opportunity.stage)}
+                      >
+                        Change Stage
+                      </Button>
+                    ) : null
+                  }
+                />
+              </div>
 
-          <CrmStageNotes
-            entityType="OPPORTUNITY"
-            entityId={opportunity.id}
-            sectionId="opp-section-notes"
-            stageOptions={
-              stageOptions.length > 0
-                ? stageOptions.map((s) => ({ code: s.id, label: s.label }))
-                : OPPORTUNITY_NOTE_STAGE_OPTIONS
-            }
-            historyLabel="Opportunity notes history"
-            currentStage={opportunity.stage}
-            demoNotes={oppDemoNotes}
-            editPath={`/crm/opportunities/${opportunity.id}/edit`}
-            composerOpen={noteComposerOpen}
-            onComposerOpenChange={setNoteComposerOpen}
-            onNotesChange={setEntityNotes}
-          />
+              <OpportunitySummaryCard
+                opportunity={opportunity}
+                customerName={customer?.customerName}
+                customerId={customer?.id}
+                contactName={contact?.name ?? customer?.contactPerson}
+                contactPhone={contactPhone}
+                contactEmail={contactEmail}
+                city={customer?.city}
+                productName={product?.productName}
+                lastActivityAt={lastActivity?.activityDate ?? opportunity.lastActivityAt ?? opportunity.modifiedAt}
+                lastActivityLabel={lastActivity?.subject ?? null}
+                dealValueLabel={commercial.dealValueLabel}
+                dealValueHint={commercial.dealValueHint}
+                dealValue={commercial.estimatedDealValue}
+              />
 
+              <CrmStageNotes
+                entityType="OPPORTUNITY"
+                entityId={opportunity.id}
+                sectionId="opp-section-notes"
+                stageOptions={
+                  stageOptions.length > 0
+                    ? stageOptions.map((s) => ({ code: s.id, label: s.label }))
+                    : OPPORTUNITY_NOTE_STAGE_OPTIONS
+                }
+                historyLabel="Opportunity notes history"
+                currentStage={opportunity.stage}
+                demoNotes={oppDemoNotes}
+                editPath={`/crm/opportunities/${opportunity.id}/edit`}
+                composerOpen={noteComposerOpen}
+                onComposerOpenChange={setNoteComposerOpen}
+                onNotesChange={setEntityNotes}
+              />
 
-            <ErpAdditionalSectionNav
-              layout="responsive"
-              sections={additionalSectionItems}
-              activeId={activeAdditionalSection}
-              onSelect={selectAdditionalSection}
-              title=""
-              panels={{
+              <ErpAdditionalSectionNav
+                layout="responsive"
+                sections={additionalSectionItems}
+                activeId={activeAdditionalSection}
+                onSelect={selectAdditionalSection}
+                title=""
+                panels={{
                 products: (
                   <ErpLineItemsGrid
                     lines={oppLines}
@@ -822,7 +868,8 @@ export function Opportunity360Page() {
                 ),
               }}
             />
-          
+            </div>
+          </div>
 
         </div>
       </CrmCardFormShell>

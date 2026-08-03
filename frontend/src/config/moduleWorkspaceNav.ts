@@ -2,14 +2,17 @@ import type { LucideIcon } from 'lucide-react'
 import {
   categoryIsActive,
   findActiveCategoryId,
-  getNavCategoryById,
   navItemIsActive,
-  moduleCategories,
   type NavCategory,
 } from './navigation'
+import { getPackagedModuleCategories } from './tenantNavPackaging'
 import { canViewPurchaseNavItem } from '../utils/permissions/purchase'
 import { canViewInventoryNavItem } from '../utils/permissions/inventory'
 import { canViewAdminNavItem } from '../utils/permissions/admin'
+
+function getPackagedCategoryById(id: string): NavCategory | undefined {
+  return getPackagedModuleCategories().find((c) => c.id === id)
+}
 
 /** Default landing route for a module category */
 export function getCategoryWorkspacePath(category: NavCategory): string {
@@ -46,7 +49,7 @@ export function getModuleSubNavForPath(pathname: string): {
 
   const categoryId = findActiveCategoryId(pathname)
   if (!categoryId) return null
-  const category = getNavCategoryById(categoryId)
+  const category = getPackagedCategoryById(categoryId)
   if (!category) return null
 
   const base = getCategoryWorkspacePath(category)
@@ -96,12 +99,12 @@ export function subNavItemIsActive(pathname: string, item: ModuleSubNavItem): bo
 
 /** Resolve which sub-nav paths belong to a module (for tests and search) */
 export function getAllModuleSubNavBases(): string[] {
-  return moduleCategories.map(getCategoryWorkspacePath)
+  return getPackagedModuleCategories().map(getCategoryWorkspacePath)
 }
 
 export function findCategoryByPath(pathname: string): NavCategory | null {
   const id = findActiveCategoryId(pathname)
-  return (id ? getNavCategoryById(id) : undefined) ?? null
+  return (id ? getPackagedCategoryById(id) : undefined) ?? null
 }
 
 export function pathnameInCategory(pathname: string, category: NavCategory): boolean {

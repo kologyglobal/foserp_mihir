@@ -1249,11 +1249,13 @@ export function ProformaReceivePaymentPage() {
     setError(null)
     if (!paymentMode) {
       setError('Select a payment mode.')
+      notify.error('Select a payment mode.')
       return
     }
     const amt = Number(amount)
     if (!Number.isFinite(amt) || amt <= 0) {
       setError('Enter a valid amount received.')
+      notify.error('Enter a valid amount received.')
       return
     }
     const payload = {
@@ -1274,10 +1276,12 @@ export function ProformaReceivePaymentPage() {
         })
       : receive(payload)
     if (!result.ok) {
-      setError(result.error ?? 'Failed to record receipt')
+      const msg = result.error ?? 'Failed to record receipt'
+      setError(msg)
+      notify.error(msg)
       return
     }
-    notify.success(`Receipt recorded`)
+    notify.success(`Receipt recorded — map it to tax invoices from Payment Allocation when ready`)
     navigate(`/sales/proforma-invoices/${proforma!.id}`)
   }
 

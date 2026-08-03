@@ -643,7 +643,11 @@ export interface AdminModuleAdministrator {
 }
 
 export async function fetchAdminModulesApi() {
-  return apiRequest<{ modules: AdminModuleStatus[]; enabledKeys: string[] }>(tenantPath('/modules'))
+  return apiRequest<{
+    modules: AdminModuleStatus[]
+    enabledKeys: string[]
+    businessType?: string
+  }>(tenantPath('/modules'))
 }
 
 export async function setAdminModuleFlagApi(moduleKey: string, payload: { isEnabled: boolean }) {

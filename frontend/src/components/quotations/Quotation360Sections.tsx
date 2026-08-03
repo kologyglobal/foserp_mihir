@@ -18,6 +18,7 @@ import { formatDate } from '../../utils/dates/format'
 import { LiveStatusBadge } from '../premium/LiveStatusBadge'
 import { quotationStatusLabel, quotationStatusTone } from './QuotationCrmCard'
 import { cn } from '../../utils/cn'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 
 import type { CustomerApprovalStatus } from '../../types/quotation'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
@@ -348,14 +349,16 @@ export function QuotationWorkflowStepper({
 }
 
 export function QuotationCommercialSummary({ document: doc }: { document: QuotationDocument }) {
-  const summary = calcPriceSummary(doc.priceLines, doc.freightAmount, doc.installationAmount, doc.customCharges)
+  const showFreight = !useTenantProfileStore((s) => s.isServices())
+  const freightAmount = showFreight ? doc.freightAmount : 0
+  const summary = calcPriceSummary(doc.priceLines, freightAmount, doc.installationAmount, doc.customCharges)
 
   const rows = [
     { label: 'Basic amount', value: summary.basicAmount },
     { label: 'Discount', value: -summary.discountAmount, muted: true },
     { label: 'Taxable value', value: summary.taxableValue },
     { label: 'GST', value: summary.gstAmount },
-    ...(doc.freightAmount > 0 ? [{ label: 'Freight', value: doc.freightAmount }] : []),
+    ...(showFreight && freightAmount > 0 ? [{ label: 'Freight', value: freightAmount }] : []),
     ...(doc.installationAmount > 0 ? [{ label: 'Installation', value: doc.installationAmount }] : []),
     ...(doc.customCharges > 0 ? [{ label: 'Custom charges', value: doc.customCharges }] : []),
   ]

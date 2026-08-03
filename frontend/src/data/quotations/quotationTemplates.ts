@@ -35,7 +35,11 @@ import {
   TIP_TRAILER_34M3_SECTIONS,
   TIP_TRAILER_34M3_TEMPLATE_VERSION,
 } from './templates/tipTrailer34M3'
-import { VF_WORD_PRINT_LAYOUT } from '../../utils/quotationEngine/printLayout'
+import { VF_WORD_PRINT_LAYOUT, KOLOGY_PROPOSAL_PRINT_LAYOUT } from '../../utils/quotationEngine/printLayout'
+import {
+  KOLOGY_OUTBOUND_PILOT_SECTIONS,
+  KOLOGY_OUTBOUND_PILOT_TEMPLATE_VERSION,
+} from './templates/kologyOutboundPilot'
 
 /** Built-in quotation templates shipped with the app (demo + merge seed). */
 export const DEFAULT_QUOTATION_TEMPLATES: QuotationTemplate[] = [
@@ -338,3 +342,30 @@ export const RETIRED_BUILTIN_QUOTATION_TEMPLATE_IDS = [
   'qtpl-tipper',
   'qtpl-custom',
 ] as const
+
+/** SERVICES packaging (Kology) — outbound pilot proposal is the standard printable template. */
+export const SERVICES_DEFAULT_QUOTATION_TEMPLATES: QuotationTemplate[] = [
+  {
+    id: 'qtpl-kology-outbound-pilot',
+    code: 'KOLOGY-OUTBOUND-PILOT',
+    templateName: 'Kology — Outbound Pilot Proposal',
+    productFamily: 'Outbound Services',
+    version: KOLOGY_OUTBOUND_PILOT_TEMPLATE_VERSION,
+    sections: KOLOGY_OUTBOUND_PILOT_SECTIONS,
+    printLayout: { ...KOLOGY_PROPOSAL_PRINT_LAYOUT },
+    defaultTerms:
+      'Pilot fees billed monthly in advance. GST extra. Validity 30 days from quotation date.',
+    defaultWarranty: '',
+    defaultExclusions: 'Tooling / dialer / LinkedIn Sales Navigator billed at actuals unless included.',
+    isActive: true,
+    createdAt: '2025-01-01T00:00:00Z',
+    createdById: 'system',
+    createdByName: 'System',
+    modifiedAt: null,
+    modifiedById: null,
+    modifiedByName: null,
+    approvedById: null,
+    approvedByName: null,
+    approvedAt: null,
+  },
+]

@@ -31,6 +31,10 @@ export function validateQuotationCreate(input: QuotationCreateValidationInput): 
   const messages: string[] = []
 
   if (input.createMode === 'opportunity') {
+    if (!input.customerId) {
+      fieldErrors.customerId = 'Select a customer first.'
+      messages.push(fieldErrors.customerId)
+    }
     if (!input.opportunityId) {
       fieldErrors.opportunityId = 'Select an opportunity to link this quotation.'
       messages.push(fieldErrors.opportunityId)

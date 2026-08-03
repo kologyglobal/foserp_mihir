@@ -251,6 +251,7 @@ export function SalesOrderNewPage() {
   const fromOpportunity = Boolean(opportunityPrefill)
   const createTitle = fromOpportunity ? 'Create Sales Order' : 'New Sales Order'
 
+  /** Pending approved quotes for SO create — exclude already converted / already linked SOs. */
   const quotationOptions = useMemo(() => {
     const latestByQuotation = new Map<string, (typeof quotationDocuments)[0]>()
     for (const doc of quotationDocuments) {
@@ -258,7 +259,17 @@ export function SalesOrderNewPage() {
       if (!cur || doc.revisionNo > cur.revisionNo) latestByQuotation.set(doc.quotationId, doc)
     }
     return [...latestByQuotation.values()]
-      .filter((d) => d.status === 'approved' || d.status === 'converted')
+      .filter((doc) => {
+        // Latest doc that can convert to SO: approved or customer-sent; not converted/rejected.
+        if (doc.status !== 'approved' && doc.status !== 'sent') return false
+        const q = getQuotation(doc.quotationId)
+        if (!q) return false
+        if (q.salesOrderId) return false
+        if (q.status === 'converted' || q.status === 'cancelled') return false
+        // Customer-first: only list quotes for the selected bill-to
+        if (!customerId || q.customerId !== customerId) return false
+        return true
+      })
       .map((doc) => {
         const q = getQuotation(doc.quotationId)
         const cust = q ? customers.find((c) => c.id === q.customerId) : undefined
@@ -274,14 +285,13 @@ export function SalesOrderNewPage() {
           (doc.totalAmount > 0 ? doc.totalAmount : null)
           ?? (q?.pricing?.grandTotal && q.pricing.grandTotal > 0 ? q.pricing.grandTotal : null)
           ?? 0
-        const statusLabel = doc.status === 'converted' ? 'Converted' : 'Approved'
         const owner = doc.salesOwnerName?.trim()
         return {
           value: doc.id,
           label: `${quotationNo} · Rev ${doc.revisionNo}`,
           subtitle: companyBits.join(' · '),
           trailing: total > 0 ? formatCurrency(total) : '—',
-          badge: owner ? `${statusLabel} · ${owner}` : statusLabel,
+          badge: owner ? `Pending SO · ${owner}` : 'Pending SO',
           searchText: [
             quotationNo,
             companyName,
@@ -290,7 +300,6 @@ export function SalesOrderNewPage() {
             cust?.state,
             cust?.gstin,
             owner,
-            statusLabel,
             String(total),
           ]
             .filter(Boolean)
@@ -299,7 +308,7 @@ export function SalesOrderNewPage() {
         }
       })
       .sort((a, b) => a.label.localeCompare(b.label))
-  }, [quotationDocuments, getQuotation, customers])
+  }, [quotationDocuments, getQuotation, customers, customerId])
 
   const customerOptions = useMemo(
     () => customers.map((c) => ({ id: c.id, label: `${c.customerCode} · ${c.customerName}` })),
@@ -389,6 +398,20 @@ export function SalesOrderNewPage() {
     if (inheritedLoc) setLocationId(inheritedLoc)
     const loc = inheritedLoc ? locations.find((l) => l.id === inheritedLoc) : null
     if (loc) setDeliveryLocation(locationDisplayLabel(loc))
+  }
+
+  /** Customer-first flow: changing customer clears an incompatible quotation selection. */
+  function handleCustomerChange(nextCustomerId: string) {
+    setCustomerId(nextCustomerId)
+    if (!quotationDocumentId) return
+    const doc = getQuotationDocument(quotationDocumentId)
+    const q = doc ? getQuotation(doc.quotationId) : undefined
+    if (!nextCustomerId || !q || q.customerId !== nextCustomerId) {
+      setQuotationDocumentId('')
+      if (createMode === 'quotation' && directSoReason.startsWith('Approved quotation handover')) {
+        setDirectSoReason('')
+      }
+    }
   }
 
   function handleCreateModeChange(mode: SoCreateMode) {
@@ -1162,35 +1185,12 @@ export function SalesOrderNewPage() {
         ) : null}
       </div>
 
-      {createMode === 'quotation' ? (
-        <ErpFieldRow
-          label="Quotation Number (Reference)"
-          required
-          colSpan={3}
-          dataField="quotationDocumentId"
-          fieldError={validationErrors.quotationDocumentId}
-          hint="Approved quotations only — selecting one fills customer, lines, and terms"
-        >
-          <ErpSmartSelect
-            options={quotationOptions}
-            value={quotationDocumentId}
-            onChange={(v) => {
-              if (v) applyQuotation(v)
-              else setQuotationDocumentId('')
-            }}
-            allowEmpty
-            placeholder="Search quotation no, customer, city, amount…"
-            dropdownMinWidth={480}
-          />
-        </ErpFieldRow>
-      ) : null}
-
       <ErpFieldGroup label="Bill-to customer" className="so-qe-customer-group">
         <ErpFieldRow label="Customer" required colSpan={3} dataField="customerId" fieldError={validationErrors.customerId}>
           <QuickCreateSelect
             entityType="customer"
             value={customerId}
-            onChange={setCustomerId}
+            onChange={handleCustomerChange}
             options={customerOptions}
             placeholder="Search by code, name, or city…"
           />
@@ -1269,6 +1269,40 @@ export function SalesOrderNewPage() {
           </div>
         )}
       </ErpFieldGroup>
+
+      {createMode === 'quotation' ? (
+        <ErpFieldRow
+          label="Quotation Number (Reference)"
+          required
+          colSpan={3}
+          dataField="quotationDocumentId"
+          fieldError={validationErrors.quotationDocumentId}
+          hint={
+            !customerId
+              ? 'Select a customer first — only their approved quotations without a sales order appear here'
+              : quotationOptions.length === 0
+                ? 'No pending approved quotations for this customer (already converted or not ready yet)'
+                : 'Pending quotations (no sales order yet) — selecting one fills lines and commercial terms'
+          }
+        >
+          <ErpSmartSelect
+            options={quotationOptions}
+            value={quotationDocumentId}
+            onChange={(v) => {
+              if (v) applyQuotation(v)
+              else setQuotationDocumentId('')
+            }}
+            allowEmpty
+            disabled={!customerId}
+            placeholder={
+              customerId
+                ? 'Search pending quotation no, amount…'
+                : 'Select a customer first…'
+            }
+            dropdownMinWidth={480}
+          />
+        </ErpFieldRow>
+      ) : null}
 
       <ErpFieldGroup label="Customer purchase order" className="so-qe-po-group" columns={4}>
         <ErpFieldRow label="Customer PO Number" dataField="customerPoNumber" fieldError={validationErrors.customerPoNumber}>

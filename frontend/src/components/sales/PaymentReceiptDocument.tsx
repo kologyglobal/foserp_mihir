@@ -1,10 +1,11 @@
-import { QUOTATION_COMPANY } from '../../utils/quotationEngine/companyProfile'
+import { useCompanyProfile } from '../../utils/quotationEngine/companyProfile'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { amountInWords } from '../../utils/amountInWords'
 import { cn } from '../../utils/cn'
 import type { CrmPaymentAllocation, CrmPaymentReceipt } from '../../types/crmCommercial'
 import { CRM_PAYMENT_MODE_LABELS } from '../../types/crmCommercial'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 
 export interface PaymentReceiptPartyInfo {
   address?: string
@@ -25,7 +26,8 @@ export function PaymentReceiptDocument({
   customer,
   className,
 }: PaymentReceiptDocumentProps) {
-  const company = QUOTATION_COMPANY
+  const company = useCompanyProfile()
+  const isServices = useTenantProfileStore((s) => s.isServices())
   const allocatedAmount = Math.max(0, receipt.amount - receipt.unallocatedAmount)
   const activeAllocations = allocations.filter((a) => !a.reversedAt)
 
@@ -40,13 +42,12 @@ export function PaymentReceiptDocument({
           </div>
           <div className="pi-print-header__identity">
             <h1 className="pi-print-header__company">{company.legalName}</h1>
-            <p className="pi-print-header__tagline">{company.tagline}</p>
+            {company.tagline ? <p className="pi-print-header__tagline">{company.tagline}</p> : null}
             <p className="pi-print-header__address">{company.address}</p>
             <p className="pi-print-header__contact">
-              {company.phone} · {company.email}
-              {company.website ? ` · ${company.website}` : ''}
+              {[company.phone, company.email, company.website].filter(Boolean).join(' · ')}
             </p>
-            <p className="pi-print-header__gstin">GSTIN: {company.gstin}</p>
+            {company.gstin ? <p className="pi-print-header__gstin">GSTIN: {company.gstin}</p> : null}
           </div>
         </div>
 
@@ -179,7 +180,7 @@ export function PaymentReceiptDocument({
 
       <footer className="pi-print-doc__footer">
         <span>{company.legalName}</span>
-        <span>Computer-generated payment receipt · Subject to Chhapi jurisdiction</span>
+        <span>Computer-generated payment receipt{!isServices ? ' · Subject to Chhapi jurisdiction' : ''}</span>
       </footer>
     </article>
   )

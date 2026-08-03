@@ -1,5 +1,6 @@
 import { formatCurrency } from '@/utils/formatters/currency'
 import { parseDecimal } from '../moneyInUi'
+import { useTenantProfileStore } from '@/store/tenantProfileStore'
 
 export function TotalsPanel({
   subtotal,
@@ -26,6 +27,7 @@ export function TotalsPanel({
   total?: string
   preview?: boolean
 }) {
+  const showFreight = !useTenantProfileStore((s) => s.isServices())
   const rows = [
     { label: 'Subtotal', value: subtotal },
     { label: 'Discount', value: discount },
@@ -33,7 +35,7 @@ export function TotalsPanel({
     { label: 'CGST', value: cgst },
     { label: 'SGST', value: sgst },
     { label: 'IGST', value: igst },
-    { label: 'Freight', value: freight },
+    ...(showFreight ? [{ label: 'Freight', value: freight }] : []),
     { label: 'Other charges', value: other },
     { label: 'Round off', value: roundOff },
   ].filter((r) => r.value !== undefined)
