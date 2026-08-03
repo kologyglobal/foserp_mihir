@@ -38,6 +38,7 @@ import { Badge, formatStatus, statusColor } from '../../components/ui/Badge'
 import { TableLink } from '../../components/ui/AppLink'
 import { CommandBar, CommandBarButton, CommandBarGroup } from '../../components/ui/CommandBar'
 import { Button } from '../../components/ui/Button'
+import { nextQuotationRevisionLabel, quotationNoWithRevision, quotationRevisionLabel } from '../../utils/quotationEngine/revisionLabels'
 import { AppLink } from '../../components/ui/AppLink'
 import { Toast } from '../../components/ui/Toast'
 import { useSalesStore } from '../../store/salesStore'
@@ -95,8 +96,10 @@ function useMasterLabels() {
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
   const customerName = useCallback(
-    (id: string | null | undefined) =>
-      id ? (customers.find((c) => c.id === id)?.customerName ?? id) : '—',
+    (id: string | null | undefined, snapshot?: string | null) => {
+      if (!id && !snapshot) return '—'
+      return customers.find((c) => c.id === id)?.customerName ?? snapshot?.trim() || id || '—'
+    },
     [customers],
   )
   const productName = useCallback(
@@ -224,7 +227,7 @@ function DashboardQuotationTable({
       header: 'Quotation',
       cell: ({ row }) => (
         <TableLink to={crmQuotationPath(row.original.id)}>
-          {row.original.quotationNo} Rev {row.original.revisionNo}
+          {quotationNoWithRevision(row.original.quotationNo, row.original.revisionNo)}
         </TableLink>
       ),
     },
@@ -233,7 +236,7 @@ function DashboardQuotationTable({
       header: 'Opportunity',
       cell: ({ row }) => row.original.opportunityNo ?? row.original.inquiryNo ?? '—',
     },
-    { accessorKey: 'customerId', header: 'Company', cell: ({ row }) => customerName(row.original.customerId) },
+    { accessorKey: 'customerId', header: 'Company', cell: ({ row }) => customerName(row.original.customerId, row.original.customerName) },
     { accessorKey: 'productId', header: 'Product', cell: ({ row }) => productName(row.original.productId) },
     {
       accessorKey: 'pricing.grandTotal',
@@ -312,7 +315,7 @@ export function ApprovalQueuePage() {
       ) : (
         <div className="space-y-4">
           {pending.map((q) => (
-            <SectionCard key={q.id} title={`${q.quotationNo} · Rev ${q.revisionNo}`} subtitle={`${customerName(q.customerId)} · ${productName(q.productId)} × ${q.qty}`}>
+            <SectionCard key={q.id} title={quotationNoWithRevision(q.quotationNo, q.revisionNo)} subtitle={`${customerName(q.customerId, q.customerName)} · ${productName(q.productId)} × ${q.qty}`}>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
                   <div>
@@ -389,7 +392,7 @@ export function QuotationListPage() {
       list = list.filter(
         (q) =>
           q.quotationNo.toLowerCase().includes(s) ||
-          customerName(q.customerId).toLowerCase().includes(s) ||
+          customerName(q.customerId, q.customerName).toLowerCase().includes(s) ||
           (q.opportunityNo ?? q.inquiryNo ?? '').toLowerCase().includes(s),
       )
     }
@@ -415,8 +418,8 @@ export function QuotationListPage() {
   function openQuotationPreview(quotation: Quotation) {
     const crmDoc = useCrmStore.getState().getLatestQuotationDocument(quotation.id)
     openDetailPanel({
-      title: `${quotation.quotationNo} Rev ${quotation.revisionNo}`,
-      subtitle: customerName(quotation.customerId),
+      title: quotationNoWithRevision(quotation.quotationNo, quotation.revisionNo),
+      subtitle: customerName(quotation.customerId, quotation.customerName),
       fields: [
         { label: 'Opportunity', value: quotation.opportunityNo ?? quotation.inquiryNo ?? '—' },
         { label: 'Product', value: productName(quotation.productId) },
@@ -427,7 +430,7 @@ export function QuotationListPage() {
       ],
       links: [{ label: 'Open Quotation', href: crmQuotationPath(quotation.id) }],
       timeline: [{ id: 'status', label: formatStatus(quotation.status), time: formatDate(quotation.validityDate), status: 'current' }],
-      aiSummary: `${quotation.quotationNo} for ${customerName(quotation.customerId)} is ${formatStatus(quotation.status).toLowerCase()} at ${formatCurrency(quotation.pricing.grandTotal)}.${quotation.status === 'pending_approval' ? ' Follow up on customer approval.' : quotation.status === 'approved' ? ' Ready to convert to sales order.' : ''}`,
+      aiSummary: `${quotation.quotationNo} for ${customerName(quotation.customerId, quotation.customerName)} is ${formatStatus(quotation.status).toLowerCase()} at ${formatCurrency(quotation.pricing.grandTotal)}.${quotation.status === 'pending_approval' ? ' Follow up on customer approval.' : quotation.status === 'approved' ? ' Ready to convert to sales order.' : ''}`,
       actions: [
         { label: 'Open Quotation', onClick: () => navigate(crmQuotationPath(quotation.id)), primary: true },
         { label: 'Edit', onClick: () => navigate(crmQuotationEditorPath(quotation.id, crmDoc?.id)) },
@@ -440,9 +443,9 @@ export function QuotationListPage() {
       'quotations-selected',
       ['Quotation', 'Opportunity', 'Company', 'Total', 'Status'],
       selected.map((q) => [
-        `${q.quotationNo} Rev ${q.revisionNo}`,
+        quotationNoWithRevision(q.quotationNo, q.revisionNo),
         q.opportunityNo ?? q.inquiryNo ?? '',
-        customerName(q.customerId),
+        customerName(q.customerId, q.customerName),
         q.pricing.grandTotal,
         q.status,
       ]),
@@ -548,7 +551,7 @@ export function QuotationDetailPage() {
   return (
     <div className="erp-page">
       <PageHeader
-        title={`${quotation.quotationNo} · Rev ${quotation.revisionNo}`}
+        title={quotationNoWithRevision(quotation.quotationNo, quotation.revisionNo)}
         description={quotation.locked ? 'Locked revision (superseded)' : quotation.isLatestRevision ? 'Latest revision' : 'Historical revision'}
         breadcrumbs={[
           { label: 'Sales', to: '/sales' },
@@ -634,7 +637,7 @@ export function QuotationDetailPage() {
         <SectionCard title="Pricing & Terms">
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <dt className="text-erp-muted">Company</dt>
-            <dd>{customerName(quotation.customerId)}</dd>
+            <dd>{customerName(quotation.customerId, quotation.customerName)}</dd>
             <dt className="text-erp-muted">Product</dt>
             <dd>{productName(quotation.productId)} × {quotation.qty}</dd>
             <dt className="text-erp-muted">Unit Price</dt>
@@ -647,9 +650,9 @@ export function QuotationDetailPage() {
             <dd>{formatCurrency(quotation.pricing.gstAmount)}</dd>
             <dt className="text-erp-muted font-semibold">Grand Total</dt>
             <dd className="font-semibold">{formatCurrency(quotation.pricing.grandTotal)}</dd>
-            <dt className="text-erp-muted">Validity</dt>
-            <dd>{formatDate(quotation.validityDate)}</dd>
-            <dt className="text-erp-muted">Payment</dt>
+            <dt className="text-erp-muted">Valid Until</dt>
+            <dd>{quotation.validityDate ? formatDate(quotation.validityDate) : ''}</dd>
+            <dt className="text-erp-muted">Payment Terms</dt>
             <dd>
               {quotation.status === 'draft' && !quotation.locked ? (
                 <QuickCreateSelect
@@ -666,11 +669,17 @@ export function QuotationDetailPage() {
                   emptyOptionLabel={quotation.paymentTerms}
                 />
               ) : (
-                quotation.paymentTerms
+                <span className="whitespace-pre-wrap">{quotation.paymentTerms}</span>
               )}
             </dd>
-            <dt className="text-erp-muted">Delivery</dt>
-            <dd>{quotation.deliveryTerms}</dd>
+            <dt className="text-erp-muted">Delivery Terms</dt>
+            <dd className="whitespace-pre-wrap">{quotation.deliveryTerms}</dd>
+            {quotation.deliveryTime ? (
+              <>
+                <dt className="text-erp-muted">Delivery Time</dt>
+                <dd className="whitespace-pre-wrap">{quotation.deliveryTime}</dd>
+              </>
+            ) : null}
             <dt className="text-erp-muted">Company Approval</dt>
             <dd><Badge color={statusColor(quotation.customerApproval)}>{formatStatus(quotation.customerApproval)}</Badge></dd>
             <dt className="text-erp-muted">Status</dt>
@@ -682,7 +691,7 @@ export function QuotationDetailPage() {
             {chain.map((q) => (
               <li key={q.id} className="flex items-center justify-between border-b border-erp-border pb-2">
                 <Link to={crmQuotationPath(q.id)} className={q.id === quotation.id ? 'font-semibold text-erp-primary' : 'text-erp-text hover:underline'}>
-                  Rev {q.revisionNo} {q.locked ? '(locked)' : q.isLatestRevision ? '(latest)' : ''}
+                  {quotationRevisionLabel(q.revisionNo)} {q.locked ? '(locked)' : q.isLatestRevision ? '(latest)' : ''}
                 </Link>
                 <span>{formatCurrency(q.pricing.grandTotal)}</span>
               </li>
@@ -710,7 +719,7 @@ export function QuotationDetailPage() {
                   else setToast(r.error ?? 'Failed')
                 }}
               >
-                Create Rev {quotation.revisionNo + 1}
+                Create {nextQuotationRevisionLabel(quotation.revisionNo)}
               </Button>
             </div>
           )}
@@ -721,7 +730,7 @@ export function QuotationDetailPage() {
         <ul className="space-y-2 text-sm">
           {quotation.changeHistory.map((c) => (
             <li key={`${c.revisionNo}-${c.changedAt}`}>
-              <span className="font-medium">Rev {c.revisionNo}</span> · {c.summary} · {c.changedByName} · {formatDate(c.changedAt.slice(0, 10))}
+              <span className="font-medium">{quotationRevisionLabel(c.revisionNo)}</span> · {c.summary} · {c.changedByName} · {formatDate(c.changedAt.slice(0, 10))}
             </li>
           ))}
         </ul>
@@ -858,7 +867,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
       list = list.filter(
         (o) =>
           o.salesOrderNo.toLowerCase().includes(s) ||
-          customerName(o.customerId).toLowerCase().includes(s) ||
+          customerName(o.customerId, o.customerName).toLowerCase().includes(s) ||
           productName(o.productId).toLowerCase().includes(s) ||
           (o.quotationNo ?? '').toLowerCase().includes(s) ||
           (o.customerPoNumber ?? '').toLowerCase().includes(s),
@@ -938,11 +947,11 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
       const value = resolveSalesOrderValue(so, product)
       openDetailPanel({
         title: so.quotationNo ?? so.salesOrderNo,
-        subtitle: customerName(so.customerId),
+        subtitle: customerName(so.customerId, so.customerName),
         fields: [
           { label: 'Status', value: 'Pending SO' },
           { label: 'Fulfillment', value: 'Awaiting SO' },
-          { label: 'Company', value: customerName(so.customerId) },
+          { label: 'Company', value: customerName(so.customerId, so.customerName) },
           { label: 'Product', value: productName(so.productId) },
           { label: 'Qty', value: formatNumber(so.qty) },
           { label: 'Value', value: value > 0 ? formatCurrency(value) : '—' },
@@ -962,7 +971,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
             status: 'current',
           },
         ],
-        aiSummary: `Approved quotation ${so.quotationNo ?? ''} for ${customerName(so.customerId)} is awaiting sales order conversion (${value > 0 ? formatCurrency(value) : 'TBD'}).`,
+        aiSummary: `Approved quotation ${so.quotationNo ?? ''} for ${customerName(so.customerId, so.customerName)} is awaiting sales order conversion (${value > 0 ? formatCurrency(value) : 'TBD'}).`,
         actions: [
           {
             label: 'Create Sales Order',
@@ -1097,7 +1106,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
         const value = resolveSalesOrderValue(so, product)
         return [
           so.salesOrderNo,
-          customerName(so.customerId),
+          customerName(so.customerId, so.customerName),
           productName(so.productId),
           so.qty,
           so.status,

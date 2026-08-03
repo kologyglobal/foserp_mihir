@@ -357,12 +357,33 @@ FROM `roles` r
 JOIN `permissions` p ON p.`name` IN ('user.view', 'crm.lead.view', 'crm.lead.create', 'crm.lead.update', 'crm.lead.delete', 'crm.lead.assign', 'crm.lead.qualify', 'crm.lead.convert', 'crm.contact.view', 'crm.contact.create', 'crm.contact.update', 'crm.contact.delete', 'crm.company.view', 'crm.company.create', 'crm.company.update', 'crm.company.delete', 'crm.activity.view', 'crm.activity.create', 'crm.activity.update', 'crm.activity.complete', 'crm.activity.delete', 'crm.pipeline.view', 'crm.pipeline.manage', 'crm.opportunity.view', 'crm.opportunity.create', 'crm.opportunity.update', 'crm.opportunity.close', 'crm.opportunity.delete', 'crm.quotation.view', 'crm.quotation.create', 'crm.quotation.update', 'crm.quotation.delete', 'crm.quotation.approve', 'crm.quotation.convert', 'crm.sales_order.view', 'crm.sales_order.create', 'crm.sales_order.update', 'crm.sales_order.delete', 'crm.sales_order.confirm', 'crm.follow_up.view', 'crm.follow_up.create', 'crm.follow_up.update', 'crm.follow_up.delete', 'crm.import.view', 'crm.import.execute', 'crm.master.view', 'crm.master.create', 'crm.master.update', 'crm.master.delete', 'crm.dashboard.view', 'crm.report.view', 'crm.search.view', 'crm.export.view', 'crm.export.execute', 'crm.note.view', 'crm.note.create', 'crm.note.update', 'crm.note.delete', 'crm.attachment.view', 'crm.attachment.create', 'crm.attachment.delete', 'master.lookup.view', 'master.product.view')
 WHERE r.`name` = 'CRM Admin' AND r.`deletedAt` IS NULL;
 
--- Sales Executive (34 permissions)
+-- Sales Executive
 INSERT IGNORE INTO `role_permissions` (`id`, `roleId`, `permissionId`)
 SELECT UUID(), r.`id`, p.`id`
 FROM `roles` r
-JOIN `permissions` p ON p.`name` IN ('crm.lead.view', 'crm.lead.create', 'crm.lead.update', 'crm.contact.view', 'crm.contact.create', 'crm.contact.update', 'crm.company.view', 'crm.activity.view', 'crm.activity.create', 'crm.activity.update', 'crm.activity.complete', 'crm.follow_up.view', 'crm.follow_up.create', 'crm.follow_up.update', 'crm.pipeline.view', 'crm.opportunity.view', 'crm.opportunity.create', 'crm.opportunity.update', 'crm.quotation.view', 'crm.quotation.create', 'crm.quotation.update', 'crm.quotation.convert', 'crm.sales_order.view', 'crm.sales_order.create', 'crm.sales_order.update', 'crm.note.view', 'crm.note.create', 'crm.note.update', 'crm.dashboard.view', 'crm.report.view', 'crm.search.view', 'master.lookup.view', 'master.item.view', 'master.product.view')
+JOIN `permissions` p ON p.`name` IN ('crm.lead.view', 'crm.lead.create', 'crm.lead.update', 'crm.contact.view', 'crm.contact.create', 'crm.contact.update', 'crm.company.view', 'crm.activity.view', 'crm.activity.create', 'crm.activity.update', 'crm.activity.complete', 'crm.follow_up.view', 'crm.follow_up.create', 'crm.follow_up.update', 'crm.pipeline.view', 'crm.opportunity.view', 'crm.opportunity.create', 'crm.opportunity.update', 'crm.quotation.view', 'crm.quotation.create', 'crm.quotation.update', 'crm.quotation.convert', 'crm.sales_order.view', 'crm.sales_order.create', 'crm.sales_order.update', 'crm.sales_order.confirm', 'crm.note.view', 'crm.note.create', 'crm.note.update', 'crm.dashboard.view', 'crm.report.view', 'crm.search.view', 'master.lookup.view', 'master.item.view', 'master.product.view')
 WHERE r.`name` = 'Sales Executive' AND r.`deletedAt` IS NULL;
+
+-- CRM User
+INSERT IGNORE INTO `role_permissions` (`id`, `roleId`, `permissionId`)
+SELECT UUID(), r.`id`, p.`id`
+FROM `roles` r
+JOIN `permissions` p ON p.`name` IN (
+  'crm.lead.view', 'crm.lead.create', 'crm.lead.update',
+  'crm.contact.view', 'crm.contact.create', 'crm.contact.update',
+  'crm.company.view',
+  'crm.activity.view', 'crm.activity.create', 'crm.activity.update', 'crm.activity.complete',
+  'crm.follow_up.view', 'crm.follow_up.create', 'crm.follow_up.update',
+  'crm.pipeline.view',
+  'crm.opportunity.view', 'crm.opportunity.create', 'crm.opportunity.update',
+  'crm.quotation.view', 'crm.quotation.create', 'crm.quotation.update', 'crm.quotation.convert',
+  'crm.sales_order.view', 'crm.sales_order.create', 'crm.sales_order.update', 'crm.sales_order.confirm',
+  'crm.note.view', 'crm.note.create', 'crm.note.update',
+  'crm.attachment.view', 'crm.attachment.create',
+  'crm.dashboard.view', 'crm.report.view', 'crm.search.view', 'crm.export.view',
+  'master.lookup.view', 'master.item.view', 'master.product.view'
+)
+WHERE r.`name` = 'CRM User' AND r.`deletedAt` IS NULL;
 
 -- Viewer (27 permissions)
 INSERT IGNORE INTO `role_permissions` (`id`, `roleId`, `permissionId`)

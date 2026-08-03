@@ -10,7 +10,9 @@ import {
   createSalesInvoiceSchema,
   listInvoiceReadyQuerySchema,
   listSalesInvoicesQuerySchema,
+  listCrmPendingTaxInvoicesQuerySchema,
   prefillFromDispatchSchema,
+  prefillFromCrmTaxInvoiceSchema,
   reverseSalesInvoiceSchema,
   updateSalesInvoiceSchema,
 } from './sales-invoice.schemas.js'
@@ -38,11 +40,23 @@ router.get(
   validateQuery(listInvoiceReadyQuerySchema),
   controller.listInvoiceReady,
 )
+router.get(
+  '/crm-pending',
+  requirePermission('finance.ar.invoice.view'),
+  validateQuery(listCrmPendingTaxInvoicesQuerySchema),
+  controller.listCrmPending,
+)
 router.post(
   '/prefill-from-dispatch',
   requirePermission('finance.ar.invoice.create'),
   validateBody(prefillFromDispatchSchema),
   controller.prefillFromDispatch,
+)
+router.post(
+  '/prefill-from-crm-tax-invoice',
+  requirePermission('finance.ar.invoice.create'),
+  validateBody(prefillFromCrmTaxInvoiceSchema),
+  controller.prefillFromCrmTaxInvoice,
 )
 router.post(
   '/',

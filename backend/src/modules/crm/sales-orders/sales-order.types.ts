@@ -20,10 +20,16 @@ export interface SalesOrderLineDto {
   technicalScopeRef?: string | null
 }
 
+export type SalesOrderWithCompany = CrmSalesOrder & {
+  company?: { id: string; name: string; companyCode?: string | null } | null
+}
+
 export interface SalesOrderDto {
   id: string
   salesOrderNo: string
   customerId: string
+  /** Resolved from CRM company for list/detail consumers (mobile/web). */
+  customerName: string | null
   itemId: string
   qty: number
   requiredDate: string | null
@@ -74,11 +80,13 @@ function parseLines(value: unknown): SalesOrderLineDto[] {
   return Array.isArray(value) ? (value as SalesOrderLineDto[]) : []
 }
 
-export function mapSalesOrderToDto(order: CrmSalesOrder, names?: AuditUserNames): SalesOrderDto {
+export function mapSalesOrderToDto(order: SalesOrderWithCompany, names?: AuditUserNames): SalesOrderDto {
+  const companyName = order.company?.name?.trim() || null
   return {
     id: order.id,
     salesOrderNo: order.salesOrderNo,
     customerId: order.companyId,
+    customerName: companyName,
     itemId: order.itemId,
     qty: decimalToNumber(order.qty),
     requiredDate: toIso(order.requiredDate)?.slice(0, 10) ?? null,
@@ -102,7 +110,7 @@ export function mapSalesOrderToDto(order: CrmSalesOrder, names?: AuditUserNames)
     technicalNotes: order.technicalNotes,
     orderDate: toIso(order.orderDate)?.slice(0, 10) ?? null,
     source: order.source,
-    customerCode: order.customerCode,
+    customerCode: order.customerCode ?? order.company?.companyCode ?? null,
     customerPoNumber: order.customerPoNumber,
     customerPoDate: toIso(order.customerPoDate)?.slice(0, 10) ?? null,
     expectedDeliveryDate: toIso(order.expectedDeliveryDate)?.slice(0, 10) ?? null,

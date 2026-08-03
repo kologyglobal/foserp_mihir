@@ -29,6 +29,28 @@ export function mapQuotationDocumentToDto(
     freightAmount: decimalToNumber(doc.freightAmount),
     installationAmount: decimalToNumber(doc.installationAmount),
     customCharges: decimalToNumber(doc.customCharges),
+    orderDiscountCalcType: (doc as { orderDiscountCalcType?: string }).orderDiscountCalcType ?? 'FLAT',
+    orderDiscountValue: decimalToNumber((doc as { orderDiscountValue?: unknown }).orderDiscountValue ?? 0),
+    orderDiscountAmount: decimalToNumber((doc as { orderDiscountAmount?: unknown }).orderDiscountAmount ?? 0),
+    freightCalcType: (doc as { freightCalcType?: string }).freightCalcType ?? 'FLAT',
+    freightValue: decimalToNumber((doc as { freightValue?: unknown }).freightValue ?? doc.freightAmount),
+    freightIsTaxable: Boolean((doc as { freightIsTaxable?: boolean }).freightIsTaxable),
+    freightTaxRate: decimalToNumber((doc as { freightTaxRate?: unknown }).freightTaxRate ?? 0),
+    freightTaxAmount: decimalToNumber((doc as { freightTaxAmount?: unknown }).freightTaxAmount ?? 0),
+    installationCalcType: (doc as { installationCalcType?: string }).installationCalcType ?? 'FLAT',
+    installationValue: decimalToNumber(
+      (doc as { installationValue?: unknown }).installationValue ?? doc.installationAmount,
+    ),
+    installationIsTaxable: Boolean((doc as { installationIsTaxable?: boolean }).installationIsTaxable),
+    installationTaxRate: decimalToNumber((doc as { installationTaxRate?: unknown }).installationTaxRate ?? 0),
+    installationTaxAmount: decimalToNumber((doc as { installationTaxAmount?: unknown }).installationTaxAmount ?? 0),
+    customChargesCalcType: (doc as { customChargesCalcType?: string }).customChargesCalcType ?? 'FLAT',
+    customChargesValue: decimalToNumber(
+      (doc as { customChargesValue?: unknown }).customChargesValue ?? doc.customCharges,
+    ),
+    customChargesIsTaxable: Boolean((doc as { customChargesIsTaxable?: boolean }).customChargesIsTaxable),
+    customChargesTaxRate: decimalToNumber((doc as { customChargesTaxRate?: unknown }).customChargesTaxRate ?? 0),
+    customChargesTaxAmount: decimalToNumber((doc as { customChargesTaxAmount?: unknown }).customChargesTaxAmount ?? 0),
     status: doc.status,
     totalAmount: decimalToNumber(doc.totalAmount),
     revisionReason: doc.revisionReason,
@@ -58,6 +80,7 @@ export function mapQuotationToDto(
   quotation: CrmQuotation & {
     documents?: CrmQuotationDocument[]
     opportunity?: { opportunityCode: string } | null
+    company?: { id: string; name: string; companyCode?: string | null } | null
   },
   names?: AuditUserNames & { salesOwnerName?: string },
 ): QuotationDto {
@@ -74,6 +97,7 @@ export function mapQuotationToDto(
     opportunityId: quotation.opportunityId,
     opportunityNo: quotation.opportunity?.opportunityCode ?? null,
     customerId: quotation.companyId,
+    customerName: quotation.company?.name?.trim() || null,
     itemId: quotation.itemId,
     qty: decimalToNumber(quotation.qty),
     revisionNo: quotation.revisionNo,

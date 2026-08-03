@@ -1,5 +1,11 @@
 import type { CrmQuotation, CrmQuotationDocument } from '@prisma/client'
 import { InvalidStateError, ValidationError } from '../../../utils/errors.js'
+import {
+  adjustmentsFromDocumentFields,
+  calcOrderDocumentTotals,
+  type OrderDocumentTotals,
+  type PriceLineForAdjustCalc,
+} from './orderAdjustmentsCalc.js'
 import type { QuotationApprovalEntryDto } from './quotation.types.js'
 import type { UpdateQuotationDocumentInput, UpdateQuotationInput } from './quotation.validation.js'
 
@@ -165,4 +171,92 @@ export function syncLineTotals<T extends { qty: number; unitPrice: number; disco
     const lineTotal = base * (1 + taxPct / 100)
     return { ...line, lineTotal }
   })
+}
+
+export type DocumentChargeFields = {
+  freightAmount?: number | null
+  installationAmount?: number | null
+  customCharges?: number | null
+  orderDiscountCalcType?: string | null
+  orderDiscountValue?: number | null
+  freightCalcType?: string | null
+  freightValue?: number | null
+  freightIsTaxable?: boolean | null
+  freightTaxRate?: number | null
+  installationCalcType?: string | null
+  installationValue?: number | null
+  installationIsTaxable?: boolean | null
+  installationTaxRate?: number | null
+  customChargesCalcType?: string | null
+  customChargesValue?: number | null
+  customChargesIsTaxable?: boolean | null
+  customChargesTaxRate?: number | null
+}
+
+export type DocumentChargePersist = {
+  freightAmount: number
+  installationAmount: number
+  customCharges: number
+  totalAmount: number
+  orderDiscountCalcType: string
+  orderDiscountValue: number
+  orderDiscountAmount: number
+  freightCalcType: string
+  freightValue: number
+  freightIsTaxable: boolean
+  freightTaxRate: number
+  freightTaxAmount: number
+  installationCalcType: string
+  installationValue: number
+  installationIsTaxable: boolean
+  installationTaxRate: number
+  installationTaxAmount: number
+  customChargesCalcType: string
+  customChargesValue: number
+  customChargesIsTaxable: boolean
+  customChargesTaxRate: number
+  customChargesTaxAmount: number
+}
+
+/** Resolve document-level adjustments into persisted amounts + total breakdown. */
+export function resolveDocumentCharges(
+  lines: Array<Partial<PriceLineForAdjustCalc> & { qty?: number; unitPrice?: number }>,
+  chargeFields: DocumentChargeFields,
+): { persist: DocumentChargePersist; totals: OrderDocumentTotals } {
+  const priceLines: PriceLineForAdjustCalc[] = (Array.isArray(lines) ? lines : []).map((line) => ({
+    qty: Number(line.qty ?? 0),
+    unitPrice: Number(line.unitPrice ?? 0),
+    discountPct: Number(line.discountPct ?? 0),
+    taxPct: Number(line.taxPct ?? 0),
+  }))
+  const adjustments = adjustmentsFromDocumentFields(chargeFields)
+  const totals = calcOrderDocumentTotals(priceLines, adjustments)
+
+  return {
+    totals,
+    persist: {
+      freightAmount: totals.freightAmount,
+      installationAmount: totals.installationAmount,
+      customCharges: totals.customCharges,
+      totalAmount: totals.grandTotal,
+      orderDiscountCalcType: totals.orderDiscount.calculationType,
+      orderDiscountValue: totals.orderDiscount.value,
+      orderDiscountAmount: totals.orderDiscount.calculatedAmount,
+      freightCalcType: totals.freight.calculationType,
+      freightValue: totals.freight.value,
+      freightIsTaxable: totals.freight.isTaxable,
+      freightTaxRate: totals.freight.taxRate,
+      freightTaxAmount: totals.freight.taxAmount,
+      installationCalcType: totals.installation.calculationType,
+      installationValue: totals.installation.value,
+      installationIsTaxable: totals.installation.isTaxable,
+      installationTaxRate: totals.installation.taxRate,
+      installationTaxAmount: totals.installation.taxAmount,
+      customChargesCalcType: totals.otherCharges.calculationType,
+      customChargesValue: totals.otherCharges.value,
+      customChargesIsTaxable: totals.otherCharges.isTaxable,
+      customChargesTaxRate: totals.otherCharges.taxRate,
+      customChargesTaxAmount: totals.otherCharges.taxAmount,
+    },
+  }
 }

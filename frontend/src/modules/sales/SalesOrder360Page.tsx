@@ -42,6 +42,7 @@ import { useCrmStore } from '../../store/crmStore'
 import { canCrmPermission } from '../../utils/permissions/crm'
 import { resolveCompany360Path } from '../../config/entity360Routes'
 import { crmQuotationPath } from '../../utils/crmQuotationNavigation'
+import { quotationNoWithRevision } from '../../utils/quotationEngine/revisionLabels'
 import {
   CRM_SALES_ORDERS_PATH,
   buildSalesOrderEditUrl,
@@ -172,6 +173,7 @@ export function SalesOrder360Page() {
   const updateSalesOrderDraft = useMrpStore((s) => s.updateSalesOrderDraft)
 
   const customer = so ? customers.find((c) => c.id === so.customerId) : undefined
+  const customerDisplayName = customer?.customerName?.trim() || so?.customerName?.trim() || null
   const product = so ? products.find((p) => p.id === so.productId) : undefined
   const quo = so?.quotationId ? getQuotation(so.quotationId) : undefined
   const crmDoc = so?.quotationId ? getLatestQuotationDocument(so.quotationId) : undefined
@@ -442,8 +444,13 @@ export function SalesOrder360Page() {
   })
 
   const formMetrics = [
+<<<<<<< HEAD
     { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', accent: 'green' as const, hint: customer?.customerName ?? 'Customer' },
     { label: 'Quantity', value: formatNumber(so.qty), accent: 'blue' as const, hint: product?.productName ?? productLabel },
+=======
+    { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', accent: 'green' as const, hint: customerDisplayName ?? 'Customer' },
+    { label: 'Quantity', value: formatNumber(so.qty), accent: 'blue' as const, hint: product?.productName ?? 'Product' },
+>>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
     { label: 'Required', value: formatDate(so.requiredDate), accent: overdue ? 'amber' as const : 'blue' as const, hint: overdue ? 'Overdue' : 'On schedule' },
     ...(showMfgPanels
       ? [{ label: 'Work Orders', value: String(orderWos.length), accent: 'blue' as const, hint: `${orderDispatches.length} dispatch` }]
@@ -453,8 +460,13 @@ export function SalesOrder360Page() {
   const documentStrip = [
     { label: 'SO No.', value: so.salesOrderNo, highlight: true },
     { label: 'Status', value: salesOrderStatusLabel(so.status) },
+<<<<<<< HEAD
     { label: 'Customer', value: customer?.customerName ?? '—', highlight: Boolean(customer) },
     { label: productLabel, value: product?.productName ?? '—' },
+=======
+    { label: 'Customer', value: customerDisplayName ?? '—', highlight: Boolean(customerDisplayName) },
+    { label: 'Product', value: product?.productName ?? '—' },
+>>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
     { label: 'Qty', value: formatNumber(so.qty) },
     { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: displayValue > 0 },
     { label: 'Required', value: formatDate(so.requiredDate) },
@@ -471,7 +483,11 @@ export function SalesOrder360Page() {
           ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
           : []),
         ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit', icon: Pencil, onClick: () => navigate(editPath) }] : []),
+<<<<<<< HEAD
         ...(!crmMode && showMfgPanels && so.status === 'confirmed'
+=======
+        ...((so.status === 'confirmed')
+>>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
           ? [{ id: 'plan', label: 'Production Plan', icon: Play, onClick: () => navigate('/manufacturing/production-plan') }]
           : []),
         ...(so.status !== 'open' && !activeProforma ? [{ id: 'proforma', label: 'Create Proforma', icon: Receipt, onClick: () => navigate(buildProformaNewUrl(so.id)) }] : []),
@@ -520,6 +536,7 @@ export function SalesOrder360Page() {
           label: 'Suggested Next',
           value:
             so.status === 'open'
+<<<<<<< HEAD
               ? 'Confirm order'
               : showMfgPanels && !crmMode && pendingMrp
                 ? 'Open production plan'
@@ -529,6 +546,17 @@ export function SalesOrder360Page() {
                     ? 'Create invoice or proforma'
                     : 'Monitor production',
           tone: so.status === 'open' || (showMfgPanels && !crmMode && pendingMrp) || overdue ? 'warning' as const : 'info' as const,
+=======
+              ? canConfirmSalesOrder
+                ? 'Confirm order'
+                : 'Request confirm permission'
+              : pendingMrp
+                ? 'Open production plan'
+                : overdue
+                  ? 'Expedite delivery'
+                  : 'Monitor production',
+          tone: so.status === 'open' || pendingMrp || overdue ? 'warning' as const : 'info' as const,
+>>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
         },
       ]}
     >
@@ -538,6 +566,7 @@ export function SalesOrder360Page() {
         actionsTitle="Quick Actions"
         summary={[
           { label: 'Status', value: salesOrderStatusLabel(so.status) },
+<<<<<<< HEAD
           { label: 'Customer', value: customer?.customerName ?? '—' },
           { label: productLabel, value: product?.productName ?? '—' },
           { label: 'Qty', value: formatNumber(so.qty) },
@@ -549,12 +578,25 @@ export function SalesOrder360Page() {
               ]
             : []),
           { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
+=======
+          { label: 'Customer', value: customerDisplayName ?? '—' },
+          { label: 'Product', value: product?.productName ?? '—' },
+          { label: 'Qty', value: formatNumber(so.qty) },
+          { label: 'Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: true },
+          { label: 'Work Orders', value: String(orderWos.length) },
+          { label: 'Dispatches', value: String(orderDispatches.length) },
+          { label: 'Quotation', value: so.quotationNo ? quotationNoWithRevision(so.quotationNo, so.quotationRevisionNo ?? 1) : '—' },
+>>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
         ]}
         actions={[
           ...(so.status === 'open' && canConfirmSalesOrder
             ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
             : []),
+<<<<<<< HEAD
           ...(showMfgPanels && !crmMode && so.status === 'confirmed'
+=======
+          ...((so.status === 'confirmed')
+>>>>>>> cd342287 (Ship CRM notifications, order adjustments, AR/tax-invoice bridge, finance period-close/FX, HRMS phases, and maintenance PM.)
             ? [{ id: 'plan', label: 'Production Plan', icon: Play, primary: true, onClick: openProductionPlan }]
             : []),
           ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit Draft', icon: Pencil, onClick: () => navigate(editPath) }] : []),
@@ -577,14 +619,14 @@ export function SalesOrder360Page() {
       <SalesCardFormShell
         title={so.salesOrderNo}
         badge={crmMode ? 'CRM' : 'Sales'}
-        className={`${ENTERPRISE_FORM_DETAIL_CLASS} enterprise-workspace--crm-smart-overview`}
+        className={`${ENTERPRISE_FORM_DETAIL_CLASS} crm-lead-form-page enterprise-workspace--crm-smart-overview`}
         recordNo={so.salesOrderNo}
-        recordTitle={customer?.customerName ?? so.salesOrderNo}
+        recordTitle={customerDisplayName ?? so.salesOrderNo}
         status={salesOrderStatusLabel(so.status)}
         statusTone={so.status === 'open' ? 'info' : score >= 70 ? 'success' : 'warning'}
         stage={product?.productName ?? 'Product'}
         createdDate={formatDate(so.orderDate ?? so.createdAt.slice(0, 10))}
-        company={customer?.customerName}
+        company={customerDisplayName ?? undefined}
         favoritePath={detailPath}
         breadcrumbs={breadcrumbs}
         commandBar={commandBar}
@@ -601,7 +643,7 @@ export function SalesOrder360Page() {
           onSelect={(id) => selectSection(id as SoTab)}
         />
 
-        <EnterpriseFormMetrics metrics={formMetrics} />
+        <EnterpriseFormMetrics metrics={formMetrics} className="dyn-form-metrics--compact" />
         {tab === 'overview' && (
           <div className="so-360-overview">
             <OrderHeroCard
@@ -631,36 +673,43 @@ export function SalesOrder360Page() {
               qcHold={qcHold}
               onOpenProduction={() => selectSection('production')}
               onOpenDispatch={() => selectSection('dispatch')}
-              onTriggerMrp={!crmMode && so.status === 'confirmed' ? openProductionPlan : undefined}
+              onTriggerMrp={so.status === 'confirmed' ? openProductionPlan : undefined}
             />
 
             <div className="so-360-overview-grid">
               <OrderCommercialSummary order={so} product={product} />
               {crmMode ? (
-                <SalesOrderAccountingSummary
-                  salesOrderNo={so.salesOrderNo}
-                  status={so.status}
-                  value={displayValue}
-                  ops={commercialPosition.data?.ops ?? null}
-                  money={
-                    isApiMode()
-                      ? commercialPosition.data?.money ?? null
-                      : demoCommercialMoney
-                  }
-                  moneyVisible={isApiMode() ? commercialPosition.data?.moneyVisible ?? false : true}
-                  loading={isApiMode() ? commercialPosition.loading : false}
-                  error={isApiMode() ? commercialPosition.error : null}
-                  onViewExpectedEntry={() => setExpectedEntryOpen(true)}
-                />
+                <div className="so-360-accounting-slot">
+                  <SalesOrderAccountingSummary
+                    salesOrderNo={so.salesOrderNo}
+                    status={so.status}
+                    value={displayValue}
+                    ops={commercialPosition.data?.ops ?? null}
+                    money={
+                      isApiMode()
+                        ? commercialPosition.data?.money ?? null
+                        : demoCommercialMoney
+                    }
+                    moneyVisible={isApiMode() ? commercialPosition.data?.moneyVisible ?? false : true}
+                    loading={isApiMode() ? commercialPosition.loading : false}
+                    error={isApiMode() ? commercialPosition.error : null}
+                    onViewExpectedEntry={() => setExpectedEntryOpen(true)}
+                  />
+                </div>
               ) : null}
               <div className="so-360-overview-aside">
                 <Entity360Panel title="Next best action" subtitle="Recommended from order state">
-                  <div className="p-4">
+                  <div className="p-3">
                     <OrderNextActionPanel
                       status={so.status}
                       overdue={overdue}
                       onConfirm={so.status === 'open' && canConfirmSalesOrder ? openConfirmDialog : undefined}
-                      onTriggerMrp={!crmMode && so.status === 'confirmed' ? openProductionPlan : undefined}
+                      confirmDeniedReason={
+                        so.status === 'open' && !canConfirmSalesOrder
+                          ? 'Requires crm.sales_order.confirm — ask an admin to grant Confirm Sales Order on your role.'
+                          : null
+                      }
+                      onTriggerMrp={so.status === 'confirmed' ? openProductionPlan : undefined}
                     />
                   </div>
                 </Entity360Panel>
@@ -671,14 +720,14 @@ export function SalesOrder360Page() {
             <OrderLineItemsPanel order={so} />
 
             <Entity360Panel title="Inventory reservations" subtitle={`Stock reserved against ${so.salesOrderNo}`}>
-              <div className="p-4">
+              <div className="p-3">
                 <ReservationsPanel referenceNo={so.salesOrderNo} compact />
               </div>
             </Entity360Panel>
 
             {so.remarks ? (
               <Entity360Panel title="Order remarks" subtitle="Commercial and delivery notes">
-                <p className="p-4 text-sm leading-relaxed text-erp-text whitespace-pre-wrap">{so.remarks}</p>
+                <p className="p-3 text-sm leading-relaxed text-erp-text whitespace-pre-wrap">{so.remarks}</p>
               </Entity360Panel>
             ) : null}
 
@@ -711,12 +760,10 @@ export function SalesOrder360Page() {
                   <p className="so-360-empty__title">No work orders yet</p>
                   <p className="so-360-empty__text">
                     {so.status === 'confirmed'
-                      ? crmMode
-                        ? 'Work orders appear after production planning on the Manufacturing side.'
-                        : 'Open Production Plan to create manufacturing work orders.'
+                      ? 'Open Production Plan to create manufacturing work orders for this confirmed order.'
                       : 'Work orders appear after production planning for confirmed orders.'}
                   </p>
-                  {!crmMode && so.status === 'confirmed' ? (
+                  {so.status === 'confirmed' ? (
                     <button type="button" className="so-360-empty__action" onClick={openProductionPlan}>
                       Open Production Plan →
                     </button>
@@ -808,9 +855,7 @@ export function SalesOrder360Page() {
                 {quo ? (
                   <div className="space-y-3">
                     <p>
-                      <TableLink to={crmQuotationPath(quo.id)}>{quo.quotationNo}</TableLink>
-                      {' '}
-                      · Rev {quo.revisionNo}
+                      <TableLink to={crmQuotationPath(quo.id)}>{quotationNoWithRevision(quo.quotationNo, quo.revisionNo)}</TableLink>
                     </p>
                     <p className="text-erp-muted">
                       Grand total {formatCurrency(quo.pricing.grandTotal)}
@@ -846,7 +891,7 @@ export function SalesOrder360Page() {
       <SalesOrderConfirmDialog
         open={confirmOpen}
         order={so}
-        customerName={customer?.customerName}
+        customerName={customerDisplayName ?? undefined}
         isSubmitting={confirmBusy}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleConfirmSubmit}

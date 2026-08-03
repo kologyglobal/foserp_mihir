@@ -7,6 +7,8 @@ import type {
   ListInvoiceReadyQueryInput,
   ListSalesInvoicesQueryInput,
   PrefillFromDispatchInput,
+  PrefillFromCrmTaxInvoiceInput,
+  ListCrmPendingTaxInvoicesQueryInput,
   ReverseSalesInvoiceBody,
 } from './sales-invoice.schemas.js'
 import * as draftService from './sales-invoice-draft.service.js'
@@ -17,6 +19,10 @@ import {
   buildInvoicePrefillFromDispatchLines,
   listInvoiceReadyDispatchLines,
 } from '../source/invoice-ready.service.js'
+import {
+  buildPrefillFromCrmTaxInvoice,
+  listCrmPendingTaxInvoices,
+} from '../source/crm-tax-invoice-ar.service.js'
 
 export const listSalesInvoices = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
@@ -43,6 +49,20 @@ export const prefillFromDispatch = asyncHandler(async (req: Request, res: Respon
   const body = req.body as PrefillFromDispatchInput
   const prefill = await buildInvoicePrefillFromDispatchLines(tenantId, body.outboundDispatchLineIds)
   return sendSuccess(res, 'invoice prefill from dispatch', prefill)
+})
+
+export const listCrmPending = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const query = req.query as unknown as ListCrmPendingTaxInvoicesQueryInput
+  const result = await listCrmPendingTaxInvoices(tenantId, query)
+  return sendPaginated(res, 'CRM tax invoices pending Money In review', result.items, buildPaginationMeta(result.total, result.page, result.limit))
+})
+
+export const prefillFromCrmTaxInvoice = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const body = req.body as PrefillFromCrmTaxInvoiceInput
+  const prefill = await buildPrefillFromCrmTaxInvoice(tenantId, body.crmTaxInvoiceId)
+  return sendSuccess(res, 'invoice prefill from CRM tax invoice', prefill)
 })
 
 export const getSalesInvoice = asyncHandler(async (req: Request, res: Response) => {

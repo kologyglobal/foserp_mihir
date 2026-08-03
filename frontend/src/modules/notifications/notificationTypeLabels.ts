@@ -1,0 +1,17 @@
+export const NOTIFICATION_TYPES_UI = [
+  { type: 'LEAD_ASSIGNED', label: 'Lead assigned', mandatory: false },
+  { type: 'LEAD_UNATTENDED', label: 'Lead not contacted', mandatory: true },
+  { type: 'OPPORTUNITY_ASSIGNED', label: 'Opportunity assigned', mandatory: false },
+  { type: 'OPPORTUNITY_STAGE_CHANGED', label: 'Opportunity stage change', mandatory: false },
+  { type: 'FOLLOW_UP_DUE', label: 'Follow-up due today', mandatory: false },
+  { type: 'FOLLOW_UP_OVERDUE', label: 'Follow-up overdue', mandatory: true },
+  { type: 'ACTIVITY_ASSIGNED', label: 'Activity assigned', mandatory: false },
+  { type: 'OPPORTUNITY_INACTIVE', label: 'Opportunity inactive', mandatory: false },
+  { type: 'OPPORTUNITY_CLOSE_DATE_MISSED', label: 'Close date missed', mandatory: true },
+  { type: 'QUOTATION_APPROVAL_REQUESTED', label: 'Quotation approval', mandatory: true },
+  { type: 'QUOTATION_APPROVED', label: 'Quotation approved', mandatory: false },
+  { type: 'QUOTATION_REJECTED', label: 'Quotation rejected', mandatory: true },
+  { type: 'QUOTATION_EXPIRING', label: 'Quotation expiring', mandatory: false },
+  { type: 'QUOTATION_ACCEPTED_AWAITING_SO', label: 'Accepted quote awaiting SO', mandatory: false },
+  { type: 'INTEGRATION_SYNC_FAILED', label: 'CRM integration failure', mandatory: true },
+] as const

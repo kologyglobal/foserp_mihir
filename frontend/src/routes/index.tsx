@@ -17,6 +17,7 @@ import { dispatchFinanceRouteChildren } from './dispatchFinanceRoutes'
 import { logisticsRouteChildren } from './logisticsRoutes'
 import { gateRouteChildren } from './gateRoutes'
 import { maintenanceRouteChildren } from './maintenanceRoutes'
+import { hrmsRouteChildren } from './hrmsRoutes'
 import { gateOperatorRouteTree } from './gateOperatorRoutes'
 import { reportsRouteChildren } from './reportsRoutes'
 import { mobileRouteTree } from './mobileRoutes'
@@ -26,6 +27,8 @@ import { accountingRouteChildren } from './accountingRoutes'
 import { adminRouteChildren } from './adminRoutes'
 import { organisationRouteChildren } from './organisationRoutes'
 import { operationsRouteChildren } from './operationsRoutes'
+import { NotificationCenterPage } from '@/modules/notifications/NotificationCenterPage'
+import { NotificationPreferencesPage } from '@/modules/notifications/NotificationPreferencesPage'
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +48,8 @@ export const router = createBrowserRouter([
         errorElement: <RouteErrorBoundary />,
         children: [
           ...homeRouteChildren,
+          { path: 'notifications', element: <NotificationCenterPage /> },
+          { path: 'notifications/settings', element: <NotificationPreferencesPage /> },
           ...masterRouteChildren,
           ...platformRouteChildren,
           ...inventoryRouteChildren,
@@ -55,6 +60,7 @@ export const router = createBrowserRouter([
           ...productionRouteChildren,
           ...qualityRouteChildren,
           ...maintenanceRouteChildren,
+          ...hrmsRouteChildren,
           ...logisticsRouteChildren,
           ...dispatchFinanceRouteChildren,
           ...gateRouteChildren,

@@ -74,6 +74,14 @@ enum CodeSeriesEntity {
   DISPATCH_POSTING
   DISPATCH_REVERSAL
   MAINTENANCE_TICKET
+  PREVENTIVE_MAINTENANCE_PLAN
+  EMPLOYEE
+  PAYSLIP
+  SALARY_PAYMENT_BATCH
+  EMPLOYEE_LOAN
+  SALARY_ADVANCE
+  EMPLOYEE_EXIT
+  FULL_FINAL_SETTLEMENT
 }
 
 enum ActivityType {
@@ -203,6 +211,16 @@ model Tenant {
   accountingPeriods                      AccountingPeriod[]
   periodCloseChecklistAcks               PeriodCloseChecklistAck[]
   yearEndCloseRuns                       YearEndCloseRun[]
+  periodEndAdjustments                   PeriodEndAdjustment[]
+  periodEndAdjustmentSchedules           PeriodEndAdjustmentSchedule[]
+  periodCloseChecklistTemplates          PeriodCloseChecklistTemplate[]
+  periodCloseChecklistTasks              PeriodCloseChecklistTask[]
+  periodCloseCalendarEvents              PeriodCloseCalendarEvent[]
+  periodReopenRequests                   PeriodReopenRequest[]
+  periodReopenRequestEvents              PeriodReopenRequestEvent[]
+  fxExchangeRates                        FxExchangeRate[]
+  fxRevaluationRuns                      FxRevaluationRun[]
+  fxRevaluationLines                     FxRevaluationLine[]
   accounts                               Account[]
   defaultAccountMappings                 DefaultAccountMapping[]
   financeSettings                        FinanceSettings[]
@@ -304,6 +322,58 @@ model Tenant {
   maintenanceTickets                 MaintenanceTicket[]
   maintenanceParts                   MaintenancePart[]
   maintenanceAttachments             MaintenanceAttachment[]
+  preventiveMaintenancePlans         PreventiveMaintenancePlan[]
+  preventiveMaintenanceChecklistItems PreventiveMaintenanceChecklistItem[]
+  maintenanceTicketChecklistItems    MaintenanceTicketChecklistItem[]
+
+  hrDesignations                HrDesignation[]
+  hrEmployees                   HrEmployee[]
+  hrEmployeeEmploymentHistories HrEmployeeEmploymentHistory[]
+  hrEmployeeBankDetails         HrEmployeeBankDetail[]
+  hrEmployeeStatutoryDetails    HrEmployeeStatutoryDetail[]
+  hrEmployeeDocuments           HrEmployeeDocument[]
+  hrShiftTemplates              HrShiftTemplate[]
+  hrHolidayCalendars            HrHolidayCalendar[]
+  hrHolidayCalendarDays         HrHolidayCalendarDay[]
+  hrEmployeeShiftAssignments    HrEmployeeShiftAssignment[]
+  hrLeaveTypes                  HrLeaveType[]
+  hrLeavePolicies               HrLeavePolicy[]
+  hrLeavePolicyLeaveTypes       HrLeavePolicyLeaveType[]
+  hrLeaveBalances               HrLeaveBalance[]
+  hrLeaveBalanceAdjustments     HrLeaveBalanceAdjustment[]
+  hrLeaveRequests               HrLeaveRequest[]
+  hrAttendanceDays              HrAttendanceDay[]
+  hrAttendancePunches           HrAttendancePunch[]
+  hrAttendanceExceptions        HrAttendanceException[]
+  hrOvertimePolicies            HrOvertimePolicy[]
+  hrOvertimeRecords             HrOvertimeRecord[]
+  hrSalaryComponents            HrSalaryComponent[]
+  hrSalaryStructures            HrSalaryStructure[]
+  hrSalaryStructureVersions     HrSalaryStructureVersion[]
+  hrSalaryStructureLines        HrSalaryStructureLine[]
+  hrEmployeeSalaryAssignments   HrEmployeeSalaryAssignment[]
+  hrPayrollPeriods              HrPayrollPeriod[]
+  hrPayrollRuns                 HrPayrollRun[]
+  hrPayrollEmployeeResults      HrPayrollEmployeeResult[]
+  hrPayrollComponentResults     HrPayrollComponentResult[]
+  hrPayrollExceptions           HrPayrollException[]
+  hrStatutoryRules              HrStatutoryRule[]
+  hrStatutoryPtSlabs            HrStatutoryPtSlab[]
+  hrStatutoryWageBasisLines     HrStatutoryWageBasisLine[]
+  hrPayslips                    HrPayslip[]
+  hrSalaryPaymentBatches        HrSalaryPaymentBatch[]
+  hrSalaryPaymentLines          HrSalaryPaymentLine[]
+  hrEmployeeLoans               HrEmployeeLoan[]
+  hrLoanRecoverySchedules       HrLoanRecoverySchedule[]
+  hrLoanRepayments              HrLoanRepayment[]
+  hrEmployeeExits               HrEmployeeExit[]
+  hrExitClearanceItems          HrExitClearanceItem[]
+  hrExitClearanceLines          HrExitClearanceLine[]
+  hrExitAssetLines              HrExitAssetLine[]
+  hrFullFinalSettlements        HrFullFinalSettlement[]
+  hrFnfComponents               HrFnfComponent[]
+  hrExitClearanceTemplates      HrExitClearanceTemplate[]
+
   manufacturingCostingPolicies       ManufacturingCostingPolicy[]
   manufacturingBoms                  ManufacturingBom[]
   manufacturingBomVersions           ManufacturingBomVersion[]
@@ -426,40 +496,40 @@ model Tenant {
   // Controlled emergency overrides (audit; do not alter posted txns)
   emergencyOverrides                 EmergencyOverride[]
 
-  purchaseRequisitions            PurchaseRequisition[]
-  purchaseRequisitionLines        PurchaseRequisitionLine[]
-  purchasePlanningRows            PurchasePlanningRow[]
-  requestForQuotations            RequestForQuotation[]
-  requestForQuotationLines        RequestForQuotationLine[]
-  rfqVendors                      RfqVendor[]
-  vendorQuotations                VendorQuotation[]
-  vendorQuotationLines            VendorQuotationLine[]
-  vendorComparisons               VendorComparison[]
-  vendorComparisonLines           VendorComparisonLine[]
-  purchaseOrders                  PurchaseOrder[]
-  purchaseOrderLines              PurchaseOrderLine[]
-  purchaseOrderRevisions          PurchaseOrderRevision[]
-  purchaseOrdersArchived          PurchaseOrderArchived[]
-  purchaseOrderLinesArchived      PurchaseOrderLineArchived[]
-  goodsReceipts                   GoodsReceipt[]
-  goodsReceiptLines               GoodsReceiptLine[]
-  purchaseApprovals               PurchaseApproval[]
-  purchaseStatusHistories         PurchaseStatusHistory[]
-  purchaseSettings                PurchaseSettings?
-  purchasePlantSettings           PurchasePlantSettings[]
-  purchaseApprovalTiers           PurchaseApprovalTier[]
-  purchaseInspectionCategories    PurchaseInspectionCategory[]
-  purchaseApproverLimits          PurchaseApproverLimit[]
-  purchaseQualityInspections           PurchaseQualityInspection[]
-  purchaseQualityInspectionLines       PurchaseQualityInspectionLine[]
-  purchaseQualityInspectionParameters  PurchaseQualityInspectionParameter[]
-  manufacturingQualityInspections      ManufacturingQualityInspection[]
-  purchaseInvoices                PurchaseInvoice[]
-  purchaseInvoiceLines            PurchaseInvoiceLine[]
-  purchaseReturns                 PurchaseReturn[]
-  purchaseReturnLines             PurchaseReturnLine[]
-  labourRateCards                 LabourRateCard[]
-  overheadCostPools               OverheadCostPool[]
+  purchaseRequisitions                PurchaseRequisition[]
+  purchaseRequisitionLines            PurchaseRequisitionLine[]
+  purchasePlanningRows                PurchasePlanningRow[]
+  requestForQuotations                RequestForQuotation[]
+  requestForQuotationLines            RequestForQuotationLine[]
+  rfqVendors                          RfqVendor[]
+  vendorQuotations                    VendorQuotation[]
+  vendorQuotationLines                VendorQuotationLine[]
+  vendorComparisons                   VendorComparison[]
+  vendorComparisonLines               VendorComparisonLine[]
+  purchaseOrders                      PurchaseOrder[]
+  purchaseOrderLines                  PurchaseOrderLine[]
+  purchaseOrderRevisions              PurchaseOrderRevision[]
+  purchaseOrdersArchived              PurchaseOrderArchived[]
+  purchaseOrderLinesArchived          PurchaseOrderLineArchived[]
+  goodsReceipts                       GoodsReceipt[]
+  goodsReceiptLines                   GoodsReceiptLine[]
+  purchaseApprovals                   PurchaseApproval[]
+  purchaseStatusHistories             PurchaseStatusHistory[]
+  purchaseSettings                    PurchaseSettings?
+  purchasePlantSettings               PurchasePlantSettings[]
+  purchaseApprovalTiers               PurchaseApprovalTier[]
+  purchaseInspectionCategories        PurchaseInspectionCategory[]
+  purchaseApproverLimits              PurchaseApproverLimit[]
+  purchaseQualityInspections          PurchaseQualityInspection[]
+  purchaseQualityInspectionLines      PurchaseQualityInspectionLine[]
+  purchaseQualityInspectionParameters PurchaseQualityInspectionParameter[]
+  manufacturingQualityInspections     ManufacturingQualityInspection[]
+  purchaseInvoices                    PurchaseInvoice[]
+  purchaseInvoiceLines                PurchaseInvoiceLine[]
+  purchaseReturns                     PurchaseReturn[]
+  purchaseReturnLines                 PurchaseReturnLine[]
+  labourRateCards                     LabourRateCard[]
+  overheadCostPools                   OverheadCostPool[]
 
   // Gate & Security — physical entry/exit only (no inventory / attendance / vouchers)
   gateSettings          GateSettings[]
@@ -476,6 +546,11 @@ model Tenant {
   gateCourierEntries    GateCourierEntry[]
   gateApprovals         GateApproval[]
   gateActivities        GateActivity[]
+
+  // In-app CRM + ops notifications (tenant-scoped)
+  notifications              Notification[]
+  notificationPreferences    NotificationPreference[]
+  notificationTenantSettings NotificationTenantSettings?
 
   @@index([status])
   @@index([deletedAt])
@@ -525,6 +600,9 @@ model User {
   responsibilities       UserResponsibility[]
   moduleAdministrations  ModuleAdministrator[]
   purchaseApproverLimits PurchaseApproverLimit[]
+  hrEmployeeLinks        HrEmployee[]            @relation("HrEmployeeUser")
+  notificationsReceived  Notification[]          @relation("NotificationRecipient")
+  notificationPreferences NotificationPreference[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -548,8 +626,9 @@ model Department {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  users  User[]
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users       User[]
+  hrEmployees HrEmployee[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1895,6 +1974,30 @@ model CrmQuotationDocument {
   freightAmount      Decimal   @default(0) @db.Decimal(18, 2)
   installationAmount Decimal   @default(0) @db.Decimal(18, 2)
   customCharges      Decimal   @default(0) @db.Decimal(18, 2)
+
+  /// Order discount (header) — FLAT | PERCENTAGE of line taxable before charges
+  orderDiscountCalcType String  @default("FLAT") @db.VarChar(16)
+  orderDiscountValue    Decimal @default(0) @db.Decimal(18, 4)
+  orderDiscountAmount   Decimal @default(0) @db.Decimal(18, 2)
+
+  freightCalcType   String  @default("FLAT") @db.VarChar(16)
+  freightValue      Decimal @default(0) @db.Decimal(18, 4)
+  freightIsTaxable  Boolean @default(false)
+  freightTaxRate    Decimal @default(0) @db.Decimal(8, 4)
+  freightTaxAmount  Decimal @default(0) @db.Decimal(18, 2)
+
+  installationCalcType  String  @default("FLAT") @db.VarChar(16)
+  installationValue     Decimal @default(0) @db.Decimal(18, 4)
+  installationIsTaxable Boolean @default(false)
+  installationTaxRate   Decimal @default(0) @db.Decimal(8, 4)
+  installationTaxAmount Decimal @default(0) @db.Decimal(18, 2)
+
+  customChargesCalcType  String  @default("FLAT") @db.VarChar(16)
+  customChargesValue     Decimal @default(0) @db.Decimal(18, 4)
+  customChargesIsTaxable Boolean @default(false)
+  customChargesTaxRate   Decimal @default(0) @db.Decimal(8, 4)
+  customChargesTaxAmount Decimal @default(0) @db.Decimal(18, 2)
+
   revisionReason     String?   @db.Text
   locked             Boolean   @default(false)
   approvalHistory    Json      @default("[]")
@@ -2028,6 +2131,14 @@ enum CrmInvoicePaymentStatus {
   unpaid
   partially_paid
   paid
+}
+
+/// Handoff from CRM commercial tax invoice → Accounting Money In AR.
+enum CrmTaxInvoiceAccountingStatus {
+  none
+  pending_review
+  converted
+  rejected
 }
 
 enum CrmCommercialSource {
@@ -2168,48 +2279,56 @@ model CrmProformaInvoiceLine {
 }
 
 model CrmTaxInvoice {
-  id                   String                  @id @default(uuid())
-  tenantId             String
-  invoiceNo            String                  @db.VarChar(64)
-  invoiceDate          DateTime                @db.Date
-  dueDate              DateTime                @db.Date
-  status               CrmTaxInvoiceStatus     @default(draft)
-  paymentStatus        CrmInvoicePaymentStatus @default(unpaid)
-  source               CrmCommercialSource     @default(direct)
-  companyId            String
-  customerNameSnapshot String                  @db.VarChar(300)
-  customerGstin        String?                 @db.VarChar(20)
-  customerState        String?                 @db.VarChar(100)
-  customerAddress      String?                 @db.Text
-  placeOfSupply        String?                 @db.VarChar(100)
-  billingAddress       String?                 @db.Text
-  shippingAddress      String?                 @db.Text
-  deliveryTerms        String?                 @db.VarChar(500)
-  paymentTerms         String?                 @db.VarChar(500)
-  customerPoNumber     String?                 @db.VarChar(100)
-  salesOrderId         String?
-  salesOrderNo         String?                 @db.VarChar(64)
-  quotationId          String?
-  quotationNo          String?                 @db.VarChar(64)
-  proformaInvoiceId    String?
-  proformaNo           String?                 @db.VarChar(64)
-  remarks              String?                 @db.Text
-  taxableAmount        Decimal                 @db.Decimal(18, 2)
-  cgstAmount           Decimal                 @default(0) @db.Decimal(18, 2)
-  sgstAmount           Decimal                 @default(0) @db.Decimal(18, 2)
-  igstAmount           Decimal                 @default(0) @db.Decimal(18, 2)
-  totalTaxAmount       Decimal                 @db.Decimal(18, 2)
-  grandTotal           Decimal                 @db.Decimal(18, 2)
-  amountPaid           Decimal                 @default(0) @db.Decimal(18, 2)
-  balanceDue           Decimal                 @db.Decimal(18, 2)
-  gstScheme            String                  @default("cgst_sgst") @db.VarChar(16)
-  postedAt             DateTime?
-  cancelledAt          DateTime?
-  createdBy            String?
-  updatedBy            String?
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
-  deletedAt            DateTime?
+  id                    String                        @id @default(uuid())
+  tenantId              String
+  invoiceNo             String                        @db.VarChar(64)
+  invoiceDate           DateTime                      @db.Date
+  dueDate               DateTime                      @db.Date
+  status                CrmTaxInvoiceStatus           @default(draft)
+  paymentStatus         CrmInvoicePaymentStatus       @default(unpaid)
+  source                CrmCommercialSource           @default(direct)
+  companyId             String
+  customerNameSnapshot  String                        @db.VarChar(300)
+  customerGstin         String?                       @db.VarChar(20)
+  customerState         String?                       @db.VarChar(100)
+  customerAddress       String?                       @db.Text
+  placeOfSupply         String?                       @db.VarChar(100)
+  billingAddress        String?                       @db.Text
+  shippingAddress       String?                       @db.Text
+  deliveryTerms         String?                       @db.VarChar(500)
+  paymentTerms          String?                       @db.VarChar(500)
+  customerPoNumber      String?                       @db.VarChar(100)
+  salesOrderId          String?
+  salesOrderNo          String?                       @db.VarChar(64)
+  quotationId           String?
+  quotationNo           String?                       @db.VarChar(64)
+  proformaInvoiceId     String?
+  proformaNo            String?                       @db.VarChar(64)
+  remarks               String?                       @db.Text
+  taxableAmount         Decimal                       @db.Decimal(18, 2)
+  cgstAmount            Decimal                       @default(0) @db.Decimal(18, 2)
+  sgstAmount            Decimal                       @default(0) @db.Decimal(18, 2)
+  igstAmount            Decimal                       @default(0) @db.Decimal(18, 2)
+  totalTaxAmount        Decimal                       @db.Decimal(18, 2)
+  grandTotal            Decimal                       @db.Decimal(18, 2)
+  amountPaid            Decimal                       @default(0) @db.Decimal(18, 2)
+  balanceDue            Decimal                       @db.Decimal(18, 2)
+  gstScheme             String                        @default("cgst_sgst") @db.VarChar(16)
+  /// Money In handoff — set to pending_review when CRM posts the tax invoice.
+  accountingStatus      CrmTaxInvoiceAccountingStatus @default(none)
+  /// Soft link to Accounting SalesInvoice (no Prisma FK).
+  salesInvoiceId        String?
+  salesInvoiceNumber    String?                       @db.VarChar(64)
+  accountingSubmittedAt DateTime?
+  accountingConvertedAt DateTime?
+  createdByNameSnapshot String?                       @db.VarChar(200)
+  postedAt              DateTime?
+  cancelledAt           DateTime?
+  createdBy             String?
+  updatedBy             String?
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+  deletedAt             DateTime?
 
   tenant      Tenant                 @relation(fields: [tenantId], references: [id])
   company     CrmCompany             @relation(fields: [companyId], references: [id])
@@ -2217,10 +2336,12 @@ model CrmTaxInvoice {
   allocations CrmPaymentAllocation[]
 
   @@unique([tenantId, invoiceNo])
+  @@unique([tenantId, salesInvoiceId])
   @@index([tenantId])
   @@index([tenantId, companyId])
   @@index([tenantId, salesOrderId])
   @@index([tenantId, status])
+  @@index([tenantId, accountingStatus])
   @@index([tenantId, deletedAt])
   @@map("crm_tax_invoices")
 }
@@ -2647,10 +2768,10 @@ model MasterBin {
   updatedAt         DateTime           @updatedAt
   deletedAt         DateTime?
 
-  tenant            Tenant             @relation(fields: [tenantId], references: [id])
-  warehouse         MasterWarehouse    @relation(fields: [warehouseId], references: [id])
-  storageLocation   MasterLocation     @relation(fields: [storageLocationId], references: [id])
-  goodsReceiptLines GoodsReceiptLine[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  warehouse          MasterWarehouse     @relation(fields: [warehouseId], references: [id])
+  storageLocation    MasterLocation      @relation(fields: [storageLocationId], references: [id])
+  goodsReceiptLines  GoodsReceiptLine[]
   purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([tenantId, warehouseId, code])
@@ -2708,10 +2829,10 @@ model MasterGstGroup {
   updatedAt   DateTime           @updatedAt
   deletedAt   DateTime?
 
-  tenant   Tenant          @relation(fields: [tenantId], references: [id])
-  hsnCodes MasterHsnCode[]
-  gstRates MasterGstRate[]
-  items    MasterItem[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  hsnCodes           MasterHsnCode[]
+  gstRates           MasterGstRate[]
+  items              MasterItem[]
   purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([tenantId, code])
@@ -2734,9 +2855,9 @@ model MasterHsnCode {
   updatedAt   DateTime           @updatedAt
   deletedAt   DateTime?
 
-  tenant   Tenant         @relation(fields: [tenantId], references: [id])
-  gstGroup MasterGstGroup @relation(fields: [gstGroupId], references: [id])
-  items    MasterItem[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  gstGroup           MasterGstGroup      @relation(fields: [gstGroupId], references: [id])
+  items              MasterItem[]
   purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([tenantId, code])
@@ -2818,34 +2939,34 @@ enum ItemConversionCalculationMode {
 }
 
 model MasterItem {
-  id                   String             @id @default(uuid())
-  tenantId             String
-  code                 String             @db.VarChar(64)
-  name                 String             @db.VarChar(300)
-  itemName2            String?            @db.VarChar(300)
-  itemDescription      String             @default("") @db.Text
-  categoryId           String
-  baseUomId            String
-  itemType             String             @db.VarChar(32)
-  productType          String?            @db.VarChar(32)
-  inventoryType        String?            @default("inventory") @db.VarChar(32)
-  codeSeriesMode       String?            @default("manual") @db.VarChar(16)
-  materialGrade        String             @default("") @db.VarChar(100)
-  hsnCode              String             @default("") @db.VarChar(16)
-  hsnId                String?
-  gstGroupId           String?
-  reorderLevel         Decimal            @default(0) @db.Decimal(18, 4)
-  reorderQty           Decimal            @default(0) @db.Decimal(18, 4)
-  standardRate         Decimal            @default(0) @db.Decimal(18, 2)
-  isPurchasable        Boolean            @default(true)
-  isStockable          Boolean            @default(true)
-  isBlocked            Boolean            @default(false)
-  batchTracked         Boolean            @default(false)
-  serialTracked        Boolean            @default(false)
-  quantityPerUom       Decimal            @default(1) @db.Decimal(18, 4)
-  purchaseUomId        String?
+  id                           String                    @id @default(uuid())
+  tenantId                     String
+  code                         String                    @db.VarChar(64)
+  name                         String                    @db.VarChar(300)
+  itemName2                    String?                   @db.VarChar(300)
+  itemDescription              String                    @default("") @db.Text
+  categoryId                   String
+  baseUomId                    String
+  itemType                     String                    @db.VarChar(32)
+  productType                  String?                   @db.VarChar(32)
+  inventoryType                String?                   @default("inventory") @db.VarChar(32)
+  codeSeriesMode               String?                   @default("manual") @db.VarChar(16)
+  materialGrade                String                    @default("") @db.VarChar(100)
+  hsnCode                      String                    @default("") @db.VarChar(16)
+  hsnId                        String?
+  gstGroupId                   String?
+  reorderLevel                 Decimal                   @default(0) @db.Decimal(18, 4)
+  reorderQty                   Decimal                   @default(0) @db.Decimal(18, 4)
+  standardRate                 Decimal                   @default(0) @db.Decimal(18, 2)
+  isPurchasable                Boolean                   @default(true)
+  isStockable                  Boolean                   @default(true)
+  isBlocked                    Boolean                   @default(false)
+  batchTracked                 Boolean                   @default(false)
+  serialTracked                Boolean                   @default(false)
+  quantityPerUom               Decimal                   @default(1) @db.Decimal(18, 4)
+  purchaseUomId                String?
   /// @deprecated Prefer uomConversionFactor — kept in sync for one release.
-  purchaseQtyPerUom    Decimal            @default(1) @db.Decimal(18, 4)
+  purchaseQtyPerUom            Decimal                   @default(1) @db.Decimal(18, 4)
   /// Vendor units per 1 primary/base unit (e.g. 3 meters = 1 NOS).
   uomConversionFactor  Decimal            @default(1) @db.Decimal(18, 4)
   /// Legacy % — dual-read only; prefer receivingToleranceId. Removed in follow-up migration.
@@ -2884,7 +3005,6 @@ model MasterItem {
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
   deletedAt               DateTime?
-
   tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
   category                 MasterItemCategory        @relation(fields: [categoryId], references: [id])
   baseUom                  MasterUom                 @relation("ItemBaseUom", fields: [baseUomId], references: [id])
@@ -3007,7 +3127,8 @@ model MasterVendor {
 
   manufacturingRoutingOperationsVendor ManufacturingRoutingOperation[]
   jobWorkOrders                        JobWorkOrder[]
-  maintenanceTickets                   MaintenanceTicket[]
+  maintenanceTickets                   MaintenanceTicket[]             @relation("MaintenanceTicketContractor")
+  preventiveMaintenancePlans           PreventiveMaintenancePlan[]     @relation("PmPlanContractor")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3158,6 +3279,41 @@ enum DefaultAccountMappingKey {
   MERCHANT_FEE_EXPENSE
   /// COGS account — Dispatch FG_DISPATCH inventory accounting (primary) + optional SI COGS (OFF).
   COST_OF_GOODS_SOLD
+  /// Accrued expense liability — month-end accrual credit side (period-close adjustments).
+  ACCRUED_EXPENSE_LIABILITY
+  /// Prepaid expense asset — prepaid amortisation credit side (period-close adjustments).
+  PREPAID_EXPENSE_ASSET
+  /// Unrealized foreign-exchange gain (period-close FX revaluation).
+  UNREALIZED_FX_GAIN
+  /// Unrealized foreign-exchange loss (period-close FX revaluation).
+  UNREALIZED_FX_LOSS
+  /// HRMS Phase 9 — payroll GL mappings (optional; not finance-activation mandatory).
+  SALARY_BASIC_EXPENSE
+  SALARY_HRA_EXPENSE
+  SALARY_ALLOWANCE_EXPENSE
+  SALARY_OT_EXPENSE
+  SALARY_PAYABLE
+  PF_EMPLOYEE_PAYABLE
+  PF_EMPLOYER_PAYABLE
+  PF_EMPLOYER_EXPENSE
+  ESIC_EMPLOYEE_PAYABLE
+  ESIC_EMPLOYER_PAYABLE
+  ESIC_EMPLOYER_EXPENSE
+  PT_PAYABLE
+  TDS_SALARY_PAYABLE
+  LWF_PAYABLE
+  LWF_EMPLOYER_PAYABLE
+  LWF_EMPLOYER_EXPENSE
+  /// HRMS Phase 10 — employee loan / salary advance receivable (optional; not finance-activation mandatory).
+  EMPLOYEE_LOAN_RECEIVABLE
+  SALARY_ADVANCE_RECEIVABLE
+  /// HRMS Phase 11 — F&F settlement (optional; not finance-activation mandatory).
+  EMPLOYEE_FNF_PAYABLE
+  EMPLOYEE_FNF_RECEIVABLE
+  LEAVE_ENCASHMENT_EXPENSE
+  NOTICE_PAY_EXPENSE
+  NOTICE_RECOVERY_INCOME
+  ASSET_RECOVERY_INCOME
 }
 
 enum FinanceFeatureKey {
@@ -3272,6 +3428,13 @@ model LegalEntity {
   financialYears                         FinancialYear[]
   accountingPeriods                      AccountingPeriod[]
   yearEndCloseRuns                       YearEndCloseRun[]
+  periodEndAdjustments                   PeriodEndAdjustment[]
+  periodCloseChecklistTemplates          PeriodCloseChecklistTemplate[]
+  periodCloseChecklistTasks              PeriodCloseChecklistTask[]
+  periodCloseCalendarEvents              PeriodCloseCalendarEvent[]
+  periodReopenRequests                   PeriodReopenRequest[]
+  fxExchangeRates                        FxExchangeRate[]
+  fxRevaluationRuns                      FxRevaluationRun[]
   accounts                               Account[]
   defaultAccountMappings                 DefaultAccountMapping[]
   financeSettings                        FinanceSettings?
@@ -3358,6 +3521,25 @@ model LegalEntity {
   gstEWayBills                 GstEWayBill[]
   manufacturingCostingPolicies ManufacturingCostingPolicy[]
 
+  hrDesignations     HrDesignation[]
+  hrEmployees        HrEmployee[]
+  hrHolidayCalendars HrHolidayCalendar[]
+  hrShiftTemplates   HrShiftTemplate[]
+  hrLeavePolicies    HrLeavePolicy[]
+  hrLeaveTypes       HrLeaveType[]
+  hrOvertimePolicies HrOvertimePolicy[]
+  hrSalaryStructures HrSalaryStructure[]
+  hrSalaryComponents HrSalaryComponent[]
+  hrPayrollPeriods   HrPayrollPeriod[]
+  hrPayrollRuns      HrPayrollRun[]
+  hrStatutoryRules   HrStatutoryRule[]
+  hrPayslips         HrPayslip[]
+  hrSalaryPaymentBatches HrSalaryPaymentBatch[]
+  hrEmployeeLoans    HrEmployeeLoan[]
+  hrEmployeeExits    HrEmployeeExit[]
+  hrFullFinalSettlements HrFullFinalSettlement[]
+  hrExitClearanceTemplates HrExitClearanceTemplate[]
+
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([tenantId, isDefault])
@@ -3443,7 +3625,15 @@ model Branch {
   treasuryAccounts                 TreasuryAccount[]
   paymentAccountMappings           PaymentAccountMapping[]
   recurringSalesInvoiceSchedules   RecurringSalesInvoiceSchedule[]
-
+  hrEmployees                      HrEmployee[]
+  hrHolidayCalendars               HrHolidayCalendar[]
+  hrLeavePolicies                  HrLeavePolicy[]
+  hrOvertimePolicies               HrOvertimePolicy[]
+  hrPayrollRuns                    HrPayrollRun[]
+  hrSalaryPaymentBatches           HrSalaryPaymentBatch[]
+  hrEmployeeLoans                  HrEmployeeLoan[]
+  hrEmployeeExits                  HrEmployeeExit[]
+  hrFullFinalSettlements           HrFullFinalSettlement[]
   @@unique([legalEntityId, code])
   @@index([tenantId])
   @@index([tenantId, legalEntityId])
@@ -3549,6 +3739,15 @@ model AccountingPeriod {
   payableCloseGateRuns PayableCloseGateRun[]
   closeChecklistAcks   PeriodCloseChecklistAck[]
 
+  periodEndAdjustments         PeriodEndAdjustment[]         @relation("PeriodEndAdjustmentPeriod")
+  periodEndAdjustmentReversals PeriodEndAdjustment[]         @relation("PeriodEndAdjustmentReversalPeriod")
+  periodEndAdjustmentSchedules PeriodEndAdjustmentSchedule[]
+  periodCloseChecklistTasks    PeriodCloseChecklistTask[]
+  periodCloseCalendarEvents    PeriodCloseCalendarEvent[]
+  periodReopenRequests         PeriodReopenRequest[]
+  fxRevaluationRuns            FxRevaluationRun[]            @relation("FxRevaluationPeriod")
+  fxRevaluationReversalRuns    FxRevaluationRun[]            @relation("FxRevaluationReversalPeriod")
+
   @@unique([financialYearId, periodNumber])
   @@index([tenantId])
   @@index([legalEntityId])
@@ -3584,6 +3783,439 @@ model PeriodCloseChecklistAck {
   @@map("period_close_checklist_acks")
 }
 
+enum PeriodCloseTaskModule {
+  SALES_AR
+  PURCHASE_AP
+  INVENTORY
+  MANUFACTURING
+  FIXED_ASSETS
+  BANK_CASH
+  GST_TDS
+  GENERAL_LEDGER
+}
+
+enum PeriodCloseTaskInstanceStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING
+  BLOCKED
+  READY_FOR_REVIEW
+  COMPLETED
+  REOPENED
+  NOT_APPLICABLE
+}
+
+enum PeriodCloseCalendarCategory {
+  CHECKLIST
+  RECONCILIATION
+  LOCK
+  YEAR_END
+  REVIEW
+  OTHER
+}
+
+enum PeriodCloseCalendarEventStatus {
+  UPCOMING
+  DUE_SOON
+  DUE_TODAY
+  OVERDUE
+  COMPLETED
+  NOT_APPLICABLE
+}
+
+enum PeriodReopenRequestStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  OPEN_TEMPORARILY
+  EXPIRED
+  CLOSED
+  CANCELLED
+}
+
+enum PeriodReopenReasonCode {
+  INCORRECT_ACCOUNT
+  INCORRECT_AMOUNT
+  DUPLICATE_ENTRY
+  WRONG_PARTY
+  WRONG_POSTING_DATE
+  CANCELLED_TRANSACTION
+  OTHER
+}
+
+/// LE-scoped period-close checklist task definitions (instantiated onto periods).
+model PeriodCloseChecklistTemplate {
+  id                   String                @id @default(uuid())
+  tenantId             String
+  legalEntityId        String
+  code                 String                @db.VarChar(32)
+  title                String                @db.VarChar(200)
+  module               PeriodCloseTaskModule
+  defaultOwnerRole     String?               @db.VarChar(64)
+  defaultDueOffsetDays Int                   @default(0)
+  sortOrder            Int                   @default(0)
+  isActive             Boolean               @default(true)
+  blocksClose          Boolean               @default(false)
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  deletedAt            DateTime?
+
+  tenant      Tenant                     @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity                @relation(fields: [legalEntityId], references: [id])
+  instances   PeriodCloseChecklistTask[]
+
+  @@unique([legalEntityId, code])
+  @@index([tenantId])
+  @@index([legalEntityId, isActive])
+  @@map("period_close_checklist_templates")
+}
+
+/// Human checklist rows instantiated onto an accounting period.
+model PeriodCloseChecklistTask {
+  id            String                        @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  periodId      String
+  templateId    String?
+  title         String                        @db.VarChar(200)
+  module        PeriodCloseTaskModule
+  ownerLabel    String?                       @db.VarChar(120)
+  reviewerLabel String?                       @db.VarChar(120)
+  dueDate       DateTime                      @db.Date
+  status        PeriodCloseTaskInstanceStatus @default(NOT_STARTED)
+  completionPct Int                           @default(0)
+  evidence      String?                       @db.VarChar(500)
+  comments      String?                       @db.VarChar(1000)
+  sortOrder     Int                           @default(0)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+  deletedAt     DateTime?
+
+  tenant      Tenant                        @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity                   @relation(fields: [legalEntityId], references: [id])
+  period      AccountingPeriod              @relation(fields: [periodId], references: [id])
+  template    PeriodCloseChecklistTemplate? @relation(fields: [templateId], references: [id])
+
+  @@index([tenantId])
+  @@index([periodId, status])
+  @@map("period_close_checklist_tasks")
+}
+
+/// Close milestones / due dates for a period (generated from templates or manual).
+model PeriodCloseCalendarEvent {
+  id            String                         @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  periodId      String
+  title         String                         @db.VarChar(200)
+  category      PeriodCloseCalendarCategory
+  dueDate       DateTime                       @db.Date
+  ownerLabel    String?                        @db.VarChar(120)
+  status        PeriodCloseCalendarEventStatus @default(UPCOMING)
+  sortOrder     Int                            @default(0)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime                       @default(now())
+  updatedAt     DateTime                       @updatedAt
+  deletedAt     DateTime?
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity      @relation(fields: [legalEntityId], references: [id])
+  period      AccountingPeriod @relation(fields: [periodId], references: [id])
+
+  @@index([tenantId])
+  @@index([periodId, dueDate])
+  @@map("period_close_calendar_events")
+}
+
+/// Controlled temporary reopen of a locked period — approval workflow document.
+model PeriodReopenRequest {
+  id              String                    @id @default(uuid())
+  tenantId        String
+  legalEntityId   String
+  periodId        String
+  requestNumber   String                    @db.VarChar(32)
+  status          PeriodReopenRequestStatus @default(DRAFT)
+  moduleLabel     String                    @db.VarChar(64)
+  reasonCode      PeriodReopenReasonCode
+  reasonDetail    String?                   @db.VarChar(500)
+  documentRef     String?                   @db.VarChar(64)
+  riskExplanation String                    @db.VarChar(2000)
+  requestedUntil  DateTime                  @db.Date
+  requestedBy     String?
+  requestedAt     DateTime?
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectedBy      String?
+  rejectedAt      DateTime?
+  rejectReason    String?                   @db.VarChar(500)
+  openedAt        DateTime?
+  expiredAt       DateTime?
+  closedAt        DateTime?
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  deletedAt       DateTime?
+
+  tenant      Tenant                     @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity                @relation(fields: [legalEntityId], references: [id])
+  period      AccountingPeriod           @relation(fields: [periodId], references: [id])
+  events      PeriodReopenRequestEvent[]
+
+  @@unique([tenantId, requestNumber])
+  @@index([tenantId])
+  @@index([legalEntityId, status])
+  @@index([periodId, status])
+  @@map("period_reopen_requests")
+}
+
+model PeriodReopenRequestEvent {
+  id        String   @id @default(uuid())
+  tenantId  String
+  requestId String
+  at        DateTime @default(now())
+  byUserId  String?
+  byLabel   String?  @db.VarChar(120)
+  action    String   @db.VarChar(64)
+  note      String?  @db.VarChar(1000)
+
+  tenant  Tenant              @relation(fields: [tenantId], references: [id])
+  request PeriodReopenRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, at])
+  @@index([tenantId])
+  @@map("period_reopen_request_events")
+}
+
+enum FxRevaluationRunStatus {
+  DRAFT
+  PREVIEWED
+  POSTED
+  REVERSED
+  CANCELLED
+}
+
+enum FxRevaluationLineSource {
+  AR_OPEN_ITEM
+  AP_OPEN_ITEM
+}
+
+/// Manual closing FX rates (foreign → base). No live bank feed in this phase.
+model FxExchangeRate {
+  id            String   @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  currencyCode  String   @db.VarChar(8)
+  asOfDate      DateTime @db.Date
+  rate          Decimal  @db.Decimal(18, 8)
+  source        String   @default("MANUAL") @db.VarChar(32)
+  notes         String?  @db.VarChar(300)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@unique([legalEntityId, currencyCode, asOfDate])
+  @@index([tenantId])
+  @@index([legalEntityId, asOfDate])
+  @@map("fx_exchange_rates")
+}
+
+/// Period-end unrealized FX revaluation run (one per LE + period).
+model FxRevaluationRun {
+  id                     String                 @id @default(uuid())
+  tenantId               String
+  legalEntityId          String
+  periodId               String
+  status                 FxRevaluationRunStatus @default(DRAFT)
+  asOfDate               DateTime               @db.Date
+  baseCurrency           String                 @db.VarChar(8)
+  totalGain              Decimal                @default(0) @db.Decimal(18, 4)
+  totalLoss              Decimal                @default(0) @db.Decimal(18, 4)
+  netGainLoss            Decimal                @default(0) @db.Decimal(18, 4)
+  gainAccountId          String?
+  lossAccountId          String?
+  gainAccountCode        String?                @db.VarChar(32)
+  gainAccountName        String?                @db.VarChar(200)
+  lossAccountCode        String?                @db.VarChar(32)
+  lossAccountName        String?                @db.VarChar(200)
+  reversalPeriodId       String?
+  voucherId              String?
+  postingEventId         String?
+  voucherNumber          String?                @db.VarChar(64)
+  reversalVoucherId      String?
+  reversalPostingEventId String?
+  reversalVoucherNumber  String?                @db.VarChar(64)
+  postedAt               DateTime?
+  postedBy               String?
+  reversedAt             DateTime?
+  reversedBy             String?
+  createdBy              String?
+  updatedBy              String?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  tenant         Tenant              @relation(fields: [tenantId], references: [id])
+  legalEntity    LegalEntity         @relation(fields: [legalEntityId], references: [id])
+  period         AccountingPeriod    @relation("FxRevaluationPeriod", fields: [periodId], references: [id])
+  reversalPeriod AccountingPeriod?   @relation("FxRevaluationReversalPeriod", fields: [reversalPeriodId], references: [id])
+  lines          FxRevaluationLine[]
+
+  @@unique([legalEntityId, periodId])
+  @@index([tenantId])
+  @@index([periodId])
+  @@map("fx_revaluation_runs")
+}
+
+model FxRevaluationLine {
+  id                String                  @id @default(uuid())
+  tenantId          String
+  runId             String
+  lineNumber        Int
+  sourceType        FxRevaluationLineSource
+  sourceId          String
+  accountOrParty    String                  @db.VarChar(300)
+  glAccountId       String
+  currencyCode      String                  @db.VarChar(8)
+  foreignAmount     Decimal                 @db.Decimal(18, 4)
+  originalRate      Decimal                 @db.Decimal(18, 8)
+  closingRate       Decimal                 @db.Decimal(18, 8)
+  bookValueBase     Decimal                 @db.Decimal(18, 4)
+  revaluedValueBase Decimal                 @db.Decimal(18, 4)
+  /// Positive = unrealized gain; negative = unrealized loss (economic sign).
+  gainLossBase      Decimal                 @db.Decimal(18, 4)
+  isAsset           Boolean                 @default(true)
+  createdAt         DateTime                @default(now())
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id])
+  run    FxRevaluationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sourceType, sourceId])
+  @@index([tenantId])
+  @@index([runId])
+  @@map("fx_revaluation_lines")
+}
+
+enum PeriodEndAdjustmentKind {
+  ACCRUAL
+  PREPAID
+}
+
+enum PeriodEndAdjustmentStatus {
+  DRAFT
+  READY_TO_POST
+  POSTED
+  PARTIALLY_RECOGNISED
+  FULLY_RECOGNISED
+  REVERSED
+  CANCELLED
+}
+
+enum PeriodEndAdjustmentScheduleStatus {
+  PENDING
+  POSTED
+  SKIPPED
+}
+
+/// Month-end accrual and prepaid amortisation documents (period-close adjustment wizards).
+/// ACCRUAL posts Dr expense / Cr accrued liability on the period end date and reverses into
+/// the next period. PREPAID amortises a prepaid asset into expense one schedule row per period.
+model PeriodEndAdjustment {
+  id                     String                    @id @default(uuid())
+  tenantId               String
+  legalEntityId          String
+  kind                   PeriodEndAdjustmentKind
+  adjustmentNumber       String                    @db.VarChar(32)
+  status                 PeriodEndAdjustmentStatus @default(DRAFT)
+  description            String                    @db.VarChar(300)
+  narration              String?                   @db.VarChar(500)
+  expenseAccountId       String
+  balanceSheetAccountId  String
+  totalAmount            Decimal                   @db.Decimal(18, 4)
+  recognisedAmount       Decimal                   @default(0) @db.Decimal(18, 4)
+  currencyCode           String                    @default("INR") @db.VarChar(3)
+  costCentreId           String?
+  departmentReference    String?                   @db.VarChar(64)
+  projectReference       String?                   @db.VarChar(64)
+  /// ACCRUAL: period whose end date the accrual posts on. PREPAID: first amortisation period.
+  periodId               String
+  /// ACCRUAL only — reverse automatically into the following period.
+  autoReverse            Boolean                   @default(true)
+  reversalPeriodId       String?
+  /// PREPAID only — number of amortisation periods (schedule row count).
+  numberOfPeriods        Int?
+  voucherId              String?
+  postingEventId         String?
+  voucherNumber          String?                   @db.VarChar(64)
+  reversalVoucherId      String?
+  reversalPostingEventId String?
+  reversalVoucherNumber  String?                   @db.VarChar(64)
+  postedAt               DateTime?
+  postedBy               String?
+  reversedAt             DateTime?
+  reversedBy             String?
+  cancelledAt            DateTime?
+  cancelledBy            String?
+  cancelReason           String?                   @db.VarChar(500)
+  createdBy              String?
+  updatedBy              String?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  deletedAt              DateTime?
+
+  tenant              Tenant                        @relation(fields: [tenantId], references: [id])
+  legalEntity         LegalEntity                   @relation(fields: [legalEntityId], references: [id])
+  period              AccountingPeriod              @relation("PeriodEndAdjustmentPeriod", fields: [periodId], references: [id])
+  reversalPeriod      AccountingPeriod?             @relation("PeriodEndAdjustmentReversalPeriod", fields: [reversalPeriodId], references: [id])
+  expenseAccount      Account                       @relation("PeriodEndAdjustmentExpenseAccount", fields: [expenseAccountId], references: [id])
+  balanceSheetAccount Account                       @relation("PeriodEndAdjustmentBalanceSheetAccount", fields: [balanceSheetAccountId], references: [id])
+  costCentre          CostCentre?                   @relation(fields: [costCentreId], references: [id])
+  schedules           PeriodEndAdjustmentSchedule[]
+
+  @@unique([tenantId, adjustmentNumber])
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@index([periodId])
+  @@index([legalEntityId, kind, status])
+  @@map("period_end_adjustments")
+}
+
+/// PREPAID amortisation rows — one per accounting period, posted individually.
+model PeriodEndAdjustmentSchedule {
+  id             String                            @id @default(uuid())
+  tenantId       String
+  adjustmentId   String
+  sequence       Int
+  periodId       String
+  amount         Decimal                           @db.Decimal(18, 4)
+  status         PeriodEndAdjustmentScheduleStatus @default(PENDING)
+  voucherId      String?
+  postingEventId String?
+  voucherNumber  String?                           @db.VarChar(64)
+  postedAt       DateTime?
+  postedBy       String?
+  createdAt      DateTime                          @default(now())
+  updatedAt      DateTime                          @updatedAt
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  adjustment PeriodEndAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  period     AccountingPeriod    @relation(fields: [periodId], references: [id])
+
+  @@unique([adjustmentId, sequence])
+  @@index([tenantId])
+  @@index([periodId])
+  @@map("period_end_adjustment_schedules")
+}
+
 model Account {
   id                     String          @id @default(uuid())
   tenantId               String
@@ -3615,6 +4247,8 @@ model Account {
   mappings                                    DefaultAccountMapping[]
   voucherLines                                AccountingVoucherLine[]
   generalLedgerEntries                        GeneralLedgerEntry[]
+  periodEndAdjustmentExpenseAccounts          PeriodEndAdjustment[]                @relation("PeriodEndAdjustmentExpenseAccount")
+  periodEndAdjustmentBalanceSheetAccounts     PeriodEndAdjustment[]                @relation("PeriodEndAdjustmentBalanceSheetAccount")
   salesInvoiceLines                           SalesInvoiceLine[]
   receivableOpenItems                         ReceivableOpenItem[]
   customerReceiptsBankCash                    CustomerReceipt[]                    @relation("ReceiptBankCashAccount")
@@ -3792,6 +4426,7 @@ model CostCentre {
   vendorInvoiceLines           VendorInvoiceLine[]
   vendorPaymentAdjustmentLines VendorPaymentAdjustmentLine[]
   vendorAdjustmentLines        VendorAdjustmentLine[]
+  periodEndAdjustments         PeriodEndAdjustment[]
 
   @@unique([legalEntityId, code])
   @@index([tenantId])
@@ -4390,6 +5025,7 @@ enum SalesInvoiceSourceType {
   SALES_ORDER
   OUTBOUND_DISPATCH
   PROFORMA_INVOICE
+  CRM_TAX_INVOICE
 }
 
 enum SalesInvoiceSupplyType {
@@ -5657,28 +6293,34 @@ enum PurchaseStatusHistoryDocumentType {
 }
 
 model PurchaseRequisition {
-  id                String                    @id @default(uuid())
-  tenantId          String
-  requisitionNumber String                    @db.VarChar(64)
-  requisitionDate   DateTime                  @db.Date
-  departmentId      String?                   @db.VarChar(36)
-  requestedById     String?                   @db.VarChar(36)
-  warehouseId       String?
-  requiredDate      DateTime?                 @db.Date
-  priority          PurchasePriority          @default(NORMAL)
-  purchasePurpose   String?                   @db.Text
-  rfqRequired       Boolean                   @default(true)
-  status            PurchaseRequisitionStatus @default(DRAFT)
-  submittedAt       DateTime?
-  approvedAt        DateTime?
-  rejectedAt        DateTime?
-  rejectionReason   String?                   @db.Text
-  remarks           String?                   @db.Text
-  createdById       String?                   @db.VarChar(36)
-  updatedById       String?                   @db.VarChar(36)
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
-  deletedAt         DateTime?
+  id                   String                    @id @default(uuid())
+  tenantId             String
+  requisitionNumber    String                    @db.VarChar(64)
+  requisitionDate      DateTime                  @db.Date
+  departmentId         String?                   @db.VarChar(36)
+  requestedById        String?                   @db.VarChar(36)
+  warehouseId          String?
+  requiredDate         DateTime?                 @db.Date
+  priority             PurchasePriority          @default(NORMAL)
+  purchasePurpose      String?                   @db.Text
+  rfqRequired          Boolean                   @default(true)
+  status               PurchaseRequisitionStatus @default(DRAFT)
+  /// Originating module — e.g. MAINTENANCE (spare shortage from ticket).
+  sourceType           String?                   @db.VarChar(40)
+  /// Originating document id (MaintenanceTicket.id when sourceType=MAINTENANCE).
+  sourceId             String?
+  /// Display snapshot e.g. MT-000125.
+  sourceDocumentNumber String?                   @db.VarChar(64)
+  submittedAt          DateTime?
+  approvedAt           DateTime?
+  rejectedAt           DateTime?
+  rejectionReason      String?                   @db.Text
+  remarks              String?                   @db.Text
+  createdById          String?                   @db.VarChar(36)
+  updatedById          String?                   @db.VarChar(36)
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  deletedAt            DateTime?
 
   tenant              Tenant                    @relation(fields: [tenantId], references: [id])
   warehouse           MasterWarehouse?          @relation(fields: [warehouseId], references: [id])
@@ -5697,6 +6339,7 @@ model PurchaseRequisition {
   @@index([tenantId, requestedById])
   @@index([tenantId, requisitionDate])
   @@index([tenantId, rfqRequired])
+  @@index([tenantId, sourceType, sourceId])
   @@map("purchase_requisitions")
 }
 
@@ -6124,47 +6767,47 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderLine {
-  id                        String    @id @default(uuid())
-  tenantId                  String
-  purchaseOrderId           String
-  lineNumber                Int
-  purchaseRequisitionLineId String?
-  purchasePlanningRowId     String?
-  itemId                    String?
-  itemCodeSnapshot          String    @default("") @db.VarChar(64)
-  itemNameSnapshot          String    @default("") @db.VarChar(300)
-  description               String?   @db.Text
+  id                           String    @id @default(uuid())
+  tenantId                     String
+  purchaseOrderId              String
+  lineNumber                   Int
+  purchaseRequisitionLineId    String?
+  purchasePlanningRowId        String?
+  itemId                       String?
+  itemCodeSnapshot             String    @default("") @db.VarChar(64)
+  itemNameSnapshot             String    @default("") @db.VarChar(300)
+  description                  String?   @db.Text
   /// Primary / stock UOM quantity.
-  quantity                  Decimal   @default(0) @db.Decimal(18, 4)
+  quantity                     Decimal   @default(0) @db.Decimal(18, 4)
   /// Vendor / purchase UOM quantity.
-  uomQuantity               Decimal   @default(0) @db.Decimal(18, 4)
+  uomQuantity                  Decimal   @default(0) @db.Decimal(18, 4)
   /// Snapshot: vendor units per 1 primary unit at line create/edit.
-  uomConversionFactor       Decimal   @default(1) @db.Decimal(18, 4)
+  uomConversionFactor          Decimal   @default(1) @db.Decimal(18, 4)
   /// Cost per primary unit (rate × uomConversionFactor).
-  unitCostPrimary           Decimal   @default(0) @db.Decimal(18, 4)
+  unitCostPrimary              Decimal   @default(0) @db.Decimal(18, 4)
   /// Vendor / purchase UOM.
-  uomId                     String?
+  uomId                        String?
   /// Vendor unit cost (per uomId).
-  rate                      Decimal   @default(0) @db.Decimal(18, 2)
-  amount                    Decimal   @default(0) @db.Decimal(18, 2)
-  receivedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
-  acceptedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
-  rejectedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
-  returnedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
-  invoicedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
-  gstGroupId                String?
-  hsnId                     String?
-  hsnCodeSnapshot           String    @default("") @db.VarChar(16)
-  gstGroupCodeSnapshot      String    @default("") @db.VarChar(32)
-  binId                     String?
-  qcRequiredSnapshot        Boolean   @default(false)
-  qualityTestGroupCodeSnapshot String? @db.VarChar(32)
-  requiredDate              DateTime? @db.Date
+  rate                         Decimal   @default(0) @db.Decimal(18, 2)
+  amount                       Decimal   @default(0) @db.Decimal(18, 2)
+  receivedQuantity             Decimal   @default(0) @db.Decimal(18, 4)
+  acceptedQuantity             Decimal   @default(0) @db.Decimal(18, 4)
+  rejectedQuantity             Decimal   @default(0) @db.Decimal(18, 4)
+  returnedQuantity             Decimal   @default(0) @db.Decimal(18, 4)
+  invoicedQuantity             Decimal   @default(0) @db.Decimal(18, 4)
+  gstGroupId                   String?
+  hsnId                        String?
+  hsnCodeSnapshot              String    @default("") @db.VarChar(16)
+  gstGroupCodeSnapshot         String    @default("") @db.VarChar(32)
+  binId                        String?
+  qcRequiredSnapshot           Boolean   @default(false)
+  qualityTestGroupCodeSnapshot String?   @db.VarChar(32)
+  requiredDate                 DateTime? @db.Date
   /// Optional PR document number displayed on the PO line.
-  requisitionNumber         String?   @db.VarChar(64)
-  remarks                   String?   @db.Text
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
+  requisitionNumber            String?   @db.VarChar(64)
+  remarks                      String?   @db.Text
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
 
   tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
   purchaseOrder           PurchaseOrder            @relation(fields: [purchaseOrderId], references: [id])
@@ -6246,8 +6889,8 @@ model PurchaseOrderArchived {
   archivedAt            DateTime            @default(now())
   reason                String              @db.Text
 
-  tenant        Tenant                     @relation(fields: [tenantId], references: [id])
-  purchaseOrder PurchaseOrder              @relation(fields: [purchaseOrderId], references: [id])
+  tenant        Tenant                      @relation(fields: [tenantId], references: [id])
+  purchaseOrder PurchaseOrder               @relation(fields: [purchaseOrderId], references: [id])
   lines         PurchaseOrderLineArchived[]
 
   @@unique([tenantId, purchaseOrderId, revisionNo])
@@ -6391,51 +7034,51 @@ model GoodsReceipt {
 }
 
 model GoodsReceiptLine {
-  id                         String    @id @default(uuid())
+  id                         String                 @id @default(uuid())
   tenantId                   String
   goodsReceiptId             String
   lineNumber                 Int
   purchaseOrderLineId        String
   itemId                     String?
-  itemCodeSnapshot           String    @default("") @db.VarChar(64)
-  itemNameSnapshot           String    @default("") @db.VarChar(300)
-  description                String?   @db.Text
+  itemCodeSnapshot           String                 @default("") @db.VarChar(64)
+  itemNameSnapshot           String                 @default("") @db.VarChar(300)
+  description                String?                @db.Text
   uomId                      String?
-  uomCodeSnapshot            String    @default("") @db.VarChar(32)
+  uomCodeSnapshot            String                 @default("") @db.VarChar(32)
   /// Snapshot: vendor units per 1 primary unit.
-  uomConversionFactor        Decimal   @default(1) @db.Decimal(18, 4)
+  uomConversionFactor        Decimal                @default(1) @db.Decimal(18, 4)
   /// Cost per primary unit used for stock valuation.
-  unitCostPrimary            Decimal   @default(0) @db.Decimal(18, 4)
+  unitCostPrimary            Decimal                @default(0) @db.Decimal(18, 4)
   /// Primary/stock quantities below.
-  orderedQuantity            Decimal   @default(0) @db.Decimal(18, 4)
-  previouslyReceivedQuantity Decimal   @default(0) @db.Decimal(18, 4)
-  openQuantity               Decimal   @default(0) @db.Decimal(18, 4)
-  challanQuantity            Decimal   @default(0) @db.Decimal(18, 4)
-  receivedQuantity           Decimal   @default(0) @db.Decimal(18, 4)
-  damagedQuantity            Decimal   @default(0) @db.Decimal(18, 4)
-  shortQuantity              Decimal   @default(0) @db.Decimal(18, 4)
-  excessQuantity             Decimal   @default(0) @db.Decimal(18, 4)
-  acceptedForQcQuantity      Decimal   @default(0) @db.Decimal(18, 4)
-  acceptedQuantity           Decimal   @default(0) @db.Decimal(18, 4)
-  rejectedQuantity           Decimal   @default(0) @db.Decimal(18, 4)
+  orderedQuantity            Decimal                @default(0) @db.Decimal(18, 4)
+  previouslyReceivedQuantity Decimal                @default(0) @db.Decimal(18, 4)
+  openQuantity               Decimal                @default(0) @db.Decimal(18, 4)
+  challanQuantity            Decimal                @default(0) @db.Decimal(18, 4)
+  receivedQuantity           Decimal                @default(0) @db.Decimal(18, 4)
+  damagedQuantity            Decimal                @default(0) @db.Decimal(18, 4)
+  shortQuantity              Decimal                @default(0) @db.Decimal(18, 4)
+  excessQuantity             Decimal                @default(0) @db.Decimal(18, 4)
+  acceptedForQcQuantity      Decimal                @default(0) @db.Decimal(18, 4)
+  acceptedQuantity           Decimal                @default(0) @db.Decimal(18, 4)
+  rejectedQuantity           Decimal                @default(0) @db.Decimal(18, 4)
   /// Vendor UOM quantities (entered / invoiced).
-  orderedUomQuantity         Decimal   @default(0) @db.Decimal(18, 4)
-  receivedUomQuantity        Decimal   @default(0) @db.Decimal(18, 4)
-  acceptedUomQuantity        Decimal   @default(0) @db.Decimal(18, 4)
-  rejectedUomQuantity        Decimal   @default(0) @db.Decimal(18, 4)
+  orderedUomQuantity         Decimal                @default(0) @db.Decimal(18, 4)
+  receivedUomQuantity        Decimal                @default(0) @db.Decimal(18, 4)
+  acceptedUomQuantity        Decimal                @default(0) @db.Decimal(18, 4)
+  rejectedUomQuantity        Decimal                @default(0) @db.Decimal(18, 4)
   /// Vendor unit cost (per uomId).
-  rate                       Decimal   @default(0) @db.Decimal(18, 2)
-  amount                     Decimal   @default(0) @db.Decimal(18, 2)
+  rate                       Decimal                @default(0) @db.Decimal(18, 2)
+  amount                     Decimal                @default(0) @db.Decimal(18, 2)
   warehouseId                String?
   storageLocationId          String?
   binId                      String?
-  binCodeSnapshot            String    @default("") @db.VarChar(32)
-  batchNumber                String?   @db.VarChar(64)
-  heatNumber                 String?   @db.VarChar(64)
-  lotNumber                  String?   @db.VarChar(64)
-  serialNumber               String?   @db.VarChar(100)
-  manufacturingDate          DateTime? @db.Date
-  expiryDate                 DateTime? @db.Date
+  binCodeSnapshot            String                 @default("") @db.VarChar(32)
+  batchNumber                String?                @db.VarChar(64)
+  heatNumber                 String?                @db.VarChar(64)
+  lotNumber                  String?                @db.VarChar(64)
+  serialNumber               String?                @db.VarChar(100)
+  manufacturingDate          DateTime?              @db.Date
+  expiryDate                 DateTime?              @db.Date
   inventoryLotId             String?
   qcRequired                 Boolean   @default(false)
   /// Snapshot of resolved receiving tolerance % at receive time.
@@ -6469,7 +7112,6 @@ model GoodsReceiptLine {
   remarks                    String?   @db.Text
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
-
   tenant            Tenant            @relation(fields: [tenantId], references: [id])
   goodsReceipt      GoodsReceipt      @relation(fields: [goodsReceiptId], references: [id])
   purchaseOrderLine PurchaseOrderLine @relation(fields: [purchaseOrderLineId], references: [id])
@@ -7004,30 +7646,30 @@ model PurchaseInvoiceLine {
 }
 
 model PurchaseReturn {
-  id                  String               @id @default(uuid())
-  tenantId            String
-  returnNumber        String               @db.VarChar(64)
-  returnDate          DateTime             @db.Date
-  vendorId            String
-  purchaseOrderId     String?
-  goodsReceiptId      String?
-  qualityInspectionId String?
-  status              PurchaseReturnStatus @default(DRAFT)
-  warehouseId         String?
-  reason              String?              @db.Text
-  remarks             String?              @db.Text
+  id                       String               @id @default(uuid())
+  tenantId                 String
+  returnNumber             String               @db.VarChar(64)
+  returnDate               DateTime             @db.Date
+  vendorId                 String
+  purchaseOrderId          String?
+  goodsReceiptId           String?
+  qualityInspectionId      String?
+  status                   PurchaseReturnStatus @default(DRAFT)
+  warehouseId              String?
+  reason                   String?              @db.Text
+  remarks                  String?              @db.Text
   /// FIN-CLOSE-1 — soft link to the Accounting VendorAdjustment (debit note) raised for
   /// the invoiced portion of this return. Null when no posted invoice exists (no AP effect).
-  vendorAdjustmentId       String?         @db.VarChar(36)
-  vendorAdjustmentDraftRef String?         @db.VarChar(64)
-  submittedAt         DateTime?
-  completedAt         DateTime?
-  cancelledAt         DateTime?
-  createdById         String?              @db.VarChar(36)
-  updatedById         String?              @db.VarChar(36)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  deletedAt           DateTime?
+  vendorAdjustmentId       String?              @db.VarChar(36)
+  vendorAdjustmentDraftRef String?              @db.VarChar(64)
+  submittedAt              DateTime?
+  completedAt              DateTime?
+  cancelledAt              DateTime?
+  createdById              String?              @db.VarChar(36)
+  updatedById              String?              @db.VarChar(36)
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  deletedAt                DateTime?
 
   tenant Tenant               @relation(fields: [tenantId], references: [id])
   lines  PurchaseReturnLine[]
@@ -8921,9 +9563,18 @@ enum BankStatementImportFormat {
   XLSX
   MT940
   CAMT_053
+  CAMT_052
+  CAMT_054
   MANUAL
   AUTO_DETECT
   OTHER
+}
+
+/// Distinguishes end-of-day statements from provisional CAMT.052/.054 documents.
+enum BankStatementDocumentType {
+  END_OF_DAY_STATEMENT
+  INTRADAY_REPORT
+  DEBIT_CREDIT_NOTIFICATION
 }
 
 enum BankStatementDuplicatePolicy {
@@ -9329,8 +9980,13 @@ model BankStatement {
 
   currencyCode String @default("INR") @db.VarChar(8)
 
+  documentType BankStatementDocumentType @default(END_OF_DAY_STATEMENT)
+
   openingBalance    Decimal @default(0) @db.Decimal(18, 4)
   closingBalance    Decimal @default(0) @db.Decimal(18, 4)
+  /// False for provisional CAMT.052/.054 when the message omits balances.
+  hasOpeningBalance Boolean @default(true)
+  hasClosingBalance Boolean @default(true)
   totalCreditAmount Decimal @default(0) @db.Decimal(18, 4)
   totalDebitAmount  Decimal @default(0) @db.Decimal(18, 4)
   balanceDifference Decimal @default(0) @db.Decimal(18, 4)
@@ -9427,6 +10083,10 @@ model BankStatementLine {
   /// Soft-exclude before validation (imported evidence retained via import issues).
   isExcluded Boolean @default(false)
 
+  /// CAMT.052/.054 lines are provisional until superseded by a canonical CAMT.053 line.
+  isProvisional      Boolean @default(false)
+  supersededByLineId String?
+
   rawPayload Json?
 
   createdAt DateTime @default(now())
@@ -9435,6 +10095,9 @@ model BankStatementLine {
   tenant        Tenant        @relation(fields: [tenantId], references: [id])
   legalEntity   LegalEntity   @relation(fields: [legalEntityId], references: [id])
   bankStatement BankStatement @relation(fields: [bankStatementId], references: [id], onDelete: Cascade)
+
+  supersededBy BankStatementLine?  @relation("BankStatementLineSupersession", fields: [supersededByLineId], references: [id], onDelete: SetNull)
+  supersedes   BankStatementLine[] @relation("BankStatementLineSupersession")
 
   issues                   BankStatementImportIssue[]
   statementAllocations     BankReconciliationStatementAllocation[]
@@ -9449,6 +10112,8 @@ model BankStatementLine {
   @@index([bankStatementId])
   @@index([bankStatementId, matchStatus], map: "bank_stmt_line_match_idx")
   @@index([tenantId, legalEntityId, lineHash], map: "bank_stmt_line_content_hash_idx")
+  @@index([supersededByLineId], map: "bank_stmt_line_superseded_idx")
+  @@index([tenantId, legalEntityId, isProvisional, isExcluded], map: "bank_stmt_line_provisional_idx")
   @@map("bank_statement_lines")
 }
 
@@ -10091,6 +10756,7 @@ model ManufacturingWorkCentre {
   dailyProductionLines      DailyProductionLine[]
   productionIssues          ProductionIssue[]
   productionDowntimes       ProductionDowntime[]
+  hrEmployees               HrEmployee[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -10133,6 +10799,7 @@ model ManufacturingMachine {
   productionIssues          ProductionIssue[]
   productionDowntimes       ProductionDowntime[]
   maintenanceTickets        MaintenanceTicket[]
+  preventiveMaintenancePlans PreventiveMaintenancePlan[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -16854,6 +17521,10 @@ model BankConnector {
   lastSyncStatus  BankConnectorProbeStatus?
   lastSyncMessage String?                   @db.VarChar(500)
 
+  /// Distributed sync lease (IndiaMART-style). Expired leases are stealable.
+  syncLockUntil DateTime?
+  syncLockToken String?   @db.VarChar(64)
+
   createdBy String?
   updatedBy String?
   createdAt DateTime  @default(now())
@@ -16869,6 +17540,7 @@ model BankConnector {
   @@index([tenantId])
   @@index([tenantId, legalEntityId, status], map: "bank_connector_le_status_idx")
   @@index([tenantId, treasuryAccountId], map: "bank_connector_acct_idx")
+  @@index([syncLockUntil], map: "bank_connector_sync_lock_until_idx")
   @@map("bank_connectors")
 }
 
@@ -17605,6 +18277,7 @@ enum MaintenanceFailureCategory {
   HYDRAULIC
   PNEUMATIC
   CONTROL
+  SAFETY
   OTHER
 }
 
@@ -17621,10 +18294,79 @@ enum MaintenanceSourceType {
   WORK_ORDER
   JOB_CARD
   OPERATION
+  PREVENTIVE
+}
+
+enum PreventiveFrequencyType {
+  DAYS
+  WEEKS
+  MONTHS
+}
+
+/// Simple preventive maintenance schedule linked to a machine. Execution = MaintenanceTicket.
+model PreventiveMaintenancePlan {
+  id       String @id @default(uuid())
+  tenantId String
+
+  planNumber String @db.VarChar(32)
+  machineId  String
+  name       String @db.VarChar(200)
+  description String? @db.Text
+
+  frequencyType  PreventiveFrequencyType
+  frequencyValue Int
+
+  startDate         DateTime  @db.Date
+  lastCompletedDate DateTime? @db.Date
+  nextDueDate       DateTime  @db.Date
+
+  assignedTechnicianId String?
+  assignedContractorId String?
+  estimatedDurationMin Int?
+  isActive             Boolean @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant     Tenant                               @relation(fields: [tenantId], references: [id])
+  machine    ManufacturingMachine                 @relation(fields: [machineId], references: [id])
+  contractor MasterVendor?                        @relation("PmPlanContractor", fields: [assignedContractorId], references: [id])
+  checklist  PreventiveMaintenanceChecklistItem[]
+  tickets    MaintenanceTicket[]
+
+  @@unique([tenantId, planNumber])
+  @@index([tenantId])
+  @@index([tenantId, machineId])
+  @@index([tenantId, nextDueDate])
+  @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
+  @@map("preventive_maintenance_plans")
+}
+
+model PreventiveMaintenanceChecklistItem {
+  id       String @id @default(uuid())
+  tenantId String
+  planId   String
+  sequence Int
+  text     String @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant                     @relation(fields: [tenantId], references: [id])
+  plan   PreventiveMaintenancePlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, sequence])
+  @@index([tenantId])
+  @@index([planId])
+  @@map("preventive_maintenance_checklist_items")
 }
 
 model MaintenanceTicket {
-  id     String @id @default(uuid())
+  id       String @id @default(uuid())
   tenantId String
 
   ticketNumber String @db.VarChar(32)
@@ -17635,16 +18377,22 @@ model MaintenanceTicket {
   sourceType       MaintenanceSourceType @default(MANUAL)
   sourceDocumentId String?               @db.VarChar(64)
 
-  workOrderId String?
-  jobCardId   String? @db.VarChar(64)
+  /// Soft link when sourceType = PREVENTIVE
+  preventiveMaintenancePlanId String?
+  /// Due date snapshot at ticket generation (compliance / delay).
+  pmScheduledDueDate          DateTime? @db.Date
+  scheduledDate               DateTime? @db.Date
+
+  workOrderId   String?
+  jobCardId     String? @db.VarChar(64)
   /// ProductionOrderStage / Job Card code for display
-  jobCardCode String? @db.VarChar(64)
-  operationId String?
+  jobCardCode   String? @db.VarChar(64)
+  operationId   String?
   operationCode String? @db.VarChar(64)
   operationName String? @db.VarChar(200)
 
-  problem  String              @db.Text
-  priority MaintenancePriority @default(NORMAL)
+  problem  String                  @db.Text
+  priority MaintenancePriority     @default(NORMAL)
   status   MaintenanceTicketStatus @default(REPORTED)
 
   failureCategory MaintenanceFailureCategory?
@@ -17656,27 +18404,34 @@ model MaintenanceTicket {
   operatorName String? @db.VarChar(200)
 
   /// Auto-captured at report time when browser GPS is available
-  reportedLatitude     Decimal? @db.Decimal(10, 7)
-  reportedLongitude    Decimal? @db.Decimal(10, 7)
-  reportedAccuracyM    Decimal? @db.Decimal(10, 2)
+  reportedLatitude      Decimal? @db.Decimal(10, 7)
+  reportedLongitude     Decimal? @db.Decimal(10, 7)
+  reportedAccuracyM     Decimal? @db.Decimal(10, 2)
   /// Plant / work centre / workstation label captured at report
-  reportedLocationLabel String? @db.VarChar(300)
+  reportedLocationLabel String?  @db.VarChar(300)
 
   repairStartedAt DateTime?
+  /// Set when test PASS (repair completion). Used for MTTR / repair duration.
+  repairEndedAt   DateTime?
 
-  technicianType    MaintenanceTechnicianType?
-  technicianUserId  String?
-  contractorId      String?
-  technicianName    String? @db.VarChar(200)
+  technicianType   MaintenanceTechnicianType?
+  technicianUserId String?
+  contractorId     String?
+  technicianName   String?                    @db.VarChar(200)
 
+  /// Legacy free-text repair notes (kept for V1 compatibility). Prefer rootCause + repairAction.
   repairDetails String? @db.Text
+  /// Technician diagnosis — not asked of operator at report time.
+  rootCause     String? @db.Text
+  /// What was done to fix the machine.
+  repairAction  String? @db.Text
 
-  testResult      MaintenanceTestResult?
-  testedByUserId  String?
-  testedAt        DateTime?
-  testRemarks     String? @db.Text
+  testResult     MaintenanceTestResult?
+  testedByUserId String?
+  testedAt       DateTime?
+  testRemarks    String?                @db.Text
 
-  closingRemarks String? @db.Text
+  closingRemarks String?   @db.Text
   closedByUserId String?
   closedAt       DateTime?
 
@@ -17704,11 +18459,13 @@ model MaintenanceTicket {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  tenant     Tenant                   @relation(fields: [tenantId], references: [id])
-  machine    ManufacturingMachine     @relation(fields: [machineId], references: [id])
-  contractor MasterVendor?            @relation(fields: [contractorId], references: [id])
+  tenant     Tenant                  @relation(fields: [tenantId], references: [id])
+  machine    ManufacturingMachine    @relation(fields: [machineId], references: [id])
+  contractor MasterVendor?           @relation("MaintenanceTicketContractor", fields: [contractorId], references: [id])
+  pmPlan     PreventiveMaintenancePlan? @relation(fields: [preventiveMaintenancePlanId], references: [id])
   parts      MaintenancePart[]
   photos     MaintenanceAttachment[]
+  checklistItems MaintenanceTicketChecklistItem[]
 
   @@unique([tenantId, ticketNumber])
   @@index([tenantId])
@@ -17716,7 +18473,31 @@ model MaintenanceTicket {
   @@index([tenantId, machineId])
   @@index([tenantId, deletedAt])
   @@index([tenantId, reportedAt])
+  @@index([tenantId, preventiveMaintenancePlanId])
+  @@index([tenantId, sourceType])
   @@map("maintenance_tickets")
+}
+
+/// Execution copy of PM plan checklist lines on a MaintenanceTicket.
+model MaintenanceTicketChecklistItem {
+  id       String @id @default(uuid())
+  tenantId String
+  ticketId String
+  sequence Int
+  text     String  @db.VarChar(500)
+  isDone   Boolean @default(false)
+  remark   String? @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id])
+  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, sequence])
+  @@index([tenantId])
+  @@index([ticketId])
+  @@map("maintenance_ticket_checklist_items")
 }
 
 model MaintenancePart {
@@ -17733,14 +18514,14 @@ model MaintenancePart {
   remarks     String? @db.VarChar(500)
 
   /// When Inventory ISSUE was posted (null = free-text / non-stockable / not posted)
-  inventoryMovementId String?
-  shortageQty         Decimal? @db.Decimal(18, 4)
+  inventoryMovementId   String?
+  shortageQty           Decimal? @db.Decimal(18, 4)
   purchaseRequisitionId String?
 
   createdBy String?
   updatedBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   tenant    Tenant            @relation(fields: [tenantId], references: [id])
@@ -17768,7 +18549,7 @@ model MaintenanceAttachment {
   storagePath      String                   @db.VarChar(500)
 
   uploadedBy String?
-  uploadedAt DateTime @default(now())
+  uploadedAt DateTime  @default(now())
   deletedAt  DateTime?
 
   tenant Tenant            @relation(fields: [tenantId], references: [id])
@@ -17778,3 +18559,2124 @@ model MaintenanceAttachment {
   @@index([tenantId, ticketId])
   @@map("maintenance_attachments")
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// HRMS Phase 1 — Foundation + Employee Master
+// Reuses LegalEntity / Branch / Department / User / CodeSeries / AuditLog.
+// Does NOT implement Shift / Attendance / Leave / OT / Payroll (later phases).
+// ─────────────────────────────────────────────────────────────────────────
+
+enum HrEmploymentType {
+  PERMANENT
+  PROBATION
+  CONTRACT
+  TRAINEE
+  INTERN
+  TEMPORARY
+}
+
+enum HrWorkerCategory {
+  STAFF
+  WORKER
+  SUPERVISOR
+  MANAGEMENT
+}
+
+enum HrEmployeeStatus {
+  DRAFT
+  ACTIVE
+  ON_NOTICE
+  INACTIVE
+  EXITED
+}
+
+enum HrGender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum HrDocumentType {
+  PHOTO
+  PAN
+  AADHAAR
+  BANK_PROOF
+  APPOINTMENT_LETTER
+  EXPERIENCE
+  QUALIFICATION
+  SKILL_CERTIFICATE
+  SALARY_REVISION
+  OTHER
+}
+
+enum HrEmploymentHistoryField {
+  LEGAL_ENTITY
+  BRANCH
+  DEPARTMENT
+  DESIGNATION
+  REPORTING_MANAGER
+  WORK_CENTRE
+  EMPLOYMENT_TYPE
+  STATUS
+  USER_LINK
+  DEFAULT_SHIFT
+}
+
+/// Tenant (optionally legal-entity-scoped) designation master for HRMS — distinct from
+/// CRM contact designations and the free-text `User.designation`.
+model HrDesignation {
+  id            String  @id @default(uuid())
+  tenantId      String
+  legalEntityId String?
+  code          String  @db.VarChar(32)
+  name          String  @db.VarChar(150)
+  description   String? @db.Text
+  level         Int?
+  isActive      Boolean @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity? @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
+  employees   HrEmployee[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, deletedAt])
+  @@map("hr_designations")
+}
+
+/// Centre of HRMS — employee identity independent from `User` login (ADR-034 / audit §1.1).
+model HrEmployee {
+  id                 String  @id @default(uuid())
+  tenantId           String
+  employeeCode       String  @db.VarChar(32)
+  userId             String?
+  legalEntityId      String
+  branchId           String
+  departmentId       String
+  designationId      String
+  primaryWorkCentreId String?
+  /// Default shift template (Phase 2). Historical attendance must snapshot effective shift — not rewrite from this.
+  defaultShiftId      String?
+  /// Optional employee-level weekly off (0=Sun … 6=Sat). Overrides shift template weeklyOffDay when set.
+  weeklyOffDay        Int?
+
+  firstName   String  @db.VarChar(100)
+  middleName  String? @db.VarChar(100)
+  lastName    String  @db.VarChar(100)
+  displayName String  @db.VarChar(220)
+
+  mobile      String?   @db.VarChar(20)
+  email       String?   @db.VarChar(255)
+  dateOfBirth DateTime? @db.Date
+  gender      HrGender?
+
+  addressLine String? @db.VarChar(300)
+  city        String? @db.VarChar(100)
+  state       String? @db.VarChar(100)
+  pin         String? @db.VarChar(12)
+  country     String? @db.VarChar(100)
+
+  joinDate                  DateTime         @db.Date
+  employmentType            HrEmploymentType
+  workerCategory            HrWorkerCategory
+  reportingManagerEmployeeId String?
+  status                    HrEmployeeStatus @default(DRAFT)
+  /// Contractual notice period in calendar days (tenant-configurable per employee).
+  noticePeriodDays          Int?
+  /// Set when exit settlement completes (EXITED).
+  exitDate                  DateTime?        @db.Date
+  lastWorkingDate           DateTime?        @db.Date
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant              Tenant                   @relation(fields: [tenantId], references: [id])
+  user                User?                    @relation("HrEmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
+  legalEntity         LegalEntity              @relation(fields: [legalEntityId], references: [id])
+  branch              Branch                   @relation(fields: [branchId], references: [id])
+  department          Department               @relation(fields: [departmentId], references: [id])
+  designation         HrDesignation            @relation(fields: [designationId], references: [id])
+  primaryWorkCentre   ManufacturingWorkCentre? @relation(fields: [primaryWorkCentreId], references: [id], onDelete: SetNull)
+  defaultShift        HrShiftTemplate?         @relation("HrEmployeeDefaultShift", fields: [defaultShiftId], references: [id], onDelete: SetNull)
+  reportingManager    HrEmployee?              @relation("HrEmployeeManager", fields: [reportingManagerEmployeeId], references: [id], onDelete: SetNull)
+  directReports       HrEmployee[]             @relation("HrEmployeeManager")
+
+  employmentHistory HrEmployeeEmploymentHistory[]
+  bankDetails       HrEmployeeBankDetail[]
+  statutoryDetail   HrEmployeeStatutoryDetail?
+  documents         HrEmployeeDocument[]
+  shiftAssignments  HrEmployeeShiftAssignment[]
+  leaveBalances     HrLeaveBalance[]
+  leaveRequests     HrLeaveRequest[]
+  attendanceDays    HrAttendanceDay[]
+  attendancePunches HrAttendancePunch[]
+  attendanceExceptions HrAttendanceException[]
+  overtimeRecords   HrOvertimeRecord[]
+  salaryAssignments HrEmployeeSalaryAssignment[]
+  payrollResults    HrPayrollEmployeeResult[]
+  payslips          HrPayslip[]
+  salaryPaymentLines HrSalaryPaymentLine[]
+  loans             HrEmployeeLoan[]
+  exits             HrEmployeeExit[]
+  fnfSettlements    HrFullFinalSettlement[]
+
+  @@unique([tenantId, employeeCode])
+  @@index([tenantId])
+  @@index([tenantId, userId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, branchId])
+  @@index([tenantId, departmentId])
+  @@index([tenantId, designationId])
+  @@index([tenantId, primaryWorkCentreId])
+  @@index([tenantId, defaultShiftId])
+  @@index([tenantId, reportingManagerEmployeeId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("hr_employees")
+}
+
+/// Audit trail of employment-affecting field changes (status/dept/designation/manager/…).
+model HrEmployeeEmploymentHistory {
+  id            String                    @id @default(uuid())
+  tenantId      String
+  employeeId    String
+  field         HrEmploymentHistoryField
+  oldValue      String?                   @db.VarChar(300)
+  newValue      String?                   @db.VarChar(300)
+  effectiveFrom DateTime
+  changedBy     String?
+  reason        String?                   @db.VarChar(500)
+  createdAt     DateTime                  @default(now())
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id])
+  employee HrEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, employeeId, effectiveFrom])
+  @@map("hr_employee_employment_history")
+}
+
+/// Sensitive — masked (last 4 digits) unless caller has `hrms.employee.sensitive.view`.
+model HrEmployeeBankDetail {
+  id                String    @id @default(uuid())
+  tenantId          String
+  employeeId        String
+  bankName          String    @db.VarChar(150)
+  accountHolderName String    @db.VarChar(150)
+  accountNumber     String    @db.VarChar(34)
+  ifsc              String    @db.VarChar(11)
+  isPrimary         Boolean   @default(false)
+  effectiveFrom     DateTime?
+  effectiveTo       DateTime?
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id])
+  employee HrEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, employeeId, deletedAt])
+  @@map("hr_employee_bank_details")
+}
+
+/// Sensitive — one row per employee (PAN/UAN/ESIC/Aadhaar ref + Phase 8 applicability).
+model HrEmployeeStatutoryDetail {
+  id          String  @id @default(uuid())
+  tenantId    String
+  employeeId  String  @unique
+  pan         String? @db.VarChar(10)
+  aadhaarRef  String? @db.VarChar(64)
+  uan         String? @db.VarChar(20)
+  esicNumber  String? @db.VarChar(30)
+
+  pfApplicable   Boolean?
+  esicApplicable Boolean?
+  ptApplicable   Boolean?
+  tdsApplicable  Boolean?
+  lwfApplicable  Boolean?
+  /// OLD | NEW — salary TDS foundation only
+  taxRegime      String?  @db.VarChar(16)
+  previousEmploymentIncome Decimal? @db.Decimal(14, 2)
+  declaredDeductions       Decimal? @db.Decimal(14, 2)
+  taxAlreadyDeducted       Decimal? @db.Decimal(14, 2)
+  /// Authorized monthly TDS override (audit via override fields)
+  tdsManualMonthly         Decimal? @db.Decimal(14, 2)
+  tdsManualReason          String?  @db.VarChar(500)
+  overrideReason           String?  @db.VarChar(500)
+  overrideByUserId         String?
+  overrideAt               DateTime?
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id])
+  employee HrEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("hr_employee_statutory_details")
+}
+
+/// Module-local employee document attachments (photo, PAN, appointment letter, …).
+model HrEmployeeDocument {
+  id       String @id @default(uuid())
+  tenantId String
+  employeeId String
+
+  documentType     HrDocumentType
+  originalFilename String         @db.VarChar(255)
+  storedFilename   String         @db.VarChar(255)
+  mimeType         String         @db.VarChar(120)
+  fileSize         Int
+  storagePath      String         @db.VarChar(500)
+  notes            String?        @db.VarChar(500)
+
+  uploadedBy String?
+  uploadedAt DateTime  @default(now())
+  deletedAt  DateTime?
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id])
+  employee HrEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, employeeId, deletedAt])
+  @@map("hr_employee_documents")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// HRMS Phase 2 — Shift templates, holiday calendars, roster assignments
+// Attendance calculation is Phase 3 — use getEffectiveShift / getHoliday helpers.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum HrHolidayType {
+  NATIONAL
+  FESTIVAL
+  COMPANY
+  OPTIONAL
+}
+
+enum HrShiftAssignmentSource {
+  DEFAULT
+  ROSTER
+  TEMPORARY
+}
+
+/// Shift template with overnight support (e.g. 22:00 → 06:00). Times stored as HH:mm (24h).
+model HrShiftTemplate {
+  id                      String  @id @default(uuid())
+  tenantId                String
+  legalEntityId           String?
+  code                    String  @db.VarChar(32)
+  name                    String  @db.VarChar(150)
+  startTime               String  @db.VarChar(5)
+  endTime                 String  @db.VarChar(5)
+  breakMinutes            Int     @default(0)
+  graceInMinutes          Int     @default(0)
+  graceOutMinutes         Int?
+  fullDayMinimumMinutes   Int
+  halfDayMinimumMinutes   Int
+  otEligible              Boolean @default(true)
+  otStartsAfterMinutes    Int?
+  overnightShift          Boolean @default(false)
+  /// Simple weekly off: 0=Sunday … 6=Saturday. Null = no weekly-off on this template.
+  weeklyOffDay            Int?
+  isActive                Boolean @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant             Tenant                     @relation(fields: [tenantId], references: [id])
+  legalEntity        LegalEntity?               @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
+  defaultEmployees   HrEmployee[]               @relation("HrEmployeeDefaultShift")
+  shiftAssignments   HrEmployeeShiftAssignment[]
+  overtimeRecords    HrOvertimeRecord[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
+  @@map("hr_shift_templates")
+}
+
+model HrHolidayCalendar {
+  id            String  @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  /// Null = applies to all branches under the legal entity.
+  branchId      String?
+  code          String  @db.VarChar(32)
+  name          String  @db.VarChar(150)
+  year          Int
+  isActive      Boolean @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity            @relation(fields: [legalEntityId], references: [id])
+  branch      Branch?                @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  days        HrHolidayCalendarDay[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, branchId])
+  @@index([tenantId, year])
+  @@index([tenantId, deletedAt])
+  @@map("hr_holiday_calendars")
+}
+
+model HrHolidayCalendarDay {
+  id                String        @id @default(uuid())
+  tenantId          String
+  calendarId        String
+  holidayDate       DateTime      @db.Date
+  name              String        @db.VarChar(150)
+  holidayType       HrHolidayType
+  optionalHoliday   Boolean       @default(false)
+  isActive          Boolean       @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id])
+  calendar HrHolidayCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, holidayDate])
+  @@index([tenantId])
+  @@index([tenantId, calendarId])
+  @@index([tenantId, holidayDate])
+  @@index([tenantId, deletedAt])
+  @@map("hr_holiday_calendar_days")
+}
+
+/// Effective-dated shift assignment. Attendance must snapshot the resolved shift, not rewrite history.
+model HrEmployeeShiftAssignment {
+  id           String                   @id @default(uuid())
+  tenantId     String
+  employeeId   String
+  shiftId      String
+  effectiveFrom DateTime                @db.Date
+  effectiveTo   DateTime?               @db.Date
+  source       HrShiftAssignmentSource  @default(ROSTER)
+  note         String?                  @db.VarChar(500)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  employee HrEmployee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shift    HrShiftTemplate @relation(fields: [shiftId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, employeeId, effectiveFrom], map: "hr_employee_shift_assignments_tenant_emp_effFrom_idx")
+  @@index([tenantId, shiftId])
+  @@index([tenantId, deletedAt])
+  @@map("hr_employee_shift_assignments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// HRMS Phase 4 — Leave Management (+ attendance sync)
+// Leave domain landed earlier; Phase 4 adds attendance read-model sync.
+// Minimal attendance foundation (day / punch / exception) supports leave UAT.
+// Full biometric device APIs / OT / payroll remain out of scope.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum HrLeaveAccrualType {
+  NONE
+  MONTHLY
+  YEARLY
+}
+
+enum HrLeaveDurationType {
+  FULL_DAY
+  FIRST_HALF
+  SECOND_HALF
+}
+
+enum HrLeaveRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// Attendance day status (read model). Leave sync writes LEAVE / HALF_DAY.
+enum HrAttendanceDayStatus {
+  PRESENT
+  ABSENT
+  LEAVE
+  HALF_DAY
+  WEEKLY_OFF
+  HOLIDAY
+  ON_DUTY
+}
+
+enum HrAttendancePunchType {
+  IN
+  OUT
+}
+
+enum HrAttendanceExceptionType {
+  PUNCH_ON_LEAVE
+  PUNCH_ON_HALF_DAY_LEAVE
+  OTHER
+}
+
+model HrLeaveType {
+  id                   String            @id @default(uuid())
+  tenantId             String
+  legalEntityId        String?
+  code                 String            @db.VarChar(32)
+  name                 String            @db.VarChar(150)
+  paid                 Boolean           @default(true)
+  allowHalfDay         Boolean           @default(true)
+  allowNegativeBalance Boolean           @default(false)
+  carryForwardAllowed  Boolean           @default(false)
+  maxCarryForward      Decimal?          @db.Decimal(8, 2)
+  accrualType          HrLeaveAccrualType @default(NONE)
+  accrualValue         Decimal?          @db.Decimal(8, 2)
+  /// Phase 11 F&F — how unused balance is settled on exit.
+  fnfSettlementAction  HrLeaveFnfAction  @default(IGNORE)
+  maxEncashDays        Decimal?          @db.Decimal(8, 2)
+  isActive             Boolean           @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant       Tenant                  @relation(fields: [tenantId], references: [id])
+  legalEntity  LegalEntity?            @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
+  policyLinks  HrLeavePolicyLeaveType[]
+  balances     HrLeaveBalance[]
+  requests     HrLeaveRequest[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, deletedAt])
+  @@map("hr_leave_types")
+}
+
+model HrLeavePolicy {
+  id                 String            @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  branchId           String?
+  /// Optional filter — null applies to all worker categories.
+  workerCategory     HrWorkerCategory?
+  code               String            @db.VarChar(32)
+  name               String            @db.VarChar(150)
+  excludeHolidays    Boolean           @default(true)
+  excludeWeeklyOff   Boolean           @default(true)
+  allowNegativeBalance Boolean         @default(false)
+  isActive           Boolean           @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant                   @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity              @relation(fields: [legalEntityId], references: [id])
+  branch      Branch?                  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  leaveTypes  HrLeavePolicyLeaveType[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, branchId])
+  @@index([tenantId, deletedAt])
+  @@map("hr_leave_policies")
+}
+
+model HrLeavePolicyLeaveType {
+  id          String @id @default(uuid())
+  tenantId    String
+  policyId    String
+  leaveTypeId String
+
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+  policy    HrLeavePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  leaveType HrLeaveType  @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, leaveTypeId])
+  @@index([tenantId])
+  @@map("hr_leave_policy_leave_types")
+}
+
+model HrLeaveBalance {
+  id          String  @id @default(uuid())
+  tenantId    String
+  employeeId  String
+  leaveTypeId String
+  year        Int
+  opening     Decimal @default(0) @db.Decimal(8, 2)
+  accrued     Decimal @default(0) @db.Decimal(8, 2)
+  pending     Decimal @default(0) @db.Decimal(8, 2)
+  used        Decimal @default(0) @db.Decimal(8, 2)
+  adjusted    Decimal @default(0) @db.Decimal(8, 2)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant      Tenant                    @relation(fields: [tenantId], references: [id])
+  employee    HrEmployee                @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType   HrLeaveType               @relation(fields: [leaveTypeId], references: [id])
+  adjustments HrLeaveBalanceAdjustment[]
+
+  @@unique([tenantId, employeeId, leaveTypeId, year])
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, leaveTypeId])
+  @@map("hr_leave_balances")
+}
+
+model HrLeaveBalanceAdjustment {
+  id            String   @id @default(uuid())
+  tenantId      String
+  balanceId     String
+  employeeId    String
+  leaveTypeId   String
+  year          Int
+  amount        Decimal  @db.Decimal(8, 2)
+  reason        String   @db.VarChar(500)
+  effectiveDate DateTime @db.Date
+  createdBy     String?
+  createdAt     DateTime @default(now())
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id])
+  balance HrLeaveBalance @relation(fields: [balanceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, balanceId])
+  @@map("hr_leave_balance_adjustments")
+}
+
+model HrLeaveRequest {
+  id                 String               @id @default(uuid())
+  tenantId           String
+  employeeId         String
+  leaveTypeId        String
+  fromDate           DateTime             @db.Date
+  toDate             DateTime             @db.Date
+  durationType       HrLeaveDurationType  @default(FULL_DAY)
+  requestedDays      Decimal              @db.Decimal(8, 2)
+  reason             String               @db.VarChar(1000)
+  status             HrLeaveRequestStatus @default(DRAFT)
+  submittedAt              DateTime?
+  approvedByUserId         String?
+  approvedByEmployeeId     String?
+  approvedAt               DateTime?
+  rejectionReason          String?              @db.VarChar(500)
+  cancelledAt              DateTime?
+  cancelledByUserId        String?
+  cancellationReason       String?              @db.VarChar(500)
+
+  attachmentOriginalFilename String? @db.VarChar(255)
+  attachmentStoredFilename   String? @db.VarChar(255)
+  attachmentMimeType         String? @db.VarChar(120)
+  attachmentFileSize         Int?
+  attachmentStoragePath      String? @db.VarChar(500)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant    Tenant      @relation(fields: [tenantId], references: [id])
+  employee  HrEmployee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType HrLeaveType @relation(fields: [leaveTypeId], references: [id])
+  attendanceDays HrAttendanceDay[]
+  attendanceExceptions HrAttendanceException[]
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, leaveTypeId])
+  @@index([tenantId, status])
+  @@index([tenantId, fromDate, toDate])
+  @@index([tenantId, deletedAt])
+  @@map("hr_leave_requests")
+}
+
+/// Daily attendance read model. Raw punches are never deleted; exceptions flag conflicts.
+model HrAttendanceDay {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  employeeId         String
+  attendanceDate     DateTime              @db.Date
+  status             HrAttendanceDayStatus
+  leaveRequestId     String?
+  leaveDurationType  HrLeaveDurationType?
+  leaveTypeCode      String?               @db.VarChar(32)
+  shiftId            String?
+  firstInAt          DateTime?
+  lastOutAt          DateTime?
+  workedMinutes      Int?
+  isFinalized        Boolean               @default(false)
+  finalizedAt        DateTime?
+  hasPunch           Boolean               @default(false)
+  exceptionFlag      Boolean               @default(false)
+  exceptionReason    String?               @db.VarChar(500)
+  /// MANUAL | LEAVE | BIOMETRIC | SYSTEM | RECALC
+  source             String                @db.VarChar(32) @default("SYSTEM")
+  note               String?               @db.VarChar(500)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  employee     HrEmployee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveRequest HrLeaveRequest? @relation(fields: [leaveRequestId], references: [id], onDelete: SetNull)
+  overtimeRecords HrOvertimeRecord[]
+
+  @@unique([tenantId, employeeId, attendanceDate])
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, attendanceDate])
+  @@index([tenantId, leaveRequestId])
+  @@index([tenantId, isFinalized])
+  @@map("hr_attendance_days")
+}
+
+/// Immutable punch evidence. Soft fields only; no delete API.
+model HrAttendancePunch {
+  id         String               @id @default(uuid())
+  tenantId   String
+  employeeId String
+  punchedAt  DateTime
+  punchType  HrAttendancePunchType
+  /// BIOMETRIC | MANUAL | MOBILE | IMPORT
+  source     String               @db.VarChar(32) @default("MANUAL")
+  deviceRef  String?              @db.VarChar(120)
+  note       String?              @db.VarChar(500)
+
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id])
+  employee HrEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, employeeId, punchedAt])
+  @@map("hr_attendance_punches")
+}
+
+model HrAttendanceException {
+  id             String                    @id @default(uuid())
+  tenantId       String
+  employeeId     String
+  attendanceDate DateTime                  @db.Date
+  exceptionType  HrAttendanceExceptionType
+  reason         String                    @db.VarChar(500)
+  leaveRequestId String?
+  punchId        String?
+  resolved       Boolean                   @default(false)
+  resolvedAt     DateTime?
+  resolvedBy     String?
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  employee     HrEmployee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveRequest HrLeaveRequest? @relation(fields: [leaveRequestId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, attendanceDate])
+  @@index([tenantId, leaveRequestId])
+  @@index([tenantId, resolved])
+  @@map("hr_attendance_exceptions")
+}
+
+// HRMS Phase 5 — Overtime Management
+
+enum HrOvertimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum HrOvertimeSource {
+  ATTENDANCE
+  MANUAL
+}
+
+model HrOvertimePolicy {
+  id                    String            @id @default(uuid())
+  tenantId              String
+  legalEntityId         String
+  branchId              String?
+  workerCategory        HrWorkerCategory?
+  code                  String            @db.VarChar(32)
+  name                  String            @db.VarChar(150)
+  enabled               Boolean           @default(true)
+  minimumExtraMinutes   Int               @default(30)
+  roundingMinutes       Int               @default(15)
+  maxOtMinutesPerDay    Int?
+  maxOtMinutesPerMonth  Int?
+  weeklyOffOtAllowed    Boolean           @default(false)
+  holidayOtAllowed      Boolean           @default(false)
+  leaveDayOtAllowed     Boolean           @default(false)
+  requireApproval       Boolean           @default(true)
+  effectiveFrom         DateTime          @db.Date
+  effectiveTo           DateTime?         @db.Date
+  isActive              Boolean           @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+  branch      Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, branchId])
+  @@index([tenantId, deletedAt])
+  @@map("hr_overtime_policies")
+}
+
+model HrOvertimeRecord {
+  id                 String           @id @default(uuid())
+  tenantId           String
+  employeeId         String
+  attendanceDate     DateTime         @db.Date
+  attendanceDayId    String?
+  shiftId            String?
+  detectedMinutes    Int              @default(0)
+  eligibleMinutes    Int              @default(0)
+  approvedMinutes    Int?
+  status             HrOvertimeStatus @default(PENDING)
+  reason             String?          @db.VarChar(1000)
+  requestedByUserId  String?
+  approvedByUserId   String?
+  approvedAt         DateTime?
+  rejectionReason    String?          @db.VarChar(500)
+  source             HrOvertimeSource @default(ATTENDANCE)
+  exceptionFlags     String?          @db.VarChar(1000)
+  firstInAt          DateTime?
+  lastOutAt          DateTime?
+  workedMinutes      Int?
+  cancelledAt        DateTime?
+  cancelledByUserId  String?
+  cancellationReason String?          @db.VarChar(500)
+  correctsRecordId   String?
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  employee      HrEmployee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  attendanceDay HrAttendanceDay? @relation(fields: [attendanceDayId], references: [id], onDelete: SetNull)
+  shift         HrShiftTemplate? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, employeeId, attendanceDate])
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, attendanceDate])
+  @@index([tenantId, status])
+  @@index([tenantId, attendanceDayId])
+  @@index([tenantId, deletedAt])
+  @@map("hr_overtime_records")
+}
+
+// HRMS Phase 6 — Salary Components + Structures (config only; no payroll calc)
+
+enum HrSalaryComponentType {
+  EARNING
+  DEDUCTION
+  EMPLOYER_CONTRIBUTION
+}
+
+enum HrSalaryCalculationType {
+  FIXED
+  PERCENTAGE
+  ATTENDANCE_LINKED
+  OT_LINKED
+  STATUTORY
+}
+
+enum HrSalaryStructureVersionStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+}
+
+enum HrEmployeeSalaryAssignmentStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  CANCELLED
+}
+
+model HrSalaryComponent {
+  id               String                   @id @default(uuid())
+  tenantId         String
+  legalEntityId    String?
+  code             String                   @db.VarChar(32)
+  name             String                   @db.VarChar(150)
+  type             HrSalaryComponentType
+  calculationType  HrSalaryCalculationType
+  taxable          Boolean                  @default(true)
+  affectsGross     Boolean                  @default(true)
+  affectsNet       Boolean                  @default(true)
+  isActive         Boolean                  @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity? @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
+  structureLines HrSalaryStructureLine[] @relation("StructureLineComponent")
+  percentageOfLines HrSalaryStructureLine[] @relation("StructureLinePercentageOf")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, deletedAt])
+  @@map("hr_salary_components")
+}
+
+model HrSalaryStructure {
+  id                String            @id @default(uuid())
+  tenantId          String
+  legalEntityId     String?
+  code              String            @db.VarChar(32)
+  name              String            @db.VarChar(150)
+  description       String?           @db.VarChar(500)
+  workerCategory    HrWorkerCategory?
+  isActive          Boolean           @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity? @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
+  versions    HrSalaryStructureVersion[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, deletedAt])
+  @@map("hr_salary_structures")
+}
+
+model HrSalaryStructureVersion {
+  id                 String                         @id @default(uuid())
+  tenantId           String
+  salaryStructureId  String
+  versionNo          Int
+  effectiveFrom      DateTime                       @db.Date
+  effectiveTo        DateTime?                      @db.Date
+  status             HrSalaryStructureVersionStatus @default(DRAFT)
+  createdBy          String?
+  approvedByUserId   String?
+  approvedAt         DateTime?
+  updatedBy          String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  structure HrSalaryStructure @relation(fields: [salaryStructureId], references: [id], onDelete: Cascade)
+  lines     HrSalaryStructureLine[]
+  assignments HrEmployeeSalaryAssignment[]
+
+  @@unique([salaryStructureId, versionNo])
+  @@index([tenantId])
+  @@index([tenantId, salaryStructureId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("hr_salary_structure_versions")
+}
+
+model HrSalaryStructureLine {
+  id                       String                   @id @default(uuid())
+  tenantId                 String
+  versionId                String
+  salaryComponentId        String
+  sequence                 Int                      @default(10)
+  calculationType          HrSalaryCalculationType
+  fixedAmount              Decimal?                 @db.Decimal(14, 2)
+  percentage               Decimal?                 @db.Decimal(8, 4)
+  percentageOfComponentId  String?
+  monthlyCap               Decimal?                 @db.Decimal(14, 2)
+  annualCap                Decimal?                 @db.Decimal(14, 2)
+  isActive                 Boolean                  @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id])
+  version             HrSalaryStructureVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  salaryComponent     HrSalaryComponent      @relation("StructureLineComponent", fields: [salaryComponentId], references: [id])
+  percentageOfComponent HrSalaryComponent?   @relation("StructureLinePercentageOf", fields: [percentageOfComponentId], references: [id], onDelete: SetNull)
+
+  @@unique([versionId, salaryComponentId])
+  @@index([tenantId])
+  @@index([tenantId, versionId])
+  @@index([tenantId, deletedAt])
+  @@map("hr_salary_structure_lines")
+}
+
+model HrEmployeeSalaryAssignment {
+  id                       String                           @id @default(uuid())
+  tenantId                 String
+  employeeId               String
+  salaryStructureVersionId String
+  effectiveFrom            DateTime                         @db.Date
+  effectiveTo              DateTime?                        @db.Date
+  annualCtc                Decimal?                         @db.Decimal(14, 2)
+  monthlyGross             Decimal?                         @db.Decimal(14, 2)
+  remarks                  String?                          @db.VarChar(500)
+  status                   HrEmployeeSalaryAssignmentStatus @default(ACTIVE)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant  Tenant                   @relation(fields: [tenantId], references: [id])
+  employee HrEmployee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  version  HrSalaryStructureVersion @relation(fields: [salaryStructureVersionId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, employeeId, effectiveFrom], map: "hr_emp_sal_asgn_tenant_emp_eff_idx")
+  @@index([tenantId, salaryStructureVersionId], map: "hr_emp_sal_asgn_tenant_ver_idx")
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("hr_employee_salary_assignments")
+}
+
+// HRMS Phase 7 — Payroll Run & Calculation (no statutory engine / GL / payslip)
+
+enum HrPayrollPeriodStatus {
+  OPEN
+  PROCESSING
+  CLOSED
+}
+
+enum HrPayrollRunStatus {
+  DRAFT
+  CALCULATED
+  REVIEWED
+  FINALIZED
+  CANCELLED
+}
+
+enum HrPayrollEmployeeResultStatus {
+  PENDING
+  CALCULATED
+  EXCLUDED
+  ERROR
+  FINALIZED
+}
+
+enum HrPayrollExceptionSeverity {
+  BLOCKER
+  WARNING
+}
+
+model HrPayrollPeriod {
+  id            String                @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  year          Int
+  month         Int
+  startDate     DateTime              @db.Date
+  endDate       DateTime              @db.Date
+  status        HrPayrollPeriodStatus @default(OPEN)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  deletedAt     DateTime?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity  @relation(fields: [legalEntityId], references: [id])
+  runs        HrPayrollRun[]
+
+  @@unique([tenantId, legalEntityId, year, month])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("hr_payroll_periods")
+}
+
+model HrPayrollRun {
+  id               String             @id @default(uuid())
+  tenantId         String
+  payrollPeriodId  String
+  legalEntityId    String
+  branchId         String?
+  code             String             @db.VarChar(32)
+  status           HrPayrollRunStatus @default(DRAFT)
+  employeeCount    Int                @default(0)
+  grossAmount      Decimal            @default(0) @db.Decimal(16, 2)
+  deductionAmount  Decimal            @default(0) @db.Decimal(16, 2)
+  employerAmount   Decimal            @default(0) @db.Decimal(16, 2)
+  netAmount        Decimal            @default(0) @db.Decimal(16, 2)
+  calculatedAt     DateTime?
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+  finalizedAt      DateTime?
+  finalizedByUserId String?
+
+  /// Phase 9 — accounting / payment lifecycle (separate from calculation status)
+  accountingStatus     HrPayrollAccountingStatus @default(NOT_POSTED)
+  accountingVoucherId  String?
+  postingEventId       String?
+  accountingPostedAt   DateTime?
+  accountingPostedByUserId String?
+  accountingError      String?  @db.VarChar(500)
+  payslipGeneratedAt   DateTime?
+  paymentStatus        HrPayrollPaymentLifecycleStatus @default(NOT_STARTED)
+
+  createdBy        String?
+  updatedBy        String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  period      HrPayrollPeriod @relation(fields: [payrollPeriodId], references: [id], onDelete: Cascade)
+  legalEntity LegalEntity   @relation(fields: [legalEntityId], references: [id])
+  branch      Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  employeeResults HrPayrollEmployeeResult[]
+  exceptions      HrPayrollException[]
+  payslips        HrPayslip[]
+  paymentBatches  HrSalaryPaymentBatch[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, payrollPeriodId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, branchId])
+  @@index([tenantId, status])
+  @@index([tenantId, accountingStatus])
+  @@index([tenantId, deletedAt])
+  @@map("hr_payroll_runs")
+}
+
+model HrPayrollEmployeeResult {
+  id                       String                         @id @default(uuid())
+  tenantId                 String
+  payrollRunId             String
+  payrollPeriodId          String
+  employeeId               String
+  salaryStructureId        String?
+  salaryStructureVersionId String?
+  salaryAssignmentId       String?
+  totalCalendarDays        Int                            @default(0)
+  basisDays                Int                            @default(0)
+  payableDays              Decimal                        @default(0) @db.Decimal(8, 2)
+  presentDays              Decimal                        @default(0) @db.Decimal(8, 2)
+  paidLeaveDays            Decimal                        @default(0) @db.Decimal(8, 2)
+  unpaidLeaveDays          Decimal                        @default(0) @db.Decimal(8, 2)
+  lopDays                  Decimal                        @default(0) @db.Decimal(8, 2)
+  weeklyOffDays            Int                            @default(0)
+  holidayDays              Int                            @default(0)
+  approvedOtMinutes        Int                            @default(0)
+  grossAmount              Decimal                        @default(0) @db.Decimal(14, 2)
+  deductionAmount          Decimal                        @default(0) @db.Decimal(14, 2)
+  employerAmount           Decimal                        @default(0) @db.Decimal(14, 2)
+  netAmount                Decimal                        @default(0) @db.Decimal(14, 2)
+  status                   HrPayrollEmployeeResultStatus  @default(PENDING)
+  paidDaysBreakdownJson    String?                        @db.LongText
+  calculationNotesJson     String?                        @db.LongText
+  errorCode                String?                        @db.VarChar(64)
+  errorMessage             String?                        @db.VarChar(500)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant                   @relation(fields: [tenantId], references: [id])
+  run      HrPayrollRun             @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee HrEmployee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  components HrPayrollComponentResult[]
+  exceptions HrPayrollException[]
+  payslip    HrPayslip?
+
+  @@unique([payrollRunId, employeeId])
+  @@unique([tenantId, payrollPeriodId, employeeId], map: "hr_pay_emp_res_tenant_period_emp_key")
+  @@index([tenantId])
+  @@index([tenantId, payrollRunId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, status])
+  @@map("hr_payroll_employee_results")
+}
+
+model HrPayrollComponentResult {
+  id                       String  @id @default(uuid())
+  tenantId                 String
+  payrollEmployeeResultId  String
+  salaryComponentId        String?
+  componentCode            String  @db.VarChar(32)
+  componentName            String  @db.VarChar(150)
+  type                     HrSalaryComponentType
+  calculationType          HrSalaryCalculationType
+  calculationBasis         String? @db.VarChar(120)
+  quantity                 Decimal? @db.Decimal(12, 4)
+  rate                     Decimal? @db.Decimal(14, 4)
+  amount                   Decimal  @default(0) @db.Decimal(14, 2)
+  sequence                 Int      @default(10)
+  notes                    String?  @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant                 @relation(fields: [tenantId], references: [id])
+  employeeResult HrPayrollEmployeeResult @relation(fields: [payrollEmployeeResultId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, payrollEmployeeResultId], map: "hr_pay_comp_res_tenant_emp_res_idx")
+  @@map("hr_payroll_component_results")
+}
+
+model HrPayrollException {
+  id                      String                     @id @default(uuid())
+  tenantId                String
+  payrollRunId            String
+  payrollEmployeeResultId String?
+  employeeId              String?
+  code                    String                     @db.VarChar(64)
+  severity                HrPayrollExceptionSeverity
+  message                 String                     @db.VarChar(500)
+  resolved                Boolean                    @default(false)
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  tenant Tenant                  @relation(fields: [tenantId], references: [id])
+  run    HrPayrollRun            @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employeeResult HrPayrollEmployeeResult? @relation(fields: [payrollEmployeeResultId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, payrollRunId])
+  @@index([tenantId, severity])
+  @@index([tenantId, code])
+  @@map("hr_payroll_exceptions")
+}
+
+// HRMS Phase 8 — Indian Statutory Payroll Foundation (no portal filing / Form 16 / GL)
+
+enum HrStatutoryRuleType {
+  PF
+  ESIC
+  PROFESSIONAL_TAX
+  TDS
+  LWF
+  BONUS
+  GRATUITY
+}
+
+enum HrStatutoryRuleStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+}
+
+enum HrStatutoryRoundingMode {
+  NONE
+  NEAREST
+  UP
+  DOWN
+}
+
+/// Effective-dated statutory rule (PF/ESIC/PT/TDS/LWF). Rates live here — not hardcoded in calc.
+model HrStatutoryRule {
+  id              String                 @id @default(uuid())
+  tenantId        String
+  legalEntityId   String?
+  type            HrStatutoryRuleType
+  code            String                 @db.VarChar(32)
+  name            String                 @db.VarChar(150)
+  /// Branch/work state code for PT / LWF (e.g. MH, KA, GJ)
+  stateCode       String?                @db.VarChar(8)
+  effectiveFrom   DateTime               @db.Date
+  effectiveTo     DateTime?              @db.Date
+  status          HrStatutoryRuleStatus  @default(DRAFT)
+  employeeRatePct Decimal?               @db.Decimal(8, 4)
+  employerRatePct Decimal?               @db.Decimal(8, 4)
+  wageCeiling     Decimal?               @db.Decimal(14, 2)
+  /// ESIC eligibility: monthly wage at/below this (null = no ceiling check)
+  eligibilityWageCeiling Decimal?        @db.Decimal(14, 2)
+  roundingMode    HrStatutoryRoundingMode @default(NEAREST)
+  /// MONTHLY | HALF_YEARLY | ANNUAL (LWF)
+  frequency       String?                @db.VarChar(16)
+  employeeFixedAmount Decimal?           @db.Decimal(14, 2)
+  employerFixedAmount Decimal?           @db.Decimal(14, 2)
+  /// Extra typed config (TDS policy flags, LWF months, etc.)
+  configJson      String?                @db.LongText
+  isActive        Boolean                @default(true)
+
+  createdBy String?
+  updatedBy String?
+  approvedByUserId String?
+  approvedAt       DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity? @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
+  wageBasisLines HrStatutoryWageBasisLine[]
+  ptSlabs        HrStatutoryPtSlab[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, stateCode])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("hr_statutory_rules")
+}
+
+/// Which salary component codes form the wage basis for a statutory rule.
+model HrStatutoryWageBasisLine {
+  id                String  @id @default(uuid())
+  tenantId          String
+  statutoryRuleId   String
+  /// Prefer component code snapshot for stable historical calc
+  componentCode     String  @db.VarChar(32)
+  salaryComponentId String?
+  sequence          Int     @default(10)
+  include           Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  rule   HrStatutoryRule @relation(fields: [statutoryRuleId], references: [id], onDelete: Cascade)
+
+  @@unique([statutoryRuleId, componentCode])
+  @@index([tenantId])
+  @@index([tenantId, statutoryRuleId])
+  @@map("hr_statutory_wage_basis_lines")
+}
+
+model HrStatutoryPtSlab {
+  id              String   @id @default(uuid())
+  tenantId        String
+  statutoryRuleId String
+  fromAmount      Decimal  @db.Decimal(14, 2)
+  toAmount        Decimal? @db.Decimal(14, 2)
+  taxAmount       Decimal  @db.Decimal(14, 2)
+  /// Optional calendar month 1–12 for special PT month rules
+  specialMonth    Int?
+  sequence        Int      @default(10)
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  rule   HrStatutoryRule @relation(fields: [statutoryRuleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, statutoryRuleId])
+  @@map("hr_statutory_pt_slabs")
+}
+
+// HRMS Phase 9 — Payslip + Payroll Accounting + Salary Payment
+
+enum HrPayrollAccountingStatus {
+  NOT_POSTED
+  POSTED
+  FAILED
+}
+
+enum HrPayrollPaymentLifecycleStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PARTIALLY_PAID
+  PAID
+}
+
+enum HrPayslipStatus {
+  GENERATED
+  VOID
+}
+
+enum HrPayslipPaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  FAILED
+}
+
+enum HrSalaryPaymentBatchStatus {
+  DRAFT
+  READY
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+enum HrSalaryPaymentLineStatus {
+  PENDING
+  READY
+  PAID
+  FAILED
+  SKIPPED
+}
+
+model HrPayslip {
+  id                      String                 @id @default(uuid())
+  tenantId                String
+  payrollRunId            String
+  payrollEmployeeResultId String                 @unique
+  employeeId              String
+  legalEntityId           String
+  payslipNumber           String                 @db.VarChar(32)
+  year                    Int
+  month                   Int
+  /// Immutable snapshot JSON (header, attendance, earnings, deductions, employer, totals)
+  snapshotJson            String                 @db.LongText
+  grossAmount             Decimal                @db.Decimal(14, 2)
+  deductionAmount         Decimal                @db.Decimal(14, 2)
+  employerAmount          Decimal                @db.Decimal(14, 2)
+  netAmount               Decimal                @db.Decimal(14, 2)
+  status                  HrPayslipStatus        @default(GENERATED)
+  paymentStatus           HrPayslipPaymentStatus @default(UNPAID)
+  generatedAt             DateTime               @default(now())
+  generatedByUserId       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id])
+  run            HrPayrollRun             @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employeeResult HrPayrollEmployeeResult  @relation(fields: [payrollEmployeeResultId], references: [id], onDelete: Cascade)
+  employee       HrEmployee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  legalEntity    LegalEntity              @relation(fields: [legalEntityId], references: [id])
+  paymentLines   HrSalaryPaymentLine[]
+
+  @@unique([tenantId, payslipNumber])
+  @@index([tenantId])
+  @@index([tenantId, payrollRunId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, year, month])
+  @@index([tenantId, paymentStatus])
+  @@map("hr_payslips")
+}
+
+model HrSalaryPaymentBatch {
+  id                String                     @id @default(uuid())
+  tenantId          String
+  payrollRunId      String
+  legalEntityId     String
+  branchId          String?
+  code              String                     @db.VarChar(32)
+  treasuryAccountId String
+  paymentDate       DateTime                   @db.Date
+  employeeCount     Int                        @default(0)
+  totalAmount       Decimal                    @default(0) @db.Decimal(16, 2)
+  paidAmount        Decimal                    @default(0) @db.Decimal(16, 2)
+  pendingAmount     Decimal                    @default(0) @db.Decimal(16, 2)
+  failedCount       Int                        @default(0)
+  status            HrSalaryPaymentBatchStatus @default(DRAFT)
+  reference         String?                    @db.VarChar(120)
+  accountingVoucherId String?
+  postingEventId      String?
+  accountingPostedAt  DateTime?
+  approvedAt          DateTime?
+  approvedByUserId    String?
+  paidAt              DateTime?
+  paidByUserId        String?
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  run         HrPayrollRun  @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  legalEntity LegalEntity   @relation(fields: [legalEntityId], references: [id])
+  branch      Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  lines       HrSalaryPaymentLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, payrollRunId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("hr_salary_payment_batches")
+}
+
+model HrSalaryPaymentLine {
+  id              String                    @id @default(uuid())
+  tenantId        String
+  batchId         String
+  employeeId      String
+  payslipId       String
+  netPay          Decimal                   @db.Decimal(14, 2)
+  bankName        String?                   @db.VarChar(150)
+  accountHolderName String?                 @db.VarChar(150)
+  accountNumberMasked String?               @db.VarChar(34)
+  /// Encrypted/stored for bank export only — never log in clear; FE shows masked
+  accountNumber   String?                   @db.VarChar(34)
+  ifsc            String?                   @db.VarChar(11)
+  paymentStatus   HrSalaryPaymentLineStatus @default(PENDING)
+  paymentReference String?                  @db.VarChar(120)
+  failureReason   String?                   @db.VarChar(500)
+  paidAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id])
+  batch    HrSalaryPaymentBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  employee HrEmployee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  payslip  HrPayslip            @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, employeeId])
+  @@unique([payslipId, batchId])
+  @@index([tenantId])
+  @@index([tenantId, batchId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, payslipId])
+  @@index([tenantId, paymentStatus])
+  @@map("hr_salary_payment_lines")
+}
+
+// ─── HRMS Phase 10 — Employee Loans & Salary Advances ───────────────────────
+
+enum HrEmployeeLoanType {
+  LOAN
+  SALARY_ADVANCE
+}
+
+enum HrEmployeeLoanStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  DISBURSED
+  RECOVERING
+  CLOSED
+  CANCELLED
+}
+
+enum HrLoanRecoveryScheduleStatus {
+  PENDING
+  RECOVERED
+  PARTIAL
+  SKIPPED
+}
+
+enum HrLoanDisbursementMethod {
+  BANK
+  CASH
+}
+
+enum HrLoanRepaymentMethod {
+  BANK
+  CASH
+  OTHER
+}
+
+model HrEmployeeLoan {
+  id                      String                @id @default(uuid())
+  tenantId                String
+  code                    String                @db.VarChar(32)
+  employeeId              String
+  legalEntityId           String
+  branchId                String?
+  type                    HrEmployeeLoanType
+  requestDate             DateTime              @db.Date
+  requestedAmount         Decimal               @db.Decimal(14, 2)
+  approvedAmount          Decimal?              @db.Decimal(14, 2)
+  disbursedAmount         Decimal               @default(0) @db.Decimal(14, 2)
+  recoveredAmount         Decimal               @default(0) @db.Decimal(14, 2)
+  outstandingAmount       Decimal               @default(0) @db.Decimal(14, 2)
+  recoveryStartYear       Int?
+  recoveryStartMonth      Int?
+  installmentAmount       Decimal?              @db.Decimal(14, 2)
+  installmentCount        Int?
+  reason                  String?               @db.VarChar(1000)
+  status                  HrEmployeeLoanStatus  @default(DRAFT)
+  rejectionReason         String?               @db.VarChar(500)
+  approvedByUserId        String?
+  approvedAt              DateTime?
+  rejectedByUserId        String?
+  rejectedAt              DateTime?
+  disbursedAt             DateTime?
+  disbursementMethod      HrLoanDisbursementMethod?
+  treasuryAccountId       String?
+  disbursementReference   String?               @db.VarChar(120)
+  disbursementVoucherId   String?
+  disbursementPostingEventId String?
+  closedAt                DateTime?
+  closedByUserId          String?
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  employee    HrEmployee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  legalEntity LegalEntity   @relation(fields: [legalEntityId], references: [id])
+  branch      Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  schedules   HrLoanRecoverySchedule[]
+  repayments  HrLoanRepayment[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, branchId])
+  @@index([tenantId, type])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("hr_employee_loans")
+}
+
+model HrLoanRecoverySchedule {
+  id                       String                       @id @default(uuid())
+  tenantId                 String
+  loanId                   String
+  installmentNo            Int
+  year                     Int
+  month                    Int
+  dueAmount                Decimal                      @db.Decimal(14, 2)
+  recoveredAmount          Decimal                      @default(0) @db.Decimal(14, 2)
+  status                   HrLoanRecoveryScheduleStatus @default(PENDING)
+  payrollRunId             String?
+  payrollEmployeeResultId  String?
+  skipReason               String?                      @db.VarChar(500)
+  notes                    String?                      @db.VarChar(500)
+  recoveredAt              DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  loan   HrEmployeeLoan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@unique([loanId, installmentNo])
+  @@unique([loanId, year, month])
+  @@index([tenantId])
+  @@index([tenantId, loanId])
+  @@index([tenantId, year, month, status])
+  @@index([tenantId, payrollEmployeeResultId])
+  @@map("hr_loan_recovery_schedules")
+}
+
+model HrLoanRepayment {
+  id                String               @id @default(uuid())
+  tenantId          String
+  loanId            String
+  amount            Decimal              @db.Decimal(14, 2)
+  repaymentDate     DateTime             @db.Date
+  method            HrLoanRepaymentMethod
+  treasuryAccountId String?
+  reference         String?              @db.VarChar(120)
+  reason            String?              @db.VarChar(500)
+  accountingVoucherId String?
+  postingEventId      String?
+
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  loan   HrEmployeeLoan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, loanId])
+  @@map("hr_loan_repayments")
+}
+
+// ─── HRMS Phase 11 — Exit, Offboarding & Full & Final Settlement ────────────
+
+enum HrLeaveFnfAction {
+  ENCASH
+  LAPSE
+  IGNORE
+}
+
+enum HrExitType {
+  RESIGNATION
+  TERMINATION
+  RETIREMENT
+  CONTRACT_END
+  ABSCONDING
+  OTHER
+}
+
+enum HrEmployeeExitStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  CLEARANCE_PENDING
+  READY_FOR_SETTLEMENT
+  SETTLED
+  CLOSED
+  CANCELLED
+}
+
+enum HrExitClearanceLineStatus {
+  PENDING
+  CLEARED
+  WAIVED
+}
+
+enum HrExitAssetStatus {
+  PENDING
+  RETURNED
+  NOT_RETURNED
+  DAMAGED
+  WAIVED
+}
+
+enum HrFnfSettlementStatus {
+  DRAFT
+  CALCULATED
+  REVIEWED
+  APPROVED
+  POSTED
+  PAID
+  CLOSED
+}
+
+enum HrFnfComponentKind {
+  EARNING
+  DEDUCTION
+}
+
+enum HrFnfExceptionSeverity {
+  WARNING
+  BLOCKER
+}
+
+model HrExitClearanceTemplate {
+  id            String  @id @default(uuid())
+  tenantId      String
+  legalEntityId String?
+  code          String  @db.VarChar(32)
+  name          String  @db.VarChar(150)
+  sequence      Int     @default(10)
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity? @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@map("hr_exit_clearance_templates")
+}
+
+model HrEmployeeExit {
+  id                       String               @id @default(uuid())
+  tenantId                 String
+  code                     String               @db.VarChar(32)
+  employeeId               String
+  legalEntityId            String
+  branchId                 String?
+  exitType                 HrExitType
+  resignationDate          DateTime?            @db.Date
+  requestedLastWorkingDate DateTime             @db.Date
+  approvedLastWorkingDate  DateTime?            @db.Date
+  noticePeriodDays         Int                  @default(0)
+  noticeServedDays         Int                  @default(0)
+  noticeShortfallDays      Int                  @default(0)
+  noticeExcessDays         Int                  @default(0)
+  /// recover | pay | none — tenant policy applied at calculation time
+  noticeSettlementMode     String               @default("recover") @db.VarChar(16)
+  reason                   String?              @db.VarChar(1000)
+  remarks                  String?              @db.VarChar(1000)
+  status                   HrEmployeeExitStatus @default(DRAFT)
+  approvedByUserId         String?
+  approvedAt               DateTime?
+  rejectedReason           String?              @db.VarChar(500)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  employee    HrEmployee             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  legalEntity LegalEntity            @relation(fields: [legalEntityId], references: [id])
+  branch      Branch?                @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  settlement  HrFullFinalSettlement?
+  clearanceLines HrExitClearanceLine[]
+  assetLines     HrExitAssetLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, branchId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("hr_employee_exits")
+}
+
+model HrExitClearanceItem {
+  id       String @id @default(uuid())
+  tenantId String
+  exitId   String
+  code     String @db.VarChar(32)
+  name     String @db.VarChar(150)
+  sequence Int    @default(10)
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id])
+  lines  HrExitClearanceLine[]
+
+  @@index([tenantId])
+  @@index([tenantId, exitId])
+  @@map("hr_exit_clearance_items")
+}
+
+model HrExitClearanceLine {
+  id          String                    @id @default(uuid())
+  tenantId    String
+  exitId      String
+  itemId      String?
+  code        String                    @db.VarChar(32)
+  name        String                    @db.VarChar(150)
+  sequence    Int                       @default(10)
+  status      HrExitClearanceLineStatus @default(PENDING)
+  ownerUserId String?
+  remarks     String?                   @db.VarChar(500)
+  clearedByUserId String?
+  clearedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant               @relation(fields: [tenantId], references: [id])
+  exit   HrEmployeeExit       @relation(fields: [exitId], references: [id], onDelete: Cascade)
+  item   HrExitClearanceItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@unique([exitId, code])
+  @@index([tenantId])
+  @@index([tenantId, exitId])
+  @@index([tenantId, status])
+  @@map("hr_exit_clearance_lines")
+}
+
+model HrExitAssetLine {
+  id             String            @id @default(uuid())
+  tenantId       String
+  exitId         String
+  description    String            @db.VarChar(200)
+  assetCategory  String?           @db.VarChar(64)
+  status         HrExitAssetStatus @default(PENDING)
+  recoveryAmount Decimal           @default(0) @db.Decimal(14, 2)
+  remarks        String?           @db.VarChar(500)
+  clearedByUserId String?
+  clearedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  exit   HrEmployeeExit @relation(fields: [exitId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, exitId])
+  @@index([tenantId, status])
+  @@map("hr_exit_asset_lines")
+}
+
+model HrFullFinalSettlement {
+  id                String               @id @default(uuid())
+  tenantId          String
+  code              String               @db.VarChar(32)
+  employeeExitId    String               @unique
+  employeeId        String
+  legalEntityId     String
+  branchId          String?
+  lastWorkingDate   DateTime             @db.Date
+  status            HrFnfSettlementStatus @default(DRAFT)
+  earningsTotal     Decimal              @default(0) @db.Decimal(14, 2)
+  deductionsTotal   Decimal              @default(0) @db.Decimal(14, 2)
+  netSettlement     Decimal              @default(0) @db.Decimal(14, 2)
+  /// Snapshot JSON of warnings/blockers from last calculate
+  exceptionsJson    String?              @db.LongText
+  calculatedAt      DateTime?
+  reviewedAt        DateTime?
+  reviewedByUserId  String?
+  approvedAt        DateTime?
+  approvedByUserId  String?
+  postedAt          DateTime?
+  postedByUserId    String?
+  accountingVoucherId String?
+  postingEventId      String?
+  paidAt            DateTime?
+  paidByUserId      String?
+  paymentMethod     String?              @db.VarChar(16)
+  treasuryAccountId String?
+  paymentReference  String?              @db.VarChar(120)
+  paymentVoucherId  String?
+  paymentPostingEventId String?
+  snapshotJson      String?              @db.LongText
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  employee    HrEmployee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  legalEntity LegalEntity   @relation(fields: [legalEntityId], references: [id])
+  branch      Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  exit        HrEmployeeExit @relation(fields: [employeeExitId], references: [id], onDelete: Cascade)
+  components  HrFnfComponent[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("hr_full_final_settlements")
+}
+
+model HrFnfComponent {
+  id            String            @id @default(uuid())
+  tenantId      String
+  settlementId  String
+  kind          HrFnfComponentKind
+  code          String            @db.VarChar(48)
+  name          String            @db.VarChar(150)
+  amount        Decimal           @db.Decimal(14, 2)
+  calculationBasis String?        @db.VarChar(500)
+  sourceRef     String?           @db.VarChar(120)
+  sequence      Int               @default(10)
+  mappingKeyHint String?          @db.VarChar(64)
+
+  createdAt DateTime @default(now())
+
+  tenant     Tenant                @relation(fields: [tenantId], references: [id])
+  settlement HrFullFinalSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, settlementId])
+  @@map("hr_fnf_components")
+}
+
+// ─── Notifications (CRM + ops, multi-tenant) ─────────────────────────────────
+
+enum NotificationPriority {
+  CRITICAL
+  HIGH
+  NORMAL
+  LOW
+  POSITIVE
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  RESOLVED
+  SNOOZED
+  DISMISSED
+}
+
+enum NotificationCategory {
+  ASSIGNMENT
+  FOLLOW_UP
+  ACTIVITY
+  MEETING
+  OPPORTUNITY
+  QUOTATION
+  SALES_ORDER
+  APPROVAL
+  PROSPECT_REPLY
+  DATA_QUALITY
+  RISK
+  INTEGRATION
+}
+
+/// In-app notifications generated from CRM / integration domain events and jobs.
+model Notification {
+  id               String               @id @default(uuid())
+  tenantId         String
+  recipientUserId  String
+
+  category         NotificationCategory
+  type             String               @db.VarChar(64)
+  priority         NotificationPriority @default(NORMAL)
+
+  title            String               @db.VarChar(300)
+  message          String               @db.Text
+
+  entityType       String?              @db.VarChar(64)
+  entityId         String?
+  entityCode       String?              @db.VarChar(64)
+  entityName       String?              @db.VarChar(300)
+
+  actionUrl        String?              @db.VarChar(500)
+  primaryAction    String?              @db.VarChar(64)
+  secondaryAction  String?              @db.VarChar(64)
+
+  status           NotificationStatus   @default(UNREAD)
+  readAt           DateTime?
+  resolvedAt       DateTime?
+  snoozedUntil     DateTime?
+
+  sourceEventId    String?              @db.VarChar(120)
+  deduplicationKey String?              @db.VarChar(255)
+  escalationLevel  Int                  @default(0)
+
+  metadata         Json?
+
+  createdByUserId  String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  deletedAt        DateTime?
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipient User   @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, recipientUserId, status])
+  @@index([tenantId, recipientUserId, createdAt])
+  @@index([tenantId, priority, createdAt])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, deduplicationKey])
+  @@index([tenantId, type, status])
+  @@index([tenantId, deletedAt])
+  @@map("app_notifications")
+}
+
+model NotificationPreference {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  userId                String
+  notificationType      String   @db.VarChar(64)
+
+  inAppEnabled          Boolean  @default(true)
+  emailEnabled          Boolean  @default(false)
+  mobilePushEnabled     Boolean  @default(false)
+  whatsappEnabled       Boolean  @default(false)
+  dailyDigestEnabled    Boolean  @default(false)
+
+  reminderMinutesBefore Int?
+  escalationEnabled     Boolean  @default(true)
+  muteUntil             DateTime?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, notificationType])
+  @@index([tenantId, userId])
+  @@map("notification_preferences")
+}
+
+/// Tenant-level SLA / threshold knobs for CRM notification jobs.
+model NotificationTenantSettings {
+  id                             String   @id @default(uuid())
+  tenantId                       String   @unique
+
+  leadContactSlaHours            Int      @default(2)
+  leadContactEscalateHours       Int      @default(8)
+  leadContactCriticalHours       Int      @default(24)
+
+  opportunityInactiveDays        Int      @default(7)
+  opportunityInactiveHighValueDays Int    @default(3)
+  opportunityStuckDays           Int      @default(14)
+  highValueDealThreshold         Decimal  @default(500000) @db.Decimal(18, 2)
+
+  followUpEscalateHours          Int      @default(24)
+  followUpCriticalHours          Int      @default(72)
+
+  quotationExpiringDays          Int      @default(3)
+  acceptedQuoteAwaitingSoHours   Int      @default(24)
+
+  businessDayStartHour           Int      @default(9)
+  businessDayEndHour             Int      @default(18)
+  timezoneOverride               String?  @db.VarChar(64)
+
+  dailyDigestHourLocal           Int      @default(8)
+
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("notification_tenant_settings")
+}
+
