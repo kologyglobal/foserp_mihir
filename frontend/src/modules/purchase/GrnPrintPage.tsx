@@ -215,7 +215,7 @@ export function GrnPrintPage() {
                     stockUom={stockUom}
                   />
                   <td className="num">{formatNumber(l.tolerancePercentage ?? 0)}</td>
-                  <td>{formatStatus(l.toleranceStatus ?? 'OK')}</td>
+                  <td>{formatStatus(l.toleranceStatus ?? 'EXACT')}</td>
                   <td className="num">{formatCurrency(l.rate)}</td>
                   <td>
                     {l.batchNumber || l.lotNumber || '—'}

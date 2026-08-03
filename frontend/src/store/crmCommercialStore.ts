@@ -18,6 +18,7 @@ import {
 } from '../types/crmCommercial'
 import { DEFAULT_GST_RATE } from '../types/invoice'
 import { computeGst } from '../utils/gstEngine'
+import { DEFAULT_PURCHASE_SETUP } from '../data/purchase/purchaseSetupSeed'
 import { nextDocumentNo } from '../utils/documentNumbers'
 import { useMasterStore } from './masterStore'
 import { useMrpStore } from './mrpStore'
@@ -74,7 +75,12 @@ function buildGst(lines: CrmCommercialLine[], customerState: string) {
   const avgRate = lines.length
     ? lines.reduce((s, l) => s + l.taxPct, 0) / lines.length
     : DEFAULT_GST_RATE
-  return computeGst(taxable, customerState, avgRate)
+  return computeGst(
+    taxable,
+    customerState,
+    avgRate,
+    DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyStateCode || DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyState,
+  )
 }
 
 function toCommercialLinesFromProforma(lines: ProformaInvoiceLine[]): CrmCommercialLine[] {

@@ -17,8 +17,10 @@ import {
 } from '@/components/purchase/PurchaseDocumentFactBox'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { ErpCardSection, ErpFieldRow, ErpFormSpan } from '@/components/erp/card-form'
+import { ErpSmartSelect } from '@/components/erp/ErpSmartSelect'
 import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
@@ -49,11 +51,11 @@ import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { systemConfirm } from '@/utils/systemConfirm'
-import { cn } from '@/utils/cn'
 import { isApiMode } from '@/config/apiConfig'
 import { useActiveWarehouses, useActiveLocations } from '@/hooks/useMasterLists'
 import { useMasterStore } from '@/store/masterStore'
-import { fetchLookup, type MasterLookupRow } from '@/services/api/masterApi'
+import { usePurchaseMasterStore } from '@/store/purchaseMasterStore'
+import { fetchLookup } from '@/services/api/masterApi'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
 /**
@@ -84,6 +86,14 @@ function warehouseFromPoDelivery(
   return { id: '', name: '' }
 }
 
+type BinOption = {
+  id: string
+  code: string
+  name: string
+  warehouseId?: string
+  storageLocationId?: string
+}
+
 type LineDraft = {
   purchaseOrderLineId: string
   itemCode: string
@@ -107,6 +117,7 @@ type LineDraft = {
   expiryDate: string
   warehouseId: string
   warehouseName: string
+  binId: string | null
   bin: string
   allowExcess: boolean
   batchControlled: boolean
@@ -177,7 +188,8 @@ function linesFromPo(
         expiryDate: '',
         warehouseId: l.locationId || po.deliveryLocation.id,
         warehouseName: l.locationName || po.deliveryLocation.name,
-        bin: '',
+        binId: l.binId ?? null,
+        bin: l.binCode ?? '',
         allowExcess: setup.allowOverReceipt,
         batchControlled: ctrl.batch,
         serialControlled: ctrl.serial,
@@ -215,6 +227,7 @@ function linesFromGrn(grn: GoodsReceiptNote): LineDraft[] {
     expiryDate: l.expiryDate ?? '',
     warehouseId: l.warehouseId,
     warehouseName: l.warehouseName,
+    binId: l.binId ?? null,
     bin: l.bin,
     allowExcess: l.allowExcess,
     batchControlled: l.batchControlled,
@@ -222,7 +235,7 @@ function linesFromGrn(grn: GoodsReceiptNote): LineDraft[] {
     expiryControlled: l.expiryControlled,
     tolerancePercentage: l.tolerancePercentage ?? 0,
     variancePercentage: l.variancePercentage ?? null,
-    toleranceStatus: l.toleranceStatus ?? 'OK',
+    toleranceStatus: l.toleranceStatus ?? 'EXACT',
     closeOpenQuantity: Boolean(l.closeOpenQuantity),
     receivingTolerancePercentage: l.receivingTolerancePercentage ?? l.tolerancePercentage ?? 0,
     remarks: l.remarks,
@@ -249,6 +262,7 @@ export function GrnEditorPage() {
   >({})
   const [setupTolerancePct, setSetupTolerancePct] = useState(0)
   const [poId, setPoId] = useState(searchParams.get('poId') ?? '')
+  const [vendorId, setVendorId] = useState('')
   const [documentDate, setDocumentDate] = useState(today())
   const [vendorChallanNumber, setVendorChallanNumber] = useState('')
   const [vendorChallanDate, setVendorChallanDate] = useState('')
@@ -269,32 +283,43 @@ export function GrnEditorPage() {
 
   const warehouses = useActiveWarehouses()
   const storageLocations = useActiveLocations()
-  const [bins, setBins] = useState<MasterLookupRow[]>([])
+  const [bins, setBins] = useState<BinOption[]>([])
 
   useEffect(() => {
-    if (!isApiMode()) return
     let cancelled = false
-    fetchLookup('bins')
-      .then((res) => {
-        if (!cancelled) setBins(res.data)
-      })
-      .catch(() => {
-        // Bin lookup is optional context; failures surface when the user opens the dropdown empty.
-      })
-    return () => {
-      cancelled = true
+    if (isApiMode()) {
+      fetchLookup('bins')
+        .then((res) => {
+          if (cancelled) return
+          setBins(
+            res.data.map((b) => ({
+              id: b.id,
+              code: b.code ?? b.name,
+              name: b.name,
+              warehouseId: b.warehouseId,
+              storageLocationId: b.storageLocationId,
+            })),
+          )
+        })
+        .catch(() => undefined)
+      return () => {
+        cancelled = true
+      }
     }
+    const demoBins = usePurchaseMasterStore.getState().getByKind('bin-codes', true)
+    setBins(
+      demoBins.map((e) => ({
+        id: e.code,
+        code: e.code,
+        name: e.name,
+      })),
+    )
   }, [])
 
   const warehouseLocations = useMemo(
     () => storageLocations.filter((l) => !warehouseId || l.warehouseId === warehouseId),
     [storageLocations, warehouseId],
   )
-  const warehouseBins = useMemo(
-    () => bins.filter((b) => !warehouseId || b.warehouseId === warehouseId),
-    [bins, warehouseId],
-  )
-
   const receivableOrders = useMemo(
     () =>
       orders.filter(
@@ -306,6 +331,57 @@ export function GrnEditorPage() {
     [orders],
   )
 
+  const selectedPo = useMemo(() => orders.find((o) => o.id === poId), [orders, poId])
+
+  const warehouseBins = useMemo(() => {
+    const byWarehouse = bins.filter(
+      (b) => !warehouseId || !b.warehouseId || b.warehouseId === warehouseId,
+    )
+    const storageLocationId = receivingLocation || selectedPo?.deliveryLocation?.id
+    if (!storageLocationId) return byWarehouse
+    const byLocation = byWarehouse.filter(
+      (b) => !b.storageLocationId || b.storageLocationId === storageLocationId,
+    )
+    return byLocation.length ? byLocation : byWarehouse
+  }, [bins, warehouseId, receivingLocation, selectedPo?.deliveryLocation?.id])
+
+  const receivableVendors = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; code: string }>()
+    for (const order of receivableOrders) {
+      if (!map.has(order.vendor.id)) map.set(order.vendor.id, order.vendor)
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [receivableOrders])
+
+  const vendorReceivableOrders = useMemo(
+    () => (vendorId ? receivableOrders.filter((o) => o.vendor.id === vendorId) : []),
+    [receivableOrders, vendorId],
+  )
+
+  const vendorSelectOptions = useMemo(
+    () =>
+      receivableVendors.map((v) => ({
+        value: v.id,
+        label: v.code ? `${v.code} — ${v.name}` : v.name,
+        searchText: `${v.code} ${v.name}`.toLowerCase(),
+      })),
+    [receivableVendors],
+  )
+
+  const poSelectOptions = useMemo(
+    () =>
+      vendorReceivableOrders.map((o) => {
+        const openQty = o.lines.reduce((s, l) => s + l.pendingQty, 0)
+        return {
+          value: o.id,
+          label: o.documentNumber,
+          searchText: `${o.documentNumber} ${o.vendor.name} ${o.vendor.code ?? ''} open ${openQty}`.toLowerCase(),
+          trailing: `Open ${formatNumber(openQty)}`,
+        }
+      }),
+    [vendorReceivableOrders],
+  )
+
   /** Approved (not yet sent) — visible for guidance, not selectable for GRN. */
   const approvedNotReleasedOrders = useMemo(
     () =>
@@ -315,7 +391,10 @@ export function GrnEditorPage() {
     [orders],
   )
 
-  const selectedPo = useMemo(() => orders.find((o) => o.id === poId), [orders, poId])
+  const vendorApprovedNotReleased = useMemo(
+    () => (vendorId ? approvedNotReleasedOrders.filter((o) => o.vendor.id === vendorId) : []),
+    [approvedNotReleasedOrders, vendorId],
+  )
 
   const lineTotals = useMemo(() => {
     const receivedQty = lines.reduce((s, l) => s + (Number(l.receivedQty) || 0), 0)
@@ -471,6 +550,8 @@ export function GrnEditorPage() {
         setDocumentNumber(grn.documentNumber)
         setStatus(grn.status)
         setPoId(grn.purchaseOrderId)
+        const grnPo = pos.find((o) => o.id === grn.purchaseOrderId)
+        if (grnPo) setVendorId(grnPo.vendor.id)
         setDocumentDate(grn.documentDate)
         setVendorChallanNumber(grn.vendorChallanNumber)
         setVendorChallanDate(grn.vendorChallanDate ?? '')
@@ -501,6 +582,7 @@ export function GrnEditorPage() {
           }
           if (po) {
             setPoId(po.id)
+            setVendorId(po.vendor.id)
             const wh = warehouseFromPoDelivery(po, effectiveSetup?.general.defaultWarehouseId)
             setWarehouseId(wh.id)
             setWarehouseName(wh.name)
@@ -531,6 +613,15 @@ export function GrnEditorPage() {
     void load()
   }, [load])
 
+  const onSelectVendor = (nextVendorId: string) => {
+    setVendorId(nextVendorId)
+    markDirty()
+    const currentPo = orders.find((o) => o.id === poId)
+    if (currentPo && currentPo.vendor.id !== nextVendorId) {
+      void onSelectPo('')
+    }
+  }
+
   const onSelectPo = async (nextPoId: string) => {
     setPoId(nextPoId)
     markDirty()
@@ -543,6 +634,7 @@ export function GrnEditorPage() {
       getPurchaseSetup().catch(() => null),
     ])
     if (!po) return
+    setVendorId(po.vendor.id)
     if (setup) {
       setAllowExcess(Boolean(setup.general.allowOverReceipt))
       setSetupTolerancePct(Number(setup.general.overReceiptTolerancePct ?? 0))
@@ -621,6 +713,7 @@ export function GrnEditorPage() {
       expiryDate: l.expiryDate || null,
       warehouseId: l.warehouseId || warehouseId,
       warehouseName: l.warehouseName || warehouseName,
+      binId: l.binId ?? null,
       bin: l.bin,
       allowExcess: l.allowExcess || allowExcess,
       closeOpenQuantity: Boolean(l.closeOpenQuantity),
@@ -639,6 +732,7 @@ export function GrnEditorPage() {
     }
 
     if (!poId) push('poId', 'Please select a purchase order.')
+    if (!vendorId) push('vendorId', 'Please select a vendor.')
     if (!warehouseId.trim()) push('warehouseId', 'Please select a warehouse.')
     if (!lines.length) push('lines', 'Add at least one open PO line to receive.')
 
@@ -769,7 +863,7 @@ export function GrnEditorPage() {
         <ErpCardSection
           id={purchaseSectionId('po-source')}
           title="PO Source"
-          subtitle="Select a released purchase order with open quantity"
+          subtitle="Select vendor, then a released PO with open quantity"
           icon={ClipboardList}
           accent="slate"
           collapsible
@@ -779,9 +873,9 @@ export function GrnEditorPage() {
         >
           <ErpFormSpan span={1}>
             <p className="mb-2 text-[12px] text-erp-muted">
-              GRN is only allowed for POs that are <strong>Sent to Vendor / Released</strong> (or
-              partially received) with open quantity. An <strong>Approved</strong> PO must be sent to
-              the vendor first. Header warehouse defaults from the PO delivery location.
+              Choose the <strong>vendor</strong> first, then pick a PO that is{' '}
+              <strong>Sent to Vendor / Released</strong> (or partially received) with open quantity.
+              Header warehouse defaults from the PO delivery location.
             </p>
             {receivableOrders.length === 0 ? (
               <div className="space-y-2 text-[13px] text-erp-muted">
@@ -804,59 +898,33 @@ export function GrnEditorPage() {
               </div>
             ) : (
               <>
-                <div
-                  className="mb-3 flex flex-wrap gap-1.5"
-                  role="listbox"
-                  aria-label="Purchase order source"
+                <ErpFieldRow
+                  label="Vendor"
+                  required
+                  fieldError={fieldErrors.vendorId}
+                  fieldState={fieldErrors.vendorId ? 'error' : 'idle'}
                 >
-                  {receivableOrders.map((o) => {
-                    const openQty = o.lines.reduce((s, l) => s + l.pendingQty, 0)
-                    const selected = poId === o.id
-                    return (
-                      <button
-                        key={o.id}
-                        type="button"
-                        role="option"
-                        aria-selected={selected}
-                        title={`${o.documentNumber} — ${o.vendor.name} · open ${formatNumber(openQty)}`}
-                        disabled={readOnlyHeaderPo}
-                        className={cn(
-                          'rounded border px-2.5 py-1 text-[12px] font-medium transition-colors',
-                          selected
-                            ? 'border-erp-primary bg-erp-primary text-white'
-                            : 'border-erp-border bg-erp-surface text-erp-text hover:border-erp-primary hover:bg-erp-primary-soft',
-                          readOnlyHeaderPo && 'cursor-not-allowed opacity-70',
-                        )}
-                        onClick={() => void onSelectPo(o.id)}
-                      >
-                        {o.documentNumber}
-                        <span
-                          className={cn(
-                            'ml-1.5 font-normal',
-                            selected ? 'text-white/80' : 'text-erp-muted',
-                          )}
-                        >
-                          open {formatNumber(openQty)}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-                {approvedNotReleasedOrders.length > 0 ? (
+                  <ErpSmartSelect
+                    className="max-w-md"
+                    options={vendorSelectOptions}
+                    value={vendorId}
+                    disabled={readOnlyHeaderPo}
+                    onChange={(v) => onSelectVendor(v || '')}
+                    allowEmpty
+                    placeholder={SELECT_PLACEHOLDER}
+                    appearance="combo"
+                    dropdownMinWidth={320}
+                  />
+                </ErpFieldRow>
+                {vendorId && vendorApprovedNotReleased.length > 0 ? (
                   <p className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
-                    Approved but not released:{' '}
-                    {approvedNotReleasedOrders.map((o, i) => (
-                      <span key={o.id}>
-                        {i > 0 ? ', ' : null}
-                        <Link
-                          className="font-medium underline"
-                          to={`/purchase/orders/${o.id}`}
-                        >
-                          {o.documentNumber}
-                        </Link>
-                      </span>
-                    ))}
-                    . Use <strong>Send to Vendor</strong> on the PO before creating a GRN.
+                    {vendorApprovedNotReleased.length} approved PO
+                    {vendorApprovedNotReleased.length === 1 ? '' : 's'} for this vendor still need{' '}
+                    <strong>Send to Vendor</strong>
+                    {vendorApprovedNotReleased.length <= 3
+                      ? `: ${vendorApprovedNotReleased.map((o) => o.documentNumber).join(', ')}`
+                      : ''}
+                    . Only released POs appear in the list below.
                   </p>
                 ) : null}
                 <ErpFieldRow
@@ -865,20 +933,19 @@ export function GrnEditorPage() {
                   fieldError={fieldErrors.poId}
                   fieldState={fieldErrors.poId ? 'error' : 'idle'}
                 >
-                  <Select
-                    value={poId}
-                    disabled={readOnlyHeaderPo}
-                    onChange={(e) => void onSelectPo(e.target.value)}
+                  <ErpSmartSelect
                     className="max-w-md"
-                  >
-                    <option value="">Select released PO…</option>
-                    {receivableOrders.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.documentNumber} — {o.vendor.name} (open{' '}
-                        {formatNumber(o.lines.reduce((s, l) => s + l.pendingQty, 0))})
-                      </option>
-                    ))}
-                  </Select>
+                    options={poSelectOptions}
+                    value={poId}
+                    disabled={readOnlyHeaderPo || !vendorId}
+                    onChange={(v) => void onSelectPo(v || '')}
+                    allowEmpty
+                    placeholder={vendorId ? 'Search PO number…' : 'Select vendor first…'}
+                    emptyMessage={vendorId ? 'No receivable POs for this vendor' : 'Select a vendor first'}
+                    appearance="combo"
+                    dropdownMinWidth={360}
+                    resolveOrphanLabel={(id) => orders.find((o) => o.id === id)?.documentNumber}
+                  />
                 </ErpFieldRow>
               </>
             )}
@@ -1284,27 +1351,28 @@ export function GrnEditorPage() {
                     ) : null}
                   </td>
                   <td>
-                    {isApiMode() ? (
-                      <Select
-                        className="w-32"
-                        value={l.bin}
-                        onChange={(e) => updateLine(i, { bin: e.target.value })}
-                        disabled={!warehouseBins.length}
-                      >
-                        <option value="">— Select —</option>
-                        {warehouseBins.map((b) => (
-                          <option key={b.id} value={b.code ?? b.name}>
-                            {b.code ?? b.name}
-                          </option>
-                        ))}
-                      </Select>
-                    ) : (
-                      <Input
-                        className="w-20"
-                        value={l.bin}
-                        onChange={(e) => updateLine(i, { bin: e.target.value })}
-                      />
-                    )}
+                    <select
+                      className="erp-input h-8 min-w-[7rem] text-[11px]"
+                      value={l.binId ?? ''}
+                      onChange={(e) => {
+                        const nextBinId = e.target.value || null
+                        const bin = warehouseBins.find((b) => b.id === nextBinId)
+                        updateLine(i, { binId: nextBinId, bin: bin?.code ?? '' })
+                      }}
+                    >
+                      <option value="">{SELECT_PLACEHOLDER}</option>
+                      {warehouseBins.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.code}
+                        </option>
+                      ))}
+                      {l.binId && !warehouseBins.some((b) => b.id === l.binId) && l.bin ? (
+                        <option value={l.binId}>{l.bin}</option>
+                      ) : null}
+                    </select>
+                    {!warehouseBins.length && warehouseId ? (
+                      <p className="mt-1 text-[10px] text-erp-muted">No bins for this warehouse</p>
+                    ) : null}
                   </td>
                   <td>
                     <Input

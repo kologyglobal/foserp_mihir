@@ -274,6 +274,12 @@ async function assertNotReferenced(
     })
     if (itemCount > 0) throw new ConflictError('HSN code is referenced by items')
   }
+  if (config.slug === 'receiving-tolerances') {
+    const itemCount = await prisma.masterItem.count({
+      where: { tenantId, receivingToleranceId: id, deletedAt: null },
+    })
+    if (itemCount > 0) throw new ConflictError('Receiving tolerance is referenced by items')
+  }
   if (config.slug === 'gst-groups') {
     const hsnCount = await prisma.masterHsnCode.count({
       where: { tenantId, gstGroupId: id, deletedAt: null },
@@ -383,7 +389,10 @@ export async function softDeleteMasterRecord(
   userId: string,
   config: MasterResourceConfig,
 ) {
-  await getMasterRecord(tenantId, config, id)
+  const existing = await getMasterRecord(tenantId, config, id)
+  if (config.slug === 'receiving-tolerances' && (existing as { isSystem?: boolean }).isSystem) {
+    throw new ConflictError('System receiving tolerance cannot be deleted')
+  }
   await assertNotReferenced(tenantId, config, id)
   const model = delegate(config)
   return model.update({
@@ -399,7 +408,14 @@ export async function setMasterStatus(
   config: MasterResourceConfig,
   status: 'ACTIVE' | 'INACTIVE',
 ) {
-  await getMasterRecord(tenantId, config, id)
+  const existing = await getMasterRecord(tenantId, config, id)
+  if (
+    config.slug === 'receiving-tolerances' &&
+    status === 'INACTIVE' &&
+    (existing as { isSystem?: boolean }).isSystem
+  ) {
+    throw new ConflictError('System receiving tolerance cannot be deactivated')
+  }
   const model = delegate(config)
   return model.update({
     where: { id, tenantId },
@@ -426,7 +442,9 @@ export async function listMasterLookups(
               ? { id: true, code: true, name: true, parentId: true, level: true }
               : config.slug === 'hsn-sac'
                 ? { id: true, code: true, description: true, gstGroupId: true }
-                : config.slug === 'gst-groups'
+                : config.slug === 'receiving-tolerances'
+                  ? { id: true, code: true, name: true, percentage: true, isSystem: true }
+                  : config.slug === 'gst-groups'
                   ? { id: true, code: true, description: true, goodsType: true }
                   : config.slug === 'gst-rates'
                     ? { id: true, code: true, gstGroupId: true, fromState: true, locationStateCode: true }

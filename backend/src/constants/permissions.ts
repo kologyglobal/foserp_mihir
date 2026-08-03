@@ -188,6 +188,11 @@ export const PERMISSIONS = [
   'master.hsn.update',
   'master.hsn.delete',
 
+  'master.receiving_tolerance.view',
+  'master.receiving_tolerance.create',
+  'master.receiving_tolerance.update',
+  'master.receiving_tolerance.delete',
+
   'master.gst_group.view',
   'master.gst_group.create',
   'master.gst_group.update',

@@ -6,6 +6,7 @@
 **/.env.*
 !.env.example
 !**/.env.example
+!**/.env.*.example
 
 # Hosting / live infra docs (DB usernames, domain, seed logins) — keep private for now
 docs/HOSTING_FINAL_UPLOAD.md

@@ -17,6 +17,8 @@ type Props = {
   disabled?: boolean
   className?: string
   onImageChange?: (imageUrl: string | null) => void
+  /** compact = form thumbnail; gallery = item view / attachments tab */
+  layout?: 'compact' | 'gallery'
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -36,6 +38,7 @@ export function MasterItemImageField({
   disabled = false,
   className,
   onImageChange,
+  layout = 'compact',
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -144,24 +147,37 @@ export function MasterItemImageField({
     }
   }
 
+  const isGallery = layout === 'gallery'
+
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
+    <div className={cn('flex flex-col gap-2', isGallery && 'items-center', className)}>
       <div
         className={cn(
-          'flex h-36 w-36 items-center justify-center overflow-hidden rounded-lg border border-erp-border bg-erp-surface-alt',
+          'flex items-center justify-center overflow-hidden rounded-lg border border-erp-border bg-erp-surface-alt',
+          isGallery
+            ? 'h-64 w-full max-w-lg border-erp-border shadow-sm'
+            : 'h-36 w-36',
           !preview && 'border-dashed',
         )}
       >
         {preview ? (
-          <img src={preview} alt="Item product" className="h-full w-full object-contain" />
+          <img
+            src={preview}
+            alt="Item product"
+            className={cn(
+              'object-contain',
+              isGallery ? 'max-h-full max-w-full' : 'h-full w-full',
+            )}
+          />
         ) : (
-          <div className="flex flex-col items-center gap-1 px-2 text-center text-erp-muted">
-            <ImageIcon className="h-8 w-8 opacity-50" aria-hidden />
-            <span className="text-[11px]">No image</span>
+          <div className={cn('flex flex-col items-center gap-1 px-2 text-center text-erp-muted', isGallery && 'py-8')}>
+            <ImageIcon className={cn(isGallery ? 'h-12 w-12' : 'h-8 w-8', 'opacity-50')} aria-hidden />
+            <span className={cn(isGallery ? 'text-sm' : 'text-[11px]')}>No product image</span>
           </div>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
+      {!disabled ? (
+        <div className={cn('flex flex-wrap gap-2', isGallery && 'justify-center')}>
         <ErpButton
           type="button"
           size="sm"
@@ -185,12 +201,21 @@ export function MasterItemImageField({
             Remove
           </ErpButton>
         ) : null}
-      </div>
-      {!itemId ? (
-        <p className="text-[11px] text-erp-muted">Save the item once, then you can upload a product image.</p>
-      ) : (
-        <p className="text-[11px] text-erp-muted">JPEG, PNG, WebP, or GIF — max 4 MB.</p>
-      )}
+        </div>
+      ) : null}
+      {!disabled && !itemId ? (
+        <p className={cn('text-[11px] text-erp-muted', isGallery && 'text-center')}>
+          Save the item once, then you can upload a product image.
+        </p>
+      ) : !disabled ? (
+        <p className={cn('text-[11px] text-erp-muted', isGallery && 'text-center')}>
+          JPEG, PNG, WebP, or GIF — max 4 MB.
+        </p>
+      ) : preview ? (
+        <p className={cn('text-[11px] text-erp-muted', isGallery && 'text-center')}>
+          Product image for catalog and purchase reference.
+        </p>
+      ) : null}
       <input
         ref={inputRef}
         type="file"

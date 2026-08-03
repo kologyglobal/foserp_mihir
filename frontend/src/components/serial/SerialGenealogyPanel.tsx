@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useSerialStore } from '../../store/serialStore'
 import { SERIAL_TYPE_LABELS } from '../../types/serialNumber'
@@ -14,14 +15,20 @@ type Props = {
 }
 
 export function SerialGenealogyPanel({ workOrderId, customerId, grnId, itemId, vendorId, trailerNo, compact = false }: Props) {
-  const serials = useSerialStore((s) =>
+  // Subscribe to the serial slice only — never `.filter()` inside the selector
+  // (new array every read → Maximum update depth exceeded).
+  const listed = useSerialStore((s) =>
     s.listSerials({
       workOrderId: workOrderId ?? undefined,
       customerId: customerId ?? undefined,
       grnId: grnId ?? undefined,
       itemId: itemId ?? undefined,
       vendorId: vendorId ?? undefined,
-    }).filter((r) => !trailerNo || r.installedTrailerNo === trailerNo || r.serialNo === trailerNo),
+    }),
+  )
+  const serials = useMemo(
+    () => listed.filter((r) => !trailerNo || r.installedTrailerNo === trailerNo || r.serialNo === trailerNo),
+    [listed, trailerNo],
   )
 
   if (serials.length === 0) {

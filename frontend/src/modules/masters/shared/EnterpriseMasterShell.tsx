@@ -132,17 +132,20 @@ export interface EnterpriseMasterWorkspaceProps {
   favoritePath?: string
   recordNo?: string
   isActive?: boolean
-  documentStrip: { label: string; value: string; highlight?: boolean }[]
+  /** Setup-style master form — no document strip, metrics, or record header; fact box / AI optional. */
+  minimalChrome?: boolean
+  documentStrip?: { label: string; value: string; highlight?: boolean }[]
   recordAudit?: RecordAuditView
   pendingAuditUserName?: string
   /** Optional — omit header save actions; use sticky footer only. */
   commandBar?: ReactNode
-  sectionNavItems: EnterpriseFormSectionNavItem[]
-  activeSection: string
-  onSectionSelect: (id: string) => void
-  formMetrics: EnterpriseFormMetric[]
+  /** Omit or pass [] for accordion-only forms (no section tabs). */
+  sectionNavItems?: EnterpriseFormSectionNavItem[]
+  activeSection?: string
+  onSectionSelect?: (id: string) => void
+  formMetrics?: EnterpriseFormMetric[]
   factBoxTitle?: string
-  factBoxSummary: { label: string; value: string; highlight?: boolean }[]
+  factBoxSummary?: { label: string; value: string; highlight?: boolean }[]
   factBoxActions?: { id: string; label: string; onClick: () => void; primary?: boolean }[]
   validationErrors?: string[]
   lockedReason?: string
@@ -164,16 +167,17 @@ export function EnterpriseMasterWorkspace({
   favoritePath,
   recordNo,
   isActive,
-  documentStrip,
+  minimalChrome = false,
+  documentStrip = [],
   recordAudit,
   pendingAuditUserName,
   commandBar,
   sectionNavItems,
   activeSection,
   onSectionSelect,
-  formMetrics,
+  formMetrics = [],
   factBoxTitle,
-  factBoxSummary,
+  factBoxSummary = [],
   factBoxActions,
   validationErrors,
   lockedReason,
@@ -188,9 +192,13 @@ export function EnterpriseMasterWorkspace({
   const group = masterGroupId ? getMasterGroupById(masterGroupId) : undefined
   const GroupIcon = group?.icon
   const auditView = recordAudit ?? {}
-  const composedStrip = appendAuditStripFields(documentStrip, auditView, { pendingUserName: pendingAuditUserName })
+  const composedStrip = minimalChrome
+    ? []
+    : appendAuditStripFields(documentStrip, auditView, { pendingUserName: pendingAuditUserName })
 
-  const factBox = (
+  const factBox = factBoxSummary.length === 0
+    ? undefined
+    : (
     <EnterpriseBusinessFactBox title={factBoxTitle ?? 'Master insight'}>
       <EnterpriseFormContextPanel
         summaryTitle="Summary"
@@ -208,18 +216,21 @@ export function EnterpriseMasterWorkspace({
       description={subtitle}
       breadcrumbs={breadcrumbs}
       favoritePath={favoritePath}
-      recordNo={recordNo ?? (title.startsWith('New ') ? 'New' : title)}
-      status={isActive === undefined ? undefined : isActive ? 'Active' : 'Inactive'}
-      statusTone={isActive === undefined ? undefined : isActive ? 'success' : 'warning'}
-      createdDate={resolveRecordCreatedDate(auditView)}
-      createdBy={resolveRecordCreatedBy(auditView, pendingAuditUserName)}
-      modifiedDate={auditView.modifiedAt ? formatDateTime(auditView.modifiedAt) : undefined}
-      modifiedBy={auditView.modifiedByName ?? undefined}
+      recordNo={minimalChrome ? undefined : recordNo ?? (title.startsWith('New ') ? 'New' : title)}
+      status={minimalChrome || isActive === undefined ? undefined : isActive ? 'Active' : 'Inactive'}
+      statusTone={minimalChrome || isActive === undefined ? undefined : isActive ? 'success' : 'warning'}
+      createdDate={minimalChrome ? undefined : resolveRecordCreatedDate(auditView)}
+      createdBy={minimalChrome ? undefined : resolveRecordCreatedBy(auditView, pendingAuditUserName)}
+      modifiedDate={minimalChrome ? undefined : auditView.modifiedAt ? formatDateTime(auditView.modifiedAt) : undefined}
+      modifiedBy={minimalChrome ? undefined : auditView.modifiedByName ?? undefined}
       documentStrip={composedStrip}
       commandBar={commandBar}
       factBox={factBox}
       footer={stickyFooter}
-      showAi
+      showAi={Boolean(factBox)}
+      hideRecordBar={minimalChrome}
+      suppressFactBoxRecord={minimalChrome}
+      collapsibleFactBox={Boolean(factBox)}
       formId={formId}
       onSubmit={onSubmit}
       validationErrors={validationErrors}
@@ -235,11 +246,13 @@ export function EnterpriseMasterWorkspace({
           {group.title}
         </span>
       ) : null}
-      <EnterpriseFormSectionNav
-        sections={sectionNavItems}
-        activeId={activeSection}
-        onSelect={onSectionSelect}
-      />
+      {sectionNavItems && sectionNavItems.length > 0 ? (
+        <EnterpriseFormSectionNav
+          sections={sectionNavItems}
+          activeId={activeSection ?? sectionNavItems[0]!.id}
+          onSelect={onSectionSelect ?? (() => undefined)}
+        />
+      ) : null}
       <EnterpriseFormMetrics metrics={formMetrics} />
       {children}
     </EnterpriseWorkspace>

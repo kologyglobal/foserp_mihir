@@ -141,7 +141,7 @@ export function OperationalPageShell({
     Boolean(filterBar) ||
     Boolean(kpiStrip?.length) ||
     Boolean(!kpiStrip?.length && insights?.length) ||
-    Boolean(!isEnterprise && commandBar)
+    Boolean(!isEnterprise && !mergeHeader && commandBar)
 
   return (
     <div
@@ -187,13 +187,13 @@ export function OperationalPageShell({
               ) : null}
             </div>
             <div className={cn('flex shrink-0 flex-wrap items-center gap-1.5', isEnterprise && 'erp-page-hero-enterprise-actions')}>
-              {isEnterprise && commandBar ? commandBar : null}
+              {isEnterprise && !mergeHeader && commandBar ? commandBar : null}
               {actions}
             </div>
           </div>
         </div>
         )}
-        {!isEnterprise && commandBar ? <StickyCommandBar>{commandBar}</StickyCommandBar> : null}
+        {!isEnterprise && !mergeHeader && commandBar ? <StickyCommandBar>{commandBar}</StickyCommandBar> : null}
         {liveAlerts && liveAlerts.length > 0 && (
           <div className="border-b border-erp-border bg-erp-surface-alt/30 px-4 py-3">
             <LiveAlertStrip alerts={liveAlerts} />

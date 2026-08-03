@@ -77,16 +77,37 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
     // Never include raw SQL. meta.modelName / column / table are safe Prisma identifiers.
     if (err.code === 'P2021' || err.code === 'P2022') {
       const meta = (err.meta ?? {}) as Record<string, unknown>
-      const columnFromMeta = meta.column ?? meta.column_name ?? null
+      const columnFromMeta =
+        typeof meta.column === 'string'
+          ? meta.column
+          : typeof meta.column_name === 'string'
+            ? meta.column_name
+            : null
       const columnFromMessage =
         typeof err.message === 'string'
-          ? err.message.match(/column [`'"]?(?:\w+\.)?(?:\w+\.)?(\w+)[`'"]? does not exist/i)?.[1] ?? null
+          ? (/column `([^`]+)`/i.exec(err.message)?.[1] ??
+            err.message.match(/column [`'"]?(?:\w+\.)?(?:\w+\.)?(\w+)[`'"]? does not exist/i)?.[1] ??
+            null)
           : null
-      sendError(res, 500, 'Database operation failed', undefined, err.code, {
+      const column = columnFromMeta ?? columnFromMessage
+      const tableFromMeta =
+        typeof meta.table === 'string'
+          ? meta.table
+          : typeof meta.table_name === 'string'
+            ? meta.table_name
+            : null
+      const tableFromMessage =
+        typeof err.message === 'string' ? (/table `([^`]+)`/i.exec(err.message)?.[1] ?? null) : null
+      const table = tableFromMeta ?? tableFromMessage
+      const devHint =
+        !env.isProd && column
+          ? `Database schema mismatch: missing column \`${column}\`${table ? ` on \`${table}\`` : ''}. Run prisma migrate deploy or live-deploy purchase SQL scripts.`
+          : 'Database operation failed'
+      sendError(res, 500, devHint, undefined, err.code, {
         prismaCode: err.code,
         modelName: meta.modelName ?? null,
-        table: meta.table ?? meta.table_name ?? null,
-        column: columnFromMeta ?? columnFromMessage,
+        table,
+        column,
       })
       return
     }

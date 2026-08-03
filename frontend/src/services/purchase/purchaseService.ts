@@ -92,7 +92,6 @@ import type {
   BlanketPurchaseOrder,
 } from '../../types/purchaseDomain'
 import {
-  GRN_DOMAIN_STATUS_LABELS,
   PURCHASE_APPROVAL_DOCUMENT_TYPE_LABELS,
   PURCHASE_APPROVAL_ROLE_LABELS,
   PURCHASE_APPROVAL_STATUS_LABELS,
@@ -135,6 +134,20 @@ import {
   PURCHASE_DOMAIN_VENDORS,
 } from '../../data/purchase/purchaseDomainSeed'
 import { DEFAULT_PURCHASE_SETUP } from '../../data/purchase/purchaseSetupSeed'
+import { determinePurchaseGstSupply } from '../../utils/gstSupply'
+
+type VendorGstRef = Pick<Vendor, 'state' | 'gstin' | 'isInterstate'> & { stateCode?: string }
+
+function resolvePurchaseGst(vendor: VendorGstRef, placeOfSupply?: string | null) {
+  return determinePurchaseGstSupply({
+    supplierState: vendor.state,
+    supplierStateCode: vendor.stateCode,
+    supplierGstin: vendor.gstin,
+    placeOfSupply,
+    defaultPlaceOfSupplyState: DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyState,
+    defaultPlaceOfSupplyStateCode: DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyStateCode,
+  })
+}
 import {
   actorForApprovalRole,
   resolveApprovalRolesForAmount,
@@ -144,6 +157,7 @@ import {
 import { getSessionUser } from '../../utils/permissions'
 import { mapPurchaseErrorMessage } from '../../utils/purchase/purchaseErrorMessages'
 import { buildPurchaseDashboardGrniRows } from './purchaseDashboardGrni'
+import { formatGrnStatusLabel } from './grnReceiptSummary'
 
 const LATENCY_MS = 35
 
@@ -2824,7 +2838,8 @@ export async function createVendorQuotation(input: VendorQuotationInput): Promis
     throw new PurchaseServiceError('VQ_NO_LINES', 'Vendor quotation requires at least one line')
   }
   const vendor = requireVendor(input.vendorId)
-  const lines = buildVendorQuotationLines(input.lines, vendor.isInterstate)
+  const gst = resolvePurchaseGst(vendor)
+  const lines = buildVendorQuotationLines(input.lines, gst.isInterstate)
   const taxable = lines.reduce((s, l) => s + l.taxableAmount, 0)
   const lineDiscount = lines.reduce((s, l) => s + l.discountAmount, 0)
   const lineFreight = lines.reduce((s, l) => s + l.freightAllocation, 0)
@@ -2833,7 +2848,7 @@ export async function createVendorQuotation(input: VendorQuotationInput): Promis
   const freight = input.freight ?? lineFreight
   const other = input.otherCharges ?? lineOther
   const discount = input.discount ?? lineDiscount
-  const totals = moneyWithPacking(taxable + discount, freight, other, discount, packing, vendor.isInterstate)
+  const totals = moneyWithPacking(taxable + discount, freight, other, discount, packing, gst.isInterstate)
   const n = state.seq.vq++
   const created: VendorQuotation = {
     id: genId('prd-vq'),
@@ -2848,7 +2863,7 @@ export async function createVendorQuotation(input: VendorQuotationInput): Promis
       name: vendor.vendorName,
       gstin: vendor.gstin,
       state: vendor.state,
-      isInterstate: vendor.isInterstate,
+      isInterstate: gst.isInterstate,
     },
     vendorReferenceNumber: input.vendorReferenceNumber ?? '',
     paymentTerms: input.paymentTerms ?? vendor.paymentTerms,
@@ -2858,7 +2873,7 @@ export async function createVendorQuotation(input: VendorQuotationInput): Promis
     packingCharges: packing,
     validTill: input.validTill ?? todayDate(),
     expectedDeliveryDate: input.expectedDeliveryDate ?? null,
-    gstScheme: vendor.isInterstate ? 'igst' : 'cgst_sgst',
+    gstScheme: gst.gstScheme,
     ...totals,
     lines,
     createdBy: PURCHASE_DOMAIN_ACTORS.buyer.name,
@@ -2898,7 +2913,8 @@ export async function updateVendorQuotation(
   const rfq = state.rfqs.find((r) => r.id === (input.rfqId ?? existing.rfqId))
   if (!rfq) throw new PurchaseServiceError('RFQ_NOT_FOUND', 'RFQ not found')
   const vendor = requireVendor(input.vendorId ?? existing.vendor.id)
-  const lines = buildVendorQuotationLines(input.lines ?? existing.lines, vendor.isInterstate)
+  const gst = resolvePurchaseGst(vendor)
+  const lines = buildVendorQuotationLines(input.lines ?? existing.lines, gst.isInterstate)
   const taxable = lines.reduce((s, l) => s + l.taxableAmount, 0)
   const lineDiscount = lines.reduce((s, l) => s + l.discountAmount, 0)
   const lineFreight = lines.reduce((s, l) => s + l.freightAllocation, 0)
@@ -2921,7 +2937,7 @@ export async function updateVendorQuotation(
       name: vendor.vendorName,
       gstin: vendor.gstin,
       state: vendor.state,
-      isInterstate: vendor.isInterstate,
+      isInterstate: gst.isInterstate,
     },
     vendorReferenceNumber: input.vendorReferenceNumber ?? existing.vendorReferenceNumber,
     paymentTerms: input.paymentTerms ?? existing.paymentTerms,
@@ -2934,7 +2950,7 @@ export async function updateVendorQuotation(
       input.expectedDeliveryDate !== undefined
         ? input.expectedDeliveryDate
         : existing.expectedDeliveryDate,
-    gstScheme: vendor.isInterstate ? 'igst' : 'cgst_sgst',
+    gstScheme: gst.gstScheme,
     currency: 'INR',
     subtotal: Number(lines.reduce((s, l) => s + l.quantity * l.rate, 0).toFixed(2)),
     discount,
@@ -3403,7 +3419,8 @@ export async function createPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
     throw new PurchaseServiceError('PO_NO_LINES', 'Purchase order requires at least one line')
   }
   const vendor = requireVendor(input.vendorId)
-  const lines = buildOrderLines(input.lines, vendor.isInterstate)
+  const gst = resolvePurchaseGst(vendor, input.placeOfSupply)
+  const lines = buildOrderLines(input.lines, gst.isInterstate)
   const money = applyPoMoney(lines, {
     freight: input.freight,
     otherCharges: input.otherCharges,
@@ -3439,10 +3456,10 @@ export async function createPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
       name: vendor.vendorName,
       gstin: vendor.gstin,
       state: vendor.state,
-      isInterstate: vendor.isInterstate,
+      isInterstate: gst.isInterstate,
       address: vendor.address,
     },
-    placeOfSupply: input.placeOfSupply ?? 'Maharashtra (27)',
+    placeOfSupply: gst.placeOfSupplyLabel,
     paymentTerms: input.paymentTerms ?? vendor.paymentTerms,
     deliveryTerms: input.deliveryTerms ?? vendor.deliveryTerms,
     freightTerms: input.freightTerms ?? 'Vendor',
@@ -3453,7 +3470,7 @@ export async function createPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
     priceBasis: input.priceBasis ?? 'FOR',
     validityDate: input.validityDate ?? null,
     expectedDeliveryDate: input.expectedDeliveryDate ?? todayDate(),
-    gstScheme: vendor.isInterstate ? 'igst' : 'cgst_sgst',
+    gstScheme: gst.gstScheme,
     purchaseRequisitionId: input.purchaseRequisitionId ?? null,
     purchaseRequisitionNumber: input.purchaseRequisitionNumber ?? null,
     rfqId: input.rfqId ?? null,
@@ -3507,7 +3524,9 @@ export async function updatePurchaseOrder(
   const existing = state.orders[idx]
   assertPoEditable(existing)
   const vendor = requireVendor(input.vendorId ?? existing.vendor.id)
-  const lines = buildOrderLines(input.lines ?? existing.lines, vendor.isInterstate)
+  const placeOfSupply = input.placeOfSupply ?? existing.placeOfSupply
+  const gst = resolvePurchaseGst(vendor, placeOfSupply)
+  const lines = buildOrderLines(input.lines ?? existing.lines, gst.isInterstate)
   const money = applyPoMoney(lines, {
     freight: input.freight ?? existing.freight,
     otherCharges: input.otherCharges ?? existing.otherCharges,
@@ -3537,10 +3556,10 @@ export async function updatePurchaseOrder(
       name: vendor.vendorName,
       gstin: vendor.gstin,
       state: vendor.state,
-      isInterstate: vendor.isInterstate,
+      isInterstate: gst.isInterstate,
       address: vendor.address,
     },
-    placeOfSupply: input.placeOfSupply ?? existing.placeOfSupply,
+    placeOfSupply,
     paymentTerms: input.paymentTerms ?? existing.paymentTerms,
     deliveryTerms: input.deliveryTerms ?? existing.deliveryTerms,
     freightTerms: input.freightTerms ?? existing.freightTerms,
@@ -3552,7 +3571,7 @@ export async function updatePurchaseOrder(
     validityDate:
       input.validityDate !== undefined ? input.validityDate : existing.validityDate,
     expectedDeliveryDate: input.expectedDeliveryDate ?? existing.expectedDeliveryDate,
-    gstScheme: vendor.isInterstate ? 'igst' : 'cgst_sgst',
+    gstScheme: gst.gstScheme,
     purchaseRequisitionId:
       input.purchaseRequisitionId !== undefined
         ? input.purchaseRequisitionId
@@ -3953,7 +3972,7 @@ export async function revisePurchaseOrder(
           invoicedQty: l.invoicedQty,
         }
       }),
-      po.vendor.isInterstate,
+      resolvePurchaseGst(po.vendor, po.placeOfSupply).isInterstate,
     )
     for (let i = 0; i < po.lines.length; i++) {
       const before = po.lines[i]
@@ -4416,7 +4435,7 @@ function toGrnListRow(g: GoodsReceiptNote): GrnListRow {
     totalRejectedQty: g.lines.reduce((s, l) => s + l.rejectedQty, 0),
     totalAmount: g.totalAmount,
     status: g.status,
-    statusLabel: GRN_DOMAIN_STATUS_LABELS[g.status],
+    statusLabel: formatGrnStatusLabel(g.status, g.lines),
     inspectionRequired: g.inspectionRequired,
     qualityInspectionId: g.qualityInspectionId,
   }
@@ -4506,8 +4525,9 @@ export async function createGRNFromPo(input: GrnInput): Promise<GoodsReceiptNote
   const inspectionRequired =
     input.inspectionRequired ?? lines.some((l) => l.qcRequired)
 
+  const poGst = resolvePurchaseGst(po.vendor, po.placeOfSupply)
   const taxable = lines.reduce((s, l) => s + l.taxableAmount, 0)
-  const totals = po.vendor.isInterstate
+  const totals = poGst.isInterstate
     ? computeInterTotals(taxable)
     : computeIntraTotals(taxable)
   const n = state.seq.grn++
@@ -4611,7 +4631,7 @@ export async function updateGRN(id: string, input: Partial<GrnInput>): Promise<G
       buildGrnLineFromPo(po, row, index, headerAllowExcess, warehouseId, warehouseName),
     )
     const taxable = grn.lines.reduce((s, l) => s + l.taxableAmount, 0)
-    const totals = po.vendor.isInterstate
+    const totals = resolvePurchaseGst(po.vendor, po.placeOfSupply).isInterstate
       ? computeInterTotals(taxable)
       : computeIntraTotals(taxable)
     Object.assign(grn, totals)
@@ -5296,8 +5316,16 @@ export async function createPurchaseInvoice(
     throw new PurchaseServiceError('INV_NO_LINES', 'Invoice requires at least one line')
   }
 
+  const invPlaceOfSupply =
+    input.placeOfSupply ?? po?.placeOfSupply ?? resolvePurchaseGst(vendor).placeOfSupplyLabel
+  const gst = resolvePurchaseGst(vendor, invPlaceOfSupply)
   const lines = buildInvoiceLines(input.lines, vendor, po, grn)
-  const totals = applyInvoiceTotals(lines, vendor, po?.freight ?? 0, po?.otherCharges ?? 0)
+  const totals = applyInvoiceTotals(
+    lines,
+    { ...vendor, isInterstate: gst.isInterstate },
+    po?.freight ?? 0,
+    po?.otherCharges ?? 0,
+  )
   const documentDate = input.documentDate ?? todayDate()
   const postingDate = input.postingDate ?? documentDate
   const paymentTerms = input.paymentTerms ?? po?.paymentTerms ?? vendor.paymentTerms
@@ -5324,16 +5352,16 @@ export async function createPurchaseInvoice(
       name: vendor.vendorName,
       gstin: vendor.gstin,
       state: vendor.state,
-      isInterstate: vendor.isInterstate,
+      isInterstate: gst.isInterstate,
     },
     paymentTerms,
     deliveryTerms: po?.deliveryTerms ?? vendor.deliveryTerms,
     expectedDeliveryDate: null,
     dueDate,
-    placeOfSupply: input.placeOfSupply ?? `${vendor.state}`,
+    placeOfSupply: invPlaceOfSupply,
     reverseCharge: input.reverseCharge ?? false,
     eInvoiceReference: input.eInvoiceReference ?? null,
-    gstScheme: vendor.isInterstate ? 'igst' : 'cgst_sgst',
+    gstScheme: gst.gstScheme,
     purchaseOrderId: po?.id ?? null,
     purchaseOrderNumber: po?.documentNumber ?? null,
     goodsReceiptId: grn?.id ?? null,
@@ -5394,8 +5422,15 @@ export async function updatePurchaseInvoice(
     throw new PurchaseServiceError('INV_NO_LINES', 'Invoice requires at least one line')
   }
 
+  const invPlaceOfSupply = input.placeOfSupply ?? inv.placeOfSupply ?? po?.placeOfSupply
+  const gst = resolvePurchaseGst(vendor, invPlaceOfSupply)
   const lines = buildInvoiceLines(input.lines, vendor, po, grn)
-  const totals = applyInvoiceTotals(lines, vendor, po?.freight ?? 0, po?.otherCharges ?? 0)
+  const totals = applyInvoiceTotals(
+    lines,
+    { ...vendor, isInterstate: gst.isInterstate },
+    po?.freight ?? 0,
+    po?.otherCharges ?? 0,
+  )
   const paymentTerms = input.paymentTerms ?? inv.paymentTerms
   const documentDate = input.documentDate ?? inv.documentDate
 
@@ -5406,7 +5441,7 @@ export async function updatePurchaseInvoice(
     documentDate,
     postingDate: input.postingDate ?? inv.postingDate,
     dueDate: input.dueDate ?? inv.dueDate,
-    placeOfSupply: input.placeOfSupply ?? inv.placeOfSupply,
+    placeOfSupply: invPlaceOfSupply ?? gst.placeOfSupplyLabel,
     paymentTerms,
     reverseCharge: input.reverseCharge ?? inv.reverseCharge,
     eInvoiceReference:
@@ -5417,9 +5452,9 @@ export async function updatePurchaseInvoice(
       name: vendor.vendorName,
       gstin: vendor.gstin,
       state: vendor.state,
-      isInterstate: vendor.isInterstate,
+      isInterstate: gst.isInterstate,
     },
-    gstScheme: vendor.isInterstate ? 'igst' : 'cgst_sgst',
+    gstScheme: gst.gstScheme,
     purchaseOrderId: po?.id ?? inv.purchaseOrderId,
     purchaseOrderNumber: po?.documentNumber ?? inv.purchaseOrderNumber,
     goodsReceiptId: grn?.id ?? inv.goodsReceiptId,
@@ -5865,9 +5900,6 @@ export async function createPurchaseReturn(
   }
   const vendor = requireVendor(input.vendorId)
   const origin = input.origin ?? 'grn_rejected_quantity'
-  const lines = buildReturnLines(input, vendor)
-  const taxable = lines.reduce((s, l) => s + l.taxableAmount, 0)
-  const totals = vendor.isInterstate ? computeInterTotals(taxable) : computeIntraTotals(taxable)
   const grn = input.goodsReceiptId
     ? state.grns.find((g) => g.id === input.goodsReceiptId)
     : null
@@ -5876,6 +5908,10 @@ export async function createPurchaseReturn(
     : grn
       ? state.orders.find((o) => o.id === grn.purchaseOrderId)
       : null
+  const returnGst = resolvePurchaseGst(vendor, po?.placeOfSupply)
+  const lines = buildReturnLines(input, { ...vendor, isInterstate: returnGst.isInterstate })
+  const taxable = lines.reduce((s, l) => s + l.taxableAmount, 0)
+  const totals = returnGst.isInterstate ? computeInterTotals(taxable) : computeIntraTotals(taxable)
   const inv = input.purchaseInvoiceId
     ? state.invoices.find((i) => i.id === input.purchaseInvoiceId)
     : null

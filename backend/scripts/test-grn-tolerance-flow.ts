@@ -233,6 +233,10 @@ async function releasePo(
     if (appr.status !== 200) fail(`PO approve failed: ${appr.status} ${JSON.stringify(appr.body)}`)
     status = String(appr.body.data.status)
   }
+  if (['SENT_TO_VENDOR', 'PARTIALLY_RECEIVED', 'FULLY_RECEIVED'].includes(status)) {
+    push('Release PO', true, `po=${poId.slice(0, 8)}… status=${status}`)
+    return status
+  }
   const send = await request(app)
     .post(`${base}/orders/${poId}/send-to-vendor`)
     .set(auth(makerToken))
@@ -390,13 +394,13 @@ function runCalculatorSelfCheck(push: (s: string, ok: boolean, d: string) => voi
     {
       label: '0% exact',
       input: { openQuantity: 100, receivedQuantity: 100, itemTolerancePct: 0 },
-      expectStatus: 'OK',
+      expectStatus: 'EXACT',
       expectApproval: false,
     },
     {
       label: '0% +1 excess',
       input: { openQuantity: 100, receivedQuantity: 101, itemTolerancePct: 0 },
-      expectStatus: 'EXCESS_OUTSIDE',
+      expectStatus: 'EXCESS_OUTSIDE_TOLERANCE',
       expectApproval: true,
     },
     {
@@ -413,7 +417,7 @@ function runCalculatorSelfCheck(push: (s: string, ok: boolean, d: string) => voi
         itemTolerancePct: 0,
         closeOpenQuantity: true,
       },
-      expectStatus: 'SHORT_OUTSIDE',
+      expectStatus: 'PARTIAL',
       expectApproval: true,
     },
     {
@@ -425,25 +429,25 @@ function runCalculatorSelfCheck(push: (s: string, ok: boolean, d: string) => voi
     {
       label: '2% within',
       input: { openQuantity: 100, receivedQuantity: 101.5, itemTolerancePct: 2 },
-      expectStatus: 'EXCESS_WITHIN',
+      expectStatus: 'EXCESS_WITHIN_TOLERANCE',
       expectApproval: false,
     },
     {
       label: '2% outside',
       input: { openQuantity: 100, receivedQuantity: 105, itemTolerancePct: 2 },
-      expectStatus: 'EXCESS_OUTSIDE',
+      expectStatus: 'EXCESS_OUTSIDE_TOLERANCE',
       expectApproval: true,
     },
     {
       label: '10% within',
       input: { openQuantity: 100, receivedQuantity: 105, itemTolerancePct: 10 },
-      expectStatus: 'EXCESS_WITHIN',
+      expectStatus: 'EXCESS_WITHIN_TOLERANCE',
       expectApproval: false,
     },
     {
       label: '10% outside',
       input: { openQuantity: 100, receivedQuantity: 111, itemTolerancePct: 10 },
-      expectStatus: 'EXCESS_OUTSIDE',
+      expectStatus: 'EXCESS_OUTSIDE_TOLERANCE',
       expectApproval: true,
     },
     {
@@ -455,7 +459,7 @@ function runCalculatorSelfCheck(push: (s: string, ok: boolean, d: string) => voi
         setupTolerancePct: 5,
         allowOverReceipt: true,
       },
-      expectStatus: 'EXCESS_WITHIN',
+      expectStatus: 'EXCESS_WITHIN_TOLERANCE',
       expectApproval: false,
     },
   ]
@@ -470,12 +474,19 @@ function runCalculatorSelfCheck(push: (s: string, ok: boolean, d: string) => voi
     )
   }
 
-  const resolved = resolveReceivingTolerancePct({
+  const resolvedLegacy = resolveReceivingTolerancePct({
+    itemTolerancePct: 10,
+    setupTolerancePct: 5,
+    allowOverReceipt: false,
+  })
+  push('Resolve legacy item when over-receipt off', resolvedLegacy === 10, `got=${resolvedLegacy}`)
+
+  const resolvedSetup = resolveReceivingTolerancePct({
     itemTolerancePct: 10,
     setupTolerancePct: 5,
     allowOverReceipt: true,
   })
-  push('Resolve item beats setup', resolved === 10, `got=${resolved}`)
+  push('Resolve setup when FK null + allowOverReceipt', resolvedSetup === 5, `got=${resolvedSetup}`)
 }
 
 async function main() {

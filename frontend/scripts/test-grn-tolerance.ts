@@ -46,25 +46,25 @@ const LINE_SCENARIOS: Array<{
   expect: GrnLineToleranceStatus
   approval: boolean
 }> = [
-  { id: 'A1 0% exact', itemTol: 0, received: 100, expect: 'OK', approval: false },
-  { id: 'A2 0% +1', itemTol: 0, received: 101, expect: 'EXCESS_OUTSIDE', approval: true },
+  { id: 'A1 0% exact', itemTol: 0, received: 100, expect: 'EXACT', approval: false },
+  { id: 'A2 0% +1', itemTol: 0, received: 101, expect: 'EXCESS_OUTSIDE_TOLERANCE', approval: true },
   { id: 'A3 0% short', itemTol: 0, received: 90, expect: 'PARTIAL', approval: false },
   {
     id: 'A4 0% short close',
     itemTol: 0,
     received: 90,
     close: true,
-    expect: 'SHORT_OUTSIDE',
+    expect: 'PARTIAL',
     approval: true,
   },
   { id: 'A5 0% zero', itemTol: 0, received: 0, expect: 'NOT_RECEIVED', approval: false },
-  { id: 'B1 2% exact', itemTol: 2, received: 100, expect: 'OK', approval: false },
-  { id: 'B2 2% +1.5', itemTol: 2, received: 101.5, expect: 'EXCESS_WITHIN', approval: false },
-  { id: 'B3 2% +5', itemTol: 2, received: 105, expect: 'EXCESS_OUTSIDE', approval: true },
+  { id: 'B1 2% exact', itemTol: 2, received: 100, expect: 'EXACT', approval: false },
+  { id: 'B2 2% +1.5', itemTol: 2, received: 101.5, expect: 'EXCESS_WITHIN_TOLERANCE', approval: false },
+  { id: 'B3 2% +5', itemTol: 2, received: 105, expect: 'EXCESS_OUTSIDE_TOLERANCE', approval: true },
   { id: 'B4 2% half', itemTol: 2, received: 50, expect: 'PARTIAL', approval: false },
-  { id: 'C1 10% +5', itemTol: 10, received: 105, expect: 'EXCESS_WITHIN', approval: false },
-  { id: 'C2 10% +11', itemTol: 10, received: 111, expect: 'EXCESS_OUTSIDE', approval: true },
-  { id: 'C3 10% at lower (90)', itemTol: 10, received: 90, expect: 'OK', approval: false },
+  { id: 'C1 10% +5', itemTol: 10, received: 105, expect: 'EXCESS_WITHIN_TOLERANCE', approval: false },
+  { id: 'C2 10% +11', itemTol: 10, received: 111, expect: 'EXCESS_OUTSIDE_TOLERANCE', approval: true },
+  { id: 'C3 10% at lower (90)', itemTol: 10, received: 90, expect: 'PARTIAL', approval: false },
   { id: 'C4 10% below band', itemTol: 10, received: 85, expect: 'PARTIAL', approval: false },
   {
     id: 'D1 setup fallback',
@@ -72,7 +72,7 @@ const LINE_SCENARIOS: Array<{
     received: 103,
     setupTol: 5,
     allowOver: true,
-    expect: 'EXCESS_WITHIN',
+    expect: 'EXCESS_WITHIN_TOLERANCE',
     approval: false,
   },
   {
@@ -81,14 +81,13 @@ const LINE_SCENARIOS: Array<{
     received: 103,
     setupTol: 5,
     allowOver: false,
-    expect: 'EXCESS_OUTSIDE',
+    expect: 'EXCESS_OUTSIDE_TOLERANCE',
     approval: true,
   },
-  // Extra edge accuracy
-  { id: 'E1 2% upper edge 102', itemTol: 2, received: 102, expect: 'EXCESS_WITHIN', approval: false },
-  { id: 'E2 2% just over 102.01', itemTol: 2, received: 102.01, expect: 'EXCESS_OUTSIDE', approval: true },
-  { id: 'E3 10% upper edge 110', itemTol: 10, received: 110, expect: 'EXCESS_WITHIN', approval: false },
-  { id: 'E4 fractional open', itemTol: 10, received: 10.5, expect: 'EXCESS_WITHIN', approval: false },
+  { id: 'E1 2% upper edge 102', itemTol: 2, received: 102, expect: 'EXCESS_WITHIN_TOLERANCE', approval: false },
+  { id: 'E2 2% just over 102.01', itemTol: 2, received: 102.01, expect: 'EXCESS_OUTSIDE_TOLERANCE', approval: true },
+  { id: 'E3 10% upper edge 110', itemTol: 10, received: 110, expect: 'EXCESS_WITHIN_TOLERANCE', approval: false },
+  { id: 'E4 fractional open', itemTol: 10, received: 10.5, expect: 'EXCESS_WITHIN_TOLERANCE', approval: false },
 ]
 
 /** Canonical 3-item PO lines used across multi-line plans. */
@@ -120,7 +119,7 @@ const DOCUMENT_PLANS: DocPlan[] = [
       { ...THREE_ITEMS.ten, receivedQuantity: 0 },
     ],
     expect: {
-      statuses: ['NOT_RECEIVED', 'OK', 'NOT_RECEIVED'],
+      statuses: ['NOT_RECEIVED', 'EXACT', 'NOT_RECEIVED'],
       requiresApproval: false,
       notReceivedCount: 2,
       receivableLineCount: 1,
@@ -134,7 +133,7 @@ const DOCUMENT_PLANS: DocPlan[] = [
       { ...THREE_ITEMS.ten, receivedQuantity: 0 },
     ],
     expect: {
-      statuses: ['OK', 'NOT_RECEIVED', 'NOT_RECEIVED'],
+      statuses: ['EXACT', 'NOT_RECEIVED', 'NOT_RECEIVED'],
       requiresApproval: false,
       notReceivedCount: 2,
       receivableLineCount: 1,
@@ -148,7 +147,7 @@ const DOCUMENT_PLANS: DocPlan[] = [
       { ...THREE_ITEMS.ten, receivedQuantity: 105 },
     ],
     expect: {
-      statuses: ['NOT_RECEIVED', 'NOT_RECEIVED', 'EXCESS_WITHIN'],
+      statuses: ['NOT_RECEIVED', 'NOT_RECEIVED', 'EXCESS_WITHIN_TOLERANCE'],
       requiresApproval: false,
       notReceivedCount: 2,
       receivableLineCount: 1,
@@ -162,7 +161,7 @@ const DOCUMENT_PLANS: DocPlan[] = [
       { ...THREE_ITEMS.ten, receivedQuantity: 0 },
     ],
     expect: {
-      statuses: ['EXCESS_OUTSIDE', 'NOT_RECEIVED', 'NOT_RECEIVED'],
+      statuses: ['EXCESS_OUTSIDE_TOLERANCE', 'NOT_RECEIVED', 'NOT_RECEIVED'],
       requiresApproval: true,
       notReceivedCount: 2,
       receivableLineCount: 1,
@@ -176,7 +175,7 @@ const DOCUMENT_PLANS: DocPlan[] = [
       { ...THREE_ITEMS.ten, receivedQuantity: 0 },
     ],
     expect: {
-      statuses: ['PARTIAL', 'OK', 'NOT_RECEIVED'],
+      statuses: ['PARTIAL', 'EXACT', 'NOT_RECEIVED'],
       requiresApproval: false,
       notReceivedCount: 1,
       receivableLineCount: 2,
@@ -190,7 +189,7 @@ const DOCUMENT_PLANS: DocPlan[] = [
       { ...THREE_ITEMS.ten, receivedQuantity: 100 },
     ],
     expect: {
-      statuses: ['OK', 'OK', 'OK'],
+      statuses: ['EXACT', 'EXACT', 'EXACT'],
       requiresApproval: false,
       notReceivedCount: 0,
       receivableLineCount: 3,
@@ -219,7 +218,7 @@ const DOCUMENT_PLANS: DocPlan[] = [
       { ...THREE_ITEMS.ten, receivedQuantity: 120 },
     ],
     expect: {
-      statuses: ['NOT_RECEIVED', 'EXCESS_WITHIN', 'EXCESS_OUTSIDE'],
+      statuses: ['NOT_RECEIVED', 'EXCESS_WITHIN_TOLERANCE', 'EXCESS_OUTSIDE_TOLERANCE'],
       requiresApproval: true,
       notReceivedCount: 1,
       receivableLineCount: 2,
@@ -233,7 +232,7 @@ const DOCUMENT_PLANS: DocPlan[] = [
       { ...THREE_ITEMS.ten, receivedQuantity: 0 },
     ],
     expect: {
-      statuses: ['NOT_RECEIVED', 'EXCESS_OUTSIDE', 'NOT_RECEIVED'],
+      statuses: ['NOT_RECEIVED', 'EXCESS_OUTSIDE_TOLERANCE', 'NOT_RECEIVED'],
       requiresApproval: true,
       notReceivedCount: 2,
       receivableLineCount: 1,
@@ -251,7 +250,7 @@ const DOCUMENT_PLANS: DocPlan[] = [
       { ...THREE_ITEMS.ten, receivedQuantity: 0 },
     ],
     expect: {
-      statuses: ['SHORT_OUTSIDE', 'NOT_RECEIVED', 'NOT_RECEIVED'],
+      statuses: ['PARTIAL', 'NOT_RECEIVED', 'NOT_RECEIVED'],
       requiresApproval: true,
       notReceivedCount: 2,
       receivableLineCount: 1,
@@ -262,12 +261,20 @@ const DOCUMENT_PLANS: DocPlan[] = [
 export function runGrnToleranceFrontendTests() {
   console.log('\n── FE Plan resolve ──')
   check(
-    'item beats setup',
+    'legacy item when over-receipt off',
+    resolveReceivingTolerancePct({
+      itemTolerancePct: 10,
+      setupTolerancePct: 5,
+      allowOverReceipt: false,
+    }) === 10,
+  )
+  check(
+    'setup fallback when FK null + allowOverReceipt',
     resolveReceivingTolerancePct({
       itemTolerancePct: 10,
       setupTolerancePct: 5,
       allowOverReceipt: true,
-    }) === 10,
+    }) === 5,
   )
   check(
     'setup fallback when item 0',
@@ -295,7 +302,7 @@ export function runGrnToleranceFrontendTests() {
       itemTolerancePct: s.itemTol,
       setupTolerancePct: s.setupTol,
       allowOverReceipt: s.allowOver,
-      closeOpenQuantity: s.close,
+      shortCloseRequested: s.close,
     })
     const ok = r.toleranceStatus === s.expect && r.requiresApproval === s.approval
     check(
@@ -305,7 +312,7 @@ export function runGrnToleranceFrontendTests() {
     )
     check(
       `${s.id} lineRequires…`,
-      lineRequiresToleranceApproval(r.toleranceStatus) === s.approval,
+      lineRequiresToleranceApproval(r.toleranceStatus) === (s.expect === 'EXCESS_OUTSIDE_TOLERANCE'),
     )
   }
 
@@ -347,9 +354,8 @@ export function runGrnToleranceFrontendTests() {
     itemTolerancePct: 10,
   })
   check('multi-GRN variance vs open', nearly(multiGrn.variancePercentage, 5), `var=${multiGrn.variancePercentage}`)
-  check('multi-GRN within 10%', multiGrn.toleranceStatus === 'EXCESS_WITHIN')
+  check('multi-GRN within 10%', multiGrn.toleranceStatus === 'EXCESS_WITHIN_TOLERANCE')
 
-  // Remaining open after 1-of-3: UI remainingOpenQty = sum(max(0, open-received))
   {
     const lines = DOCUMENT_PLANS[0]!.lines
     const remaining = lines.reduce(

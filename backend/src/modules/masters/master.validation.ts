@@ -13,6 +13,7 @@ export const MASTER_REGISTRY_SLUGS = [
   'bins',
   'item-categories',
   'hsn-sac',
+  'receiving-tolerances',
   'gst-groups',
   'gst-rates',
   'products',
@@ -149,6 +150,15 @@ export const createHsnSacSchema = z.object({
 })
 export const updateHsnSacSchema = createHsnSacSchema.partial()
 
+export const createReceivingToleranceSchema = z.object({
+  code: z.string().trim().min(1).max(32),
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional().nullable(),
+  percentage: z.coerce.number().min(0).max(100),
+  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+})
+export const updateReceivingToleranceSchema = createReceivingToleranceSchema.partial()
+
 export const createGstGroupSchema = z.object({
   code: z.string().trim().min(1).max(32),
   goodsType: z.enum(['goods', 'service']).default('goods'),
@@ -233,5 +243,6 @@ export type CreateLocationInput = z.infer<typeof createLocationSchema>
 export type CreateBinInput = z.infer<typeof createBinSchema>
 export type CreateItemCategoryInput = z.infer<typeof createItemCategorySchema>
 export type CreateHsnSacInput = z.infer<typeof createHsnSacSchema>
+export type CreateReceivingToleranceInput = z.infer<typeof createReceivingToleranceSchema>
 export type CreateGstGroupInput = z.infer<typeof createGstGroupSchema>
 export type CreateGstRateInput = z.infer<typeof createGstRateSchema>

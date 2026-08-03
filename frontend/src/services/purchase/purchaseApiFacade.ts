@@ -11,6 +11,8 @@ import { apiRequest, tenantPath } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
 import type { Item as MasterItem, Vendor as MasterVendor } from '../../types/master'
 import { normalizeEngineeringProductType } from '../../utils/purchaseProductType'
+import { resolveGstStateCode } from '../../utils/gstStateCode'
+import { determinePurchaseGstSupply } from '../../utils/gstSupply'
 import type {
   PurchaseApprovalDocumentType,
   PurchaseApprovalQueueFilters,
@@ -2073,6 +2075,14 @@ function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
 function mapMasterVendorToPurchaseVendor(v: MasterVendor): Vendor {
   const vendorType =
     v.vendorType === 'service' ? 'service' : v.vendorType === 'trader' ? 'trader' : 'manufacturer'
+  const stateCode = resolveGstStateCode(v.gstin) ?? resolveGstStateCode(v.state) ?? ''
+  const gst = determinePurchaseGstSupply({
+    supplierState: v.state ?? '',
+    supplierStateCode: stateCode,
+    supplierGstin: v.gstin ?? '',
+    defaultPlaceOfSupplyState: 'Maharashtra',
+    defaultPlaceOfSupplyStateCode: '27',
+  })
   return {
     id: v.id,
     vendorCode: v.vendorCode,
@@ -2085,12 +2095,12 @@ function mapMasterVendorToPurchaseVendor(v: MasterVendor): Vendor {
     address2: v.address2 ?? '',
     city: v.city ?? '',
     state: v.state ?? '',
-    stateCode: '',
+    stateCode,
     pincode: v.pincode ?? '',
     country: v.country ?? '',
     gstin: v.gstin ?? '',
     pan: v.pan ?? '',
-    isInterstate: false,
+    isInterstate: gst.isInterstate,
     paymentTerms: v.paymentTermsDays ? `Net ${v.paymentTermsDays}` : '',
     deliveryTerms: '',
     currency: 'INR',

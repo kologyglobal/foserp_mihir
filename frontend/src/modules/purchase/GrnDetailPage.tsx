@@ -30,7 +30,6 @@ import {
   approveToleranceGRN,
   createPurchaseReturnFromGrn,
   getGRNById,
-  GRN_DOMAIN_STATUS_LABELS,
   GRN_LINE_INSPECTION_STATUS_LABELS,
   postGRN,
   PurchaseServiceError,
@@ -38,6 +37,11 @@ import {
   submitGRN,
 } from '@/services/purchase'
 import { GRN_TOLERANCE_STATUS_LABELS } from '@/services/purchase/grnTolerance'
+import {
+  formatGrnStatusLabel,
+  remainingPoOpenAfterGrn,
+  summarizeGrnReceipt,
+} from '@/services/purchase/grnReceiptSummary'
 import type { GoodsReceiptNote } from '@/types/purchaseDomain'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
@@ -98,6 +102,11 @@ export function GrnDetailPage() {
     }
   }
 
+  const receiptSummary = useMemo(
+    () => (grn ? summarizeGrnReceipt(grn.lines) : null),
+    [grn],
+  )
+
   const headerFacts = useMemo(() => {
     if (!grn) return []
     return [
@@ -133,7 +142,7 @@ export function GrnDetailPage() {
     )
   }
 
-  const statusLabel = GRN_DOMAIN_STATUS_LABELS[grn.status]
+  const statusLabel = formatGrnStatusLabel(grn.status, grn.lines)
   const canEdit = grn.status === 'draft' || grn.status === 'pending_inspection'
   const canSubmit = grn.status === 'draft'
   const canPost =
@@ -486,11 +495,28 @@ export function GrnDetailPage() {
 
         <ErpCardSection
           title="Item Lines"
-          subtitle={`${grn.lines.length} line${grn.lines.length === 1 ? '' : 's'}`}
+          subtitle={
+            receiptSummary
+              ? `${grn.lines.length} line${grn.lines.length === 1 ? '' : 's'} · received on this GRN: ${receiptSummary.receivedLineCount} · not received: ${receiptSummary.notReceivedLineCount}`
+              : `${grn.lines.length} line${grn.lines.length === 1 ? '' : 's'}`
+          }
           collapsible
           defaultOpen
           columns={1}
         >
+          {grn.status === 'posted' && receiptSummary && (receiptSummary.partialReceipt || receiptSummary.stillOpenOnPoTotal > 0) ? (
+            <p className="mb-3 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-950">
+              <strong>Posted</strong> means inventory was updated for quantities received on{' '}
+              <em>this</em> GRN only ({formatNumber(grn.lines.reduce((s, l) => s + l.receivedQty, 0))} total).
+              {receiptSummary.notReceivedLineCount > 0
+                ? ` ${receiptSummary.notReceivedLineCount} line${receiptSummary.notReceivedLineCount === 1 ? '' : 's'} marked Not received (0 qty) — PO open quantity remains. Create another GRN to receive the balance.`
+                : null}
+            </p>
+          ) : null}
+          <p className="mb-2 text-[11px] text-erp-muted">
+            <strong>PO open (before GRN)</strong> is the open PO quantity when this GRN was created (snapshot).
+            <strong> Still on PO</strong> is what remains open on the purchase order after this GRN&apos;s received qty.
+          </p>
           <div className="min-w-0 w-full overflow-x-auto rounded-md border border-erp-border">
             <table className="erp-table w-full min-w-[960px] text-left text-[12px]">
               <thead>
@@ -499,8 +525,9 @@ export function GrnDetailPage() {
                   <th>Item</th>
                   <th className="num">Ordered</th>
                   <th className="num">Prev</th>
-                  <th className="num">Pending</th>
+                  <th className="num" title="Open PO quantity when this GRN was created">PO open (before)</th>
                   <th className="num">Received</th>
+                  <th className="num" title="PO quantity still open after this GRN">Still on PO</th>
                   <th className="num">Tol %</th>
                   <th className="num">Var %</th>
                   <th>Tol status</th>
@@ -525,13 +552,14 @@ export function GrnDetailPage() {
                     <td className="num tabular-nums">{formatNumber(l.previouslyReceivedQty)}</td>
                     <td className="num tabular-nums">{formatNumber(l.pendingQty)}</td>
                     <td className="num tabular-nums">{formatNumber(l.receivedQty)}</td>
+                    <td className="num tabular-nums">{formatNumber(remainingPoOpenAfterGrn(l))}</td>
                     <td className="num tabular-nums">{formatNumber(l.tolerancePercentage ?? 0)}</td>
                     <td className="num tabular-nums">
                       {l.variancePercentage == null ? '—' : `${formatNumber(l.variancePercentage)}%`}
                     </td>
                     <td className="whitespace-nowrap">
                       {GRN_TOLERANCE_STATUS_LABELS[
-                        (l.toleranceStatus ?? 'OK') as keyof typeof GRN_TOLERANCE_STATUS_LABELS
+                        (l.toleranceStatus ?? 'EXACT') as keyof typeof GRN_TOLERANCE_STATUS_LABELS
                       ] ?? l.toleranceStatus}
                     </td>
                     <td className="num tabular-nums">{formatNumber(l.acceptedQty)}</td>

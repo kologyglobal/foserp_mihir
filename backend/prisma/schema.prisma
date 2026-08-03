@@ -194,6 +194,7 @@ model Tenant {
   masterHsnCodes                         MasterHsnCode[]
   masterGstGroups                        MasterGstGroup[]
   masterGstRates                         MasterGstRate[]
+  masterReceivingTolerances              MasterReceivingTolerance[]
   masterItems                            MasterItem[]
   masterVendors                          MasterVendor[]
   legalEntities                          LegalEntity[]
@@ -2434,6 +2435,7 @@ model MasterUom {
   itemsBaseUom             MasterItem[]              @relation("ItemBaseUom")
   itemsPurchaseUom         MasterItem[]              @relation("ItemPurchaseUom")
   itemsSalesUom            MasterItem[]              @relation("ItemSalesUom")
+  itemsWeightUom           MasterItem[]              @relation("ItemWeightUom")
   purchaseRequisitionLines PurchaseRequisitionLine[]
   purchasePlanningRows     PurchasePlanningRow[]
   requestForQuotationLines RequestForQuotationLine[]
@@ -2778,6 +2780,43 @@ model MasterGstRate {
   @@map("master_gst_rates")
 }
 
+/// Tenant-scoped receiving tolerance master (excess-only % band for GRN).
+model MasterReceivingTolerance {
+  id          String             @id @default(uuid())
+  tenantId    String
+  code        String             @db.VarChar(32)
+  name        String             @db.VarChar(200)
+  description String?            @db.Text
+  percentage  Decimal            @default(0) @db.Decimal(8, 4)
+  isSystem    Boolean            @default(false)
+  status      MasterRecordStatus @default(ACTIVE)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id])
+  items  MasterItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_receiving_tolerances")
+}
+
+enum ItemReceiptEntryMode {
+  UNIT_ONLY
+  WEIGHT_ONLY
+  UNIT_AND_WEIGHT
+}
+
+enum ItemConversionCalculationMode {
+  AUTOMATIC
+  MANUAL
+}
+
 model MasterItem {
   id                   String             @id @default(uuid())
   tenantId             String
@@ -2809,8 +2848,17 @@ model MasterItem {
   purchaseQtyPerUom    Decimal            @default(1) @db.Decimal(18, 4)
   /// Vendor units per 1 primary/base unit (e.g. 3 meters = 1 NOS).
   uomConversionFactor  Decimal            @default(1) @db.Decimal(18, 4)
-  /// ±% band for GRN receiving vs open qty (Item Master source of truth).
+  /// Legacy % — dual-read only; prefer receivingToleranceId. Removed in follow-up migration.
   receivingTolerancePercentage Decimal @default(0) @db.Decimal(5, 2)
+  receivingToleranceId         String?
+  receiptEntryMode             ItemReceiptEntryMode          @default(UNIT_ONLY)
+  conversionCalculationMode    ItemConversionCalculationMode @default(AUTOMATIC)
+  allowManualUnitQuantity      Boolean                       @default(false)
+  allowManualWeightQuantity    Boolean                       @default(false)
+  requireWeightAtReceipt       Boolean                       @default(false)
+  weightUomId                  String?
+  /// Weight UOM qty per 1 base/primary unit (e.g. 10 Kg per 1 NOS).
+  standardWeightPerBaseUnit    Decimal                       @default(0) @db.Decimal(18, 4)
   /// CRM / Sales commercial description (distinct from engineering itemDescription).
   salesDescription        String?                   @db.Text
   /// Optional sales UOM; falls back to baseUom when null.
@@ -2844,6 +2892,8 @@ model MasterItem {
   salesUom                 MasterUom?                @relation("ItemSalesUom", fields: [salesUomId], references: [id], onDelete: SetNull)
   hsn                      MasterHsnCode?            @relation(fields: [hsnId], references: [id])
   gstGroup                 MasterGstGroup?           @relation(fields: [gstGroupId], references: [id])
+  receivingTolerance       MasterReceivingTolerance? @relation(fields: [receivingToleranceId], references: [id])
+  weightUom                MasterUom?                @relation("ItemWeightUom", fields: [weightUomId], references: [id])
   purchaseRequisitionLines PurchaseRequisitionLine[]
   purchasePlanningRows     PurchasePlanningRow[]
   requestForQuotationLines RequestForQuotationLine[]
@@ -2899,6 +2949,8 @@ model MasterItem {
   @@index([tenantId, status])
   @@index([tenantId, deletedAt])
   @@index([tenantId, salesAllowed])
+  @@index([tenantId, receivingToleranceId])
+  @@index([tenantId, weightUomId])
   @@map("master_items")
 }
 
@@ -6256,12 +6308,24 @@ enum GoodsReceiptStatus {
 }
 
 enum GrnLineToleranceStatus {
-  OK
-  PARTIAL
   NOT_RECEIVED
-  SHORT_OUTSIDE
-  EXCESS_WITHIN
-  EXCESS_OUTSIDE
+  PARTIAL
+  EXACT
+  EXCESS_WITHIN_TOLERANCE
+  EXCESS_OUTSIDE_TOLERANCE
+}
+
+enum GrnLineWeightToleranceStatus {
+  NOT_APPLICABLE
+  EXACT
+  EXCESS_WITHIN_TOLERANCE
+  EXCESS_OUTSIDE_TOLERANCE
+}
+
+enum GrnReceiptApprovalReason {
+  UNIT_OVER_TOLERANCE
+  WEIGHT_OVER_TOLERANCE
+  SHORT_CLOSE_REQUESTED
 }
 
 model GoodsReceipt {
@@ -6374,12 +6438,33 @@ model GoodsReceiptLine {
   expiryDate                 DateTime? @db.Date
   inventoryLotId             String?
   qcRequired                 Boolean   @default(false)
-  /// Snapshot of item/Setup receiving tolerance % at receive time.
-  tolerancePercentage        Decimal   @default(0) @db.Decimal(5, 2)
+  /// Snapshot of resolved receiving tolerance % at receive time.
+  tolerancePercentage        Decimal   @default(0) @db.Decimal(8, 4)
+  receivingToleranceIdSnapshot       String?   @db.VarChar(36)
+  receivingToleranceCodeSnapshot     String    @default("") @db.VarChar(32)
+  receivingToleranceNameSnapshot     String    @default("") @db.VarChar(200)
+  receivingTolerancePercentageSnapshot Decimal @default(0) @db.Decimal(8, 4)
+  maximumAllowedUnitQuantity         Decimal   @default(0) @db.Decimal(18, 4)
+  unitVariance                       Decimal   @default(0) @db.Decimal(18, 4)
   /// ((received - open) / open) * 100 when open > 0.
   variancePercentage         Decimal?  @db.Decimal(9, 4)
-  toleranceStatus            GrnLineToleranceStatus @default(OK)
-  /// When true, under-receipt outside band is SHORT_OUTSIDE (close open) instead of PARTIAL.
+  toleranceStatus            GrnLineToleranceStatus @default(EXACT)
+  receivedWeight             Decimal?  @db.Decimal(18, 4)
+  expectedWeight             Decimal?  @db.Decimal(18, 4)
+  maximumAllowedWeight       Decimal?  @db.Decimal(18, 4)
+  weightVariance             Decimal?  @db.Decimal(18, 4)
+  weightVariancePercentage   Decimal?  @db.Decimal(9, 4)
+  weightConversionRateSnapshot Decimal? @db.Decimal(18, 4)
+  weightUomIdSnapshot        String?   @db.VarChar(36)
+  weightUomCodeSnapshot      String    @default("") @db.VarChar(32)
+  manualUnitEntry            Boolean   @default(false)
+  manualWeightEntry          Boolean   @default(false)
+  weightToleranceStatus      GrnLineWeightToleranceStatus @default(NOT_APPLICABLE)
+  requiresApproval           Boolean   @default(false)
+  approvalReasons            Json      @default("[]")
+  shortCloseRequested        Boolean   @default(false)
+  shortCloseReason           String?   @db.Text
+  /// @deprecated Use shortCloseRequested — kept one release for back-compat reads.
   closeOpenQuantity          Boolean   @default(false)
   remarks                    String?   @db.Text
   createdAt                  DateTime  @default(now())

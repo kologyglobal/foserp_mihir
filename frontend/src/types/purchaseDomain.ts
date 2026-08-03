@@ -2060,6 +2060,7 @@ export interface GoodsReceiptLine {
   warehouseId: string
   warehouseName: string
   bin: string
+  binId?: string | null
   locationId: string
   locationName: string
   inspectionStatus: GrnLineInspectionStatus
@@ -2072,14 +2073,20 @@ export interface GoodsReceiptLine {
   tolerancePercentage?: number
   variancePercentage?: number | null
   toleranceStatus?:
-    | 'OK'
-    | 'PARTIAL'
     | 'NOT_RECEIVED'
-    | 'SHORT_OUTSIDE'
-    | 'EXCESS_WITHIN'
-    | 'EXCESS_OUTSIDE'
+    | 'PARTIAL'
+    | 'EXACT'
+    | 'EXCESS_WITHIN_TOLERANCE'
+    | 'EXCESS_OUTSIDE_TOLERANCE'
   closeOpenQuantity?: boolean
-  /** Item master tolerance used for client preview before save. */
+  shortCloseRequested?: boolean
+  receivedWeight?: number | null
+  expectedWeight?: number | null
+  maximumAllowedWeight?: number | null
+  weightToleranceStatus?: string
+  requiresApproval?: boolean
+  approvalReasons?: string[]
+  receivingToleranceId?: string | null
   receivingTolerancePercentage?: number
   orderedUomQty?: number
   remarks: string
@@ -2716,6 +2723,7 @@ export type GrnInput = {
     warehouseId?: string
     warehouseName?: string
     bin?: string
+    binId?: string | null
     allowExcess?: boolean
     /** Close remaining open qty (short outside band → approval). */
     closeOpenQuantity?: boolean

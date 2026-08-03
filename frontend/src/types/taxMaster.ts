@@ -26,6 +26,18 @@ export interface HsnMaster extends MasterRecordAudit {
   updatedAt: string
 }
 
+export interface ReceivingToleranceMaster extends MasterRecordAudit {
+  id: string
+  code: string
+  name: string
+  description?: string | null
+  percentage: number
+  isSystem?: boolean
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface GstGroupCode extends MasterRecordAudit {
   id: string
   code: string

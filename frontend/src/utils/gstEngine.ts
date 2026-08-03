@@ -1,18 +1,26 @@
 import type { GstBreakdown, GstScheme } from '../types/invoice'
-import { COMPANY_STATE, DEFAULT_GST_RATE } from '../types/invoice'
+import { COMPANY_GSTIN, COMPANY_STATE, DEFAULT_GST_RATE } from '../types/invoice'
 import { isApiMode } from '../config/apiConfig'
 import {
   resolveGstTaxFromMasters,
   type ResolveGstTaxParams,
 } from '../services/accounting/taxResolutionApi'
+import { determineSalesGstSupply } from './gstSupply'
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-/** Intra-state → CGST+SGST; inter-state → IGST */
-export function resolveGstScheme(customerState: string): GstScheme {
-  return customerState.trim().toLowerCase() === COMPANY_STATE.toLowerCase() ? 'cgst_sgst' : 'igst'
+/** Intra-state → CGST+SGST; inter-state → IGST (compares billing / PoS state codes). */
+export function resolveGstScheme(
+  customerState: string,
+  companyStateOrCode?: string | null,
+): GstScheme {
+  return determineSalesGstSupply({
+    companyState: companyStateOrCode ?? COMPANY_STATE,
+    companyGstin: COMPANY_GSTIN,
+    customerState,
+  }).gstScheme
 }
 
 /**
@@ -23,13 +31,14 @@ export function computeGst(
   taxableAmount: number,
   customerState: string,
   gstRate: number = DEFAULT_GST_RATE,
+  companyStateOrCode?: string | null,
 ): GstBreakdown {
   if (isApiMode()) {
     console.warn(
       '[gstEngine] computeGst is demo-local; use computeGstFromTaxMaster or finance calculate APIs in API mode.',
     )
   }
-  const scheme = resolveGstScheme(customerState)
+  const scheme = resolveGstScheme(customerState, companyStateOrCode)
   const totalTax = round2(taxableAmount * (gstRate / 100))
 
   if (scheme === 'cgst_sgst') {

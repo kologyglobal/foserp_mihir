@@ -1,5 +1,5 @@
 import type { Item, ItemCategory, Vendor } from '../../types/master'
-import type { GstGroupCode, GstRate, HsnMaster } from '../../types/taxMaster'
+import type { GstGroupCode, GstRate, HsnMaster, ReceivingToleranceMaster } from '../../types/taxMaster'
 import { API_CONFIG } from '../../config/apiConfig'
 import { apiRequest, getStoredSession, tenantPath } from './client'
 import {
@@ -85,6 +85,14 @@ export interface ItemDto {
   purchaseQtyPerUom: number | string
   uomConversionFactor?: number | string
   receivingTolerancePercentage?: number | string
+  receivingToleranceId?: string | null
+  receiptEntryMode?: string
+  conversionCalculationMode?: string
+  allowManualUnitQuantity?: boolean
+  allowManualWeightQuantity?: boolean
+  requireWeightAtReceipt?: boolean
+  weightUomId?: string | null
+  standardWeightPerBaseUnit?: number | string
   qcRequired: boolean
   qualityTestGroupCode?: string | null
   productionBomId?: string | null
@@ -210,6 +218,30 @@ export function mapHsnDto(row: MasterRecordDto): HsnMaster {
   }
 }
 
+export function mapReceivingToleranceDto(row: MasterRecordDto): ReceivingToleranceMaster {
+  return {
+    id: row.id,
+    code: row.code ?? '',
+    name: row.name ?? '',
+    description: row.description ?? '',
+    percentage: num(row.percentage),
+    isSystem: Boolean(row.isSystem),
+    isActive: row.status === 'ACTIVE',
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
+}
+
+export function receivingToleranceToApiPayload(data: Partial<ReceivingToleranceMaster>) {
+  return {
+    code: data.code,
+    name: data.name,
+    description: data.description ?? null,
+    percentage: data.percentage,
+    status: toStatus(data.isActive),
+  }
+}
+
 export function mapGstGroupDto(row: MasterRecordDto): GstGroupCode {
   return {
     id: row.id,
@@ -277,6 +309,14 @@ export function mapItemDto(row: ItemDto): Item {
     purchaseQtyPerUom: num(row.uomConversionFactor ?? row.purchaseQtyPerUom),
     uomConversionFactor: num(row.uomConversionFactor ?? row.purchaseQtyPerUom),
     receivingTolerancePercentage: num(row.receivingTolerancePercentage),
+    receivingToleranceId: row.receivingToleranceId ?? null,
+    receiptEntryMode: (row.receiptEntryMode ?? 'UNIT_ONLY') as Item['receiptEntryMode'],
+    conversionCalculationMode: (row.conversionCalculationMode ?? 'AUTOMATIC') as Item['conversionCalculationMode'],
+    allowManualUnitQuantity: row.allowManualUnitQuantity ?? false,
+    allowManualWeightQuantity: row.allowManualWeightQuantity ?? false,
+    requireWeightAtReceipt: row.requireWeightAtReceipt ?? false,
+    weightUomId: row.weightUomId ?? null,
+    standardWeightPerBaseUnit: num(row.standardWeightPerBaseUnit ?? 0),
     qcRequired: row.qcRequired,
     qualityTestGroupCode: row.qualityTestGroupCode ?? null,
     productionBomId: row.productionBomId ?? null,
@@ -435,6 +475,14 @@ export function itemToApiPayload(data: Item): Record<string, unknown> {
     purchaseQtyPerUom: data.uomConversionFactor ?? data.purchaseQtyPerUom ?? 1,
     uomConversionFactor: data.uomConversionFactor ?? data.purchaseQtyPerUom ?? 1,
     receivingTolerancePercentage: data.receivingTolerancePercentage ?? 0,
+    receivingToleranceId: data.receivingToleranceId || null,
+    receiptEntryMode: data.receiptEntryMode ?? 'UNIT_ONLY',
+    conversionCalculationMode: data.conversionCalculationMode ?? 'AUTOMATIC',
+    allowManualUnitQuantity: data.allowManualUnitQuantity ?? false,
+    allowManualWeightQuantity: data.allowManualWeightQuantity ?? false,
+    requireWeightAtReceipt: data.requireWeightAtReceipt ?? false,
+    weightUomId: data.weightUomId || null,
+    standardWeightPerBaseUnit: data.standardWeightPerBaseUnit ?? 0,
     qcRequired: data.qcRequired ?? false,
     qualityTestGroupCode: data.qualityTestGroupCode || null,
     productionBomId: data.productionBomId || null,
@@ -484,6 +532,10 @@ export async function fetchItemCategories() {
 
 export async function fetchHsnCodes() {
   return fetchAllMasterPages('hsn-sac')
+}
+
+export async function fetchReceivingTolerances() {
+  return fetchAllMasterPages('receiving-tolerances')
 }
 
 export async function fetchGstGroups() {

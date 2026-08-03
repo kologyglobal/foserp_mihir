@@ -13,7 +13,7 @@ import type {
   Warehouse,
   Location,
 } from '../types/master'
-import type { GstGroupCode, GstRate, HsnMaster } from '../types/taxMaster'
+import type { GstGroupCode, GstRate, HsnMaster, ReceivingToleranceMaster } from '../types/taxMaster'
 import type { PaymentMethod } from '../types/paymentMaster'
 import type { VendorOrderAddress } from '../types/orderAddressMaster'
 import type { Bank, BankAccount } from '../types/bankMaster'
@@ -29,7 +29,7 @@ import {
   seedWarehouses,
   seedLocations,
 } from '../data/masters/seed'
-import { seedGstGroups, seedGstRates, seedHsnMasters } from '../data/masters/taxMasterSeed'
+import { seedGstGroups, seedGstRates, seedHsnMasters, seedReceivingTolerances } from '../data/masters/taxMasterSeed'
 import { seedPaymentMethods } from '../data/masters/paymentMethodSeed'
 import { seedVendorOrderAddresses } from '../data/masters/orderAddressSeed'
 import { seedBanks } from '../data/masters/bankSeed'
@@ -91,6 +91,7 @@ interface MasterState {
   geoStates: GeoState[]
   geoCities: GeoCity[]
   hsnMasters: HsnMaster[]
+  receivingTolerances: ReceivingToleranceMaster[]
   gstGroups: GstGroupCode[]
   gstRates: GstRate[]
   paymentMethods: PaymentMethod[]
@@ -181,6 +182,15 @@ interface MasterState {
   deactivateHsn: (id: string) => MaybePromise<void>
   getHsn: (id: string) => HsnMaster | undefined
   getHsnByCode: (code: string) => HsnMaster | undefined
+
+  // Receiving Tolerance CRUD
+  addReceivingTolerance: (data: Omit<ReceivingToleranceMaster, 'id' | 'createdAt' | 'updatedAt' | 'isSystem'>) => MaybePromise<string>
+  updateReceivingTolerance: (id: string, data: Partial<ReceivingToleranceMaster>) => MaybePromise<void>
+  deleteReceivingTolerance: (id: string) => MaybePromise<void>
+  activateReceivingTolerance: (id: string) => MaybePromise<void>
+  deactivateReceivingTolerance: (id: string) => MaybePromise<void>
+  getReceivingTolerance: (id: string) => ReceivingToleranceMaster | undefined
+  getReceivingToleranceByCode: (code: string) => ReceivingToleranceMaster | undefined
 
   // GST Group CRUD
   addGstGroup: (data: Omit<GstGroupCode, 'id' | 'createdAt' | 'updatedAt'>) => MaybePromise<string>
@@ -276,6 +286,7 @@ export const useMasterStore = create<MasterState>()(
   geoStates: seedGeoStates,
   geoCities: seedGeoCities,
   hsnMasters: seedHsnMasters,
+  receivingTolerances: seedReceivingTolerances,
   gstGroups: seedGstGroups,
   gstRates: seedGstRates,
   paymentMethods: seedPaymentMethods,
@@ -599,6 +610,33 @@ export const useMasterStore = create<MasterState>()(
   getHsn: (id) => get().hsnMasters.find((h) => h.id === id),
   getHsnByCode: (code) => get().hsnMasters.find((h) => h.code === code),
 
+  addReceivingTolerance: (data) => {
+    if (isApiMode()) return import('../services/bridges/masterBatchApiBridge').then((m) => m.apiCreateReceivingTolerance(data))
+    const id = genId('rtol')
+    set((s) => ({ receivingTolerances: [...s.receivingTolerances, withMasterCreateUpdated({ ...data, isSystem: false }, id)] }))
+    return id
+  },
+  updateReceivingTolerance: (id, data) => {
+    if (isApiMode()) return import('../services/bridges/masterBatchApiBridge').then((m) => m.apiUpdateReceivingTolerance(id, data))
+    set((s) => ({
+      receivingTolerances: s.receivingTolerances.map((r) => (r.id === id ? withMasterUpdateUpdated(r, data) : r)),
+    }))
+  },
+  deleteReceivingTolerance: (id) => {
+    if (isApiMode()) return import('../services/bridges/masterBatchApiBridge').then((m) => m.apiDeleteReceivingTolerance(id))
+    set((s) => ({ receivingTolerances: s.receivingTolerances.filter((r) => r.id !== id) }))
+  },
+  activateReceivingTolerance: (id) => {
+    if (isApiMode()) return import('../services/bridges/masterBatchApiBridge').then((m) => m.apiActivateReceivingTolerance(id))
+    set((s) => ({ receivingTolerances: s.receivingTolerances.map((r) => (r.id === id ? { ...r, isActive: true } : r)) }))
+  },
+  deactivateReceivingTolerance: (id) => {
+    if (isApiMode()) return import('../services/bridges/masterBatchApiBridge').then((m) => m.apiDeactivateReceivingTolerance(id))
+    set((s) => ({ receivingTolerances: s.receivingTolerances.map((r) => (r.id === id ? { ...r, isActive: false } : r)) }))
+  },
+  getReceivingTolerance: (id) => get().receivingTolerances.find((r) => r.id === id),
+  getReceivingToleranceByCode: (code) => get().receivingTolerances.find((r) => r.code === code),
+
   addGstGroup: (data) => {
     if (isApiMode()) return import('../services/bridges/masterBatchApiBridge').then((m) => m.apiCreateGstGroup(data))
     const id = genId('gstg')
@@ -842,6 +880,7 @@ export const useMasterStore = create<MasterState>()(
         geoStates: isApiMode() ? [] : s.geoStates,
         geoCities: isApiMode() ? [] : s.geoCities,
         hsnMasters: isApiMode() ? [] : s.hsnMasters,
+        receivingTolerances: isApiMode() ? [] : s.receivingTolerances,
         gstGroups: isApiMode() ? [] : s.gstGroups,
         gstRates: isApiMode() ? [] : s.gstRates,
         paymentMethods: s.paymentMethods,
@@ -866,6 +905,7 @@ export const useMasterStore = create<MasterState>()(
             items: current.items ?? [],
             vendors: current.vendors ?? [],
             hsnMasters: current.hsnMasters ?? [],
+            receivingTolerances: current.receivingTolerances ?? [],
             gstGroups: current.gstGroups ?? [],
             gstRates: current.gstRates ?? [],
             products: [],

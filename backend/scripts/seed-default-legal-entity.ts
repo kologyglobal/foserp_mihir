@@ -28,7 +28,27 @@ async function main() {
 
   for (const tenant of tenants) {
     const before = await prisma.legalEntity.count({ where: { tenantId: tenant.id } })
-    const legalEntityId = await ensureDefaultLegalEntity(tenant.id)
+    const vasantSeed =
+      tenant.slug === 'vasant-trailers'
+        ? {
+            code: 'LE-VTL',
+            legalName: 'Vasant Trailers Private Limited',
+            displayName: 'Vasant Trailers',
+            tradeName: 'Vasant Trailers',
+            registeredAddressJson: {
+              line1: 'MIDC Chakan, Phase II',
+              city: 'Pune',
+              state: 'Maharashtra',
+              postalCode: '410501',
+              country: 'India',
+              countryCode: 'IN',
+              stateCode: '27',
+            },
+            branchCode: 'HO-PUNE',
+            branchName: 'Pune Head Office',
+          }
+        : undefined
+    const legalEntityId = await ensureDefaultLegalEntity(tenant.id, vasantSeed)
     const after = await prisma.legalEntity.findMany({
       where: { tenantId: tenant.id },
       select: { id: true, code: true, displayName: true, isDefault: true, gstin: true },

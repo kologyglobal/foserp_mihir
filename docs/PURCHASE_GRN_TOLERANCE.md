@@ -2,36 +2,46 @@
 
 ## Contract
 
-- **Source of truth:** Item Master `receivingTolerancePercentage` (±% vs **open/pending** qty on this GRN).
-- **Fallback:** Purchase Setup `allowOverReceipt` + `overReceiptTolerancePct` when item % is 0.
+- **Primary source:** Item Master `receivingToleranceId` → `MasterReceivingTolerance.percentage` (excess-only band vs **open/pending** qty).
+- **FK rule:** When `receivingToleranceId != null`, master % applies always — including **0% (EXACT)**. Never use truthy checks on percentage.
+- **Fallback:** When FK is null → Purchase Setup `allowOverReceipt` + `overReceiptTolerancePct`; else legacy `receivingTolerancePercentage` if non-zero; else 0%.
 - **Variance:** `((received - open) / open) * 100` in primary UOM.
-- Zero received: line status `NOT_RECEIVED` — no stock / no PO received delta; line stays open for next GRN.
-- **Multi-line:** each line evaluated independently. Receiving **1 of 3** items (others qty 0) is valid; header approval only if any line is outside band.
-- **Partial under band:** `PARTIAL` — inventory for received qty; remainder stays open (no approval).
-- **Outside band:** `SHORT_OUTSIDE` (only when `closeOpenQuantity`) or `EXCESS_OUTSIDE` → GRN status `PENDING_TOLERANCE_APPROVAL` + `PurchaseApproval` (`GOODS_RECEIPT`). Approve continues submit/QC/post; Reject returns to `DRAFT`.
+- **Weight path:** When item `receiptEntryMode` is `WEIGHT_ONLY` or `UNIT_AND_WEIGHT`, expected weight = `receivedUnit × standardWeightPerBaseUnit`; max = expected × (1 + tol%).
+- Zero received: line status `NOT_RECEIVED` — no stock / no PO received delta.
+- **Multi-line:** each line evaluated independently. Header approval when any line `requiresApproval`.
+- **Partial under-receipt:** `PARTIAL` — no symmetric lower band; inventory for received qty; remainder stays open.
+- **Outside band:** `EXCESS_OUTSIDE_TOLERANCE` (unit) and/or `WEIGHT_OVER_TOLERANCE` → `PENDING_TOLERANCE_APPROVAL` + `PurchaseApproval` (`GOODS_RECEIPT`). Short close uses `SHORT_CLOSE_REQUESTED` approval reason.
+
+## Master
+
+- Registry slug: `receiving-tolerances` (`/api/v1/t/:tenantSlug/masters/receiving-tolerances`)
+- System seed per tenant: `EXACT` (0%), `STD10` (10%), `BULK20` (20%)
+- Permissions: `master.receiving_tolerance.view|create|update|delete`
+- Hostinger SQL: `backend/scripts/live-deploy-receiving-tolerance-master.sql`
 
 ## Line statuses
 
 | Status | Meaning |
 |--------|---------|
-| OK | Within ±tol of open |
-| PARTIAL | Under lower band, leave open |
+| EXACT | Received equals open |
+| PARTIAL | Under open (excess-only model) |
 | NOT_RECEIVED | Received = 0 |
-| EXCESS_WITHIN | Over open but ≤ upper band |
-| EXCESS_OUTSIDE | Over upper band → approval |
-| SHORT_OUTSIDE | Under lower band + close flag → approval |
+| EXCESS_WITHIN_TOLERANCE | Over open but ≤ max allowed |
+| EXCESS_OUTSIDE_TOLERANCE | Over max allowed → approval |
+
+Weight statuses: `NOT_APPLICABLE`, `EXACT`, `EXCESS_WITHIN_TOLERANCE`, `EXCESS_OUTSIDE_TOLERANCE`.
 
 ## API
 
+- `POST /purchase/grns/evaluate-lines` — authoritative preview (PO id + draft lines)
 - `POST /purchase/grns/:id/submit` — may return `PENDING_TOLERANCE_APPROVAL`
-- `POST /purchase/grns/:id/approve-tolerance`
-- `POST /purchase/grns/:id/reject-tolerance`
-- Approvals queue lists `GOODS_RECEIPT` rows; approve/reject/send-back route to the same tolerance endpoints (`purchase.grn.post`).
-- Unit: `backend/tests/purchase/grn-tolerance.test.ts` (`npm run test:grn-tolerance`)
-- Live E2E + seed items 0%/2%/10%: `npm run test:grn-tolerance-live` (`--seed-only` for UI)
-- Frontend calculator parity: `cd frontend && npm run test:grn-tolerance`
-- Scenario matrix: `docs/PURCHASE_GRN_TOLERANCE_TEST_PLAN.md`
-- Live lifecycle: outside band → pending approval (not hard 400).
+- `POST /purchase/grns/:id/approve-tolerance` / `reject-tolerance`
+- Unit: `backend/tests/purchase/grn-tolerance.test.ts`, `backend/tests/purchase/receiving-tolerance.test.ts` (`npm run test:grn-tolerance`)
+- Frontend demo mirror: `frontend/src/services/purchase/grnTolerance.ts` (API mode should call evaluate-lines)
+
+## Casting example (weight)
+
+PO open 100 Nos; 10 Kg/Nos; 20% tolerance → expected weight 1000 Kg, max 1200 Kg. 1150 Kg = within; 1250 Kg = `WEIGHT_OVER_TOLERANCE`.
 
 ## PDF
 

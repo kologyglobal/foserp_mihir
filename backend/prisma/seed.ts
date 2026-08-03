@@ -613,6 +613,40 @@ async function main(): Promise<void> {
     hsnCount += 1
   }
 
+  const RECEIVING_TOLERANCE_SEED = [
+    { code: 'EXACT', name: 'Exact receipt', description: '0% excess tolerance', percentage: 0 },
+    { code: 'STD10', name: 'Standard 10%', description: '10% excess tolerance', percentage: 10 },
+    { code: 'BULK20', name: 'Bulk 20%', description: '20% excess tolerance for bulk materials', percentage: 20 },
+  ] as const
+  let receivingToleranceCount = 0
+  const receivingToleranceIdByCode = new Map<string, string>()
+  for (const row of RECEIVING_TOLERANCE_SEED) {
+    const tol = await prisma.masterReceivingTolerance.upsert({
+      where: { tenantId_code: { tenantId: tenant.id, code: row.code } },
+      create: {
+        tenantId: tenant.id,
+        code: row.code,
+        name: row.name,
+        description: row.description,
+        percentage: row.percentage,
+        isSystem: true,
+        status: 'ACTIVE',
+        createdBy: tenantAdmin.id,
+        updatedBy: tenantAdmin.id,
+      },
+      update: {
+        name: row.name,
+        description: row.description,
+        percentage: row.percentage,
+        isSystem: true,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+    })
+    receivingToleranceIdByCode.set(row.code, tol.id)
+    receivingToleranceCount += 1
+  }
+
   const trailerHsnId = hsnIdByCode.get('871639') ?? null
   const trailerGstGroupId = gstGroupIdByCode.get('GST18-GOODS') ?? null
 
@@ -950,18 +984,42 @@ async function main(): Promise<void> {
     data: { defaultQualityPlanRef: inProcessPlan.planCode },
   })
 
+  const { ensureDefaultLegalEntity } = await import(
+    '../src/modules/accounting/legal-entities/ensure-default-legal-entity.js'
+  )
+  const legalEntityId = await ensureDefaultLegalEntity(tenant.id, {
+    code: 'LE-VTL',
+    legalName: 'Vasant Trailers Private Limited',
+    displayName: 'Vasant Trailers',
+    tradeName: 'Vasant Trailers',
+    pan: 'AABCV1234F',
+    gstin: '27AABCV1234F1Z5',
+    registeredAddressJson: {
+      line1: 'MIDC Chakan, Phase II',
+      city: 'Pune',
+      state: 'Maharashtra',
+      postalCode: '410501',
+      country: 'India',
+      countryCode: 'IN',
+      stateCode: '27',
+    },
+    branchCode: 'HO-PUNE',
+    branchName: 'Pune Head Office',
+  })
+
   console.log('\n=== Seed complete ===')
   console.log(`Tenant: ${tenant.name} (slug: ${tenant.slug})`)
   console.log(`Company: ${tenant.legalName} · ${tenant.city}, ${tenant.state}, ${tenant.country}`)
   console.log(`Geography: ${GEO_COUNTRY_SEED.length} countries, ${GEO_STATE_SEED.length} states, ${cityCount} cities`)
   console.log(`UOMs: ${UOM_SEED_ROWS.length} · Item categories: ${ITEM_CATEGORY_SEED_ROWS.length}`)
-  console.log(`GST groups: ${GST_GROUP_SEED_ROWS.length} · rates: ${gstRateCount} · HSN: ${hsnCount}`)
+  console.log(`GST groups: ${GST_GROUP_SEED_ROWS.length} · rates: ${gstRateCount} · HSN: ${hsnCount} · receiving tolerances: ${receivingToleranceCount}`)
   console.log(`Warehouses: ${WAREHOUSE_SEED_ROWS.length}`)
   console.log(`Locations: ${locationCount}`)
   console.log(`Products: ${PRODUCT_SEED_ROWS.length}`)
   console.log(`FG items: ${fgItemIdByCode.size}`)
   console.log(`Quotation templates: ${QUOTATION_TEMPLATE_SEED_ROWS.length}`)
   console.log(`QC parameters: 3 · plans: ${inProcessPlan.planCode}, ${finalPlan.planCode}`)
+  console.log(`Legal entity: ${legalEntityId} (Vasant Trailers · default)`)
   console.log('\nDevelopment credentials (tenantSlug: vasant-trailers):')
   console.log('  Superadmin:  super@fos-erp.com           / Super@123      → Super Admin')
   console.log('  Admin:       admin@vasant-trailers.com   / Admin@123      → Tenant Admin + Admin')

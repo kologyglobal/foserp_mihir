@@ -1,4 +1,4 @@
-import type { GoodsReceiptStatus, Prisma } from '@prisma/client'
+import type { GoodsReceiptStatus, GrnLineToleranceStatus, GrnLineWeightToleranceStatus, GrnReceiptApprovalReason, Prisma } from '@prisma/client'
 import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListGoodsReceiptsQuery } from './goods-receipt.validation.js'
@@ -65,7 +65,28 @@ export type GrnLineCreateData = {
   qcRequired: boolean
   tolerancePercentage: number
   variancePercentage: number | null
-  toleranceStatus: 'OK' | 'PARTIAL' | 'NOT_RECEIVED' | 'SHORT_OUTSIDE' | 'EXCESS_WITHIN' | 'EXCESS_OUTSIDE'
+  toleranceStatus: GrnLineToleranceStatus
+  receivingToleranceIdSnapshot: string | null
+  receivingToleranceCodeSnapshot: string
+  receivingToleranceNameSnapshot: string
+  receivingTolerancePercentageSnapshot: number
+  maximumAllowedUnitQuantity: number
+  unitVariance: number
+  receivedWeight: number | null
+  expectedWeight: number | null
+  maximumAllowedWeight: number | null
+  weightVariance: number | null
+  weightVariancePercentage: number | null
+  weightConversionRateSnapshot: number | null
+  weightUomIdSnapshot: string | null
+  weightUomCodeSnapshot: string
+  manualUnitEntry: boolean
+  manualWeightEntry: boolean
+  weightToleranceStatus: GrnLineWeightToleranceStatus
+  requiresApproval: boolean
+  approvalReasons: GrnReceiptApprovalReason[]
+  shortCloseRequested: boolean
+  shortCloseReason: string | null
   closeOpenQuantity: boolean
   remarks: string | null
 }

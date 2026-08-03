@@ -1,4 +1,4 @@
-import type { GstGroupCode, GstRate, HsnMaster } from '../../types/taxMaster'
+import type { GstGroupCode, GstRate, HsnMaster, ReceivingToleranceMaster } from '../../types/taxMaster'
 
 const now = () => new Date().toISOString()
 
@@ -19,6 +19,12 @@ export const seedHsnMasters: HsnMaster[] = [
   { id: 'hsn-3208', code: '3208', gstGroupId: 'gstg-18-goods', description: 'Paints and varnishes — primer, topcoat', isActive: true, createdAt: now(), updatedAt: now() },
   { id: 'hsn-8311', code: '8311', gstGroupId: 'gstg-12-goods', description: 'Wire, rods, tubes — welding wire', isActive: true, createdAt: now(), updatedAt: now() },
   { id: 'hsn-4016', code: '4016', gstGroupId: 'gstg-18-goods', description: 'Articles of vulcanised rubber — seals, gaskets', isActive: true, createdAt: now(), updatedAt: now() },
+]
+
+export const seedReceivingTolerances: ReceivingToleranceMaster[] = [
+  { id: 'rt-exact', code: 'EXACT', name: 'Exact receipt', description: '0% excess tolerance', percentage: 0, isSystem: true, isActive: true, createdAt: now(), updatedAt: now() },
+  { id: 'rt-std10', code: 'STD10', name: 'Standard 10%', description: '10% excess tolerance', percentage: 10, isSystem: true, isActive: true, createdAt: now(), updatedAt: now() },
+  { id: 'rt-bulk20', code: 'BULK20', name: 'Bulk 20%', description: '20% excess tolerance for bulk materials', percentage: 20, isSystem: true, isActive: true, createdAt: now(), updatedAt: now() },
 ]
 
 export const seedGstRates: GstRate[] = [

@@ -15,7 +15,6 @@ import {
 import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/accounting/inventory-accounting-event.service.js'
 import {
   evaluateGrnLineTolerance,
-  lineRequiresToleranceApproval,
 } from '../shared/grn-tolerance.js'
 import {
   lineAmountFromVendor,
@@ -151,6 +150,123 @@ async function resolveBin(
   return bin
 }
 
+const itemReceiptConfigSelect = {
+  id: true,
+  receivingToleranceId: true,
+  receivingTolerancePercentage: true,
+  receiptEntryMode: true,
+  standardWeightPerBaseUnit: true,
+  weightUomId: true,
+  allowManualUnitQuantity: true,
+  allowManualWeightQuantity: true,
+  receivingTolerance: {
+    select: { id: true, code: true, name: true, percentage: true, status: true },
+  },
+  weightUom: { select: { id: true, code: true } },
+} as const
+
+type ItemReceiptConfig = {
+  id: string
+  receivingToleranceId: string | null
+  receivingTolerancePercentage: unknown
+  receiptEntryMode: 'UNIT_ONLY' | 'WEIGHT_ONLY' | 'UNIT_AND_WEIGHT'
+  standardWeightPerBaseUnit: unknown
+  weightUomId: string | null
+  allowManualUnitQuantity: boolean
+  allowManualWeightQuantity: boolean
+  receivingTolerance: {
+    id: string
+    code: string
+    name: string
+    percentage: unknown
+    status: string
+  } | null
+  weightUom: { id: string; code: string } | null
+}
+
+async function loadItemReceiptConfigMap(tenantId: string, itemIds: string[]) {
+  if (!itemIds.length) return new Map<string, ItemReceiptConfig>()
+  const items = await prisma.masterItem.findMany({
+    where: { id: { in: itemIds }, tenantId, deletedAt: null },
+    select: itemReceiptConfigSelect,
+  })
+  return new Map(items.map((it) => [it.id, it as ItemReceiptConfig]))
+}
+
+function mapItemMasterTolerance(
+  tol: ItemReceiptConfig['receivingTolerance'],
+): { id: string; code: string; name: string; percentage: number } | null {
+  if (!tol) return null
+  return {
+    id: tol.id,
+    code: tol.code,
+    name: tol.name,
+    percentage: Number(tol.percentage),
+  }
+}
+
+function toleranceFieldsFromEvaluation(
+  tol: ReturnType<typeof evaluateGrnLineTolerance>,
+  input: GoodsReceiptLineInput,
+  itemConfig?: ItemReceiptConfig | null,
+): Pick<
+  repo.GrnLineCreateData,
+  | 'tolerancePercentage'
+  | 'variancePercentage'
+  | 'toleranceStatus'
+  | 'receivingToleranceIdSnapshot'
+  | 'receivingToleranceCodeSnapshot'
+  | 'receivingToleranceNameSnapshot'
+  | 'receivingTolerancePercentageSnapshot'
+  | 'maximumAllowedUnitQuantity'
+  | 'unitVariance'
+  | 'receivedWeight'
+  | 'expectedWeight'
+  | 'maximumAllowedWeight'
+  | 'weightVariance'
+  | 'weightVariancePercentage'
+  | 'weightConversionRateSnapshot'
+  | 'weightUomIdSnapshot'
+  | 'weightUomCodeSnapshot'
+  | 'manualUnitEntry'
+  | 'manualWeightEntry'
+  | 'weightToleranceStatus'
+  | 'requiresApproval'
+  | 'approvalReasons'
+  | 'shortCloseRequested'
+  | 'shortCloseReason'
+  | 'closeOpenQuantity'
+> {
+  const shortCloseRequested = Boolean(input.shortCloseRequested ?? input.closeOpenQuantity)
+  return {
+    tolerancePercentage: tol.tolerancePercentage,
+    variancePercentage: tol.variancePercentage,
+    toleranceStatus: tol.toleranceStatus,
+    receivingToleranceIdSnapshot: tol.receivingToleranceIdSnapshot,
+    receivingToleranceCodeSnapshot: tol.receivingToleranceCodeSnapshot,
+    receivingToleranceNameSnapshot: tol.receivingToleranceNameSnapshot,
+    receivingTolerancePercentageSnapshot: tol.receivingTolerancePercentageSnapshot,
+    maximumAllowedUnitQuantity: tol.maximumAllowedUnitQuantity,
+    unitVariance: tol.unitVariance,
+    receivedWeight: tol.receivedWeight,
+    expectedWeight: tol.expectedWeight,
+    maximumAllowedWeight: tol.maximumAllowedWeight,
+    weightVariance: tol.weightVariance,
+    weightVariancePercentage: tol.weightVariancePercentage,
+    weightConversionRateSnapshot: tol.weightConversionRateSnapshot,
+    weightUomIdSnapshot: itemConfig?.weightUomId ?? null,
+    weightUomCodeSnapshot: tol.weightUomCodeSnapshot,
+    manualUnitEntry: tol.manualUnitEntry,
+    manualWeightEntry: tol.manualWeightEntry,
+    weightToleranceStatus: tol.weightToleranceStatus as repo.GrnLineCreateData['weightToleranceStatus'],
+    requiresApproval: tol.requiresApproval,
+    approvalReasons: tol.approvalReasons as repo.GrnLineCreateData['approvalReasons'],
+    shortCloseRequested: tol.shortCloseRequested,
+    shortCloseReason: tol.shortCloseReason,
+    closeOpenQuantity: shortCloseRequested,
+  }
+}
+
 async function buildLineCreates(
   tenantId: string,
   po: Awaited<ReturnType<typeof loadReceivablePo>>,
@@ -174,15 +290,7 @@ async function buildLineCreates(
   const itemIds = [
     ...new Set(po.lines.map((l) => l.itemId).filter((id): id is string => Boolean(id))),
   ]
-  const items = itemIds.length
-    ? await prisma.masterItem.findMany({
-        where: { id: { in: itemIds }, tenantId, deletedAt: null },
-        select: { id: true, receivingTolerancePercentage: true },
-      })
-    : []
-  const itemTolById = new Map(
-    items.map((it) => [it.id, Number(it.receivingTolerancePercentage ?? 0)]),
-  )
+  const itemConfigById = await loadItemReceiptConfigMap(tenantId, itemIds)
 
   const result: repo.GrnLineCreateData[] = []
   for (let i = 0; i < lines.length; i++) {
@@ -233,15 +341,25 @@ async function buildLineCreates(
     const orderedUom = qty((poLine as { uomQuantity?: unknown }).uomQuantity) || toUomQuantity(ordered, factor)
     const previously = qty(poLine.receivedQuantity)
     const open = Math.max(0, ordered - previously)
-    const closeOpenQuantity = Boolean(input.closeOpenQuantity)
-    const itemTol = poLine.itemId ? itemTolById.get(poLine.itemId) ?? 0 : 0
+    const shortCloseRequested = Boolean(input.shortCloseRequested ?? input.closeOpenQuantity)
+    const itemConfig = poLine.itemId ? itemConfigById.get(poLine.itemId) : undefined
     const tol = evaluateGrnLineTolerance({
       openQuantity: open,
       receivedQuantity: received,
-      itemTolerancePct: itemTol,
+      receivingToleranceId: itemConfig?.receivingToleranceId,
+      masterTolerance: mapItemMasterTolerance(itemConfig?.receivingTolerance ?? null),
+      itemTolerancePct: itemConfig ? Number(itemConfig.receivingTolerancePercentage ?? 0) : 0,
       setupTolerancePct: overReceiptTolerancePct,
       allowOverReceipt: allowExcess,
-      closeOpenQuantity,
+      closeOpenQuantity: shortCloseRequested,
+      shortCloseRequested,
+      shortCloseReason: input.shortCloseReason,
+      receivedWeight: input.receivedWeight,
+      standardWeightPerBaseUnit: itemConfig ? Number(itemConfig.standardWeightPerBaseUnit ?? 0) : 0,
+      receiptEntryMode: itemConfig?.receiptEntryMode,
+      manualUnitEntry: input.manualUnitEntry,
+      manualWeightEntry: input.manualWeightEntry,
+      weightUomCode: itemConfig?.weightUom?.code ?? null,
     })
 
     const lineWarehouseId = input.warehouseId ?? headerWarehouseId
@@ -302,10 +420,7 @@ async function buildLineCreates(
       manufacturingDate: parseDateInput(input.manufacturingDate ?? undefined) ?? null,
       expiryDate: parseDateInput(input.expiryDate ?? undefined) ?? null,
       qcRequired,
-      tolerancePercentage: tol.tolerancePercentage,
-      variancePercentage: tol.variancePercentage,
-      toleranceStatus: tol.toleranceStatus,
-      closeOpenQuantity,
+      ...toleranceFieldsFromEvaluation(tol, input, itemConfig),
       remarks: input.remarks?.trim() || null,
     })
   }
@@ -431,13 +546,7 @@ export async function getReceivableLines(tenantId: string, purchaseOrderId: stri
     : []
   const uomById = new Map(uoms.map((u) => [u.id, u]))
   const itemIds = [...new Set(po.lines.map((l) => l.itemId).filter((id): id is string => Boolean(id)))]
-  const items = itemIds.length
-    ? await prisma.masterItem.findMany({
-        where: { id: { in: itemIds }, tenantId, deletedAt: null },
-        select: { id: true, receivingTolerancePercentage: true },
-      })
-    : []
-  const itemTolById = new Map(items.map((it) => [it.id, Number(it.receivingTolerancePercentage ?? 0)]))
+  const itemConfigById = await loadItemReceiptConfigMap(tenantId, itemIds)
   return {
     purchaseOrderId: po.id,
     orderNumber: po.orderNumber,
@@ -446,14 +555,81 @@ export async function getReceivableLines(tenantId: string, purchaseOrderId: stri
     vendorCode: po.vendor.code,
     vendorName: po.vendor.name,
     lines: po.lines
-      .map((line) =>
-        mapReceivableLineDto({
+      .map((line) => {
+        const itemConfig = line.itemId ? itemConfigById.get(line.itemId) : undefined
+        return mapReceivableLineDto({
           ...line,
           uom: line.uomId ? uomById.get(line.uomId) ?? null : null,
-          receivingTolerancePercentage: line.itemId ? itemTolById.get(line.itemId) ?? 0 : 0,
-        }),
-      )
+          receivingTolerancePercentage: itemConfig
+            ? Number(itemConfig.receivingTolerancePercentage ?? 0)
+            : 0,
+          receivingToleranceId: itemConfig?.receivingToleranceId ?? null,
+          receivingToleranceCode: itemConfig?.receivingTolerance?.code ?? null,
+          receiptEntryMode: itemConfig?.receiptEntryMode ?? 'UNIT_ONLY',
+          standardWeightPerBaseUnit: itemConfig
+            ? Number(itemConfig.standardWeightPerBaseUnit ?? 0)
+            : 0,
+          weightUomId: itemConfig?.weightUomId ?? null,
+          weightUomCode: itemConfig?.weightUom?.code ?? null,
+          requireWeightAtReceipt: false,
+        })
+      })
       .filter((l) => l.openQuantity > 0),
+  }
+}
+
+export async function evaluateGoodsReceiptLines(
+  tenantId: string,
+  input: { purchaseOrderId: string; lines: GoodsReceiptLineInput[] },
+) {
+  const po = await loadReceivablePo(tenantId, input.purchaseOrderId)
+  const settings = await resolveEffectivePurchaseDefaults(
+    tenantId,
+    (po as { plantId?: string | null }).plantId,
+  )
+  const allowExcess = settings.allowOverReceipt
+  let warehouseId = po.deliveryWarehouseId ?? settings.defaultWarehouseId
+  if (!warehouseId) {
+    const fallbackWh = await prisma.masterWarehouse.findFirst({
+      where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+      select: { id: true },
+    })
+    warehouseId = fallbackWh?.id ?? ''
+  }
+  const lines = await buildLineCreates(
+    tenantId,
+    po,
+    warehouseId,
+    settings.defaultReceivingLocationId,
+    allowExcess,
+    settings.overReceiptTolerancePct,
+    settings.autoCreateQualityInspection,
+    input.lines,
+  )
+  return {
+    purchaseOrderId: po.id,
+    requiresApproval: lines.some((l) => l.requiresApproval),
+    lines: lines.map((line) => ({
+      purchaseOrderLineId: line.purchaseOrderLineId,
+      lineNumber: line.lineNumber,
+      openQuantity: line.openQuantity,
+      receivedQuantity: line.receivedQuantity,
+      tolerancePercentage: line.tolerancePercentage,
+      variancePercentage: line.variancePercentage,
+      toleranceStatus: line.toleranceStatus,
+      receivingToleranceIdSnapshot: line.receivingToleranceIdSnapshot,
+      receivingToleranceCodeSnapshot: line.receivingToleranceCodeSnapshot,
+      receivingToleranceNameSnapshot: line.receivingToleranceNameSnapshot,
+      maximumAllowedUnitQuantity: line.maximumAllowedUnitQuantity,
+      receivedWeight: line.receivedWeight,
+      expectedWeight: line.expectedWeight,
+      maximumAllowedWeight: line.maximumAllowedWeight,
+      weightToleranceStatus: line.weightToleranceStatus,
+      requiresApproval: line.requiresApproval,
+      approvalReasons: line.approvalReasons,
+      shortQuantity: line.shortQuantity,
+      excessQuantity: line.excessQuantity,
+    })),
   }
 }
 
@@ -502,7 +678,7 @@ export async function createGoodsReceipt(
     inspectionRequired,
     input.lines,
   )
-  const toleranceApprovalRequired = lines.some((l) => lineRequiresToleranceApproval(l.toleranceStatus))
+  const toleranceApprovalRequired = lines.some((l) => l.requiresApproval)
 
   await assertDuplicateChallanPolicy(
     tenantId,
@@ -659,9 +835,7 @@ export async function updateGoodsReceipt(
     inspectionRequired,
   }
   if (lines) {
-    data.toleranceApprovalRequired = lines.some((l) =>
-      lineRequiresToleranceApproval(l.toleranceStatus),
-    )
+    data.toleranceApprovalRequired = lines.some((l) => l.requiresApproval)
   }
   if (input.receiptDate !== undefined) data.receiptDate = parseDateInput(input.receiptDate) ?? existing.receiptDate
   if (input.vendorChallanNumber !== undefined) data.vendorChallanNumber = challan
@@ -783,13 +957,7 @@ export async function submitGoodsReceipt(
   const itemIds = [
     ...new Set(existing.lines.map((l) => l.itemId).filter((x): x is string => Boolean(x))),
   ]
-  const items = itemIds.length
-    ? await prisma.masterItem.findMany({
-        where: { id: { in: itemIds }, tenantId, deletedAt: null },
-        select: { id: true, receivingTolerancePercentage: true },
-      })
-    : []
-  const itemTolById = new Map(items.map((it) => [it.id, Number(it.receivingTolerancePercentage ?? 0)]))
+  const itemConfigById = await loadItemReceiptConfigMap(tenantId, itemIds)
 
   let needsApproval = false
   for (const line of existing.lines) {
@@ -802,13 +970,28 @@ export async function submitGoodsReceipt(
     }
     const open = Math.max(0, qty(poLine.quantity) - qty(poLine.receivedQuantity))
     const received = qty(line.receivedQuantity)
+    const itemConfig = line.itemId ? itemConfigById.get(line.itemId) : undefined
+    const shortCloseRequested = Boolean(
+      (line as { shortCloseRequested?: boolean }).shortCloseRequested ??
+        (line as { closeOpenQuantity?: boolean }).closeOpenQuantity,
+    )
     const tol = evaluateGrnLineTolerance({
       openQuantity: open,
       receivedQuantity: received,
-      itemTolerancePct: line.itemId ? itemTolById.get(line.itemId) ?? 0 : 0,
+      receivingToleranceId: itemConfig?.receivingToleranceId,
+      masterTolerance: mapItemMasterTolerance(itemConfig?.receivingTolerance ?? null),
+      itemTolerancePct: itemConfig ? Number(itemConfig.receivingTolerancePercentage ?? 0) : 0,
       setupTolerancePct: settings.overReceiptTolerancePct,
       allowOverReceipt: settings.allowOverReceipt,
-      closeOpenQuantity: Boolean((line as { closeOpenQuantity?: boolean }).closeOpenQuantity),
+      closeOpenQuantity: shortCloseRequested,
+      shortCloseRequested,
+      shortCloseReason: (line as { shortCloseReason?: string | null }).shortCloseReason,
+      receivedWeight: (line as { receivedWeight?: unknown }).receivedWeight != null
+        ? qty((line as { receivedWeight?: unknown }).receivedWeight)
+        : null,
+      standardWeightPerBaseUnit: itemConfig ? Number(itemConfig.standardWeightPerBaseUnit ?? 0) : 0,
+      receiptEntryMode: itemConfig?.receiptEntryMode,
+      weightUomCode: itemConfig?.weightUom?.code ?? null,
     })
     if (tol.requiresApproval) needsApproval = true
   }
