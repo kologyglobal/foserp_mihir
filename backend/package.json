@@ -41,6 +41,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:deploy:hostinger": "node scripts/migrate-deploy.mjs",
     "db:recover-live-p3009": "tsx scripts/recover-live-p3009-blockers.ts",
+    "db:recover-live-p3018": "tsx scripts/recover-live-p3018-blockers.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:purchase-demo": "tsx scripts/seed-purchase-demo-data.ts",
     "db:seed:purchase-test-pack": "tsx scripts/seed-purchase-test-pack.ts",
