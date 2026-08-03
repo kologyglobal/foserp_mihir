@@ -4,6 +4,79 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Open — CRM Notifications (post-MVP)
+
+| Field | Value |
+|-------|-------|
+| Module | CRM Notifications |
+| Description | Initial production slice shipped 2026-08-03 (DB, service, event hooks, 15m scheduler, bell + centre + prefs). Remaining: email/push delivery, mandatory admin policy UI, manager escalation targets, meeting engine, SO delivery notifications, dashboard Action Zone shared counts, full integration-failure fan-out, digest email job |
+| Status | **in_progress** / READY WITH CONDITIONS |
+| Next step | `migrate deploy` `20260803100000_crm_notifications`; live smoke assign lead → unread count; wire Action Zone to `/notifications/summary` |
+
+---
+
+## Open — HRMS V1 (phased)
+
+| Field | Value |
+|-------|-------|
+| Module | HRMS |
+| Description | Phase 1–11 in code. **UI/UX redesign (2026-07-31)** shipped frontend-only Zoho People–inspired shell (`/hrms` home, employee 360, attendance register, leave/OT/payroll/loans/exit polish). Backend phases unchanged. |
+| Doc | [`docs/hrms/HRMS_UI_UX_REDESIGN.md`](hrms/HRMS_UI_UX_REDESIGN.md), [`HRMS_PHASE11_EXIT_FNF.md`](hrms/HRMS_PHASE11_EXIT_FNF.md) |
+| Status | **UI/UX READY WITH CONDITIONS** + Phase 11 **READY WITH CONDITIONS** (migrate + sync-permissions + vitest live + SPA UAT) |
+| Next step | Manual HRMS SPA UAT checklist in redesign doc; migrate/sync for Phase 1–11 backends; polish leftover transactional drawers / Leave Approvals nav / My HR linked employee |
+| Deferred (V1 non-goals) | Recruitment, ATS, performance management, LMS; portal filing (EPFO/ESIC/TRACES), Form 16/24Q, live bank payment gateway APIs, interest-bearing loan products, full annual TDS engine; OKR, GPS attendance, biometric device APIs, engagement |
+
+---
+
+## Done recently — Maintenance V2 Preventive (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Maintenance |
+| Description | PM Plan → due → generate MaintenanceTicket (PREVENTIVE) → existing repair/test/close → next due; checklist; PM compliance; dashboard due KPIs |
+| Doc | `docs/maintenance/MAINTENANCE_V2_PREVENTIVE.md` |
+| Status | **done** in code — **READY WITH CONDITIONS**: migrate `20260730210000_maintenance_v2_preventive` + `test-maintenance-v2.ts` |
+| Next step | Live harness PASS. Deferred: meter-based PM, AMC, IoT, auto scheduling |
+
+---
+
+## Done recently — Maintenance V1.1 Machine Health (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Maintenance |
+| Description | Failure SAFETY + rootCause/repairAction; automatic downtime/repair time; repeat breakdown; Machine Health API/UI; MFG active-ticket banner; PR `sourceType=MAINTENANCE` + part backlink; dashboard month KPIs; production impact + contractor reports |
+| Doc | `docs/maintenance/MAINTENANCE_V11_AUDIT.md`, `MACHINE_HEALTH.md`, `PRODUCTION_MAINTENANCE_INTEGRATION.md`, `MAINTENANCE_ANALYTICS.md`, `MAINTENANCE_V11_UAT.md` |
+| Status | **done** in code — **READY WITH CONDITIONS**: migrate `20260730200000_maintenance_v11_machine_health` + run `test-maintenance-v1.ts` / `test-maintenance-v11.ts` |
+| Next step | Live harness PASS; then optional human SPA UAT. Deferred: PM scheduler, calendar, AMC, IoT, OEE, CAPA |
+
+---
+
+## Done recently — CRM Tax Invoice → Money In bridge (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | CRM Commercial / Money In AR |
+| Description | Posted CRM tax invoices appear in Money In CRM queue (creator tag) → Accounting converts to SI (`CRM_TAX_INVOICE`) → receipt/allocation syncs payment back to Sales + Customer 360 |
+| Doc | `docs/accounting/CRM_TAX_INVOICE_MONEY_IN_BRIDGE.md` |
+| Status | **done** in code — **condition**: migrate deploy `20260730160000_crm_tax_invoice_ar_bridge` on stage |
+| Next step | Stage migrate + UAT: post CRM INV → crm-pending → Convert → post SI → allocate → verify CRM payment status |
+
+---
+
+## Done recently — Period Close FX revaluation (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Accounting / Period Close |
+| Description | Closing FX rates + unrealized AR/AP revaluation preview/post/reverse; dual-mode FE wizard |
+| Doc | `docs/accounting/PERIOD_CLOSE_FX_REVALUATION.md` |
+| Test evidence | `finance-fx-revaluation` **4/4 PASS**; migrate `20260730220000_finance_fx_revaluation` applied locally; `db:sync-permissions` (+5 FX keys) |
+| Status | **done** — **conditions**: Hostinger migrate + sync-permissions; map `UNREALIZED_FX_GAIN` / `UNREALIZED_FX_LOSS`; enable `MULTI_CURRENCY` |
+| Next step | Treasury FX / intercompany; live TPP AIS (external) |
+
+---
+
 ## Done recently — Accounting year-end P&L close (2026-07-30)
 
 | Field | Value |
@@ -13,7 +86,33 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Doc | `docs/accounting/PERIOD_CLOSE_STATUS.md` |
 | Test evidence | `finance-year-end-close` **8/8**; core finance pack **50/50**; BE/FE typecheck PASS; `test:period-close` PASS; `test:money-out` **68/68** |
 | Status | **done** for year-end P&L slice — **conditions**: Hostinger migrate deploy of `20260730121000_finance_year_end_close`; human SPA year-end walk |
-| Next step | Accruals/prepaid/FX reval (deferred); live TPP AIS/FX/intercompany (Bank & Cash phases) |
+| Next step | Treasury FX / intercompany; live TPP AIS (external) |
+
+---
+
+## Done recently — Period Close calendar + reopen requests (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Accounting / Period Close |
+| Description | Checklist templates (LE), calendar generate/CRUD, reopen-request approval workflow (approve reopens period until requestedUntil); dual-mode FE |
+| Doc | `docs/accounting/PERIOD_CLOSE_CALENDAR_REOPEN.md` |
+| Test evidence | BE typecheck PASS; live suite `finance-period-close-calendar-reopen` |
+| Status | **done** — **conditions**: Hostinger migrate `20260730200000_finance_period_close_calendar_reopen` + `db:sync-permissions` |
+| Next step | Treasury FX / intercompany |
+
+---
+
+## Done recently — Period-end accruals + prepaid (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Accounting / Period Close |
+| Description | Live accruals (post + auto-reverse next period) and prepaid amortisation schedules via `/accounting/period-adjustments`; default mappings `ACCRUED_EXPENSE_LIABILITY` / `PREPAID_EXPENSE_ASSET`; dual-mode FE on Period Close Accruals/Prepaid pages |
+| Doc | `docs/accounting/PERIOD_END_ADJUSTMENTS.md` |
+| Test evidence | BE/FE typecheck PASS; `finance-period-end-adjustments` **4/4**; migration + permissions synced locally |
+| Status | **done** for accruals/prepaid — **conditions**: Hostinger migrate deploy of `20260730190000_finance_period_end_adjustments` + `db:sync-permissions` |
+| Next step | Treasury FX / intercompany |
 
 ---
 
@@ -60,7 +159,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Module | Maintenance |
 | Description | Spare parts post `ISSUE_TO_MAINTENANCE` via inventory `postStockMovement` (on-hand + cost entry); FE honest stockable vs free-text; PR shortage deep-link (`source=MAINTENANCE`); `sync-permissions` verified |
 | Test | `npx tsx scripts/test-maintenance-v1.ts` — **PASS** (ISSUE `STM-000187`; insufficient stock fail-closed). External contractor **SKIP** (no vendor). |
-| Status | **done** for V1 product gate (**READY**). Human: optional SPA walk; contractor UAT when vendor exists. Deferred: PM scheduler; persisted PR `sourceType` column. |
+| Status | **done** for V1 product gate (**READY**). V1.1 closed PR `sourceType` persistence (see V1.1 section above). Human: optional SPA walk; contractor UAT when vendor exists. Deferred: PM scheduler. |
 | Docs | `docs/maintenance/` |
 
 ---
@@ -642,10 +741,10 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Field | Value |
 |-------|-------|
 | Module | Accounting |
-| Description | **Finance Settings Phase 1** + journals/AR/AP/treasury + **Period Close P1 + Close Control Hardening + year-end P&L→RE** (2026-07-30). |
-| Next step | Accruals / prepaid / FX reval posting wizards; close calendar; reopen-request workflow; Budgeting Phase 2+ / GST filing as prioritized. |
-| Test required | `tests/finance/finance-year-end-close.test.ts` + `period-close-hardening` + `npm run test:period-close` |
-| Status | partial (year-end shipped; accruals/calendar still demo) |
+| Description | **Finance Settings Phase 1** + journals/AR/AP/treasury + **Period Close P1 + Close Control Hardening + year-end P&L→RE + accruals/prepaid + calendar/reopen + FX reval** (2026-07-30). |
+| Next step | Treasury FX / intercompany; Budgeting Phase 2+ / GST filing as prioritized. |
+| Test required | `tests/finance/finance-year-end-close.test.ts` + `finance-period-end-adjustments` + `finance-period-close-calendar-reopen` + `finance-fx-revaluation` + `period-close-hardening` |
+| Status | partial (year-end + accruals/prepaid + calendar/reopen + FX reval shipped; treasury FX / IC still open) |
 
 ### P3-6: Commercial terms single source
 

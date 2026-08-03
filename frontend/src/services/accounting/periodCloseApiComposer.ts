@@ -64,6 +64,30 @@ export async function loadApiPeriodCloseSetup(): Promise<PeriodCloseSetup> {
   const currentFy = pickCurrentFy(years)
   const periods = currentFy ? await listPeriods(le.id, currentFy.id) : []
 
+  let taskTemplates: PeriodCloseSetup['taskTemplates'] = []
+  try {
+    const { listPeriodCloseTemplates } = await import('@/services/bridges/financeApiBridge')
+    const templates = await listPeriodCloseTemplates(le.id)
+    const moduleMap: Record<string, import('@/types/periodClose').CloseTaskModule> = {
+      SALES_AR: 'sales_ar',
+      PURCHASE_AP: 'purchase_ap',
+      INVENTORY: 'inventory',
+      MANUFACTURING: 'manufacturing',
+      FIXED_ASSETS: 'fixed_assets',
+      BANK_CASH: 'bank_cash',
+      GST_TDS: 'gst_tds',
+      GENERAL_LEDGER: 'general_ledger',
+    }
+    taskTemplates = templates.map((t) => ({
+      id: t.id,
+      task: t.title,
+      module: moduleMap[t.module] ?? 'general_ledger',
+      defaultOwnerRole: t.defaultOwnerRole ?? 'Finance',
+    }))
+  } catch {
+    taskTemplates = []
+  }
+
   return {
     companies: [{ id: le.id, name: le.displayName }],
     fiscalYears: years.map((y) => ({
@@ -80,7 +104,7 @@ export async function loadApiPeriodCloseSetup(): Promise<PeriodCloseSetup> {
       end: dateOnly(p.endDate),
       id: p.id,
     })),
-    taskTemplates: [],
+    taskTemplates,
     lockPolicies: [
       { module: 'General Ledger', softLockDaysBefore: 0, hardLockOnClose: true },
       { module: 'Payables', softLockDaysBefore: 0, hardLockOnClose: true },

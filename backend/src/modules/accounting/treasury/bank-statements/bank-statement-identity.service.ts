@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import type { BankStatementDocumentType } from './bank-statement.types.js'
 
 /**
  * Deterministic identity keys for bank statement de-duplication across re-imports.
@@ -11,6 +12,10 @@ export interface StatementUniquenessKeyInput {
   statementReference: string
   periodStartDate: Date
   periodEndDate: Date
+  /** Distinguishes overlapping provisional CAMT.052/.054 snapshots from end-of-day 053. */
+  documentType?: BankStatementDocumentType | null
+  /** Message/container identity when present (CAMT MsgId:StmtId). */
+  externalStatementId?: string | null
 }
 
 function isoDate(date: Date): string {
@@ -19,15 +24,22 @@ function isoDate(date: Date): string {
 
 /** `BankStatement.statementUniquenessKey` — dedupe key across re-imports of the same period/reference. */
 export function buildStatementUniquenessKey(input: StatementUniquenessKeyInput): string {
-  const raw = [
+  const parts = [
     input.tenantId,
     input.legalEntityId,
     input.treasuryAccountId,
     input.statementReference.trim().toUpperCase(),
     isoDate(input.periodStartDate),
     isoDate(input.periodEndDate),
-  ].join('|')
-  return createHash('sha256').update(raw).digest('hex')
+  ]
+  const documentType = input.documentType ?? 'END_OF_DAY_STATEMENT'
+  const externalId = (input.externalStatementId ?? '').trim().toUpperCase()
+  // Keep legacy key shape for canonical end-of-day docs without an external message id
+  // so re-imports of existing MT940/CAMT.053 statements still collide correctly.
+  if (documentType !== 'END_OF_DAY_STATEMENT' || externalId) {
+    parts.push(documentType.toUpperCase(), externalId)
+  }
+  return createHash('sha256').update(parts.join('|')).digest('hex')
 }
 
 export interface StatementLineHashInput {

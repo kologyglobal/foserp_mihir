@@ -6,8 +6,9 @@
  * - Post SYSTEM journal zeroing P&L into RETAINED_EARNINGS (idempotent)
  * - Harden FY close: all periods CLOSED + year-end run present
  *
- * Deferred: accruals/prepaid/FX reval wizards; opening-balance voucher
+ * Deferred: FX reval wizard; opening-balance voucher
  * (continuous GL carries BS naturally); reopen-request workflow.
+ * Accruals/prepaid: see `period-adjustments/` (2026-07-30).
  */
 import type { Account, AccountingPeriod, FinancialYear, YearEndCloseRun } from '@prisma/client'
 import { prisma } from '../../../config/prisma.js'

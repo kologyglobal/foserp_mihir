@@ -13,7 +13,7 @@ import {
   getRouting,
   getRoutingVersion,
   getRoutingWhereUsed,
-  listMachines,
+  listAllMachines,
   listWorkCentres,
   updateRouting,
   type RoutingWhereUsed,
@@ -148,16 +148,16 @@ export function RoutingDetailPage() {
     }
     setLoading(true)
     try {
-      const [routingRes, wcRes, machineRes] = await Promise.all([
+      const [routingRes, wcRes, machineRows] = await Promise.all([
         getRouting(routingId),
         listWorkCentres({ limit: 100 }),
-        listMachines({ limit: 200 }),
+        listAllMachines(),
       ])
       const nextVersions = routingRes.data.versions ?? []
       setRouting(routingRes.data)
       setVersions(nextVersions)
       setWorkCentres(wcRes.data)
-      setMachines(machineRes.data)
+      setMachines(machineRows)
       const defaultId = pickDefaultVersionId(nextVersions)
       setSelectedVersionId(defaultId)
       if (defaultId) await loadVersionDetail(defaultId)

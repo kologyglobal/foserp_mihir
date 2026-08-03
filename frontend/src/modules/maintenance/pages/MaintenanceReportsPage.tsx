@@ -5,9 +5,10 @@ import { OperationalPageShell } from '@/components/design-system/OperationalPage
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { Input, Select } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { listMachines } from '@/services/api/manufacturingApi'
+import { listAllMachines } from '@/services/api/manufacturingApi'
 import {
   getMaintenanceReports,
+  getPmComplianceReport,
   type MaintenanceFailureCategory,
   type MaintenanceStatus,
 } from '@/services/api/maintenanceApi'
@@ -26,10 +27,13 @@ export function MaintenanceReportsPage() {
   const [status, setStatus] = useState<MaintenanceStatus | ''>('')
   const [failureCategory, setFailureCategory] = useState<MaintenanceFailureCategory | ''>('')
   const [data, setData] = useState<Awaited<ReturnType<typeof getMaintenanceReports>>['data'] | null>(null)
+  const [pmCompliance, setPmCompliance] = useState<
+    Awaited<ReturnType<typeof getPmComplianceReport>>['data'] | null
+  >(null)
 
   useEffect(() => {
-    void listMachines({ limit: 200 })
-      .then((r) => setMachines(r.data))
+    void listAllMachines()
+      .then((rows) => setMachines(rows))
       .catch(() => setMachines([]))
   }, [])
 
@@ -40,14 +44,22 @@ export function MaintenanceReportsPage() {
     }
     setLoading(true)
     try {
-      const res = await getMaintenanceReports({
-        from: from || undefined,
-        to: to || undefined,
-        machineId: machineId || undefined,
-        status: status || undefined,
-        failureCategory: failureCategory || undefined,
-      })
+      const [res, pm] = await Promise.all([
+        getMaintenanceReports({
+          from: from || undefined,
+          to: to || undefined,
+          machineId: machineId || undefined,
+          status: status || undefined,
+          failureCategory: failureCategory || undefined,
+        }),
+        getPmComplianceReport({
+          from: from || undefined,
+          to: to || undefined,
+          machineId: machineId || undefined,
+        }).catch(() => ({ data: null })),
+      ])
       setData(res.data)
+      setPmCompliance(pm.data)
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load reports')
       setData(null)
@@ -116,7 +128,7 @@ export function MaintenanceReportsPage() {
             onChange={(e) => setFailureCategory(e.target.value as MaintenanceFailureCategory | '')}
           >
             <option value="">All</option>
-            {['MECHANICAL', 'ELECTRICAL', 'HYDRAULIC', 'PNEUMATIC', 'CONTROL', 'OTHER'].map((s) => (
+            {['MECHANICAL', 'ELECTRICAL', 'HYDRAULIC', 'PNEUMATIC', 'CONTROL', 'SAFETY', 'OTHER'].map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -186,15 +198,17 @@ export function MaintenanceReportsPage() {
 
           {data.contractors.length > 0 && perms.canViewCost ? (
             <section>
-              <h2 className="mb-2 text-sm font-semibold">Contractor summary</h2>
+              <h2 className="mb-2 text-sm font-semibold">5. Contractor Performance</h2>
               <div className="overflow-hidden rounded-xl border border-erp-border bg-white">
                 <table className="min-w-full text-left text-[13px]">
                   <thead className="border-b border-erp-border bg-slate-50 text-[11px] uppercase text-erp-muted">
                     <tr>
                       <th className="px-3 py-2">Contractor</th>
                       <th className="px-3 py-2">Jobs</th>
+                      <th className="px-3 py-2">Closed</th>
                       <th className="px-3 py-2">Avg repair</th>
                       <th className="px-3 py-2 text-right">Total cost</th>
+                      <th className="px-3 py-2 text-right">Avg cost</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -204,8 +218,93 @@ export function MaintenanceReportsPage() {
                           {c.code} — {c.name}
                         </td>
                         <td className="px-3 py-2">{c.jobs}</td>
+                        <td className="px-3 py-2">{c.closedJobs ?? '—'}</td>
                         <td className="px-3 py-2">{c.avgRepairMinutes}m</td>
                         <td className="px-3 py-2 text-right">{formatInr(c.totalCost)}</td>
+                        <td className="px-3 py-2 text-right">
+                          {formatInr(c.jobs ? c.totalCost / c.jobs : 0)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {(data.productionImpactByMachine?.length ?? 0) > 0 ? (
+            <section>
+              <h2 className="mb-2 text-sm font-semibold">6. Production Impact</h2>
+              <div className="overflow-hidden rounded-xl border border-erp-border bg-white">
+                <table className="min-w-full text-left text-[13px]">
+                  <thead className="border-b border-erp-border bg-slate-50 text-[11px] uppercase text-erp-muted">
+                    <tr>
+                      <th className="px-3 py-2">Machine</th>
+                      <th className="px-3 py-2 text-right">Breakdowns</th>
+                      <th className="px-3 py-2 text-right">Affected WOs</th>
+                      <th className="px-3 py-2 text-right">Affected JCs</th>
+                      <th className="px-3 py-2 text-right">Prod. downtime</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.productionImpactByMachine!.map((r) => (
+                      <tr key={r.machineId} className="border-b border-erp-border/60 last:border-0">
+                        <td className="px-3 py-2">
+                          {r.code} — {r.name}
+                        </td>
+                        <td className="px-3 py-2 text-right">{r.breakdowns}</td>
+                        <td className="px-3 py-2 text-right">{r.affectedWorkOrders}</td>
+                        <td className="px-3 py-2 text-right">{r.affectedJobCards}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {Math.floor(r.productionDowntimeMinutes / 60)}h {r.productionDowntimeMinutes % 60}m
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {pmCompliance ? (
+            <section>
+              <h2 className="mb-2 text-sm font-semibold">7. PM Compliance</h2>
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <SummaryCard label="Scheduled" value={String(pmCompliance.summary.scheduled)} />
+                <SummaryCard label="On Time" value={String(pmCompliance.summary.completedOnTime)} />
+                <SummaryCard label="Late" value={String(pmCompliance.summary.completedLate)} />
+                <SummaryCard label="Overdue" value={String(pmCompliance.summary.overdue)} />
+              </div>
+              <div className="overflow-hidden rounded-xl border border-erp-border bg-white">
+                <table className="min-w-full text-left text-[13px]">
+                  <thead className="border-b border-erp-border bg-slate-50 text-[11px] uppercase text-erp-muted">
+                    <tr>
+                      <th className="px-3 py-2">Plan</th>
+                      <th className="px-3 py-2">Machine</th>
+                      <th className="px-3 py-2">Due</th>
+                      <th className="px-3 py-2">Completed</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2 text-right">Delay</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pmCompliance.rows.map((r, i) => (
+                      <tr key={`${r.planNumber}-${r.dueDate}-${i}`} className="border-b border-erp-border/60 last:border-0">
+                        <td className="px-3 py-2">
+                          {r.ticketId ? (
+                            <Link to={`/maintenance/tickets/${r.ticketId}`} className="text-erp-primary hover:underline">
+                              {r.planNumber}
+                            </Link>
+                          ) : (
+                            r.planNumber
+                          )}
+                          <div className="text-[11px] text-erp-muted">{r.planName}</div>
+                        </td>
+                        <td className="px-3 py-2">{r.machineCode}</td>
+                        <td className="px-3 py-2">{r.dueDate ?? '—'}</td>
+                        <td className="px-3 py-2">{r.completedDate ?? '—'}</td>
+                        <td className="px-3 py-2">{r.status.replace(/_/g, ' ')}</td>
+                        <td className="px-3 py-2 text-right">{r.delayDays ? `${r.delayDays}d` : '—'}</td>
                       </tr>
                     ))}
                   </tbody>

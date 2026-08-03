@@ -1,13 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Download, FileUp, Loader2 } from 'lucide-react'
 import { AccountDrawerShell } from './AccountDrawerShell'
+import { Select } from '@/components/forms/Inputs'
+import { isApiMode } from '@/config/apiConfig'
 import {
-  getImportTemplateCsv,
+  downloadImportTemplate,
   importAccounts,
   validateAccountImport,
   ChartOfAccountsServiceError,
+  type CoaImportDuplicateMode,
 } from '@/services/accounting/chartOfAccountsService'
+import {
+  ensureLegalEntityId,
+  listLegalEntities,
+  useFinanceSetupStore,
+} from '@/services/bridges/financeApiBridge'
 import type { AccountImportPreview } from '@/types/chartOfAccounts'
+import type { LegalEntity } from '@/types/financeSetup'
+import { formatApiError } from '@/services/api/apiErrors'
 import { cn } from '@/utils/cn'
 
 const STEPS = [
@@ -19,16 +29,6 @@ const STEPS = [
   { id: 6, label: 'Confirm' },
 ] as const
 
-function downloadBlob(fileName: string, content: string, mime: string) {
-  const blob = new Blob([content], { type: mime })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = fileName
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 export function AccountImportDialog({
   open,
   onClose,
@@ -38,6 +38,10 @@ export function AccountImportDialog({
   onClose: () => void
   onImported?: (result: { imported: number; message: string }) => void
 }) {
+  const api = isApiMode()
+  const selectedFromStore = useFinanceSetupStore((s) => s.selectedLegalEntityId)
+  const setSelectedLegalEntityId = useFinanceSetupStore((s) => s.setSelectedLegalEntityId)
+
   const [step, setStep] = useState(1)
   const [fileName, setFileName] = useState('')
   const [csvText, setCsvText] = useState('')
@@ -45,8 +49,35 @@ export function AccountImportDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [entities, setEntities] = useState<LegalEntity[]>([])
+  const [legalEntityId, setLegalEntityId] = useState('')
+  const [duplicateMode, setDuplicateMode] = useState<CoaImportDuplicateMode>('skip')
 
   const errorRows = useMemo(() => preview?.rows.filter((r) => r.status === 'error') ?? [], [preview])
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const list = await listLegalEntities()
+        if (cancelled) return
+        setEntities(list.filter((e) => e.isActive !== false))
+        const resolved = await ensureLegalEntityId(selectedFromStore ?? undefined).catch(() => '')
+        if (!cancelled && resolved) {
+          setLegalEntityId(resolved)
+          setSelectedLegalEntityId(resolved)
+        } else if (!cancelled && list[0]?.id) {
+          setLegalEntityId(list[0].id)
+        }
+      } catch {
+        if (!cancelled) setEntities([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, selectedFromStore, setSelectedLegalEntityId])
 
   function reset() {
     setStep(1)
@@ -56,6 +87,7 @@ export function AccountImportDialog({
     setBusy(false)
     setError(null)
     setSuccessMessage(null)
+    setDuplicateMode('skip')
   }
 
   function handleClose() {
@@ -68,14 +100,18 @@ export function AccountImportDialog({
       setError('Upload a CSV file before validating.')
       return
     }
+    if (api && !legalEntityId) {
+      setError('Select a legal entity before validating.')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
-      const result = await validateAccountImport(fileName || 'import.csv', csvText)
+      const result = await validateAccountImport(fileName || 'import.csv', csvText, { duplicateMode })
       setPreview(result)
       setStep(result.errorRows > 0 ? 5 : 4)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Validation failed')
+      setError(api ? formatApiError(e) : e instanceof Error ? e.message : 'Validation failed')
     } finally {
       setBusy(false)
     }
@@ -83,15 +119,40 @@ export function AccountImportDialog({
 
   async function runImport() {
     if (!preview) return
+    if (api && !legalEntityId) {
+      setError('Select a legal entity before import.')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
-      const result = await importAccounts(preview)
+      const result = await importAccounts(preview, {
+        legalEntityId: legalEntityId || undefined,
+        duplicateMode,
+      })
       setSuccessMessage(result.message)
       onImported?.(result)
       setStep(6)
     } catch (e) {
-      setError(e instanceof ChartOfAccountsServiceError ? e.message : 'Import failed')
+      setError(
+        e instanceof ChartOfAccountsServiceError
+          ? e.message
+          : api
+            ? formatApiError(e)
+            : 'Import failed',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDownloadTemplate() {
+    setBusy(true)
+    setError(null)
+    try {
+      await downloadImportTemplate()
+    } catch (e) {
+      setError(api ? formatApiError(e) : e instanceof Error ? e.message : 'Template download failed')
     } finally {
       setBusy(false)
     }
@@ -103,7 +164,11 @@ export function AccountImportDialog({
       onClose={handleClose}
       eyebrow="Import"
       title="Import chart of accounts"
-      subtitle="Demo session only — imports are not persisted to the database"
+      subtitle={
+        api
+          ? 'Live import — accounts are saved to the database for the selected legal entity'
+          : 'Demo session only — imports are not persisted to the database'
+      }
       widthClassName="max-w-xl"
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -145,7 +210,7 @@ export function AccountImportDialog({
                 type="button"
                 className="erp-btn erp-btn-primary h-9 px-4 text-[12px] font-semibold"
                 onClick={runValidate}
-                disabled={busy || !csvText.trim()}
+                disabled={busy || !csvText.trim() || (api && !legalEntityId)}
               >
                 {busy ? <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" /> : null}
                 Validate
@@ -175,7 +240,7 @@ export function AccountImportDialog({
                 type="button"
                 className="erp-btn erp-btn-primary h-9 px-4 text-[12px] font-semibold"
                 onClick={runImport}
-                disabled={busy || preview.errorRows > 0}
+                disabled={busy || preview.errorRows > 0 || (api && !legalEntityId)}
               >
                 {busy ? <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" /> : null}
                 Confirm import
@@ -185,10 +250,51 @@ export function AccountImportDialog({
         </div>
       }
     >
-      <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-        <strong>Demo session only.</strong> Imported accounts exist in this browser session via the mock service — they are
-        not saved to MySQL.
-      </div>
+      {api ? (
+        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
+          <strong>Live import.</strong> Valid rows are written to MySQL for the selected legal entity
+          (permissions: <code className="text-[11px]">finance.coa.manage</code>).
+        </div>
+      ) : (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+          <strong>Demo session only.</strong> Imported accounts exist in this browser session via the mock
+          service — they are not saved to MySQL. Set <code className="text-[11px]">VITE_USE_API=true</code> for
+          live import.
+        </div>
+      )}
+
+      {api ? (
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <label className="block text-[12px]">
+            <span className="mb-1 block font-semibold text-erp-text">Legal entity</span>
+            <Select
+              value={legalEntityId}
+              onChange={(e) => {
+                setLegalEntityId(e.target.value)
+                if (e.target.value) setSelectedLegalEntityId(e.target.value)
+              }}
+            >
+              <option value="">— Select —</option>
+              {entities.map((le) => (
+                <option key={le.id} value={le.id}>
+                  {le.displayName || le.legalName} ({le.code})
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label className="block text-[12px]">
+            <span className="mb-1 block font-semibold text-erp-text">If account code exists</span>
+            <Select
+              value={duplicateMode}
+              onChange={(e) => setDuplicateMode(e.target.value as CoaImportDuplicateMode)}
+            >
+              <option value="skip">Skip existing</option>
+              <option value="update">Update existing</option>
+              <option value="reject">Reject row</option>
+            </Select>
+          </label>
+        </div>
+      ) : null}
 
       <ol className="mb-5 flex flex-wrap gap-1">
         {STEPS.map((s) => (
@@ -224,12 +330,10 @@ export function AccountImportDialog({
           <button
             type="button"
             className="erp-btn erp-btn-secondary h-9 px-3 text-[12px] font-semibold"
-            onClick={() => {
-              const csv = getImportTemplateCsv()
-              downloadBlob('chart-of-accounts-import-template.csv', csv, 'text/csv;charset=utf-8')
-            }}
+            onClick={() => void handleDownloadTemplate()}
+            disabled={busy}
           >
-            <Download className="mr-1.5 h-3.5 w-3.5" />
+            {busy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}
             Download template
           </button>
         </div>
@@ -237,7 +341,10 @@ export function AccountImportDialog({
 
       {step === 2 ? (
         <div className="space-y-3 text-[12px]">
-          <p>Upload a comma-separated file. Maximum recommended: 500 rows for demo validation.</p>
+          <p>
+            Upload a comma-separated file.
+            {api ? ' Maximum 2,000 rows per import.' : ' Maximum recommended: 500 rows for demo validation.'}
+          </p>
           <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-erp-border bg-erp-surface px-4 py-8 hover:bg-erp-surface-alt">
             <FileUp className="h-8 w-8 text-erp-muted" />
             <span className="font-semibold text-erp-text">Choose CSV file</span>
@@ -266,10 +373,13 @@ export function AccountImportDialog({
       {step === 3 ? (
         <div className="space-y-2 text-[12px]">
           <p>
-            File: <strong>{fileName || 'import.csv'}</strong> — {csvText.split(/\r?\n/).filter((l) => l.trim()).length} lines
-            detected.
+            File: <strong>{fileName || 'import.csv'}</strong> — {csvText.split(/\r?\n/).filter((l) => l.trim()).length}{' '}
+            lines detected.
           </p>
-          <p className="text-erp-muted">Click Validate to parse rows and check mandatory fields, duplicates, and parent references.</p>
+          <p className="text-erp-muted">
+            Click Validate to parse rows and check mandatory fields, duplicates, and parent references.
+            {api ? ' Parents that already exist on the legal entity will be accepted on import.' : null}
+          </p>
         </div>
       ) : null}
 
@@ -343,12 +453,22 @@ export function AccountImportDialog({
       {step === 6 && preview && !successMessage ? (
         <div className="space-y-3 text-[12px]">
           <p>
-            Ready to import <strong>{preview.validRows}</strong> account(s) from <strong>{preview.fileName}</strong>.
+            Ready to import <strong>{preview.validRows}</strong> account(s) from <strong>{preview.fileName}</strong>
+            {api && legalEntityId
+              ? ` for legal entity ${entities.find((e) => e.id === legalEntityId)?.displayName ?? legalEntityId}`
+              : null}
+            .
           </p>
-          <p className="text-erp-muted">
-            This action updates the in-memory demo chart only. Refreshing the page will restore seed data unless the mock
-            store is extended.
-          </p>
+          {api ? (
+            <p className="text-erp-muted">
+              This writes accounts to the database. Duplicate codes will be handled as: <strong>{duplicateMode}</strong>.
+            </p>
+          ) : (
+            <p className="text-erp-muted">
+              This action updates the in-memory demo chart only. Refreshing the page will restore seed data unless the
+              mock store is extended.
+            </p>
+          )}
           {preview.errorRows > 0 ? (
             <p className="font-semibold text-red-700">Resolve {preview.errorRows} error row(s) before confirming.</p>
           ) : null}

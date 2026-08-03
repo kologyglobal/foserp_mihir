@@ -2,7 +2,14 @@
  * Bank connector adapter contract (Phase 5D1 scaffold + 5D2 live/sandbox pull).
  */
 
-export type BankConnectorStatementFormatHint = 'MT940' | 'CAMT053' | 'CSV' | 'OTHER' | 'UNKNOWN'
+export type BankConnectorStatementFormatHint =
+  | 'MT940'
+  | 'CAMT053'
+  | 'CAMT052'
+  | 'CAMT054'
+  | 'CSV'
+  | 'OTHER'
+  | 'UNKNOWN'
 
 export interface BankConnectorRemoteFile {
   name: string

@@ -33,6 +33,8 @@ export function sourceDocumentRoute(
       return `/dispatch/${sourceDocumentId}`
     case 'PROFORMA_INVOICE':
       return `/sales/proforma-invoices/${sourceDocumentId}`
+    case 'CRM_TAX_INVOICE':
+      return `/sales/invoices/${sourceDocumentId}`
     case 'PURCHASE_ORDER':
       return `/purchase/orders/${sourceDocumentId}`
     case 'GOODS_RECEIPT':
@@ -52,6 +54,8 @@ export function sourceTypeLabel(sourceType: string): string {
       return 'Outbound Dispatch'
     case 'PROFORMA_INVOICE':
       return 'Proforma Invoice'
+    case 'CRM_TAX_INVOICE':
+      return 'CRM Tax Invoice'
     case 'PURCHASE_ORDER':
       return 'Purchase Order'
     case 'GOODS_RECEIPT':

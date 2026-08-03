@@ -503,7 +503,11 @@ export function CodeSeriesFormPage() {
 export function CodeSeriesDetailPage() {
   const { id } = useParams()
   const record = useCodeSeriesStore((s) => (id ? s.getSeries(id) : undefined))
-  const auditLog = useCodeSeriesStore((s) => s.auditLog.filter((a) => a.seriesId === id).slice(0, 10))
+  const allAuditLog = useCodeSeriesStore((s) => s.auditLog)
+  const auditLog = useMemo(
+    () => allAuditLog.filter((a) => a.seriesId === id).slice(0, 10),
+    [allAuditLog, id],
+  )
   if (!record) return <MasterNotFound message="Code series not found." />
 
   let nextCode = '—'

@@ -277,7 +277,7 @@ export async function deleteBankStatementLine(statementId: string, lineId: strin
 
 export async function createImportBatch(input: {
   treasuryAccountId: string
-  importFormat: 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'AUTO_DETECT'
+  importFormat: 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054' | 'AUTO_DETECT'
   mappingTemplateId?: string
   file: File
 }) {

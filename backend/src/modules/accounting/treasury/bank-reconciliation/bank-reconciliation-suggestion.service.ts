@@ -112,7 +112,12 @@ export async function generateSuggestionsForSession(
 ): Promise<SuggestionDto[]> {
   const settings = await getEffectiveMatchingSettings(tenantId, statement.treasuryAccountId)
   const lines = await readRepo.listStatementLines(tenantId, statement.id)
-  const openLines = lines.filter((l) => l.matchStatus === 'UNMATCHED' || l.matchStatus === 'PARTIALLY_MATCHED')
+  const openLines = lines.filter(
+    (l) =>
+      !l.isExcluded &&
+      l.matchStatus !== 'EXCLUDED' &&
+      (l.matchStatus === 'UNMATCHED' || l.matchStatus === 'PARTIALLY_MATCHED'),
+  )
 
   const existingPending = new Set(
     (await repo.findPendingSuggestionsForSession(tenantId, session.id)).flatMap((s) => s.statementLineIds as string[]),

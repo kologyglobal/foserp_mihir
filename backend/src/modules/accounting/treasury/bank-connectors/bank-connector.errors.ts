@@ -51,3 +51,16 @@ export class BankConnectorProbeFailedError extends AppError {
     super(422, message, 'BANK_CONNECTOR_PROBE_FAILED')
   }
 }
+
+export class BankConnectorSyncInProgressError extends ConflictError {
+  constructor(
+    message = 'Bank connector sync is already in progress on another instance',
+    public readonly syncLeaseUntil: string | null = null,
+  ) {
+    super(message)
+    Object.defineProperty(this, 'code', { value: 'BANK_CONNECTOR_SYNC_IN_PROGRESS' })
+    Object.defineProperty(this, 'details', {
+      value: syncLeaseUntil ? { syncLeaseUntil } : undefined,
+    })
+  }
+}

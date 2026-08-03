@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.054.001.02">
+  <BkToCstmrDbtCdtNtfctn>
+    <GrpHdr>
+      <MsgId>CAMT054-MSG-001</MsgId>
+      <CreDtTm>2026-07-02T09:15:00</CreDtTm>
+    </GrpHdr>
+    <Ntfctn>
+      <Id>NTF-CAMT054-001</Id>
+      <CreDtTm>2026-07-02T09:15:00</CreDtTm>
+      <Acct>
+        <Id>
+          <Othr>
+            <Id>998877665544</Id>
+          </Othr>
+        </Id>
+        <Ccy>INR</Ccy>
+      </Acct>
+      <Ntry>
+        <Amt Ccy="INR">40000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <BookgDt>
+          <Dt>2026-07-02</Dt>
+        </BookgDt>
+        <ValDt>
+          <Dt>2026-07-02</Dt>
+        </ValDt>
+        <AcctSvcrRef>REF-C1</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <Refs>
+              <EndToEndId>E2E-C1</EndToEndId>
+              <TxId>TX-C1</TxId>
+            </Refs>
+            <RmtInf>
+              <Ustrd>Credit notification customer ABC</Ustrd>
+            </RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="INR">5000.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <BookgDt>
+          <Dt>2026-07-02</Dt>
+        </BookgDt>
+        <ValDt>
+          <Dt>2026-07-02</Dt>
+        </ValDt>
+        <AcctSvcrRef>REF-D2</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <Refs>
+              <EndToEndId>E2E-D2</EndToEndId>
+              <TxId>TX-D2</TxId>
+            </Refs>
+            <RmtInf>
+              <Ustrd>Debit notification bank charge</Ustrd>
+            </RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+    </Ntfctn>
+  </BkToCstmrDbtCdtNtfctn>
+</Document>

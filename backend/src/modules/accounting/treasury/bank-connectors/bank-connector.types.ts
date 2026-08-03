@@ -72,6 +72,9 @@ export interface BankConnectorDto {
   lastSyncAt: string | null
   lastSyncStatus: BankConnectorProbeStatusCode | null
   lastSyncMessage: string | null
+  /** True when another instance holds an unexpired sync lease. */
+  syncInProgress: boolean
+  syncLeaseUntil: string | null
   createdBy: string | null
   updatedBy: string | null
   createdAt: string
@@ -129,6 +132,8 @@ export function toBankConnectorDto(
 
   const lastOk = row.lastTestStatus === 'OK'
   const isLiveConnected = row.status === 'ENABLED' && lastOk
+  const syncLeaseUntil = row.syncLockUntil ?? null
+  const syncInProgress = Boolean(syncLeaseUntil && syncLeaseUntil.getTime() > Date.now())
 
   let connectionLabel: BankConnectorDto['connectionLabel'] = 'Coming soon'
   if (row.status === 'DISABLED') connectionLabel = 'Disabled'
@@ -155,6 +160,8 @@ export function toBankConnectorDto(
     lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
     lastSyncStatus: (row.lastSyncStatus as BankConnectorProbeStatusCode | null) ?? null,
     lastSyncMessage: row.lastSyncMessage,
+    syncInProgress,
+    syncLeaseUntil: syncLeaseUntil?.toISOString() ?? null,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
     createdAt: row.createdAt.toISOString(),

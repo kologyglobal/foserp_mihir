@@ -36,6 +36,19 @@ export const applyTemplate = asyncHandler(async (req: Request, res: Response) =>
   return sendCreated(res, 'chart of accounts template applied', item)
 })
 
+export const getImportTemplate = asyncHandler(async (_req: Request, res: Response) => {
+  const csv = service.accountImportTemplateCsv()
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', 'attachment; filename="chart-of-accounts-import-template.csv"')
+  return res.status(200).send(csv)
+})
+
+export const importAccounts = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const summary = await service.importAccountsRecord(req, tenantId, req.body)
+  return sendSuccess(res, 'Chart of accounts import completed', summary)
+})
+
 export const updateAccount = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const id = getRouteParam(req, 'id')

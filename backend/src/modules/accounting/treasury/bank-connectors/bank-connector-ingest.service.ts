@@ -1,6 +1,6 @@
 /**
  * Phase 5D2 — ingest a fetched statement file into BankStatement via existing parsers.
- * sourceType = BANK_API. Reuses MT940 / CAMT.053 structured parse + duplicate guards.
+ * sourceType = BANK_API. Supports MT940 + CAMT.052/.053/.054 with provisional supersession.
  */
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
@@ -9,29 +9,41 @@ import { saveTreasuryStatementFile } from '../../../../services/fileStorage.serv
 import {
   assertNoDuplicateFile,
   computeFileChecksum,
-  isDuplicateLine,
 } from '../bank-statements/bank-statement-duplicate.service.js'
 import { buildStatementLineHash, buildStatementUniquenessKey } from '../bank-statements/bank-statement-identity.service.js'
 import * as stmtRepo from '../bank-statements/bank-statement.repository.js'
+import {
+  markProvisionalLineSuperseded,
+  resolveLineSupersession,
+} from '../bank-statements/bank-statement-supersession.service.js'
 import { nextBatchReference } from '../bank-statements/import/bank-statement-import-batch.repository.js'
+import { persistBatchIssues } from '../bank-statements/import/bank-statement-import-issue.service.js'
 import { sanitiseFileName } from '../bank-statements/import/bank-statement-import-security.service.js'
 import { parseStructuredStatementFile } from '../bank-statements/import/bank-statement-structured-parse.service.js'
 import { BankStatementDuplicateFileError, BankStatementDuplicateStatementError } from '../treasury.errors.js'
 import type { BankConnectorFetchedFile } from './bank-connector.interface.js'
 import { BankConnectorValidationError } from './bank-connector.errors.js'
 
-function toImportFormat(hint: BankConnectorFetchedFile['formatHint']): 'MT940' | 'CAMT_053' {
+function toImportFormat(
+  hint: BankConnectorFetchedFile['formatHint'],
+): 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054' {
   if (hint === 'CAMT053') return 'CAMT_053'
+  if (hint === 'CAMT052') return 'CAMT_052'
+  if (hint === 'CAMT054') return 'CAMT_054'
   if (hint === 'MT940') return 'MT940'
   throw new BankConnectorValidationError(
-    'Connector sync currently supports MT940 and CAMT.053 only. Set expectedFormat accordingly.',
+    'Connector sync currently supports MT940 and CAMT.052/.053/.054. Set expectedFormat accordingly.',
   )
 }
 
-function extensionFor(format: 'MT940' | 'CAMT_053', fileName: string): string {
+function extensionFor(format: 'MT940' | 'CAMT_053' | 'CAMT_052' | 'CAMT_054', fileName: string): string {
   const fromName = path.extname(fileName)
   if (fromName) return fromName
-  return format === 'CAMT_053' ? '.xml' : '.sta'
+  return format === 'MT940' ? '.sta' : '.xml'
+}
+
+function isCamtXmlFormat(format: string): boolean {
+  return format === 'CAMT_053' || format === 'CAMT_052' || format === 'CAMT_054'
 }
 
 export async function ingestConnectorFetchedFile(args: {
@@ -82,6 +94,8 @@ export async function ingestConnectorFetchedFile(args: {
 
   const parsed = parseStructuredStatementFile(file.buffer, importFormat)
   const header = parsed.header
+  const documentType = header.documentType ?? 'END_OF_DAY_STATEMENT'
+  const isProvisional = header.isProvisional === true
 
   const uniquenessKey = buildStatementUniquenessKey({
     tenantId,
@@ -90,6 +104,8 @@ export async function ingestConnectorFetchedFile(args: {
     statementReference: header.statementReference,
     periodStartDate: header.periodStartDate,
     periodEndDate: header.periodEndDate,
+    documentType,
+    externalStatementId: header.externalStatementId ?? null,
   })
 
   try {
@@ -127,7 +143,7 @@ export async function ingestConnectorFetchedFile(args: {
     fileSizeBytes: file.buffer.length,
     fileChecksum,
     storageKey,
-    mimeType: importFormat === 'CAMT_053' ? 'application/xml' : 'text/plain',
+    mimeType: isCamtXmlFormat(importFormat) ? 'application/xml' : 'text/plain',
   })
 
   const statement = await stmtRepo.createStatement({
@@ -149,10 +165,16 @@ export async function ingestConnectorFetchedFile(args: {
     importFormat,
     sourceType: 'BANK_API',
     createdBy: uploadedBy,
+    documentType,
+    hasOpeningBalance: header.hasOpeningBalance ?? true,
+    hasClosingBalance: header.hasClosingBalance ?? true,
+    externalStatementId: header.externalStatementId ?? null,
   })
 
   let lineNumber = 0
   let importedLineCount = 0
+  const issues = [...parsed.issues]
+
   for (const row of parsed.lines) {
     const lineHash = buildStatementLineHash({
       treasuryAccountId,
@@ -163,11 +185,23 @@ export async function ingestConnectorFetchedFile(args: {
       description: row.description,
       externalTransactionId: row.externalTransactionId,
     })
-    const dup = await isDuplicateLine(tenantId, legalEntityId, lineHash)
-    if (dup.isDuplicate) continue
+
+    const outcome = await resolveLineSupersession({
+      tenantId,
+      legalEntityId,
+      lineHash,
+      incomingIsProvisional: isProvisional,
+      sourceRowNumber: row.sourceRowNumber,
+    })
+
+    if (outcome.action === 'SKIP_DUPLICATE') continue
+    if (outcome.action === 'BLOCK_ACTIVE_MATCH') {
+      issues.push(outcome.issue)
+      continue
+    }
 
     lineNumber += 1
-    await stmtRepo.createStatementLine({
+    const created = await stmtRepo.createStatementLine({
       tenantId,
       legalEntityId,
       bankStatementId: statement.id,
@@ -190,8 +224,22 @@ export async function ingestConnectorFetchedFile(args: {
       runningBalance: row.runningBalance ?? null,
       lineHash,
       rawPayload: (row.rawPayload ?? undefined) as never,
+      isProvisional: outcome.isProvisional,
+      isExcluded: outcome.action === 'CREATE_EXCLUDED',
+      matchStatus: outcome.action === 'CREATE_EXCLUDED' ? 'EXCLUDED' : 'UNMATCHED',
+      supersededByLineId: outcome.action === 'CREATE_EXCLUDED' ? outcome.supersededByLineId : null,
     })
-    importedLineCount += 1
+
+    if (outcome.action === 'CREATE_AND_SUPERSEDE') {
+      await markProvisionalLineSuperseded({
+        provisionalLineId: outcome.provisionalLineId,
+        canonicalLineId: created.id,
+      })
+    }
+
+    if (outcome.action !== 'CREATE_EXCLUDED') {
+      importedLineCount += 1
+    }
   }
 
   await stmtRepo.updateStatement(tenantId, statement.id, {
@@ -199,8 +247,10 @@ export async function ingestConnectorFetchedFile(args: {
     status: 'IMPORTED',
   })
 
+  await persistBatchIssues(tenantId, legalEntityId, batch.id, issues, statement.id)
+
   await stmtRepo.updateImportBatch(tenantId, batch.id, {
-    status: 'IMPORTED',
+    status: issues.some((i) => i.severity === 'BLOCKER') ? 'PARTIALLY_IMPORTED' : 'IMPORTED',
     completedAt: new Date(),
     importedLineCount,
     totalLineCount: parsed.lines.length,

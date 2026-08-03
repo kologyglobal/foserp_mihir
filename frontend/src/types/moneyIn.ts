@@ -1,7 +1,12 @@
 /** Money In (AR) DTOs — amounts as decimal strings matching backend Phase 3A. */
 
 export type SalesInvoiceStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
-export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'PROFORMA_INVOICE'
+export type SalesInvoiceSourceType =
+  | 'DIRECT'
+  | 'SALES_ORDER'
+  | 'OUTBOUND_DISPATCH'
+  | 'PROFORMA_INVOICE'
+  | 'CRM_TAX_INVOICE'
 export type SalesInvoiceSettlementStatus =
   | 'UNPAID'
   | 'PARTIALLY_PAID'
@@ -285,6 +290,59 @@ export interface InvoicePrefillFromDispatchDto {
     hsnCode: string | null
   }>
   sourceLinks: SalesInvoiceSourceLinkInput[]
+}
+
+export interface CrmPendingTaxInvoiceDto {
+  id: string
+  invoiceNo: string
+  invoiceDate: string
+  dueDate: string
+  customerId: string
+  customerName: string
+  grandTotal: string
+  balanceDue: string
+  paymentStatus: string
+  status: string
+  accountingStatus: string
+  createdBy: string | null
+  createdByName: string | null
+  salesOrderId: string | null
+  salesOrderNo: string | null
+  salesInvoiceId: string | null
+  salesInvoiceNumber: string | null
+  accountingSubmittedAt: string | null
+}
+
+export interface InvoicePrefillFromCrmTaxInvoiceDto {
+  sourceType: 'CRM_TAX_INVOICE'
+  sourceDocumentId: string
+  customerId: string
+  customerName: string
+  invoiceDate: string
+  dueDate: string | null
+  customerPoNumber: string | null
+  paymentTermsDays: number | null
+  salesOrderId: string | null
+  salesOrderNo: string | null
+  narration: string | null
+  createdByName: string | null
+  lines: Array<{
+    itemId: string | null
+    itemCode: string | null
+    description: string
+    quantity: string
+    unitPrice: string
+    hsnCode: string | null
+    uom: string | null
+    taxRate: string | null
+    sourceLineId: string | null
+  }>
+  sourceDocumentSnapshot: {
+    crmTaxInvoiceId: string
+    invoiceNo: string
+    createdBy: string | null
+    createdByName: string | null
+  }
 }
 
 export interface ListInvoiceReadyQuery {

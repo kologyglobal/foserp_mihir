@@ -477,6 +477,14 @@ export function mapDomainInputToApiPayload(
     purchasePurpose: input.purpose?.trim() ? input.purpose : null,
     rfqRequired: input.rfqRequired,
     remarks: input.remarks?.trim() ? input.remarks : null,
+    sourceType:
+      input.sourceType?.trim() ||
+      (input.source === 'maintenance' ? 'MAINTENANCE' : null),
+    sourceId: asUuid(input.sourceId) ?? asUuid(input.maintenanceOrderNo) ?? asUuid(input.referenceNumber),
+    sourceDocumentNumber:
+      input.sourceDocumentNumber?.trim() ||
+      (input.source === 'maintenance' ? input.maintenanceOrderNo || input.referenceNumber || null : null),
+    maintenancePartId: asUuid(input.maintenancePartId),
     lines,
   }
 }

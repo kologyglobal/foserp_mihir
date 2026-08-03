@@ -17,7 +17,7 @@ import type {
 } from '../../types/financeSetup'
 import type { Journal, JournalAuditEntry, JournalListFilters, JournalValidationReport } from '../../types/journals'
 import type { ApprovalListFilters, ApprovalRequest, JournalApprovalTimelineEntry } from '../../types/approvals'
-import { apiRequest, tenantPath } from './client'
+import { apiDownloadBlob, apiRequest, tenantPath } from './client'
 
 function buildQuery(params?: Record<string, string | number | boolean | undefined | null>): string {
   if (!params) return ''
@@ -276,6 +276,386 @@ export async function upsertPeriodCloseChecklistAcks(
   })
 }
 
+// ─── Period-end adjustments (accruals + prepaid) ──────────────────────────────
+
+export type PeriodAdjustmentKindApi = 'ACCRUAL' | 'PREPAID'
+export type PeriodAdjustmentStatusApi =
+  | 'DRAFT'
+  | 'READY_TO_POST'
+  | 'POSTED'
+  | 'PARTIALLY_RECOGNISED'
+  | 'FULLY_RECOGNISED'
+  | 'REVERSED'
+  | 'CANCELLED'
+
+export type PeriodAdjustmentScheduleApi = {
+  id: string
+  sequence: number
+  periodId: string
+  periodName: string
+  periodStatus: string
+  periodEndDate: string
+  amount: string
+  status: string
+  voucherId: string | null
+  voucherNumber: string | null
+  postedAt: string | null
+}
+
+export type PeriodAdjustmentDto = {
+  id: string
+  kind: PeriodAdjustmentKindApi
+  adjustmentNumber: string
+  status: PeriodAdjustmentStatusApi
+  legalEntityId: string
+  description: string
+  narration: string | null
+  totalAmount: string
+  recognisedAmount: string
+  remainingAmount: string
+  currencyCode: string
+  expenseAccount: { id: string; accountCode: string; accountName: string }
+  balanceSheetAccount: { id: string; accountCode: string; accountName: string }
+  costCentre: { id: string; code: string; name: string } | null
+  departmentReference: string | null
+  projectReference: string | null
+  period: { id: string; name: string; status: string; startDate: string; endDate: string }
+  postingDate: string
+  autoReverse: boolean
+  reversalPeriod: { id: string; name: string; status: string; startDate: string } | null
+  numberOfPeriods: number | null
+  voucherId: string | null
+  voucherNumber: string | null
+  reversalVoucherId: string | null
+  reversalVoucherNumber: string | null
+  postedAt: string | null
+  reversedAt: string | null
+  cancelledAt: string | null
+  cancelReason: string | null
+  schedules: PeriodAdjustmentScheduleApi[]
+  createdAt: string
+  updatedAt: string
+}
+
+export async function listPeriodAdjustments(params?: {
+  legalEntityId?: string
+  kind?: PeriodAdjustmentKindApi
+  status?: PeriodAdjustmentStatusApi
+  periodId?: string
+  page?: number
+  limit?: number
+  search?: string
+}) {
+  return apiRequest<PeriodAdjustmentDto[]>(
+    `${tenantPath('/accounting/period-adjustments')}${buildQuery(params)}`,
+  )
+}
+
+export async function getPeriodAdjustment(id: string) {
+  return apiRequest<PeriodAdjustmentDto>(tenantPath(`/accounting/period-adjustments/${id}`))
+}
+
+export async function createPeriodAdjustment(body: Record<string, unknown>) {
+  return apiRequest<PeriodAdjustmentDto>(tenantPath('/accounting/period-adjustments'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updatePeriodAdjustment(id: string, body: Record<string, unknown>) {
+  return apiRequest<PeriodAdjustmentDto>(tenantPath(`/accounting/period-adjustments/${id}`), {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function markPeriodAdjustmentReady(id: string) {
+  return apiRequest<PeriodAdjustmentDto>(tenantPath(`/accounting/period-adjustments/${id}/mark-ready`), {
+    method: 'POST',
+  })
+}
+
+export async function revisePeriodAdjustment(id: string) {
+  return apiRequest<PeriodAdjustmentDto>(tenantPath(`/accounting/period-adjustments/${id}/revise`), {
+    method: 'POST',
+  })
+}
+
+export async function cancelPeriodAdjustment(id: string, reason: string) {
+  return apiRequest<PeriodAdjustmentDto>(tenantPath(`/accounting/period-adjustments/${id}/cancel`), {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
+
+export async function postPeriodAdjustment(id: string) {
+  return apiRequest<PeriodAdjustmentDto>(tenantPath(`/accounting/period-adjustments/${id}/post`), {
+    method: 'POST',
+  })
+}
+
+export async function reversePeriodAdjustment(id: string, body: { reason: string; reversalDate?: string }) {
+  return apiRequest<PeriodAdjustmentDto>(tenantPath(`/accounting/period-adjustments/${id}/reverse`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function recognisePrepaidSchedule(id: string, scheduleId: string) {
+  return apiRequest<PeriodAdjustmentDto>(
+    tenantPath(`/accounting/period-adjustments/${id}/schedules/${scheduleId}/recognise`),
+    { method: 'POST' },
+  )
+}
+
+export async function getPeriodAdjustmentSummary(periodId: string) {
+  return apiRequest<Record<string, unknown>>(
+    tenantPath(`/accounting/period-adjustments/periods/${periodId}/summary`),
+  )
+}
+
+// ─── Period Close ops (calendar / templates / reopen requests) ────────────────
+
+export type PeriodCloseChecklistTemplateApi = {
+  id: string
+  legalEntityId: string
+  code: string
+  title: string
+  module: string
+  defaultOwnerRole: string | null
+  defaultDueOffsetDays: number
+  sortOrder: number
+  isActive: boolean
+  blocksClose: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type PeriodCloseCalendarEventApi = {
+  id: string
+  periodId: string
+  title: string
+  category: string
+  dueDate: string
+  ownerLabel: string | null
+  status: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type PeriodReopenRequestApi = {
+  id: string
+  requestNumber: string
+  status: string
+  legalEntityId: string
+  periodId: string
+  periodName: string
+  periodStatus: string
+  moduleLabel: string
+  reasonCode: string
+  reasonDetail: string | null
+  documentRef: string | null
+  riskExplanation: string
+  requestedUntil: string
+  requestedBy: string | null
+  requestedAt: string | null
+  approvedBy: string | null
+  approvedAt: string | null
+  rejectedBy: string | null
+  rejectedAt: string | null
+  rejectReason: string | null
+  openedAt: string | null
+  expiredAt: string | null
+  closedAt: string | null
+  audit: Array<{ at: string; by: string; action: string; note?: string }>
+  createdAt: string
+  updatedAt: string
+}
+
+export async function listPeriodCloseTemplates(legalEntityId: string, includeInactive = false) {
+  return apiRequest<PeriodCloseChecklistTemplateApi[]>(
+    `${tenantPath('/accounting/period-close/checklist-templates')}${buildQuery({ legalEntityId, includeInactive, limit: 100 })}`,
+  )
+}
+
+export async function createPeriodCloseTemplate(body: Record<string, unknown>) {
+  return apiRequest<PeriodCloseChecklistTemplateApi>(tenantPath('/accounting/period-close/checklist-templates'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function listPeriodCloseCalendarEvents(periodId: string) {
+  return apiRequest<PeriodCloseCalendarEventApi[]>(
+    tenantPath(`/accounting/period-close/periods/${periodId}/calendar-events`),
+  )
+}
+
+export async function generatePeriodCloseCalendar(periodId: string) {
+  return apiRequest<PeriodCloseCalendarEventApi[]>(
+    tenantPath(`/accounting/period-close/periods/${periodId}/calendar/generate`),
+    { method: 'POST' },
+  )
+}
+
+export async function createPeriodCloseCalendarEvent(periodId: string, body: Record<string, unknown>) {
+  return apiRequest<PeriodCloseCalendarEventApi>(
+    tenantPath(`/accounting/period-close/periods/${periodId}/calendar-events`),
+    { method: 'POST', body: JSON.stringify(body) },
+  )
+}
+
+export async function listPeriodReopenRequests(params?: {
+  legalEntityId?: string
+  periodId?: string
+  status?: string
+  page?: number
+  limit?: number
+}) {
+  return apiRequest<PeriodReopenRequestApi[]>(
+    `${tenantPath('/accounting/period-close/reopen-requests')}${buildQuery(params)}`,
+  )
+}
+
+export async function createPeriodReopenRequest(body: Record<string, unknown>) {
+  return apiRequest<PeriodReopenRequestApi>(tenantPath('/accounting/period-close/reopen-requests'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function submitPeriodReopenRequest(id: string) {
+  return apiRequest<PeriodReopenRequestApi>(tenantPath(`/accounting/period-close/reopen-requests/${id}/submit`), {
+    method: 'POST',
+  })
+}
+
+export async function approvePeriodReopenRequest(id: string, body?: { note?: string; activate?: boolean }) {
+  return apiRequest<PeriodReopenRequestApi>(tenantPath(`/accounting/period-close/reopen-requests/${id}/approve`), {
+    method: 'POST',
+    body: JSON.stringify(body ?? {}),
+  })
+}
+
+export async function rejectPeriodReopenRequest(id: string, reason: string) {
+  return apiRequest<PeriodReopenRequestApi>(tenantPath(`/accounting/period-close/reopen-requests/${id}/reject`), {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
+
+export async function instantiatePeriodCloseChecklist(periodId: string) {
+  return apiRequest<unknown[]>(tenantPath(`/accounting/period-close/periods/${periodId}/checklist/instantiate`), {
+    method: 'POST',
+  })
+}
+
+// ─── FX revaluation (period close) ────────────────────────────────────────────
+
+export type FxRevaluationLineApi = {
+  id: string
+  accountOrParty: string
+  currency: string
+  foreignAmount: number
+  originalRate: number
+  closingRate: number
+  bookValueInr: number
+  revaluedValueInr: number
+  gainLoss: number
+  sourceType: string
+  sourceId: string
+  isAsset: boolean
+}
+
+export type FxRevaluationRunApi = {
+  id: string
+  status: string
+  legalEntityId: string
+  periodId: string
+  periodName: string
+  asOfDate: string
+  baseCurrency: string
+  totalGain: string
+  totalLoss: string
+  netGainLoss: string
+  exchangeGainAccount: string | null
+  exchangeLossAccount: string | null
+  gainAccountId: string | null
+  lossAccountId: string | null
+  reversalPeriod: { id: string; name: string; startDate: string } | null
+  voucherId: string | null
+  voucherNumber: string | null
+  reversalVoucherNumber: string | null
+  postedAt: string | null
+  reversedAt: string | null
+  lines: FxRevaluationLineApi[]
+  createdAt: string
+  updatedAt: string
+}
+
+export type FxExchangeRateApi = {
+  id: string
+  legalEntityId: string
+  currencyCode: string
+  asOfDate: string
+  rate: string
+  source: string
+  notes: string | null
+}
+
+export async function listFxRates(params: {
+  legalEntityId: string
+  currencyCode?: string
+  asOfDate?: string
+  page?: number
+  limit?: number
+}) {
+  return apiRequest<FxExchangeRateApi[]>(
+    `${tenantPath('/accounting/period-close/fx-revaluation/rates')}${buildQuery(params)}`,
+  )
+}
+
+export async function upsertFxRate(body: {
+  legalEntityId: string
+  currencyCode: string
+  asOfDate: string
+  rate: string | number
+  notes?: string
+}) {
+  return apiRequest<FxExchangeRateApi>(tenantPath('/accounting/period-close/fx-revaluation/rates'), {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function getFxRevaluationRun(periodId: string) {
+  return apiRequest<FxRevaluationRunApi | null>(
+    tenantPath(`/accounting/period-close/fx-revaluation/periods/${periodId}/run`),
+  )
+}
+
+export async function previewFxRevaluation(periodId: string) {
+  return apiRequest<FxRevaluationRunApi>(
+    tenantPath(`/accounting/period-close/fx-revaluation/periods/${periodId}/preview`),
+    { method: 'POST' },
+  )
+}
+
+export async function postFxRevaluation(runId: string) {
+  return apiRequest<FxRevaluationRunApi>(
+    tenantPath(`/accounting/period-close/fx-revaluation/runs/${runId}/post`),
+    { method: 'POST' },
+  )
+}
+
+export async function reverseFxRevaluation(runId: string, body: { reason: string; reversalDate?: string }) {
+  return apiRequest<FxRevaluationRunApi>(
+    tenantPath(`/accounting/period-close/fx-revaluation/runs/${runId}/reverse`),
+    { method: 'POST', body: JSON.stringify(body) },
+  )
+}
+
 // ─── Accounts ─────────────────────────────────────────────────────────────────
 
 export async function listAccounts(
@@ -320,6 +700,35 @@ export async function applyCoaTemplate(legalEntityId: string, templateId: CoaTem
     method: 'POST',
     body: JSON.stringify({ legalEntityId, templateId }),
   })
+}
+
+export type CoaImportSummary = {
+  imported: number
+  updated: number
+  skipped: number
+  failed: number
+  rows: Array<{ row: number; ok: boolean; code?: string; errors?: string[] }>
+}
+
+export async function importCoaAccounts(body: {
+  legalEntityId: string
+  rows: Array<Record<string, string>>
+  duplicateMode?: 'skip' | 'update' | 'reject'
+}) {
+  return apiRequest<CoaImportSummary>(tenantPath('/accounting/accounts/import'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function downloadCoaImportTemplate(): Promise<void> {
+  const { blob, filename } = await apiDownloadBlob(tenantPath('/accounting/accounts/import/template'))
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename ?? 'chart-of-accounts-import-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── Default mappings ─────────────────────────────────────────────────────────

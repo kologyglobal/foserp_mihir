@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-30** (Accounting year-end P&L close; Maintenance V1 READY; Quality QI checklist; Auth IAM; Inventory Costing READY). Prior **2026-07-29**: FIN-CLOSE-1 stop; MFG Fuel Tank READY.
+Last verified against codebase: **2026-07-31** (HRMS UI/UX redesign — Zoho People–inspired FE). Prior **2026-07-31**: Phase 11 Exit & F&F; Phase 10 Loans; Phase 9 Payslip/Accounting/Payment; Phase 8 Statutory; Phase 7 Payroll. Prior **2026-07-30**: HRMS Phase 6 Salary Structures; Phase 5 Overtime; Leave + attendance; Phase 2 Shift/Roster; Phase 1 Employee. Prior **2026-07-29**: FIN-CLOSE-1 stop; MFG Fuel Tank READY.
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** see [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -24,8 +24,8 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | Category | Modules |
 |----------|---------|
 | **Completed (API mode)** | **Auth** (login/JWT/self-service) + **Admin tenants/users/roles**; … **AR 3A–3C** (invoice/receipt/CN + allocation) + **3B6/3C6 Money In UI** + receipt/CN/allocation/journal reverse + corrections hub; **AP Money Out UI** + corrections + AP reversal history; Dispatch→SI invoice-ready + POD gate on manual create |
-| **Not started** | — |
-| **Partially completed** | mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **Admin A8** broader demo-mix pack beyond security regression |
+| **Not started** | HRMS EPFO-ESIC-TRACES portal filing / Form 16 / recruitment / ATS / performance management / LMS / employee self-service portal / interest-bearing loan products / live bank payment APIs … |
+| **Partially completed** | **HRMS** through Phase 11 Exit & Full/Final Settlement in code (READY WITH CONDITIONS); mobile CRM; sales-order fulfilment beyond confirm/close; **Admin A8** broader demo-mix pack beyond security regression |
 | **Scaffolding (not shipped)** | — (Accounting: some CoA/voucher demo surfaces; Period Close **P1 + hardening + year-end P&L→RE** live — accruals/prepaid/FX/calendar still demo; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode) |
 | **Blocked** | — (none currently) |
 | **Deferred by design** | Broad QMS beyond shipped Quality scope (CAPA/calibration/SPC — see `docs/quality/QUALITY_SCOPE_AND_DEFERRALS.md`); SO MRP / dispatch client production hardening leftovers |
@@ -43,6 +43,16 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | Inventory costing rollout | **READY 2026-07-30 — live verified after migrate deploy.** Inventory pack: **9 files / 21 tests PASS, 0 skipped**; SPA UAT API harness **9/9 PASS**; Inventory↔GL parity **3/3 PASS** (operational RM = mapped GL, no Force Balance). Purchase invoice retro-cost integration is now closed under FIN-CLOSE-1; residual optional human SPA walk only. |
 | Manufacturing Fuel Tank golden path | **MFG-GOLDEN-1** + **pilot A1–A9 + partial FG signed 2026-07-29** (`WO-000039` happy / `WO-000040` partial). Verdict **READY**. Optional live SPA UX walk only. |
 | Maintenance V1 | Ticket-centric REPORT→REPAIR→TEST→CLOSE + spare ISSUE (`ISSUE_TO_MAINTENANCE`). Harness **PASS** (`MT-000003`/`MT-000004`, `STM-000187`). **READY** — human SPA/contractor sign-off optional; see `docs/maintenance/`. |
+| Maintenance V1.1 | Machine Health read model, failure SAFETY + rootCause/repairAction, automatic downtime/MTTR display, repeat breakdown, MFG active-ticket banner, PR `sourceType=MAINTENANCE` + part backlink. Migration `20260730200000_maintenance_v11_machine_health`. **READY WITH CONDITIONS** until `test-maintenance-v1.ts` + `test-maintenance-v11.ts` PASS post-migrate. |
+| Maintenance V2 | Preventive plans (`PM-`) → ticket (`PREVENTIVE`) → close recalculates next due. Checklist on plan/ticket. Dashboard PM due KPIs + compliance report. Migration `20260730210000_maintenance_v2_preventive`. **READY WITH CONDITIONS** until `test-maintenance-v2.ts` PASS. |
+| HRMS Phase 5 Overtime | OT policy/records; detect/eligible/approve; FE `/hrms/overtime`. Migration `20260730270000_hrms_phase5_overtime`. **READY WITH CONDITIONS** — sync-permissions + FE verify. |
+| HRMS Phase 6 Salary Structures | Components, versioned structures, assignment/revision, effective lookup + preview. FE `/hrms/payroll/setup/*` + employee Salary. Migration `20260730280000_hrms_phase6_salary_structure`. **READY WITH CONDITIONS** — migrate + vitest + sync-permissions. |
+| HRMS Phase 7 Payroll | Period/run lifecycle; paid-days + prorated calc; review/finalize; exceptions. FE `/hrms/payroll/runs`. Migration `20260731010000_hrms_phase7_payroll`. **READY WITH CONDITIONS** — migrate + vitest + sync-permissions. |
+| HRMS Phase 8 Statutory | PF/ESIC/PT/TDS/LWF rules + wage basis + PT slabs; employee profile overrides; payroll calc appends statutory lines; registers API/CSV. FE `/hrms/payroll/statutory*`. Migration `20260731030000_hrms_phase8_statutory`. **READY WITH CONDITIONS** — migrate + vitest + sync-permissions + UAT A–J. **Stop before portal filing / Form 16 / payslip / payroll GL / F&F.** TDS is foundation-only (manual override or review-required). |
+| HRMS Phase 9 Payslip/Accounting/Payment | Immutable payslip snapshots + HTML/PDF; payroll accrual GL via shared `post()` + CoA mappings; salary payment batch DRAFT→READY→APPROVED→PAID (bank validation, duplicate guard, CSV, payment GL clears only `SALARY_PAYABLE`). FE: `/hrms/payroll/payslips`, run Accounting/Payments tabs, `/hrms/payroll/my-payslips`. Migration `20260731040000_hrms_phase9_payslip_accounting_payment`. **READY WITH CONDITIONS** — migrate + vitest live (9 skipped pending migrate) + sync-permissions + UAT A–M. **Stop before portal filing / Form 16 / live bank APIs / F&F / loans.** |
+| HRMS Phase 10 Employee Loans & Salary Advances | Loan/advance lifecycle; recovery schedule; payroll `LOAN_RECOVERY`/`ADVANCE_RECOVERY` (confirm on finalize); GL disburse/repay via shared `post()`. FE `/hrms/loans*`, `/hrms/my-loans`. Migration `20260731050000_hrms_phase10_loans_advances`. **READY WITH CONDITIONS** — migrate + vitest live + sync-permissions + UAT. **Stop before interest products / F&F / portal filing / performance management.** |
+| HRMS Phase 11 Exit & Full/Final Settlement | Exit lifecycle; clearance + assets; notice reconciliation; F&F calc/review/approve/post/pay (negative net → receivable, no pay). FE `/hrms/exits*`, `/hrms/fnf*`. Migration `20260731060000_hrms_phase11_exit_fnf`. **READY WITH CONDITIONS** — migrate + vitest live + sync-permissions + UAT. **Stop before recruitment / ATS / performance / LMS / portal filing.** |
+| HRMS UI/UX redesign | Zoho People–inspired FE shell across `/hrms/*` (home, employee register/360, attendance, leave/OT, payroll guided steps, payslips, loans, exit/F&F, My HR). Shared `Hr*` components; APIs reused; no business-rule rewrites. Doc `docs/hrms/HRMS_UI_UX_REDESIGN.md`. **READY WITH CONDITIONS** — manual SPA UAT + drawer polish + linked-employee My HR. |
 | Quality (scoped QMS) | Manufacturing 4A/4B/7B + Purchase incoming QI (incl. parameter checklist). **READY 2026-07-30 — live verified after migrate deploy: 23/23 PASS, 0 skipped** (4A 5/5, 4B 5/5, 7B 7/7, Purchase QI 6/6). The `awaitingQuality` failures were fixture drift — 4A/4B now seed strict `flexibleExecution: false`. Broad QMS deferred — `docs/quality/QUALITY_SCOPE_AND_DEFERRALS.md`. |
 | FIN-CLOSE-1 accounting integration | **Code closure met 2026-07-30** — prior stop scope plus purchase invoice retro cost + **year-end P&L→RE**. **Human action remains:** Hostinger migrate deploy (incl. `20260730121000_finance_year_end_close`) + mapping runbook. Accruals/FX/AIS still deferred. |
 
@@ -400,6 +410,19 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | Demo mode | ✅ | qualityStore + Purchase demo QI parameters |
 | API mode | ✅ | qualityRoutes + purchaseApiFacade |
 | Remaining gap | **READY** — QI params migration deployed and live suites green (live-DB evidence condition closed). Broad QMS (CAPA/calibration/SPC/supplier scorecards) **deferred by design** — see `docs/quality/QUALITY_SCOPE_AND_DEFERRALS.md` |
+
+### HRMS (Indian payroll-safe workforce)
+
+| Aspect | Status | Notes |
+|--------|--------|-------|
+| Frontend | ⚠️ | Leave/OT/payroll/payslips/payments/loans + Phase 11 `/hrms/exits*`, `/hrms/fnf*` |
+| Backend | ⚠️ | Payroll + salary + statutory + OT + leave + attendance + Phase 10 `/hrms/loans/*` + Phase 11 `/hrms/exits/*`, `/hrms/fnf/*` |
+| DB | ⚠️ | Migrations through `20260731060000_hrms_phase11_exit_fnf` |
+| API | ⚠️ | `/api/v1/t/:tenantSlug/hrms/*` + module flag `hrms` |
+| Tests | ⚠️ | Phase 11 unit **7/7 PASS** local (2026-07-31, `computeNotice`); Phase 11 live **11 skipped** (no DB reachable this session — see `HRMS_PHASE11_TEST_RESULTS.md`); Phase 10 unit 5/5 PASS prior session; stage migrate + sync-permissions pending confirm |
+| Demo mode | ❌ | API-required banner |
+| API mode | ⚠️ | Dual-mode gate |
+| Remaining gap | **READY WITH CONDITIONS** — migrate `20260731060000_hrms_phase11_exit_fnf` + `db:sync-permissions` + live vitest PASS + UAT. **Stop before recruitment / ATS / performance management / LMS / employee portal filing.** Docs: `docs/hrms/HRMS_PHASE11_*` |
 
 ### Inventory / Production / Maintenance / Finance (invoices)
 

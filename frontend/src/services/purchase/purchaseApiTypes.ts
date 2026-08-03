@@ -171,6 +171,10 @@ export interface ApiCreatePurchaseRequisitionPayload {
   purchasePurpose?: string | null
   rfqRequired?: boolean
   remarks?: string | null
+  sourceType?: string | null
+  sourceId?: string | null
+  sourceDocumentNumber?: string | null
+  maintenancePartId?: string | null
   lines?: ApiPurchaseRequisitionLineInput[]
 }
 

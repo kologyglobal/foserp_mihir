@@ -34,6 +34,8 @@ export async function assertNoDuplicateStatement(input: {
   statementReference: string
   periodStartDate: Date
   periodEndDate: Date
+  documentType?: import('./bank-statement.types.js').BankStatementDocumentType | null
+  externalStatementId?: string | null
   duplicatePolicy?: 'BLOCK' | 'WARN' | 'ALLOW_WITH_REVIEW'
 }): Promise<{ isDuplicate: boolean; existingStatementId?: string }> {
   const key = buildStatementUniquenessKey(input)

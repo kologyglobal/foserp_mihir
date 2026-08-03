@@ -39,6 +39,15 @@ export const CRM_INVOICE_PAYMENT_STATUS_LABELS: Record<CrmInvoicePaymentStatus, 
   paid: 'Paid',
 }
 
+export type CrmTaxInvoiceAccountingStatus = 'none' | 'pending_review' | 'converted' | 'rejected'
+
+export const CRM_TAX_INVOICE_ACCOUNTING_STATUS_LABELS: Record<CrmTaxInvoiceAccountingStatus, string> = {
+  none: 'Not sent',
+  pending_review: 'Pending Accounting',
+  converted: 'In Money In',
+  rejected: 'Rejected',
+}
+
 export type CrmCommercialSource = 'sales_order' | 'proforma' | 'direct' | 'customer'
 
 export interface CrmCommercialLine {
@@ -112,6 +121,12 @@ export interface CrmTaxInvoice {
   gst: GstBreakdown
   amountPaid: number
   balanceDue: number
+  accountingStatus?: CrmTaxInvoiceAccountingStatus
+  salesInvoiceId?: string | null
+  salesInvoiceNumber?: string | null
+  accountingSubmittedAt?: string | null
+  accountingConvertedAt?: string | null
+  createdByName?: string
   postedAt: string | null
   cancelledAt: string | null
   createdAt: string

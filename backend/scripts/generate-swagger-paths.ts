@@ -8,7 +8,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { swaggerSpec } from '../src/config/swagger.js'
+import { swaggerSpecDraft } from '../src/config/swagger.js'
 
 type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete'
 
@@ -20,9 +20,9 @@ interface RouteOp {
 }
 
 const METHODS = new Set(['get', 'post', 'put', 'patch', 'delete'])
-/** Match Express route registrations on router / *Router / *Routes bindings. */
+/** Match Express route registrations; capture binding name for multi-router files. */
 const HTTP_RE =
-  /\b(?:router|app|[A-Za-z_][\w]*(?:Router|Routes))\.(get|post|put|patch|delete)\(\s*([`'"])([\s\S]*?)\2/g
+  /\b([A-Za-z_][\w]*)\.(get|post|put|patch|delete)\(\s*([`'"])([\s\S]*?)\3/g
 const USE_RE = /\b(?:router|app)\.use\(\s*([`'"])(\/[^`'"]*)\1\s*,\s*([A-Za-z_][\w]*)/g
 const IMPORT_RE =
   /import\s+(?:(\w+)\s*,\s*)?(?:\{\s*([^}]+)\s*\}\s*,?\s*)?(?:(\w+)\s*)?from\s+['"]([^'"]+)['"]/g
@@ -30,32 +30,45 @@ const IMPORT_RE =
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SRC = path.resolve(__dirname, '../src')
 
+type AppMount = {
+  prefix: string
+  importHint: string
+  /** When set, only document HTTP calls on these router bindings (multi-router files). */
+  routerBindings?: string[]
+}
+
 /** Mount prefixes applied in app.ts for tenant slug form (canonical for docs). */
-const APP_MOUNTS: Array<{ prefix: string; importHint: string }> = [
+const APP_MOUNTS: AppMount[] = [
   { prefix: '/auth', importHint: 'auth.routes' },
   { prefix: '/webhooks/indiamart', importHint: 'indiamart.webhook.routes' },
   { prefix: '/tenants', importHint: 'tenant.routes' },
   { prefix: '/t/{tenantSlug}/users', importHint: 'user.routes' },
   { prefix: '/t/{tenantSlug}/users', importHint: 'scope.routes' },
+  { prefix: '/t/{tenantSlug}/users', importHint: 'responsibility.routes', routerBindings: ['userRouter'] },
+  { prefix: '/t/{tenantSlug}/users', importHint: 'effective-access.routes', routerBindings: ['userEffectiveAccessRoutes'] },
+  { prefix: '/t/{tenantSlug}/users', importHint: 'security.routes', routerBindings: ['userSecurityRouter'] },
   { prefix: '/t/{tenantSlug}/departments', importHint: 'department.routes' },
-  { prefix: '/t/{tenantSlug}/responsibilities', importHint: 'responsibility.routes' },
-  { prefix: '/t/{tenantSlug}/security', importHint: 'security.routes' },
+  { prefix: '/t/{tenantSlug}/responsibilities', importHint: 'responsibility.routes', routerBindings: ['catalogRouter'] },
+  { prefix: '/t/{tenantSlug}/access-review', importHint: 'effective-access.routes', routerBindings: ['accessReviewRoutes'] },
+  { prefix: '/t/{tenantSlug}/security', importHint: 'security.routes', routerBindings: ['securityRouter'] },
   { prefix: '/t/{tenantSlug}/modules', importHint: 'module.routes' },
   { prefix: '/t/{tenantSlug}/roles', importHint: 'role.routes' },
   { prefix: '/t/{tenantSlug}/crm', importHint: 'crm.routes' },
-  { prefix: '/t/{tenantSlug}/masters/items', importHint: 'item.routes' },
-  { prefix: '/t/{tenantSlug}/masters/vendors', importHint: 'vendor.routes' },
+  { prefix: '/t/{tenantSlug}/masters/items', importHint: 'item.routes', routerBindings: ['router'] },
+  { prefix: '/t/{tenantSlug}/masters/vendors', importHint: 'vendor.routes', routerBindings: ['router'] },
   { prefix: '/t/{tenantSlug}/masters/imports', importHint: 'import.routes' },
   { prefix: '/t/{tenantSlug}/masters/exports', importHint: 'export.routes' },
   { prefix: '/t/{tenantSlug}/masters', importHint: 'masters.routes' },
   { prefix: '/t/{tenantSlug}/inventory', importHint: 'inventory.routes' },
   { prefix: '/t/{tenantSlug}/inventory', importHint: 'inventory-masters.routes' },
-  { prefix: '/t/{tenantSlug}/lookups/items', importHint: 'item.routes' },
-  { prefix: '/t/{tenantSlug}/lookups/vendors', importHint: 'vendor.routes' },
+  { prefix: '/t/{tenantSlug}/lookups/items', importHint: 'item.routes', routerBindings: ['itemLookupRouter'] },
+  { prefix: '/t/{tenantSlug}/lookups/vendors', importHint: 'vendor.routes', routerBindings: ['vendorLookupRouter'] },
   { prefix: '/t/{tenantSlug}/lookups', importHint: 'lookups.routes' },
   { prefix: '/t/{tenantSlug}/accounting', importHint: 'accounting.routes' },
   { prefix: '/t/{tenantSlug}/organisation', importHint: 'organisation.routes' },
   { prefix: '/t/{tenantSlug}/manufacturing', importHint: 'manufacturing.routes' },
+  { prefix: '/t/{tenantSlug}/maintenance', importHint: 'maintenance.routes' },
+  { prefix: '/t/{tenantSlug}/hrms', importHint: 'hrms.routes' },
   { prefix: '/t/{tenantSlug}/purchase', importHint: 'purchase.routes' },
   { prefix: '/t/{tenantSlug}/quality', importHint: 'quality.routes' },
   { prefix: '/t/{tenantSlug}/dispatch', importHint: 'dispatch.routes' },
@@ -145,13 +158,20 @@ function collectNestedMounts(file: string, prefix: string, visited = new Set<str
   return mounts
 }
 
-function extractOpsFromFile(file: string, prefix: string): RouteOp[] {
+function isDocumentedRouteBinding(name: string, filter?: string[]): boolean {
+  if (filter) return filter.includes(name)
+  return name === 'router' || name === 'app' || /(?:Router|Routes)$/.test(name)
+}
+
+function extractOpsFromFile(file: string, prefix: string, routerBindings?: string[]): RouteOp[] {
   const src = fs.readFileSync(file, 'utf8')
   const ops: RouteOp[] = []
   for (const m of src.matchAll(HTTP_RE)) {
-    const method = m[1].toLowerCase() as HttpMethod
+    const binding = m[1]
+    if (!isDocumentedRouteBinding(binding, routerBindings)) continue
+    const method = m[2].toLowerCase() as HttpMethod
     if (!METHODS.has(method)) continue
-    let routePath = m[3].trim()
+    let routePath = m[4].trim()
     // Skip template literals with ${} interpolation — rare; leave for hand docs
     if (routePath.includes('${')) continue
     if (!routePath.startsWith('/')) routePath = `/${routePath}`
@@ -240,7 +260,9 @@ function main() {
     }
     const nested = collectNestedMounts(file, mount.prefix)
     for (const n of nested) {
-      allOps.push(...extractOpsFromFile(n.file, n.mount))
+      // Apply routerBindings only to the mount's own file (multi-router modules).
+      const bindings = n.file === file ? mount.routerBindings : undefined
+      allOps.push(...extractOpsFromFile(n.file, n.mount, bindings))
     }
   }
 
@@ -253,8 +275,9 @@ function main() {
   }
   const unique = [...byKey.values()]
 
+  // Skip only hand-written paths (not previously generated stubs) so regenerate refreshes stubs.
   const existing = new Set<string>()
-  const handPaths = (swaggerSpec as { paths?: Record<string, Record<string, unknown>> }).paths ?? {}
+  const handPaths = (swaggerSpecDraft as { paths?: Record<string, Record<string, unknown>> }).paths ?? {}
   for (const [p, methods] of Object.entries(handPaths)) {
     for (const m of Object.keys(methods)) {
       if (METHODS.has(m)) existing.add(`${m} ${p}`)

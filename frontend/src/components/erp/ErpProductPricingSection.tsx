@@ -21,8 +21,23 @@ import { isItemSellable, itemNotSellableForSalesMessage } from '../../utils/oppo
 import { notify } from '../../store/toastStore'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { cn } from '../../utils/cn'
+import {
+  ChargeEditor,
+  OrderAdjustmentsPanel,
+  PRODUCT_PRICING_GST_RATES,
+} from './OrderAdjustmentsGrid'
 
-export const PRODUCT_PRICING_GST_RATES = [0, 5, 12, 18, 28] as const
+export { PRODUCT_PRICING_GST_RATES } from './OrderAdjustmentsGrid'
+export { ChargeEditor, ModeToggle, OrderAdjustmentsPanel } from './OrderAdjustmentsGrid'
+
+export type ChargeTaxability = 'taxable' | 'non_taxable'
+
+export interface AdjustmentFieldState {
+  mode: OrderDiscountMode
+  value: number
+  isTaxable: boolean
+  taxRate: number
+}
 
 export interface ErpProductPricingPanelProps {
   lines: OpportunityLine[]
@@ -31,19 +46,49 @@ export interface ErpProductPricingPanelProps {
   productPickMap: Map<string, ProductMasterPick>
   rowErrors?: Record<string, string[]>
   readOnly?: boolean
-  /** Show freight + order discount editors (default true). */
+  /** Show freight + order discount + charge editors (default true). */
   showAdjustments?: boolean
+  /** When false, hide installation / other (default true for full quotation). */
+  showExtendedCharges?: boolean
+
   freightAmount?: number
   onFreightChange?: (amount: number) => void
+  freightMode?: OrderDiscountMode
+  onFreightModeChange?: (mode: OrderDiscountMode) => void
+  freightValue?: number
+  onFreightValueChange?: (value: number) => void
+  freightIsTaxable?: boolean
+  onFreightIsTaxableChange?: (v: boolean) => void
+  freightTaxRate?: number
+  onFreightTaxRateChange?: (rate: number) => void
+
   orderDiscountMode?: OrderDiscountMode
   onOrderDiscountModeChange?: (mode: OrderDiscountMode) => void
   orderDiscountInput?: number
   onOrderDiscountInputChange?: (value: number) => void
-  /** Legacy quotation add-ons (shown in summary; editable when callbacks provided). */
+
   installationAmount?: number
   onInstallationChange?: (amount: number) => void
+  installationMode?: OrderDiscountMode
+  onInstallationModeChange?: (mode: OrderDiscountMode) => void
+  installationValue?: number
+  onInstallationValueChange?: (value: number) => void
+  installationIsTaxable?: boolean
+  onInstallationIsTaxableChange?: (v: boolean) => void
+  installationTaxRate?: number
+  onInstallationTaxRateChange?: (rate: number) => void
+
   customCharges?: number
   onCustomChargesChange?: (amount: number) => void
+  customChargesMode?: OrderDiscountMode
+  onCustomChargesModeChange?: (mode: OrderDiscountMode) => void
+  customChargesValue?: number
+  onCustomChargesValueChange?: (value: number) => void
+  customChargesIsTaxable?: boolean
+  onCustomChargesIsTaxableChange?: (v: boolean) => void
+  customChargesTaxRate?: number
+  onCustomChargesTaxRateChange?: (rate: number) => void
+
   className?: string
 }
 
@@ -54,12 +99,9 @@ export interface ErpProductPricingSectionProps extends ErpProductPricingPanelPro
   title?: string
   subtitle?: string
   accent?: 'blue' | 'teal' | 'green' | 'violet' | 'amber' | 'slate'
-  /** Extra content below the pricing panel (e.g. scope notes). */
   children?: ReactNode
-  /** When false, render panel only (caller supplies the card). Default true. */
   wrapInSection?: boolean
   sectionClassName?: string
-  /** Uncontrolled initial open state for the collapsible FastTab. Default true. */
   defaultOpen?: boolean
 }
 
@@ -71,64 +113,111 @@ export function ErpProductPricingPanel({
   rowErrors = {},
   readOnly,
   showAdjustments = true,
-  freightAmount: freightProp,
+  showExtendedCharges = true,
+  freightAmount: freightAmountProp,
   onFreightChange,
+  freightMode: freightModeProp,
+  onFreightModeChange,
+  freightValue: freightValueProp,
+  onFreightValueChange,
+  freightIsTaxable: freightTaxableProp,
+  onFreightIsTaxableChange,
+  freightTaxRate: freightTaxRateProp,
+  onFreightTaxRateChange,
   orderDiscountMode: discountModeProp,
   onOrderDiscountModeChange,
   orderDiscountInput: discountInputProp,
   onOrderDiscountInputChange,
-  installationAmount: installationProp,
+  installationAmount: installationAmountProp,
   onInstallationChange,
-  customCharges: customProp,
+  installationMode: installModeProp,
+  onInstallationModeChange,
+  installationValue: installValueProp,
+  onInstallationValueChange,
+  installationIsTaxable: installTaxableProp,
+  onInstallationIsTaxableChange,
+  installationTaxRate: installTaxRateProp,
+  onInstallationTaxRateChange,
+  customCharges: customAmountProp,
   onCustomChargesChange,
+  customChargesMode: customModeProp,
+  onCustomChargesModeChange,
+  customChargesValue: customValueProp,
+  onCustomChargesValueChange,
+  customChargesIsTaxable: customTaxableProp,
+  onCustomChargesIsTaxableChange,
+  customChargesTaxRate: customTaxRateProp,
+  onCustomChargesTaxRateChange,
   className,
 }: ErpProductPricingPanelProps) {
   /** Freight is manufacturing-oriented; hide for SERVICES packaging (e.g. Kology). */
   const showFreight = !useTenantProfileStore((s) => s.isServices())
-  const [localFreight, setLocalFreight] = useState(0)
+  const [localFreightMode, setLocalFreightMode] = useState<OrderDiscountMode>('flat')
+  const [localFreightValue, setLocalFreightValue] = useState(0)
+  const [localFreightTaxable, setLocalFreightTaxable] = useState(false)
+  const [localFreightTaxRate, setLocalFreightTaxRate] = useState(18)
   const [localDiscountMode, setLocalDiscountMode] = useState<OrderDiscountMode>('flat')
   const [localDiscountInput, setLocalDiscountInput] = useState(0)
-  const [localInstallation, setLocalInstallation] = useState(0)
-  const [localCustom, setLocalCustom] = useState(0)
+  const [localInstallMode, setLocalInstallMode] = useState<OrderDiscountMode>('flat')
+  const [localInstallValue, setLocalInstallValue] = useState(0)
+  const [localInstallTaxable, setLocalInstallTaxable] = useState(false)
+  const [localInstallTaxRate, setLocalInstallTaxRate] = useState(18)
+  const [localCustomMode, setLocalCustomMode] = useState<OrderDiscountMode>('flat')
+  const [localCustomValue, setLocalCustomValue] = useState(0)
+  const [localCustomTaxable, setLocalCustomTaxable] = useState(false)
+  const [localCustomTaxRate, setLocalCustomTaxRate] = useState(18)
 
-  const freightAmount = showFreight ? (freightProp ?? localFreight) : 0
+  const freightMode = freightModeProp ?? localFreightMode
+  const freightValue =
+    freightValueProp ??
+    (freightAmountProp != null && freightModeProp == null ? freightAmountProp : localFreightValue)
+  const freightIsTaxable = freightTaxableProp ?? localFreightTaxable
+  const freightTaxRate = freightTaxRateProp ?? localFreightTaxRate
+
   const orderDiscountMode = discountModeProp ?? localDiscountMode
   const orderDiscountInput = discountInputProp ?? localDiscountInput
-  const installationAmount = installationProp ?? localInstallation
-  const customCharges = customProp ?? localCustom
 
-  const setFreight = (n: number) => {
-    if (!showFreight) return
-    const next = Math.max(0, n)
-    if (onFreightChange) onFreightChange(next)
-    else setLocalFreight(next)
-  }
-  const setDiscountMode = (mode: OrderDiscountMode) => {
-    if (onOrderDiscountModeChange) onOrderDiscountModeChange(mode)
-    else setLocalDiscountMode(mode)
-  }
-  const setDiscountInput = (n: number) => {
-    if (onOrderDiscountInputChange) onOrderDiscountInputChange(n)
-    else setLocalDiscountInput(n)
-  }
-  const setInstallation = (n: number) => {
-    const next = Math.max(0, n)
-    if (onInstallationChange) onInstallationChange(next)
-    else setLocalInstallation(next)
-  }
-  const setCustom = (n: number) => {
-    const next = Math.max(0, n)
-    if (onCustomChargesChange) onCustomChargesChange(next)
-    else setLocalCustom(next)
+  const installationMode = installModeProp ?? localInstallMode
+  const installationValue =
+    installValueProp ??
+    (installationAmountProp != null && installModeProp == null ? installationAmountProp : localInstallValue)
+  const installationIsTaxable = installTaxableProp ?? localInstallTaxable
+  const installationTaxRate = installTaxRateProp ?? localInstallTaxRate
+
+  const customChargesMode = customModeProp ?? localCustomMode
+  const customChargesValue =
+    customValueProp ??
+    (customAmountProp != null && customModeProp == null ? customAmountProp : localCustomValue)
+  const customChargesIsTaxable = customTaxableProp ?? localCustomTaxable
+  const customChargesTaxRate = customTaxRateProp ?? localCustomTaxRate
+
+  const setFreightMode = (mode: OrderDiscountMode) => {
+    if (onFreightModeChange) onFreightModeChange(mode)
+    else setLocalFreightMode(mode)
   }
 
   const synced = syncOpportunityLines(lines)
   const adjustments: ProductPricingAdjustments = {
-    freightAmount,
     orderDiscountMode,
     orderDiscountInput,
-    installationAmount,
-    customCharges,
+    freight: {
+      calculationType: freightMode,
+      value: freightValue,
+      isTaxable: freightIsTaxable,
+      taxRate: freightTaxRate,
+    },
+    installation: {
+      calculationType: installationMode,
+      value: installationValue,
+      isTaxable: installationIsTaxable,
+      taxRate: installationTaxRate,
+    },
+    otherCharges: {
+      calculationType: customChargesMode,
+      value: customChargesValue,
+      isTaxable: customChargesIsTaxable,
+      taxRate: customChargesTaxRate,
+    },
   }
   const orderSummary = calcProductPricingSummary(synced, adjustments)
 
@@ -165,10 +254,7 @@ export function ErpProductPricingPanel({
     updateLine(lineId, built)
   }
 
-  const showLegacyCharges =
-    Boolean(onInstallationChange || onCustomChargesChange)
-    || installationAmount > 0
-    || customCharges > 0
+  const showCharges = showExtendedCharges
 
   return (
     <div className={cn('so-pricing-panel so-pricing-panel--pro', className)}>
@@ -356,119 +442,131 @@ export function ErpProductPricingPanel({
 
       {showAdjustments ? (
         <div className="so-pricing-totals">
-          <div className="so-pricing-adjust">
-            <p className="so-pricing-adjust__title">Order adjustments</p>
-            <div className="so-pricing-charges">
+          <OrderAdjustmentsPanel>
+              <ChargeEditor
+                label="Order discount"
+                mode={orderDiscountMode}
+                value={orderDiscountInput}
+                calculatedAmount={orderSummary.orderDiscountAmount}
+                isTaxable={false}
+                taxRate={0}
+                readOnly={readOnly}
+                modePctLabel="% Disc."
+                amountHint={
+                  orderSummary.orderDiscountAmount > 0
+                    ? 'off taxable (before GST)'
+                    : undefined
+                }
+                onModeChange={(m) => {
+                  if (onOrderDiscountModeChange) onOrderDiscountModeChange(m)
+                  else setLocalDiscountMode(m)
+                  if (onOrderDiscountInputChange) onOrderDiscountInputChange(0)
+                  else setLocalDiscountInput(0)
+                }}
+                onValueChange={(n) => {
+                  if (onOrderDiscountInputChange) onOrderDiscountInputChange(n)
+                  else setLocalDiscountInput(n)
+                }}
+              />
+
               {showFreight ? (
-                <label className="so-pricing-charge">
-                  <span className="so-pricing-charge__label">Freight</span>
-                  <div className="so-pricing-charge__control">
-                    <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      className="so-pricing-input so-pricing-input--num"
-                      value={freightAmount}
-                      onChange={(e) => setFreight(Number(e.target.value) || 0)}
-                      disabled={readOnly}
-                      aria-label="Freight"
-                    />
-                  </div>
-                </label>
+                <ChargeEditor
+                  label="Freight"
+                  mode={freightMode}
+                  value={freightValue}
+                  calculatedAmount={orderSummary.freightAmount}
+                  isTaxable={freightIsTaxable}
+                  taxRate={freightTaxRate}
+                  readOnly={readOnly}
+                  showTax
+                  onModeChange={(m) => {
+                    setFreightMode(m)
+                    const zero = 0
+                    if (onFreightValueChange) onFreightValueChange(zero)
+                    else setLocalFreightValue(zero)
+                    if (onFreightChange) onFreightChange(0)
+                  }}
+                  onValueChange={(n) => {
+                    if (onFreightValueChange) onFreightValueChange(n)
+                    else setLocalFreightValue(n)
+                    if (onFreightChange && freightMode === 'flat') onFreightChange(n)
+                  }}
+                  onIsTaxableChange={(v) => {
+                    if (onFreightIsTaxableChange) onFreightIsTaxableChange(v)
+                    else setLocalFreightTaxable(v)
+                  }}
+                  onTaxRateChange={(r) => {
+                    if (onFreightTaxRateChange) onFreightTaxRateChange(r)
+                    else setLocalFreightTaxRate(r)
+                  }}
+                />
               ) : null}
-              <div className="so-pricing-charge">
-                <div className="so-pricing-charge__label-row">
-                  <span className="so-pricing-charge__label">Order discount</span>
-                  {!readOnly ? (
-                    <div className="so-pricing-discount-mode" role="group" aria-label="Discount type">
-                      <button
-                        type="button"
-                        className={`so-pricing-discount-mode__btn${orderDiscountMode === 'flat' ? ' so-pricing-discount-mode__btn--active' : ''}`}
-                        aria-pressed={orderDiscountMode === 'flat'}
-                        onClick={() => {
-                          if (orderDiscountMode === 'flat') return
-                          setDiscountMode('flat')
-                          setDiscountInput(0)
-                        }}
-                      >
-                        Flat ₹
-                      </button>
-                      <button
-                        type="button"
-                        className={`so-pricing-discount-mode__btn${orderDiscountMode === 'percent' ? ' so-pricing-discount-mode__btn--active' : ''}`}
-                        aria-pressed={orderDiscountMode === 'percent'}
-                        onClick={() => {
-                          if (orderDiscountMode === 'percent') return
-                          setDiscountMode('percent')
-                          setDiscountInput(0)
-                        }}
-                      >
-                        % Discount
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-                <label className="so-pricing-charge__control">
-                  <span className="so-pricing-charge__prefix" aria-hidden>
-                    {orderDiscountMode === 'percent' ? '%' : '₹'}
-                  </span>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={orderDiscountMode === 'percent' ? 100 : undefined}
-                    step={orderDiscountMode === 'percent' ? 0.5 : 1}
-                    className="so-pricing-input so-pricing-input--num"
-                    value={orderDiscountInput}
-                    onChange={(e) => {
-                      const raw = Math.max(0, Number(e.target.value) || 0)
-                      setDiscountInput(orderDiscountMode === 'percent' ? Math.min(100, raw) : raw)
-                    }}
-                    disabled={readOnly}
-                    aria-label={orderDiscountMode === 'percent' ? 'Order discount percent' : 'Order discount amount'}
-                  />
-                </label>
-                {orderDiscountMode === 'percent' && orderDiscountInput > 0 ? (
-                  <p className="so-pricing-charge__hint">
-                    Equals {formatCurrency(orderSummary.orderDiscountAmount)} off taxable + GST
-                  </p>
-                ) : null}
-              </div>
-              {showLegacyCharges ? (
+
+              {showCharges ? (
                 <>
-                  <label className="so-pricing-charge">
-                    <span className="so-pricing-charge__label">Installation</span>
-                    <div className="so-pricing-charge__control">
-                      <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
-                      <Input
-                        type="number"
-                        min={0}
-                        className="so-pricing-input so-pricing-input--num"
-                        value={installationAmount}
-                        onChange={(e) => setInstallation(Number(e.target.value) || 0)}
-                        disabled={readOnly || !onInstallationChange}
-                        aria-label="Installation"
-                      />
-                    </div>
-                  </label>
-                  <label className="so-pricing-charge">
-                    <span className="so-pricing-charge__label">Other charges</span>
-                    <div className="so-pricing-charge__control">
-                      <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
-                      <Input
-                        type="number"
-                        min={0}
-                        className="so-pricing-input so-pricing-input--num"
-                        value={customCharges}
-                        onChange={(e) => setCustom(Number(e.target.value) || 0)}
-                        disabled={readOnly || !onCustomChargesChange}
-                        aria-label="Other charges"
-                      />
-                    </div>
-                  </label>
+                  <ChargeEditor
+                    label="Installation"
+                    mode={installationMode}
+                    value={installationValue}
+                    calculatedAmount={orderSummary.installationAmount}
+                    isTaxable={installationIsTaxable}
+                    taxRate={installationTaxRate}
+                    readOnly={readOnly}
+                    showTax
+                    onModeChange={(m) => {
+                      if (onInstallationModeChange) onInstallationModeChange(m)
+                      else setLocalInstallMode(m)
+                      if (onInstallationValueChange) onInstallationValueChange(0)
+                      else setLocalInstallValue(0)
+                      if (onInstallationChange) onInstallationChange(0)
+                    }}
+                    onValueChange={(n) => {
+                      if (onInstallationValueChange) onInstallationValueChange(n)
+                      else setLocalInstallValue(n)
+                      if (onInstallationChange && installationMode === 'flat') onInstallationChange(n)
+                    }}
+                    onIsTaxableChange={(v) => {
+                      if (onInstallationIsTaxableChange) onInstallationIsTaxableChange(v)
+                      else setLocalInstallTaxable(v)
+                    }}
+                    onTaxRateChange={(r) => {
+                      if (onInstallationTaxRateChange) onInstallationTaxRateChange(r)
+                      else setLocalInstallTaxRate(r)
+                    }}
+                  />
+                  <ChargeEditor
+                    label="Other charges"
+                    mode={customChargesMode}
+                    value={customChargesValue}
+                    calculatedAmount={orderSummary.customCharges}
+                    isTaxable={customChargesIsTaxable}
+                    taxRate={customChargesTaxRate}
+                    readOnly={readOnly}
+                    showTax
+                    onModeChange={(m) => {
+                      if (onCustomChargesModeChange) onCustomChargesModeChange(m)
+                      else setLocalCustomMode(m)
+                      if (onCustomChargesValueChange) onCustomChargesValueChange(0)
+                      else setLocalCustomValue(0)
+                      if (onCustomChargesChange) onCustomChargesChange(0)
+                    }}
+                    onValueChange={(n) => {
+                      if (onCustomChargesValueChange) onCustomChargesValueChange(n)
+                      else setLocalCustomValue(n)
+                      if (onCustomChargesChange && customChargesMode === 'flat') onCustomChargesChange(n)
+                    }}
+                    onIsTaxableChange={(v) => {
+                      if (onCustomChargesIsTaxableChange) onCustomChargesIsTaxableChange(v)
+                      else setLocalCustomTaxable(v)
+                    }}
+                    onTaxRateChange={(r) => {
+                      if (onCustomChargesTaxRateChange) onCustomChargesTaxRateChange(r)
+                      else setLocalCustomTaxRate(r)
+                    }}
+                  />
                 </>
               ) : null}
-            </div>
-          </div>
+            </OrderAdjustmentsPanel>
 
           <aside className="so-pricing-summary" aria-label="Order summary">
             <p className="so-pricing-summary__title">Order summary</p>
@@ -489,8 +587,55 @@ export function ErpProductPricingPanel({
               ) : null}
               <div className="so-pricing-summary__row">
                 <span>Taxable amount</span>
-                <span className="tabular-nums">{formatCurrency(orderSummary.subtotal)}</span>
+                <span className="tabular-nums">{formatCurrency(orderSummary.taxableBeforeOverallDiscount)}</span>
               </div>
+              <div className="so-pricing-summary__row">
+                <span>
+                  Overall discount
+                  {orderDiscountMode === 'percent' && orderDiscountInput > 0
+                    ? ` (${orderDiscountInput}%)`
+                    : ''}
+                </span>
+                <span className="tabular-nums">
+                  {orderSummary.orderDiscountAmount > 0
+                    ? `−${formatCurrency(orderSummary.orderDiscountAmount)}`
+                    : formatCurrency(0)}
+                </span>
+              </div>
+              {orderSummary.orderDiscountAmount > 0 ? (
+                <div className="so-pricing-summary__row">
+                  <span>Taxable after discount</span>
+                  <span className="tabular-nums">{formatCurrency(orderSummary.taxableAfterOverallDiscount)}</span>
+                </div>
+              ) : null}
+              {orderSummary.freightAmount > 0 ? (
+                <div className="so-pricing-summary__row">
+                  <span>
+                    Freight
+                    {freightIsTaxable ? ' (taxable)' : ''}
+                    {freightMode === 'percent' && freightValue > 0 ? ` ${freightValue}%` : ''}
+                  </span>
+                  <span className="tabular-nums">{formatCurrency(orderSummary.freightAmount)}</span>
+                </div>
+              ) : null}
+              {orderSummary.installationAmount > 0 ? (
+                <div className="so-pricing-summary__row">
+                  <span>
+                    Installation
+                    {installationIsTaxable ? ' (taxable)' : ''}
+                  </span>
+                  <span className="tabular-nums">{formatCurrency(orderSummary.installationAmount)}</span>
+                </div>
+              ) : null}
+              {orderSummary.customCharges > 0 ? (
+                <div className="so-pricing-summary__row">
+                  <span>
+                    Other charges
+                    {customChargesIsTaxable ? ' (taxable)' : ''}
+                  </span>
+                  <span className="tabular-nums">{formatCurrency(orderSummary.customCharges)}</span>
+                </div>
+              ) : null}
               {[...orderSummary.gstByRate.entries()]
                 .sort(([a], [b]) => a - b)
                 .map(([rate, amount]) => (
@@ -502,37 +647,6 @@ export function ErpProductPricingPanel({
               <div className="so-pricing-summary__row">
                 <span>Total GST</span>
                 <span className="tabular-nums">{formatCurrency(orderSummary.totalGst)}</span>
-              </div>
-              {showFreight ? (
-                <div className="so-pricing-summary__row">
-                  <span>Freight</span>
-                  <span className="tabular-nums">{formatCurrency(freightAmount)}</span>
-                </div>
-              ) : null}
-              {installationAmount > 0 ? (
-                <div className="so-pricing-summary__row">
-                  <span>Installation</span>
-                  <span className="tabular-nums">{formatCurrency(installationAmount)}</span>
-                </div>
-              ) : null}
-              {customCharges > 0 ? (
-                <div className="so-pricing-summary__row">
-                  <span>Other charges</span>
-                  <span className="tabular-nums">{formatCurrency(customCharges)}</span>
-                </div>
-              ) : null}
-              <div className="so-pricing-summary__row">
-                <span>
-                  Order discount
-                  {orderDiscountMode === 'percent' && orderDiscountInput > 0
-                    ? ` (${orderDiscountInput}%)`
-                    : ''}
-                </span>
-                <span className="tabular-nums">
-                  {orderSummary.orderDiscountAmount > 0
-                    ? `−${formatCurrency(orderSummary.orderDiscountAmount)}`
-                    : formatCurrency(0)}
-                </span>
               </div>
             </div>
             <div className="so-pricing-summary__grand">

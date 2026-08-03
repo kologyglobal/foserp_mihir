@@ -37,8 +37,11 @@ Green tabs = live in-app CSV import. Brown = collection / assisted setup.
 | Contacts | `05_contacts.csv` |
 | Leads | `06_leads.csv` |
 | BOM | `07_bom_combined.csv` |
+| Chart of Accounts | `08_chart_of_accounts.csv` |
 
-**Not live API CSV yet:** Chart of Accounts (`08_`), warehouses, opening stock, users, work centres — collect in Excel; load via UI / invite / assisted import.
+**Not live API CSV yet:** warehouses, opening stock, users, work centres — collect in Excel; load via UI / invite / assisted import.
+
+**Chart of Accounts:** Accounting → Chart of Accounts → Import (API mode). Requires a legal entity; parents resolve by Account Code (file or existing CoA).
 
 ## Client instructions (copy into email)
 
@@ -50,4 +53,4 @@ Green tabs = live in-app CSV import. Brown = collection / assisted setup.
 
 ## Load order
 
-Prerequisites (UOM, categories, GST groups, geography) → HSN → Items → Vendors → Companies → Contacts → Leads → Warehouses / Work Centres → BOM → Opening Stock → invite Users.
+Prerequisites (UOM, categories, GST groups, geography) → Legal entity / Chart of Accounts → HSN → Items → Vendors → Companies → Contacts → Leads → Warehouses / Work Centres → BOM → Opening Stock → invite Users.

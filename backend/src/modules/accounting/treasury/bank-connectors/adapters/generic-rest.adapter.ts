@@ -59,7 +59,7 @@ function authHeaders(ctx: BankConnectorAdapterContext): Record<string, string> {
 function formatHint(ctx: BankConnectorAdapterContext): BankConnectorStatementFormatHint {
   const expected =
     typeof ctx.configJson?.expectedFormat === 'string' ? ctx.configJson.expectedFormat : undefined
-  if (expected === 'MT940' || expected === 'CAMT053' || expected === 'CSV' || expected === 'OTHER') {
+  if (expected === 'MT940' || expected === 'CAMT053' || expected === 'CAMT052' || expected === 'CAMT054' || expected === 'CSV' || expected === 'OTHER') {
     return expected
   }
   return 'UNKNOWN'

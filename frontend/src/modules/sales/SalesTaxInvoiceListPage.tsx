@@ -422,6 +422,26 @@ export function SalesTaxInvoiceListPage() {
         ),
       },
       {
+        id: 'accounting',
+        header: 'Accounting',
+        meta: { columnLabel: 'Accounting' },
+        enableSorting: false,
+        cell: ({ row }) => {
+          const status = row.original.accountingStatus ?? 'none'
+          if (status === 'converted' && row.original.salesInvoiceId) {
+            return (
+              <TableLink to={`/accounting/money-in/invoices/${row.original.salesInvoiceId}`}>
+                {row.original.salesInvoiceNumber || 'Money In'}
+              </TableLink>
+            )
+          }
+          if (status === 'pending_review') {
+            return <StatusDot label="Pending Accounting" tone="warning" />
+          }
+          return <span className="text-erp-muted">—</span>
+        },
+      },
+      {
         accessorKey: 'customerName',
         header: 'Customer',
         meta: { columnLabel: 'Customer' },

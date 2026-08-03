@@ -37,7 +37,7 @@ import { RECURRING_FREQUENCY_LABELS } from '../recurring-invoices/RecurringInvoi
 import { useAccountingCustomerLookups } from '@/hooks/useAccountingLookups'
 import { gstStateCodeFromGstin } from '@/utils/customerUtils'
 import { cn } from '@/utils/cn'
-import type { DispatchInvoicePrefillState } from './invoicePrefillState'
+import type { DispatchInvoicePrefillState, CrmTaxInvoicePrefillState } from './invoicePrefillState'
 import { useTenantProfileStore } from '@/store/tenantProfileStore'
 import { resolveTaxInvoiceFromProforma, type TaxInvoicePrefill } from '@/utils/taxInvoicePrefill'
 
@@ -189,19 +189,35 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [searchParams] = useSearchParams()
   const perms = useMoneyInPermissions()
   const showFreight = !useTenantProfileStore((s) => s.isServices())
-  const dispatchPrefill = (location.state as DispatchInvoicePrefillState | null)?.dispatchPrefill
+  const locationState = location.state as (DispatchInvoicePrefillState & CrmTaxInvoicePrefillState) | null
+  const dispatchPrefill = locationState?.dispatchPrefill
+  const crmTaxPrefill = locationState?.crmTaxInvoicePrefill
   const proformaId = mode === 'create' ? searchParams.get('proformaId') : null
   const [loading, setLoading] = useState(mode === 'edit')
   const [saving, setSaving] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<string>()
   const [wasReady, setWasReady] = useState(false)
   const [sourceMode, setSourceMode] = useState<SalesInvoiceSourceType>(() =>
-    dispatchPrefill ? 'OUTBOUND_DISPATCH' : proformaId ? 'PROFORMA_INVOICE' : 'DIRECT',
+    dispatchPrefill
+      ? 'OUTBOUND_DISPATCH'
+      : proformaId
+        ? 'PROFORMA_INVOICE'
+        : crmTaxPrefill
+          ? 'CRM_TAX_INVOICE'
+          : 'DIRECT',
   )
   const [proformaSource, setProformaSource] = useState<TaxInvoicePrefill | null>(null)
-  const [salesOrderId, setSalesOrderId] = useState(dispatchPrefill?.salesOrderId ?? '')
+  const [salesOrderId, setSalesOrderId] = useState(
+    dispatchPrefill?.salesOrderId ?? crmTaxPrefill?.salesOrderId ?? '',
+  )
   const [dispatchSourceDocumentId, setDispatchSourceDocumentId] = useState<string | null>(
     dispatchPrefill?.sourceDocumentId ?? null,
+  )
+  const [crmTaxInvoiceId, setCrmTaxInvoiceId] = useState<string | null>(
+    crmTaxPrefill?.sourceDocumentId ?? null,
+  )
+  const [crmCreatedByName, setCrmCreatedByName] = useState<string | null>(
+    crmTaxPrefill?.createdByName ?? null,
   )
   const [dispatchSourceLinks, setDispatchSourceLinks] = useState<SalesInvoiceSourceLinkInput[]>(
     dispatchPrefill?.sourceLinks ?? [],
@@ -327,6 +343,40 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     )
     setSourceMode('PROFORMA_INVOICE')
   }, [applyCustomerDefaults, form, mode, proformaId, proformaSource])
+
+  useEffect(() => {
+    if (mode !== 'create' || !crmTaxPrefill) return
+    applyCustomerDefaults(crmTaxPrefill.customerId)
+    if (crmTaxPrefill.invoiceDate) {
+      form.setValue('invoiceDate', crmTaxPrefill.invoiceDate, { shouldDirty: true })
+      form.setValue('postingDate', crmTaxPrefill.invoiceDate, { shouldDirty: true })
+    }
+    if (crmTaxPrefill.dueDate) {
+      form.setValue('dueDate', crmTaxPrefill.dueDate, { shouldDirty: true })
+    }
+    if (crmTaxPrefill.customerPoNumber) {
+      form.setValue('customerPoNumber', crmTaxPrefill.customerPoNumber, { shouldDirty: true })
+    }
+    if (crmTaxPrefill.narration) {
+      form.setValue('narration', crmTaxPrefill.narration, { shouldDirty: true })
+    }
+    form.setValue(
+      'lines',
+      crmTaxPrefill.lines.map((l) => ({
+        itemId: l.itemId ?? '',
+        description: l.description,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        hsnCode: l.hsnCode ?? '',
+        uom: l.uom ?? '',
+      })),
+      { shouldDirty: true },
+    )
+    setCrmTaxInvoiceId(crmTaxPrefill.sourceDocumentId)
+    setCrmCreatedByName(crmTaxPrefill.createdByName)
+    if (crmTaxPrefill.salesOrderId) setSalesOrderId(crmTaxPrefill.salesOrderId)
+    setSourceMode('CRM_TAX_INVOICE')
+  }, [applyCustomerDefaults, crmTaxPrefill, form, mode])
 
   // API mode: invoice-eligible SOs from the accounting lookup endpoint.
   useEffect(() => {
@@ -569,6 +619,7 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     const fromSo = sourceMode === 'SALES_ORDER' && salesOrderId
     const fromDispatch = sourceMode === 'OUTBOUND_DISPATCH' && dispatchSourceDocumentId
     const fromProforma = sourceMode === 'PROFORMA_INVOICE' && proformaId
+    const fromCrmTax = sourceMode === 'CRM_TAX_INVOICE' && crmTaxInvoiceId
     const linkedItem = (itemId?: string) => (itemId ? items.find((i) => i.id === itemId) : undefined)
     const lookup = accountingCustomers?.find((c) => c.id === values.customerId)
     const storeCustomer = customers.find((c) => c.id === values.customerId)
@@ -601,12 +652,19 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 projectRef: values.projectRef?.trim() || null,
                 projectNameSnapshot: values.projectNameSnapshot?.trim() || null,
               }
-            : {
-                sourceType: (fromSo ? 'SALES_ORDER' : 'DIRECT') as SalesInvoiceSourceType,
-                sourceDocumentId: fromSo ? salesOrderId : null,
-                projectRef: values.projectRef?.trim() || null,
-                projectNameSnapshot: values.projectNameSnapshot?.trim() || null,
-              }
+            : fromCrmTax
+              ? {
+                  sourceType: 'CRM_TAX_INVOICE' as SalesInvoiceSourceType,
+                  sourceDocumentId: crmTaxInvoiceId,
+                  projectRef: values.projectRef?.trim() || null,
+                  projectNameSnapshot: values.projectNameSnapshot?.trim() || null,
+                }
+              : {
+                  sourceType: (fromSo ? 'SALES_ORDER' : 'DIRECT') as SalesInvoiceSourceType,
+                  sourceDocumentId: fromSo ? salesOrderId : null,
+                  projectRef: values.projectRef?.trim() || null,
+                  projectNameSnapshot: values.projectNameSnapshot?.trim() || null,
+                }
         : {
             projectRef: values.projectRef?.trim() || null,
             projectNameSnapshot: values.projectNameSnapshot?.trim() || null,
@@ -769,13 +827,24 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
         </div>
       )}
 
+      {sourceMode === 'CRM_TAX_INVOICE' && crmTaxInvoiceId && (
+        <div className="mb-3 rounded border border-violet-200 bg-violet-50 px-3 py-2 text-[12px] text-violet-950">
+          Converting CRM tax invoice — created by{' '}
+          <strong>CRM · {crmCreatedByName || 'user'}</strong>. Save creates a Money In draft linked for
+          Accounting approval / post. Receipts &amp; allocations sync payment status back to Sales and Customer 360.
+        </div>
+      )}
+
       <form onSubmit={onSave} className="sales-invoice-zoho-form space-y-3">
         {/* ── Customer & invoice details (Zoho-style compact document header) ── */}
         <FormSection
           title="Customer & Invoice Details"
           subtitle="Party, source document, dates, and GST classification — defaults pulled from the Customer Master."
           actions={
-            mode === 'create' && sourceMode !== 'OUTBOUND_DISPATCH' && sourceMode !== 'PROFORMA_INVOICE' ? (
+            mode === 'create' &&
+            sourceMode !== 'OUTBOUND_DISPATCH' &&
+            sourceMode !== 'PROFORMA_INVOICE' &&
+            sourceMode !== 'CRM_TAX_INVOICE' ? (
               <div className="flex flex-wrap items-center gap-3">
                 <div className="inline-flex overflow-hidden rounded border border-erp-border" role="group" aria-label="Invoice source">
                   <button
@@ -890,7 +959,8 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                       disabled={
                         (sourceMode === 'SALES_ORDER' && Boolean(salesOrderId)) ||
                         (sourceMode === 'OUTBOUND_DISPATCH' && Boolean(watched.customerId)) ||
-                        (sourceMode === 'PROFORMA_INVOICE' && Boolean(watched.customerId))
+                        (sourceMode === 'PROFORMA_INVOICE' && Boolean(watched.customerId)) ||
+                        (sourceMode === 'CRM_TAX_INVOICE' && Boolean(watched.customerId))
                       }
                       allowEmpty
                       source="accounting"

@@ -1,12 +1,12 @@
 # Bank & Cash — Status
 
-**Status:** Live API for **internal UAT / controlled pilot**. **Phase 5D4 SIMULATED AIS + cron** shipped (2026-07-30). **Live bank TPP AIS**, **FX**, and **intercompany** remain deferred.
+**Status:** Live API for **internal UAT / controlled pilot**. **Phase 5D4 SIMULATED AIS + cron** shipped (2026-07-30). **Bank hardening** (distributed sync lease + CAMT.052/.054) shipped (2026-07-31). **Live bank TPP AIS**, **FX**, and **intercompany** remain deferred.
 
 **UAT / pilot surface (API mode):** `/accounting/bank-cash` liquidity hub + transfers, statements, reconciliation, cheques, adjustments, standing instructions, posting rules, connectors, bankbook/cashbook. Seed registers (`bank-accounts`, `transactions`, `deposits`, `cash-counts`, `setup`, …) are **not routed** — deep links redirect to the hub.
 
-Phases **5A1–5A3**, **5B1–5B3**, **5C1**, **MT940/CAMT.053 file ingest**, **5D1–5D3 bank connectors**, **5D4 SIMULATED AIS + scheduleCron** complete.
+Phases **5A1–5A3**, **5B1–5B3**, **5C1**, **MT940/CAMT family file ingest**, **5D1–5D4 bank connectors**, **bank hardening** complete.
 
-Core (API mode): bank-originated controls, statement import (CSV/XLSX/**MT940/CAMT.053**), reconciliation, transfers, cheques, treasury adjustments, liquidity / cash position, connectors (sandbox FS + allow-listed REST + **live SFTP** + **SIMULATED Open Banking AIS**) → `BANK_API`. Open Banking **live TPP AIS** still deferred. Use `VITE_USE_API=true`; demo seed is not the SoT.
+Core (API mode): bank-originated controls, statement import (CSV/XLSX/**MT940/CAMT.052/.053/.054**), reconciliation, transfers, cheques, treasury adjustments, liquidity / cash position, connectors (sandbox FS + allow-listed REST + **live SFTP** + **SIMULATED Open Banking AIS**) → `BANK_API`. Multi-instance connector sync uses a MySQL lease. Open Banking **live TPP AIS** still deferred. Use `VITE_USE_API=true`; demo seed is not the SoT.
 
 ## Phase 5A1–5B3 — Shipped ✅
 
@@ -85,6 +85,17 @@ Docs: [`BANK_CONNECTOR_ARCHITECTURE.md`](BANK_CONNECTOR_ARCHITECTURE.md)
 | **Live TPP AIS** | `mode=LIVE` or `BANK_CONNECTOR_AIS_PROVIDER=LIVE` → still **422 NOT_IMPLEMENTED** |
 | **Tests** | Live connector suite + cron matcher unit + scheduled tick live |
 
+## Bank hardening — Distributed lease + CAMT.052/.054 — Shipped ✅ (2026-07-31)
+
+| Area | Detail |
+|------|--------|
+| **Sync lease** | `syncLockUntil` / `syncLockToken` on `BankConnector`; manual + scheduled; 10 min TTL; heartbeat; `409 BANK_CONNECTOR_SYNC_IN_PROGRESS` |
+| **CAMT family** | Shared `bank-statement-camt-common.ts`; CAMT.052 intraday + CAMT.054 notifications as provisional documents |
+| **Supersession** | Later CAMT.053 excludes unmatched provisional duplicates; matched provisional blocks auto-supersede |
+| **FE** | Format picker, document badge, N/A balances, provisional/superseded line flags, Sync disabled while leased |
+| **Migration** | `20260731020000_finance_bank_hardening` |
+| **Tests** | `finance-bank-hardening.test.ts` |
+
 ## Explicitly deferred
 
 | Item | Why deferred | Next phase name |
@@ -93,7 +104,6 @@ Docs: [`BANK_CONNECTOR_ARCHITECTURE.md`](BANK_CONNECTOR_ARCHITECTURE.md)
 | **FX / cross-currency treasury** | Accounts carry `currencyCode` + `exchangeRate` on docs, but **no FX rate table**, no period-end revaluation journals, transfers require same currency | Treasury **FX Phase** |
 | **Intercompany dual-LE transfers** | Transfers explicitly require same legal entity; dual-entity posting + IC clearing not designed | Treasury **Intercompany Phase** |
 | Payment files (pain.001) | Outbound initiation | Payment execution phase |
-| CAMT.052 / .054 | Not end-of-day statement | Later |
 | Hard cash day-lock of GL | Soft day-close only (5C1) | Closing hardening |
 | Cheque print | Layout/print service not in scope | Cheque print phase |
 

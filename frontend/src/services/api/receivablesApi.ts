@@ -82,6 +82,27 @@ export async function prefillInvoiceFromDispatch(outboundDispatchLineIds: string
   })
 }
 
+export async function listCrmPendingTaxInvoices(params?: {
+  companyId?: string
+  search?: string
+  page?: number
+  limit?: number
+}) {
+  return apiRequest<import('../../types/moneyIn').CrmPendingTaxInvoiceDto[]>(
+    `${tenantPath(`${BASE}/invoices/crm-pending`)}${buildQuery(params as Record<string, string | number | boolean | undefined>)}`,
+  )
+}
+
+export async function prefillInvoiceFromCrmTaxInvoice(crmTaxInvoiceId: string) {
+  return apiRequest<import('../../types/moneyIn').InvoicePrefillFromCrmTaxInvoiceDto>(
+    tenantPath(`${BASE}/invoices/prefill-from-crm-tax-invoice`),
+    {
+      method: 'POST',
+      body: JSON.stringify({ crmTaxInvoiceId }),
+    },
+  )
+}
+
 export async function getSalesInvoice(id: string) {
   return apiRequest<SalesInvoiceDto>(tenantPath(`${BASE}/invoices/${id}`))
 }

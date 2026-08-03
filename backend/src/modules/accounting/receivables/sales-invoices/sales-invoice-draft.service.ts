@@ -21,6 +21,7 @@ import {
   buildCalculationInputFromStoredInvoice,
   parseCalculationContext,
 } from './sales-invoice-validation.service.js'
+import { ValidationError } from '../../../../utils/errors.js'
 import { validateAndEnrichSalesInvoiceSourceLinks } from './sales-invoice-source-validation.service.js'
 import { serializeSalesInvoiceDetail } from './sales-invoice-read.service.js'
 import { assertSalesOrderNotOverInvoiced } from './sales-order-invoice-amount.guard.js'
@@ -90,6 +91,15 @@ export async function createSalesInvoiceDraft(req: Request, tenantId: string, in
     metaWarnings = source.warnings
   }
 
+  if (input.sourceType === 'CRM_TAX_INVOICE' && input.sourceDocumentId) {
+    const { buildPrefillFromCrmTaxInvoice } = await import('../source/crm-tax-invoice-ar.service.js')
+    const prefill = await buildPrefillFromCrmTaxInvoice(tenantId, input.sourceDocumentId)
+    if (prefill.customerId !== input.customerId) {
+      throw new ValidationError('Customer must match the CRM tax invoice customer')
+    }
+    sourceSnapshot = prefill.sourceDocumentSnapshot
+  }
+
   const enrichedLinks = await validateAndEnrichSalesInvoiceSourceLinks({
     tenantId,
     customerId: input.customerId,
@@ -129,10 +139,22 @@ export async function createSalesInvoiceDraft(req: Request, tenantId: string, in
     sourceLinks: enrichedLinks.sourceLinks,
   })
 
+  if (input.sourceType === 'CRM_TAX_INVOICE' && input.sourceDocumentId) {
+    const { linkCrmTaxInvoiceToSalesInvoice } = await import('../source/crm-tax-invoice-ar.service.js')
+    await linkCrmTaxInvoiceToSalesInvoice({
+      tenantId,
+      crmTaxInvoiceId: input.sourceDocumentId,
+      salesInvoiceId: invoice.id,
+      salesInvoiceNumber: invoice.invoiceNumber ?? invoice.draftReference,
+      userId,
+    })
+  }
+
   await writeAudit(req, tenantId, invoice.id, 'SALES_INVOICE_DRAFT_CREATED', undefined, {
     draftReference: invoice.draftReference,
     status: invoice.status,
     sourceLinkCount: enrichedLinks.sourceLinks.length,
+    sourceType: input.sourceType,
   })
 
   const detail = await serializeSalesInvoiceDetail(req, invoice)

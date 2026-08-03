@@ -1,4 +1,12 @@
-﻿# 2026-07-30 — Accounting year-end close + Money In/Out honest verdict
+﻿# 2026-07-31 — Bank hardening (distributed lease + CAMT.052/.054)
+
+- Migration `20260731020000_finance_bank_hardening` — connector sync lease + CAMT enums/documentType/provisional line columns — **applied**
+- `npx vitest run tests/finance/finance-bank-hardening.test.ts --no-file-parallelism` — **8/8 PASS** (parser unit + live lease/supersession)
+- Docs: `BANK_CONNECTOR_ARCHITECTURE.md`, `BANK_STATEMENT_IMPORT_ARCHITECTURE.md`, `BANK_CASH_STATUS.md`
+
+---
+
+# 2026-07-30 — Accounting year-end close + Money In/Out honest verdict
 
 - Backend `npm run typecheck` — **PASS** (exit 0)
 - Frontend `npm run typecheck` (`tsc -b --noEmit`) — **PASS** (exit 0)

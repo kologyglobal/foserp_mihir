@@ -18,10 +18,11 @@ export const FAILURE_CATEGORIES = [
   'HYDRAULIC',
   'PNEUMATIC',
   'CONTROL',
+  'SAFETY',
   'OTHER',
 ] as const
 export const PHOTO_CATEGORIES = ['BEFORE', 'DURING', 'AFTER', 'OTHER'] as const
-export const SOURCE_TYPES = ['MANUAL', 'MY_WORK', 'WORK_ORDER', 'JOB_CARD', 'OPERATION'] as const
+export const SOURCE_TYPES = ['MANUAL', 'MY_WORK', 'WORK_ORDER', 'JOB_CARD', 'OPERATION', 'PREVENTIVE'] as const
 
 export const listTicketsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -91,6 +92,8 @@ export const startRepairSchema = z
 
 export const updateRepairSchema = z.object({
   repairDetails: z.string().trim().max(8000).optional(),
+  rootCause: z.string().trim().max(4000).optional().nullable(),
+  repairAction: z.string().trim().max(4000).optional().nullable(),
   failureCategory: z.enum(FAILURE_CATEGORIES).optional().nullable(),
   serviceDescription: z.string().trim().max(4000).optional().nullable(),
   serviceCost: z.coerce.number().min(0).optional(),
@@ -100,6 +103,16 @@ export const updateRepairSchema = z.object({
   technicianName: z.string().trim().max(200).optional().nullable(),
   contractorId: z.string().uuid().optional().nullable(),
   operatorName: z.string().trim().max(200).optional().nullable(),
+  checklistItems: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        isDone: z.boolean(),
+        remark: z.string().trim().max(500).optional().nullable(),
+      }),
+    )
+    .max(50)
+    .optional(),
 })
 
 export const holdTicketSchema = z.object({
@@ -129,6 +142,12 @@ export const addPartSchema = z.object({
   unitCost: z.coerce.number().min(0).default(0),
   remarks: z.string().trim().max(500).optional(),
   shortageQty: z.coerce.number().min(0).optional(),
+  purchaseRequisitionId: z.string().uuid().optional(),
+})
+
+export const linkPartPrSchema = z.object({
+  partId: z.string().uuid(),
+  purchaseRequisitionId: z.string().uuid(),
 })
 
 export const reportQuerySchema = z.object({
@@ -141,6 +160,24 @@ export const reportQuerySchema = z.object({
   contractorId: z.string().uuid().optional(),
 })
 
+export const machineHealthQuerySchema = z.object({
+  workCentreId: z.string().uuid().optional(),
+  machineId: z.string().uuid().optional(),
+  status: z.enum(['AVAILABLE', 'IN_USE', 'UNDER_MAINTENANCE', 'OUT_OF_SERVICE']).optional(),
+  failureCategory: z.enum(FAILURE_CATEGORIES).optional(),
+  /** YTD (default) | 30d | 90d | custom — when custom, from/to apply */
+  period: z.enum(['YTD', '30d', '90d', 'custom']).default('YTD'),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  /** Repeat-breakdown threshold defaults */
+  repeatBreakdownCount: z.coerce.number().int().min(2).max(50).default(3),
+  repeatBreakdownDays: z.coerce.number().int().min(7).max(365).default(30),
+})
+
+export const activeTicketByMachineQuerySchema = z.object({
+  machineId: z.string().uuid(),
+})
+
 export type ListTicketsQuery = z.infer<typeof listTicketsQuerySchema>
 export type CreateTicketInput = z.infer<typeof createTicketSchema>
 export type StartRepairInput = z.infer<typeof startRepairSchema>
@@ -150,4 +187,6 @@ export type ResumeTicketInput = z.infer<typeof resumeTicketSchema>
 export type TestMachineInput = z.infer<typeof testMachineSchema>
 export type CloseTicketInput = z.infer<typeof closeTicketSchema>
 export type AddPartInput = z.infer<typeof addPartSchema>
+export type LinkPartPrInput = z.infer<typeof linkPartPrSchema>
 export type ReportQuery = z.infer<typeof reportQuerySchema>
+export type MachineHealthQuery = z.infer<typeof machineHealthQuerySchema>

@@ -15,7 +15,10 @@ Dual-mode workspace at `/accounting/period-close` that **actually** closes/reope
 | **Manufacturing Close** | Seed KPIs | Live mfg workspace summary (unposted/failed/WIP/close-ready) |
 | **Bank Reconciliation Status** | Seed KPIs | Live open recon session count from close-readiness |
 | **Year-End Closing** | Seed preview only | **Live** P&L → `RETAINED_EARNINGS` via `POST …/financial-years/:id/year-end-close`; FY lock hardened |
-| Other screens (calendar, accruals, prepaid, FX reval, reopen-request workflow) | Demo scaffolding | Still demo / empty — later phases |
+| **Accruals / Prepaid** | Seed scaffolding | **Live** period-end adjustments via `/accounting/period-adjustments` — see [`PERIOD_END_ADJUSTMENTS.md`](PERIOD_END_ADJUSTMENTS.md) |
+| **Close Calendar / Templates / Reopen Requests** | Seed scaffolding | **Live** via `/accounting/period-close` — see [`PERIOD_CLOSE_CALENDAR_REOPEN.md`](PERIOD_CLOSE_CALENDAR_REOPEN.md) |
+| **FX Revaluation** | Seed scaffolding | **Live** rates + preview/post/reverse — see [`PERIOD_CLOSE_FX_REVALUATION.md`](PERIOD_CLOSE_FX_REVALUATION.md) |
+| Other screens | Demo scaffolding | Still demo — later phases |
 
 ### Permissions
 
@@ -91,11 +94,18 @@ cd backend && npx vitest run tests/finance/period-close-hardening.test.ts tests/
 
 ## Still deferred
 
-- Accruals / prepaid / FX revaluation posting wizards
-- Configurable close checklist templates + calendar (persisted)
+- FX revaluation posting wizard (period-close screen still demo)
 - Module soft/hard locks beyond whole-period GL lock
-- Reopen **request** approval workflow (today: direct reopen with reason)
 - Opening-balance voucher for greenfield ledgers (not required for continuous GL)
+- Auto-reclose of period when reopen temporary window expires
+
+## Accruals / prepaid (2026-07-30)
+
+Shipped — docs: [`PERIOD_END_ADJUSTMENTS.md`](PERIOD_END_ADJUSTMENTS.md). Migration `20260730190000_finance_period_end_adjustments`.
+
+## Calendar / templates / reopen requests (2026-07-30)
+
+Shipped — docs: [`PERIOD_CLOSE_CALENDAR_REOPEN.md`](PERIOD_CLOSE_CALENDAR_REOPEN.md). Migration `20260730200000_finance_period_close_calendar_reopen`.
 
 ---
 

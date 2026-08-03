@@ -29,7 +29,16 @@ export interface CreateImportBatchInput {
   treasuryAccountId: string
   batchReference: string
   sourceType?: 'FILE_UPLOAD' | 'MANUAL' | 'BANK_API' | 'SYSTEM_GENERATED' | 'OTHER'
-  importFormat?: 'CSV' | 'XLSX' | 'MT940' | 'CAMT_053' | 'MANUAL' | 'AUTO_DETECT' | 'OTHER'
+  importFormat?:
+    | 'CSV'
+    | 'XLSX'
+    | 'MT940'
+    | 'CAMT_053'
+    | 'CAMT_052'
+    | 'CAMT_054'
+    | 'MANUAL'
+    | 'AUTO_DETECT'
+    | 'OTHER'
   uploadedBy?: string | null
   originalFileName?: string | null
   sanitisedFileName?: string | null
@@ -114,9 +123,22 @@ export interface CreateStatementInput {
   totalDebitAmount: string | number
   balanceDifference?: string | number
   statementUniquenessKey: string
-  importFormat?: 'CSV' | 'XLSX' | 'MANUAL' | 'MT940' | 'CAMT_053' | 'AUTO_DETECT' | 'OTHER'
+  importFormat?:
+    | 'CSV'
+    | 'XLSX'
+    | 'MANUAL'
+    | 'MT940'
+    | 'CAMT_053'
+    | 'CAMT_052'
+    | 'CAMT_054'
+    | 'AUTO_DETECT'
+    | 'OTHER'
   sourceType?: 'FILE_UPLOAD' | 'MANUAL' | 'BANK_API' | 'SYSTEM_GENERATED' | 'OTHER'
   createdBy?: string | null
+  documentType?: 'END_OF_DAY_STATEMENT' | 'INTRADAY_REPORT' | 'DEBIT_CREDIT_NOTIFICATION'
+  hasOpeningBalance?: boolean
+  hasClosingBalance?: boolean
+  externalStatementId?: string | null
 }
 
 export async function createStatement(input: CreateStatementInput) {
@@ -141,6 +163,10 @@ export async function createStatement(input: CreateStatementInput) {
       sourceType: input.sourceType ?? 'FILE_UPLOAD',
       importFormat: input.importFormat ?? null,
       statementUniquenessKey: input.statementUniquenessKey,
+      documentType: input.documentType ?? 'END_OF_DAY_STATEMENT',
+      hasOpeningBalance: input.hasOpeningBalance ?? true,
+      hasClosingBalance: input.hasClosingBalance ?? true,
+      externalStatementId: input.externalStatementId ?? null,
       createdBy: input.createdBy ?? null,
     },
   })
@@ -182,6 +208,10 @@ export interface CreateStatementLineInput {
   sourceRowNumber?: number | null
   lineHash: string
   rawPayload?: Prisma.InputJsonValue
+  isProvisional?: boolean
+  isExcluded?: boolean
+  matchStatus?: 'UNMATCHED' | 'EXCLUDED'
+  supersededByLineId?: string | null
 }
 
 export async function createStatementLine(input: CreateStatementLineInput) {
@@ -208,7 +238,10 @@ export async function createStatementLine(input: CreateStatementLineInput) {
       externalLineId: input.externalLineId ?? null,
       externalTransactionId: input.externalTransactionId ?? null,
       runningBalance: input.runningBalance ?? null,
-      matchStatus: 'UNMATCHED',
+      matchStatus: input.matchStatus ?? 'UNMATCHED',
+      isExcluded: input.isExcluded ?? false,
+      isProvisional: input.isProvisional ?? false,
+      supersededByLineId: input.supersededByLineId ?? null,
       lineHash: input.lineHash,
       rawPayload: input.rawPayload,
     },

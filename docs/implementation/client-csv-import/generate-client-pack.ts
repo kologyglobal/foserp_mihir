@@ -298,9 +298,9 @@ const IMPORT_SHEETS: SheetSpec[] = [
   {
     csvFile: '08_chart_of_accounts.csv',
     excelName: '08_Chart_of_Accounts',
-    liveImport: false,
+    liveImport: true,
     notes:
-      'Collection sheet — matches CoA UI template. No production API CSV import yet. Account Type: Group|Posting. Category: Asset|Liability|Equity|Income|Expense.',
+      'Live API CSV import (Accounting → Chart of Accounts → Import). Scoped to legal entity. Account Type: Group|Posting. Category: Asset|Liability|Equity|Income|Expense. Parent by Account Code. Duplicate mode: skip|update|reject.',
     headers: [
       'Account Code',
       'Account Name',
@@ -464,11 +464,11 @@ async function main() {
     const lines: Array<[string, string]> = [
       ['FOS ERP — Client Data Collection Pack', ''],
       ['How to use', '1) Fill Questionnaire (Client_Answer column). 2) Replace sample rows on data sheets with your data. 3) Keep header row text exactly as provided. 4) Return this Excel OR export each data sheet as CSV.'],
-      ['Live CSV imports (upload in product)', 'Items, Vendors, HSN/SAC, Companies, Contacts, Leads, BOM'],
-      ['Collection / assisted setup', 'Prerequisites, Warehouses, Opening Stock, Users/Roles, Work Centres, Chart of Accounts'],
-      ['Load order', 'Prerequisites (UOM, categories, GST groups, geography) → HSN → Items → Vendors → Companies → Contacts → Leads → Warehouses/WC → BOM → Opening Stock → Users invited'],
+      ['Live CSV imports (upload in product)', 'Items, Vendors, HSN/SAC, Companies, Contacts, Leads, BOM, Chart of Accounts'],
+      ['Collection / assisted setup', 'Prerequisites, Warehouses, Opening Stock, Users/Roles, Work Centres'],
+      ['Load order', 'Prerequisites (UOM, categories, GST groups, geography) → Legal entity / Chart of Accounts → HSN → Items → Vendors → Companies → Contacts → Leads → Warehouses/WC → BOM → Opening Stock → Users invited'],
       ['Rules', 'UTF-8; no passwords or bank secrets; booleans true/false; Status ACTIVE; codes must match across sheets (e.g. Category Code, Company Code).'],
-      ['Limits', 'Masters/CRM import batches: max 500 rows. BOM import: up to 2000 rows.'],
+      ['Limits', 'Masters/CRM import batches: max 500 rows. BOM import: up to 2000 rows. Chart of Accounts import: up to 2000 rows.'],
       ['Mode', 'Product imports require API mode (VITE_USE_API=true) and a provisioned tenant.'],
       ['Generated', new Date().toISOString().slice(0, 10)],
     ]

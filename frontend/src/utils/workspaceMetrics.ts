@@ -9,6 +9,7 @@ import { useInvoiceStore } from '../store/invoiceStore'
 import { useInventoryStore } from '../store/inventoryStore'
 import { useMasterStore } from '../store/masterStore'
 import { crmQuotationPath } from './crmQuotationNavigation'
+import { quotationRevisionLabel } from './quotationEngine/revisionLabels'
 import type { NotificationItem } from '../store/uiStore'
 import { formatCurrency } from './formatters/currency'
 export function buildNotifications(): NotificationItem[] {
@@ -38,7 +39,7 @@ export function buildNotifications(): NotificationItem[] {
       group: 'approvals',
       severity: 'amber',
       title: `Quotation ${q.quotationNo} needs customer approval`,
-      description: `Rev ${q.revisionNo}`,
+      description: quotationRevisionLabel(q.revisionNo),
       href: crmQuotationPath(q.id),
       createdAt: now,
     })

@@ -167,6 +167,12 @@ export function ApiConnectorListPage() {
 
   const runSync = async (row: BankConnectorDto) => {
     if (!perms.canSync) return
+    if (row.syncInProgress) {
+      notify.info(
+        `Sync already in progress${row.syncLeaseUntil ? ` until ${new Date(row.syncLeaseUntil).toLocaleString()}` : ''}`,
+      )
+      return
+    }
     setBusyId(row.id)
     try {
       const result = await syncBankConnector(row.id)
@@ -286,9 +292,11 @@ export function ApiConnectorListPage() {
                   <td className="px-3 py-2">{row.configJson?.expectedFormat ?? '—'}</td>
                   <td className="px-3 py-2">{row.status}</td>
                   <td className="px-3 py-2 text-erp-muted">
-                    {row.provider === 'OPEN_BANKING' && row.consent
-                      ? `Consent: ${row.consent.status}`
-                      : row.connectionLabel}
+                    {row.syncInProgress
+                      ? `Sync in progress${row.syncLeaseUntil ? ` until ${new Date(row.syncLeaseUntil).toLocaleString()}` : ''}`
+                      : row.provider === 'OPEN_BANKING' && row.consent
+                        ? `Consent: ${row.consent.status}`
+                        : row.connectionLabel}
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
@@ -349,6 +357,12 @@ export function ApiConnectorListPage() {
                           variant="secondary"
                           icon={RefreshCw}
                           loading={busyId === row.id}
+                          disabled={Boolean(row.syncInProgress)}
+                          title={
+                            row.syncInProgress
+                              ? `Sync already in progress${row.syncLeaseUntil ? ` until ${row.syncLeaseUntil}` : ''}`
+                              : undefined
+                          }
                           onClick={() => void runSync(row)}
                         >
                           Sync

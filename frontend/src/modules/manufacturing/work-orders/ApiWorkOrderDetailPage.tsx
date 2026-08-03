@@ -28,6 +28,7 @@ import { ErpCommandBar, type ErpCommandAction } from '@/components/erp/ErpComman
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
+import { ManufacturingActiveMaintenanceBanner } from '../components/ManufacturingActiveMaintenanceBanner'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { Modal } from '@/design-system/components/Modal'
@@ -1274,20 +1275,21 @@ export function ApiWorkOrderDetailPage() {
         salesOrderId: null,
       })
     }
-    const relatedSo = wo.relatedSalesOrder
-    const postedFgQty = fgReceipts
+    const relatedSoInner = wo.relatedSalesOrder
+    const postedFgQtyInner = fgReceipts
       .filter((r) => r.status === 'POSTED' || r.status === 'PARTIALLY_REVERSED')
       .reduce((sum, r) => sum + Number(r.acceptedQuantity || r.receiptQuantity || 0), 0)
-    const completedGood = Number(wo.completedGoodQuantity || 0)
-    const fgRemaining = wo.status === 'COMPLETED' && completedGood > 0 && postedFgQty + 1e-9 < completedGood
+    const completedGoodInner = Number(wo.completedGoodQuantity || 0)
+    const fgRemainingInner =
+      wo.status === 'COMPLETED' && completedGoodInner > 0 && postedFgQtyInner + 1e-9 < completedGoodInner
     return deriveWoFulfilmentJourney({
       status: wo.status,
       stages: wo.stages,
       qualityBlockerCount: qualityBlockers.length,
       fgReceiptCount: fgReceipts.length,
-      fgRemaining,
-      salesOrderId: relatedSo?.id ?? wo.salesOrderId ?? null,
-      salesOrderNo: relatedSo?.salesOrderNo ?? null,
+      fgRemaining: fgRemainingInner,
+      salesOrderId: relatedSoInner?.id ?? wo.salesOrderId ?? null,
+      salesOrderNo: relatedSoInner?.salesOrderNo ?? null,
     })
   }, [wo, qualityBlockers.length, fgReceipts])
 
@@ -1352,10 +1354,10 @@ export function ApiWorkOrderDetailPage() {
   const completionPct = liveProgress?.pipelinePct ?? Math.min(100, Math.max(0, Math.round(Number(wo.completionPercent) || 0)))
   const qualityMeta = qualityStatusMeta(wo.qualityStatus)
   const materialMeta = materialControlMeta(wo.materialControlStatus)
-  const relatedSo = wo.relatedSalesOrder
   const visibleMoreTabs = MORE_TABS.filter((item) => item.id !== 'costing' || canViewCost())
   const moreTabActive = visibleMoreTabs.some((t) => t.id === tab)
 
+  const relatedSo = wo.relatedSalesOrder
   const postedFgQty = fgReceipts
     .filter((r) => r.status === 'POSTED' || r.status === 'PARTIALLY_REVERSED')
     .reduce((sum, r) => sum + Number(r.acceptedQuantity || r.receiptQuantity || 0), 0)
@@ -1623,6 +1625,13 @@ export function ApiWorkOrderDetailPage() {
           }))}
           compactTip="Flexible execution: inventory, purchase, and QC warn instead of hard-blocking production on this Work Order. Progress resumes via ?step= in the URL."
         />
+
+        {(() => {
+          const opWithMachine = (wo.operations ?? []).find((o) => o.machineId)
+          return opWithMachine?.machineId ? (
+            <ManufacturingActiveMaintenanceBanner machineId={opWithMachine.machineId} />
+          ) : null
+        })()}
 
         {nextBestAction ? <NextBestActionBanner nba={nextBestAction} /> : null}
 

@@ -1,12 +1,17 @@
 /**
- * Chart of Accounts mock service — Promise-based so a real API can replace this later.
- * Demo / UI only. Does not post real ledger entries.
+ * Chart of Accounts service — dual-mode:
+ * - VITE_USE_API=false → in-memory demo seed (session only)
+ * - VITE_USE_API=true  → live accounting API for CSV import (tenant + legal entity)
  *
- * SECURITY: All mutations must also be enforced by the future backend
- * (tenant isolation + accounting.coa.* permissions). UI gating alone is not security.
+ * SECURITY: Mutations must also be enforced by the backend
+ * (tenant isolation + finance.coa.* permissions). UI gating alone is not security.
  */
 
+import { isApiMode } from '../../config/apiConfig'
 import { seedChartOfAccountsDemo, seedCoaDimensionLookups } from '../../data/accounting/chartOfAccountsSeed'
+import * as financeApi from '../api/financeApi'
+import { ensureLegalEntityId } from '../bridges/financeApiBridge'
+import type { Account as FinanceAccount, AccountTreeNode as FinanceAccountTreeNode } from '../../types/financeSetup'
 import type {
   AccountBalance,
   AccountExportFormat,
@@ -20,8 +25,16 @@ import type {
   AccountType,
   ChartOfAccount,
 } from '../../types/chartOfAccounts'
-import { DEFAULT_ACCOUNT_FILTER as FILTER_DEFAULTS } from '../../types/chartOfAccounts'
+import {
+  DEFAULT_ACCOUNT_FILTER as FILTER_DEFAULTS,
+  defaultDimensionConfiguration,
+  defaultManufacturingConfiguration,
+  defaultPostingControl,
+  defaultTaxConfiguration,
+} from '../../types/chartOfAccounts'
 import { getSessionUser } from '../../utils/permissions'
+
+export type CoaImportDuplicateMode = 'skip' | 'update' | 'reject'
 
 export class ChartOfAccountsServiceError extends Error {
   constructor(message: string) {
@@ -243,20 +256,99 @@ function buildHierarchy(list: ChartOfAccount[]): AccountHierarchyNode[] {
   return walk(null)
 }
 
+function mapFinanceCategory(category: FinanceAccount['category']): ChartOfAccount['category'] {
+  const map: Record<string, ChartOfAccount['category']> = {
+    ASSET: 'Asset',
+    LIABILITY: 'Liability',
+    EQUITY: 'Equity',
+    INCOME: 'Income',
+    EXPENSE: 'Expense',
+  }
+  return map[category] ?? 'Asset'
+}
+
+function mapFinanceAccountToChart(a: FinanceAccount): ChartOfAccount {
+  const accountType: AccountType = a.isGroup ? 'Group' : 'Posting'
+  const posting = defaultPostingControl(accountType)
+  posting.allowDirectPosting = !a.isGroup && a.allowManualPosting
+  posting.allowManualJournalPosting = !a.isGroup && a.allowManualPosting
+  posting.isControlAccount = a.isControlAccount
+  posting.reconciliationRequired = a.requiresReconciliation
+  posting.currency = a.currencyCode || 'INR'
+  return {
+    id: a.id,
+    code: a.accountCode,
+    name: a.accountName,
+    alias: '',
+    accountType,
+    category: mapFinanceCategory(a.category),
+    parentId: a.parentAccountId ?? null,
+    normalBalance: a.normalBalance === 'CREDIT' ? 'Credit' : 'Debit',
+    description: a.description ?? '',
+    active: a.isActive,
+    systemAccount: false,
+    posting,
+    tax: defaultTaxConfiguration(),
+    manufacturing: defaultManufacturingConfiguration(),
+    dimensions: defaultDimensionConfiguration(),
+    currentBalance: 0,
+    hasLedgerActivity: false,
+    createdBy: '—',
+    createdAt: a.createdAt ?? nowIso(),
+    modifiedBy: '—',
+    modifiedAt: a.updatedAt ?? a.createdAt ?? nowIso(),
+  }
+}
+
+function flattenAccountTree(nodes: FinanceAccountTreeNode[]): FinanceAccount[] {
+  const out: FinanceAccount[] = []
+  const walk = (list: FinanceAccountTreeNode[]) => {
+    for (const n of list) {
+      const { children, ...rest } = n
+      out.push(rest)
+      if (children?.length) walk(children)
+    }
+  }
+  walk(nodes)
+  return out
+}
+
+async function loadApiAccountsCache(): Promise<ChartOfAccount[]> {
+  const legalEntityId = await ensureLegalEntityId()
+  const treeRes = await financeApi.getAccountTree(legalEntityId, true)
+  const flat = flattenAccountTree(treeRes.data)
+  return flat.map(mapFinanceAccountToChart)
+}
+
 export async function getAccounts(filter?: Partial<AccountFilter>): Promise<ChartOfAccount[]> {
-  await delay()
   const f: AccountFilter = { ...FILTER_DEFAULTS, ...filter }
+  if (isApiMode()) {
+    const all = await loadApiAccountsCache()
+    return clone(all.filter((a) => matchesFilter(a, f, all))).sort((a, b) =>
+      a.code.localeCompare(b.code, undefined, { numeric: true }),
+    )
+  }
+  await delay()
   return clone(accountsStore.filter((a) => matchesFilter(a, f, accountsStore))).sort((a, b) =>
     a.code.localeCompare(b.code, undefined, { numeric: true }),
   )
 }
 
 export async function getAccountHierarchy(): Promise<AccountHierarchyNode[]> {
+  if (isApiMode()) {
+    const all = await loadApiAccountsCache()
+    return clone(buildHierarchy(all))
+  }
   await delay()
   return clone(buildHierarchy(accountsStore))
 }
 
 export async function getAccountById(id: string): Promise<ChartOfAccount | null> {
+  if (isApiMode()) {
+    const all = await loadApiAccountsCache()
+    const found = all.find((a) => a.id === id)
+    return found ? clone(found) : null
+  }
   await delay()
   const found = accountsStore.find((a) => a.id === id)
   return found ? clone(found) : null
@@ -476,49 +568,116 @@ export async function getAccountLedgerPreview(id: string): Promise<AccountLedger
   return lines
 }
 
-export async function validateAccountImport(fileName: string, csvText: string): Promise<AccountImportPreview> {
-  await delay(220)
+/** Parse CoA CSV into header-keyed row objects (demo + live API). */
+export function parseCoaImportCsv(csvText: string): Array<Record<string, string>> {
   const lines = csvText
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean)
-  const dataLines = lines[0]?.toLowerCase().includes('account code') ? lines.slice(1) : lines
+  if (lines.length === 0) return []
+  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
+  const looksLikeHeader = headers.some((h) => /account\s*code/i.test(h))
+  const fallback = [
+    'Account Code',
+    'Account Name',
+    'Account Type',
+    'Category',
+    'Parent Account Code',
+    'Normal Balance',
+    'Direct Posting',
+    'Control Account',
+    'Active',
+  ]
+  if (!looksLikeHeader) {
+    return lines.map((line) => {
+      const cols = line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
+      const row: Record<string, string> = {}
+      fallback.forEach((h, i) => {
+        row[h] = cols[i] ?? ''
+      })
+      return row
+    })
+  }
+  return lines.slice(1).map((line) => {
+    const cols = line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
+    const row: Record<string, string> = {}
+    headers.forEach((h, i) => {
+      row[h] = cols[i] ?? ''
+    })
+    return row
+  })
+}
+
+function pickCell(row: Record<string, string>, ...keys: string[]): string {
+  for (const key of keys) {
+    if (row[key] != null && String(row[key]).trim() !== '') return String(row[key]).trim()
+    const norm = key.toLowerCase().replace(/\s+/g, '_')
+    const found = Object.entries(row).find(([k]) => k.toLowerCase().replace(/\s+/g, '_') === norm)
+    if (found?.[1] != null && String(found[1]).trim() !== '') return String(found[1]).trim()
+  }
+  return ''
+}
+
+export async function validateAccountImport(
+  fileName: string,
+  csvText: string,
+  _opts?: { duplicateMode?: CoaImportDuplicateMode },
+): Promise<AccountImportPreview> {
+  void _opts
+  await delay(isApiMode() ? 80 : 220)
+  const rawRows = parseCoaImportCsv(csvText)
   const rows: AccountImportPreviewRow[] = []
   const seen = new Set<string>()
+  const fileCodes = new Set(
+    rawRows.map((r) => pickCell(r, 'Account Code', 'account_code', 'code')).filter(Boolean),
+  )
 
-  dataLines.forEach((line, idx) => {
-    const cols = line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
-    const [code, name, accountType, category, parentAccountCode, normalBalance, directPosting, controlAccount, active] =
-      cols
+  rawRows.forEach((row, idx) => {
+    const code = pickCell(row, 'Account Code', 'account_code', 'code')
+    const name = pickCell(row, 'Account Name', 'account_name', 'name')
+    const accountType = pickCell(row, 'Account Type', 'account_type', 'type')
+    const category = pickCell(row, 'Category', 'category')
+    const parentAccountCode = pickCell(row, 'Parent Account Code', 'parent_account_code', 'parent_code')
+    const normalBalance = pickCell(row, 'Normal Balance', 'normal_balance')
+    const directPosting = pickCell(row, 'Direct Posting', 'direct_posting')
+    const controlAccount = pickCell(row, 'Control Account', 'control_account')
+    const active = pickCell(row, 'Active', 'active', 'status')
     const errors: string[] = []
+
     if (!code) errors.push('Missing mandatory field: Account Code')
     if (!name) errors.push('Missing mandatory field: Account Name')
-    if (!accountType || !['Group', 'Posting'].includes(accountType)) errors.push('Invalid account type')
-    if (!category || !['Asset', 'Liability', 'Equity', 'Income', 'Expense'].includes(category)) {
+    if (!category) errors.push('Missing mandatory field: Category')
+    if (accountType && !/^(group|posting)$/i.test(accountType) && !/^[A-Z][A-Z0-9_]*$/i.test(accountType.replace(/\s/g, '_'))) {
+      errors.push('Invalid account type (use Group or Posting)')
+    }
+    if (category && !['Asset', 'Liability', 'Equity', 'Income', 'Expense'].includes(category)) {
       errors.push('Invalid category')
     }
-    if (code && (seen.has(code) || accountsStore.some((a) => a.code === code))) {
+    if (code && seen.has(code)) errors.push('Duplicate account code in file')
+    // Demo: reject if code already in session store. API mode: server applies duplicateMode.
+    if (code && !isApiMode() && accountsStore.some((a) => a.code === code)) {
       errors.push('Duplicate account code')
     }
     if (code) seen.add(code)
     if (parentAccountCode) {
-      const parentExists =
-        accountsStore.some((a) => a.code === parentAccountCode) ||
-        dataLines.some((l) => l.split(',')[0]?.trim() === parentAccountCode)
-      if (!parentExists) errors.push('Missing parent account')
       if (parentAccountCode === code) errors.push('Circular hierarchy')
+      if (!isApiMode()) {
+        const parentExists =
+          accountsStore.some((a) => a.code === parentAccountCode) || fileCodes.has(parentAccountCode)
+        if (!parentExists) errors.push('Missing parent account')
+      }
     }
     rows.push({
       rowNumber: idx + 2,
-      code: code ?? '',
-      name: name ?? '',
-      accountType: accountType ?? '',
-      category: category ?? '',
-      parentAccountCode: parentAccountCode ?? '',
-      normalBalance: normalBalance ?? '',
-      directPosting: directPosting ?? '',
-      controlAccount: controlAccount ?? '',
-      active: active ?? '',
+      code,
+      name,
+      accountType: accountType || 'Posting',
+      category,
+      parentAccountCode,
+      normalBalance,
+      directPosting,
+      controlAccount,
+      active,
       status: errors.length ? 'error' : 'valid',
       errors,
     })
@@ -531,11 +690,57 @@ export async function validateAccountImport(fileName: string, csvText: string): 
     errorRows: rows.filter((r) => r.status === 'error').length,
     warningRows: 0,
     rows,
-    isDemoPreview: true,
+    rawRows,
+    isDemoPreview: !isApiMode(),
   }
 }
 
-export async function importAccounts(preview: AccountImportPreview): Promise<{ imported: number; message: string }> {
+export async function importAccounts(
+  preview: AccountImportPreview,
+  opts?: { legalEntityId?: string; duplicateMode?: CoaImportDuplicateMode },
+): Promise<{ imported: number; updated: number; skipped: number; failed: number; message: string }> {
+  if (isApiMode()) {
+    if (preview.errorRows > 0) {
+      throw new ChartOfAccountsServiceError('Resolve validation errors before confirming import')
+    }
+    const legalEntityId = opts?.legalEntityId
+    if (!legalEntityId) throw new ChartOfAccountsServiceError('Legal entity is required for import')
+    const rows =
+      preview.rawRows ??
+      preview.rows
+        .filter((r) => r.status === 'valid')
+        .map((r) => ({
+          'Account Code': r.code,
+          'Account Name': r.name,
+          'Account Type': r.accountType,
+          Category: r.category,
+          'Parent Account Code': r.parentAccountCode,
+          'Normal Balance': r.normalBalance,
+          'Direct Posting': r.directPosting,
+          'Control Account': r.controlAccount,
+          Active: r.active,
+        }))
+    if (rows.length === 0) throw new ChartOfAccountsServiceError('No rows to import')
+    const res = await financeApi.importCoaAccounts({
+      legalEntityId,
+      rows,
+      duplicateMode: opts?.duplicateMode ?? 'skip',
+    })
+    const summary = res.data
+    importHistory.push({
+      at: nowIso(),
+      fileName: preview.fileName,
+      rowCount: summary.imported + summary.updated,
+    })
+    return {
+      imported: summary.imported,
+      updated: summary.updated,
+      skipped: summary.skipped,
+      failed: summary.failed,
+      message: `Imported ${summary.imported}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}.`,
+    }
+  }
+
   await delay(200)
   if (preview.errorRows > 0) {
     throw new ChartOfAccountsServiceError('Resolve validation errors before confirming import')
@@ -620,6 +825,9 @@ export async function importAccounts(preview: AccountImportPreview): Promise<{ i
   importHistory.push({ at: nowIso(), fileName: preview.fileName, rowCount: imported })
   return {
     imported,
+    updated: 0,
+    skipped: 0,
+    failed: 0,
     message: `Demo import staged ${imported} account(s) in this browser session only — not permanently saved to the database.`,
   }
 }
@@ -629,7 +837,7 @@ export async function exportAccounts(
   format: AccountExportFormat,
   filter?: Partial<AccountFilter>,
 ): Promise<{ fileName: string; mime: string; content: string; message: string }> {
-  await delay(150)
+  await delay(isApiMode() ? 40 : 150)
   let list = await getAccounts(scope === 'current_view' ? filter : undefined)
   if (scope === 'posting') list = list.filter((a) => a.accountType === 'Posting')
   if (scope === 'group') list = list.filter((a) => a.accountType === 'Group')
@@ -637,12 +845,13 @@ export async function exportAccounts(
     list = await getAccounts({})
   }
 
+  const allForParent = isApiMode() ? await getAccounts({}) : accountsStore
+  const parentCode = (id: string | null) => allForParent.find((a) => a.id === id)?.code ?? ''
+
   const header =
     scope === 'audit'
       ? 'Account Code,Account Name,Created By,Created Date,Modified By,Modified Date'
       : 'Account Code,Account Name,Account Type,Category,Parent Account Code,Normal Balance,Direct Posting,Control Account,Active,Current Balance'
-
-  const parentCode = (id: string | null) => accountsStore.find((a) => a.id === id)?.code ?? ''
 
   const body = list
     .map((a) => {
@@ -681,7 +890,9 @@ export async function exportAccounts(
     fileName,
     mime: 'text/csv;charset=utf-8',
     content,
-    message: `Exported ${list.length} account(s) as ${format.toUpperCase()} (demo download).`,
+    message: isApiMode()
+      ? `Exported ${list.length} account(s) as ${format.toUpperCase()}.`
+      : `Exported ${list.length} account(s) as ${format.toUpperCase()} (demo download).`,
   }
 }
 
@@ -691,6 +902,16 @@ export async function getDimensionLookups() {
 }
 
 export async function getCoaSummary() {
+  if (isApiMode()) {
+    const all = await loadApiAccountsCache()
+    return {
+      total: all.length,
+      posting: all.filter((a) => a.accountType === 'Posting').length,
+      group: all.filter((a) => a.accountType === 'Group').length,
+      inactive: all.filter((a) => !a.active).length,
+      withBalance: all.filter((a) => a.currentBalance !== 0).length,
+    }
+  }
   await delay(40)
   const all = accountsStore
   return {
@@ -705,8 +926,25 @@ export async function getCoaSummary() {
 export function getImportTemplateCsv(): string {
   return [
     'Account Code,Account Name,Account Type,Category,Parent Account Code,Normal Balance,Direct Posting,Control Account,Active',
-    '1199,Demo Advance Account,Posting,Asset,1150,Debit,Y,N,Y',
+    '1000,Assets,Group,Asset,,Debit,N,N,Y',
+    '1100,Current Assets,Group,Asset,1000,Debit,N,N,Y',
+    '1110,Cash and Bank,Posting,Asset,1100,Debit,Y,N,Y',
   ].join('\n')
+}
+
+export async function downloadImportTemplate(): Promise<void> {
+  if (isApiMode()) {
+    await financeApi.downloadCoaImportTemplate()
+    return
+  }
+  const csv = getImportTemplateCsv()
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'chart-of-accounts-import-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export function resetChartOfAccountsDemo(): void {

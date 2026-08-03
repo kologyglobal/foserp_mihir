@@ -151,6 +151,48 @@ export async function softDeleteConnector(tenantId: string, id: string, updatedB
   })
 }
 
+const DEFAULT_SYNC_LOCK_MINUTES = 10
+
+/** Acquire sync lock — returns true if this caller owns the lock (IndiaMART pattern). */
+export async function tryAcquireSyncLock(
+  connectorId: string,
+  token: string,
+  lockMinutes = DEFAULT_SYNC_LOCK_MINUTES,
+): Promise<boolean> {
+  const now = new Date()
+  const until = new Date(now.getTime() + lockMinutes * 60_000)
+  const result = await prisma.bankConnector.updateMany({
+    where: {
+      id: connectorId,
+      deletedAt: null,
+      OR: [{ syncLockUntil: null }, { syncLockUntil: { lt: now } }],
+    },
+    data: { syncLockUntil: until, syncLockToken: token },
+  })
+  return result.count === 1
+}
+
+export async function releaseSyncLock(connectorId: string, token: string): Promise<void> {
+  await prisma.bankConnector.updateMany({
+    where: { id: connectorId, syncLockToken: token },
+    data: { syncLockUntil: null, syncLockToken: null },
+  })
+}
+
+/** Extend lease while still owned. Returns false if ownership was lost. */
+export async function heartbeatSyncLock(
+  connectorId: string,
+  token: string,
+  lockMinutes = DEFAULT_SYNC_LOCK_MINUTES,
+): Promise<boolean> {
+  const until = new Date(Date.now() + lockMinutes * 60_000)
+  const result = await prisma.bankConnector.updateMany({
+    where: { id: connectorId, syncLockToken: token },
+    data: { syncLockUntil: until },
+  })
+  return result.count === 1
+}
+
 /** ENABLED connectors with a non-empty scheduleCron (for the 5D4 cron worker). */
 export async function listScheduledEnabledConnectors(take = 200): Promise<BankConnector[]> {
   return prisma.bankConnector.findMany({

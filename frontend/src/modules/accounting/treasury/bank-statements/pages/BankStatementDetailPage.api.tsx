@@ -22,7 +22,7 @@ import { BankStatementStatusChip } from '../components/BankStatementStatusChip'
 import { StatementBalanceSummary } from '../components/StatementBalanceSummary'
 import { StatementLineGrid } from '../components/StatementLineGrid'
 import { BankStatementWorkspaceShell } from '../components/BankStatementWorkspaceShell'
-import { parseDecimal } from '../utils/bankStatementUi'
+import { DOCUMENT_TYPE_LABELS, parseDecimal } from '../utils/bankStatementUi'
 
 export function ApiBankStatementDetailPage() {
   const { id } = useParams()
@@ -114,6 +114,11 @@ export function ApiBankStatementDetailPage() {
     totalCreditAmount: stmt.totalCreditAmount,
     totalDebitAmount: stmt.totalDebitAmount,
     balanceDifference: stmt.balanceDifference,
+    documentType: stmt.documentType,
+    hasOpeningBalance: stmt.hasOpeningBalance,
+    hasClosingBalance: stmt.hasClosingBalance,
+    isProvisional:
+      stmt.documentType === 'INTRADAY_REPORT' || stmt.documentType === 'DEBIT_CREDIT_NOTIFICATION',
   }
 
   return (
@@ -156,6 +161,11 @@ export function ApiBankStatementDetailPage() {
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <BankStatementStatusChip status={stmt.status} />
+        {stmt.documentType ? (
+          <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
+            {DOCUMENT_TYPE_LABELS[stmt.documentType]}
+          </span>
+        ) : null}
         <span className="text-[12px] text-erp-muted">
           {formatDate(stmt.statementDate)} · {stmt.lineCount} lines · {stmt.importFormat}
         </span>
@@ -174,7 +184,11 @@ export function ApiBankStatementDetailPage() {
       <div className="mt-4 grid gap-2 text-[12px] sm:grid-cols-3">
         <div>
           <span className="text-erp-muted">Balance difference</span>
-          <p className="font-medium tabular-nums">{formatCurrency(parseDecimal(stmt.balanceDifference))}</p>
+          <p className="font-medium tabular-nums">
+            {stmt.hasOpeningBalance === false || stmt.hasClosingBalance === false
+              ? 'N/A'
+              : formatCurrency(parseDecimal(stmt.balanceDifference))}
+          </p>
         </div>
         <div>
           <span className="text-erp-muted">Source</span>
@@ -187,7 +201,7 @@ export function ApiBankStatementDetailPage() {
       </div>
 
       <h2 className="mb-2 mt-4 text-[13px] font-semibold">Statement lines</h2>
-      <StatementLineGrid rows={detail.lines} currencyCode={stmt.currencyCode} maxHeight="32rem" />
+      <StatementLineGrid rows={detail.lines} currencyCode={stmt.currencyCode} maxHeight="32rem" hideExcludedMatching />
     </BankStatementWorkspaceShell>
   )
 }

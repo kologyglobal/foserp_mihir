@@ -162,6 +162,8 @@ export function ConnectorFormDrawer({
             >
               <option value="MT940">MT940</option>
               <option value="CAMT053">CAMT.053</option>
+              <option value="CAMT052">CAMT.052 (intraday)</option>
+              <option value="CAMT054">CAMT.054 (notification)</option>
               <option value="CSV">CSV</option>
               <option value="OTHER">Other</option>
             </Select>

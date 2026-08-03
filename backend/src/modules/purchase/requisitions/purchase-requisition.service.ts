@@ -153,6 +153,9 @@ export async function createPurchaseRequisition(
         purchasePurpose: input.purchasePurpose?.trim() || null,
         rfqRequired,
         status: 'DRAFT',
+        sourceType: input.sourceType?.trim() || null,
+        sourceId: input.sourceId ?? null,
+        sourceDocumentNumber: input.sourceDocumentNumber?.trim() || null,
         remarks: input.remarks?.trim() || null,
         createdById: actorId,
         updatedById: actorId,
@@ -195,6 +198,31 @@ export async function createPurchaseRequisition(
     return pr
   })
 
+  if (input.maintenancePartId && input.sourceType === 'MAINTENANCE' && input.sourceId) {
+    await prisma.maintenancePart.updateMany({
+      where: {
+        id: input.maintenancePartId,
+        tenantId,
+        ticketId: input.sourceId,
+        deletedAt: null,
+      },
+      data: { purchaseRequisitionId: created.id, updatedBy: actorId },
+    })
+    await prisma.maintenanceTicket.updateMany({
+      where: {
+        id: input.sourceId,
+        tenantId,
+        deletedAt: null,
+        status: { notIn: ['CLOSED', 'CANCELLED'] },
+      },
+      data: {
+        status: 'WAITING_FOR_PART',
+        holdReason: `Waiting for part via ${created.requisitionNumber}`,
+        updatedBy: actorId,
+      },
+    })
+  }
+
   await writePurchaseAudit({
     tenantId,
     actorId,
@@ -206,6 +234,8 @@ export async function createPurchaseRequisition(
       status: created.status,
       rfqRequired: created.rfqRequired,
       lineCount: created.lines?.length ?? 0,
+      sourceType: created.sourceType,
+      sourceId: created.sourceId,
     },
   })
 

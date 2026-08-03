@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { isApiMode } from '@/config/apiConfig'
 import {
@@ -22,8 +22,10 @@ import { mobileDispatchCanPost } from '../../utils/mobilePermissions'
 
 export function MobileDispatchListPage() {
   const navigate = useNavigate()
-  const demoDispatches = useDispatchStore((s) =>
-    s.dispatches.filter((d) => !['closed', 'cancelled', 'delivered'].includes(d.status)),
+  const dispatches = useDispatchStore((s) => s.dispatches)
+  const demoDispatches = useMemo(
+    () => dispatches.filter((d) => !['closed', 'cancelled', 'delivered'].includes(d.status)),
+    [dispatches],
   )
   const [apiRows, setApiRows] = useState<OutboundDispatch[]>([])
   const [loading, setLoading] = useState(false)

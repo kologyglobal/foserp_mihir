@@ -20679,4 +20679,3 @@ model NotificationTenantSettings {
 
   @@map("notification_tenant_settings")
 }
-
