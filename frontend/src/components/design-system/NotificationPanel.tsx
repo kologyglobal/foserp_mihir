@@ -86,7 +86,6 @@ function ApiNotificationPanel({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<'critical' | 'today' | 'earlier'>('today')
 
   const grouped = useMemo(() => {
-    const now = Date.now()
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
     const critical: AppNotification[] = []
