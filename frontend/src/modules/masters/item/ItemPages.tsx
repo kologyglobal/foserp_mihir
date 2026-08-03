@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect, useCallback, type FormEvent } fro
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { z } from 'zod'
-import { useForm, useWatch, type Resolver } from 'react-hook-form'
+import { useForm, useWatch, Controller, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Box,
@@ -468,18 +468,48 @@ export function ItemFormPage() {
 
   const formDefaults = useMemo(
     () => buildItemFormDefaults(existing, leafCategories, uoms, taxLookup),
-    [existing, leafCategories, uoms, taxLookup, hsnMasters.length, gstGroups.length],
+    [existing, leafCategories, uoms, taxLookup],
   )
 
-  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const {
+    register,
+    handleSubmit,
+    control,
+    setValue,
+    getValues,
+    watch,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
     defaultValues: formDefaults,
+    shouldUnregister: false,
   })
 
   useEffect(() => {
     if (!existing) return
     reset(buildItemFormDefaults(existing, leafCategories, uoms, taxLookup))
-  }, [existing?.id, existing?.updatedAt, leafCategories, uoms, taxLookup, hsnMasters.length, gstGroups.length, reset])
+  }, [existing?.id, existing?.updatedAt, leafCategories, uoms, taxLookup, reset])
+
+  /** Patch tax FKs once masters are in the store — never wipe user-picked values. */
+  useEffect(() => {
+    if (!existing || hsnMasters.length === 0 || gstGroups.length === 0) return
+
+    const currentHsnId = String(getValues('hsnId') ?? '')
+    const currentGstGroupId = String(getValues('gstGroupId') ?? '')
+    if (isUuid(currentHsnId) && isUuid(currentGstGroupId)) return
+
+    const tax = resolveItemTaxFields(existing, taxLookup)
+    if (tax.hsnId && !isUuid(currentHsnId)) {
+      setValue('hsnId', tax.hsnId, { shouldValidate: true })
+    }
+    if (tax.gstGroupId && !isUuid(currentGstGroupId)) {
+      setValue('gstGroupId', tax.gstGroupId, { shouldValidate: true })
+    }
+    if (tax.hsnCode && !getValues('hsnCode')?.trim()) {
+      setValue('hsnCode', tax.hsnCode, { shouldValidate: true })
+    }
+  }, [existing, hsnMasters.length, gstGroups.length, taxLookup, getValues, setValue])
 
   const watched = useWatch({ control })
   const productType = watch('productType')
@@ -520,29 +550,6 @@ export function ItemFormPage() {
     () => routingHeaders.map((r) => ({ value: r.routingNo, label: `${r.routingNo} Rev ${r.revision}`, searchText: r.routingNo.toLowerCase() })),
     [routingHeaders],
   )
-
-  function onGstGroupChange(gstGroupMasterId: string) {
-    const nextGroupId = gstGroupMasterId || null
-    setValue('gstGroupId', nextGroupId, { shouldValidate: true })
-    const currentHsn = hsnId ? getHsn(hsnId) : null
-    if (currentHsn && nextGroupId && currentHsn.gstGroupId !== nextGroupId) {
-      setValue('hsnId', null)
-      setValue('hsnCode', '', { shouldValidate: true })
-    }
-  }
-
-  function onHsnChange(hsnMasterId: string) {
-    setValue('hsnId', hsnMasterId || null)
-    const hsn = hsnMasterId ? getHsn(hsnMasterId) : null
-    if (hsn) {
-      setValue('hsnCode', hsn.code, { shouldValidate: true })
-      if (!gstGroupId) {
-        setValue('gstGroupId', hsn.gstGroupId, { shouldValidate: true })
-      }
-    } else {
-      setValue('hsnCode', '', { shouldValidate: true })
-    }
-  }
 
   function bumpSection(sectionId: string) {
     setSectionForceOpen((prev) => ({ ...prev, [sectionId]: (prev[sectionId] ?? 0) + 1 }))
@@ -896,15 +903,51 @@ export function ItemFormPage() {
           forceOpenKey={sectionForceOpen['item-section-tax']}
         >
           <FormField label="GST Group Code" required error={errors.gstGroupId?.message}>
-            <GstGroupSelect value={gstGroupId ?? ''} onChange={onGstGroupChange} allowEmpty />
+            <Controller
+              name="gstGroupId"
+              control={control}
+              render={({ field }) => (
+                <GstGroupSelect
+                  value={field.value ?? ''}
+                  onChange={(nextGroupId) => {
+                    field.onChange(nextGroupId || '')
+                    const currentHsn = getValues('hsnId')
+                    const currentHsnRow = currentHsn ? getHsn(String(currentHsn)) : null
+                    if (currentHsnRow && nextGroupId && currentHsnRow.gstGroupId !== nextGroupId) {
+                      setValue('hsnId', '', { shouldValidate: true, shouldDirty: true })
+                      setValue('hsnCode', '', { shouldValidate: true, shouldDirty: true })
+                    }
+                  }}
+                  allowEmpty
+                />
+              )}
+            />
           </FormField>
           <FormField label="HSN Code" required error={errors.hsnId?.message}>
-            <HsnMasterSelect
-              value={hsnId ?? ''}
-              onChange={onHsnChange}
-              allowEmpty
-              gstGroupId={gstGroupId}
-              disabled={!gstGroupId}
+            <Controller
+              name="hsnId"
+              control={control}
+              render={({ field }) => (
+                <HsnMasterSelect
+                  value={field.value ?? ''}
+                  onChange={(hsnMasterId) => {
+                    field.onChange(hsnMasterId || '')
+                    const hsn = hsnMasterId ? getHsn(hsnMasterId) : null
+                    if (hsn) {
+                      setValue('hsnCode', hsn.code, { shouldValidate: true, shouldDirty: true })
+                      const currentGst = getValues('gstGroupId')
+                      if (!currentGst) {
+                        setValue('gstGroupId', hsn.gstGroupId, { shouldValidate: true, shouldDirty: true })
+                      }
+                    } else {
+                      setValue('hsnCode', '', { shouldValidate: true, shouldDirty: true })
+                    }
+                  }}
+                  allowEmpty
+                  gstGroupId={gstGroupId}
+                  disabled={!gstGroupId}
+                />
+              )}
             />
           </FormField>
           <FormField label="Legacy HSN (text)">
