@@ -4,7 +4,7 @@
  * Commercial flags: tenant `DispatchSettings` (partial / multi / invoice mode / POD) with env fallback for POD.
  */
 import type { DispatchInvoiceMode } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { env } from '../../../config/env.js'
 
 export type { DispatchInvoiceMode }

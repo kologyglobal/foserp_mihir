@@ -232,6 +232,22 @@ export interface DispatchLineInvoiceReadyDto {
   deliveryChallanLineId: string | null
   podStatus?: string | null
   podBlocksInvoice?: boolean
+  blockers?: string[]
+  canCreateInvoice?: boolean
+}
+
+/** Tenant dispatch commercial policy snapshot on Invoice Ready list. */
+export interface InvoiceReadyPolicyDto {
+  invoiceMode: string
+  requirePodBeforeInvoice: boolean
+  allowPartialDispatch: boolean
+  allowMultipleDispatches: boolean
+  allowsMultiDispatchInvoice: boolean
+}
+
+export interface InvoiceReadyListResultDto {
+  items: DispatchLineInvoiceReadyDto[]
+  policy: InvoiceReadyPolicyDto | null
 }
 
 export interface InvoicePrefillFromDispatchDto {
@@ -279,6 +295,8 @@ export interface ListInvoiceReadyQuery {
   page?: number
   limit?: number
   readyOnly?: boolean
+  /** When false, include POD-blocked waiting lines (default server: hide when readyOnly). */
+  excludePodBlocked?: boolean
 }
 
 export type SalesInvoiceListItemDto = Omit<SalesInvoiceDto, 'lines' | 'validationSummary'>

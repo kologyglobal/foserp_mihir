@@ -78,7 +78,7 @@ export function EnterpriseWorkspace({
   /** Purchase FactBox preference sticks across routes/refresh via localStorage. */
   const useLocalFactBoxStore = factBoxPaneKey === PURCHASE_FACTBOX_COLLAPSED_KEY
   const [factBoxOpen, setFactBoxOpenState] = useState(() => {
-    if (!factBoxPaneKey) return true
+    if (!factBoxPaneKey) return false
     return getFactBoxInitialOpen(factBoxPaneKey)
   })
 

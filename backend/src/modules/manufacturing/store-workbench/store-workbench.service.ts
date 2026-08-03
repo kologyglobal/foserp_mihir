@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { getStockPosition } from '../../inventory/balances/balance.service.js'
 import { isPositive, subDec, toDecimal } from '../shared/quantity.service.js'
 import { dec } from '../shared/manufacturing.mappers.js'

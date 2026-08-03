@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { getLineFulfilmentPosition, getSalesOrderFulfilmentPositions } from '../fulfilment/sales-order-fulfilment-position.service.js'
 import { overdueDays, roundQty } from '../shared/dispatch-qty.js'

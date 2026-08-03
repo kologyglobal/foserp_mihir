@@ -1075,6 +1075,7 @@
   right: auto;
   top: auto;
   bottom: auto;
+  z-index: 10070;
   overflow-y: auto;
   box-shadow: var(--ent-shadow-md, 0 8px 24px rgb(0 0 0 / 0.16));
 }
@@ -1268,8 +1269,8 @@
 }
 
 .crm-sticky-record-header__actions .erp-btn,
-.crm-sticky-record-header__actions button,
-.crm-sticky-record-header__actions .erp-command-btn {
+.crm-sticky-record-header__actions .erp-command-btn,
+.crm-sticky-record-header__actions > .erp-command-bar button.erp-command-btn {
   white-space: nowrap;
   box-sizing: border-box;
   min-height: 28px;
@@ -1289,6 +1290,16 @@
 .crm-sticky-record-header__actions .erp-command-more,
 .crm-sticky-record-header__actions .erp-command-btn-wrap {
   height: 28px;
+  overflow: visible;
+}
+
+/* Sticky header actions must not clip the More dropdown */
+.crm-sticky-record-header__actions,
+.crm-sticky-record-header__actions .erp-command-bar,
+.crm-sticky-record-header__actions .erp-command-bar--inline,
+.crm-sticky-record-header__actions .erp-command-group,
+.crm-sticky-record-header__actions .erp-command-group__actions {
+  overflow: visible !important;
 }
 
 .crm-sticky-record-header__meta .dyn-status-chip {

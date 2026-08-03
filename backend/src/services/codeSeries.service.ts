@@ -1,5 +1,5 @@
 import type { CodeSeriesEntity, Prisma } from '@prisma/client'
-import { prisma } from '../config/database.js'
+import { prisma } from '../config/prisma.js'
 
 const DEFAULT_PREFIX: Record<CodeSeriesEntity, string> = {
   USER: 'USR',
@@ -46,6 +46,7 @@ const DEFAULT_PREFIX: Record<CodeSeriesEntity, string> = {
   INVENTORY_STOCK_COUNT: 'STC',
   INVENTORY_ADJUSTMENT: 'IADJ',
   MANUFACTURING_ROUTING: 'RT',
+  MAINTENANCE_TICKET: 'MT',
 }
 
 export async function ensureCodeSeries(

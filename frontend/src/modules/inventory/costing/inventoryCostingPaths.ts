@@ -18,12 +18,12 @@ export const inventoryCostingPaths = {
 } as const
 
 export const COSTING_SUBNAV = [
-  { label: 'Valuation Summary', path: inventoryCostingPaths.summary, end: true },
+  { label: 'Overview', path: inventoryCostingPaths.summary, end: true },
   { label: 'Cost Entries', path: inventoryCostingPaths.entries },
   { label: 'FIFO Layers', path: inventoryCostingPaths.layers },
-  { label: 'Average Cost', path: inventoryCostingPaths.average },
-  { label: 'Standard Cost', path: inventoryCostingPaths.standard },
-  { label: 'Specific ID', path: inventoryCostingPaths.specific },
+  { label: 'Moving Average', path: inventoryCostingPaths.average },
+  { label: 'Standard Costs', path: inventoryCostingPaths.standard },
+  { label: 'Specific Identification', path: inventoryCostingPaths.specific },
   { label: 'Reconciliation', path: inventoryCostingPaths.reconciliation },
   { label: 'Method Change', path: inventoryCostingPaths.methodChange },
 ] as const

@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ConflictError, NotFoundError } from '../../../utils/errors.js'
 import { n, roundQty } from '../shared/dispatch-qty.js'
 

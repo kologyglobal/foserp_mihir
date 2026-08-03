@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 export async function nextAssetNumber(tenantId: string, legalEntityId: string): Promise<string> {
   const year = new Date().getUTCFullYear()

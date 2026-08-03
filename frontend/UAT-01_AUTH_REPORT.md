@@ -1,7 +1,7 @@
 # UAT-01 — Authentication & Access
 
-**Date:** 2026-07-27
-**Overall:** ✅ PASS (21/21)
+**Date:** 2026-07-30
+**Overall:** ✅ PASS (24/24)
 
 | ID | Area | Test | Status | Notes |
 |----|------|------|--------|-------|
@@ -10,9 +10,12 @@
 | UAT-01.3 | Protected-route access | ApiAuthGate bypasses when not API mode | PASS |  |
 | UAT-01.4 | Protected-route access | Unauthenticated users redirected to /login | PASS |  |
 | UAT-01.5 | Protected-route access | ProtectedOutlet guards page content | PASS |  |
-| UAT-01.6 | Login/logout | AuthProvider wraps application | PASS |  |
+| UAT-01.6 | Login/logout | AuthProvider wraps all routes including /login | PASS |  |
 | UAT-01.7 | Login/logout | Login page supports sign-in + forgot + reset views | PASS |  |
 | UAT-01.8 | Login/logout | Logout API wired in AuthProvider | PASS |  |
+| UAT-01.8a | Self-service | Change password route + page wired | PASS |  |
+| UAT-01.8b | Self-service | Profile settings route + updateProfile + changePassword | PASS |  |
+| UAT-01.8c | Self-service | User menu exposes Edit profile and Change password | PASS |  |
 | UAT-01.9 | Session persistence | Session round-trips via localStorage | PASS |  |
 | UAT-01.10 | Session persistence | Remember-me key defined on login page | PASS |  |
 | UAT-01.11 | Session persistence | syncSessionUserFromAuth maps API user to session | PASS |  |
@@ -25,7 +28,7 @@
 | UAT-01.18 | Role/permission | Shop Floor can access /shop-floor | PASS |  |
 | UAT-01.19 | Role/permission | Admin can access /crm and /settings | PASS |  |
 | UAT-01.20 | Direct URL without permission | AccessDeniedPage shows role + required permission | PASS |  |
-| UAT-01.21 | Invalid credentials | Live API tests skipped — backend unreachable | PASS | Unexpected end of JSON input |
+| UAT-01.21 | Invalid credentials | Live API tests skipped — backend unreachable | PASS | fetch failed |
 
 ## Manual sign-off checklist
 

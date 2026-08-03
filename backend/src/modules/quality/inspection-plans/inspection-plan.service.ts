@@ -1,6 +1,6 @@
 import type { QualityInspectionPlan, QualityInspectionPlanLine, QualityParameter } from '@prisma/client'
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ConflictError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import * as paramRepo from '../parameters/parameter.repository.js'
 import * as repo from './inspection-plan.repository.js'

@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getCashPosition } from './cash-position.service.js'
 import { getClosingControls } from './closing-controls.service.js'
 import { getDailyLiquidity } from './daily-liquidity.service.js'

@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ValidationError } from '../../../utils/errors.js'
 import * as companyService from '../companies/company.service.js'
 import * as contactService from '../contacts/contact.service.js'

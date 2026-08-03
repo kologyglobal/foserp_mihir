@@ -3,7 +3,7 @@
  * See docs/PURCHASE_PO_VERSIONING.md
  */
 import type { PurchaseOrderLine, PurchaseOrderStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { PURCHASE_AUDIT_ACTION, PURCHASE_AUDIT_ENTITY, writePurchaseAudit } from '../shared/purchase-audit.js'
 import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
 import {
@@ -347,6 +347,65 @@ export async function revisePurchaseOrder(
         changes,
       },
     })
+
+    const archivedHeader = await tx.purchaseOrderArchived.create({
+      data: {
+        tenantId,
+        purchaseOrderId: existing.id,
+        revisionNo: existing.revisionNo,
+        orderNumber: existing.orderNumber,
+        orderDate: existing.orderDate,
+        vendorId: existing.vendorId,
+        origin: existing.origin,
+        status: existing.status,
+        purchaseRequisitionId: existing.purchaseRequisitionId,
+        requestForQuotationId: existing.requestForQuotationId,
+        vendorQuotationId: existing.vendorQuotationId,
+        vendorComparisonId: existing.vendorComparisonId,
+        currencyCode: existing.currencyCode,
+        expectedDeliveryDate: existing.expectedDeliveryDate,
+        paymentTerms: existing.paymentTerms,
+        deliveryTerms: existing.deliveryTerms,
+        deliveryWarehouseId: existing.deliveryWarehouseId,
+        subtotalAmount: existing.subtotalAmount,
+        taxAmount: existing.taxAmount,
+        freightAmount: existing.freightAmount,
+        totalAmount: existing.totalAmount,
+        remarks: existing.remarks,
+        archivedById: actorId,
+        reason,
+      },
+    })
+
+    if (existing.lines.length) {
+      await tx.purchaseOrderLineArchived.createMany({
+        data: existing.lines.map((line) => ({
+          tenantId,
+          archivedHeaderId: archivedHeader.id,
+          purchaseOrderId: existing.id,
+          sourceLineId: line.id,
+          revisionNo: existing.revisionNo,
+          lineNumber: line.lineNumber,
+          purchaseRequisitionLineId: line.purchaseRequisitionLineId,
+          purchasePlanningRowId: line.purchasePlanningRowId,
+          itemId: line.itemId,
+          itemCodeSnapshot: line.itemCodeSnapshot,
+          itemNameSnapshot: line.itemNameSnapshot,
+          description: line.description,
+          quantity: line.quantity,
+          uomQuantity: line.uomQuantity,
+          uomConversionFactor: line.uomConversionFactor,
+          unitCostPrimary: line.unitCostPrimary,
+          uomId: line.uomId,
+          rate: line.rate,
+          amount: line.amount,
+          receivedQuantity: line.receivedQuantity,
+          requiredDate: line.requiredDate,
+          requisitionNumber: (line as { requisitionNumber?: string | null }).requisitionNumber ?? null,
+          remarks: line.remarks,
+        })),
+      })
+    }
 
     await repo.createStatusHistory(
       {

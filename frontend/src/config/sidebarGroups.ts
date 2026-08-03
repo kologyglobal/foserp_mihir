@@ -14,6 +14,7 @@ import {
   Tag,
   User,
   Warehouse,
+  Wrench,
 } from 'lucide-react'
 
 /** Icon rail menu — order and short labels matching enterprise sidebar design */
@@ -29,6 +30,7 @@ export const SIDEBAR_ICON_MENU: {
   { categoryId: 'purchase', label: 'Procurement', icon: ShoppingCart },
   { categoryId: 'production', label: 'Manufacturing', icon: Factory },
   { categoryId: 'quality', label: 'Quality', icon: ShieldCheck },
+  { categoryId: 'maintenance', label: 'Maintenance', icon: Wrench },
   { categoryId: 'inventory', label: 'Inventory & Warehouse', icon: Warehouse },
   { categoryId: 'dispatch', label: 'Logistics', icon: Box },
   { categoryId: 'gate', label: 'Gate & Security', icon: HardHat },
@@ -53,7 +55,7 @@ export const SIDEBAR_GROUPS = [
   {
     id: 'operations',
     label: 'Operations',
-    categoryIds: ['purchase', 'production', 'quality', 'dispatch', 'gate', 'inventory'],
+    categoryIds: ['purchase', 'production', 'quality', 'maintenance', 'dispatch', 'gate', 'inventory'],
   },
   {
     id: 'engineering',

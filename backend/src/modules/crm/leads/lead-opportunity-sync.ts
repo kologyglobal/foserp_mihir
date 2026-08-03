@@ -1,5 +1,5 @@
 import type { CrmLead } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { decimalToNumber } from '../../../shared/index.js'
 import { ensureLeadCompany } from './lead.repository.js'
 

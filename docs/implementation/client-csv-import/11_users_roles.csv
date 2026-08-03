@@ -1,0 +1,5 @@
+email,firstName,lastName,mobile,designation,department,status,roleName
+admin@client.com,Admin,User,9999999999,System Admin,IT,ACTIVE,Admin
+sales@client.com,Sales,Manager,,Sales Manager,Sales,ACTIVE,Sales Manager
+stores@client.com,Store,Keeper,,Stores,Stores,ACTIVE,Store User
+production@client.com,Prod,Planner,,Production Planner,Production,ACTIVE,Production Planner

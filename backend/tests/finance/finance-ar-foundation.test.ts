@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { PERMISSIONS, ROLE_PERMISSIONS, type PermissionName } from '../../src/constants/permissions.js'
 import {
   findCustomerParty,

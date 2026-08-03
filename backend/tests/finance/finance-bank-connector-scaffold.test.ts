@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../../src/app.js'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import {
   bootstrapApAllocFixture,
   cleanupTenant,
@@ -52,7 +52,11 @@ describe.skipIf(!dbAvailable)('Finance Phase 5D1 — Bank connector scaffold', (
     expect(res.status, JSON.stringify(res.body)).toBe(200)
     expect(Array.isArray(res.body.data)).toBe(true)
     expect(res.body.data.some((p: { provider: string }) => p.provider === 'GENERIC_REST')).toBe(true)
-    expect(res.body.data.some((p: { provider: string; implemented: boolean }) => p.provider === 'OPEN_BANKING' && p.implemented === false)).toBe(true)
+    expect(
+      res.body.data.some(
+        (p: { provider: string; implemented: boolean }) => p.provider === 'OPEN_BANKING' && p.implemented === true,
+      ),
+    ).toBe(true)
     expect(res.body.data.some((p: { provider: string; implemented: boolean }) => p.provider === 'MT940_SFTP' && p.implemented === true)).toBe(true)
   })
 
@@ -121,7 +125,7 @@ describe.skipIf(!dbAvailable)('Finance Phase 5D1 — Bank connector scaffold', (
     expect(disable.body.data.status).toBe('DISABLED')
   })
 
-  it('test-connection returns NOT_IMPLEMENTED (or PROVIDER_DISABLED when disabled)', async () => {
+  it('test-connection returns PROVIDER_DISABLED when disabled; consent required when enabled OPEN_BANKING', async () => {
     const create = await request(app)
       .post(base())
       .set(auth())
@@ -152,8 +156,9 @@ describe.skipIf(!dbAvailable)('Finance Phase 5D1 — Bank connector scaffold', (
     updatedAt = enabled.body.data.updatedAt
 
     const test = await request(app).post(`${base()}/${id}/test-connection`).set(auth())
-    expect(test.status).toBe(422)
-    expect(test.body.code).toBe('BANK_CONNECTOR_NOT_IMPLEMENTED')
+    expect(test.status).toBe(400)
+    expect(test.body.code).toBe('BANK_CONNECTOR_VALIDATION_FAILED')
+    expect(String(test.body.message ?? '')).toMatch(/AUTHORIZED consent/i)
   })
 
   it('sync returns NOT_IMPLEMENTED and creates zero BankStatement rows', async () => {

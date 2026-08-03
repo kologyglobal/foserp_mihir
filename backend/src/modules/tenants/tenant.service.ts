@@ -1,10 +1,11 @@
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { TENANT_ADMIN_PERMISSIONS } from '../../constants/permissions.js'
 import { createAuditLog } from '../../services/audit.service.js'
 import { initTenantCodeSeries } from '../../services/codeSeries.service.js'
-import { ConflictError, NotFoundError } from '../../utils/errors.js'
+import { ConflictError, NotFoundError, ValidationError } from '../../utils/errors.js'
 import { hashPassword } from '../../utils/password.js'
 import { buildPaginationMeta } from '../../utils/pagination.js'
+import { PASSWORD_MIN_LENGTH } from '../security/security.constants.js'
 import * as tenantRepository from './tenant.repository.js'
 import type { CreateTenantInput, ListTenantsQuery, UpdateTenantInput } from './tenant.validation.js'
 
@@ -36,6 +37,11 @@ export async function createTenant(
   const permissions = await prisma.permission.findMany({
     where: { name: { in: [...TENANT_ADMIN_PERMISSIONS] } },
   })
+
+  // Tenant does not exist yet — enforce the same defaults as getOrCreateSecuritySettings.
+  if (input.adminUser.password.length < PASSWORD_MIN_LENGTH) {
+    throw new ValidationError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`)
+  }
 
   const passwordHash = await hashPassword(input.adminUser.password)
 

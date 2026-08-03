@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../src/app.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import * as accessReviewService from '../src/modules/effective-access/access-review.service.js'
 import * as effectiveAccessService from '../src/modules/effective-access/effective-access.service.js'
 import * as userService from '../src/modules/users/user.service.js'

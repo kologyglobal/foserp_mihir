@@ -1,7 +1,7 @@
 import type { QualityParameter } from '@prisma/client'
 import type { Request } from 'express'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ConflictError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import * as repo from './parameter.repository.js'
 import type { CreateParameterInput, ListParametersQuery, UpdateParameterInput } from './parameter.schemas.js'

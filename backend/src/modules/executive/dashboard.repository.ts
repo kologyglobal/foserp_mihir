@@ -1,5 +1,5 @@
 import type { ExecutiveDashboard, ExecutiveDashboardWidget, Prisma } from '@prisma/client'
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import type { WidgetLayoutInput } from './dashboard.types.js'
 
 export type DashboardWithWidgets = ExecutiveDashboard & { widgets: ExecutiveDashboardWidget[] }

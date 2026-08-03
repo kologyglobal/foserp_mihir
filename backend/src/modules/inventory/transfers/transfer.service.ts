@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { ConflictError, InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { getOrCreateBalance } from '../shared/balance.service.js'
@@ -129,7 +129,7 @@ export async function dispatchTransfer(tenantId: string, id: string, actorId: st
     if (document.status === 'IN_TRANSIT' || document.status === 'PARTIALLY_RECEIVED' || document.status === 'RECEIVED') return document
     if (document.status !== 'APPROVED') throw new InvalidStateError('Only approved transfers can be dispatched')
     for (const line of [...document.lines].sort((a, b) => a.itemId.localeCompare(b.itemId))) {
-      await InventoryPostingService.post({
+      const dispatched = await InventoryPostingService.post({
         tenantId,
         itemId: line.itemId,
         warehouseId: document.fromWarehouseId,
@@ -144,10 +144,15 @@ export async function dispatchTransfer(tenantId: string, id: string, actorId: st
         referenceNo: document.transferNumber,
         remarks: input.remarks ?? document.remarks ?? undefined,
         idempotencyKey: `INVTR:${id}:DISPATCH:${line.id}`,
-        rate: line.rate,
+        // Omit zero rate so FIFO/MA/Standard/Specific resolve inventory cost (no artificial transfer rate).
+        rate: Number(line.rate) > 0 ? line.rate : undefined,
         createdBy: actorId,
       }, tx)
-      await tx.inventoryTransferLine.update({ where: { id: line.id }, data: { dispatchedQty: line.quantity } })
+      // Persist exact relieved unit cost for receive — transfers must not invent P/L.
+      await tx.inventoryTransferLine.update({
+        where: { id: line.id },
+        data: { dispatchedQty: line.quantity, rate: dispatched.rate },
+      })
     }
     await tx.inventoryTransfer.update({
       where: { id },
@@ -173,6 +178,19 @@ export async function receiveTransfer(tenantId: string, id: string, actorId: str
       if (quantity === undefined) continue
       const remaining = line.dispatchedQty.minus(line.receivedQty)
       if (remaining.lessThan(quantity)) throw new ConflictError(`Receipt exceeds remaining quantity for item ${line.item.code}`)
+      // Prefer cost from matching dispatch movement (exact lineage). Fallback: line.rate stamped at dispatch.
+      const dispatchMovement = await tx.inventoryStockMovement.findFirst({
+        where: { tenantId, idempotencyKey: `INVTR:${id}:DISPATCH:${line.id}` },
+        include: { costEntries: { orderBy: { createdAt: 'asc' }, take: 1 } },
+      })
+      const transferUnitCost = dispatchMovement?.costEntries[0]
+        ? Number(dispatchMovement.costEntries[0].unitCost)
+        : Number(dispatchMovement?.rate ?? line.rate)
+      if (!(transferUnitCost > 0)) {
+        throw new ValidationError(
+          `Transfer receive blocked: no positive inventory cost on dispatch for item ${line.item.code}`,
+        )
+      }
       await InventoryPostingService.post({
         tenantId,
         itemId: line.itemId,
@@ -187,7 +205,7 @@ export async function receiveTransfer(tenantId: string, id: string, actorId: str
         movementDate: new Date(),
         referenceNo: document.transferNumber,
         idempotencyKey: `INVTR:${id}:RECEIVE:${requestKey}:${line.id}`,
-        rate: line.rate,
+        rate: transferUnitCost,
         createdBy: actorId,
       }, tx)
       await tx.inventoryTransferLine.update({

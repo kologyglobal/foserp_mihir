@@ -11,6 +11,7 @@ import {
   createCostingPolicySchema,
   listCostingPoliciesQuerySchema,
   updateCostingPolicySchema,
+  workOrderCostTraceParamSchema,
 } from './costing.schemas.js'
 
 const router = Router({ mergeParams: true })
@@ -26,6 +27,7 @@ router.get('/costing/readiness', requirePermission('manufacturing.accounting.vie
 
 router.get('/work-orders/:id/cost-summary', validateParams(uuidParamSchema), requirePermission('manufacturing.cost.view'), controller.getCostSummary)
 router.get('/work-orders/:id/cost-details', validateParams(uuidParamSchema), requirePermission('manufacturing.cost.view'), controller.getCostDetails)
+router.get('/work-orders/:id/cost-trace/:entryId', validateParams(workOrderCostTraceParamSchema), requirePermission('manufacturing.cost.view'), controller.getCostTrace)
 router.post('/work-orders/:id/cost/calculate', validateParams(uuidParamSchema), requirePermission('manufacturing.cost.calculate'), validateBody(calculateWorkOrderCostSchema), controller.calculateCost)
 router.get('/work-orders/:id/cost-snapshots', validateParams(uuidParamSchema), requirePermission('manufacturing.cost.view'), controller.getCostSnapshots)
 router.get('/work-orders/:id/accounting-readiness', validateParams(uuidParamSchema), requirePermission('manufacturing.accounting.view'), controller.getWorkOrderReadiness)

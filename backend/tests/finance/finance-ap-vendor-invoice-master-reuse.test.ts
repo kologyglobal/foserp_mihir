@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import { randomUUID } from 'node:crypto'
 import { createApp } from '../../src/app.js'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import {
   bootstrapApAllocFixture,
   cleanupTenant,

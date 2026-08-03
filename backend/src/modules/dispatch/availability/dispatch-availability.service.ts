@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { resolveWarehouseMapping } from '../../manufacturing/warehouse-mappings/warehouse-mapping.service.js'
 import { n, roundQty } from '../shared/dispatch-qty.js'
 

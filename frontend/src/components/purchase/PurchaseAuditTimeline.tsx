@@ -10,25 +10,123 @@ import {
 import { formatDateTime } from '@/utils/dates/format'
 import { cn } from '@/utils/cn'
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Open',
+  DRAFT: 'Open',
+  pending_approval: 'Pending Approved',
+  PENDING_APPROVAL: 'Pending Approved',
+  approved: 'Approved',
+  APPROVED: 'Approved',
+  rejected: 'Rejected',
+  REJECTED: 'Rejected',
+  sent_back: 'Sent Back',
+  SENT_BACK: 'Sent Back',
+  released: 'Released',
+  SENT_TO_VENDOR: 'Released',
+  partially_received: 'Partially Received',
+  PARTIALLY_RECEIVED: 'Partially Received',
+  fully_received: 'Fully Received',
+  FULLY_RECEIVED: 'Fully Received',
+  invoiced: 'Invoiced',
+  PARTIALLY_INVOICED: 'Partially Invoiced',
+  FULLY_INVOICED: 'Invoiced',
+  closed: 'Closed',
+  CLOSED: 'Closed',
+  cancelled: 'Cancelled',
+  CANCELLED: 'Cancelled',
+}
+
+const ORIGIN_LABELS: Record<string, string> = {
+  MANUAL: 'Manual',
+  manual: 'Manual',
+  PURCHASE_REQUISITION: 'Purchase Requisition',
+  purchase_requisition: 'Purchase Requisition',
+  QUOTATION_COMPARISON: 'Quotation Comparison',
+  quotation_comparison: 'Quotation Comparison',
+  VENDOR_QUOTATION: 'Vendor Quotation',
+  vendor_quotation: 'Vendor Quotation',
+  BLANKET_ORDER: 'Blanket Order',
+  blanket_order: 'Blanket Order',
+}
+
+/** Keys safe to show to end users — never expose *Id / UUID fields. */
+const FRIENDLY_FIELD_LABELS: Record<string, string> = {
+  status: 'Status',
+  orderNumber: 'PO Number',
+  documentNumber: 'Document No.',
+  origin: 'Origin',
+  quantity: 'Qty',
+  rate: 'Rate',
+  expectedRate: 'Expected rate',
+  rfqRequired: 'RFQ required',
+  rejectionReason: 'Reason',
+  remarks: 'Remarks',
+}
+
+function isUuid(value: unknown): boolean {
+  return typeof value === 'string' && UUID_RE.test(value.trim())
+}
+
+function formatDisplayValue(key: string, value: unknown): string | null {
+  if (value == null) return null
+  if (isUuid(value)) return null
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (typeof value === 'number') return String(value)
+
+  const text = String(value).trim()
+  if (!text) return null
+  if (isUuid(text)) return null
+
+  if (key === 'status' || key.toLowerCase().endsWith('status')) {
+    return STATUS_LABELS[text] ?? text.replace(/_/g, ' ')
+  }
+  if (key === 'origin') {
+    return ORIGIN_LABELS[text] ?? text.replace(/_/g, ' ')
+  }
+  return text
+}
+
 function summarizeValue(value: unknown): string | null {
   if (value == null) return null
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    if (isUuid(value)) return null
+    if (typeof value === 'string' && STATUS_LABELS[value]) return STATUS_LABELS[value]
     return String(value)
   }
-  if (typeof value === 'object') {
-    const obj = value as Record<string, unknown>
-    const bits: string[] = []
-    for (const key of ['status', 'rfqRequired', 'buyerId', 'selectedVendorId', 'expectedRate', 'quantity', 'rate', 'rejectionReason']) {
-      if (obj[key] !== undefined && obj[key] !== null) bits.push(`${key}: ${String(obj[key])}`)
-    }
-    if (bits.length) return bits.join(' · ')
-    try {
-      const raw = JSON.stringify(value)
-      return raw.length > 120 ? `${raw.slice(0, 117)}…` : raw
-    } catch {
-      return null
-    }
+  if (typeof value !== 'object') return null
+
+  const obj = value as Record<string, unknown>
+  const bits: string[] = []
+
+  for (const [key, label] of Object.entries(FRIENDLY_FIELD_LABELS)) {
+    if (obj[key] === undefined || obj[key] === null) continue
+    const formatted = formatDisplayValue(key, obj[key])
+    if (!formatted) continue
+    bits.push(`${label}: ${formatted}`)
   }
+
+  if (bits.length) return bits.join(' · ')
+
+  // Status-only / small change payloads without known keys
+  for (const [key, raw] of Object.entries(obj)) {
+    if (/id$/i.test(key) || key === 'id' || isUuid(raw)) continue
+    if (typeof raw === 'object') continue
+    const formatted = formatDisplayValue(key, raw)
+    if (!formatted) continue
+    const label = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()
+    bits.push(`${label.charAt(0).toUpperCase()}${label.slice(1)}: ${formatted}`)
+    if (bits.length >= 3) break
+  }
+
+  return bits.length ? bits.join(' · ') : null
+}
+
+function formatActor(event: PurchaseTimelineEvent): string | null {
+  const name = event.actorName?.trim()
+  if (name && !isUuid(name)) return name
   return null
 }
 
@@ -36,12 +134,15 @@ export function PurchaseAuditTimeline({
   entityType,
   entityId,
   title = 'Audit Timeline',
+  showTitle = true,
   demoEvents,
   className,
 }: {
   entityType: PurchaseTimelineEntityType
   entityId: string | null | undefined
   title?: string
+  /** When embedded in an ErpCardSection that already has a title. */
+  showTitle?: boolean
   /** Demo-mode fallback events when API is off. */
   demoEvents?: PurchaseTimelineEvent[]
   className?: string
@@ -78,10 +179,12 @@ export function PurchaseAuditTimeline({
 
   return (
     <section className={cn('erp-page-panel p-4', className)}>
-      <div className="mb-3 flex items-center gap-2">
-        <Clock className="h-4 w-4 text-erp-muted" aria-hidden />
-        <h3 className="text-[14px] font-semibold text-erp-text">{title}</h3>
-      </div>
+      {showTitle ? (
+        <div className="mb-3 flex items-center gap-2">
+          <Clock className="h-4 w-4 text-erp-muted" aria-hidden />
+          <h3 className="text-[14px] font-semibold text-erp-text">{title}</h3>
+        </div>
+      ) : null}
       {loading ? <LoadingState variant="table" rows={4} cols={1} /> : null}
       {!loading && error ? <p className="text-[13px] text-red-600">{error}</p> : null}
       {!loading && !error && events.length === 0 ? (
@@ -92,6 +195,7 @@ export function PurchaseAuditTimeline({
           {events.map((event, idx) => {
             const prev = summarizeValue(event.previousValue)
             const next = summarizeValue(event.newValue)
+            const actor = formatActor(event)
             return (
               <div key={event.id} className="relative flex gap-3 pb-4">
                 {idx < events.length - 1 ? (
@@ -104,19 +208,22 @@ export function PurchaseAuditTimeline({
                   <p className="text-[13px] font-medium text-erp-text">{event.actionLabel}</p>
                   <p className="text-[12px] text-erp-muted">
                     {formatDateTime(event.timestamp)}
-                    {event.actorName || event.actorId
-                      ? ` · ${event.actorName ?? event.actorId}`
-                      : ''}
-                    {event.source === 'status_history' ? ' · status' : ''}
+                    {actor ? ` · ${actor}` : ''}
                   </p>
                   {event.remarks ? (
                     <p className="mt-1 text-[12px] text-erp-text">{event.remarks}</p>
                   ) : null}
                   {(prev || next) && (
                     <p className="mt-1 text-[12px] text-erp-muted">
-                      {prev ? <span>From {prev}</span> : null}
-                      {prev && next ? ' → ' : null}
-                      {next ? <span>{prev ? `To ${next}` : next}</span> : null}
+                      {prev && next ? (
+                        <>
+                          <span>{prev}</span>
+                          {' → '}
+                          <span>{next}</span>
+                        </>
+                      ) : (
+                        <span>{next ?? prev}</span>
+                      )}
                     </p>
                   )}
                 </div>
@@ -154,7 +261,7 @@ export function buildDemoPurchaseTimeline(input: {
       previousValue: null,
       newValue: input.statusLabel ? { status: input.statusLabel } : null,
       actorId: null,
-      actorName: input.createdBy ?? null,
+      actorName: input.createdBy && !UUID_RE.test(input.createdBy) ? input.createdBy : null,
       timestamp: input.createdAt,
       remarks: null,
       requestMetadata: null,
@@ -173,7 +280,7 @@ export function buildDemoPurchaseTimeline(input: {
       previousValue: null,
       newValue: null,
       actorId: null,
-      actorName: extra.actor ?? null,
+      actorName: extra.actor && !UUID_RE.test(extra.actor) ? extra.actor : null,
       timestamp: extra.timestamp,
       remarks: null,
       requestMetadata: null,
@@ -192,7 +299,7 @@ export function buildDemoPurchaseTimeline(input: {
       previousValue: null,
       newValue: null,
       actorId: null,
-      actorName: input.updatedBy ?? null,
+      actorName: input.updatedBy && !UUID_RE.test(input.updatedBy) ? input.updatedBy : null,
       timestamp: input.updatedAt,
       remarks: null,
       requestMetadata: null,

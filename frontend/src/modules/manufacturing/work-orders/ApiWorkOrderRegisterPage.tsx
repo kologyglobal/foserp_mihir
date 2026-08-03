@@ -4,11 +4,17 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { Ban, CheckCircle2, Eye, FileInput, Pause, Play, Plus, Wrench } from 'lucide-react'
 import { TableLink } from '@/components/ui/AppLink'
 import { DataTable } from '@/components/tables/DataTable'
+import { StatusDot } from '@/components/design-system/StatusDot'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import {
+  EnterpriseNumericCell,
+  EnterpriseRecordCell,
+} from '@/design-system/enterprise/EnterpriseTableCells'
 import {
   EnterpriseRowActionsMenu,
   type RowActionItem,
 } from '@/design-system/enterprise/EnterpriseTablePrimitives'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
 import { CrmListFilterBar } from '@/components/crm/CrmListFilterBar'
@@ -313,74 +319,89 @@ export function ApiWorkOrderRegisterPage() {
       {
         accessorKey: 'salesOrderNo',
         header: 'Sales Order',
+        meta: { columnLabel: 'Sales Order', cellClass: 'min-w-[160px]' },
         cell: ({ row }) => (
-          <div className="min-w-[120px]">
-            <TableLink to={`/sales/orders/${row.original.id}`} className="font-mono text-[13px] font-semibold">
-              {row.original.salesOrderNo}
-            </TableLink>
-            <p className="mt-0.5 text-[11px] capitalize text-erp-muted">{soStatusLabel(row.original.status)}</p>
-          </div>
+          <EnterpriseRecordCell
+            primary={
+              <TableLink to={`/sales/orders/${row.original.id}`} className="ent-td-id">
+                {row.original.salesOrderNo}
+              </TableLink>
+            }
+            subtitle={
+              <StatusDot
+                label={soStatusLabel(row.original.status)}
+                tone={row.original.status === 'in_production' ? 'info' : 'success'}
+                className="h-5 px-1.5 text-[10px] leading-5"
+              />
+            }
+          />
         ),
       },
       {
         id: 'customer',
         header: 'Customer',
+        meta: { columnLabel: 'Customer', cellClass: 'min-w-[230px]' },
         cell: ({ row }) => (
-          <div className="min-w-0 max-w-[240px]">
-            <p className="truncate text-[13px] font-medium text-erp-text">
-              {row.original.customerName?.trim() || '—'}
-            </p>
-            {row.original.customerCode ? (
-              <p className="truncate font-mono text-[11px] text-erp-muted">{row.original.customerCode}</p>
-            ) : null}
-          </div>
+          <EnterpriseRecordCell
+            primary={row.original.customerName?.trim() || '—'}
+            subtitle={row.original.customerCode || undefined}
+            className="max-w-[320px]"
+          />
         ),
       },
       {
         accessorKey: 'orderDate',
         header: 'Order Date',
+        meta: { columnLabel: 'Order Date', cellClass: 'min-w-[120px]' },
         cell: ({ row }) => (
-          <span className="tabular-nums text-[12px]">
+          <span className="whitespace-nowrap tabular-nums">
             {row.original.orderDate ? formatDate(row.original.orderDate) : '—'}
           </span>
         ),
       },
       {
         accessorKey: 'requiredDate',
-        header: 'Required',
+        header: 'Required Date',
+        meta: { columnLabel: 'Required Date', cellClass: 'min-w-[130px]' },
         cell: ({ row }) => (
-          <span className="tabular-nums text-[12px]">
+          <span className="whitespace-nowrap tabular-nums">
             {row.original.requiredDate ? formatDate(row.original.requiredDate) : '—'}
           </span>
         ),
       },
       {
         id: 'lines',
-        header: 'Lines',
+        header: 'Open Lines',
+        meta: { align: 'right', numeric: true, columnLabel: 'Open Lines', cellClass: 'min-w-[105px]' },
         cell: ({ row }) => {
           const remaining = row.original.remainingLineCount ?? row.original.lineCount
           return (
-            <div className="tabular-nums text-[12px]">
-              <p className="font-semibold text-erp-text">
-                {remaining} open
-              </p>
-              <p className="text-[10px] text-erp-muted">{row.original.lineCount} total</p>
-            </div>
+            <EnterpriseNumericCell>
+              {remaining}
+              <span className="ml-1 font-normal text-erp-muted">/ {row.original.lineCount}</span>
+            </EnterpriseNumericCell>
           )
         },
       },
       {
         id: 'remainingQty',
         header: 'Remaining Qty',
+        meta: {
+          align: 'right',
+          numeric: true,
+          columnLabel: 'Remaining Qty',
+          cellClass: 'min-w-[125px]',
+        },
         cell: ({ row }) => (
-          <span className="tabular-nums text-[12px] font-semibold text-erp-text">
-            {row.original.remainingQuantity ?? '—'}
-          </span>
+          <EnterpriseNumericCell value={row.original.remainingQuantity ?? '—'} />
         ),
       },
       {
         id: 'actions',
-        header: 'Actions',
+        header: '',
+        enableSorting: false,
+        enableHiding: false,
+        meta: { align: 'center', columnLabel: 'Actions', cellClass: 'w-14 min-w-14' },
         cell: ({ row }) => {
           const so = row.original
           const actions: RowActionItem[] = [
@@ -404,24 +425,7 @@ export function ApiWorkOrderRegisterPage() {
                 ]
               : []),
           ]
-          return (
-            <div className="flex items-center gap-2">
-              {perms.canCreateWo ? (
-                <button
-                  type="button"
-                  className="erp-btn erp-btn-primary h-8 px-2.5 text-[12px]"
-                  onClick={() =>
-                    navigate(
-                      `/manufacturing/work-orders/new?mode=sales_order&salesOrderId=${encodeURIComponent(so.id)}`,
-                    )
-                  }
-                >
-                  Create WO
-                </button>
-              ) : null}
-              <EnterpriseRowActionsMenu actions={actions} />
-            </div>
-          )
+          return <EnterpriseRowActionsMenu actions={actions} />
         },
       },
     ],
@@ -777,10 +781,31 @@ export function ApiWorkOrderRegisterPage() {
             </>
           ) : (
             <>
-              <p className="text-[12px] text-erp-muted">
-                Confirmed / in-production sales orders with remaining quantity still available to convert into work
-                orders.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm ring-1 ring-blue-100">
+                    <FileInput className="h-[18px] w-[18px]" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-erp-text">Sales orders ready for production</p>
+                    <p className="text-[11px] text-erp-muted">
+                      Select a confirmed line with remaining quantity and convert it into a work order.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-md border border-blue-100 bg-white px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                    {filteredSalesOrders.length} eligible
+                  </span>
+                  <span className="rounded-md border border-erp-border bg-white px-2.5 py-1 text-[11px] font-medium text-erp-muted">
+                    {filteredSalesOrders.reduce(
+                      (sum, so) => sum + Number(so.remainingQuantity ?? 0),
+                      0,
+                    )}{' '}
+                    qty open
+                  </span>
+                </div>
+              </div>
               {soLoading ? <LoadingState variant="table" rows={6} /> : null}
               {!soLoading && filteredSalesOrders.length === 0 ? (
                 <ProductionEmptyState
@@ -803,9 +828,18 @@ export function ApiWorkOrderRegisterPage() {
                 />
               ) : null}
               {!soLoading && filteredSalesOrders.length > 0 ? (
-                <div className="overflow-x-auto rounded-xl border border-erp-border bg-white shadow-sm">
-                  <DataTable columns={soColumns} data={filteredSalesOrders} />
-                </div>
+                <EnterpriseRegisterTableShell className="min-w-0">
+                  <DataTable
+                    columns={soColumns}
+                    data={filteredSalesOrders}
+                    pageSize={10}
+                    pageSizeOptions={[10, 25, 50]}
+                    stickyFirstColumn
+                    zebra
+                    recordLabel="Eligible sales orders"
+                    onRowSelect={(so) => navigate(`/sales/orders/${so.id}`)}
+                  />
+                </EnterpriseRegisterTableShell>
               ) : null}
             </>
           )}

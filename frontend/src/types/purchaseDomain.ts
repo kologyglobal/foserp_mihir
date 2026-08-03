@@ -129,8 +129,8 @@ export const PURCHASE_ORDER_DOMAIN_STATUSES: readonly PurchaseOrderDomainStatus[
 ] as const
 
 export const PURCHASE_ORDER_DOMAIN_STATUS_LABELS: Record<PurchaseOrderDomainStatus, string> = {
-  draft: 'Draft',
-  pending_approval: 'Sent for Approval',
+  draft: 'Open',
+  pending_approval: 'Pending Approved',
   approved: 'Approved',
   rejected: 'Rejected',
   sent_back: 'Sent Back',
@@ -645,6 +645,9 @@ export interface PurchaseItem {
   hsnCode: string
   /** Service Accounting Code — used for job work / services. */
   sacCode: string | null
+  gstGroupId?: string | null
+  hsnId?: string | null
+  qualityTestGroupCode?: string | null
   gstRatePct: number
   standardRate: number
   reorderLevel: number
@@ -772,6 +775,8 @@ export interface PurchaseSetupGeneral {
   overReceiptTolerancePct: number
   /** When true, revising a released PO returns it to Pending Approval. */
   requireApprovalOnPoRevision: boolean
+  /** When true, new POs must be submitted for approval before release. */
+  requireApprovalOnPo: boolean
   allowShortClose: boolean
   requirePoWarehouse: boolean
   requireExpectedDeliveryDate: boolean
@@ -1806,6 +1811,16 @@ export interface PurchaseOrderLine {
   uom: string
   hsnCode: string
   sacCode: string | null
+  gstGroupId?: string | null
+  hsnId?: string | null
+  gstGroupCode?: string
+  outstandingQty?: number
+  outstandingQtyBase?: number
+  receivedQtyBase?: number
+  qcRequired?: boolean
+  qualityTestGroupCode?: string | null
+  binId?: string | null
+  binCode?: string
   /** Primary / stock UOM quantity. */
   quantity: number
   /** Vendor / purchase UOM quantity (what user typically enters). */
@@ -1835,12 +1850,16 @@ export interface PurchaseOrderLine {
   receivedQty: number
   pendingQty: number
   invoicedQty: number
+  /** Invoiced qty in base / stock UOM (when MUOM). */
+  invoicedQtyBase?: number
   lineStatus: PurchaseOrderLineStatus
   /** @deprecated use warehouseId — kept for older callers */
   locationId: string
   locationName: string
   expectedDeliveryDate: IsoDate
   prLineId: string | null
+  /** Display / editable PR document number on the line (manual or from source). */
+  requisitionNo?: string | null
   rfqLineId: string | null
   vendorQuotationLineId: string | null
   remarks: string
@@ -2320,6 +2339,8 @@ export interface PurchaseInvoice extends PurchaseMoneyTotals, PurchaseAuditField
   holdAt: IsoDateTime | null
   debitNoteId: string | null
   debitNoteNumber: string | null
+  /** Soft FK to Accounting Vendor Invoice after post handoff (API mode). */
+  accountingVendorInvoiceId: string | null
   lines: PurchaseInvoiceLine[]
   approvalIds: string[]
   postedAt: IsoDateTime | null
@@ -2452,6 +2473,7 @@ export type PurchasePendingActionType =
   | 'pr_approval'
   | 'po_approval'
   | 'grn_inspection'
+  | 'grn_not_invoiced'
   | 'invoice_mismatch'
   | 'overdue_delivery'
 
@@ -2462,6 +2484,26 @@ export interface PurchaseDashboardPendingAction {
   count: number
   href: string
   severity: 'primary' | 'warning' | 'critical'
+}
+
+/** GRNs with accepted/received qty that still have open (uninvoiced) quantity. */
+export interface PurchaseDashboardGrniRow {
+  id: string
+  grnNumber: string
+  receiptDate: IsoDate
+  ageDays: number
+  vendorName: string
+  purchaseOrderId: string
+  purchaseOrderNumber: string
+  openLineCount: number
+  acceptedQty: number
+  invoicedQty: number
+  openQty: number
+  openValue: number
+  status: GrnDomainStatus | string
+  statusLabel: string
+  href: string
+  createInvoiceHref: string
 }
 
 export interface PurchaseDashboardTrendPoint {
@@ -2508,6 +2550,7 @@ export interface PurchaseDashboardData {
     purchaseOrdersThisMonth: number
     pendingDeliveries: number
     pendingGrns: number
+    grniPending: number
     pendingPurchaseInvoices: number
     monthlyPurchaseValue: number
   }
@@ -2518,6 +2561,7 @@ export interface PurchaseDashboardData {
     purchaseOrdersThisMonth: string
     pendingDeliveries: string
     pendingGrns: string
+    grniPending: string
     pendingPurchaseInvoices: string
     monthlyPurchaseValue: string
   }
@@ -2525,6 +2569,7 @@ export interface PurchaseDashboardData {
   poStatus: PurchaseDashboardStatusBucket[]
   upcomingDeliveries: PurchaseDashboardDeliveryRow[]
   pendingActions: PurchaseDashboardPendingAction[]
+  grniPending: PurchaseDashboardGrniRow[]
   monthlyTrend: PurchaseDashboardTrendPoint[]
   byCategory: PurchaseDashboardCategorySlice[]
   topVendors: PurchaseDashboardVendorRow[]

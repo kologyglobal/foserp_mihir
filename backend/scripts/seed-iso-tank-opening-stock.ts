@@ -16,7 +16,7 @@
  *   npx tsx scripts/seed-iso-tank-opening-stock.ts
  *   npx tsx scripts/seed-iso-tank-opening-stock.ts vasant-trailers
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { postStockMovement } from '../src/modules/inventory/shared/stock-posting.service.js'
 import { ensureCodeSeries } from '../src/services/codeSeries.service.js'
 

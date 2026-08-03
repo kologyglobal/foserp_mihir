@@ -9,10 +9,10 @@
 
 ## Deferred (not 4B)
 
-- Incoming GRN QC (`/quality/incoming`)
-- Purchase GRN API
+- Incoming GRN QC remains on Purchase QI path (not manufacturing INCOMING category) — see QUALITY_SCOPE_AND_DEFERRALS
 - Instruments / calibration
 - Replacing opaque `defaultQualityPlanRef` / routing `qualityPlanRef` with FK columns
+- Merging Purchase QI free-form checklist into manufacturing QualityParameter masters
 
 ## Database
 

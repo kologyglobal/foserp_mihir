@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { getPagination } from '../../../utils/pagination.js'
 import { decimalToNumber, resolveUserNames, tenantActiveFilter } from '../../../shared/index.js'
 import type { ReportQuery } from './report.validation.js'

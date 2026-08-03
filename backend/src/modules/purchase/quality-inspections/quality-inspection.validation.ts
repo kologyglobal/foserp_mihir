@@ -21,6 +21,17 @@ export const qualityInspectionLineSchema = z.object({
   deviationQuantity: z.coerce.number().min(0).default(0),
   remarks: z.string().trim().max(2000).optional().nullable(),
 })
+export const qualityInspectionParameterSchema = z.object({
+  id: z.string().uuid().optional(),
+  parameter: z.string().trim().min(1).max(200),
+  specification: z.string().trim().max(500).optional().default(''),
+  minValue: z.coerce.number().nullable().optional(),
+  maxValue: z.coerce.number().nullable().optional(),
+  observedValue: z.coerce.number().nullable().optional(),
+  unit: z.string().trim().max(32).optional().default(''),
+  result: z.enum(['pass', 'fail', 'na']).default('na'),
+  remarks: z.string().trim().max(2000).optional().nullable(),
+})
 export const createQualityInspectionSchema = z.object({
   inspectionDate: z.string().trim().optional(),
   goodsReceiptId: z.string().uuid().optional().nullable(),
@@ -30,18 +41,22 @@ export const createQualityInspectionSchema = z.object({
   plantId: z.string().uuid().optional().nullable(),
   inspectedById: z.string().trim().max(36).optional().nullable(),
   inspectedByName: z.string().trim().max(200).optional().nullable(),
+  inspectionPlan: z.string().trim().max(300).optional().nullable(),
   remarks: z.string().trim().max(5000).optional().nullable(),
   deviationRemarks: z.string().trim().max(5000).optional().nullable(),
   lines: z.array(qualityInspectionLineSchema).min(1).optional(),
+  parameters: z.array(qualityInspectionParameterSchema).max(100).optional(),
 }).refine((input) => input.goodsReceiptId || input.lines?.length, { message: 'Provide a goods receipt or inspection lines.', path: ['lines'] })
 export const updateQualityInspectionSchema = z.object({
   inspectionDate: z.string().trim().optional(),
   warehouseId: z.string().uuid().optional().nullable(),
   inspectedById: z.string().trim().max(36).optional().nullable(),
   inspectedByName: z.string().trim().max(200).optional().nullable(),
+  inspectionPlan: z.string().trim().max(300).optional().nullable(),
   remarks: z.string().trim().max(5000).optional().nullable(),
   deviationRemarks: z.string().trim().max(5000).optional().nullable(),
   lines: z.array(qualityInspectionLineSchema).min(1).optional(),
+  parameters: z.array(qualityInspectionParameterSchema).max(100).optional(),
 })
 export const completeQualityInspectionSchema = z.object({
   outcome: z.enum(['AUTO', 'ACCEPT', 'REJECT']).default('AUTO'),
@@ -53,3 +68,4 @@ export type ListQualityInspectionsQuery = z.infer<typeof listQualityInspectionsQ
 export type CreateQualityInspectionInput = z.infer<typeof createQualityInspectionSchema>
 export type UpdateQualityInspectionInput = z.infer<typeof updateQualityInspectionSchema>
 export type QualityInspectionLineInput = z.infer<typeof qualityInspectionLineSchema>
+export type QualityInspectionParameterInput = z.infer<typeof qualityInspectionParameterSchema>

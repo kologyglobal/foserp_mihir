@@ -24,11 +24,11 @@ vi.mock('../src/modules/purchase/invoices/purchase-invoice.repository.js', () =>
   findPurchaseInvoices: vi.fn(),
   replacePurchaseInvoiceLines: vi.fn(),
 }))
-vi.mock('../src/config/database.js', () => ({
+vi.mock('../src/config/prisma.js', () => ({
   prisma: {
     masterVendor: { findFirst: mocks.vendor },
-    purchaseOrder: { findFirst: mocks.po },
-    goodsReceipt: { findFirst: mocks.grn },
+    purchaseOrder: { findFirst: mocks.po, findMany: vi.fn().mockResolvedValue([]) },
+    goodsReceipt: { findFirst: mocks.grn, findMany: vi.fn().mockResolvedValue([]) },
     purchaseInvoice: { create: mocks.create },
     $transaction: vi.fn(async (arg: unknown) => typeof arg === 'function'
       ? (arg as (tx: unknown) => unknown)({

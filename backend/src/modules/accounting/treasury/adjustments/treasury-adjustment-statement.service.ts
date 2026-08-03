@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import * as readRepo from '../bank-reconciliation/bank-reconciliation-read.repository.js'
 import { createTreasuryAdjustmentDraftFromStatementLine } from './treasury-adjustment-draft.service.js'
 import { serializeTreasuryAdjustment } from './treasury-adjustment-read.service.js'

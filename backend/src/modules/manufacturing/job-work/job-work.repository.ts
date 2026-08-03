@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 export const detailInclude = {
   vendor: true, item: true, materialWarehouse: true, receiptWarehouse: true,

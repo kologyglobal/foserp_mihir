@@ -3,6 +3,8 @@
 **Location:** `docs/implementation/templates/`  
 **Purpose:** Stub CSV headers for pilot master/data load. Prefer real Prisma field names for mapping; loaders may map codes → UUIDs.
 
+**Live client import pack (preferred for Items / Vendors / HSN / CRM / BOM):** [`client-csv-import/README.md`](client-csv-import/README.md) — headers match in-app template downloads.
+
 ## Files
 
 | File | Maps toward | Notes |

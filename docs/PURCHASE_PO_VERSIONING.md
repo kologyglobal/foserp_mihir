@@ -1,27 +1,45 @@
-# Purchase Order Versioning — Implementation Plan
+# Purchase Order Versioning
 
 ## Goal
 
-Every meaningful change to a **released** PO is a numbered **revision** (Rev 0 → Rev 1 → …) with a persisted snapshot and field-level change log, so Approvals / Detail / Reports can show history. Draft / sent-back POs still use normal **Edit** (no revision bump).
+Every meaningful change to a **released** PO is a numbered **revision** (Rev 0 → Rev 1 → …) with a persisted snapshot and field-level change log. Draft / sent-back (**Open**) POs still use normal **Edit** (no revision bump).
 
-## Rules
+## Status labels (UI)
+
+| Backend | UI label |
+|---------|----------|
+| `DRAFT` | Open |
+| `PENDING_APPROVAL` | Pending Approved |
+| `SENT_TO_VENDOR` | Released |
+
+## Lifecycle (create / release)
+
+| Setup | Behaviour |
+|-------|-----------|
+| `requireApprovalOnPo` **on** (default) | Open → Send for approval → Pending Approved → **Approve** → Released |
+| `requireApprovalOnPo` **off** | Open → **Release** → Released |
+| **Cancel** | Only from Pending Approved → back to **Open**. Not available when Released. Draft Delete soft-cancels Open POs. |
+
+## Revision rules
 
 | Rule | Behavior |
 |------|----------|
-| When | Status in `SENT_TO_VENDOR`, `PARTIALLY_RECEIVED`, `FULLY_RECEIVED`, `PARTIALLY_INVOICED`, `FULLY_INVOICED` |
+| When | Status in `SENT_TO_VENDOR`, `PARTIALLY_RECEIVED`, `FULLY_RECEIVED`, `PARTIALLY_INVOICED`, `FULLY_INVOICED` **and** no line has `receivedQuantity > 0` |
+| Receipt block | Any partial/full receipt → Revise disabled (API + UI) |
 | Reason | Required free-text amendment reason |
-| Lines | Qty / rate change only on existing lines; **qty ≥ receivedQuantity** |
+| Lines | Qty / rate change only on existing lines |
 | Header | Expected delivery, payment/delivery terms, freight amount, remarks (v1 commercial set) |
 | No change | Reject with `PO_REVISION_NO_CHANGES` |
-| History | Immutable `PurchaseOrderRevision` row per Rev N (before snapshot + changes JSON) |
-| Setup | `requireApprovalOnPoRevision` (default **true**) → after revise, status → `PENDING_APPROVAL` + approval queue row; approve → `APPROVED` (re-send to vendor as today) |
-| Setup off | Bump revision, keep current status |
+| History | Dual-write: JSON `PurchaseOrderRevision` **and** relational `purchase_order_archived` / `purchase_line_archived` |
+| Setup | `requireApprovalOnPoRevision` (default **true**) → after revise, status → `PENDING_APPROVAL`; off → keep status |
 
 ## Data model
 
 - `PurchaseOrder.revisionNo` `Int` default `0`
-- `PurchaseOrderRevision` — `revisionNo`, `reason`, `revisedById`, `revisedAt`, `statusBefore`, `headerSnapshot` (JSON), `linesSnapshot` (JSON), `changes` (JSON array)
-- `PurchaseSettings.requireApprovalOnPoRevision` `Boolean` default `true`
+- `PurchaseOrderRevision` — JSON `headerSnapshot` / `linesSnapshot` / `changes`
+- `PurchaseOrderArchived` → table `purchase_order_archived` (header before revise)
+- `PurchaseOrderLineArchived` → table `purchase_line_archived` (lines before revise)
+- `PurchaseSettings.requireApprovalOnPo` / `requireApprovalOnPoRevision`
 
 ## API
 
@@ -31,24 +49,10 @@ Every meaningful change to a **released** PO is a numbered **revision** (Rev 0 �
 
 ## UI
 
-- Enable **Revise** on PO detail in API mode when status revisable  
-- Map `revisionNo`, `revisions`, `changeHistory` from API  
-- Purchase Setup → General: **Require approval on PO revision**  
-- Approvals page already lists `PURCHASE_ORDER` pending — reused when setup requires re-approval  
-
-## Out of scope (v1)
-
-- Adding/removing lines on revise (use cancel + new PO or later phase)  
-- Restoring prior revision as live document  
-- Separate “amendment approval” document type  
-
-## How to demo
-
-1. Purchase Setup → General → **Require approval on PO revision** (default on).
-2. Open a released PO → **Revise** → change qty/rate + reason → Save.
-3. Approvals queue shows the PO again (if setup on).
-4. Approve → **Send to vendor** again.
-5. PO detail → revision history / change log (Rev 1, Rev 2, …).
+- PO editor: four sections — General, Item Lines, Tax & Totals, Terms/Notes/Attachments  
+- General: readonly **Status** + **Revised version**  
+- Line grid: Expected Delivery Date + Requisition no.  
+- List row actions: View / Edit / Delete / Print / **Reopen** (lifecycle actions on detail)  
 
 ## How to run
 

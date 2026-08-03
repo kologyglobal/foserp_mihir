@@ -1522,6 +1522,7 @@ function poLine(partial: {
   invoicedQty?: number
   expectedDeliveryDate: string
   prLineId?: string | null
+  requisitionNo?: string | null
   remarks?: string
   description?: string
   specification?: string
@@ -1572,6 +1573,7 @@ function poLine(partial: {
     locationName: PURCHASE_DEMO_LOCATION.name,
     expectedDeliveryDate: partial.expectedDeliveryDate,
     prLineId: partial.prLineId ?? null,
+    requisitionNo: partial.requisitionNo ?? null,
     rfqLineId: null,
     vendorQuotationLineId: null,
     remarks: partial.remarks ?? '',
@@ -2239,6 +2241,7 @@ export const PURCHASE_DOMAIN_INVOICES: PurchaseInvoice[] = [
     holdAt: null,
     debitNoteId: null,
     debitNoteNumber: null,
+    accountingVendorInvoiceId: null,
     ...moneyIntra(184500, 2100, 0, 0, 18),
     lines: [
       {
@@ -2323,6 +2326,7 @@ export const PURCHASE_DOMAIN_INVOICES: PurchaseInvoice[] = [
     holdAt: null,
     debitNoteId: null,
     debitNoteNumber: null,
+    accountingVendorInvoiceId: null,
     ...moneyIntra(128100, 0, 0, 0, 18),
     lines: [
       {

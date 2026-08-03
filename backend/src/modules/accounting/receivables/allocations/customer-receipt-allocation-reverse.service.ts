@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { createAuditLog } from '../../../../services/audit.service.js'
 import { formatForPersistence, isZero, sumDecimals, toDecimal } from '../../shared/finance-decimal.js'
 import { hashPayload } from '../../shared/payload-hash.js'

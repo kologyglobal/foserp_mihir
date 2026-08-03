@@ -194,7 +194,8 @@ export function CommandBarOverflowMenu({
       top: openUp ? undefined : rect.bottom + 4,
       bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
       maxHeight: Math.max(120, (openUp ? spaceAbove : spaceBelow) - 4),
-      zIndex: 10050,
+      zIndex: 10070,
+      minWidth: Math.max(width, rect.width),
     })
   }, [visible.length])
 

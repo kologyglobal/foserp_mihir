@@ -1,5 +1,5 @@
 import type { QualityInspectionStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { logger } from '../../../config/logger.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
@@ -10,8 +10,54 @@ import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/
 import { QualityInspectionNotFoundError, QualityInspectionValidationError, QualityInspectionWorkflowError } from './quality-inspection.errors.js'
 import { mapQualityInspection, type QiEnrichment } from './quality-inspection.mapper.js'
 import * as repo from './quality-inspection.repository.js'
-import type { CreateQualityInspectionInput, ListQualityInspectionsQuery, QualityInspectionLineInput, UpdateQualityInspectionInput } from './quality-inspection.validation.js'
+import type {
+  CreateQualityInspectionInput,
+  ListQualityInspectionsQuery,
+  QualityInspectionLineInput,
+  QualityInspectionParameterInput,
+  UpdateQualityInspectionInput,
+} from './quality-inspection.validation.js'
 import { assertQiEditable, qiDate, qiQty, validateQiLines } from './quality-inspection.workflow.js'
+
+function defaultQiParameters(itemCode: string): QualityInspectionParameterInput[] {
+  const code = itemCode.trim() || 'item'
+  return [
+    {
+      parameter: 'Visual / dimensions',
+      specification: `${code} — as per PO / drawing`,
+      minValue: null,
+      maxValue: null,
+      observedValue: null,
+      unit: '',
+      result: 'na',
+      remarks: '',
+    },
+    {
+      parameter: 'Documentation',
+      specification: 'TC / COA present',
+      minValue: null,
+      maxValue: null,
+      observedValue: null,
+      unit: '',
+      result: 'na',
+      remarks: '',
+    },
+  ]
+}
+
+function buildQiParameters(inputs: QualityInspectionParameterInput[]) {
+  return inputs.map((p, index) => ({
+    lineNumber: index + 1,
+    parameterName: p.parameter.trim(),
+    specification: p.specification?.trim() || '',
+    minValue: p.minValue ?? null,
+    maxValue: p.maxValue ?? null,
+    observedValue: p.observedValue ?? null,
+    unit: p.unit?.trim() || '',
+    result: p.result ?? 'na',
+    remarks: p.remarks?.trim() || null,
+  }))
+}
 
 async function loadOrThrow(tenantId: string, id: string) {
   const row = await repo.findQualityInspectionById(tenantId, id)
@@ -173,6 +219,14 @@ export async function createQualityInspection(tenantId: string, actorId: string,
     input.inspectedByName?.trim() ||
     (await resolveInspectorName(tenantId, input.inspectedById?.trim() || actorId))
   const inspectionNumber = await nextCode(tenantId, 'QUALITY_INSPECTION')
+  const firstItemCode = lines[0]?.itemCodeSnapshot || ''
+  const parameterInputs = input.parameters?.length
+    ? input.parameters
+    : defaultQiParameters(firstItemCode)
+  const parameters = buildQiParameters(parameterInputs)
+  const inspectionPlan =
+    input.inspectionPlan?.trim() ||
+    (firstItemCode ? `Incoming inspection — ${firstItemCode}` : 'Incoming inspection')
   const created = await prisma.$transaction(async (tx) => {
     const row = await tx.purchaseQualityInspection.create({ data: {
       tenantId, inspectionNumber, inspectionDate: qiDate(input.inspectionDate) ?? new Date(),
@@ -180,12 +234,15 @@ export async function createQualityInspection(tenantId: string, actorId: string,
       purchaseOrderId: grn?.purchaseOrderId ?? input.purchaseOrderId ?? null,
       vendorId: grn?.vendorId ?? input.vendorId ?? null,
       warehouseId: grn?.warehouseId ?? input.warehouseId ?? defaults.defaultWarehouseId,
-      status: 'DRAFT', remarks: input.remarks?.trim() || null,
+      status: 'DRAFT',
+      inspectionPlan,
+      remarks: input.remarks?.trim() || null,
       deviationRemarks: input.deviationRemarks?.trim() || null,
       inspectedById: input.inspectedById?.trim() || actorId,
       inspectedByName,
       createdById: actorId, updatedById: actorId,
       lines: { create: lines.map((line) => ({ ...line, tenantId })) },
+      parameters: { create: parameters.map((parameter) => ({ ...parameter, tenantId })) },
     }, include: repo.includeQualityInspection })
     await repo.addQiHistory(tenantId, row.id, row.inspectionNumber, 'QI_CREATED', null, 'DRAFT', actorId, undefined, tx)
     if (grn) await tx.goodsReceipt.updateMany({ where: { id: grn.id, tenantId, deletedAt: null }, data: { status: 'QC_PENDING', updatedById: actorId } })
@@ -202,14 +259,17 @@ export async function updateQualityInspection(tenantId: string, id: string, acto
     const ids = new Set(grn!.lines.map((line) => line.id))
     if (lines.some((line) => line.goodsReceiptLineId && !ids.has(line.goodsReceiptLineId))) throw new QualityInspectionValidationError('Inspection line does not belong to its goods receipt.')
   }
+  const parameters = input.parameters ? buildQiParameters(input.parameters) : undefined
   await prisma.$transaction(async (tx) => {
     if (lines) await repo.replaceQualityInspectionLines(tenantId, id, lines, tx)
+    if (parameters) await repo.replaceQualityInspectionParameters(tenantId, id, parameters, tx)
     await repo.updateQualityInspection(tenantId, id, {
       status: existing.status === 'DRAFT' ? 'IN_PROGRESS' : existing.status, updatedById: actorId,
       ...(input.inspectionDate !== undefined ? { inspectionDate: qiDate(input.inspectionDate) ?? existing.inspectionDate } : {}),
       ...(input.warehouseId !== undefined ? { warehouseId: input.warehouseId } : {}),
       ...(input.inspectedById !== undefined ? { inspectedById: input.inspectedById } : {}),
       ...(input.inspectedByName !== undefined ? { inspectedByName: input.inspectedByName } : {}),
+      ...(input.inspectionPlan !== undefined ? { inspectionPlan: input.inspectionPlan?.trim() || null } : {}),
       ...(input.remarks !== undefined ? { remarks: input.remarks?.trim() || null } : {}),
       ...(input.deviationRemarks !== undefined ? { deviationRemarks: input.deviationRemarks?.trim() || null } : {}),
     }, tx)

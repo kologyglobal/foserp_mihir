@@ -1,5 +1,5 @@
 import type { Account, LegalEntity } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { MAX_ACCOUNT_DEPTH, MAX_COST_CENTRE_DEPTH } from './finance.constants.js'
 

@@ -141,6 +141,7 @@ export function PurchaseModuleDashboard() {
         result.kpis.openRequisitions === 0 &&
         result.kpis.purchaseOrdersThisMonth === 0 &&
         result.kpis.openRfqs === 0 &&
+        result.kpis.grniPending === 0 &&
         result.upcomingDeliveries.length === 0 &&
         result.recentActivity.length === 0
       setData(result)
@@ -366,6 +367,14 @@ export function PurchaseModuleDashboard() {
       href: kpiHrefs.pendingGrns,
     },
     {
+      id: 'grni-pending',
+      label: 'GRNs Awaiting Invoice',
+      value: kpis.grniPending,
+      icon: FileText,
+      accent: kpis.grniPending ? 'amber' : 'green',
+      href: kpiHrefs.grniPending,
+    },
+    {
       id: 'pending-inv',
       label: 'Pending Invoices',
       value: kpis.pendingPurchaseInvoices,
@@ -383,7 +392,7 @@ export function PurchaseModuleDashboard() {
         {data.pendingActions.length === 0 ? (
           <p className="flex items-center gap-2 text-[13px] text-erp-success-fg">
             <CheckCircle2 className="h-4 w-4" />
-            No pending approvals, inspections, mismatches or overdue deliveries.
+            No pending approvals, inspections, GRNI bills, mismatches or overdue deliveries.
           </p>
         ) : (
           <ul className="space-y-2">
@@ -415,6 +424,77 @@ export function PurchaseModuleDashboard() {
               </li>
             ))}
           </ul>
+        )}
+      </DynamicsDashboardPanel>
+
+      <DynamicsDashboardPanel
+        title="GRNs awaiting invoice (GRNI)"
+        noPadding
+        actions={
+          <button
+            type="button"
+            className="text-[12px] font-medium text-erp-primary hover:underline"
+            onClick={() => navigate('/purchase/reports?focus=grn-grni')}
+          >
+            Open GRNI report →
+          </button>
+        }
+      >
+        {data.grniPending.length === 0 ? (
+          <p className="dyn-empty-hint px-4 py-6">
+            No received GRNs with open uninvoiced quantity for this filter.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="erp-table">
+              <thead>
+                <tr>
+                  <th>GRN</th>
+                  <th>Vendor</th>
+                  <th>PO</th>
+                  <th>Receipt date</th>
+                  <th className="num">Age (days)</th>
+                  <th className="num">Open lines</th>
+                  <th className="num">GRNI value</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.grniPending.map((row) => (
+                  <tr key={row.id} className={row.ageDays >= 14 ? 'bg-amber-50/60' : undefined}>
+                    <td>
+                      <TableLink to={row.href}>{row.grnNumber}</TableLink>
+                    </td>
+                    <td>{row.vendorName}</td>
+                    <td>
+                      {row.purchaseOrderId ? (
+                        <TableLink to={`/purchase/orders/${row.purchaseOrderId}`}>
+                          {row.purchaseOrderNumber}
+                        </TableLink>
+                      ) : (
+                        row.purchaseOrderNumber || '—'
+                      )}
+                    </td>
+                    <td>{formatDate(row.receiptDate)}</td>
+                    <td className="num">{row.ageDays}</td>
+                    <td className="num">{row.openLineCount}</td>
+                    <td className="num">{formatCurrency(row.openValue)}</td>
+                    <td>{row.statusLabel}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="text-[12px] font-medium text-erp-primary hover:underline"
+                        onClick={() => navigate(row.createInvoiceHref)}
+                      >
+                        Create invoice
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </DynamicsDashboardPanel>
 

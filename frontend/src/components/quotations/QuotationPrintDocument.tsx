@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { QuotationDocument, QuotationPrintLayout, QuotationSpecRow } from '../../types/crm'
+import type { CrmContact, QuotationDocument, QuotationPrintLayout, QuotationSpecRow } from '../../types/crm'
 import type { Quotation } from '../../types/sales'
 import type { Customer } from '../../types/master'
 import type { Opportunity } from '../../types/crm'
@@ -19,6 +19,7 @@ import {
 import { cn } from '../../utils/cn'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { KologyProposalPrintDocument } from './KologyProposalPrintDocument'
+import { resolveCustomerDetailsPrintContent } from '../../utils/quotationEngine/customerDetails'
 
 export type QuotationSectionFieldChange = (sectionId: string, field: 'title' | 'content', value: string) => void
 export type QuotationSpecRowFieldChange = (
@@ -33,6 +34,7 @@ interface QuotationPrintDocumentProps {
   quotation: Quotation
   customer?: Customer
   opportunity?: Opportunity
+  contact?: CrmContact | null
   contactName?: string
   className?: string
   printLayout?: QuotationPrintLayout
@@ -218,6 +220,7 @@ export function QuotationPrintDocument({
   quotation,
   customer,
   opportunity,
+  contact,
   contactName,
   className,
   printLayout = DEFAULT_QUOTATION_PRINT_LAYOUT,
@@ -229,8 +232,8 @@ export function QuotationPrintDocument({
   const showFreight = !useTenantProfileStore((s) => s.isServices())
   const company = useCompanyProfile()
   const map = useMemo(
-    () => buildQuotationMergeMap({ document: doc, quotation, customer, opportunity, contactName }),
-    [doc, quotation, customer, opportunity, contactName],
+    () => buildQuotationMergeMap({ document: doc, quotation, customer, opportunity, contact, contactName }),
+    [doc, quotation, customer, opportunity, contact, contactName],
   )
   const sorted = useMemo(() => [...doc.sections].sort((a, b) => a.sequenceNo - b.sequenceNo), [doc.sections])
   const lines = syncLineTotals(doc.priceLines)
@@ -434,7 +437,10 @@ export function QuotationPrintDocument({
           )
         }
 
-        const rawContent = sec.content
+        const rawContent =
+          sec.sectionType === 'customer_details'
+            ? resolveCustomerDetailsPrintContent(sec.content, map, doc.salesOwnerName)
+            : sec.content
         const content = editable ? rawContent : resolvePlaceholders(rawContent, map)
         if (!content.trim() && !editable) return null
 

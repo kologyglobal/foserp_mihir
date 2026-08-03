@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import {
   isTimelineEntityType,
   purchaseAuditActionLabel,
@@ -143,6 +143,28 @@ export async function getPurchaseTimeline(
     if (seen.has(key)) continue
     seen.add(key)
     deduped.push(event)
+  }
+
+  // Resolve actor display names — never leave raw user UUIDs for the UI.
+  const actorIds = [
+    ...new Set(deduped.map((e) => e.actorId).filter((id): id is string => Boolean(id))),
+  ]
+  if (actorIds.length > 0) {
+    const users = await prisma.user.findMany({
+      where: { tenantId, id: { in: actorIds } },
+      select: { id: true, firstName: true, lastName: true, email: true },
+    })
+    const nameById = new Map(
+      users.map((u) => {
+        const full = `${u.firstName} ${u.lastName}`.trim()
+        return [u.id, full || u.email] as const
+      }),
+    )
+    for (const event of deduped) {
+      if (event.actorName?.trim()) continue
+      if (!event.actorId) continue
+      event.actorName = nameById.get(event.actorId) ?? null
+    }
   }
 
   return deduped

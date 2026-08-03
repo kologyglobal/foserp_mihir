@@ -10,10 +10,12 @@
  * and layers on DB-backed default-mapping lookups + account validation.
  */
 import type { Account, DefaultAccountMappingKey, TdsRecognitionMode } from '@prisma/client'
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { add, divide, isPositive, isZero, multiply, subtract, toDecimal } from '../../../shared/finance-decimal.js'
 import { formatDecimal4 } from './vendor-invoice-decimal.js'
 import { calcError, VENDOR_INVOICE_CALC_CODES } from './vendor-invoice-calculation.errors.js'
+import { grirLineFor } from './vendor-invoice-grir-release.service.js'
+import type { VendorInvoiceGrirReleasePlan } from './vendor-invoice-grir-release.service.js'
 import type { VendorInvoiceAmountsCalculationResult } from './vendor-invoice-amounts.service.js'
 import type {
   VendorInvoiceAccountComponent,
@@ -29,6 +31,9 @@ const ZERO = toDecimal(0)
 /** No default-mapping key exists for these components (CESS input credit / RCM payables) — override-only. */
 const DEFAULT_MAPPING_BY_COMPONENT: Partial<Record<VendorInvoiceAccountComponent, DefaultAccountMappingKey>> = {
   LINE_DEBIT: 'PURCHASE',
+  GRIR_CLEARING: 'GRIR_CLEARING',
+  PURCHASE_PRICE_VARIANCE: 'PURCHASE_PRICE_VARIANCE',
+  RAW_MATERIAL_INVENTORY: 'RAW_MATERIAL_INVENTORY',
   INPUT_CGST: 'GST_INPUT_CGST',
   INPUT_SGST: 'GST_INPUT_SGST',
   INPUT_IGST: 'GST_INPUT_IGST',
@@ -121,6 +126,8 @@ export interface BuildRequiredAccountComponentsParams {
   amountsResult: VendorInvoiceAmountsCalculationResult
   configuration: VendorInvoiceCalculationConfiguration | undefined
   tdsMode: TdsRecognitionMode | undefined
+  /** FIN-CLOSE-1 — when present, listed lines clear GR/IR instead of debiting PURCHASE. */
+  grirReleasePlan?: VendorInvoiceGrirReleasePlan | null
 }
 
 /**
@@ -130,14 +137,30 @@ export interface BuildRequiredAccountComponentsParams {
  * UNRESOLVED; `resolveVendorInvoiceAccounts` upgrades those via DefaultAccountMapping lookups.
  */
 export function buildRequiredAccountComponents(params: BuildRequiredAccountComponentsParams): VendorInvoiceResolvedAccount[] {
-  const { amountsResult, configuration, tdsMode } = params
+  const { amountsResult, configuration, tdsMode, grirReleasePlan } = params
   const overrides = configuration?.accounts ?? {}
   const totals = amountsResult.totals
   const results: VendorInvoiceResolvedAccount[] = []
 
   const headerDebitOverride = overrides.purchaseOrDebit ?? null
   for (const line of amountsResult.lines) {
-    const debitNeeded = add(toDecimal(line.taxableAmount), toDecimal(line.nonRecoverableTaxAmount))
+    const grir = grirLineFor(grirReleasePlan, line.lineNumber)
+    if (grir) {
+      // GR/IR takes the goods value; PURCHASE only keeps non-recoverable tax on this line.
+      // Registered per line (like LINE_DEBIT) so the preview can attribute each voucher line.
+      if (!isZero(grir.grirAmount)) {
+        results.push(componentRef('GRIR_CLEARING', line.lineNumber, true, 'UNRESOLVED', null, null, null))
+      }
+      if (!isZero(grir.inventoryAdjustmentAmount)) {
+        results.push(componentRef('RAW_MATERIAL_INVENTORY', line.lineNumber, true, 'UNRESOLVED', null, null, null))
+      }
+      if (!isZero(grir.ppvAmount)) {
+        results.push(componentRef('PURCHASE_PRICE_VARIANCE', line.lineNumber, true, 'UNRESOLVED', null, null, null))
+      }
+    }
+    const debitNeeded = grir
+      ? toDecimal(line.nonRecoverableTaxAmount)
+      : add(toDecimal(line.taxableAmount), toDecimal(line.nonRecoverableTaxAmount))
     if (isZero(debitNeeded)) continue
 
     if (line.debitAccountId) {
@@ -306,6 +329,7 @@ export interface ResolveVendorInvoiceAccountsParams {
   input: { configuration?: VendorInvoiceCalculationConfiguration; tdsRecognitionMode?: TdsRecognitionMode }
   tdsMode?: TdsRecognitionMode
   includeDbLookups: boolean
+  grirReleasePlan?: VendorInvoiceGrirReleasePlan | null
 }
 
 export async function resolveVendorInvoiceAccounts(params: ResolveVendorInvoiceAccountsParams): Promise<VendorInvoiceAccountReadiness> {
@@ -314,6 +338,7 @@ export async function resolveVendorInvoiceAccounts(params: ResolveVendorInvoiceA
     amountsResult: params.amountsResult,
     configuration: params.input.configuration,
     tdsMode,
+    grirReleasePlan: params.grirReleasePlan,
   })
 
   if (params.includeDbLookups) {

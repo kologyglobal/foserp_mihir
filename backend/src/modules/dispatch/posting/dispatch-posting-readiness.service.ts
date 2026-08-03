@@ -1,7 +1,7 @@
 /**
  * Phase 7C5 — backend-derived outbound posting readiness (single source of truth for UI).
  */
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { getReservationPosition } from '../reservation/dispatch-reservation.service.js'
 import { n, roundQty } from '../shared/dispatch-qty.js'

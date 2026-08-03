@@ -8,6 +8,7 @@ import {
   SalesCustomersRouteLayout,
 } from '@/modules/sales/SalesPages'
 import {
+  SalesOrderStatusPage,
   SalesPipelineLegacyRedirect,
   SalesLeadsLegacyRedirect,
   SalesLeadNewLegacyRedirect,
@@ -70,6 +71,7 @@ export const salesRouteChildren: RouteObject[] = [
   { path: 'sales/orders/:id/edit', element: <SalesOrderEditPage /> },
   { path: 'sales/orders/:id/print', element: <SalesOrderPrintPage /> },
   { path: 'sales/orders/:id', element: <SalesOrderDetailPage /> },
+  { path: 'sales/order-status', element: <SalesOrderStatusPage /> },
   { path: 'sales/proforma-invoices', element: <ProformaInvoiceListPage /> },
   { path: 'sales/proforma-invoices/new', element: <ProformaInvoiceFormPage /> },
   { path: 'sales/proforma-invoices/:id/print', element: <ProformaInvoicePrintPage /> },
@@ -81,4 +83,5 @@ export const salesRouteChildren: RouteObject[] = [
   { path: 'sales/payment-allocation', element: <SalesPaymentAllocationPage /> },
   { path: 'sales/receipts/:id/print', element: <PaymentReceiptPrintPage /> },
   { path: 'sales/receipts/:id', element: <CrmReceiptDetailPage /> },
+  { path: 'sales/reports', element: <Navigate to="/reports/crm" replace /> },
 ]

@@ -11,7 +11,7 @@
    Safe to re-run: skips names that already exist.
    ========================================================= */
 
-USE `u233611619_fos_erp`;
+USE `u233611619_foserp`;
 
 SELECT DATABASE() AS current_db, NOW() AS ran_at, 'mark_prisma_migrations' AS script;
 
@@ -69,6 +69,42 @@ WHERE NOT EXISTS (
   WHERE `migration_name` = '20260728180000_po_versioning'
 );
 
+/* 20260730100000_po_line_tax_bin_qc_snapshots */
+INSERT INTO `_prisma_migrations`
+  (`id`, `checksum`, `finished_at`, `migration_name`, `logs`, `rolled_back_at`, `started_at`, `applied_steps_count`)
+SELECT
+  UUID(),
+  '1acf05cfcf520d616ba19361f095b35762f606a12f8ed6b62ad82a31242ae718',
+  NOW(3),
+  '20260730100000_po_line_tax_bin_qc_snapshots',
+  NULL,
+  NULL,
+  NOW(3),
+  1
+FROM DUAL
+WHERE NOT EXISTS (
+  SELECT 1 FROM `_prisma_migrations`
+  WHERE `migration_name` = '20260730100000_po_line_tax_bin_qc_snapshots'
+);
+
+/* 20260730110000_item_master_image_url */
+INSERT INTO `_prisma_migrations`
+  (`id`, `checksum`, `finished_at`, `migration_name`, `logs`, `rolled_back_at`, `started_at`, `applied_steps_count`)
+SELECT
+  UUID(),
+  '824f62ba5981258df5ef3be4daa70dd577aedb2e4744107b4ac09371dd26c59d',
+  NOW(3),
+  '20260730110000_item_master_image_url',
+  NULL,
+  NULL,
+  NOW(3),
+  1
+FROM DUAL
+WHERE NOT EXISTS (
+  SELECT 1 FROM `_prisma_migrations`
+  WHERE `migration_name` = '20260730110000_item_master_image_url'
+);
+
 SELECT
   migration_name,
   finished_at,
@@ -78,6 +114,8 @@ FROM `_prisma_migrations`
 WHERE migration_name IN (
   '20260727180000_purchase_multi_unit_uom',
   '20260728140000_grn_receiving_tolerance',
-  '20260728180000_po_versioning'
+  '20260728180000_po_versioning',
+  '20260730100000_po_line_tax_bin_qc_snapshots',
+  '20260730110000_item_master_image_url'
 )
 ORDER BY migration_name;

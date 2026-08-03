@@ -4,7 +4,7 @@
  */
 import { getManufacturingAccountingReadiness } from '../costing/accounting-readiness.service.js'
 import { getManufacturingAccountingGateStatus } from './manufacturing-accounting-gate.service.js'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 export type NextActionCode =
   | 'CONFIGURE_ACCOUNT_MAPPINGS'

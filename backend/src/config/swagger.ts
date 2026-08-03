@@ -3225,6 +3225,84 @@ const swaggerSpecDraft = {
       },
     },
 
+    '/t/{tenantSlug}/maintenance/dashboard': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Maintenance operational dashboard',
+        description: 'Permission: `maintenance.view`. Module flag: `maintenance`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Dashboard KPIs + needs attention' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/tickets': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'List maintenance tickets',
+        description: 'Permission: `maintenance.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Paginated tickets' } },
+      },
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Report breakdown (create ticket)',
+        description: 'Permission: `maintenance.create`. Sets machine to OUT_OF_SERVICE.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/tickets/{id}': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Get maintenance ticket',
+        description: 'Permission: `maintenance.view`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Ticket detail' } },
+      },
+      patch: {
+        tags: ['Maintenance'],
+        summary: 'Update repair / service / cost fields',
+        description: 'Permission: `maintenance.update`. Totals recomputed server-side.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Updated' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/tickets/{id}/start-repair': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Start repair (INTERNAL / EXTERNAL)',
+        description: 'Permission: `maintenance.start`. Machine → UNDER_MAINTENANCE.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Repair started' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/tickets/{id}/test': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Test machine (PASS / FAIL)',
+        description: 'Permission: `maintenance.test`. FAIL keeps IN_REPAIR; PASS → TESTING.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Test recorded' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/tickets/{id}/close': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Close ticket after PASS test',
+        description: 'Permission: `maintenance.close`. Machine → AVAILABLE if no other open ticket.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Closed' } },
+      },
+    },
+    '/t/{tenantSlug}/maintenance/reports': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Downtime / cost / breakdown frequency reports',
+        description: 'Permission: `maintenance.report.view`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Report payload' } },
+      },
+    },
+
     '/t/{tenantSlug}/manufacturing/boms': {
       get: {
         tags: ['Manufacturing BOMs'],

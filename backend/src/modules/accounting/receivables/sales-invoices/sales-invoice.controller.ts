@@ -32,12 +32,10 @@ export const listInvoiceReady = asyncHandler(async (req: Request, res: Response)
   const tenantId = getTenantId(req)
   const query = req.query as unknown as ListInvoiceReadyQueryInput
   const result = await listInvoiceReadyDispatchLines(tenantId, query)
-  return sendPaginated(
-    res,
-    'invoice-ready dispatch lines listed',
-    result.items,
-    buildPaginationMeta(result.total, result.page, result.limit),
-  )
+  return sendSuccess(res, 'invoice-ready dispatch lines listed', result.items, 200, {
+    ...buildPaginationMeta(result.total, result.page, result.limit),
+    policy: result.policy,
+  } as ReturnType<typeof buildPaginationMeta>)
 })
 
 export const prefillFromDispatch = asyncHandler(async (req: Request, res: Response) => {

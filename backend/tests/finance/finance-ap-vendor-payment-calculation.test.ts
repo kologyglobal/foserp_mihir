@@ -10,7 +10,7 @@ import type {
   VendorPaymentCalculationInput,
   VendorPaymentValidationIssue,
 } from '../../src/modules/accounting/payables/vendor-payments/calculation/vendor-payment-calculation.types.js'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 
 function acct(id: string, code: string, name: string) {
   return { id, code, name }

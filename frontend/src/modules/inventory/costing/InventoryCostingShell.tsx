@@ -68,7 +68,7 @@ export function InventoryCostingShell({
       breadcrumbs={[
         { label: 'Inventory', to: '/inventory' },
         { label: 'Costing', to: inventoryCostingPaths.summary },
-        ...(title !== 'Valuation Summary' ? [{ label: title }] : []),
+        ...(title !== 'Inventory Costing' && title !== 'Valuation Summary' ? [{ label: title }] : []),
       ]}
       autoBreadcrumbs={false}
       favoritePath={favoritePath ?? inventoryCostingPaths.summary}

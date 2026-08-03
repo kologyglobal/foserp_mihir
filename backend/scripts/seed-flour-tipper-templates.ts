@@ -17,7 +17,7 @@
 import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import {
   QUOTATION_TEMPLATE_SEED_ROWS,
   VF_WORD_PRINT_LAYOUT_SEED,

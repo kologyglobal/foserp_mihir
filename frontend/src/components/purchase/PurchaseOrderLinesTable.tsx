@@ -17,12 +17,16 @@ import {
   normalizeEngineeringProductType,
 } from '@/utils/purchaseProductType'
 import { getPurchaseLineUomOptions } from '@/utils/purchaseLineUom'
+import { PurchaseLineQtyCell } from '@/components/purchase/PurchaseLineQtyCell'
+import { PurchaseLineTrackingQtyCell } from '@/components/purchase/PurchaseLineTrackingQtyCell'
 import {
   ENGINEERING_PRODUCT_TYPES,
   ENGINEERING_PRODUCT_TYPE_LABELS,
   type EngineeringProductType,
 } from '@/types/taxMaster'
 import type { PurchaseOrderLine } from '@/types/purchaseDomain'
+import { useMasterStore } from '@/store/masterStore'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 
 export type PoLinesEditorLine = PurchaseOrderLine & { key: string }
 
@@ -39,6 +43,7 @@ export type PurchaseOrderLinesTableProps = {
   lines: PoLinesEditorLine[]
   catalogItems: PurchaseItemCodeCatalogOption[]
   warehouseOptions: Array<{ id: string; name: string }>
+  binOptions?: Array<{ id: string; code: string; name: string }>
   editable: boolean
   isInterstate: boolean
   dirty?: boolean
@@ -133,6 +138,7 @@ export function PurchaseOrderLinesTable({
   lines,
   catalogItems,
   warehouseOptions: _warehouseOptions,
+  binOptions = [],
   editable,
   isInterstate: _isInterstate,
   dirty,
@@ -147,6 +153,10 @@ export function PurchaseOrderLinesTable({
   toolbarExtra,
 }: PurchaseOrderLinesTableProps) {
   const collapseSecondary = useMediaQuery(MQ_BELOW_LG)
+  const gstGroups = useMasterStore((s) => s.gstGroups)
+  const hsnMasters = useMasterStore((s) => s.hsnMasters)
+  const getHsn = useMasterStore((s) => s.getHsn)
+  const getGstGroup = useMasterStore((s) => s.getGstGroup)
 
   const totals = useMemo(() => {
     return lines.reduce(
@@ -305,9 +315,9 @@ export function PurchaseOrderLinesTable({
             />
           </div>
 
-          {/* Tablet / desktop: grid table */}
-          <div className="erp-table-wrap hidden max-h-[min(28rem,55vh)] overflow-auto rounded-md border border-erp-border md:block">
-          <table className="erp-table purchase-doc-lines-grid text-[11px]">
+          {/* Tablet / desktop: grid table — scroll lives on this wrapper only */}
+          <div className="purchase-doc-lines-grid-scroll relative hidden rounded-md border border-erp-border md:block">
+          <table className="erp-table purchase-doc-lines-grid w-max min-w-full text-[11px]">
             <thead>
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-line">#</th>
@@ -315,13 +325,23 @@ export function PurchaseOrderLinesTable({
                 <th className="purchase-doc-lines-grid__sticky-item">Item</th>
                 <th className="min-w-[11rem]">Description</th>
                 <th className="min-w-[9rem]">Specification</th>
-                <th>UOM</th>
-                <th className="num">Qty</th>
-                <th className="num">Rate</th>
-                <th className="num">Discount</th>
-                <th className="num">Tax %</th>
-                <th className="num">Taxable Amount</th>
-                <th className="num">Line Total</th>
+                <th className="purchase-doc-lines-grid__uom-col">UOM</th>
+                <th className="num min-w-[11rem] purchase-doc-lines-grid__qty-col">Qty</th>
+                <th className="num min-w-[5.75rem]">Rate</th>
+                <th className="num min-w-[5rem]">Discount</th>
+                <th className="num min-w-[4rem]">Tax %</th>
+                <th className="num min-w-[5.75rem]">Taxable Amount</th>
+                <th className="num min-w-[5.75rem]">Line Total</th>
+                <th className="min-w-[9rem]">Expected Delivery Date</th>
+                <th className="min-w-[8rem]">Requisition no.</th>
+                <th className="min-w-[7rem]">GST Group</th>
+                <th className="min-w-[7rem]">HSN Code</th>
+                <th className="num min-w-[7.5rem]">Outstanding</th>
+                <th className="num min-w-[7.5rem]">Received</th>
+                <th className="num min-w-[7.5rem]">Invoiced</th>
+                <th className="min-w-[4rem]">QC Required</th>
+                <th className="min-w-[7rem]">Quality Test Group</th>
+                <th className="min-w-[7rem]">Bin Code</th>
                 <th className="purchase-doc-lines-grid__sticky-actions">Actions</th>
               </tr>
             </thead>
@@ -376,6 +396,7 @@ export function PurchaseOrderLinesTable({
                         catalogItems={rowCatalog}
                         disabled={!editable}
                         textClassName="text-[11px]"
+                        className="w-full min-w-0 max-w-none"
                         emptyCatalogHint={
                           line.productType
                             ? 'No Item Master rows for this product type'
@@ -407,25 +428,22 @@ export function PurchaseOrderLinesTable({
                         onChange={(e) => onPatchLine(line.key, { specification: e.target.value })}
                       />
                     </td>
-                    <td onKeyDown={onCellKeyDown}>
+                    <td className="purchase-doc-lines-grid__uom-col" onKeyDown={onCellKeyDown}>
                       {(() => {
                         const uomOptions = getPurchaseLineUomOptions(line.itemId)
                         const multi = uomOptions.length > 1
+                        const uomCode = uomOptions[0]?.code || line.uom || '—'
                         if (!editable || !line.itemId) {
                           return (
-                            <input
-                              className="erp-input h-8 w-16 text-[11px]"
-                              disabled
-                              readOnly
-                              value={line.uom || '—'}
-                              title="Unit comes from Item Master"
-                            />
+                            <span className="block text-center text-[11px] font-medium uppercase text-erp-text">
+                              {line.uom || '—'}
+                            </span>
                           )
                         }
                         if (multi) {
                           return (
                             <select
-                              className="erp-input h-8 w-[4.5rem] text-[11px]"
+                              className="erp-input h-8 w-full max-w-[2.75rem] px-0.5 text-center text-[10px]"
                               value={line.uomId || uomOptions[0]?.id || ''}
                               title="Select purchase unit from Item Master"
                               onChange={(e) => {
@@ -447,48 +465,29 @@ export function PurchaseOrderLinesTable({
                           )
                         }
                         return (
-                          <input
-                            className="erp-input h-8 w-16 text-[11px]"
-                            disabled
-                            readOnly
-                            value={uomOptions[0]?.code || line.uom || '—'}
-                            title="Unit locked from Item Master"
-                          />
+                          <span className="block text-center text-[11px] font-medium uppercase text-erp-text">
+                            {uomCode}
+                          </span>
                         )
                       })()}
                     </td>
                     <td
                       id={`purchase-line-${line.key}-quantity`}
                       className={cn(
-                        'num',
+                        'num purchase-doc-lines-grid__qty-col min-w-[11rem]',
                         qtyErr
                           ? 'ring-1 ring-inset ring-red-400/80'
                           : miss.missingQty && 'ring-1 ring-inset ring-amber-400/70',
                       )}
                       onKeyDown={onCellKeyDown}
                     >
-                      <input
-                        type="number"
-                        min={0}
-                        step="any"
-                        className={cn(
-                          'erp-input h-8 w-20 text-right text-[11px]',
-                          qtyErr && 'border-erp-danger-fg',
-                        )}
+                      <PurchaseLineQtyCell
+                        line={line}
+                        editable={editable}
                         disabled={!editable}
-                        title="UOM Quantity (vendor unit)"
-                        value={line.uomQuantity ?? line.quantity}
-                        onChange={(e) =>
-                          onPatchLine(line.key, {
-                            uomQuantity: Number(e.target.value),
-                          })
-                        }
+                        inputId={`purchase-line-${line.key}-quantity`}
+                        onChange={(v) => onPatchLine(line.key, { uomQuantity: v })}
                       />
-                      {Number(line.uomConversionFactor ?? 1) !== 1 ? (
-                        <p className="mt-0.5 text-[10px] text-erp-muted">
-                          → {Number(line.quantity).toLocaleString()} stock
-                        </p>
-                      ) : null}
                       {qtyErr ? (
                         <p className="mt-0.5 text-[10px] text-erp-danger-fg">{qtyErr}</p>
                       ) : null}
@@ -542,6 +541,140 @@ export function PurchaseOrderLinesTable({
                     </td>
                     <td className="num tabular-nums">{formatCurrency(line.taxableAmount)}</td>
                     <td className="num tabular-nums font-medium">{formatCurrency(line.lineTotal)}</td>
+                    <td onKeyDown={onCellKeyDown}>
+                      <input
+                        type="date"
+                        className="erp-input h-8 min-w-[9rem] text-[11px]"
+                        disabled={!editable}
+                        value={line.expectedDeliveryDate || line.requiredDate || ''}
+                        onChange={(e) =>
+                          onPatchLine(line.key, {
+                            expectedDeliveryDate: e.target.value,
+                            requiredDate: e.target.value,
+                          })
+                        }
+                      />
+                    </td>
+                    <td onKeyDown={onCellKeyDown}>
+                      <input
+                        className="erp-input h-8 min-w-[8rem] text-[11px] font-mono"
+                        disabled={!editable}
+                        value={line.requisitionNo ?? ''}
+                        placeholder="PR no."
+                        onChange={(e) =>
+                          onPatchLine(line.key, {
+                            requisitionNo: e.target.value.trim() ? e.target.value : null,
+                          })
+                        }
+                      />
+                    </td>
+                    <td onKeyDown={onCellKeyDown}>
+                      <select
+                        className="erp-input h-8 min-w-[7rem] text-[11px]"
+                        disabled={!editable}
+                        value={line.gstGroupId ?? ''}
+                        onChange={(e) => {
+                          const nextGroupId = e.target.value || null
+                          const patch: Partial<PurchaseOrderLine> = {
+                            gstGroupId: nextGroupId,
+                            gstGroupCode: nextGroupId ? getGstGroup(nextGroupId)?.code ?? '' : '',
+                          }
+                          const currentHsn = line.hsnId ? getHsn(line.hsnId) : null
+                          if (currentHsn && nextGroupId && currentHsn.gstGroupId !== nextGroupId) {
+                            patch.hsnId = null
+                            patch.hsnCode = ''
+                          }
+                          onPatchLine(line.key, patch)
+                        }}
+                      >
+                        <option value="">{SELECT_PLACEHOLDER}</option>
+                        {gstGroups
+                          .filter((g) => g.isActive)
+                          .map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.code}
+                            </option>
+                          ))}
+                      </select>
+                    </td>
+                    <td onKeyDown={onCellKeyDown}>
+                      <select
+                        className="erp-input h-8 min-w-[7rem] text-[11px]"
+                        disabled={!editable || !line.gstGroupId}
+                        value={line.hsnId ?? ''}
+                        onChange={(e) => {
+                          const nextHsnId = e.target.value || null
+                          const hsn = nextHsnId ? getHsn(nextHsnId) : null
+                          onPatchLine(line.key, {
+                            hsnId: nextHsnId,
+                            hsnCode: hsn?.code ?? '',
+                          })
+                        }}
+                      >
+                        <option value="">{SELECT_PLACEHOLDER}</option>
+                        {hsnMasters
+                          .filter((h) => h.isActive && h.gstGroupId === line.gstGroupId)
+                          .map((h) => (
+                            <option key={h.id} value={h.id}>
+                              {h.code}
+                            </option>
+                          ))}
+                      </select>
+                    </td>
+                    <td className="num">
+                      <PurchaseLineTrackingQtyCell
+                        line={line}
+                        purchaseQty={Number(line.outstandingQty ?? line.pendingQty ?? 0)}
+                        baseQty={Number(line.outstandingQtyBase ?? line.pendingQty ?? 0)}
+                      />
+                    </td>
+                    <td className="num">
+                      <PurchaseLineTrackingQtyCell
+                        line={line}
+                        purchaseQty={Number(line.receivedQty ?? 0)}
+                        baseQty={Number(line.receivedQtyBase ?? 0)}
+                      />
+                    </td>
+                    <td className="num">
+                      <PurchaseLineTrackingQtyCell
+                        line={line}
+                        purchaseQty={Number(line.invoicedQty ?? 0)}
+                        baseQty={Number(line.invoicedQtyBase ?? 0)}
+                      />
+                    </td>
+                    <td className="text-center">
+                      <input type="checkbox" checked={Boolean(line.qcRequired)} disabled readOnly />
+                    </td>
+                    <td>
+                      <input
+                        className="erp-input h-8 min-w-[7rem] text-[11px]"
+                        disabled
+                        readOnly
+                        value={line.qualityTestGroupCode ?? ''}
+                      />
+                    </td>
+                    <td onKeyDown={onCellKeyDown}>
+                      <select
+                        className="erp-input h-8 min-w-[7rem] text-[11px]"
+                        disabled={!editable}
+                        value={line.binId ?? ''}
+                        onChange={(e) => {
+                          const nextBinId = e.target.value || null
+                          const bin = binOptions.find((b) => b.id === nextBinId)
+                          onPatchLine(line.key, {
+                            binId: nextBinId,
+                            binCode: bin?.code ?? '',
+                          })
+                        }}
+                      >
+                        <option value="">{SELECT_PLACEHOLDER}</option>
+                        {binOptions.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.code}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="purchase-doc-lines-grid__sticky-actions">
                       <div className="flex items-center justify-center gap-0.5">
                         <button
@@ -573,6 +706,8 @@ export function PurchaseOrderLinesTable({
                 </td>
                 <td className="num tabular-nums">{formatCurrency(totals.taxable)}</td>
                 <td className="num tabular-nums">{formatCurrency(totals.lineTotal)}</td>
+                <td colSpan={2} />
+                <td colSpan={8} />
                 <td className="purchase-doc-lines-grid__sticky-actions" />
               </tr>
             </tfoot>
@@ -582,6 +717,58 @@ export function PurchaseOrderLinesTable({
       )}
 
       <style>{`
+        .purchase-doc-lines-grid-scroll {
+          width: 100%;
+          min-width: 0;
+          max-width: 100%;
+          max-height: min(32rem, 60vh);
+          overflow-x: auto;
+          overflow-y: auto;
+          overscroll-behavior-x: contain;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+        }
+        .purchase-doc-lines-grid-scroll::-webkit-scrollbar {
+          width: 10px;
+          height: 10px;
+        }
+        .purchase-doc-lines-grid-scroll::-webkit-scrollbar-thumb {
+          border-radius: 999px;
+          background: var(--erp-border-strong, #cbd5e1);
+        }
+        .purchase-doc-lines-grid-scroll::-webkit-scrollbar-track {
+          background: var(--erp-surface-alt, #f8fafc);
+        }
+        .purchase-doc-lines-grid__uom-col {
+          width: 2.75rem !important;
+          min-width: 2.75rem !important;
+          max-width: 2.75rem !important;
+          padding: 6px 2px !important;
+          text-align: center;
+          white-space: nowrap;
+          overflow: hidden;
+        }
+        .purchase-doc-lines-grid thead .purchase-doc-lines-grid__uom-col {
+          padding: 8px 2px !important;
+        }
+        .purchase-doc-lines-grid__qty-col {
+          min-width: 11rem;
+          width: 11rem;
+        }
+        .purchase-doc-lines-grid__sticky-item {
+          position: sticky;
+          left: 12rem;
+          z-index: 11;
+          width: 20rem;
+          min-width: 20rem;
+          max-width: 20rem;
+          padding-left: 8px !important;
+          padding-right: 8px !important;
+          background: #fff;
+          border-right: 1px solid var(--erp-border, #e2e8f0);
+          box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
+          overflow: visible;
+        }
         .purchase-doc-lines-grid thead th {
           position: sticky;
           top: 0;
@@ -611,22 +798,12 @@ export function PurchaseOrderLinesTable({
           max-width: 9.5rem;
           box-sizing: border-box;
           background: #fff;
-          box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
+          border-right: 1px solid var(--erp-border, #e2e8f0);
         }
         .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-type,
         .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-type {
           z-index: 21;
           background: var(--erp-surface-alt, #f8fafc);
-        }
-        .purchase-doc-lines-grid__sticky-item {
-          position: sticky;
-          left: 12rem;
-          z-index: 11;
-          min-width: 10.5rem;
-          max-width: 14rem;
-          background: #fff;
-          box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
-          overflow: visible;
         }
         .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-item,
         .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-item {
@@ -641,6 +818,7 @@ export function PurchaseOrderLinesTable({
           width: 2.75rem;
           text-align: center;
           background: #fff;
+          border-left: 1px solid var(--erp-border, #e2e8f0);
           box-shadow: -4px 0 8px rgb(15 23 42 / 0.06);
         }
         .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-actions,

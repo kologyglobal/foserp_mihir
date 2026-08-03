@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { InventorySetupBody } from './setup.schemas.js'
 
 export const DEFAULT_INVENTORY_SETTINGS = {

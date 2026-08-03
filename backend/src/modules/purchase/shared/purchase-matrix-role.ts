@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { PurchaseApprovalMatrixRole } from '@prisma/client'
 import { permissionSetIncludes } from '../../../constants/permissions.js'
 

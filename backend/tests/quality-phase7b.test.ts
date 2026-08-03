@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../src/app.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { PERMISSIONS, type PermissionName } from '../src/constants/permissions.js'
 import { computeSampleQty } from '../src/modules/quality/shared/sampling.service.js'
 import { incomingNotReady } from '../src/modules/quality/workspace.service.js'
@@ -79,7 +79,7 @@ describe.skipIf(!dbAvailable)('Quality Phase 7B — API integration', () => {
       await prisma.qualityCertificate.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.qualityInspectionParameterResult.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.qualityNcr.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
-      await prisma.qualityInspection.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
+      await prisma.manufacturingQualityInspection.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.qualityInspectionPlanRevision.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.qualityInspectionPlanLine.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.qualityInspectionPlan.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
@@ -190,7 +190,7 @@ describe.skipIf(!dbAvailable)('Quality Phase 7B — API integration', () => {
       return
     }
     const inspectionId = createInsp.body.data?.id ?? createInsp.body.id
-    await prisma.qualityInspection.update({
+    await prisma.manufacturingQualityInspection.update({
       where: { id: inspectionId },
       data: { certificateRequired: true, certificateStatus: 'PENDING' },
     })

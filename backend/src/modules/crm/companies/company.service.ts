@@ -80,7 +80,7 @@ export async function listCompanies(tenantId: string, query: ListCompaniesQuery)
   const nameMap = await resolveUserNames(
     result.items.flatMap((c) => [c.createdBy, c.updatedBy, c.ownerId]),
     tenantId,
-    (await import('../../../config/database.js')).prisma,
+    (await import('../../../config/prisma.js')).prisma,
   )
   return {
     items: result.items.map((c) => mapWithOwner(c, nameMap)!),
@@ -96,7 +96,7 @@ export async function getCompany(tenantId: string, id: string) {
   const nameMap = await resolveUserNames(
     [company.createdBy, company.updatedBy, company.ownerId],
     tenantId,
-    (await import('../../../config/database.js')).prisma,
+    (await import('../../../config/prisma.js')).prisma,
   )
   return mapWithOwner(company, nameMap)!
 }
@@ -113,7 +113,7 @@ export async function createCompany(tenantId: string, userId: string, input: Cre
   const nameMap = await resolveUserNames(
     [company.createdBy, company.updatedBy, company.ownerId],
     tenantId,
-    (await import('../../../config/database.js')).prisma,
+    (await import('../../../config/prisma.js')).prisma,
   )
   return mapWithOwner(company, nameMap)!
 }
@@ -140,7 +140,7 @@ export async function updateCompany(tenantId: string, id: string, userId: string
   const nameMap = await resolveUserNames(
     [company.createdBy, company.updatedBy, company.ownerId],
     tenantId,
-    (await import('../../../config/database.js')).prisma,
+    (await import('../../../config/prisma.js')).prisma,
   )
   return mapWithOwner(company, nameMap)!
 }

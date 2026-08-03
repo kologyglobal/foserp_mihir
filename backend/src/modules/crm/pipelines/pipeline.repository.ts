@@ -1,6 +1,6 @@
 import type { PipelineStatus, Prisma } from '@prisma/client'
 import { DEFAULT_PIPELINE_STAGES } from '../../../constants/permissions.js'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { DEFAULT_PIPELINE_NAME } from './pipeline.constants.js'
 import type { CreatePipelineInput, ListPipelinesQuery, StageInput, UpdatePipelineInput } from './pipeline.validation.js'

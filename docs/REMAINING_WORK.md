@@ -4,29 +4,76 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
-## Done recently — Money In Recurring Invoices + Zoho-style create form (2026-07-28)
+## Done recently — Accounting year-end P&L close (2026-07-30)
 
 | Field | Value |
 |-------|-------|
-| Module | Accounting Money In (AR) |
-| Description | `RecurringSalesInvoiceSchedule`/`Execution` (migration `20260728060000`) — create-form "Recurring invoice" toggle (frequency + next date + optional end date) posts `POST /recurring-schedules`; `/accounting/money-in/recurring-invoices` (schedules + cancel) and `/recurring-invoices/upcoming` (queue + Approve → creates a real Sales Invoice draft via `approveUpcomingInvoice`, advances `nextInvoiceDate`, and self-schedules the next occurrence). Invoice create form also cleaned to a Zoho-style layout: dropped Customer PO / Payment Terms / Posting Date / Project Ref / Project Name / Round Off / Other Charges from the UI (posting date silently trails invoice date; PO/project still flow through on SO/dispatch sourced invoices); added a Currency dropdown and a "+ New" customer quick-create popup (`QuickCompanyCreateModal`). Freight remains hidden for SERVICES tenants via `isServices()` (pre-existing). |
-| Test | Backend `npm run typecheck` clean; frontend `npx tsc --noEmit` clean; `prisma migrate deploy` applied locally |
-| Status | **done** — API mode only (recurring schedules are not modelled in the demo store, matching the AR disputes pattern); live UAT (create → upcoming → approve → post) not yet run against a seeded tenant |
+| Module | Accounting / Period Close |
+| Description | Year-end closing entries (INCOME/EXPENSE → `RETAINED_EARNINGS`), FY lock hardened, FE year-end wizard API mode, AP cascade idempotencyKey hash fix, money-out npm scripts wired |
+| Doc | `docs/accounting/PERIOD_CLOSE_STATUS.md` |
+| Test evidence | `finance-year-end-close` **8/8**; core finance pack **50/50**; BE/FE typecheck PASS; `test:period-close` PASS; `test:money-out` **68/68** |
+| Status | **done** for year-end P&L slice — **conditions**: Hostinger migrate deploy of `20260730121000_finance_year_end_close`; human SPA year-end walk |
+| Next step | Accruals/prepaid/FX reval (deferred); live TPP AIS/FX/intercompany (Bank & Cash phases) |
 
 ---
 
-## Done recently — Kology SERVICES packaging K1–K5 base (2026-07-27)
+## Done recently — Purchase QI parameter checklist (2026-07-30)
 
 | Field | Value |
 |-------|-------|
-| Module | Tenant packaging / CRM+Sales+Accounting reuse |
-| Description | `businessType=SERVICES`, module flags, nav/route gates, service MasterItems, SO→AR over-invoice guard, Expenses hub; docs under `docs/kology/` |
-| Status | **done** for packaging base — **open**: full golden-path live UAT evidence (Lead→SO→SI→Receipt + expense) on `kology`; live P&L/BS polish; billing-type schema beyond `productType` string |
+| Module | Quality / Purchase QI |
+| Description | Persist incoming QI `inspectionPlan` + parameter checklist (DB → API → facade → FE); hold/DEVIATION_PENDING editable; docs scope + deferrals |
+| Doc | `docs/quality/QUALITY_SCOPE_AND_DEFERRALS.md` |
+| Status | **done** in code — **condition**: migrate deploy + live `purchase-qi-lifecycle` re-run when MySQL up |
+| Next step | `npx tsx scripts/prisma-cli.ts migrate deploy` then vitest QI + quality-phase suites |
+
+---
+
+## Done recently — Inventory Costing READY gate closure (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory Costing |
+| Description | Closed READY WITH CONDITIONS: wired costing recon/overview to FIN-CLOSE-1 Inventory↔GL TB (Not Available when flag off; never ₹0; no Force Balance); SPA UAT API harness; live GL parity suite + npm scripts |
+| Doc | `docs/inventory/INVENTORY_COSTING_TEST_RESULTS.md`, `INVENTORY_COSTING_CONTROLLED_UAT.md` |
+| Status | **done** for Inventory Costing READY — residual optional human browser walk; purchase-return/dispatch matrices + 10k soak accepted deferrals; **purchase invoice retro cost** remains Purchase/FIN open (not an Inventory Costing condition) |
+| Next step | Optional SPA browser sign-off; Purchase retro cost adjust separately |
+
+---
+
+## FIN-CLOSE-1 deferred leftovers (updated 2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Accounting / Purchase / Inventory |
+| Description | **FIN-CLOSE-1 code closure met.** Purchase invoice retro cost now uses Inventory Costing: remaining stock is capitalised, consumed delta remains PPV, original receipt is immutable, retries are idempotent, and reversal reallocates consumed delta to PPV. Optional GR/IR ageing remains nice-to-have. |
+| Blocker | **Human production action only:** Hostinger `migrate deploy`, FIN mapping script, build/redeploy and post-checks per `docs/accounting/FIN_CLOSE_1_HOSTINGER_MIGRATION_RUNBOOK.md`. Nothing was deployed remotely. |
+| Test evidence | **PASS** — `npm run test:fin-close-1-live`; retro-cost live 4/4; purchase/inventory regression pack 15/15; backend typecheck; Inventory↔GL matched without Force Balance. |
+| Status | **done in code / production deploy pending human action** |
+
+---
+
+## Done recently — Maintenance V1 inventory ISSUE (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Maintenance |
+| Description | Spare parts post `ISSUE_TO_MAINTENANCE` via inventory `postStockMovement` (on-hand + cost entry); FE honest stockable vs free-text; PR shortage deep-link (`source=MAINTENANCE`); `sync-permissions` verified |
+| Test | `npx tsx scripts/test-maintenance-v1.ts` — **PASS** (ISSUE `STM-000187`; insufficient stock fail-closed). External contractor **SKIP** (no vendor). |
+| Status | **done** for V1 product gate (**READY**). Human: optional SPA walk; contractor UAT when vendor exists. Deferred: PM scheduler; persisted PR `sourceType` column. |
+| Docs | `docs/maintenance/` |
+
+---
+
+## Done recently — Purchase multi-unit UOM (2026-07-27)
+
+- Vendor → primary conversion across Item Master / PO / GRN / inventory posting.
+- Fields: `quantity` (primary), `uomQuantity` (vendor), `uomConversionFactor`.
+- Docs: `docs/PURCHASE_MULTI_UNIT_UOM.md`; Hostinger SQL: `backend/scripts/purchase-multi-unit-uom-hostinger.sql`.
 
 ---
 
 ## Done recently — Dispatch commercial policy UI + enforcement (2026-07-27)
-
 
 | Field | Value |
 |-------|-------|
@@ -58,14 +105,15 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
-## Done recently — Bank & Cash UAT readiness (2026-07-23)
+
+## Done recently — Bank & Cash UAT readiness (2026-07-23; 5D4 closed 2026-07-30)
 
 | Field | Value |
 |-------|-------|
 | Module | Accounting / Treasury |
-| Description | Live API for **internal UAT / controlled pilot**; workspace tabs + seed redirects cleaned |
+| Description | Live API for **internal UAT / controlled pilot**; workspace tabs + seed redirects cleaned; **5D4 SIMULATED AIS + scheduleCron** shipped |
 | Doc | `docs/accounting/BANK_CASH_STATUS.md` |
-| Status | **done** for core UAT surface — **open** / deferred: **AIS (5D4)**, **FX**, **intercompany** |
+| Status | **done** for core UAT + SIMULATED AIS/cron — **open** / deferred: **live TPP AIS**, **FX**, **intercompany**, cheque print |
 
 ---
 
@@ -135,6 +183,26 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — MFG pilot scenarios API pack (2026-07-29)
+
+| Field | Value |
+|-------|-------|
+| Module | Manufacturing |
+| Description | Open pilot scenarios automated: shortage→PR, material return (+ batch return fix), hold/resume, SO→Demand→WO, Dispatch serial AVAILABLE; SPA checklist for UI walk |
+| Evidence | `test-fuel-tank-pilot-scenarios.ts` **PASS**; `PR-000010`; `WO-000038` from SO; serials @ FG-MAIN |
+| Doc | `docs/manufacturing/MFG_PILOT_SPA_UAT_CHECKLIST.md`, `MFG_PILOT_SCENARIO_RESULTS.md` |
+| Status | **done** for API scenario pack + **A1–A9 + partial FG signed** (2026-07-29) — optional live SPA UX walk remains |
+
+## Done recently — MFG-GOLDEN-1 Fuel Tank re-verification (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Manufacturing |
+| Description | Audit + re-run factory golden path; docs pack under `docs/manufacturing/MFG_*`; no new mfg features |
+| Evidence | `WO-000010`, serial `FT-5000L-52948875`, material=WO=FG ₹111,020; CLOSE purpose blocked / COMPLETE ready |
+| Doc | `docs/manufacturing/MFG_GOLDEN_PATH_AUDIT.md`, `MFG_GOLDEN_PATH_TEST_RESULTS.md`, `FUEL_TANK_GOLDEN_PATH.md` |
+| Status | **READY FOR CONTROLLED PILOT** — live SPA sign-off / shortage-return-partial SPA / SO→WO UI run / perf soak remain open |
+
 ## Done recently — Fuel Tank factory golden path (2026-07-27)
 
 | Field | Value |
@@ -143,7 +211,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Description | Controlled UAT: ONE FG WO + LOGICAL SFG Job Cards → reserve/issue → route/QC/rework → WC/machine assignment → FG serial receipt → WO actual cost (inventory costing) → FG valuation → close readiness → COMPLETED |
 | Evidence | `WO-000009`, serial `FT-5000L-43550266`, material/WO/FG cost ₹111,020; script `npx tsx scripts/test-fuel-tank-wo-execution.ts` |
 | Doc | `docs/manufacturing/examples/FUEL_TANK_UAT.md` |
-| Status | **PASS** — factory golden path closed (no new mfg features) |
+| Status | **PASS** — superseded evidence by 2026-07-28 re-run (`WO-000010`) |
 
 ## Done recently — Fuel Tank mfg master (2026-07-23)
 
@@ -156,14 +224,58 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Purchase completion FE/integration (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Purchase |
+| Description | GRN receiving-chain UX; Invoice AP handoff honesty + Money Out link; Return accounting-pending banner; GRN→cost entry automated proof |
+| Doc | `docs/purchase/PURCHASE_COMPLETION_AUDIT.md`, `PURCHASE_COMPLETION_TEST_RESULTS.md` |
+| Status | **done** for internal UAT closure of FE/integration links — return→AP and invoice retro cost are now closed; spend/supplier dashboards remain optional (QI parameters API **done** 2026-07-30) |
+
+---
+
+## Done recently — Inventory Costing UAT-1 hardening (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory Costing |
+| Description | Controlled UAT suite (4 methods + transfer + tenant isolation); cost-entry/movement value parity; transfer cost preservation; method-change readiness preview; MA before/after history; Standard ItemLookupSelect; recon GL Not Available |
+| Doc | `docs/inventory/INVENTORY_COSTING_UAT_AUDIT.md`, `INVENTORY_COSTING_TEST_RESULTS.md`, `INVENTORY_COSTING_PRODUCTION_READINESS.md` |
+| Status | **done** for UAT-1 automated hardening + **2026-07-30 READY gate** (SPA API harness + Inventory↔GL wiring) — **accepted deferrals**: purchase-return/dispatch 4-method matrices, 10k soak, dedicated approve permission; residual human SPA walk optional |
+
+---
+
+## Done recently — Inventory Costing FE + Reconciliation UI (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory Costing UI |
+| Description | Overview, enriched registers, MA/standard/specific screens, Run Reconciliation, method-change current method, read APIs |
+| Doc | `docs/inventory/INVENTORY_COSTING_FE_AUDIT.md`, `INVENTORY_COSTING_UI.md` |
+| Status | **done** for FE usability + Inventory↔GL summary surface — residual human SPA walk optional |
+
+---
+
+## Done recently — IV-MFG-1 Inventory ↔ Manufacturing cost consolidation (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory Costing / Manufacturing Costing |
+| Description | Inventory Costing is sole inventory valuation authority; WO material consumes InventoryCostEntry; legacy mfg valuation enum deprecated (not dropped); cost-trace + item summary + effective-method APIs; WO Costing material UI |
+| Doc | `docs/inventory/INVENTORY_MANUFACTURING_COSTING_AUDIT.md`, `docs/inventory/INVENTORY_VALUATION_ARCHITECTURE.md` |
+| Status | **done** for architecture consolidation — **open**: controlled golden-path UAT (MA/FIFO/Standard/Specific) + live mfg GL still blocked |
+
+---
+
 ## In progress — Inventory costing engine (2026-07-27)
 
 | Field | Value |
 |-------|-------|
 | Module | Inventory / Manufacturing / Finance integration |
-| Description | Costing engine Phase A–C BE + **Phase 1 FE Costing UI** + **all 4 valuation methods hardened** (MA issue rate, standard fail-closed, FIFO/Specific return restore, Specific lot/pool + method-change migration). |
-| Status | **in_progress** (engines + UI + method fixes shipped; live UAT + variance GL / inventory↔GL TB still open) |
-| Next step | Controlled UAT with `VITE_USE_API=true` (FIFO + standard/specific + WO actual FG + recon + method change). **Do not** expand live Manufacturing Accounting GL until the gate below clears. |
+| Description | Costing engine Phase A–C BE + **Phase 1 FE Costing UI** + **all 4 valuation methods hardened** + **IV-MFG-1** (WO material from InventoryCostEntry; legacy mfg enum deprecated). |
+| Status | **done** (engines + UI + IV-MFG-1 + UAT-1 + **2026-07-30 READY**: SPA API harness + Inventory↔GL TB wiring) |
+| Next step | Optional live SPA browser checklist. Purchase-return + dispatch 4-method matrices and 10k soak remain accepted deferrals. **Do not** expand live Manufacturing Accounting GL until the gate below clears. |
 
 ---
 
@@ -471,11 +583,11 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + **GRNI report** + **per-user approver ₹ limits** (2026-07-27). Remaining: ITC/vendor-outstanding placeholders; formal GR/IR clearing GL. |
+| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + GRNI + approver limits + **multi-unit UOM** + **GRN tolerance** + **PO versioning** + FIN-CLOSE-1 GR/IR, PPV, return→AP and **purchase invoice retro cost** are live-verified. Remaining product gaps: ITC placeholders and fuller dual-UOM display. Hostinger migration/redeploy remains a human operation. |
 | Dependencies | Items, vendors (done); PR schema Phase 03 (done); PO lifecycle (done); Approvals queue (done); Setup 1A (done) |
-| Next step | Optional ITC/AP outstanding report integrations; formal GR/IR clearing account if Finance requires it. |
-| Test required | Setup **13/13**; QI/return lifecycle stock asserts; GRNI report live; matrix + approver-limit unit; invoice lifecycle. |
-| Status | **in_progress** (core purchase loop + GRNI + user limits closed) |
+| Next step | Human Hostinger migration/mapping/redeploy runbook; optional ITC and reporting enhancements. |
+| Test required | Setup **13/13**; QI/return lifecycle; GRNI; invoice lifecycle; **purchase-completion-grn-costing** PASS |
+| Status | **in_progress** (core loop ready for internal UAT) |
 
 ### P3-3: Inventory / production / quality / finance backends
 
@@ -530,10 +642,10 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Field | Value |
 |-------|-------|
 | Module | Accounting |
-| Description | **Finance Settings Phase 1** + journals/AR/AP/treasury + **Period Close P1 + Close Control Hardening** (close-readiness, optional hard-block, checklist acks). |
-| Next step | Period close year-end / accruals; Budgeting Phase 2+ / GST filing as prioritized. |
-| Test required | Finance tests (`tests/finance/`) + `npm run test:money-in` + `npm run test:period-close` |
-| Status | partial (Period Close lock/readiness hardening shipped 2026-07-23; year-end/accruals/calendar still demo) |
+| Description | **Finance Settings Phase 1** + journals/AR/AP/treasury + **Period Close P1 + Close Control Hardening + year-end P&L→RE** (2026-07-30). |
+| Next step | Accruals / prepaid / FX reval posting wizards; close calendar; reopen-request workflow; Budgeting Phase 2+ / GST filing as prioritized. |
+| Test required | `tests/finance/finance-year-end-close.test.ts` + `period-close-hardening` + `npm run test:period-close` |
+| Status | partial (year-end shipped; accruals/calendar still demo) |
 
 ### P3-6: Commercial terms single source
 
@@ -551,4 +663,4 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ## Recommended next task
 
-See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) open risks. Highest ops: **redeploy production `.htaccess`** so `/api` returns JSON. Product backlog: **verify P1-1/P1-2 admin UIs**; then P2 mobile API E2E. Finance Money In/Out reverse UIs shipped — next: Dispatch invoice policy UI polish / period close year-end.
+See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) open risks. Highest ops: **redeploy production `.htaccess`** so `/api` returns JSON. Product backlog: **verify P1-1/P1-2 admin UIs**; then P2 mobile API E2E. Finance Money In/Out + year-end P&L close shipped — next: accruals/FX wizards or Dispatch invoice policy UI polish as prioritized.

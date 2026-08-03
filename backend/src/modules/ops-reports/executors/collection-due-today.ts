@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { parseDateOnly } from '../../accounting/shared/finance.helpers.js'
 import { OUTSTANDING_ACTIVE_STATUSES } from '../../accounting/receivables/reporting/receivable-reporting.types.js'
 import { formatLocalDate } from '../timezone.js'

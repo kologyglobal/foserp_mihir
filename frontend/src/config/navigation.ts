@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
   FileText,
   GitBranch,
+  GitCompare,
   Handshake,
   HardHat,
   Inbox,
@@ -206,6 +207,17 @@ export const moduleCategories: NavCategory[] = [
     ],
   },
   {
+    id: 'maintenance',
+    title: 'Maintenance',
+    items: [
+      { label: 'Dashboard', path: '/maintenance', icon: LayoutDashboard, end: true, workspace: true },
+      { label: 'Tickets', path: '/maintenance/tickets', icon: Wrench },
+      { label: 'Machine History', path: '/maintenance/machines', icon: Cog },
+      { label: 'Reports', path: '/maintenance/reports', icon: BarChart3 },
+      { label: 'Setup', path: '/maintenance/setup', icon: Settings2, group: 'Setup' },
+    ],
+  },
+  {
     id: 'dispatch',
     title: 'Logistics',
     items: [
@@ -247,6 +259,7 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Bank & Cash', path: '/accounting/bank-cash', icon: Landmark },
       { label: 'Fixed Assets', path: '/accounting/fixed-assets', icon: Building2 },
       { label: 'Manufacturing Accounting', path: '/accounting/manufacturing', icon: Factory },
+      { label: 'Inventory ↔ GL', path: '/accounting/inventory-gl-reconciliation', icon: GitCompare },
       { label: 'GST & Tax', path: '/accounting/tax-compliance', icon: Receipt },
       ...TAX_COMPLIANCE_NAV.map((item) => ({
         label: item.label,
@@ -359,6 +372,7 @@ export function findActiveCategoryId(pathname: string): string | null {
   if (pathname.startsWith('/entity360/customers')) return 'crm'
   if (pathname.startsWith('/sales/leads')) return 'crm'
   if (pathname.startsWith('/logistics')) return 'dispatch'
+  if (pathname.startsWith('/maintenance')) return 'maintenance'
   if (pathname.startsWith('/masters') || pathname.startsWith('/settings/roles') || pathname.startsWith('/settings/permissions')) {
     return 'masters'
   }

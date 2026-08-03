@@ -68,3 +68,32 @@ export async function readDispatchPodFile(storageKey: string): Promise<Buffer> {
   const base = path.join(process.cwd(), 'uploads', 'dispatch-pod')
   return readFile(path.join(base, storageKey))
 }
+
+const ITEM_IMAGE_BASE_DIR = path.join(process.cwd(), 'uploads', 'items')
+
+export async function saveItemImageFile(
+  tenantId: string,
+  itemId: string,
+  buffer: Buffer,
+  ext: string,
+): Promise<string> {
+  const dir = path.join(ITEM_IMAGE_BASE_DIR, tenantId)
+  await mkdir(dir, { recursive: true })
+  const safeExt = ext && ext.startsWith('.') ? ext.slice(0, 20) : '.jpg'
+  const filename = `${itemId}${safeExt}`
+  const fullPath = path.join(dir, filename)
+  await writeFile(fullPath, buffer)
+  return path.join(tenantId, filename).replace(/\\/g, '/')
+}
+
+export async function readItemImageFile(storageKey: string): Promise<Buffer> {
+  return readFile(path.join(ITEM_IMAGE_BASE_DIR, storageKey))
+}
+
+export function itemImageContentType(storageKey: string): string {
+  const lower = storageKey.toLowerCase()
+  if (lower.endsWith('.png')) return 'image/png'
+  if (lower.endsWith('.webp')) return 'image/webp'
+  if (lower.endsWith('.gif')) return 'image/gif'
+  return 'image/jpeg'
+}

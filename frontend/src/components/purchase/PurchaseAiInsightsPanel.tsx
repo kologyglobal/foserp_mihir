@@ -109,7 +109,7 @@ export function PurchaseAiInsightsRestoreButton({
 export const PURCHASE_AI_INSIGHTS_COLLAPSED_KEY = 'purchase.ai-insights.collapsed'
 
 export function readPurchaseAiInsightsOpen(storageKey = PURCHASE_AI_INSIGHTS_COLLAPSED_KEY): boolean {
-  if (typeof window === 'undefined') return true
+  if (typeof window === 'undefined') return false
   try {
     const collapsed = localStorage.getItem(storageKey)
     if (collapsed === '1') return false
@@ -117,7 +117,8 @@ export function readPurchaseAiInsightsOpen(storageKey = PURCHASE_AI_INSIGHTS_COL
   } catch {
     /* ignore */
   }
-  return true
+  // Unset preference: closed by default (✦ restores).
+  return false
 }
 
 export function usePurchaseAiInsightsOpen(storageKey = PURCHASE_AI_INSIGHTS_COLLAPSED_KEY) {

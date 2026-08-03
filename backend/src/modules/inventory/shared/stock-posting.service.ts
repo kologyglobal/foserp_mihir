@@ -5,7 +5,7 @@ import type {
   InventoryStockMovement,
   Prisma,
 } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import {
@@ -1102,12 +1102,14 @@ export async function postStockMovement(
     const costEntry = await recordInventoryCostEntryInTx(innerTx, {
       tenantId: input.tenantId,
       costLayerId: fifoReceiptCostLayerId,
+      unitCost: rate,
+      totalCost: value,
       movement: {
         id: movement.id,
         movementType: movement.movementType,
         referenceType: movement.referenceType,
         quantity: movement.quantity,
-        rate: movement.rate,
+        rate,
         itemId: movement.itemId,
         warehouseId: movement.warehouseId,
         movementDate: movement.movementDate,

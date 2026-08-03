@@ -72,7 +72,8 @@ export function ErpCardFormPage({
   const mergeHeader = isEnterprise && Boolean(workspaceHeaderSetters)
   const factBoxPaneKey = factBoxStorageKey ?? (collapsibleFactBox ? `erp-factbox:${pathname}` : undefined)
   const [internalFactBoxOpen, setInternalFactBoxOpenState] = useState(() => {
-    if (!collapsibleFactBox || !factBoxPaneKey) return true
+    if (!collapsibleFactBox) return true
+    if (!factBoxPaneKey) return false
     return getFactBoxInitialOpen(factBoxPaneKey)
   })
 
@@ -193,12 +194,6 @@ export function ErpCardFormPage({
           label={factBoxLabel}
           setOpen={setFactBoxOpen}
         >
-          {factBoxCollapsed ? (
-            <div className="erp-card-form-page__context-restore" role="toolbar" aria-label="Smart context">
-              <FactBoxPaneAiToggle />
-            </div>
-          ) : null}
-
           <div
             className={cn(
               'erp-card-form-page__body erp-form-shell-content erp-form-shell-content--padded min-h-0',
@@ -207,6 +202,12 @@ export function ErpCardFormPage({
                 : 'pb-4',
             )}
           >
+            {factBoxCollapsed ? (
+              <div className="erp-card-form-page__context-restore" role="toolbar" aria-label="Smart context">
+                <FactBoxPaneAiToggle />
+              </div>
+            ) : null}
+
             <div
               className="erp-card-form-page__layout-wrap"
               data-factbox-open={showSplitLayout ? 'true' : factBox && collapsibleFactBox ? 'false' : undefined}

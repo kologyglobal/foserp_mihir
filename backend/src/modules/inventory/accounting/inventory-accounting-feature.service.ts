@@ -4,7 +4,7 @@
  */
 import type { FinanceFeatureKey } from '@prisma/client'
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import {
   AuthenticationError,
   AuthorizationError,
@@ -16,10 +16,16 @@ import type { PutInventoryAccountingFeatureInput } from './inventory-accounting.
 
 export const INVENTORY_ACCOUNTING_FEATURE_KEY: FinanceFeatureKey = 'INVENTORY_ACCOUNTING'
 
-/** Mapping keys required before COGS (and other inventory GL) can post. */
+/**
+ * Mapping keys required before COGS / GRN (and other inventory GL) can post.
+ * FIN-CLOSE-1 added RAW_MATERIAL_INVENTORY + GRIR_CLEARING: GRN inward posts
+ * Dr inventory / Cr GR-IR, so both must resolve before the flag can be turned on.
+ */
 export const INVENTORY_ACCOUNTING_REQUIRED_MAPPINGS = [
   'COST_OF_GOODS_SOLD',
   'FINISHED_GOODS_INVENTORY',
+  'RAW_MATERIAL_INVENTORY',
+  'GRIR_CLEARING',
 ] as const
 
 async function assertLegalEntity(tenantId: string, legalEntityId: string) {

@@ -19,6 +19,7 @@ import {
   getPeriodCloseReadiness,
   getReopenRequests,
   getYearEndPreview,
+  executeYearEndClosing,
   listPeriodClosePeriods,
   loadPeriodCloseFilter,
   markAccountingPeriodUnderReview,
@@ -679,10 +680,12 @@ export function YearEndClosingPage() {
   const [step, setStep] = useState<YearEndWizardStep>('select_fy')
   const [preview, setPreview] = useState<YearEndPreview | null>(null)
   const [loading, setLoading] = useState(false)
+  const [posting, setPosting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const stepMeta = YEAR_END_STEPS.find((s) => s.id === step) ?? YEAR_END_STEPS[0]
   const stepIndex = YEAR_END_STEPS.findIndex((s) => s.id === step)
+  const apiMode = isApiMode()
 
   const loadPreview = useCallback(async () => {
     if (!perms.canYearEndPreview) {
@@ -701,8 +704,8 @@ export function YearEndClosingPage() {
   }, [filter.fiscalYear, perms.canYearEndPreview])
 
   useEffect(() => {
-    if (stepIndex >= 3) void loadPreview()
-  }, [stepIndex, loadPreview])
+    if (stepIndex >= 3 || (apiMode && stepIndex >= 1)) void loadPreview()
+  }, [stepIndex, loadPreview, apiMode])
 
   const goNext = () => {
     const next = YEAR_END_STEPS[stepIndex + 1]
@@ -713,20 +716,58 @@ export function YearEndClosingPage() {
     if (prev) setStep(prev.id)
   }
 
-  const onFinal = () => {
+  const onFinal = async () => {
     if (!perms.canApproveYearEnd) {
       notify.error('You do not have permission to approve year-end closing.')
       return
     }
-    notify.info(
-      'Year-end closing preview prepared in demo mode. No ledger balances were updated.',
-    )
+    if (!apiMode) {
+      notify.info(
+        'Year-end closing preview prepared in demo mode. No ledger balances were updated.',
+      )
+      return
+    }
+    const fyId = preview?.financialYearId ?? filter.fiscalYear
+    if (!fyId) {
+      notify.error('Select a financial year before posting year-end closing entries.')
+      return
+    }
+    if (preview?.alreadyClosed) {
+      notify.info(
+        preview.voucherNumber
+          ? `Year-end already posted (voucher ${preview.voucherNumber}).`
+          : 'Year-end closing already completed for this financial year.',
+      )
+      return
+    }
+    if (preview && !preview.readyToPost) {
+      notify.error(preview.exceptions[0] ?? 'Resolve year-end blockers before posting.')
+      return
+    }
+    setPosting(true)
+    try {
+      const result = await executeYearEndClosing(fyId)
+      setPreview(result)
+      notify.success(
+        result.voucherNumber
+          ? `Year-end closing posted — voucher ${result.voucherNumber}. Close remaining periods, then lock the FY.`
+          : 'Year-end recorded with no P&L activity. Close remaining periods, then lock the FY.',
+      )
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Year-end close failed')
+    } finally {
+      setPosting(false)
+    }
   }
 
   return (
     <PeriodCloseShell
       title="Year-End Closing"
-      description="Controlled year-end wizard — preview only; no real closing entries."
+      description={
+        apiMode
+          ? 'Posts P&L closing entries into retained earnings, then lock the financial year after all periods are closed.'
+          : 'Controlled year-end wizard — preview only; no real closing entries.'
+      }
       periodFilter={filter}
       onPeriodChange={setFilter}
     >
@@ -767,15 +808,19 @@ export function YearEndClosingPage() {
 
         {step === 'validate_open_periods' ? (
           <p className="mt-2 text-[12px] text-erp-muted">
-            Demo validation: June 2026 hard-locked; July 2026 open for close preparation. Resolve open periods before
-            year-end.
+            {apiMode && preview
+              ? preview.exceptions.some((e) => /period/i.test(e))
+                ? 'Open / non-closed periods must be resolved before FY lock. Last period must stay OPEN to post closing entries.'
+                : 'Earlier periods are closed; last period is available for year-end posting.'
+              : 'Demo validation: June 2026 hard-locked; July 2026 open for close preparation. Resolve open periods before year-end.'}
           </p>
         ) : null}
 
         {step === 'validate_reconciliations' ? (
           <p className="mt-2 text-[12px] text-erp-muted">
-            Subledger differences remain on AR, Inventory and Bank. Year-end should not proceed until reconciliations
-            are reviewed.
+            {apiMode
+              ? 'Use Period Close readiness and AP/AR close gates for subledger review. Accruals / FX revaluation remain deferred.'
+              : 'Subledger differences remain on AR, Inventory and Bank. Year-end should not proceed until reconciliations are reviewed.'}
           </p>
         ) : null}
 
@@ -807,23 +852,40 @@ export function YearEndClosingPage() {
               </ul>
             ) : null}
             <PeriodCloseStatusBadge
-              status={preview.unresolvedDifferences ? 'Blocked' : 'Ready for Review'}
+              status={
+                preview.alreadyClosed
+                  ? 'Completed'
+                  : preview.unresolvedDifferences
+                    ? 'Blocked'
+                    : 'Ready for Review'
+              }
             />
+            {preview.voucherNumber ? (
+              <p className="text-[12px] text-erp-muted">Closing voucher: {preview.voucherNumber}</p>
+            ) : null}
           </div>
         ) : null}
 
-        {step === 'lock_financial_year' ? (
+        {step === 'lock_financial_year' || step === 'final_approval' || step === 'transfer_pnl' ? (
           <div className="mt-3 space-y-2">
             <p className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[12px] text-amber-950">
-              Year-end closing preview prepared in demo mode. No ledger balances were updated.
+              {apiMode
+                ? 'Posting year-end creates a SYSTEM journal that zeros P&L into retained earnings. Then close the last period and use Finance Settings → lock FY.'
+                : 'Year-end closing preview prepared in demo mode. No ledger balances were updated.'}
             </p>
             <button
               type="button"
               className="rounded bg-erp-primary px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"
-              disabled={!perms.canApproveYearEnd}
-              onClick={onFinal}
+              disabled={!perms.canApproveYearEnd || posting}
+              onClick={() => void onFinal()}
             >
-              Confirm Year-End Preview
+              {apiMode
+                ? posting
+                  ? 'Posting…'
+                  : preview?.alreadyClosed
+                    ? 'Year-End Already Posted'
+                    : 'Post Year-End Closing Entries'
+                : 'Confirm Year-End Preview'}
             </button>
           </div>
         ) : null}

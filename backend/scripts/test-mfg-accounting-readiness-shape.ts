@@ -1,4 +1,4 @@
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { getReadiness } from '../src/modules/manufacturing/accounting/manufacturing-accounting-readiness.service.js'
 
 async function main() {

@@ -1,7 +1,7 @@
 /**
  * Count soft-deleted rows with null itemId (blocks ALTER NOT NULL).
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 async function main() {
   const [quotes, sos, opp] = await Promise.all([

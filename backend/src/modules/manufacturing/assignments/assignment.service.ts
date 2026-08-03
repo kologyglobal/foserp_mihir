@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { AuthorizationError, InvalidStateError, NotFoundError } from '../../../utils/errors.js'
 import { logProductionActivity } from '../shared/activity.service.js'
 import { toDecimal } from '../shared/quantity.service.js'

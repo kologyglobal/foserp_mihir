@@ -11,12 +11,13 @@ type MappingPair = { debit: DefaultAccountMappingKey; credit: DefaultAccountMapp
 
 /**
  * GL pairs per inventory event (ADR-039: finance default-account mappings only).
- * PURCHASE acts as the GR/IR-style counterpart for GRN quantity events until a
- * dedicated clearing mapping exists.
+ * FIN-CLOSE-1: GRN events settle against GRIR_CLEARING so goods-received-not-invoiced
+ * is a real balance; the Vendor Invoice clears it. Only posts when INVENTORY_ACCOUNTING
+ * is enabled for the legal entity.
  */
 const EVENT_MAPPINGS: Record<InventoryAccountingEventType, MappingPair> = {
-  GRN_INWARD: { debit: 'RAW_MATERIAL_INVENTORY', credit: 'PURCHASE' },
-  GRN_REVERSAL: { debit: 'PURCHASE', credit: 'RAW_MATERIAL_INVENTORY' },
+  GRN_INWARD: { debit: 'RAW_MATERIAL_INVENTORY', credit: 'GRIR_CLEARING' },
+  GRN_REVERSAL: { debit: 'GRIR_CLEARING', credit: 'RAW_MATERIAL_INVENTORY' },
   PURCHASE_RETURN: { debit: 'PURCHASE_RETURN', credit: 'RAW_MATERIAL_INVENTORY' },
   STOCK_ADJUSTMENT: { debit: 'RAW_MATERIAL_INVENTORY', credit: 'STOCK_ADJUSTMENT' },
   STOCK_ADJUSTMENT_REVERSAL: { debit: 'STOCK_ADJUSTMENT', credit: 'RAW_MATERIAL_INVENTORY' },

@@ -19,6 +19,7 @@ interface OperatorTaskCardProps {
   onResume: () => void
   onComplete: () => void
   onReportProblem: () => void
+  onReportBreakdown?: () => void
 }
 
 /** Mobile-first operator task card — WO, product, stage, quantities, machine, instructions. */
@@ -32,6 +33,7 @@ export function OperatorTaskCard({
   onResume,
   onComplete,
   onReportProblem,
+  onReportBreakdown,
 }: OperatorTaskCardProps) {
   const woNo = assignment.productionOrder?.orderNumber ?? 'Work Order'
   const stageLabel = assignment.stage?.name ?? 'Stage'
@@ -97,6 +99,7 @@ export function OperatorTaskCard({
           onResume={onResume}
           onComplete={onComplete}
           onReportProblem={onReportProblem}
+          onReportBreakdown={onReportBreakdown}
         />
       </div>
     </article>

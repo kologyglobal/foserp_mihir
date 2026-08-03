@@ -1,5 +1,5 @@
 import type { Prisma, PurchaseOrderStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListPurchaseOrdersQuery } from './purchase-order.validation.js'
 
@@ -8,6 +8,7 @@ const includeOrderBase = {
     orderBy: { lineNumber: 'asc' as const },
     include: {
       uom: { select: { id: true, code: true, name: true } },
+      bin: { select: { id: true, code: true, name: true } },
     },
   },
   vendor: {
@@ -202,6 +203,9 @@ export async function replacePurchaseOrderLines(
     itemNameSnapshot: string
     description: string | null
     quantity: number
+    uomQuantity?: number
+    uomConversionFactor?: number
+    unitCostPrimary?: number
     uomId: string | null
     rate: number
     amount: number
@@ -209,6 +213,14 @@ export async function replacePurchaseOrderLines(
     remarks: string | null
     purchaseRequisitionLineId: string | null
     purchasePlanningRowId: string | null
+    requisitionNumber?: string | null
+    gstGroupId?: string | null
+    hsnId?: string | null
+    hsnCodeSnapshot?: string
+    gstGroupCodeSnapshot?: string
+    binId?: string | null
+    qcRequiredSnapshot?: boolean
+    qualityTestGroupCodeSnapshot?: string | null
   }>,
   tx: Prisma.TransactionClient,
 ) {

@@ -1,6 +1,6 @@
 import type { Prisma, QualityParameterType } from '@prisma/client'
 import { Prisma as PrismaNS } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { ListParametersQuery } from './parameter.schemas.js'
 
 export async function listParameters(tenantId: string, query: ListParametersQuery) {

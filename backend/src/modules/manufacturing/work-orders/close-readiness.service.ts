@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { AppError, NotFoundError } from '../../../utils/errors.js'
 import { collectQualityBlockers } from '../../quality/shared/blockers.service.js'
 import { getMaterialReconciliation } from '../materials/material-reconciliation.service.js'

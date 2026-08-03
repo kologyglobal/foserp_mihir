@@ -1,5 +1,5 @@
 import { Prisma, type VendorAdjustmentSourceLink } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { VendorAdjustmentNotFoundError, VendorAdjustmentSourceLinkConflictError } from './vendor-adjustment.errors.js'
 import type { CreateVendorAdjustmentSourceLinkInput } from './vendor-adjustment.types.js'
 

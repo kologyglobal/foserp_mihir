@@ -12,6 +12,7 @@ import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import { isApiMode } from '@/config/apiConfig'
 import {
   fetchValuationReconciliation,
+  runValuationReconciliation,
   type ValuationReconciliationDto,
 } from '@/services/api/inventoryCostingApi'
 import { formatCurrency } from '@/utils/formatters/currency'
@@ -25,6 +26,8 @@ export function InventoryValuationReconPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mismatchesOnly, setMismatchesOnly] = useState(false)
+
+  const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -43,9 +46,39 @@ export function InventoryValuationReconPage() {
     }
   }, [api, mismatchesOnly])
 
+  const runRecon = useCallback(async () => {
+    if (!api) {
+      setError('Run Reconciliation requires API mode')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await runValuationReconciliation({ mismatchesOnly })
+      setData(res.data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Reconciliation run failed')
+    } finally {
+      setBusy(false)
+    }
+  }, [api, mismatchesOnly])
+
   useEffect(() => {
     void load()
   }, [load])
+
+  const reasonLabel = (code: string) =>
+    ({
+      COSTED_QTY_MISMATCH: 'Costed quantity mismatch',
+      FIFO_LAYER_MISMATCH: 'FIFO / layer value mismatch',
+      NEGATIVE_STOCK_COST_PENDING: 'Negative stock affecting costing',
+      UNCOSTED_MOVEMENT: 'Uncosted movement',
+      MOVING_AVERAGE_STATE_MISMATCH: 'Moving average state mismatch',
+      MISSING_STANDARD_COST: 'Missing standard cost',
+      SPECIFIC_COST_NOT_IDENTIFIED: 'Specific cost not identified',
+      OPENING_BALANCE_NOT_VALUED: 'Opening balance not valued',
+      FAILED_COST_ADJUSTMENT: 'Failed cost adjustment',
+    }[code] ?? code.replace(/_/g, ' '))
 
   return (
     <InventoryCostingShell
@@ -58,10 +91,22 @@ export function InventoryValuationReconPage() {
           secondaryActions={[
             { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
             {
+              id: 'run',
+              label: busy ? 'Running…' : 'Run Reconciliation',
+              onClick: () => void runRecon(),
+            },
+            {
               id: 'accounting',
               label: 'Inventory Accounting',
               onClick: () => {
                 window.location.assign('/inventory/accounting')
+              },
+            },
+            {
+              id: 'inv-gl',
+              label: 'Inventory ↔ GL',
+              onClick: () => {
+                window.location.assign('/accounting/inventory-gl-reconciliation')
               },
             },
           ]}
@@ -80,6 +125,37 @@ export function InventoryValuationReconPage() {
             <span className={data.mismatched > 0 ? 'text-rose-700' : 'text-emerald-700'}>
               Mismatches: <strong className="tabular-nums">{data.mismatched}</strong>
             </span>
+            {data.summary ? (
+              <>
+                <span>Stock qty: <strong className="tabular-nums">{data.summary.stockQuantity.toLocaleString()}</strong></span>
+                <span>
+                  Inventory value:{' '}
+                  <strong className="tabular-nums">{formatCurrency(data.summary.inventoryCostValue)}</strong>
+                </span>
+                <span>
+                  Uncosted:{' '}
+                  <strong className="tabular-nums">{data.summary.uncostedMovements}</strong>
+                </span>
+                <span>
+                  GL reconciliation:{' '}
+                  <strong>
+                    {(data.summary as { glReconciliation?: string }).glReconciliation ??
+                      (data.summary.glInventoryValue == null
+                        ? 'Not Available'
+                        : formatCurrency(data.summary.glInventoryValue))}
+                  </strong>
+                  {data.summary.glInventoryValue != null ? (
+                    <span className="ml-1 tabular-nums text-erp-muted">
+                      ({formatCurrency(data.summary.glInventoryValue)}
+                      {data.summary.difference != null
+                        ? ` · Δ ${formatCurrency(data.summary.difference)}`
+                        : ''}
+                      )
+                    </span>
+                  ) : null}
+                </span>
+              </>
+            ) : null}
           </>
         ) : null}
         <div className="ml-auto min-w-[160px]">
@@ -94,11 +170,10 @@ export function InventoryValuationReconPage() {
       </div>
 
       <div className="border-b border-erp-border px-3 py-2 text-[12px] text-erp-muted">
-        Inventory vs GL: use this screen for stock-value truth, then{' '}
-        <Link to="/inventory/accounting" className="font-semibold text-erp-primary hover:underline">
-          Inventory Accounting
-        </Link>{' '}
-        for voucher events when INVENTORY_ACCOUNTING is enabled. Full inventory↔GL trial balance recon remains deferred.
+        Compares physical stock balances to OPEN cost layers. Run Reconciliation refreshes the read model — it does not
+        force-balance or rewrite posted costs. When Inventory Accounting is enabled, summary GL totals come from the
+        Inventory↔GL trial balance (RM+FG control accounts); open that hub for WIP/GR-IR detail.
+        {data?.summary?.note ? ` ${data.summary.note}` : ''}
       </div>
 
       {loading ? (
@@ -124,6 +199,7 @@ export function InventoryValuationReconPage() {
                 <th className="text-right">Stock value</th>
                 <th className="text-right">Layer value</th>
                 <th className="text-right">Δ value</th>
+                <th>Reasons</th>
                 <th />
               </tr>
             </thead>
@@ -134,7 +210,7 @@ export function InventoryValuationReconPage() {
                   <td>{r.warehouse ? r.warehouse.code : r.warehouseId.slice(0, 8)}</td>
                   <td>
                     <DynamicsStatusChip
-                      label={r.status}
+                      label={r.costingStatus ?? r.status}
                       tone={r.status === 'MATCHED' ? 'success' : 'critical'}
                     />
                   </td>
@@ -144,6 +220,9 @@ export function InventoryValuationReconPage() {
                   <td className="text-right font-mono tabular-nums">{formatCurrency(Number(r.layerRemainingValue))}</td>
                   <td className="text-right font-mono tabular-nums font-semibold">
                     {formatCurrency(Number(r.valueDifference))}
+                  </td>
+                  <td className="max-w-[200px] text-[11px] text-erp-muted">
+                    {(r.reasonCodes ?? []).map(reasonLabel).join('; ') || '—'}
                   </td>
                   <td className="text-right">
                     <Link

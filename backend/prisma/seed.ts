@@ -1,5 +1,5 @@
 import { PERMISSIONS, ROLE_PERMISSIONS, DEFAULT_PIPELINE_STAGES } from '../src/constants/permissions.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { hashPassword } from '../src/utils/password.js'
 import { initTenantCodeSeries } from '../src/services/codeSeries.service.js'
 

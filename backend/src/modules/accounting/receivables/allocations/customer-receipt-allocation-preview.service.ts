@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence } from '../../shared/finance-decimal.js'
 import {
   RECEIPT_ALLOCATION_ERROR_CODES,

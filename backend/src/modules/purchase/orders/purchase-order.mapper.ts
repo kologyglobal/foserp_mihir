@@ -1,4 +1,5 @@
 import type { MasterVendor, MasterWarehouse, PurchaseOrder, PurchaseOrderLine } from '@prisma/client'
+import { toUomQuantity } from '../shared/uom-conversion.js'
 import { allowedActions } from './purchase-order.workflow.js'
 
 const num = (value: unknown) => Number(value ?? 0)
@@ -38,6 +39,7 @@ type OrderWithRelations = PurchaseOrder & {
 export function mapPurchaseOrderToDto(
   order: OrderWithRelations,
   userNames?: Map<string, string>,
+  opts: { requireApprovalOnPo?: boolean } = {},
 ) {
   const warehouse = order.deliveryWarehouse ?? order.purchaseRequisition?.warehouse ?? null
   const warehouseId =
@@ -89,7 +91,9 @@ export function mapPurchaseOrderToDto(
     createdByName: (order.createdById && userNames?.get(order.createdById)) || null,
     createdAt: iso(order.createdAt),
     updatedAt: iso(order.updatedAt),
-    allowedActions: allowedActions(order),
+    allowedActions: allowedActions(order, {
+      requireApprovalOnPo: opts.requireApprovalOnPo,
+    }),
     revisions: (order.revisions ?? []).map((r) => ({
       id: r.id,
       revisionNo: r.revisionNo,
@@ -122,6 +126,14 @@ export function mapPurchaseOrderToDto(
     lines: order.lines.map((line) => {
       const quantity = num(line.quantity)
       const received = num(line.receivedQuantity)
+      const invoiced = num(line.invoicedQuantity)
+      const factor = num((line as { uomConversionFactor?: unknown }).uomConversionFactor ?? 1) || 1
+      const uomQuantity = num((line as { uomQuantity?: unknown }).uomQuantity ?? quantity)
+      const receivedQtyBase = received
+      const outstandingQtyBase = Math.max(0, quantity - received)
+      const receivedUomQty = factor > 0 ? toUomQuantity(received, factor) : received
+      const invoicedUomQty = factor > 0 ? toUomQuantity(invoiced, factor) : invoiced
+      const outstandingQty = Math.max(0, uomQuantity - receivedUomQty)
       return {
         id: line.id,
         lineNumber: line.lineNumber,
@@ -130,8 +142,8 @@ export function mapPurchaseOrderToDto(
         itemName: line.itemNameSnapshot,
         description: line.description,
         quantity,
-        uomQuantity: num((line as { uomQuantity?: unknown }).uomQuantity ?? quantity),
-        uomConversionFactor: num((line as { uomConversionFactor?: unknown }).uomConversionFactor ?? 1) || 1,
+        uomQuantity,
+        uomConversionFactor: factor,
         unitCostPrimary: num((line as { unitCostPrimary?: unknown }).unitCostPrimary ?? line.rate),
         uomId: line.uomId,
         uomCode:
@@ -140,14 +152,32 @@ export function mapPurchaseOrderToDto(
         rate: num(line.rate),
         amount: num(line.amount),
         receivedQuantity: received,
+        receivedQtyBase,
         acceptedQuantity: num(line.acceptedQuantity),
         rejectedQuantity: num(line.rejectedQuantity),
         returnedQuantity: num(line.returnedQuantity),
-        invoicedQuantity: num(line.invoicedQuantity),
-        openQuantity: Math.max(0, quantity - received),
+        invoicedQuantity: invoiced,
+        openQuantity: outstandingQtyBase,
+        outstandingQty,
+        outstandingQtyBase,
+        receivedUomQty,
+        invoicedUomQty,
+        gstGroupId: (line as { gstGroupId?: string | null }).gstGroupId ?? null,
+        hsnId: (line as { hsnId?: string | null }).hsnId ?? null,
+        hsnCode: (line as { hsnCodeSnapshot?: string }).hsnCodeSnapshot ?? '',
+        gstGroupCode: (line as { gstGroupCodeSnapshot?: string }).gstGroupCodeSnapshot ?? '',
+        binId: (line as { binId?: string | null }).binId ?? null,
+        binCode:
+          (line as { bin?: { code?: string | null } | null }).bin?.code ??
+          null,
+        qcRequired: Boolean((line as { qcRequiredSnapshot?: boolean }).qcRequiredSnapshot),
+        qualityTestGroupCode:
+          (line as { qualityTestGroupCodeSnapshot?: string | null }).qualityTestGroupCodeSnapshot ??
+          null,
         requiredDate: date(line.requiredDate),
         purchaseRequisitionLineId: line.purchaseRequisitionLineId,
         purchasePlanningRowId: line.purchasePlanningRowId,
+        requisitionNumber: (line as { requisitionNumber?: string | null }).requisitionNumber ?? null,
         remarks: line.remarks,
       }
     }),

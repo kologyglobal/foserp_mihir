@@ -4,7 +4,7 @@
  *
  * Usage: npx tsx scripts/verify-finance-integrity.ts [--tenant=<tenantId>] [--legalEntity=<id>]
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 type Severity = 'P0' | 'P1' | 'P2' | 'INFO'
 type CheckResult = {

@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { getLegalEntityOrThrow } from '../shared/finance.helpers.js'
 import type { ListNumberSeriesQuery, UpsertNumberSeriesInput } from './finance-number-series.validation.js'

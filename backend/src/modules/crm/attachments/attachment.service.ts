@@ -4,7 +4,7 @@ import { auditFromRequest, createAuditLog } from '../../../services/audit.servic
 import { NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { resolveUserNames, tenantActiveFilter } from '../../../shared/index.js'
 import { assertCrmEntityInTenant } from '../crm.entity-refs.js'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import * as repo from './attachment.repository.js'
 import {
   assertAttachmentUploadAllowed,

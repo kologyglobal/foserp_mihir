@@ -1,7 +1,7 @@
 import request from 'supertest'
 import { expect } from 'vitest'
 import type { Express } from 'express'
-import { prisma } from '../../../src/config/database.js'
+import { prisma } from '../../../src/config/prisma.js'
 import type { ApAllocFixture } from './ap-allocation-fixture.js'
 
 export async function createGlAccount(

@@ -2,7 +2,7 @@
  * Admin Panel Phase 8 — login activity, lockout, sessions register.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import * as authService from '../src/modules/auth/auth.service.js'
 import { MAX_FAILED_LOGINS } from '../src/modules/security/security.constants.js'
 import * as securityService from '../src/modules/security/security.service.js'

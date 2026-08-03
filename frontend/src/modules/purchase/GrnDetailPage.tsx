@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   CheckCircle2,
   ClipboardCheck,
+  FileText,
   Package,
   PackageCheck,
   Pencil,
@@ -119,7 +120,6 @@ export function GrnDetailPage() {
           { label: 'GRN / Receipts', to: '/purchase/grn' },
           { label: 'Loading' },
         ]}
-        backLink={{ to: '/purchase/grn', label: 'Back to GRN / Receipts' }}
         footer={null}
         stickyFooter={false}
         detailMode
@@ -189,7 +189,6 @@ export function GrnDetailPage() {
         { label: 'GRN / Receipts', to: '/purchase/grn' },
         { label: grn.documentNumber },
       ]}
-      backLink={{ to: '/purchase/grn', label: 'Back to GRN / Receipts' }}
       createdBy={grn.createdBy}
       createdDate={formatDate(grn.createdAt.slice(0, 10))}
       modifiedBy={grn.updatedBy ?? undefined}
@@ -299,10 +298,29 @@ export function GrnDetailPage() {
             },
             {
               id: 'valuation',
-              label: 'Receipt Cost',
+              label: 'View Cost Entries',
               icon: Package,
-              onClick: () => navigate('/inventory/costing/entries'),
-              hidden: grn.status !== 'posted',
+              onClick: () =>
+                navigate(
+                  `/inventory/costing/entries?search=${encodeURIComponent(grn.documentNumber)}`,
+                ),
+              hidden: grn.status === 'draft' || grn.status === 'cancelled',
+            },
+            {
+              id: 'invoice',
+              label: 'Create Invoice',
+              icon: FileText,
+              onClick: () =>
+                navigate(`/purchase/invoices/new?fromGrn=${grn.id}`),
+              hidden: !perms.canCreateInvoice,
+              disabled:
+                busy ||
+                !(
+                  grn.status === 'posted' ||
+                  grn.status === 'accepted' ||
+                  grn.status === 'partially_accepted'
+                ),
+              disabledReason: 'Accept / post GRN before invoicing',
             },
             {
               id: 'return',
@@ -374,6 +392,96 @@ export function GrnDetailPage() {
           <ErpViewField label="Received By" value={grn.receivedBy.name} />
           <ErpViewField label="Inspection Required" value={grn.inspectionRequired ? 'Yes' : 'No'} />
           <ErpViewField label="Remarks" value={grn.remarks || '—'} colSpan={3} />
+        </ErpCardSection>
+
+        <ErpCardSection
+          title="Receiving chain"
+          subtitle="Quality · Inventory costing · Invoice · Return"
+          collapsible
+          defaultOpen
+          columns={1}
+        >
+          <div className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-md border border-erp-border p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Quality</div>
+              <p className="mt-1">
+                {grn.inspectionRequired
+                  ? grn.qualityInspectionId
+                    ? 'QI linked'
+                    : 'QI required'
+                  : 'QI not required'}
+              </p>
+              {grn.inspectionRequired ? (
+                <button
+                  type="button"
+                  className="mt-2 font-semibold text-erp-primary hover:underline"
+                  onClick={() =>
+                    navigate(
+                      grn.qualityInspectionId
+                        ? `/purchase/quality-inspections/${grn.qualityInspectionId}`
+                        : `/purchase/quality-inspections/new?grnId=${grn.id}`,
+                    )
+                  }
+                >
+                  {grn.qualityInspectionId ? 'Open QI →' : 'Create QI →'}
+                </button>
+              ) : null}
+            </div>
+            <div className="rounded-md border border-erp-border p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
+                Inventory costing
+              </div>
+              <p className="mt-1">Valuation is owned by Inventory Costing (not Purchase).</p>
+              <button
+                type="button"
+                className="mt-2 font-semibold text-erp-primary hover:underline"
+                onClick={() =>
+                  navigate(
+                    `/inventory/costing/entries?search=${encodeURIComponent(grn.documentNumber)}`,
+                  )
+                }
+              >
+                View cost entries →
+              </button>
+            </div>
+            <div className="rounded-md border border-erp-border p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Invoice</div>
+              <p className="mt-1">Create Purchase Invoice from accepted / posted quantity.</p>
+              <button
+                type="button"
+                className="mt-2 font-semibold text-erp-primary hover:underline disabled:opacity-50"
+                disabled={!perms.canCreateInvoice}
+                onClick={() =>
+                  navigate(`/purchase/invoices/new?fromGrn=${grn.id}`)
+                }
+              >
+                Create invoice →
+              </button>
+            </div>
+            <div className="rounded-md border border-erp-border p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Return</div>
+              <p className="mt-1">Returnable qty comes from the Purchase Return API.</p>
+              <button
+                type="button"
+                className="mt-2 font-semibold text-erp-primary hover:underline disabled:opacity-50"
+                disabled={returnGate.hidden || returnGate.disabled || busy}
+                onClick={async () => {
+                  setBusy(true)
+                  try {
+                    const ret = await createPurchaseReturnFromGrn(grn.id)
+                    notify.success(`Return ${ret.documentNumber} created`)
+                    navigate(`/purchase/returns/${ret.id}`)
+                  } catch (err) {
+                    notify.error(err instanceof PurchaseServiceError ? err.message : 'Return failed')
+                  } finally {
+                    setBusy(false)
+                  }
+                }}
+              >
+                Create return →
+              </button>
+            </div>
+          </div>
         </ErpCardSection>
 
         <ErpCardSection

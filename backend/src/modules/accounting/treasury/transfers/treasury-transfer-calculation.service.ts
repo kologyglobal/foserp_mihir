@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { compare, formatForPersistence, toDecimal } from '../../shared/finance-decimal.js'
 import { buildTreasuryTransferAccountingPreview } from './treasury-transfer-accounting-preview.service.js'
 import { resolveTreasuryTransferAccounts } from './treasury-transfer-account-resolver.service.js'

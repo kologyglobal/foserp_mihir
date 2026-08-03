@@ -1,4 +1,4 @@
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { NotFoundError } from '../../utils/errors.js'
 
 /** Seeded tenant-admin persona names (see prisma/seed + ROLE_PERMISSIONS). */

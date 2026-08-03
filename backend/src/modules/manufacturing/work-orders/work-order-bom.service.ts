@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { assertItem, assertUom } from '../shared/manufacturing.helpers.js'
 import { dec } from '../shared/manufacturing.mappers.js'

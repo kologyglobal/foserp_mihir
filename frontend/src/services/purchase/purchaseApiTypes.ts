@@ -442,7 +442,22 @@ export interface ApiPurchaseOrderLine {
   requiredDate: string | null
   purchaseRequisitionLineId: string | null
   purchasePlanningRowId: string | null
+  /** Optional PR document number shown on the PO line. */
+  requisitionNumber: string | null
   remarks: string | null
+  gstGroupId?: string | null
+  hsnId?: string | null
+  hsnCode?: string
+  gstGroupCode?: string
+  binId?: string | null
+  binCode?: string | null
+  qcRequired?: boolean
+  qualityTestGroupCode?: string | null
+  outstandingQty?: number
+  outstandingQtyBase?: number
+  receivedQtyBase?: number
+  receivedUomQty?: number
+  invoicedUomQty?: number
 }
 
 export interface ApiPurchaseOrder {
@@ -542,6 +557,10 @@ export interface ApiPurchaseOrderLineInput {
   remarks?: string | null
   purchaseRequisitionLineId?: string | null
   purchasePlanningRowId?: string | null
+  requisitionNumber?: string | null
+  gstGroupId?: string | null
+  hsnId?: string | null
+  binId?: string | null
 }
 
 export interface ApiPurchaseOrderInput {
@@ -786,6 +805,9 @@ export interface ApiPurchaseInvoice {
   matchingRemarks: string | null
   overrideAuthorized: boolean
   overrideRemarks: string | null
+  /** Soft link to Accounting Vendor Invoice (AP SoT) after post handoff. */
+  vendorInvoiceId?: string | null
+  vendorInvoiceDraftRef?: string | null
   remarks: string | null
   submittedAt: string | null
   approvedAt: string | null
@@ -828,6 +850,19 @@ export interface ApiQualityInspectionLine {
   updatedAt: string | null
 }
 
+export interface ApiQualityInspectionParameter {
+  id: string
+  parameter: string
+  specification: string
+  minValue: number | null
+  maxValue: number | null
+  observedValue: number | null
+  unit: string
+  result: 'pass' | 'fail' | 'na'
+  remarks: string
+  lineNumber?: number
+}
+
 export interface ApiQualityInspection {
   id: string
   inspectionNumber: string
@@ -841,6 +876,7 @@ export interface ApiQualityInspection {
   vendorId: string | null
   warehouseId: string | null
   status: ApiQualityInspectionStatus
+  inspectionPlan?: string | null
   remarks: string | null
   deviationRemarks: string | null
   inspectedById: string | null
@@ -852,6 +888,7 @@ export interface ApiQualityInspection {
   allowedActions: { canEdit: boolean; canComplete: boolean; canCancel: boolean }
   totals: { inspected: number; accepted: number; rejected: number; deviation: number }
   lines: ApiQualityInspectionLine[]
+  parameters?: ApiQualityInspectionParameter[]
 }
 
 /* ─── Purchase Return (backend `/purchase/returns`) ─── */

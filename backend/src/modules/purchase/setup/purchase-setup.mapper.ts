@@ -171,6 +171,9 @@ export function mapPurchaseSettingsToDto(
       allowOverReceipt: d.allowOverReceipt,
       overReceiptTolerancePct: d.overReceiptTolerancePct,
       requireApprovalOnPoRevision: d.requireApprovalOnPoRevision,
+      requireApprovalOnPo: Boolean(
+        (d as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
+      ),
       allowShortClose: d.allowShortClose,
         requirePoWarehouse: d.requirePoWarehouse,
         requireExpectedDeliveryDate: d.requireExpectedDeliveryDate,
@@ -286,6 +289,9 @@ export function mapPurchaseSettingsToDto(
       allowOverReceipt: row.allowOverReceipt,
       overReceiptTolerancePct: num(row.overReceiptTolerancePct),
       requireApprovalOnPoRevision: row.requireApprovalOnPoRevision,
+      requireApprovalOnPo: Boolean(
+        (row as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
+      ),
       allowShortClose: row.allowShortClose,
       requirePoWarehouse: row.requirePoWarehouse,
       requireExpectedDeliveryDate: row.requireExpectedDeliveryDate,

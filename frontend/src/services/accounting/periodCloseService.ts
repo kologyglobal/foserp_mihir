@@ -490,8 +490,72 @@ export async function updateReopenStatus(
 }
 
 export async function getYearEndPreview(fiscalYear?: string): Promise<YearEndPreview> {
+  if (isApiMode()) {
+    const setup = await loadApiPeriodCloseSetup()
+    const fyId =
+      fiscalYear && setup.fiscalYears.some((y) => y.code === fiscalYear)
+        ? fiscalYear
+        : setup.fiscalYears[0]?.code
+    if (!fyId) {
+      return {
+        fiscalYear: fiscalYear ?? '—',
+        revenueToClose: 0,
+        expenseToClose: 0,
+        profitOrLoss: 0,
+        retainedEarningsAccount: '—',
+        exceptions: ['No financial year available for year-end preview.'],
+        unresolvedDifferences: 1,
+        readyToPost: false,
+      }
+    }
+    const { previewYearEndClose } = await import('@/services/bridges/financeApiBridge')
+    const apiPreview = await previewYearEndClose(fyId)
+    return {
+      fiscalYear: apiPreview.financialYearName,
+      financialYearId: apiPreview.financialYearId,
+      revenueToClose: Number(apiPreview.revenueToClose),
+      expenseToClose: Number(apiPreview.expenseToClose),
+      profitOrLoss: Number(apiPreview.profitOrLoss),
+      retainedEarningsAccount: apiPreview.retainedEarnings
+        ? `${apiPreview.retainedEarnings.accountCode} — ${apiPreview.retainedEarnings.accountName}`
+        : 'Not mapped',
+      exceptions: apiPreview.blockers.map((b) => b.message),
+      unresolvedDifferences: apiPreview.blockers.length,
+      readyToPost: apiPreview.readyToPost,
+      alreadyClosed: apiPreview.alreadyClosed,
+      blockers: apiPreview.blockers,
+      voucherNumber: apiPreview.existingRun?.voucherNumber ?? null,
+      postingDate: apiPreview.postingDate,
+    }
+  }
   await delay()
   return { ...SEED_YEAR_END, fiscalYear: fiscalYear ?? SEED_YEAR_END.fiscalYear }
+}
+
+export async function executeYearEndClosing(financialYearId: string): Promise<YearEndPreview> {
+  if (!isApiMode()) {
+    throw new Error('Year-end closing posts only in API mode.')
+  }
+  const { executeYearEndClose } = await import('@/services/bridges/financeApiBridge')
+  const result = await executeYearEndClose(financialYearId)
+  const apiPreview = result.preview
+  return {
+    fiscalYear: apiPreview.financialYearName,
+    financialYearId: apiPreview.financialYearId,
+    revenueToClose: Number(apiPreview.revenueToClose),
+    expenseToClose: Number(apiPreview.expenseToClose),
+    profitOrLoss: Number(apiPreview.profitOrLoss),
+    retainedEarningsAccount: apiPreview.retainedEarnings
+      ? `${apiPreview.retainedEarnings.accountCode} — ${apiPreview.retainedEarnings.accountName}`
+      : 'Not mapped',
+    exceptions: apiPreview.blockers.map((b) => b.message),
+    unresolvedDifferences: apiPreview.blockers.length,
+    readyToPost: apiPreview.readyToPost,
+    alreadyClosed: apiPreview.alreadyClosed,
+    blockers: apiPreview.blockers,
+    voucherNumber: apiPreview.existingRun?.voucherNumber ?? null,
+    postingDate: apiPreview.postingDate,
+  }
 }
 
 export async function getCloseReports(): Promise<CloseReportDef[]> {

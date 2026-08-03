@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { getPagination } from '../../../utils/pagination.js'
 import { freeQty, getBalance, unrestrictedQty } from '../shared/balance.service.js'
 import { mapStockBalance } from '../shared/inventory.mappers.js'

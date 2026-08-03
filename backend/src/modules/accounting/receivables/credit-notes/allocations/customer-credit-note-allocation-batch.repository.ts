@@ -1,5 +1,5 @@
 import type { CustomerCreditNoteAllocationBatch, Prisma } from '@prisma/client'
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { formatForPersistence, roundExchangeRate } from '../../../shared/finance-decimal.js'
 import type { CustomerCreditNoteAllocationBatchDto } from './customer-credit-note-allocation.types.js'
 

@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence } from '../../shared/finance-decimal.js'
 import * as repo from './customer-receipt.repository.js'
 import { resolveCustomerReceiptAllowedActions } from './customer-receipt-allowed-actions.js'

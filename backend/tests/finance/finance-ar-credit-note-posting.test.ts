@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import type { Request } from 'express'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { buildCustomerCreditNotePostingRequest } from '../../src/modules/accounting/receivables/credit-notes/posting/customer-credit-note-accounting-builder.service.js'
 import { buildCustomerCreditNotePostEventKey } from '../../src/modules/accounting/receivables/credit-notes/posting/customer-credit-note-posting.types.js'
 import { postCustomerCreditNote, postCustomerCreditNoteFromRequest } from '../../src/modules/accounting/receivables/credit-notes/posting/customer-credit-note-posting.service.js'

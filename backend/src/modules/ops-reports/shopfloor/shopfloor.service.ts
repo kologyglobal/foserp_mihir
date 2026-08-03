@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { toNum } from '../executors/helpers.js'
 import type { ReportRow } from '../types.js'
 

@@ -1,4 +1,4 @@
-import { prisma as p } from '../src/config/database.js'
+import { prisma as p } from '../src/config/prisma.js'
 
 async function main() {
   const tid = (await p.tenant.findFirst({ where: { slug: 'vasant-trailers' } }))!.id

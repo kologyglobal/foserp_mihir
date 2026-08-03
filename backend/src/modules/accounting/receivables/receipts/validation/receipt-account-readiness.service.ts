@@ -1,5 +1,5 @@
 import type { Account, DefaultAccountMappingKey } from '@prisma/client'
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import {
   MAPPING_KEY_ACCOUNT_TYPES,
   MAPPING_KEY_CATEGORIES,

@@ -50,6 +50,7 @@ import { Quotation360Page } from './Quotation360Page'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
 import { useQuotationConversion } from '../crm/hooks/useQuotationConversion'
+import { useQuotationPartyContext } from '../../hooks/useQuotationPartyContext'
 import { QuotationConversionDialog } from '@/components/quotations/QuotationConversionDialog'
 import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
 import { canCrmPermission } from '@/utils/permissions/crm'
@@ -762,8 +763,7 @@ export function CrmQuotationPrintPage() {
   const documentId = docId ?? (id ? getLatest(id)?.id : undefined)
   const doc = documentId ? getDoc(documentId) : undefined
   const quotation = useSalesStore((s) => (doc ? s.getQuotation(doc.quotationId) : undefined))
-  const customers = useMasterStore((s) => s.customers)
-  const customer = quotation ? customers.find((c) => c.id === quotation.customerId) : undefined
+  const { customer, contact, contactName } = useQuotationPartyContext(quotation, doc)
   const opportunity = doc?.opportunityId ? opportunities.find((o) => o.id === doc.opportunityId) : undefined
   const template = doc?.templateId ? useCrmStore.getState().getTemplate(doc.templateId) : undefined
   const printLayout = resolveQuotationPrintLayout(template)
@@ -795,7 +795,15 @@ export function CrmQuotationPrintPage() {
       onBack={() => navigate(`/crm/quotations/${doc.quotationId}`)}
       className="quo-print-page"
     >
-      <QuotationPrintDocument doc={doc} quotation={quotation} customer={customer} opportunity={opportunity} printLayout={printLayout} />
+      <QuotationPrintDocument
+        doc={doc}
+        quotation={quotation}
+        customer={customer}
+        opportunity={opportunity}
+        contact={contact}
+        contactName={contactName}
+        printLayout={printLayout}
+      />
     </DocumentPrintShell>
   )
 }

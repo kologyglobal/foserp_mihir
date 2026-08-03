@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { decimalToNumber, resolveUserNames, tenantActiveFilter, toIso } from '../../../shared/index.js'
 import { aggregateSalesForecast, type ForecastInputRow } from './forecast.aggregate.js'
 import type { ForecastQuery } from './forecast.validation.js'

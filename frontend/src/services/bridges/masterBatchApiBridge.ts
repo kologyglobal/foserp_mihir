@@ -307,6 +307,20 @@ export async function apiDeactivateItem(id: string): Promise<void> {
   })
 }
 
+export async function apiUploadItemImage(id: string, file: File): Promise<void> {
+  return withSubmitLock(lockKey('master:item:image', id), async () => {
+    const res = await api.uploadItemImageApi(id, file)
+    upsertItem(api.mapItemDto(res.data))
+  })
+}
+
+export async function apiDeleteItemImage(id: string): Promise<void> {
+  return withSubmitLock(lockKey('master:item:image', id), async () => {
+    const res = await api.deleteItemImageApi(id)
+    upsertItem(api.mapItemDto(res.data))
+  })
+}
+
 export async function apiCreateVendor(data: Omit<Vendor, 'id' | 'createdAt'>): Promise<string> {
   return withSubmitLock(lockKey('master:vendor:create'), async () => {
     const res = await api.createVendorApi(api.vendorToApiPayload(data as Vendor))

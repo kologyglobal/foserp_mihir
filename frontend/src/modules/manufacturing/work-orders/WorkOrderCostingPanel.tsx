@@ -18,12 +18,16 @@ import { formatDateTime } from '@/utils/dates/format'
 import {
   calculateWorkOrderCost,
   getWorkOrderAccountingReadiness,
+  getWorkOrderCostDetails,
   getWorkOrderCostSummary,
+  getWorkOrderCostTrace,
   previewWorkOrderFinancialClose,
   recordWorkOrderFinancialClose,
   type FinancialClosePreview,
   type ManufacturingAccountingReadiness,
+  type WorkOrderCostEntry,
   type WorkOrderCostSummary,
+  type WorkOrderCostTrace,
 } from '@/services/api/manufacturingCostingApi'
 import {
   canCalculateCost,
@@ -68,6 +72,7 @@ const WARNING_LABELS: Array<{ prefix: string; label: string }> = [
   { prefix: 'NOT_CALCULATED', label: 'Cost has not been calculated yet' },
   { prefix: 'INCOMPLETE_MATERIAL_RATE', label: 'Material rate missing (item standard rate not set)' },
   { prefix: 'PROVISIONAL_MATERIAL_RATE', label: 'Material valued at provisional (standard) rate' },
+  { prefix: 'MISSING_INVENTORY_COST_ENTRY', label: 'Material movement has no Inventory Cost Entry (using stamped movement value)' },
   { prefix: 'INCOMPLETE_LABOUR_RATE', label: 'Labour rate missing (work centre / policy rate not set)' },
   { prefix: 'INCOMPLETE_LABOUR_TIME', label: 'Labour time not recorded yet' },
   { prefix: 'INCOMPLETE_MACHINE_RATE', label: 'Machine rate missing (machine / work centre rate not set)' },
@@ -156,25 +161,31 @@ function costingStatusMeta(status: string | undefined): { label: string; tone: '
 export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) {
   const [summary, setSummary] = useState<WorkOrderCostSummary | null>(null)
   const [readiness, setReadiness] = useState<ManufacturingAccountingReadiness | null>(null)
+  const [details, setDetails] = useState<WorkOrderCostEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [showReadiness, setShowReadiness] = useState(false)
   const [closePreview, setClosePreview] = useState<FinancialClosePreview | null>(null)
   const [closePreviewOpen, setClosePreviewOpen] = useState(false)
+  const [trace, setTrace] = useState<WorkOrderCostTrace | null>(null)
+  const [traceOpen, setTraceOpen] = useState(false)
+  const [traceBusy, setTraceBusy] = useState(false)
 
   const accountingViewAllowed = canViewAccounting()
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [summaryRes, readinessRes] = await Promise.all([
+      const [summaryRes, readinessRes, detailsRes] = await Promise.all([
         getWorkOrderCostSummary(workOrderId),
         accountingViewAllowed
           ? getWorkOrderAccountingReadiness(workOrderId).catch(() => null)
           : Promise.resolve(null),
+        getWorkOrderCostDetails(workOrderId).catch(() => ({ data: [] as WorkOrderCostEntry[] })),
       ])
       setSummary(summaryRes.data)
       setReadiness(readinessRes?.data ?? null)
+      setDetails(detailsRes.data ?? [])
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load work order costing')
     } finally {
@@ -185,6 +196,27 @@ export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) 
   useEffect(() => {
     void load()
   }, [load])
+
+  const materialLines = useMemo(
+    () => details.filter((d) => d.costCategory === 'MATERIAL'),
+    [details],
+  )
+
+  const openTrace = useCallback(
+    async (entryId: string) => {
+      setTraceBusy(true)
+      try {
+        const res = await getWorkOrderCostTrace(workOrderId, entryId)
+        setTrace(res.data)
+        setTraceOpen(true)
+      } catch (e) {
+        notify.error(e instanceof Error ? e.message : 'Failed to load cost trace')
+      } finally {
+        setTraceBusy(false)
+      }
+    },
+    [workOrderId],
+  )
 
   const snapshot = summary?.snapshot ?? null
   const warnings = summary?.warnings ?? []
@@ -469,6 +501,85 @@ export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) 
         </div>
       </section>
 
+      {/* Material lines — Inventory Cost Entry sourced */}
+      <section className="rounded-lg border border-erp-border bg-white p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">Material (Inventory Costing)</h3>
+          <span className="text-[11px] text-erp-muted">
+            Amounts from Inventory Cost Entries — Manufacturing does not revalue stock
+          </span>
+        </div>
+        {materialLines.length === 0 ? (
+          <p className="text-[12px] text-erp-muted">
+            {notCalculated ? 'Calculate cost to load material lines.' : 'No material issues/returns on this work order.'}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="erp-table w-full text-[12px]">
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th className="text-right">Qty</th>
+                  <th>UOM</th>
+                  <th>Valuation</th>
+                  <th className="text-right">Unit cost</th>
+                  <th className="text-right">Total</th>
+                  <th>Source</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {materialLines.map((line) => (
+                  <tr key={line.id}>
+                    <td className="font-medium">
+                      {line.itemCode ? `${line.itemCode} — ` : ''}
+                      {line.itemName ?? line.itemId ?? '—'}
+                    </td>
+                    <td className="text-right tabular-nums">{line.quantity ?? '—'}</td>
+                    <td>{line.uom ?? '—'}</td>
+                    <td>
+                      {line.valuationMethod
+                        ? String(line.valuationMethod).replace(/_/g, ' ')
+                        : '—'}
+                    </td>
+                    <td className="text-right tabular-nums">{moneyValue(line.rate)}</td>
+                    <td className="text-right tabular-nums">{moneyValue(line.amount)}</td>
+                    <td>
+                      <DynamicsStatusChip
+                        label={
+                          line.costSource === 'INVENTORY_COST_ENTRY'
+                            ? 'Inventory Cost Entry'
+                            : line.provisional
+                              ? 'Provisional'
+                              : 'Movement'
+                        }
+                        tone={
+                          line.costSource === 'INVENTORY_COST_ENTRY'
+                            ? 'success'
+                            : line.provisional
+                              ? 'warning'
+                              : 'neutral'
+                        }
+                      />
+                    </td>
+                    <td>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={traceBusy}
+                        onClick={() => void openTrace(line.id)}
+                      >
+                        Trace
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       {/* Warnings */}
       {warnings.length > 0 ? (
         <section className="rounded-lg border border-erp-border bg-white p-4">
@@ -560,6 +671,101 @@ export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) 
                 Recording financial close creates a PRODUCTION_VARIANCE accounting event. Posted vouchers are immutable.
               </p>
             )}
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={traceOpen}
+        onClose={() => setTraceOpen(false)}
+        title="Material cost trace"
+        footer={
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setTraceOpen(false)}>
+              Close
+            </Button>
+          </div>
+        }
+      >
+        {trace ? (
+          <div className="space-y-3 text-[13px]">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <p className="text-[11px] uppercase text-erp-muted">Material</p>
+                <p className="font-medium">
+                  {trace.item ? `${trace.item.itemCode} — ${trace.item.itemName}` : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase text-erp-muted">Work order</p>
+                <p className="font-medium">{trace.workOrder?.orderNumber ?? workOrderId}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase text-erp-muted">Valuation</p>
+                <p className="font-medium">{(trace.valuationMethod ?? '—').replace(/_/g, ' ')}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase text-erp-muted">Amount</p>
+                <p className="font-semibold tabular-nums">{moneyValue(trace.costEntry.amount)}</p>
+              </div>
+            </div>
+            {trace.inventoryMovement ? (
+              <div className="rounded-md border border-erp-border bg-erp-surface/40 px-3 py-2 text-[12px]">
+                <p className="font-medium">
+                  Inventory movement {trace.inventoryMovement.movementNumber} ·{' '}
+                  {trace.inventoryMovement.referenceType.replace(/_/g, ' ')}
+                </p>
+                <p className="text-erp-muted">
+                  Qty {String(trace.inventoryMovement.quantity)} · Rate {moneyValue(String(trace.inventoryMovement.rate))} ·
+                  Value {moneyValue(String(trace.inventoryMovement.value))}
+                </p>
+              </div>
+            ) : null}
+            {trace.inventoryCostEntry ? (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
+                Cost source: Inventory Cost Entry {trace.inventoryCostEntry.id.slice(0, 8)}… ·{' '}
+                {String(trace.inventoryCostEntry.valuationMethod).replace(/_/g, ' ')}
+              </div>
+            ) : (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                No Inventory Cost Entry linked — using movement / provisional fallback.
+              </div>
+            )}
+            {trace.fifoLayers.length > 0 ? (
+              <div>
+                <p className="mb-1 text-[11px] font-medium uppercase text-erp-muted">FIFO / Specific layers consumed</p>
+                <ul className="space-y-1 text-[12px]">
+                  {trace.fifoLayers.map((layer) => (
+                    <li key={layer.consumptionId} className="flex justify-between gap-2 border-b border-erp-border/60 py-1">
+                      <span>
+                        {layer.quantityConsumed} @ {moneyValue(String(layer.unitCost))}
+                        {layer.serialId ? ` · serial ${layer.serialId.slice(0, 8)}…` : ''}
+                        {layer.lotId ? ` · lot ${layer.lotId.slice(0, 8)}…` : ''}
+                      </span>
+                      <span className="tabular-nums">{moneyValue(String(layer.totalCost))}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {trace.standardCost ? (
+              <div className="text-[12px]">
+                Standard v{trace.standardCost.version}: {moneyValue(String(trace.standardCost.unitCost))} (from{' '}
+                {String(trace.standardCost.effectiveFrom).slice(0, 10)})
+              </div>
+            ) : null}
+            {trace.variances.length > 0 ? (
+              <div>
+                <p className="mb-1 text-[11px] font-medium uppercase text-erp-muted">Variances</p>
+                <ul className="space-y-1 text-[12px]">
+                  {trace.variances.map((v) => (
+                    <li key={v.id}>
+                      {v.varianceType.replace(/_/g, ' ')}: {moneyValue(String(v.varianceAmount))}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </Modal>

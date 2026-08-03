@@ -2,13 +2,17 @@ import type {
   Prisma,
   PurchaseQualityInspection,
   PurchaseQualityInspectionLine,
+  PurchaseQualityInspectionParameter,
   QualityInspectionStatus,
 } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListQualityInspectionsQuery } from './quality-inspection.validation.js'
 
-export const includeQualityInspection = { lines: { orderBy: { lineNumber: 'asc' as const } } } as const
+export const includeQualityInspection = {
+  lines: { orderBy: { lineNumber: 'asc' as const } },
+  parameters: { orderBy: { lineNumber: 'asc' as const } },
+} as const
 
 export async function findQualityInspections(tenantId: string, query: ListQualityInspectionsQuery) {
   const { getPagination } = await import('../../../utils/pagination.js')
@@ -78,6 +82,24 @@ export async function replaceQualityInspectionLines(
   })
 }
 
+export async function replaceQualityInspectionParameters(
+  tenantId: string,
+  qualityInspectionId: string,
+  parameters: Array<
+    Omit<
+      Prisma.PurchaseQualityInspectionParameterUncheckedCreateInput,
+      'id' | 'tenantId' | 'qualityInspectionId' | 'createdAt' | 'updatedAt'
+    >
+  >,
+  tx: Prisma.TransactionClient,
+) {
+  await tx.purchaseQualityInspectionParameter.deleteMany({ where: { tenantId, qualityInspectionId } })
+  if (!parameters.length) return
+  await tx.purchaseQualityInspectionParameter.createMany({
+    data: parameters.map((parameter) => ({ ...parameter, tenantId, qualityInspectionId })),
+  })
+}
+
 export const addQiHistory = (
   tenantId: string,
   id: string,
@@ -105,4 +127,5 @@ export const addQiHistory = (
 
 export type QualityInspectionWithLines = PurchaseQualityInspection & {
   lines: PurchaseQualityInspectionLine[]
+  parameters: PurchaseQualityInspectionParameter[]
 }

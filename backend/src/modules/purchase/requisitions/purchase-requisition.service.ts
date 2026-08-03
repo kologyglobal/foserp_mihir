@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { nextCode, previewNextCode } from '../../../services/codeSeries.service.js'
 import { syncPurchasePlanningRowsFromApprovedPr } from '../planning/purchase-planning-sync.service.js'
 import {

@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client'
 export async function resolveUserNames(
   userIds: Array<string | null | undefined>,
   tenantId: string,
-  db: Prisma.TransactionClient | typeof import('../../config/database.js').prisma,
+  db: Prisma.TransactionClient | typeof import('../../config/prisma.js').prisma,
 ): Promise<Map<string, string>> {
   const ids = [...new Set(userIds.filter((id): id is string => Boolean(id)))]
   if (ids.length === 0) return new Map()

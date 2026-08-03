@@ -74,6 +74,8 @@ export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: Permissio
   { prefix: '/job-work', permission: 'production.view', pageName: 'Job Work' },
   { prefix: '/production', permission: 'production.view', pageName: 'Production' },
   { prefix: '/quality', permission: 'quality.view', pageName: 'Quality' },
+  // Maintenance shell: canRoute checks JWT maintenance.view (see permissions/index.ts)
+  { prefix: '/maintenance', permission: 'production.view', pageName: 'Maintenance' },
   { prefix: '/logistics', permission: 'dispatch.view', pageName: 'Logistics' },
   { prefix: '/dispatch/settings', permission: 'dispatch.view', pageName: 'Dispatch Settings' },
   { prefix: '/dispatch', permission: 'dispatch.view', pageName: 'Dispatch' },

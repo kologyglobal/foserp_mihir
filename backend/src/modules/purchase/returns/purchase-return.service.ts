@@ -1,10 +1,15 @@
 import type { Prisma, PurchaseReturnStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { resolveEffectivePurchaseDefaults } from '../shared/purchase-defaults.js'
 import { postPurchaseReturnStockIssue } from '../shared/purchase-inventory-posting.js'
 import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/accounting/inventory-accounting-event.service.js'
+import {
+  buildPurchaseReturnApAdjustmentPreview,
+  handoffPurchaseReturnToVendorAdjustmentDraft,
+} from './purchase-return-ap-handoff.service.js'
+import { logger } from '../../../config/logger.js'
 import { PurchaseReturnNotFoundError, PurchaseReturnValidationError } from './purchase-return.errors.js'
 import { mapPurchaseReturn, type PurchaseReturnEnrichment } from './purchase-return.mapper.js'
 import * as repo from './purchase-return.repository.js'
@@ -259,7 +264,27 @@ export async function completePurchaseReturn(tenantId: string, id: string, actor
     narration: `Purchase return ${existing.returnNumber}`,
     userId: actorId,
   })
+  // FIN-CLOSE-1 — raise the AP debit note for the invoiced portion. Best-effort: the
+  // stock issue is already committed, so a finance-setup gap must not fail the return.
+  // Re-runnable from the Purchase Return detail page.
+  try {
+    await handoffPurchaseReturnToVendorAdjustmentDraft(tenantId, id, actorId)
+  } catch (error) {
+    logger.error('Purchase return AP adjustment handoff failed', {
+      tenantId,
+      purchaseReturnId: id,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
   return toReturnDto(tenantId, await loadOrThrow(tenantId, id))
+}
+
+export async function getPurchaseReturnApAdjustmentPreview(tenantId: string, id: string) {
+  return buildPurchaseReturnApAdjustmentPreview(tenantId, id)
+}
+
+export async function createPurchaseReturnApAdjustment(tenantId: string, id: string, actorId: string) {
+  return handoffPurchaseReturnToVendorAdjustmentDraft(tenantId, id, actorId)
 }
 export async function cancelPurchaseReturn(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
   const existing = await loadOrThrow(tenantId, id); assertReturnStatus(existing.status, ['DRAFT', 'SUBMITTED', 'APPROVED'], 'cancelled')

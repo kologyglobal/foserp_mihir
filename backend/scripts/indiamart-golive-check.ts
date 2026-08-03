@@ -2,7 +2,7 @@
  * One-shot IndiaMART go-live readiness check (no secrets printed).
  * Usage: npx tsx scripts/indiamart-golive-check.ts [--tenant=vasant-trailers]
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { isFieldEncryptionConfigured } from '../src/utils/fieldEncryption.js'
 
 const tenantArg = process.argv.find((a) => a.startsWith('--tenant='))?.slice('--tenant='.length)

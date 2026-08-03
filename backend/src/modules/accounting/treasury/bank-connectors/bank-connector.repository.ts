@@ -1,6 +1,6 @@
 import type { BankConnector, BankConnectorProvider, BankConnectorStatus } from '@prisma/client'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { BankConnectorNotFoundError, BankConnectorStaleVersionError } from './bank-connector.errors.js'
 import type { ListBankConnectorsQuery } from './bank-connector.schemas.js'
@@ -148,5 +148,19 @@ export async function softDeleteConnector(tenantId: string, id: string, updatedB
       status: 'DISABLED',
       updatedBy,
     },
+  })
+}
+
+/** ENABLED connectors with a non-empty scheduleCron (for the 5D4 cron worker). */
+export async function listScheduledEnabledConnectors(take = 200): Promise<BankConnector[]> {
+  return prisma.bankConnector.findMany({
+    where: {
+      ...notDeleted(),
+      status: 'ENABLED',
+      scheduleCron: { not: null },
+      NOT: { scheduleCron: '' },
+    },
+    take,
+    orderBy: [{ lastSyncAt: 'asc' }, { code: 'asc' }],
   })
 }

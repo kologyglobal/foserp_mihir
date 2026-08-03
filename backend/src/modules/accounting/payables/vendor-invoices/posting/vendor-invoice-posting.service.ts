@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../../../services/audit.service.js'
 import { AuthorizationError } from '../../../../../utils/errors.js'
 import { formatForPersistence } from '../../../shared/finance-decimal.js'
@@ -27,6 +27,7 @@ import {
 } from './vendor-invoice-posting.errors.js'
 import { VendorInvoiceNotFoundError } from '../vendor-invoice.errors.js'
 import { compare } from '../../../shared/finance-decimal.js'
+import { applyPurchaseInvoiceRetroCostInTx } from '../../../../inventory/costing/purchase-invoice-retro-cost.service.js'
 
 function hasPerm(req: Request, permission: string): boolean {
   const perms = req.context?.permissions ?? []
@@ -223,6 +224,15 @@ export async function postVendorInvoice(
           throw new VendorInvoicePayableOpenItemCreationFailedError()
         }
         openItemId = openItem.id
+
+        await applyPurchaseInvoiceRetroCostInTx(tx, {
+          tenantId: txContext.tenantId,
+          legalEntityId: invoice.legalEntityId,
+          vendorInvoiceId: invoice.id,
+          postingDate: invoice.postingDate ?? invoice.documentDate,
+          actorId: txContext.userId ?? null,
+          plan: postingCtx.retroCostPlan,
+        })
 
         const updated = await finalizePostedVendorInvoice(tx, {
           tenantId: txContext.tenantId,

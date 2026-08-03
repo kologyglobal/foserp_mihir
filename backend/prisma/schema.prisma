@@ -73,6 +73,7 @@ enum CodeSeriesEntity {
   MANUFACTURING_ROUTING
   DISPATCH_POSTING
   DISPATCH_REVERSAL
+  MAINTENANCE_TICKET
 }
 
 enum ActivityType {
@@ -200,6 +201,7 @@ model Tenant {
   financialYears                         FinancialYear[]
   accountingPeriods                      AccountingPeriod[]
   periodCloseChecklistAcks               PeriodCloseChecklistAck[]
+  yearEndCloseRuns                       YearEndCloseRun[]
   accounts                               Account[]
   defaultAccountMappings                 DefaultAccountMapping[]
   financeSettings                        FinanceSettings[]
@@ -298,6 +300,9 @@ model Tenant {
 
   manufacturingWorkCentres           ManufacturingWorkCentre[]
   manufacturingMachines              ManufacturingMachine[]
+  maintenanceTickets                 MaintenanceTicket[]
+  maintenanceParts                   MaintenancePart[]
+  maintenanceAttachments             MaintenanceAttachment[]
   manufacturingCostingPolicies       ManufacturingCostingPolicy[]
   manufacturingBoms                  ManufacturingBom[]
   manufacturingBomVersions           ManufacturingBomVersion[]
@@ -433,6 +438,8 @@ model Tenant {
   purchaseOrders                  PurchaseOrder[]
   purchaseOrderLines              PurchaseOrderLine[]
   purchaseOrderRevisions          PurchaseOrderRevision[]
+  purchaseOrdersArchived          PurchaseOrderArchived[]
+  purchaseOrderLinesArchived      PurchaseOrderLineArchived[]
   goodsReceipts                   GoodsReceipt[]
   goodsReceiptLines               GoodsReceiptLine[]
   purchaseApprovals               PurchaseApproval[]
@@ -442,9 +449,10 @@ model Tenant {
   purchaseApprovalTiers           PurchaseApprovalTier[]
   purchaseInspectionCategories    PurchaseInspectionCategory[]
   purchaseApproverLimits          PurchaseApproverLimit[]
-  purchaseQualityInspections      PurchaseQualityInspection[]
-  purchaseQualityInspectionLines  PurchaseQualityInspectionLine[]
-  manufacturingQualityInspections ManufacturingQualityInspection[]
+  purchaseQualityInspections           PurchaseQualityInspection[]
+  purchaseQualityInspectionLines       PurchaseQualityInspectionLine[]
+  purchaseQualityInspectionParameters  PurchaseQualityInspectionParameter[]
+  manufacturingQualityInspections      ManufacturingQualityInspection[]
   purchaseInvoices                PurchaseInvoice[]
   purchaseInvoiceLines            PurchaseInvoiceLine[]
   purchaseReturns                 PurchaseReturn[]
@@ -2517,6 +2525,7 @@ model MasterWarehouse {
   purchaseSettingsDefault            PurchaseSettings[]        @relation("PurchaseSettingsDefaultWarehouse")
   purchaseSettingsRequisitionDefault PurchaseSettings[]        @relation("PurchaseSettingsRequisitionWarehouse")
   plantSettingsDefault               PurchasePlantSettings[]   @relation("PurchasePlantSettingsDefaultWarehouse")
+  maintenanceParts                   MaintenancePart[]
 
   manufacturingProfilesProduction    ManufacturingProfile[]           @relation("ProfileProductionWarehouse")
   manufacturingProfilesWip           ManufacturingProfile[]           @relation("ProfileWipWarehouse")
@@ -2640,6 +2649,7 @@ model MasterBin {
   warehouse         MasterWarehouse    @relation(fields: [warehouseId], references: [id])
   storageLocation   MasterLocation     @relation(fields: [storageLocationId], references: [id])
   goodsReceiptLines GoodsReceiptLine[]
+  purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([tenantId, warehouseId, code])
   @@index([tenantId])
@@ -2700,6 +2710,7 @@ model MasterGstGroup {
   hsnCodes MasterHsnCode[]
   gstRates MasterGstRate[]
   items    MasterItem[]
+  purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2724,6 +2735,7 @@ model MasterHsnCode {
   tenant   Tenant         @relation(fields: [tenantId], references: [id])
   gstGroup MasterGstGroup @relation(fields: [gstGroupId], references: [id])
   items    MasterItem[]
+  purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2816,6 +2828,8 @@ model MasterItem {
   routingNo               String?                   @db.VarChar(64)
   drawingNo               String?                   @db.VarChar(64)
   subAssemblyRule         String?                   @db.VarChar(32)
+  /// Relative storage key under uploads/items (tenantId/itemId.ext)
+  imageUrl                String?                   @db.VarChar(500)
   status                  MasterRecordStatus        @default(ACTIVE)
   createdBy               String?
   updatedBy               String?
@@ -2876,6 +2890,7 @@ model MasterItem {
   dispatchPickLines               DispatchPickLine[]
   dispatchTrackingAllocations     DispatchTrackingAllocation[]
   dispatchPackageLines            DispatchPackageLine[]
+  maintenanceParts                MaintenancePart[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2940,6 +2955,7 @@ model MasterVendor {
 
   manufacturingRoutingOperationsVendor ManufacturingRoutingOperation[]
   jobWorkOrders                        JobWorkOrder[]
+  maintenanceTickets                   MaintenanceTicket[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3035,6 +3051,11 @@ enum DefaultAccountMappingKey {
   FINISHED_GOODS_INVENTORY
   STOCK_ADJUSTMENT
   MATERIAL_CONSUMPTION
+  /// FIN-CLOSE-1 — goods received not invoiced clearing. Credited on GRN inward,
+  /// debited when the Vendor Invoice posts. Replaces PURCHASE as the GRN counterpart.
+  GRIR_CLEARING
+  /// FIN-CLOSE-1 — purchase price variance (vendor invoice vs receipt / standard cost).
+  PURCHASE_PRICE_VARIANCE
   /// Manufacturing costing uses the finance default-account mapping source (ADR-039);
   /// do not introduce a separate manufacturing account-mapping table.
   LABOUR_ABSORPTION
@@ -3198,6 +3219,7 @@ model LegalEntity {
   branches                               Branch[]
   financialYears                         FinancialYear[]
   accountingPeriods                      AccountingPeriod[]
+  yearEndCloseRuns                       YearEndCloseRun[]
   accounts                               Account[]
   defaultAccountMappings                 DefaultAccountMapping[]
   financeSettings                        FinanceSettings?
@@ -3395,6 +3417,7 @@ model FinancialYear {
   tenant               Tenant                @relation(fields: [tenantId], references: [id])
   legalEntity          LegalEntity           @relation(fields: [legalEntityId], references: [id])
   periods              AccountingPeriod[]
+  yearEndCloseRun      YearEndCloseRun?
   financeNumberSeries  FinanceNumberSeries[]
   accountingVouchers   AccountingVoucher[]
   generalLedgerEntries GeneralLedgerEntry[]
@@ -3410,6 +3433,42 @@ model FinancialYear {
   @@index([legalEntityId, startDate, endDate])
   @@index([legalEntityId, isCurrent])
   @@map("financial_years")
+}
+
+enum YearEndCloseRunStatus {
+  POSTED
+  NO_ACTIVITY
+}
+
+/// Year-end P&L close into retained earnings (one successful run per financial year).
+model YearEndCloseRun {
+  id                        String                @id @default(uuid())
+  tenantId                  String
+  legalEntityId             String
+  financialYearId           String                @unique
+  status                    YearEndCloseRunStatus
+  postingDate               DateTime              @db.Date
+  revenueTotal              Decimal               @db.Decimal(18, 4)
+  expenseTotal              Decimal               @db.Decimal(18, 4)
+  profitOrLoss              Decimal               @db.Decimal(18, 4)
+  retainedEarningsAccountId String
+  retainedEarningsCode      String                @db.VarChar(32)
+  retainedEarningsName      String                @db.VarChar(200)
+  voucherId                 String?
+  postingEventId            String?
+  voucherNumber             String?               @db.VarChar(64)
+  closedBy                  String?
+  closedAt                  DateTime              @default(now())
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  legalEntity   LegalEntity   @relation(fields: [legalEntityId], references: [id])
+  financialYear FinancialYear @relation(fields: [financialYearId], references: [id])
+
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@map("year_end_close_runs")
 }
 
 model AccountingPeriod {
@@ -5997,6 +6056,7 @@ model PurchaseOrder {
   goodsReceipts             GoodsReceipt[]
   approvals                 PurchaseApproval[]        @relation("PurchaseApprovalPo")
   revisions                 PurchaseOrderRevision[]
+  archives                  PurchaseOrderArchived[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
@@ -6040,7 +6100,16 @@ model PurchaseOrderLine {
   rejectedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
   returnedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
   invoicedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  gstGroupId                String?
+  hsnId                     String?
+  hsnCodeSnapshot           String    @default("") @db.VarChar(16)
+  gstGroupCodeSnapshot      String    @default("") @db.VarChar(32)
+  binId                     String?
+  qcRequiredSnapshot        Boolean   @default(false)
+  qualityTestGroupCodeSnapshot String? @db.VarChar(32)
   requiredDate              DateTime? @db.Date
+  /// Optional PR document number displayed on the PO line.
+  requisitionNumber         String?   @db.VarChar(64)
   remarks                   String?   @db.Text
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
@@ -6051,6 +6120,9 @@ model PurchaseOrderLine {
   purchasePlanningRow     PurchasePlanningRow?     @relation(fields: [purchasePlanningRowId], references: [id])
   item                    MasterItem?              @relation(fields: [itemId], references: [id])
   uom                     MasterUom?               @relation(fields: [uomId], references: [id])
+  gstGroup                MasterGstGroup?          @relation(fields: [gstGroupId], references: [id])
+  hsn                     MasterHsnCode?           @relation(fields: [hsnId], references: [id])
+  bin                     MasterBin?               @relation(fields: [binId], references: [id])
   goodsReceiptLines       GoodsReceiptLine[]
 
   @@unique([tenantId, purchaseOrderId, lineNumber])
@@ -6059,6 +6131,9 @@ model PurchaseOrderLine {
   @@index([tenantId, purchaseRequisitionLineId])
   @@index([tenantId, purchasePlanningRowId])
   @@index([tenantId, itemId])
+  @@index([tenantId, gstGroupId])
+  @@index([tenantId, hsnId])
+  @@index([tenantId, binId])
   @@map("purchase_order_lines")
 }
 
@@ -6088,6 +6163,82 @@ model PurchaseOrderRevision {
   @@index([tenantId])
   @@index([tenantId, purchaseOrderId])
   @@map("purchase_order_revisions")
+}
+
+/// Relational archive of a PO header as it existed before a revise (Rev N snapshot).
+model PurchaseOrderArchived {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  purchaseOrderId       String
+  revisionNo            Int
+  orderNumber           String              @db.VarChar(64)
+  orderDate             DateTime            @db.Date
+  vendorId              String
+  origin                PurchaseOrderOrigin @default(MANUAL)
+  status                PurchaseOrderStatus
+  purchaseRequisitionId String?
+  requestForQuotationId String?
+  vendorQuotationId     String?
+  vendorComparisonId    String?
+  currencyCode          String              @default("INR") @db.VarChar(8)
+  expectedDeliveryDate  DateTime?           @db.Date
+  paymentTerms          String?             @db.VarChar(200)
+  deliveryTerms         String?             @db.VarChar(200)
+  deliveryWarehouseId   String?
+  subtotalAmount        Decimal             @default(0) @db.Decimal(18, 2)
+  taxAmount             Decimal             @default(0) @db.Decimal(18, 2)
+  freightAmount         Decimal             @default(0) @db.Decimal(18, 2)
+  totalAmount           Decimal             @default(0) @db.Decimal(18, 2)
+  remarks               String?             @db.Text
+  archivedById          String?             @db.VarChar(36)
+  archivedAt            DateTime            @default(now())
+  reason                String              @db.Text
+
+  tenant        Tenant                     @relation(fields: [tenantId], references: [id])
+  purchaseOrder PurchaseOrder              @relation(fields: [purchaseOrderId], references: [id])
+  lines         PurchaseOrderLineArchived[]
+
+  @@unique([tenantId, purchaseOrderId, revisionNo])
+  @@index([tenantId])
+  @@index([tenantId, purchaseOrderId])
+  @@map("purchase_order_archived")
+}
+
+/// Relational archive of PO lines as they existed before a revise.
+model PurchaseOrderLineArchived {
+  id                        String    @id @default(uuid())
+  tenantId                  String
+  archivedHeaderId          String
+  purchaseOrderId           String
+  sourceLineId              String?
+  revisionNo                Int
+  lineNumber                Int
+  purchaseRequisitionLineId String?
+  purchasePlanningRowId     String?
+  itemId                    String?
+  itemCodeSnapshot          String    @default("") @db.VarChar(64)
+  itemNameSnapshot          String    @default("") @db.VarChar(300)
+  description               String?   @db.Text
+  quantity                  Decimal   @default(0) @db.Decimal(18, 4)
+  uomQuantity               Decimal   @default(0) @db.Decimal(18, 4)
+  uomConversionFactor       Decimal   @default(1) @db.Decimal(18, 4)
+  unitCostPrimary           Decimal   @default(0) @db.Decimal(18, 4)
+  uomId                     String?
+  rate                      Decimal   @default(0) @db.Decimal(18, 2)
+  amount                    Decimal   @default(0) @db.Decimal(18, 2)
+  receivedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  requiredDate              DateTime? @db.Date
+  requisitionNumber         String?   @db.VarChar(64)
+  remarks                   String?   @db.Text
+  archivedAt                DateTime  @default(now())
+
+  tenant         Tenant                @relation(fields: [tenantId], references: [id])
+  archivedHeader PurchaseOrderArchived @relation(fields: [archivedHeaderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, archivedHeaderId])
+  @@map("purchase_line_archived")
 }
 
 enum GoodsReceiptStatus {
@@ -6424,6 +6575,8 @@ model PurchaseSettings {
   overReceiptTolerancePct        Decimal                     @default(0) @db.Decimal(5, 2)
   /// When true, revising a released PO returns it to PENDING_APPROVAL.
   requireApprovalOnPoRevision    Boolean                     @default(true)
+  /// When true, new POs must be submitted for approval before release.
+  requireApprovalOnPo            Boolean                     @default(true)
   allowShortClose                Boolean                     @default(true)
   requireVendorChallan           Boolean                     @default(false)
   requireVehicleNumber           Boolean                     @default(false)
@@ -6602,6 +6755,7 @@ model PurchaseQualityInspection {
   vendorId         String?
   status           QualityInspectionStatus @default(DRAFT)
   warehouseId      String?
+  inspectionPlan   String?                 @db.VarChar(300)
   remarks          String?                 @db.Text
   deviationRemarks String?                 @db.Text
   inspectedById    String?                 @db.VarChar(36)
@@ -6613,8 +6767,9 @@ model PurchaseQualityInspection {
   updatedAt        DateTime                @updatedAt
   deletedAt        DateTime?
 
-  tenant Tenant                          @relation(fields: [tenantId], references: [id])
-  lines  PurchaseQualityInspectionLine[]
+  tenant     Tenant                               @relation(fields: [tenantId], references: [id])
+  lines      PurchaseQualityInspectionLine[]
+  parameters PurchaseQualityInspectionParameter[]
 
   @@unique([tenantId, inspectionNumber])
   @@index([tenantId])
@@ -6650,6 +6805,32 @@ model PurchaseQualityInspectionLine {
   @@index([tenantId])
   @@index([tenantId, qualityInspectionId])
   @@map("purchase_quality_inspection_lines")
+}
+
+/// Free-form incoming QI parameter checklist (not linked to manufacturing QualityParameter masters).
+model PurchaseQualityInspectionParameter {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  qualityInspectionId String
+  lineNumber          Int
+  parameterName       String   @db.VarChar(200)
+  specification       String   @default("") @db.VarChar(500)
+  minValue            Decimal? @db.Decimal(18, 4)
+  maxValue            Decimal? @db.Decimal(18, 4)
+  observedValue       Decimal? @db.Decimal(18, 4)
+  unit                String   @default("") @db.VarChar(32)
+  result              String   @default("na") @db.VarChar(16)
+  remarks             String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id])
+  qualityInspection PurchaseQualityInspection @relation(fields: [qualityInspectionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, qualityInspectionId, lineNumber], map: "qi_params_tenant_qi_lineno_key")
+  @@index([tenantId])
+  @@index([tenantId, qualityInspectionId], map: "qi_params_tenant_qi_idx")
+  @@map("purchase_quality_inspection_parameters")
 }
 
 model PurchaseInvoice {
@@ -6750,6 +6931,10 @@ model PurchaseReturn {
   warehouseId         String?
   reason              String?              @db.Text
   remarks             String?              @db.Text
+  /// FIN-CLOSE-1 — soft link to the Accounting VendorAdjustment (debit note) raised for
+  /// the invoiced portion of this return. Null when no posted invoice exists (no AP effect).
+  vendorAdjustmentId       String?         @db.VarChar(36)
+  vendorAdjustmentDraftRef String?         @db.VarChar(64)
   submittedAt         DateTime?
   completedAt         DateTime?
   cancelledAt         DateTime?
@@ -8003,6 +8188,8 @@ enum VendorAdjustmentSourceLinkType {
   PURCHASE_ORDER
   GOODS_RECEIPT
   PURCHASE_RECEIPT
+  /// FIN-CLOSE-1 — Purchase Return that triggered this AP adjustment.
+  PURCHASE_RETURN
   CONTRACT
   PROJECT
   OTHER
@@ -9860,6 +10047,7 @@ model ManufacturingMachine {
   dailyProductionLines      DailyProductionLine[]
   productionIssues          ProductionIssue[]
   productionDowntimes       ProductionDowntime[]
+  maintenanceTickets        MaintenanceTicket[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -11405,6 +11593,7 @@ enum InventoryReferenceType {
   STOCK_COUNT_REVERSAL
   CONTROLLED_ADJUSTMENT
   ADJUSTMENT_REVERSAL
+  ISSUE_TO_MAINTENANCE
 }
 
 enum InventoryReservationDemandType {
@@ -15119,6 +15308,9 @@ enum WorkOrderCostCategory {
   REVERSAL
 }
 
+/// @deprecated LEGACY — InventoryValuationMethod on Inventory Costing is canonical.
+/// ManufacturingCostingPolicy.inventoryValuationMethod is retained for historical readability only.
+/// Do not use for new material valuation decisions (IV-MFG-1).
 model ManufacturingCostingPolicy {
   id                       String                                @id @default(uuid())
   tenantId                 String
@@ -15136,6 +15328,7 @@ model ManufacturingCostingPolicy {
   defaultMachineRate       Decimal                               @default(0) @db.Decimal(18, 2)
   fgPostingMode            ManufacturingPostingMode              @default(MANUAL)
   variancePostingMode      ManufacturingPostingMode              @default(MANUAL)
+  /// @deprecated Unused at runtime. Canonical method: InventorySettings → InventoryValuationMethod.
   inventoryValuationMethod ManufacturingInventoryValuationMethod @default(MOVING_AVERAGE)
   status                   ManufacturingCostingPolicyStatus      @default(DRAFT)
   effectiveFrom            DateTime?                             @db.Date
@@ -17290,4 +17483,213 @@ model ExecutiveDashboardWidget {
   @@index([tenantId, dashboardId])
   @@index([dashboardId])
   @@map("executive_dashboard_widgets")
+}
+
+// ─── Maintenance V1 ──────────────────────────────────────────────────────────
+
+enum MaintenanceTicketStatus {
+  REPORTED
+  IN_REPAIR
+  WAITING_FOR_PART
+  ON_HOLD
+  TESTING
+  CLOSED
+  CANCELLED
+}
+
+enum MaintenancePriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum MaintenanceTechnicianType {
+  INTERNAL
+  EXTERNAL
+}
+
+enum MaintenanceTestResult {
+  PASS
+  FAIL
+}
+
+enum MaintenanceFailureCategory {
+  MECHANICAL
+  ELECTRICAL
+  HYDRAULIC
+  PNEUMATIC
+  CONTROL
+  OTHER
+}
+
+enum MaintenancePhotoCategory {
+  BEFORE
+  DURING
+  AFTER
+  OTHER
+}
+
+enum MaintenanceSourceType {
+  MANUAL
+  MY_WORK
+  WORK_ORDER
+  JOB_CARD
+  OPERATION
+}
+
+model MaintenanceTicket {
+  id     String @id @default(uuid())
+  tenantId String
+
+  ticketNumber String @db.VarChar(32)
+
+  machineId    String
+  workCentreId String?
+
+  sourceType       MaintenanceSourceType @default(MANUAL)
+  sourceDocumentId String?               @db.VarChar(64)
+
+  workOrderId String?
+  jobCardId   String? @db.VarChar(64)
+  /// ProductionOrderStage / Job Card code for display
+  jobCardCode String? @db.VarChar(64)
+  operationId String?
+  operationCode String? @db.VarChar(64)
+  operationName String? @db.VarChar(200)
+
+  problem  String              @db.Text
+  priority MaintenancePriority @default(NORMAL)
+  status   MaintenanceTicketStatus @default(REPORTED)
+
+  failureCategory MaintenanceFailureCategory?
+
+  reportedByUserId String?
+  reportedAt       DateTime @default(now())
+
+  /// Operator / reporter display name (may differ from logged-in user)
+  operatorName String? @db.VarChar(200)
+
+  /// Auto-captured at report time when browser GPS is available
+  reportedLatitude     Decimal? @db.Decimal(10, 7)
+  reportedLongitude    Decimal? @db.Decimal(10, 7)
+  reportedAccuracyM    Decimal? @db.Decimal(10, 2)
+  /// Plant / work centre / workstation label captured at report
+  reportedLocationLabel String? @db.VarChar(300)
+
+  repairStartedAt DateTime?
+
+  technicianType    MaintenanceTechnicianType?
+  technicianUserId  String?
+  contractorId      String?
+  technicianName    String? @db.VarChar(200)
+
+  repairDetails String? @db.Text
+
+  testResult      MaintenanceTestResult?
+  testedByUserId  String?
+  testedAt        DateTime?
+  testRemarks     String? @db.Text
+
+  closingRemarks String? @db.Text
+  closedByUserId String?
+  closedAt       DateTime?
+
+  /// Derived on close / when machine returns AVAILABLE
+  downtimeEndedAt DateTime?
+  downtimeMinutes Int?
+
+  partsCost   Decimal @default(0) @db.Decimal(18, 2)
+  serviceCost Decimal @default(0) @db.Decimal(18, 2)
+  otherCost   Decimal @default(0) @db.Decimal(18, 2)
+  totalCost   Decimal @default(0) @db.Decimal(18, 2)
+
+  serviceDescription String?   @db.Text
+  invoiceNumber      String?   @db.VarChar(64)
+  invoiceDate        DateTime?
+
+  holdReason String? @db.Text
+
+  /// True when any stockable part line still lacks an Inventory ISSUE movement
+  inventoryPostingPending Boolean @default(false)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant     Tenant                   @relation(fields: [tenantId], references: [id])
+  machine    ManufacturingMachine     @relation(fields: [machineId], references: [id])
+  contractor MasterVendor?            @relation(fields: [contractorId], references: [id])
+  parts      MaintenancePart[]
+  photos     MaintenanceAttachment[]
+
+  @@unique([tenantId, ticketNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, machineId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, reportedAt])
+  @@map("maintenance_tickets")
+}
+
+model MaintenancePart {
+  id       String @id @default(uuid())
+  tenantId String
+  ticketId String
+
+  itemId      String?
+  warehouseId String?
+  description String  @db.VarChar(300)
+  qty         Decimal @db.Decimal(18, 4)
+  unitCost    Decimal @default(0) @db.Decimal(18, 4)
+  totalCost   Decimal @default(0) @db.Decimal(18, 2)
+  remarks     String? @db.VarChar(500)
+
+  /// When Inventory ISSUE was posted (null = free-text / non-stockable / not posted)
+  inventoryMovementId String?
+  shortageQty         Decimal? @db.Decimal(18, 4)
+  purchaseRequisitionId String?
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  ticket    MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  item      MasterItem?       @relation(fields: [itemId], references: [id])
+  warehouse MasterWarehouse?  @relation(fields: [warehouseId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, ticketId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, warehouseId])
+  @@map("maintenance_parts")
+}
+
+model MaintenanceAttachment {
+  id       String @id @default(uuid())
+  tenantId String
+  ticketId String
+
+  category         MaintenancePhotoCategory @default(OTHER)
+  originalFilename String                   @db.VarChar(255)
+  storedFilename   String                   @db.VarChar(255)
+  mimeType         String                   @db.VarChar(120)
+  fileSize         Int
+  storagePath      String                   @db.VarChar(500)
+
+  uploadedBy String?
+  uploadedAt DateTime @default(now())
+  deletedAt  DateTime?
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id])
+  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, ticketId])
+  @@map("maintenance_attachments")
 }

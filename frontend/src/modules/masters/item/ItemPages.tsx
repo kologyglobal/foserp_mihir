@@ -46,6 +46,7 @@ import type { Item, ItemSalesFulfilmentMethod, ItemType, SubAssemblyRule } from 
 import { SUB_ASSEMBLY_RULE_LABELS } from '../../../types/bom'
 import { EnterpriseMasterWorkspace, MasterStickyFooter } from '../shared/EnterpriseMasterShell'
 import { MasterCodeField } from '../../../components/masters/MasterCodeField'
+import { MasterItemImageField } from '../../../components/masters/MasterItemImageField'
 import type { MasterCodeSeriesHandle } from '../../../hooks/useMasterCodeSeries'
 
 const FULFILMENT_OPTIONS: { value: ItemSalesFulfilmentMethod; label: string }[] = [
@@ -204,7 +205,6 @@ export function ItemListPage() {
       statusFilter={status}
       onStatusFilterChange={setStatus}
       statusOptions={STATUS_FILTER_OPTIONS}
-      resultCount={filtered.length}
       onImport={() => setImportOpen(true)}
       onExport={() => void handleExport()}
       extraFilters={(
@@ -334,12 +334,26 @@ export function ItemFormPage() {
     [routingHeaders],
   )
 
+  function onGstGroupChange(gstGroupMasterId: string) {
+    const nextGroupId = gstGroupMasterId || null
+    setValue('gstGroupId', nextGroupId, { shouldValidate: true })
+    const currentHsn = hsnId ? getHsn(hsnId) : null
+    if (currentHsn && nextGroupId && currentHsn.gstGroupId !== nextGroupId) {
+      setValue('hsnId', null)
+      setValue('hsnCode', '', { shouldValidate: true })
+    }
+  }
+
   function onHsnChange(hsnMasterId: string) {
     setValue('hsnId', hsnMasterId || null)
     const hsn = hsnMasterId ? getHsn(hsnMasterId) : null
     if (hsn) {
       setValue('hsnCode', hsn.code, { shouldValidate: true })
-      setValue('gstGroupId', hsn.gstGroupId, { shouldValidate: true })
+      if (!gstGroupId) {
+        setValue('gstGroupId', hsn.gstGroupId, { shouldValidate: true })
+      }
+    } else {
+      setValue('hsnCode', '', { shouldValidate: true })
     }
   }
 
@@ -445,6 +459,13 @@ export function ItemFormPage() {
           collapsible
           defaultOpen
         >
+          <FormField label="Product Image" className="md:col-span-3">
+            <MasterItemImageField
+              itemId={id}
+              imageUrl={existing?.imageUrl}
+              updatedAt={existing?.updatedAt}
+            />
+          </FormField>
           <FormField label="Product Type" required>
             <Select
               {...register('productType')}
@@ -615,11 +636,17 @@ export function ItemFormPage() {
           collapsible
           defaultOpen
         >
-          <FormField label="HSN Code" required error={errors.hsnId?.message}>
-            <HsnMasterSelect value={hsnId} onChange={onHsnChange} allowEmpty />
+          <FormField label="GST Group Code" required error={errors.gstGroupId?.message}>
+            <GstGroupSelect value={gstGroupId ?? ''} onChange={onGstGroupChange} allowEmpty />
           </FormField>
-          <FormField label="GST Group Code">
-            <GstGroupSelect value={gstGroupId} onChange={(v) => setValue('gstGroupId', v || null)} allowEmpty />
+          <FormField label="HSN Code" required error={errors.hsnId?.message}>
+            <HsnMasterSelect
+              value={hsnId ?? ''}
+              onChange={onHsnChange}
+              allowEmpty
+              gstGroupId={gstGroupId}
+              disabled={!gstGroupId}
+            />
           </FormField>
           <FormField label="Legacy HSN (text)">
             <Input {...register('hsnCode')} readOnly={Boolean(hsnId)} />
@@ -733,6 +760,15 @@ export function ItemDetailPage() {
     <DetailLayout backTo="/masters/items" backLabel="Item Master" title={`${item.itemCode} — ${item.itemName}`} editTo={`/masters/items/${item.id}/edit`}>
       <DetailSection title="General">
         <DetailGrid>
+          <div className="col-span-full mb-2">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Product Image</p>
+            <MasterItemImageField
+              itemId={item.id}
+              imageUrl={item.imageUrl}
+              updatedAt={item.updatedAt}
+              disabled
+            />
+          </div>
           <DetailField label="Product Type" value={item.productType ? ENGINEERING_PRODUCT_TYPE_LABELS[item.productType] : '—'} />
           <DetailField label="Type" value={item.inventoryType ? INVENTORY_POSTING_TYPE_LABELS[item.inventoryType] : '—'} />
           <DetailField label="Category" value={getCategoryName(item.categoryId)} />

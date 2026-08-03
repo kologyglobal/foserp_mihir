@@ -91,6 +91,7 @@ export interface ItemDto {
   routingNo?: string | null
   drawingNo?: string | null
   subAssemblyRule?: string | null
+  imageUrl?: string | null
   status: 'ACTIVE' | 'INACTIVE'
   createdAt: string
   updatedAt: string
@@ -282,6 +283,7 @@ export function mapItemDto(row: ItemDto): Item {
     routingNo: row.routingNo ?? null,
     drawingNo: row.drawingNo ?? null,
     subAssemblyRule: (row.subAssemblyRule ?? null) as Item['subAssemblyRule'],
+    imageUrl: row.imageUrl ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
@@ -630,6 +632,19 @@ export async function activateItemApi(id: string) {
 
 export async function deactivateItemApi(id: string) {
   return apiRequest<ItemDto>(tenantPath(`/masters/items/${id}/deactivate`), { method: 'POST' })
+}
+
+export async function uploadItemImageApi(id: string, file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return apiRequest<ItemDto>(tenantPath(`/masters/items/${id}/image`), {
+    method: 'POST',
+    body: form,
+  })
+}
+
+export async function deleteItemImageApi(id: string) {
+  return apiRequest<ItemDto>(tenantPath(`/masters/items/${id}/image`), { method: 'DELETE' })
 }
 
 export async function createVendorApi(body: Record<string, unknown>) {

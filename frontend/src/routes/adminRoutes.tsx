@@ -1,7 +1,6 @@
 import type { RouteObject } from 'react-router-dom'
 import { UserAdminListPage, UserAdminFormPage, UserAdminDetailPage } from '@/modules/systemAdmin/UserAdminPages'
 import { RoleAdminListPage, RoleAdminFormPage, RoleAdminDetailPage } from '@/modules/systemAdmin/RoleAdminPages'
-import { TenantAdminListPage, TenantAdminFormPage, TenantAdminDetailPage } from '@/modules/systemAdmin/TenantAdminPages'
 import { AdminOverviewPage } from '@/modules/systemAdmin/AdminOverviewPage'
 import {
   AdminOrganizationPage,
@@ -41,10 +40,7 @@ export const adminRouteChildren: RouteObject[] = [
   { path: 'admin/roles/:id', element: <RoleAdminDetailPage /> },
   { path: 'admin/roles/:id/edit', element: <RoleAdminFormPage /> },
 
-  { path: 'admin/tenants', element: <TenantAdminListPage /> },
-  { path: 'admin/tenants/new', element: <TenantAdminFormPage /> },
-  { path: 'admin/tenants/:id', element: <TenantAdminDetailPage /> },
-  { path: 'admin/tenants/:id/edit', element: <TenantAdminFormPage /> },
+  // Platform tenants CRUD lives under /platform/tenants (see platformRoutes) — /admin/tenants redirects there.
 
   { path: 'admin/invitations', element: <AdminInvitationsPage /> },
   { path: 'admin/departments', element: <AdminDepartmentsPage /> },

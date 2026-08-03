@@ -1,14 +1,17 @@
 import type { BankConnectorAdapter, BankConnectorAdapterContext } from '../bank-connector.interface.js'
 import type { BankConnectorProviderCode } from '../bank-connector.enums.js'
 
-function notImplementedAdapter(providerCode: BankConnectorProviderCode): BankConnectorAdapter {
+export function notImplementedAdapter(providerCode: BankConnectorProviderCode): BankConnectorAdapter {
   return {
     providerCode,
     async testConnection(_ctx: BankConnectorAdapterContext) {
       return {
         ok: false as const,
         code: 'NOT_IMPLEMENTED' as const,
-        message: `Provider ${providerCode} is not implemented for live pull yet (OPEN_BANKING / PSD2 OAuth deferred).`,
+        message:
+          providerCode === 'OPEN_BANKING'
+            ? 'Live Open Banking AIS statement download is not implemented (set mode=SIMULATED + sandboxRoot for simulated AIS).'
+            : `Provider ${providerCode} is not implemented for live pull yet.`,
       }
     },
     // Intentionally omit listRemoteFiles / fetchStatementFile so sync → NOT_IMPLEMENTED.

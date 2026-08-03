@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { PurchaseRequisitionNotFoundError } from '../shared/requisition.errors.js'
 import type { RequisitionRow } from '../shared/mappers.js'
 import type { ListRequisitionsQuery } from './requisition.schemas.js'

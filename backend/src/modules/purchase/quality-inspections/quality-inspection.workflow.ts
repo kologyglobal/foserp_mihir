@@ -3,7 +3,10 @@ import { QualityInspectionValidationError, QualityInspectionWorkflowError } from
 export const qiQty = (value: unknown) => Number(value ?? 0)
 export const qiDate = (value?: string | null) => value ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00.000Z` : value) : null
 export function assertQiEditable(status: QualityInspectionStatus) {
-  if (!['DRAFT', 'PENDING', 'IN_PROGRESS'].includes(status)) throw new QualityInspectionWorkflowError(`Quality inspection cannot be edited from ${status}.`)
+  // DEVIATION_PENDING covers hold / deviation review — checklist & qty edits stay allowed until complete.
+  if (!['DRAFT', 'PENDING', 'IN_PROGRESS', 'DEVIATION_PENDING'].includes(status)) {
+    throw new QualityInspectionWorkflowError(`Quality inspection cannot be edited from ${status}.`)
+  }
 }
 export function validateQiLines(lines: Array<{ inspectedQuantity: unknown; acceptedQuantity: unknown; rejectedQuantity: unknown; deviationQuantity: unknown }>) {
   if (!lines.length) throw new QualityInspectionValidationError('At least one inspection line is required.')
@@ -16,7 +19,7 @@ export function validateQiLines(lines: Array<{ inspectedQuantity: unknown; accep
 export function qiAllowedActions(status: QualityInspectionStatus, deletedAt?: Date | null) {
   const active = !deletedAt
   return {
-    canEdit: active && ['DRAFT', 'PENDING', 'IN_PROGRESS'].includes(status),
+    canEdit: active && ['DRAFT', 'PENDING', 'IN_PROGRESS', 'DEVIATION_PENDING'].includes(status),
     canComplete: active && ['DRAFT', 'PENDING', 'IN_PROGRESS', 'DEVIATION_PENDING'].includes(status),
     canCancel: active && ['DRAFT', 'PENDING', 'IN_PROGRESS', 'DEVIATION_PENDING'].includes(status),
   }

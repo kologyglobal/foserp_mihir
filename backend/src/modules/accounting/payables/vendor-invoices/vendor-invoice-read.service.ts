@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { VendorInvoice, VendorInvoiceLine } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence } from '../../shared/finance-decimal.js'
 import type { ListVendorInvoicesQuery } from './vendor-invoice.schemas.js'
 import type { VendorInvoiceWithLines } from './vendor-invoice.types.js'

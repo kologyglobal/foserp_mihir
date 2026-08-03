@@ -2,18 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
-  Building2,
   CheckCircle,
   ClipboardList,
   Copy,
   Eraser,
-  FileSignature,
-  MapPin,
   Package,
-  Plus,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
-import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import {
   purchaseSectionId,
   scrollToPurchaseValidationTarget,
@@ -26,10 +21,6 @@ import {
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { PurchaseOrderLinesTable } from '@/components/purchase/PurchaseOrderLinesTable'
 import { PurchaseDocumentWorkflowStrip } from '@/components/purchase/PurchaseDocumentWorkflowStrip'
-import {
-  PurchaseOrderOriginPicker,
-  PurchaseOrderOriginSourcePanel,
-} from '@/components/purchase/PurchaseOrderOriginPicker'
 import {
   PurchaseDocumentAttachments,
   purchaseAttachmentIdsFromRows,
@@ -44,7 +35,6 @@ import {
   ErpFieldRow,
   ErpFormSpan,
 } from '@/components/erp/card-form'
-import { ErpButton } from '@/components/erp/ErpButton'
 import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { formatVendorAddress } from '@/utils/vendorAddress'
@@ -71,18 +61,13 @@ import {
   getBlanketOrders,
   getPurchaseItems,
   getPurchaseOrderById,
-  getPurchaseRequisitions,
   getPurchaseSetup,
-  getQuotationComparison,
-  getRFQs,
-  getVendorQuotations,
   getVendors,
   getPurchaseWarehouses,
   previewNextPurchaseOrderNumber,
   PurchaseServiceError,
   updatePurchaseOrder,
   PURCHASE_ORDER_DOMAIN_STATUS_LABELS,
-  PURCHASE_ORDER_ORIGIN_LABELS,
   PURCHASE_ORDER_TYPE_LABELS,
 } from '@/services/purchase'
 import type {
@@ -94,12 +79,8 @@ import type {
   PurchaseOrderLineItemType,
   PurchaseOrderOrigin,
   PurchaseOrderType,
-  PurchaseRequisition,
   PurchaseSetup,
-  QuotationComparison,
-  RequestForQuotation,
   Vendor,
-  VendorQuotation,
 } from '@/types/purchaseDomain'
 import {
   isPurchaseInsuranceTermsApplicable,
@@ -116,15 +97,32 @@ import {
   purchaseFieldId,
   validatePurchaseOrderForm,
 } from '@/utils/purchaseOrderValidation'
+import { nextPurchaseLineNo } from '@/utils/purchaseLineNumbers'
 import { notify } from '@/store/toastStore'
 import { purchaseUserMessage } from '@/utils/purchase/purchaseErrorMessages'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 import { useOptionalAuth } from '@/context/AuthProvider'
-import { isApiMode } from '@/config/apiConfig'
 import { useMasterStore } from '@/store/masterStore'
+import { isApiMode } from '@/config/apiConfig'
+import { fetchLookup } from '@/services/api/masterApi'
+import { usePurchaseMasterStore } from '@/store/purchaseMasterStore'
 
-type LocationOption = { id: string; code: string; name: string; state: string; city: string }
-const EMPTY_LOCATION: LocationOption = { id: '', code: '', name: '', state: '', city: '' }
+type LocationOption = {
+  id: string
+  code: string
+  name: string
+  address: string
+  state: string
+  city: string
+}
+const EMPTY_LOCATION: LocationOption = {
+  id: '',
+  code: '',
+  name: '',
+  address: '',
+  state: '',
+  city: '',
+}
 
 // Backend rule: only draft and sent-back POs are editable (submitted POs are locked).
 const EDITABLE_STATUSES: PurchaseOrder['status'][] = ['draft', 'sent_back']
@@ -173,6 +171,16 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     uom: 'NOS',
     hsnCode: '',
     sacCode: null,
+    gstGroupId: null,
+    hsnId: null,
+    gstGroupCode: '',
+    outstandingQty: 0,
+    outstandingQtyBase: 0,
+    receivedQtyBase: 0,
+    qcRequired: false,
+    qualityTestGroupCode: null,
+    binId: null,
+    binCode: '',
     quantity: 0,
     uomQuantity: 0,
     uomConversionFactor: 1,
@@ -198,11 +206,13 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     receivedQty: 0,
     pendingQty: 0,
     invoicedQty: 0,
+    invoicedQtyBase: 0,
     lineStatus: 'open',
     locationId: '',
     locationName: '',
     expectedDeliveryDate: today(),
     prLineId: null,
+    requisitionNo: null,
     rfqLineId: null,
     vendorQuotationLineId: null,
     remarks: '',
@@ -233,14 +243,18 @@ function computeLine(line: PoEditorLine, isInterstate: boolean): PoEditorLine {
   const taxAmount = Number(((taxableAmount * gstRatePct) / 100).toFixed(2))
   const half = Number((taxAmount / 2).toFixed(2))
   const lineTotal = Number((taxableAmount + taxAmount).toFixed(2))
-  const receivedQty = Number(line.receivedQty) || 0
-  const pendingQty = Math.max(0, Number((primaryQty - receivedQty).toFixed(4)))
+  const receivedQtyBase = Number(line.receivedQtyBase ?? line.receivedQty) || 0
+  const receivedUomQty = factor > 0 ? receivedQtyBase * factor : receivedQtyBase
+  const invoicedQtyBase = Number(line.invoicedQtyBase ?? 0) || 0
+  const invoicedUomQty = factor > 0 ? invoicedQtyBase * factor : invoicedQtyBase
+  const outstandingQtyBase = Math.max(0, Number((primaryQty - receivedQtyBase).toFixed(4)))
+  const outstandingQty = Math.max(0, Number((uomQuantity - receivedUomQty).toFixed(4)))
   const lineStatus: PurchaseOrderLine['lineStatus'] =
     line.lineStatus === 'cancelled'
       ? 'cancelled'
-      : receivedQty <= 0
+      : receivedQtyBase <= 0
         ? 'open'
-        : receivedQty >= primaryQty
+        : receivedQtyBase >= primaryQty
           ? 'received'
           : 'partial'
   return {
@@ -256,13 +270,19 @@ function computeLine(line: PoEditorLine, isInterstate: boolean): PoEditorLine {
     sgst: isInterstate ? 0 : half,
     igst: isInterstate ? taxAmount : 0,
     lineTotal,
-    pendingQty,
+    receivedQty: receivedUomQty,
+    receivedQtyBase,
+    pendingQty: outstandingQtyBase,
+    outstandingQty,
+    outstandingQtyBase,
+    invoicedQty: invoicedUomQty,
+    invoicedQtyBase,
     lineStatus,
   }
 }
 
-function renumberLines(lines: PoEditorLine[], isInterstate: boolean) {
-  return lines.map((l, i) => computeLine({ ...l, lineNo: i + 1 }, isInterstate))
+function computeLines(lines: PoEditorLine[], isInterstate: boolean) {
+  return lines.map((l) => computeLine(l, isInterstate))
 }
 
 function aggregateTotals(
@@ -458,7 +478,7 @@ export function PurchaseOrderEditorPage() {
 
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
-  const [creating, setCreating] = useState(false)
+  const [, setCreating] = useState(false)
   const [recordId, setRecordId] = useState<string | null>(id ?? null)
   const [documentNumber, setDocumentNumber] = useState<string | null>(null)
   const [status, setStatus] = useState<PurchaseOrder['status']>('draft')
@@ -473,7 +493,7 @@ export function PurchaseOrderEditorPage() {
   const [attemptedMode, setAttemptedMode] = useState<'draft' | 'submit' | null>(null)
   const [forceOpenKey, setForceOpenKey] = useState(0)
   const [forceOpenSections, setForceOpenSections] = useState<
-    Partial<Record<'general' | 'commercial' | 'lines', number>>
+    Partial<Record<'general' | 'lines' | 'notes', number>>
   >({})
   const [, setLastSavedAt] = useState<Date | null>(null)
   const attachmentIds = purchaseAttachmentIdsFromRows(attachments)
@@ -482,6 +502,7 @@ export function PurchaseOrderEditorPage() {
   const [catalogItems, setCatalogItems] = useState<PurchaseItem[]>([])
   const [purchaseSetup, setPurchaseSetup] = useState<PurchaseSetup | null>(null)
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>([])
+  const [binOptions, setBinOptions] = useState<Array<{ id: string; code: string; name: string; warehouseId?: string }>>([])
 
   const originParam = (searchParams.get('origin') ?? '') as string
   const originModeFromParam: PurchaseOrderOrigin =
@@ -496,37 +517,38 @@ export function PurchaseOrderEditorPage() {
             : 'manual'
 
   const [originMode, setOriginMode] = useState<PurchaseOrderOrigin>(originModeFromParam)
-  /** Deep-link / query param: origin already chosen; otherwise start with compact source chips. */
-  const [originChosen, setOriginChosen] = useState(
-    () =>
-      Boolean(originParam) ||
-      Boolean(
-        searchParams.get('prId') ||
-          searchParams.get('comparisonId') ||
-          searchParams.get('vqId') ||
-          searchParams.get('blanketId'),
-      ),
-  )
-  const [approvedPrs, setApprovedPrs] = useState<PurchaseRequisition[]>([])
-  const [selectedPrId, setSelectedPrId] = useState(searchParams.get('prId') ?? '')
-  const [selectedPrVendorId, setSelectedPrVendorId] = useState('')
-
-  const [eligibleComparisons, setEligibleComparisons] = useState<
-    { comparison: QuotationComparison; rfq: RequestForQuotation }[]
-  >([])
-  const [selectedComparisonId, setSelectedComparisonId] = useState(searchParams.get('comparisonId') ?? '')
-
-  const [approvedVqs, setApprovedVqs] = useState<VendorQuotation[]>([])
-  const [selectedVqId, setSelectedVqId] = useState(searchParams.get('vqId') ?? '')
+  /**
+   * Blank `/purchase/orders/new` opens the manual PO form immediately (no origin chooser).
+   * Deep links (`?origin=…`, `?prId=…`, etc.) auto-create then navigate to edit.
+   */
+  const [selectedPrId] = useState(searchParams.get('prId') ?? '')
+  const [selectedPrVendorId] = useState('')
+  const [selectedComparisonId] = useState(searchParams.get('comparisonId') ?? '')
+  const [selectedVqId] = useState(searchParams.get('vqId') ?? '')
 
   const [activeBlankets, setActiveBlankets] = useState<BlanketPurchaseOrder[]>([])
-  const [selectedBlanketId, setSelectedBlanketId] = useState(searchParams.get('blanketId') ?? '')
-  const [blanketQuantities, setBlanketQuantities] = useState<Record<string, number>>({})
+  const [selectedBlanketId] = useState(searchParams.get('blanketId') ?? '')
+  const [blanketQuantities] = useState<Record<string, number>>({})
 
   const editable = EDITABLE_STATUSES.includes(status)
   const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(editable)
 
   const selectedVendor = useMemo(() => vendors.find((v) => v.id === header.vendorId), [vendors, header.vendorId])
+  const selectedPurchaseLocation = useMemo(
+    () => locationOptions.find((location) => location.id === header.purchaseLocationId),
+    [header.purchaseLocationId, locationOptions],
+  )
+  const selectedDeliveryLocation = useMemo(
+    () => locationOptions.find((location) => location.id === header.deliveryLocationId),
+    [header.deliveryLocationId, locationOptions],
+  )
+  const warehouseBinOptions = useMemo(
+    () =>
+      binOptions.filter(
+        (b) => !header.deliveryLocationId || !b.warehouseId || b.warehouseId === header.deliveryLocationId,
+      ),
+    [binOptions, header.deliveryLocationId],
+  )
   const catalogItemsForPicker = useMemo(
     () =>
       catalogItems.map((item) => ({
@@ -586,7 +608,7 @@ export function PurchaseOrderEditorPage() {
     Number(header.insuranceCharges) > 0 ||
     mentionsInsurance(header.freightTerms, header.deliveryTerms, header.packingTerms)
 
-  const computedLines = useMemo(() => renumberLines(lines, isInterstate), [lines, isInterstate])
+  const computedLines = useMemo(() => computeLines(lines, isInterstate), [lines, isInterstate])
   const validation = useMemo(
     () =>
       validatePurchaseOrderForm(
@@ -835,6 +857,10 @@ export function PurchaseOrderEditorPage() {
       mapEngineeringProductTypeToPurchaseCategory(productType) ||
       line?.category ||
       'raw_material'
+    const gstGroupId = item.gstGroupId ?? master?.gstGroupId ?? null
+    const hsnId = item.hsnId ?? master?.hsnId ?? null
+    const hsnMaster = hsnId ? useMasterStore.getState().getHsn(hsnId) : null
+    const gstGroupMaster = gstGroupId ? useMasterStore.getState().getGstGroup(gstGroupId) : null
     patchLine(key, {
       itemId: item.id,
       itemCode: item.itemCode,
@@ -846,25 +872,32 @@ export function PurchaseOrderEditorPage() {
       uom: purchaseUomCode,
       uomId: purchaseUomId,
       uomConversionFactor: factor,
-      hsnCode: item.hsnCode,
+      hsnCode: hsnMaster?.code ?? item.hsnCode,
+      hsnId,
+      gstGroupId,
+      gstGroupCode: gstGroupMaster?.code ?? '',
       sacCode: item.sacCode,
+      qcRequired: Boolean(item.qcRequired ?? master?.qcRequired),
+      qualityTestGroupCode: item.qualityTestGroupCode ?? master?.qualityTestGroupCode ?? null,
       rate: item.standardRate,
       gstRatePct: item.gstRatePct,
     })
   }
 
   useEffect(() => {
+    void import('@/services/bridges/masterApiBridge')
+      .then((m) => m.syncCoreMastersFromApi())
+      .catch(() => undefined)
+    void import('@/services/bridges/masterBatchApiBridge')
+      .then((m) => m.syncBatchMastersFromApi())
+      .catch(() => undefined)
     void Promise.all([
       getVendors(),
       getPurchaseItems({ forceRefresh: true, purchasableOnly: false }),
-      getPurchaseRequisitions(),
-      getVendorQuotations(),
-      getRFQs(),
       getBlanketOrders(),
       getPurchaseSetup(),
       getPurchaseWarehouses(),
-      import('@/services/bridges/masterApiBridge').then((m) => m.syncCoreMastersFromApi()).catch(() => undefined),
-    ]).then(async ([vendorRows, items, prs, vqs, rfqs, blankets, setup, warehouses]) => {
+    ]).then(([vendorRows, items, blankets, setup, warehouses]) => {
       setVendors(vendorRows.filter((v) => v.isActive))
       setCatalogItems(items)
       setPurchaseSetup(setup)
@@ -872,6 +905,7 @@ export function PurchaseOrderEditorPage() {
         id: w.id,
         code: w.code,
         name: w.name,
+        address: w.address,
         state: w.state,
         city: w.city,
       }))
@@ -896,29 +930,39 @@ export function PurchaseOrderEditorPage() {
             /* preview is optional — save still allocates server-side */
           })
       }
-      setApprovedPrs(
-        prs
-          .filter((p) => p.status === 'approved' || p.status === 'converted_to_rfq')
-          .sort((a, b) => Number(!a.rfqRequired) - Number(!b.rfqRequired)),
-      )
-      setApprovedVqs(vqs.filter((q) => q.status === 'selected'))
       setActiveBlankets(blankets.filter((b) => b.status === 'active'))
-
-      const rfqsWithComparison = rfqs.filter((r) => r.comparisonId)
-      const comparisons = await Promise.all(
-        rfqsWithComparison.map(async (rfq) => {
-          const cmp = await getQuotationComparison(rfq.id)
-          return cmp ? { comparison: cmp, rfq } : null
-        }),
-      )
-      setEligibleComparisons(
-        comparisons.filter(
-          (c): c is { comparison: QuotationComparison; rfq: RequestForQuotation } =>
-            c !== null && c.comparison.status === 'completed' && c.comparison.recommendationStatus === 'approved',
-        ),
-      )
     })
   }, [isNew])
+
+  useEffect(() => {
+    if (isApiMode()) {
+      let cancelled = false
+      fetchLookup('bins')
+        .then((res) => {
+          if (cancelled) return
+          setBinOptions(
+            res.data.map((b) => ({
+              id: b.id,
+              code: b.code ?? b.name,
+              name: b.name,
+              warehouseId: b.warehouseId,
+            })),
+          )
+        })
+        .catch(() => undefined)
+      return () => {
+        cancelled = true
+      }
+    }
+    const demoBins = usePurchaseMasterStore.getState().getByKind('bin-codes', true)
+    setBinOptions(
+      demoBins.map((e) => ({
+        id: e.code,
+        code: e.code,
+        name: e.name,
+      })),
+    )
+  }, [])
 
   useEffect(() => {
     if (isNew || !id) return
@@ -1023,7 +1067,7 @@ export function PurchaseOrderEditorPage() {
       if (!result.errors.length) return
       const nextKey = forceOpenKey + 1
       setForceOpenKey(nextKey)
-      const opened: Partial<Record<'general' | 'commercial' | 'lines', number>> = {}
+      const opened: Partial<Record<'general' | 'lines' | 'notes', number>> = {}
       for (const section of result.sectionsToOpen) {
         opened[section] = nextKey
       }
@@ -1133,22 +1177,17 @@ export function PurchaseOrderEditorPage() {
   }
 
   useEffect(() => {
-    if (!isNew) return
+    if (!isNew || recordId) return
     if (originMode === 'quotation_comparison' && selectedComparisonId) {
       void createFromOrigin()
     }
     if (originMode === 'vendor_quotation' && selectedVqId) {
       void createFromOrigin()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const apiOriginDisabled = useMemo((): Partial<Record<PurchaseOrderOrigin, string>> | undefined => {
-    if (!isApiMode()) return undefined
-    return {
-      vendor_quotation: 'Use Quotation Comparison → Create PO (VQ→PO direct is not API-backed yet).',
-      blanket_order: 'Blanket call-off is not available in API mode yet.',
+    if (originMode === 'purchase_requisition' && selectedPrId) {
+      void createFromOrigin()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loading) {
@@ -1156,7 +1195,7 @@ export function PurchaseOrderEditorPage() {
       <PurchaseCardFormShell
         title="Purchase Order"
         description="Loading…"
-        status="Draft"
+        status="Open"
         favoritePath="/purchase/orders/new"
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
@@ -1170,74 +1209,15 @@ export function PurchaseOrderEditorPage() {
     )
   }
 
-  /** Block save until manual form is visible (source origins create via modal then navigate). */
-  const awaitingOriginCreate =
-    isNew && !recordId && (!originChosen || originMode !== 'manual')
-  const showPoForm = !awaitingOriginCreate
-
-  const selectOrigin = (mode: PurchaseOrderOrigin) => {
-    if (apiOriginDisabled?.[mode]) {
-      notify.info(apiOriginDisabled[mode])
-      return
-    }
-    setOriginMode(mode)
-    setOriginChosen(true)
-  }
-
-  const reopenOriginSelector = () => {
-    setOriginChosen(false)
-  }
-
-  if (isNew && !recordId && !originChosen) {
-    return (
-      <OperationalPageShell
-        title="New Purchase Order"
-        badge="Purchase"
-        variant="dynamics"
-        favoritePath="/purchase/orders/new"
-        breadcrumbs={[
-          { label: 'Orders', to: '/purchase/orders' },
-          { label: 'New' },
-        ]}
-      >
-        <PurchaseOrderOriginPicker
-          onSelect={selectOrigin}
-          onCancel={() => navigate(PURCHASE_FORM_ROUTES.purchaseOrder.list)}
-          pendingPoCount={approvedPrs.filter((p) => !p.rfqRequired && !p.convertedPoId).length}
-          disabledOrigins={apiOriginDisabled}
-        />
-      </OperationalPageShell>
-    )
-  }
-
-  /** Origin-gated source refs: only relevant labels; hide empty values (no wall of "—"). */
-  const allSourceRefs: { label: string; value: string | null }[] = [
-    { label: 'Source PR', value: header.purchaseRequisitionNumber },
-    { label: 'Source RFQ', value: header.rfqNumber },
-    { label: 'Source Vendor Quotation', value: header.vendorQuotationNumber },
-    { label: 'Source Comparison', value: header.comparisonNumber },
-    { label: 'Source Blanket Order', value: header.blanketOrderNumber },
-  ]
-  const sourceLabelsByOrigin: Record<Exclude<PurchaseOrderOrigin, 'manual'>, string[]> = {
-    purchase_requisition: ['Source PR'],
-    quotation_comparison: ['Source RFQ', 'Source Comparison'],
-    vendor_quotation: ['Source Vendor Quotation', 'Source RFQ'],
-    blanket_order: ['Source Blanket Order'],
-  }
-  const sourceCandidates =
-    originMode === 'manual'
-      ? []
-      : allSourceRefs.filter((r) => sourceLabelsByOrigin[originMode].includes(r.label))
-  const populatedSourceRefs = sourceCandidates.filter(
-    (r): r is { label: string; value: string } => Boolean(r.value),
-  )
-  const showManualSourceFact = originMode === 'manual'
+  /** Manual create form only — source origins create via deep-link then navigate to edit. */
+  const showPoForm = originMode === 'manual' || Boolean(recordId)
 
   return (
     <>
     <PurchaseCardFormShell
       title={isNew ? 'New Purchase Order' : `Edit ${documentNumber ?? 'Purchase Order'}`}
       description="Vendor purchase commitment — draft and pending-approval documents only"
+      className="purchase-order-editor--scrollbar-hidden"
       recordNo={documentNumber ?? (isNew ? 'New' : undefined)}
       recordTitle={documentTitle}
       status={PURCHASE_ORDER_DOMAIN_STATUS_LABELS[status]}
@@ -1273,8 +1253,8 @@ export function PurchaseOrderEditorPage() {
           : undefined
       }
       commandBar={null}
-      factBox={awaitingOriginCreate ? undefined : documentFactBox}
-      collapsibleFactBox={!awaitingOriginCreate}
+      factBox={showPoForm ? documentFactBox : undefined}
+      collapsibleFactBox={showPoForm}
       stickyFooter
       footer={
         <FormActionBar
@@ -1282,10 +1262,10 @@ export function PurchaseOrderEditorPage() {
           cancelFirst
           busy={saving}
           dirty={dirty}
-          disabled={awaitingOriginCreate || !editable}
+          disabled={!showPoForm || !editable}
           disabledReason={
-            awaitingOriginCreate
-              ? 'Choose a purchase order origin first'
+            !showPoForm
+              ? 'Creating purchase order from source…'
               : !editable
                 ? 'Document is read-only'
                 : undefined
@@ -1299,200 +1279,6 @@ export function PurchaseOrderEditorPage() {
       }
       onSaveShortcut={() => void saveDraft()}
     >
-      {isNew && !recordId && originChosen && originMode !== 'manual' ? (
-        <div className="mb-3 space-y-3">
-          <PurchaseOrderOriginSourcePanel
-              originLabel={PURCHASE_ORDER_ORIGIN_LABELS[originMode]}
-              description={
-                originMode === 'purchase_requisition'
-                  ? 'Direct PRs (RFQ not required) create PO via Planning. RFQ-required PRs must go through RFQ → comparison.'
-                  : originMode === 'quotation_comparison'
-                    ? 'Select a completed comparison with an approved recommendation.'
-                    : originMode === 'vendor_quotation'
-                      ? 'Select a vendor quotation marked as selected / approved.'
-                      : 'Release quantities against an active blanket order.'
-              }
-              onChangeSource={reopenOriginSelector}
-              actions={
-                <>
-                  <ErpButton type="button" variant="ghost" disabled={creating} onClick={reopenOriginSelector}>
-                    Cancel
-                  </ErpButton>
-                  <ErpButton
-                    type="button"
-                    variant="primary"
-                    icon={Plus}
-                    disabled={
-                      creating ||
-                      (originMode === 'purchase_requisition' &&
-                        (!selectedPrId ||
-                          Boolean(approvedPrs.find((p) => p.id === selectedPrId)?.rfqRequired))) ||
-                      (originMode === 'quotation_comparison' && !selectedComparisonId) ||
-                      (originMode === 'vendor_quotation' && !selectedVqId) ||
-                      (originMode === 'blanket_order' && !selectedBlanketId)
-                    }
-                    onClick={() => void createFromOrigin()}
-                  >
-                    {creating ? 'Creating…' : 'Create Purchase Order'}
-                  </ErpButton>
-                </>
-              }
-            >
-              {originMode === 'purchase_requisition' ? (
-                <div className="space-y-3">
-                  {approvedPrs.length === 0 ? (
-                    <p className="text-[13px] text-erp-muted">No approved requisitions available.</p>
-                  ) : (
-                    <Select value={selectedPrId} onChange={(e) => setSelectedPrId(e.target.value)}>
-                      <option value="">Select approved requisition…</option>
-                      {approvedPrs.map((pr) => (
-                        <option key={pr.id} value={pr.id}>
-                          {pr.documentNumber} · {pr.department} · {formatCurrency(pr.totalAmount)}
-                          {pr.status === 'approved' && !pr.rfqRequired
-                            ? ' · Ready for PO'
-                            : pr.status === 'converted_to_rfq'
-                              ? ' · Via RFQ'
-                              : pr.rfqRequired
-                                ? ' · RFQ required'
-                                : ''}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                  {selectedPrId && approvedPrs.find((p) => p.id === selectedPrId)?.rfqRequired ? (
-                    <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-                      This PR requires RFQ. Open{' '}
-                      <a className="underline" href={`/purchase/rfqs/new?prId=${selectedPrId}`}>
-                        New RFQ
-                      </a>{' '}
-                      (or Comparison → Create PO). Direct PO from PR is not allowed.
-                    </p>
-                  ) : null}
-                  <Select value={selectedPrVendorId} onChange={(e) => setSelectedPrVendorId(e.target.value)}>
-                    <option value="">Vendor (optional — use Planning preferred vendor)</option>
-                    {vendors.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.vendorCode} — {v.vendorName}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              ) : originMode === 'quotation_comparison' ? (
-                <div className="space-y-3">
-                  {eligibleComparisons.length === 0 ? (
-                    <p className="text-[13px] text-erp-muted">No completed &amp; approved comparisons available.</p>
-                  ) : (
-                    <Select
-                      value={selectedComparisonId}
-                      onChange={(e) => setSelectedComparisonId(e.target.value)}
-                    >
-                      <option value="">Select comparison…</option>
-                      {eligibleComparisons.map(({ comparison, rfq }) => (
-                        <option key={comparison.id} value={comparison.id}>
-                          {comparison.documentNumber} · RFQ {rfq.documentNumber} ·{' '}
-                          {comparison.recommendedVendorName}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                </div>
-              ) : originMode === 'vendor_quotation' ? (
-                <div className="space-y-3">
-                  {approvedVqs.length === 0 ? (
-                    <p className="text-[13px] text-erp-muted">
-                      No approved (selected) vendor quotations available. Create or select a quotation
-                      under Vendors → Vendor Quotation first.
-                    </p>
-                  ) : (
-                    <Select value={selectedVqId} onChange={(e) => setSelectedVqId(e.target.value)}>
-                      <option value="">Select vendor quotation…</option>
-                      {approvedVqs.map((vq) => (
-                        <option key={vq.id} value={vq.id}>
-                          {vq.documentNumber} · {vq.vendor.name} · {formatCurrency(vq.totalAmount)}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                </div>
-              ) : originMode === 'blanket_order' ? (
-                <div className="space-y-3">
-                  {activeBlankets.length === 0 ? (
-                    <p className="text-[13px] text-erp-muted">No active blanket orders available.</p>
-                  ) : (
-                    <Select
-                      value={selectedBlanketId}
-                      onChange={(e) => {
-                        setSelectedBlanketId(e.target.value)
-                        setBlanketQuantities({})
-                      }}
-                    >
-                      <option value="">Select active blanket order…</option>
-                      {activeBlankets.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.documentNumber} · {b.vendor.name}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                  {selectedBlanketId
-                    ? (() => {
-                        const blanket = activeBlankets.find((b) => b.id === selectedBlanketId)
-                        if (!blanket) return null
-                        return (
-                          <div className="overflow-x-auto rounded-md border border-erp-border">
-                            <table className="erp-table text-[12px]">
-                              <thead>
-                                <tr>
-                                  <th>Item Code</th>
-                                  <th>Item</th>
-                                  <th className="num">Max Qty</th>
-                                  <th className="num">Released</th>
-                                  <th className="num">Available</th>
-                                  <th className="num">Rate</th>
-                                  <th className="num">Release Qty</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {blanket.lines.map((l) => {
-                                  const available = Math.max(0, l.maxQuantity - l.releasedQuantity)
-                                  return (
-                                    <tr key={l.id}>
-                                      <td className="font-mono">{l.itemCode}</td>
-                                      <td>{l.itemName}</td>
-                                      <td className="num">{l.maxQuantity}</td>
-                                      <td className="num">{l.releasedQuantity}</td>
-                                      <td className="num">{available}</td>
-                                      <td className="num">{formatCurrency(l.rate)}</td>
-                                      <td className="num">
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          max={available}
-                                          className="erp-input h-8 w-24 text-right text-[12px]"
-                                          value={blanketQuantities[l.itemId] ?? 0}
-                                          onChange={(e) =>
-                                            setBlanketQuantities((prev) => ({
-                                              ...prev,
-                                              [l.itemId]: Number(e.target.value),
-                                            }))
-                                          }
-                                        />
-                                      </td>
-                                    </tr>
-                                  )
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )
-                      })()
-                    : null}
-                </div>
-              ) : null}
-            </PurchaseOrderOriginSourcePanel>
-        </div>
-      ) : null}
-
       {showPoForm ? (
 
         <>
@@ -1504,8 +1290,8 @@ export function PurchaseOrderEditorPage() {
           <div className="space-y-3">
           <ErpCardSection
             id={purchaseSectionId('general')}
-            title="Order Information"
-            subtitle="Document identity and buyer context"
+            title="General"
+            subtitle="Document identity, vendor, and delivery locations"
             icon={ClipboardList}
             accent="blue"
             collapsible
@@ -1519,6 +1305,20 @@ export function PurchaseOrderEditorPage() {
                 placeholder="Loading number…"
                 readOnly
                 className="bg-erp-surface-alt"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Status" readOnly hint="Lifecycle status — not editable on the form">
+              <Input
+                value={PURCHASE_ORDER_DOMAIN_STATUS_LABELS[status]}
+                readOnly
+                className="bg-erp-surface-alt"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Revised version" readOnly>
+              <Input
+                value={String(revisionNo)}
+                readOnly
+                className="bg-erp-surface-alt tabular-nums"
               />
             </ErpFieldRow>
             <ErpFieldRow
@@ -1537,6 +1337,7 @@ export function PurchaseOrderEditorPage() {
             </ErpFieldRow>
             <ErpFieldRow label="Order Type">
               <Select
+                native={false}
                 value={header.orderType}
                 disabled={!editable}
                 onChange={(e) => patchHeader({ orderType: e.target.value as PurchaseOrderType })}
@@ -1561,18 +1362,6 @@ export function PurchaseOrderEditorPage() {
                 onChange={(e) => patchHeader({ department: e.target.value })}
               />
             </ErpFieldRow>
-          </ErpCardSection>
-
-          <ErpCardSection
-            title="Vendor Information"
-            subtitle="Supplier identity and place of supply"
-            icon={Building2}
-            accent="teal"
-            collapsible
-            defaultOpen
-            forceOpenKey={forceOpenSections.general}
-            dense
-          >
             <ErpFieldRow
               id={purchaseFieldId('vendorId')}
               label="Vendor"
@@ -1624,52 +1413,6 @@ export function PurchaseOrderEditorPage() {
                 />
               </ErpFieldRow>
             </ErpFormSpan>
-            <ErpFormSpan span={3}>
-              <div className="mt-1 min-h-[4.75rem] rounded-md border border-erp-border bg-erp-surface-alt/60 px-3 py-2.5 text-[12px]">
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
-                  Vendor summary
-                </p>
-                <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <span className="text-erp-muted">Code</span>
-                    <p className="font-mono font-medium text-erp-text">
-                      {selectedVendor?.vendorCode || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-erp-muted">GSTIN</span>
-                    <p className="font-mono font-medium text-erp-text">
-                      {selectedVendor?.gstin || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-erp-muted">Payment terms</span>
-                    <p className="font-medium text-erp-text">
-                      {header.paymentTerms || selectedVendor?.paymentTerms || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-erp-muted">Lead time</span>
-                    <p className="font-medium text-erp-text">
-                      {selectedVendor?.leadTimeDays != null
-                        ? `${selectedVendor.leadTimeDays} days`
-                        : '—'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </ErpFormSpan>
-          </ErpCardSection>
-
-          <ErpCardSection
-            title="Location and Delivery"
-            subtitle="Purchase and ship-to locations"
-            icon={MapPin}
-            accent="slate"
-            collapsible
-            defaultOpen
-            dense
-          >
             <ErpFieldRow label="Purchase Location">
               <Select
                 value={header.purchaseLocationId}
@@ -1696,55 +1439,45 @@ export function PurchaseOrderEditorPage() {
                 ))}
               </Select>
             </ErpFieldRow>
-          </ErpCardSection>
-
-          <ErpCardSection
-            title="Source Reference"
-            subtitle="Origin document linkage for this purchase order"
-            icon={ClipboardList}
-            accent="blue"
-            collapsible
-            defaultOpen
-            dense
-          >
-            {showManualSourceFact ? (
-              <ErpFormSpan span={3}>
-                <p className="text-[13px] text-erp-muted">
-                  Source: <span className="text-erp-text">{PURCHASE_ORDER_ORIGIN_LABELS.manual}</span>
-                </p>
-              </ErpFormSpan>
-            ) : populatedSourceRefs.length > 0 ? (
-              populatedSourceRefs.map((ref) => (
-                <ErpFieldRow key={ref.label} label={ref.label} readOnly>
-                  <Input value={ref.value} readOnly className="bg-erp-surface-alt font-mono" />
-                </ErpFieldRow>
-              ))
-            ) : (
-              <ErpFormSpan span={3}>
-                <p className="text-[13px] text-erp-muted">
-                  Source: <span className="text-erp-text">{PURCHASE_ORDER_ORIGIN_LABELS[originMode]}</span>
-                  {!originChosen ? null : (
-                    <span className="ml-1">(select a source document to populate references)</span>
-                  )}
-                </p>
-              </ErpFormSpan>
-            )}
-          </ErpCardSection>
-
-          <ErpCardSection
-            id={purchaseSectionId('commercial')}
-            title="Commercial Terms"
-            subtitle="Delivery window, price basis, and commercial clauses"
-            collapsedSummary={commercialSummary || undefined}
-            icon={FileSignature}
-            accent="violet"
-            collapsible
-            defaultOpen={false}
-            forceOpenKey={forceOpenSections.commercial}
-            dense
-          >
             <ErpFormSpan span={3}>
-              <p className="erp-field-group__label">Dates</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <ErpFieldRow label="Purchase Location Address" readOnly>
+                  <Textarea
+                    value={
+                      selectedPurchaseLocation?.address ||
+                      [
+                        selectedPurchaseLocation?.name,
+                        selectedPurchaseLocation?.city,
+                        selectedPurchaseLocation?.state,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')
+                    }
+                    readOnly
+                    rows={3}
+                    className="resize-none whitespace-pre-wrap bg-erp-surface-alt"
+                    placeholder="Select a purchase location to show its full address"
+                  />
+                </ErpFieldRow>
+                <ErpFieldRow label="Delivery Location Address" readOnly>
+                  <Textarea
+                    value={
+                      selectedDeliveryLocation?.address ||
+                      [
+                        selectedDeliveryLocation?.name,
+                        selectedDeliveryLocation?.city,
+                        selectedDeliveryLocation?.state,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')
+                    }
+                    readOnly
+                    rows={3}
+                    className="resize-none whitespace-pre-wrap bg-erp-surface-alt"
+                    placeholder="Select a delivery location to show its full address"
+                  />
+                </ErpFieldRow>
+              </div>
             </ErpFormSpan>
             <ErpFieldRow
               id={purchaseFieldId('expectedDeliveryDate')}
@@ -1770,88 +1503,6 @@ export function PurchaseOrderEditorPage() {
                 onChange={(e) => patchHeader({ validityDate: e.target.value })}
               />
             </ErpFieldRow>
-            <ErpFieldRow label="Price Basis">
-              <PurchaseTermSelect
-                value={header.priceBasis}
-                options={PURCHASE_PRICE_BASIS}
-                disabled={!editable}
-                onChange={(v) => patchHeader({ priceBasis: v })}
-                emptyLabel="Select price basis…"
-              />
-            </ErpFieldRow>
-
-            <ErpFormSpan span={3}>
-              <p className="erp-field-group__label">Commercial</p>
-            </ErpFormSpan>
-            <ErpFieldRow label="Payment Terms">
-              <PurchaseTermSelect
-                value={header.paymentTerms}
-                options={PURCHASE_PAYMENT_TERMS}
-                disabled={!editable}
-                onChange={(v) => patchHeader({ paymentTerms: v })}
-                emptyLabel="Select payment terms…"
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Delivery Terms">
-              <PurchaseTermSelect
-                value={header.deliveryTerms}
-                options={PURCHASE_DELIVERY_TERMS}
-                disabled={!editable}
-                onChange={(v) => patchHeader({ deliveryTerms: v })}
-                emptyLabel="Select delivery terms…"
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Freight Terms">
-              <PurchaseTermSelect
-                value={header.freightTerms}
-                options={PURCHASE_FREIGHT_TERMS}
-                disabled={!editable}
-                onChange={(v) => patchHeader({ freightTerms: v })}
-                emptyLabel="Select freight terms…"
-              />
-            </ErpFieldRow>
-
-            <ErpFormSpan span={3}>
-              <p className="erp-field-group__label">Additional Conditions</p>
-            </ErpFormSpan>
-            <ErpFieldRow label="Packing Terms">
-              <PurchaseTermSelect
-                value={header.packingTerms}
-                options={PURCHASE_PACKING_TERMS}
-                disabled={!editable}
-                onChange={(v) => patchHeader({ packingTerms: v })}
-                emptyLabel="Select packing terms…"
-              />
-            </ErpFieldRow>
-            {showInsuranceTerms ? (
-              <ErpFieldRow label="Insurance Terms">
-                <PurchaseTermSelect
-                  value={header.insuranceTerms}
-                  options={PURCHASE_INSURANCE_TERMS}
-                  disabled={!editable}
-                  onChange={(v) => patchHeader({ insuranceTerms: v })}
-                  emptyLabel="Select insurance terms…"
-                />
-              </ErpFieldRow>
-            ) : null}
-            <ErpFieldRow label="Warranty">
-              <Input
-                value={header.warranty}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ warranty: e.target.value })}
-                placeholder="e.g. 12 months manufacturing defect"
-              />
-            </ErpFieldRow>
-            {showInspectionRequirement ? (
-              <ErpFieldRow label="Inspection Requirement" colSpan={3}>
-                <Input
-                  value={header.inspectionRequirement}
-                  disabled={!editable}
-                  onChange={(e) => patchHeader({ inspectionRequirement: e.target.value })}
-                  placeholder="e.g. Mill TC + dimensional check on receipt"
-                />
-              </ErpFieldRow>
-            ) : null}
           </ErpCardSection>
 
           <ErpCardSection
@@ -1865,25 +1516,28 @@ export function PurchaseOrderEditorPage() {
             forceOpenKey={forceOpenSections.lines}
             dense
             columns={1}
-            className="ring-1 ring-teal-200/70 shadow-sm"
+            className="purchase-doc-lines-section ring-1 ring-teal-200/70 shadow-sm"
             badge={
               <span className="text-[11px] tabular-nums text-erp-muted">
                 {computedLines.length} line{computedLines.length === 1 ? '' : 's'}
               </span>
             }
           >
-            <div id={purchaseFieldId('lines')}>
+            <div id={purchaseFieldId('lines')} className="min-w-0 max-w-full">
               <PurchaseOrderLinesTable
                 lines={computedLines}
                 catalogItems={catalogItemsForPicker}
                 warehouseOptions={locationOptions}
+                binOptions={warehouseBinOptions}
                 editable={editable}
                 isInterstate={isInterstate}
                 dirty={dirty}
                 formatCurrency={formatCurrency}
                 showErrors={showErrors}
                 lineErrors={activeValidation.lineErrors}
-                onAddLine={() => setLinesDirty([...lines, emptyLine()])}
+                onAddLine={() =>
+                  setLinesDirty([...lines, emptyLine({ lineNo: nextPurchaseLineNo(lines) })])
+                }
                 onPatchLine={patchLine}
                 onRemoveLine={(key) => setLinesDirty(lines.filter((l) => l.key !== key))}
                 onSelectCatalogItem={applyItemCatalog}
@@ -1902,7 +1556,7 @@ export function PurchaseOrderEditorPage() {
                           ...last,
                           key: crypto.randomUUID(),
                           id: '',
-                          lineNo: lines.length + 1,
+                          lineNo: nextPurchaseLineNo(lines),
                         },
                       ])
                     },
@@ -2044,15 +1698,100 @@ export function PurchaseOrderEditorPage() {
           <ErpCardSection
             id={purchaseSectionId('notes')}
             title="Terms, Notes & Attachments"
-            subtitle="Commercial narrative, internal notes, and supporting files"
-            collapsedSummary={notesPeek || attachmentsPeek || undefined}
+            subtitle="Commercial terms, narrative, internal notes, and supporting files"
+            collapsedSummary={
+              [commercialSummary, notesPeek, attachmentsPeek].filter(Boolean).join(' · ') ||
+              undefined
+            }
             icon={CheckCircle}
             accent="slate"
             collapsible
             defaultOpen={false}
+            forceOpenKey={forceOpenSections.notes}
             dense
             columns={1}
           >
+            <ErpFormSpan span={3}>
+              <p className="erp-field-group__label">Commercial</p>
+            </ErpFormSpan>
+            <ErpFieldRow label="Price Basis">
+              <PurchaseTermSelect
+                value={header.priceBasis}
+                options={PURCHASE_PRICE_BASIS}
+                disabled={!editable}
+                onChange={(v) => patchHeader({ priceBasis: v })}
+                emptyLabel="Select price basis…"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Payment Terms">
+              <PurchaseTermSelect
+                value={header.paymentTerms}
+                options={PURCHASE_PAYMENT_TERMS}
+                disabled={!editable}
+                onChange={(v) => patchHeader({ paymentTerms: v })}
+                emptyLabel="Select payment terms…"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Delivery Terms">
+              <PurchaseTermSelect
+                value={header.deliveryTerms}
+                options={PURCHASE_DELIVERY_TERMS}
+                disabled={!editable}
+                onChange={(v) => patchHeader({ deliveryTerms: v })}
+                emptyLabel="Select delivery terms…"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Freight Terms">
+              <PurchaseTermSelect
+                value={header.freightTerms}
+                options={PURCHASE_FREIGHT_TERMS}
+                disabled={!editable}
+                onChange={(v) => patchHeader({ freightTerms: v })}
+                emptyLabel="Select freight terms…"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Packing Terms">
+              <PurchaseTermSelect
+                value={header.packingTerms}
+                options={PURCHASE_PACKING_TERMS}
+                disabled={!editable}
+                onChange={(v) => patchHeader({ packingTerms: v })}
+                emptyLabel="Select packing terms…"
+              />
+            </ErpFieldRow>
+            {showInsuranceTerms ? (
+              <ErpFieldRow label="Insurance Terms">
+                <PurchaseTermSelect
+                  value={header.insuranceTerms}
+                  options={PURCHASE_INSURANCE_TERMS}
+                  disabled={!editable}
+                  onChange={(v) => patchHeader({ insuranceTerms: v })}
+                  emptyLabel="Select insurance terms…"
+                />
+              </ErpFieldRow>
+            ) : null}
+            <ErpFieldRow label="Warranty">
+              <Input
+                value={header.warranty}
+                disabled={!editable}
+                onChange={(e) => patchHeader({ warranty: e.target.value })}
+                placeholder="e.g. 12 months manufacturing defect"
+              />
+            </ErpFieldRow>
+            {showInspectionRequirement ? (
+              <ErpFieldRow label="Inspection Requirement" colSpan={3}>
+                <Input
+                  value={header.inspectionRequirement}
+                  disabled={!editable}
+                  onChange={(e) => patchHeader({ inspectionRequirement: e.target.value })}
+                  placeholder="e.g. Mill TC + dimensional check on receipt"
+                />
+              </ErpFieldRow>
+            ) : null}
+
+            <ErpFormSpan span={3}>
+              <p className="erp-field-group__label mt-2">Notes &amp; Attachments</p>
+            </ErpFormSpan>
             <PurchaseTermsNotesTabs
               disabled={!editable}
               values={{
@@ -2080,13 +1819,12 @@ export function PurchaseOrderEditorPage() {
                 />
               }
             />
-            {revisionNo > 0 ? (
-              <p className="mt-2 text-[12px] text-erp-muted">Revision {revisionNo}</p>
-            ) : null}
           </ErpCardSection>
           </div>
         </>
-      ) : null}
+      ) : (
+        <LoadingState variant="form" rows={6} />
+      )}
     </PurchaseCardFormShell>
     </>
   )

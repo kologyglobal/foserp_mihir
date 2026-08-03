@@ -37,6 +37,10 @@ VITE_TENANT_SLUG=vasant-trailers
 Backend database/JWT variables remain configured in Hostinger Environment
 Variables. Never place their values in Git.
 
+For the prepared FIN-CLOSE-1 database batch, follow
+[`accounting/FIN_CLOSE_1_HOSTINGER_MIGRATION_RUNBOOK.md`](accounting/FIN_CLOSE_1_HOSTINGER_MIGRATION_RUNBOOK.md).
+Production `migrate deploy`, mapping, and hPanel redeploy remain explicit human actions.
+
 ## What the build does
 
 `npm run build` calls `scripts/build-hostinger.mjs`:

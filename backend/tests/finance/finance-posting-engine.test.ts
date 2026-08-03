@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../../src/app.js'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { PERMISSIONS, type PermissionName } from '../../src/constants/permissions.js'
 import * as glRepo from '../../src/modules/accounting/ledger/general-ledger.repository.js'
 import * as postingEventRepo from '../../src/modules/accounting/ledger/posting-event.repository.js'

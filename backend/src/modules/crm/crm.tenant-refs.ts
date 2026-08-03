@@ -1,4 +1,4 @@
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { ValidationError } from '../../utils/errors.js'
 import { tenantActiveFilter } from '../../shared/index.js'
 

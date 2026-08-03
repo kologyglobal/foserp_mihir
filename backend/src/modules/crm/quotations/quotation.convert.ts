@@ -1,6 +1,6 @@
 import type { CrmQuotation, CrmQuotationDocument, CrmOpportunity } from '@prisma/client'
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ConflictError, InvalidStateError, ValidationError } from '../../../utils/errors.js'
 import { findWonStage } from '../opportunities/opportunity.repository.js'
 import { normalizeSalesLineForWrite } from '../shared/crm-item-resolver.js'

@@ -3,7 +3,7 @@
  * Product aliases (DIRECT_LABOUR_ABSORPTION, SCRAP_EXPENSE, …) resolve to existing enum keys.
  */
 import type { DefaultAccountMappingKey } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { resolveCostingPolicy } from './costing-policy.service.js'
 
 /** Always required for Manufacturing Accounting enablement / posting. */

@@ -11,7 +11,7 @@
  *
  * Note: GRN has no backend table yet (demo FE only) — cannot seed GRNs to MySQL.
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const TENANT_SLUG = process.env.SEED_TENANT_SLUG ?? 'vasant-trailers'
 const PREFIX = 'UAT'

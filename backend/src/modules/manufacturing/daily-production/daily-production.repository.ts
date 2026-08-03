@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { getPagination } from '../../../utils/pagination.js'
 import type { ListDailyBatchesQuery } from './daily-production.schemas.js'

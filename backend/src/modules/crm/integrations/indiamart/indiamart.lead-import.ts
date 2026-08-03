@@ -1,5 +1,5 @@
 import type { IndiaMartConnection, IndiaMartEnquiry, IndiaMartImportStatus } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { nextCode } from '../../../../services/codeSeries.service.js'
 import { createAuditLog } from '../../../../services/audit.service.js'
 import * as followUpService from '../../follow-ups/follow-up.service.js'

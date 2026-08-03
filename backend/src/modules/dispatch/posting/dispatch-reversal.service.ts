@@ -7,7 +7,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Request } from 'express'
 import type { InventoryStockMovement, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import {
   AuthorizationError,

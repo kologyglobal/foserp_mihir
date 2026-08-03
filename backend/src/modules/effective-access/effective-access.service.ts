@@ -1,4 +1,4 @@
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { NotFoundError } from '../../utils/errors.js'
 import { listUserResponsibilities } from '../responsibilities/responsibility.service.js'
 import { loadUserDataScope, type UserDataScope } from '../access-scopes/scope.service.js'

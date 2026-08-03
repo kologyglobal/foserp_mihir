@@ -66,7 +66,7 @@ export async function resolveInspectionPlan(
   },
 ) {
   if (opts.inspectionPlanId) {
-    const { prisma } = await import('../../../config/database.js')
+    const { prisma } = await import('../../../config/prisma.js')
     const plan = await prisma.qualityInspectionPlan.findFirst({
       where: { id: opts.inspectionPlanId, tenantId, deletedAt: null, status: 'ACTIVE' },
       include: {

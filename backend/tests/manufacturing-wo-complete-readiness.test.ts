@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import type { Request } from 'express'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import {
   assertCompleteAllowed,
   getCloseReadiness,

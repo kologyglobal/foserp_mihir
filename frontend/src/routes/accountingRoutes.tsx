@@ -91,6 +91,7 @@ import { AssetLedgerPage } from '@/modules/accounting/AssetLedgerPage'
 import { FixedAssetsReportsPage } from '@/modules/accounting/FixedAssetsReportsPage'
 import { FixedAssetsSetupPage } from '@/modules/accounting/FixedAssetsSetupPage'
 import { ManufacturingAccountingApiGate } from '@/components/accounting/manufacturingAccounting/ManufacturingAccountingApiGate'
+import { InventoryGlReconciliationPage } from '@/modules/accounting/inventory-gl-reconciliation/InventoryGlReconciliationPage'
 import {
   ApprovalRulesPage,
   BranchesPage,
@@ -371,6 +372,7 @@ export const accountingRouteChildren: RouteObject[] = [
   /** Manufacturing Accounting — live Phase 7E workspace only (seed sub-pages removed) */
   { path: 'accounting/manufacturing', element: <ManufacturingAccountingApiGate /> },
   { path: 'accounting/manufacturing/*', element: <Navigate to="/accounting/manufacturing" replace /> },
+  { path: 'accounting/inventory-gl-reconciliation', element: <InventoryGlReconciliationPage /> },
 
   /** Tax — live GST extract + e-invoice / e-way only */
   { path: 'accounting/gst-tds', element: <Navigate to="/accounting/tax-compliance" replace /> },

@@ -5,7 +5,7 @@ import type {
   Prisma,
 } from '@prisma/client'
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { logger } from '../../../config/logger.js'
 import { post } from '../../accounting/posting/posting.service.js'
 import type { PostingContext } from '../../accounting/posting/posting.types.js'

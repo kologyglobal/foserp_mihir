@@ -7,6 +7,7 @@ import {
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { filterPurchaseCatalogByProductType } from '@/utils/purchaseCatalogFilter'
 import { getPurchaseLineUomOptions } from '@/utils/purchaseLineUom'
+import { PurchaseLineQtyCell } from '@/components/purchase/PurchaseLineQtyCell'
 import { cn } from '@/utils/cn'
 import {
   ENGINEERING_PRODUCT_TYPES,
@@ -173,62 +174,56 @@ export function PurchaseDocumentLineCards({
                   />
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-medium text-erp-muted">Qty</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      className="erp-input h-9 w-full text-right text-[13px]"
-                      disabled={!editable}
-                      value={line.uomQuantity ?? line.quantity}
-                      onChange={(e) =>
-                        onPatchLine(line.key, {
-                          uomQuantity: Number(e.target.value),
-                          quantity: Number(e.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-medium text-erp-muted">UOM</span>
-                    {(() => {
-                      const uomOptions = getPurchaseLineUomOptions(line.itemId)
-                      const multi = uomOptions.length > 1
-                      if (!editable || !line.itemId || !multi) {
-                        return (
-                          <input
-                            className="erp-input h-9 w-full text-[13px]"
-                            disabled
-                            readOnly
-                            value={uomOptions[0]?.code || line.uom || '—'}
-                            title="Unit locked from Item Master"
+                  {(() => {
+                    const uomOptions = getPurchaseLineUomOptions(line.itemId)
+                    const multi = uomOptions.length > 1
+                    return (
+                      <>
+                        <label className={cn('block', multi ? '' : 'col-span-2')}>
+                          <span className="mb-1 block text-[11px] font-medium text-erp-muted">Qty</span>
+                          <PurchaseLineQtyCell
+                            line={line}
+                            editable={editable}
+                            disabled={!editable}
+                            onChange={(v) => onPatchLine(line.key, { uomQuantity: v })}
                           />
-                        )
-                      }
-                      return (
-                        <select
-                          className="erp-input h-9 w-full text-[13px]"
-                          value={line.uomId || uomOptions[0]?.id || ''}
-                          onChange={(e) => {
-                            const opt = uomOptions.find((o) => o.id === e.target.value)
-                            if (!opt) return
-                            onPatchLine(line.key, {
-                              uomId: opt.id,
-                              uom: opt.code,
-                              uomConversionFactor: opt.factor,
-                            })
-                          }}
-                        >
-                          {uomOptions.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.code}
-                            </option>
-                          ))}
-                        </select>
-                      )
-                    })()}
-                  </label>
+                        </label>
+                        {multi ? (
+                          <label className="block">
+                            <span className="mb-1 block text-[11px] font-medium text-erp-muted">UOM</span>
+                            {editable && line.itemId ? (
+                              <select
+                                className="erp-input h-9 w-full text-[13px]"
+                                value={line.uomId || uomOptions[0]?.id || ''}
+                                onChange={(e) => {
+                                  const opt = uomOptions.find((o) => o.id === e.target.value)
+                                  if (!opt) return
+                                  onPatchLine(line.key, {
+                                    uomId: opt.id,
+                                    uom: opt.code,
+                                    uomConversionFactor: opt.factor,
+                                  })
+                                }}
+                              >
+                                {uomOptions.map((o) => (
+                                  <option key={o.id} value={o.id}>
+                                    {o.code}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                className="erp-input h-9 w-full text-[13px]"
+                                disabled
+                                readOnly
+                                value={uomOptions[0]?.code || line.uom || '—'}
+                              />
+                            )}
+                          </label>
+                        ) : null}
+                      </>
+                    )
+                  })()}
                   <label className="block">
                     <span className="mb-1 block text-[11px] font-medium text-erp-muted">Rate</span>
                     <input

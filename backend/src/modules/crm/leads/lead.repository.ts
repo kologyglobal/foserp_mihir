@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { DEFAULT_LEAD_PRIORITY, DEFAULT_LEAD_STAGE } from './lead.constants.js'
 import type {

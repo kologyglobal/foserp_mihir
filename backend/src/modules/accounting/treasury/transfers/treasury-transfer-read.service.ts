@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { TreasuryTransfer } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence } from '../../shared/finance-decimal.js'
 import { resolveTreasuryTransferAllowedActions } from './treasury-transfer-allowed-actions.js'
 import * as repo from './treasury-transfer.repository.js'

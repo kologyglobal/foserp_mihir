@@ -22,6 +22,8 @@ import type { TdsRecognitionMode } from '@prisma/client'
 import { add, compare, formatForPersistence, isNegative, isPositive, isZero, subtract, sumDecimals, toDecimal } from '../../../shared/finance-decimal.js'
 import { calcError, VENDOR_INVOICE_CALC_CODES } from './vendor-invoice-calculation.errors.js'
 import { computeRecoverableInputTaxByComponent } from './vendor-invoice-account-resolver.service.js'
+import { grirLineFor } from './vendor-invoice-grir-release.service.js'
+import type { VendorInvoiceGrirReleasePlan } from './vendor-invoice-grir-release.service.js'
 import type { VendorInvoiceAmountsCalculationResult } from './vendor-invoice-amounts.service.js'
 import type {
   VendorInvoiceAccountComponent,
@@ -41,6 +43,8 @@ export interface BuildVendorInvoiceAccountingPreviewParams {
     exchangeRate?: string
     tdsRecognitionMode?: TdsRecognitionMode
   }
+  /** FIN-CLOSE-1 — lines listed here clear GR/IR instead of debiting PURCHASE. */
+  grirReleasePlan?: VendorInvoiceGrirReleasePlan | null
 }
 
 function findResolvedAccount(
@@ -98,6 +102,46 @@ export function buildVendorInvoiceAccountingPreview(params: BuildVendorInvoiceAc
   }
 
   for (const line of amountsResult.lines) {
+    const grir = grirLineFor(params.grirReleasePlan, line.lineNumber)
+    if (grir) {
+      // Release the receipt-cost balance the GRN parked in GR/IR, then book the difference
+      // between invoice price and receipt cost to purchase price variance.
+      pushLine('GRIR_CLEARING', 'DEBIT', grir.grirAmount, `GR/IR release — ${line.description}`, {
+        sourceLineNumber: line.lineNumber,
+        costCentreId: line.costCentreId,
+      })
+      const inventoryAdjustment = toDecimal(grir.inventoryAdjustmentAmount)
+      if (isPositive(inventoryAdjustment)) {
+        pushLine('RAW_MATERIAL_INVENTORY', 'DEBIT', formatForPersistence(inventoryAdjustment), `Retro cost adjustment — ${line.description}`, {
+          sourceLineNumber: line.lineNumber,
+          costCentreId: line.costCentreId,
+        })
+      } else if (isNegative(inventoryAdjustment)) {
+        pushLine('RAW_MATERIAL_INVENTORY', 'CREDIT', formatForPersistence(inventoryAdjustment.abs()), `Retro cost adjustment — ${line.description}`, {
+          sourceLineNumber: line.lineNumber,
+          costCentreId: line.costCentreId,
+        })
+      }
+      const ppv = toDecimal(grir.ppvAmount)
+      if (isPositive(ppv)) {
+        pushLine('PURCHASE_PRICE_VARIANCE', 'DEBIT', formatForPersistence(ppv), `Price variance — ${line.description}`, {
+          sourceLineNumber: line.lineNumber,
+          costCentreId: line.costCentreId,
+        })
+      } else if (isNegative(ppv)) {
+        pushLine('PURCHASE_PRICE_VARIANCE', 'CREDIT', formatForPersistence(ppv.abs()), `Price variance — ${line.description}`, {
+          sourceLineNumber: line.lineNumber,
+          costCentreId: line.costCentreId,
+        })
+      }
+      // Non-recoverable tax is never part of GR/IR — it stays on the expense account.
+      pushLine('LINE_DEBIT', 'DEBIT', formatForPersistence(toDecimal(line.nonRecoverableTaxAmount)), line.description, {
+        sourceLineNumber: line.lineNumber,
+        costCentreId: line.costCentreId,
+      })
+      continue
+    }
+
     const debitAmount = add(toDecimal(line.taxableAmount), toDecimal(line.nonRecoverableTaxAmount))
     pushLine('LINE_DEBIT', 'DEBIT', formatForPersistence(debitAmount), line.description, {
       sourceLineNumber: line.lineNumber,

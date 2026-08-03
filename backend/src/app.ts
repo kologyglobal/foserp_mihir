@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import swaggerUi from 'swagger-ui-express'
 import { env } from './config/env.js'
-import { prisma } from './config/database.js'
+import { prisma } from './config/prisma.js'
 import { errorMiddleware } from './middleware/error.middleware.js'
 import authRoutes from './modules/auth/auth.routes.js'
 import crmRoutes from './modules/crm/crm.routes.js'
@@ -33,6 +33,7 @@ import vendorRoutes, { vendorLookupRouter } from './modules/vendors/vendor.route
 import accountingRoutes from './modules/accounting/accounting.routes.js'
 import organisationRoutes from './modules/organisation/organisation.routes.js'
 import manufacturingRoutes from './modules/manufacturing/manufacturing.routes.js'
+import maintenanceRoutes from './modules/maintenance/maintenance.routes.js'
 import inventoryRoutes from './modules/inventory/inventory.routes.js'
 import qualityRoutes from './modules/quality/quality.routes.js'
 import dispatchRoutes from './modules/dispatch/dispatch.routes.js'
@@ -156,6 +157,7 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/accounting', accountingRoutes)
   app.use('/api/v1/tenants/:tenantId/organisation', organisationRoutes)
   app.use('/api/v1/tenants/:tenantId/manufacturing', manufacturingRoutes)
+  app.use('/api/v1/tenants/:tenantId/maintenance', maintenanceRoutes)
   app.use('/api/v1/tenants/:tenantId/purchase', purchaseRoutes)
   app.use('/api/v1/tenants/:tenantId/quality', qualityRoutes)
   app.use('/api/v1/tenants/:tenantId/dispatch', dispatchRoutes)
@@ -191,6 +193,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/accounting', accountingRoutes)
   app.use('/api/v1/t/:tenantSlug/organisation', organisationRoutes)
   app.use('/api/v1/t/:tenantSlug/manufacturing', manufacturingRoutes)
+  app.use('/api/v1/t/:tenantSlug/maintenance', maintenanceRoutes)
   app.use('/api/v1/t/:tenantSlug/purchase', purchaseRoutes)
   app.use('/api/v1/t/:tenantSlug/quality', qualityRoutes)
   app.use('/api/v1/t/:tenantSlug/dispatch', dispatchRoutes)

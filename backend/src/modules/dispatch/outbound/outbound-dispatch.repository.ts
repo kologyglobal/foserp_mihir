@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { ListOutboundDispatchesQuery } from './outbound-dispatch.schemas.js'
 
 const lineOrder = { lineNo: 'asc' as const }

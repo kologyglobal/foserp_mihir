@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { n, roundQty } from '../shared/dispatch-qty.js'
 import * as outboundRepo from '../outbound/outbound-dispatch.repository.js'

@@ -1,4 +1,4 @@
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { compare } from '../../../shared/finance-decimal.js'
 import { resolvePostingPeriod } from '../../../posting/posting-period.service.js'
 import { requireActiveCustomerParty } from '../../customer-party/customer-party.service.js'

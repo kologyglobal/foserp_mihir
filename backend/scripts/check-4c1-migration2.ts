@@ -1,4 +1,4 @@
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 async function main() {
   const vp = await prisma.$queryRawUnsafe("SHOW COLUMNS FROM vendor_payments LIKE 'reversal%'")

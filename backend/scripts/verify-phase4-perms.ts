@@ -1,4 +1,4 @@
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const phase4Modules = ['item_category', 'hsn', 'gst_group', 'gst_rate', 'item', 'vendor']
 

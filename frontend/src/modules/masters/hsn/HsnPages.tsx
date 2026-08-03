@@ -11,7 +11,7 @@ import { DetailLayout, DetailSection, DetailGrid, DetailField, MasterNotFound } 
 import { GstGroupSelect } from '../../../components/masters/TaxMasterSelects'
 import { ActiveBadge } from '../../../components/ui/StatusBadge'
 import { FormField } from '../../../components/forms/FormField'
-import { Checkbox, Textarea } from '../../../components/forms/Inputs'
+import { Checkbox, Input, Textarea } from '../../../components/forms/Inputs'
 import { ErpCardSection } from '../../../components/erp/card-form'
 import { useMasterStore } from '../../../store/masterStore'
 import { resolveMaybeId, resolveMaybeVoid } from '../../../store/storeAction'
@@ -28,7 +28,11 @@ import { MasterCodeField } from '../../../components/masters/MasterCodeField'
 import type { MasterCodeSeriesHandle } from '../../../hooks/useMasterCodeSeries'
 
 const schema = z.object({
-  code: z.string().min(4, 'HSN code required').max(10),
+  code: z
+    .string()
+    .min(4, 'HSN code required')
+    .max(10)
+    .regex(/^\d+$/, 'HSN code must contain digits only'),
   gstGroupId: z.string().min(1, 'GST group required'),
   description: z.string().min(1, 'Description required'),
   isActive: z.boolean(),
@@ -139,11 +143,16 @@ export function HsnFormPage() {
 
   function save(mode: 'default' | 'new' | 'close' = 'default') {
     void handleSubmit(async (data) => {
-      const validation = codeSeriesRef.current?.validateBeforeSave(data.code, {
-        checkDuplicate: (c) => hsnMasters.some((h) => h.code === c && h.id !== id),
-      })
-      if (validation && !validation.ok) {
-        setSaveError(validation.message ?? 'Invalid code')
+      if (!isEdit) {
+        const validation = codeSeriesRef.current?.validateBeforeSave(data.code, {
+          checkDuplicate: (c) => hsnMasters.some((h) => h.code === c && h.id !== id),
+        })
+        if (validation && !validation.ok) {
+          setSaveError(validation.message ?? 'Invalid code')
+          return
+        }
+      } else if (hsnMasters.some((h) => h.code === data.code && h.id !== id)) {
+        setSaveError('HSN code already exists')
         return
       }
       setSaveError(null)
@@ -203,16 +212,30 @@ export function HsnFormPage() {
       <form onSubmit={(e: FormEvent) => { e.preventDefault(); save('default') }}>
         <ErpCardSection id="hsn-section-general" title="General" subtitle="HSN code, GST group, and description." icon={Hash} accent="blue" collapsible defaultOpen>
           <div className="grid gap-4 md:grid-cols-2">
-            <MasterCodeField
-              entityType="hsn"
-              isEdit={isEdit}
-              existingCode={existing?.code}
-              value={watched.code ?? ''}
-              onChange={(v) => setValue('code', v, { shouldValidate: true })}
-              onSeriesReady={(h) => { codeSeriesRef.current = h }}
-              error={errors.code?.message}
-              required
-            />
+            {isEdit ? (
+              <FormField label="HSN Code" required error={errors.code?.message}>
+                <Input
+                  value={watched.code ?? ''}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 10)
+                    setValue('code', digits, { shouldValidate: true })
+                  }}
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              </FormField>
+            ) : (
+              <MasterCodeField
+                entityType="hsn"
+                isEdit={false}
+                existingCode={existing?.code}
+                value={watched.code ?? ''}
+                onChange={(v) => setValue('code', v.replace(/\D/g, '').slice(0, 10), { shouldValidate: true })}
+                onSeriesReady={(h) => { codeSeriesRef.current = h }}
+                error={errors.code?.message}
+                required
+              />
+            )}
             <FormField label="GST Group Code" required error={errors.gstGroupId?.message}>
               <GstGroupSelect value={gstGroupId} onChange={(v) => setValue('gstGroupId', v, { shouldValidate: true })} />
             </FormField>

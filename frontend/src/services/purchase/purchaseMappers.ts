@@ -1136,6 +1136,19 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
   const unitCostPrimary = Number((line as { unitCostPrimary?: number }).unitCostPrimary ?? rate * factor) || 0
   const amount = Number(line.amount) || uomQuantity * rate
   const received = Number(line.receivedQuantity) || 0
+  const invoiced = Number(line.invoicedQuantity) || 0
+  const outstandingQtyBase =
+    Number((line as { outstandingQtyBase?: number }).outstandingQtyBase) ||
+    Math.max(0, qty - received)
+  const receivedUomQty =
+    Number((line as { receivedUomQty?: number }).receivedUomQty) ||
+    (factor > 0 ? received * factor : received)
+  const invoicedUomQty =
+    Number((line as { invoicedUomQty?: number }).invoicedUomQty) ||
+    (factor > 0 ? invoiced * factor : invoiced)
+  const outstandingQty =
+    Number((line as { outstandingQty?: number }).outstandingQty) ||
+    Math.max(0, uomQuantity - receivedUomQty)
   const requiredDate = line.requiredDate ?? new Date().toISOString().slice(0, 10)
   return {
     id: line.id,
@@ -1148,8 +1161,18 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     specification: '',
     category: 'raw_material',
     uom: resolveApiUomCode(line),
-    hsnCode: '',
+    hsnCode: line.hsnCode ?? '',
     sacCode: null,
+    gstGroupId: line.gstGroupId ?? null,
+    hsnId: line.hsnId ?? null,
+    gstGroupCode: line.gstGroupCode ?? '',
+    outstandingQty,
+    outstandingQtyBase,
+    receivedQtyBase: Number((line as { receivedQtyBase?: number }).receivedQtyBase) || received,
+    qcRequired: Boolean(line.qcRequired),
+    qualityTestGroupCode: line.qualityTestGroupCode ?? null,
+    binId: line.binId ?? null,
+    binCode: line.binCode ?? '',
     quantity: qty,
     uomQuantity,
     uomConversionFactor: factor,
@@ -1172,14 +1195,16 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     costCentre: '',
     project: '',
     productionOrder: '',
-    receivedQty: received,
-    pendingQty: line.openQuantity ?? Math.max(0, qty - received),
-    invoicedQty: Number(line.invoicedQuantity) || 0,
+    receivedQty: receivedUomQty,
+    pendingQty: outstandingQtyBase,
+    invoicedQty: invoicedUomQty,
+    invoicedQtyBase: invoiced,
     lineStatus: received >= qty && qty > 0 ? 'received' : received > 0 ? 'partial' : 'open',
     locationId: '',
     locationName: '',
     expectedDeliveryDate: requiredDate,
     prLineId: line.purchaseRequisitionLineId,
+    requisitionNo: line.requisitionNumber ?? null,
     rfqLineId: null,
     vendorQuotationLineId: null,
     remarks: line.remarks ?? '',
@@ -1398,9 +1423,13 @@ export function mapDomainPoInputToApiPayload(
         uomConversionFactor: factor,
         uomId: uuidOrNull(line.uomId ?? null),
         rate: Number(line.rate) || 0,
-        requiredDate: line.requiredDate ?? null,
+        requiredDate: line.requiredDate ?? line.expectedDeliveryDate ?? null,
         remarks: line.remarks ?? null,
         purchaseRequisitionLineId: uuidOrNull(line.prLineId ?? null),
+        requisitionNumber: line.requisitionNo?.trim() || null,
+        gstGroupId: uuidOrNull(line.gstGroupId ?? null),
+        hsnId: uuidOrNull(line.hsnId ?? null),
+        binId: uuidOrNull(line.binId ?? null),
       }
     }),
   }
@@ -1701,6 +1730,7 @@ export function mapApiPurchaseInvoiceToDomain(api: ApiPurchaseInvoice): Purchase
     holdAt: null,
     debitNoteId: null,
     debitNoteNumber: null,
+    accountingVendorInvoiceId: api.vendorInvoiceId ?? null,
     lines: (api.lines ?? []).map((l) => {
       const lineTax = Number(l.taxAmount) || 0
       return {
@@ -1873,12 +1903,22 @@ export function mapApiQualityInspectionToDomain(api: ApiQualityInspection): Qual
     sampleQty: Number(api.totals?.inspected) || 0,
     acceptedQty: Number(api.totals?.accepted) || 0,
     rejectedQty: Number(api.totals?.rejected) || 0,
-    inspectionPlan: '',
+    inspectionPlan: api.inspectionPlan || '',
     inspector: { id: api.inspectedById || '', code: '', name: api.inspectedByName || '' },
     inspectedAt: api.completedAt,
     deviationRequested: Boolean(api.deviationRemarks),
     deviationRemarks: api.deviationRemarks || '',
-    parameters: [],
+    parameters: (api.parameters ?? []).map((p) => ({
+      id: p.id,
+      parameter: p.parameter,
+      specification: p.specification || '',
+      minValue: p.minValue ?? null,
+      maxValue: p.maxValue ?? null,
+      observedValue: p.observedValue ?? null,
+      unit: p.unit || '',
+      result: p.result === 'pass' || p.result === 'fail' || p.result === 'na' ? p.result : 'na',
+      remarks: p.remarks || '',
+    })),
     createdAt: api.createdAt || new Date().toISOString(),
     updatedAt: api.updatedAt,
     createdBy: '',

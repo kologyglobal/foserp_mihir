@@ -1,5 +1,5 @@
 import type { DispatchReadinessStatus, DispatchRequirementStatus, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 export async function findById(tenantId: string, id: string) {
   return prisma.dispatchRequirement.findFirst({

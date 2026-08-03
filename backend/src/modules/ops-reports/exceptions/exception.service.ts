@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ConflictError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { deriveOpenExceptions } from './exception-derivation.service.js'
 import type { ExceptionResolutionStatus, ExceptionRow } from './exception.types.js'

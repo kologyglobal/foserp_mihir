@@ -259,6 +259,12 @@ export interface VendorInvoiceDuplicateAssessment {
 /** GL account slots the accounting preview may need to post to. */
 export type VendorInvoiceAccountComponent =
   | 'LINE_DEBIT'
+  /** FIN-CLOSE-1 — releases the GR/IR balance a posted GRN created for this line. */
+  | 'GRIR_CLEARING'
+  /** FIN-CLOSE-1 — invoice price minus receipt cost on a GR/IR-cleared line. */
+  | 'PURCHASE_PRICE_VARIANCE'
+  /** Purchase invoice variance capitalised into remaining raw-material stock. */
+  | 'RAW_MATERIAL_INVENTORY'
   | 'INPUT_CGST'
   | 'INPUT_SGST'
   | 'INPUT_IGST'
@@ -365,4 +371,6 @@ export interface VendorInvoiceCalculationResult {
   accountingPreview: VendorInvoiceAccountingPreview
   validation: VendorInvoiceCalculationValidation
   snapshot: VendorInvoiceCalculationSnapshot
+  /** Internal posting plan; not persisted as the deterministic calculation snapshot. */
+  grirReleasePlan: import('./vendor-invoice-grir-release.service.js').VendorInvoiceGrirReleasePlan
 }

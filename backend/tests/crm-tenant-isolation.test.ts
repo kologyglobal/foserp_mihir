@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../src/app.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const app = createApp()
 const TENANT_A = 'vasant-trailers'

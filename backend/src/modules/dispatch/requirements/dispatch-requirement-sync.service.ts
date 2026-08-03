@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { getSalesOrderFulfilmentPositions } from '../fulfilment/sales-order-fulfilment-position.service.js'
 import { shipToKeyFromAddress } from '../shared/dispatch-qty.js'

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../src/app.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import {
   cleanupPurchaseTenant,
   createSentPo,
@@ -182,6 +182,107 @@ describe.skipIf(!dbAvailable)('Purchase quality inspection lifecycle (live HTTP)
       },
     })
     expect(releaseMoves.length).toBeGreaterThan(0)
+  })
+
+  it('persists parameter checklist on create and update', async () => {
+    const grn = await freshQcPendingGrn()
+    const created = await request(app)
+      .post(qiBase())
+      .set(auth())
+      .send({ goodsReceiptId: grn.grnId })
+    expect(created.status).toBe(201)
+    const qiId = created.body.data.id as string
+    expect(created.body.data.inspectionPlan).toMatch(/Incoming inspection/)
+    expect(created.body.data.parameters).toHaveLength(2)
+    expect(created.body.data.parameters[0].parameter).toBe('Visual / dimensions')
+    expect(created.body.data.parameters[0].result).toBe('na')
+
+    const patched = await request(app)
+      .patch(`${qiBase()}/${qiId}`)
+      .set(auth())
+      .send({
+        inspectionPlan: 'Incoming plate — thickness / surface',
+        parameters: [
+          {
+            parameter: 'Thickness',
+            specification: '10 ± 0.5 mm',
+            minValue: 9.5,
+            maxValue: 10.5,
+            observedValue: 10.1,
+            unit: 'mm',
+            result: 'pass',
+            remarks: 'OK',
+          },
+          {
+            parameter: 'Surface condition',
+            specification: 'No rust / pits',
+            observedValue: null,
+            unit: '',
+            result: 'fail',
+            remarks: 'Light rust on edge',
+          },
+        ],
+      })
+    expect(patched.status).toBe(200)
+    expect(patched.body.data.inspectionPlan).toBe('Incoming plate — thickness / surface')
+    expect(patched.body.data.parameters).toHaveLength(2)
+    expect(patched.body.data.parameters[0]).toMatchObject({
+      parameter: 'Thickness',
+      observedValue: 10.1,
+      result: 'pass',
+    })
+    expect(patched.body.data.parameters[1]).toMatchObject({
+      parameter: 'Surface condition',
+      result: 'fail',
+    })
+
+    const get = await request(app).get(`${qiBase()}/${qiId}`).set(auth())
+    expect(get.status).toBe(200)
+    expect(get.body.data.parameters).toHaveLength(2)
+    expect(get.body.data.parameters[0].specification).toBe('10 ± 0.5 mm')
+
+    const rows = await prisma.purchaseQualityInspectionParameter.findMany({
+      where: { tenantId, qualityInspectionId: qiId },
+      orderBy: { lineNumber: 'asc' },
+    })
+    expect(rows).toHaveLength(2)
+    expect(rows[0].parameterName).toBe('Thickness')
+    expect(Number(rows[0].observedValue)).toBeCloseTo(10.1)
+    expect(rows[1].result).toBe('fail')
+  })
+
+  it('allows checklist edit after hold (DEVIATION_PENDING)', async () => {
+    const grn = await freshQcPendingGrn()
+    const created = await request(app)
+      .post(qiBase())
+      .set(auth())
+      .send({ goodsReceiptId: grn.grnId })
+    expect(created.status).toBe(201)
+    const qiId = created.body.data.id as string
+
+    const held = await request(app)
+      .post(`${qiBase()}/${qiId}/hold`)
+      .set(auth())
+      .send({ remarks: 'Awaiting mill TC' })
+    expect(held.status).toBe(200)
+    expect(held.body.data.status).toBe('DEVIATION_PENDING')
+
+    const patched = await request(app)
+      .patch(`${qiBase()}/${qiId}`)
+      .set(auth())
+      .send({
+        parameters: [
+          {
+            parameter: 'Documentation',
+            specification: 'TC / COA present',
+            result: 'pass',
+            remarks: 'TC received',
+          },
+        ],
+      })
+    expect(patched.status).toBe(200)
+    expect(patched.body.data.parameters).toHaveLength(1)
+    expect(patched.body.data.parameters[0].result).toBe('pass')
   })
 
   it('denies create without permission', async () => {

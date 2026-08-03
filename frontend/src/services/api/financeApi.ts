@@ -133,6 +133,53 @@ export async function closeFinancialYear(id: string) {
   return apiRequest<FinancialYear>(tenantPath(`/accounting/financial-years/${id}/close`), { method: 'POST' })
 }
 
+export interface YearEndClosePreviewApi {
+  financialYearId: string
+  financialYearName: string
+  legalEntityId: string
+  status: string
+  alreadyClosed: boolean
+  existingRun: {
+    id: string
+    status: string
+    voucherId: string | null
+    voucherNumber: string | null
+    closedAt: string
+  } | null
+  postingDate: string
+  lastPeriod: { id: string; name: string; status: string; endDate: string } | null
+  openPeriodNames: string[]
+  revenueToClose: string
+  expenseToClose: string
+  profitOrLoss: string
+  retainedEarnings: { accountId: string; accountCode: string; accountName: string } | null
+  lines: Array<{
+    accountId: string
+    accountCode: string
+    accountName: string
+    category: 'INCOME' | 'EXPENSE'
+    netBalance: string
+    closeDebit: string
+    closeCredit: string
+  }>
+  blockers: Array<{ code: string; message: string }>
+  readyToPost: boolean
+}
+
+export async function previewYearEndClose(financialYearId: string) {
+  return apiRequest<YearEndClosePreviewApi>(
+    tenantPath(`/accounting/financial-years/${financialYearId}/year-end-preview`),
+  )
+}
+
+export async function executeYearEndClose(financialYearId: string) {
+  return apiRequest<{
+    run: Record<string, unknown>
+    preview: YearEndClosePreviewApi
+    idempotentReplay: boolean
+  }>(tenantPath(`/accounting/financial-years/${financialYearId}/year-end-close`), { method: 'POST' })
+}
+
 // ─── Periods ──────────────────────────────────────────────────────────────────
 
 export async function listPeriods(

@@ -2,7 +2,7 @@
  * Upsert minimum UOM set + core item categories with stock policies.
  * Usage: npx tsx scripts/seed-min-uom-categories.ts
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { ITEM_CATEGORY_SEED_ROWS, UOM_SEED_ROWS } from '../prisma/uomCategorySeedData.js'
 
 const TENANT_SLUG = process.env.TENANT_SLUG ?? 'vasant-trailers'

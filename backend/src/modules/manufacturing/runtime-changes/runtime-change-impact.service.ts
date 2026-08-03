@@ -1,5 +1,5 @@
 import type { Prisma, ProductionOrder, ProductionOrderOperation, ProductionOrderStage, ProductionAssignment, ProductionDemand } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { toDecimal } from '../shared/quantity.service.js'

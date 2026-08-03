@@ -1263,6 +1263,44 @@ export function ApiWorkOrderDetailPage() {
     await loadMaterials()
   }, [applySyncedMaterials, loadMaterials, run, workOrderId])
 
+  const journeyDerived = useMemo(() => {
+    if (!wo) {
+      return deriveWoFulfilmentJourney({
+        status: 'DRAFT',
+        stages: [],
+        qualityBlockerCount: 0,
+        fgReceiptCount: 0,
+        fgRemaining: false,
+        salesOrderId: null,
+      })
+    }
+    const relatedSo = wo.relatedSalesOrder
+    const postedFgQty = fgReceipts
+      .filter((r) => r.status === 'POSTED' || r.status === 'PARTIALLY_REVERSED')
+      .reduce((sum, r) => sum + Number(r.acceptedQuantity || r.receiptQuantity || 0), 0)
+    const completedGood = Number(wo.completedGoodQuantity || 0)
+    const fgRemaining = wo.status === 'COMPLETED' && completedGood > 0 && postedFgQty + 1e-9 < completedGood
+    return deriveWoFulfilmentJourney({
+      status: wo.status,
+      stages: wo.stages,
+      qualityBlockerCount: qualityBlockers.length,
+      fgReceiptCount: fgReceipts.length,
+      fgRemaining,
+      salesOrderId: relatedSo?.id ?? wo.salesOrderId ?? null,
+      salesOrderNo: relatedSo?.salesOrderNo ?? null,
+    })
+  }, [wo, qualityBlockers.length, fgReceipts])
+
+  const { step: journeyStep, urlStep: journeyUrlStep, setStep: setJourneyStep } =
+    useFulfilmentJourneyStep(journeyDerived.activeStep)
+
+  useEffect(() => {
+    if (!wo?.id || journeyUrlStep) return
+    setJourneyStep(journeyDerived.activeStep, { replace: true })
+    // Seed once per WO open so refresh resumes; do not chase later derived changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wo?.id])
+
   if (loading || !wo) {
     return (
       <OperationalPageShell
@@ -1329,24 +1367,7 @@ export function ApiWorkOrderDetailPage() {
     ? `/dispatch/workbench?salesOrderId=${encodeURIComponent(relatedSo.id)}`
     : '/dispatch/workbench'
 
-  const journey = deriveWoFulfilmentJourney({
-    status: wo.status,
-    stages: wo.stages,
-    qualityBlockerCount: qualityBlockers.length,
-    fgReceiptCount: fgReceipts.length,
-    fgRemaining,
-    salesOrderId: relatedSo?.id ?? wo.salesOrderId ?? null,
-    salesOrderNo: relatedSo?.salesOrderNo ?? null,
-  })
-  const { step: journeyStep, urlStep: journeyUrlStep, setStep: setJourneyStep } =
-    useFulfilmentJourneyStep(journey.activeStep)
-
-  useEffect(() => {
-    if (journeyUrlStep) return
-    setJourneyStep(journey.activeStep, { replace: true })
-    // Seed once per WO open so refresh resumes; do not chase later derived changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wo.id])
+  const journey = journeyDerived
 
   const openDispatchHandoff = () => {
     if (soFulfilmentPath) navigate(`${soFulfilmentPath}?step=dispatch`)
@@ -1513,6 +1534,23 @@ export function ApiWorkOrderDetailPage() {
       ? [{ id: 'correct', label: 'Correct / Reverse', icon: RotateCcw, onClick: () => setCorrectionOpen(true) }]
       : []),
     ...(canCancel ? [{ id: 'cancel', label: 'Cancel', icon: Ban, onClick: () => setDialog('cancel') }] : []),
+    {
+      id: 'report-breakdown',
+      label: 'Report Breakdown',
+      icon: AlertTriangle,
+      onClick: () => {
+        const opWithMachine = (wo.operations ?? []).find((o) => o.machineId)
+        const qs = new URLSearchParams({
+          workOrderId: wo.id,
+          sourceType: 'WORK_ORDER',
+        })
+        if (opWithMachine?.machineId) qs.set('machineId', opWithMachine.machineId)
+        if (opWithMachine?.id) qs.set('operationId', opWithMachine.id)
+        if (opWithMachine?.name) qs.set('operationName', opWithMachine.name)
+        if (opWithMachine?.code) qs.set('operationCode', opWithMachine.code)
+        navigate(`/maintenance/tickets/new?${qs.toString()}`)
+      },
+    },
   ]
 
   return (

@@ -77,11 +77,16 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
     // Never include raw SQL. meta.modelName / column / table are safe Prisma identifiers.
     if (err.code === 'P2021' || err.code === 'P2022') {
       const meta = (err.meta ?? {}) as Record<string, unknown>
+      const columnFromMeta = meta.column ?? meta.column_name ?? null
+      const columnFromMessage =
+        typeof err.message === 'string'
+          ? err.message.match(/column [`'"]?(?:\w+\.)?(?:\w+\.)?(\w+)[`'"]? does not exist/i)?.[1] ?? null
+          : null
       sendError(res, 500, 'Database operation failed', undefined, err.code, {
         prismaCode: err.code,
         modelName: meta.modelName ?? null,
-        table: meta.table ?? null,
-        column: meta.column ?? null,
+        table: meta.table ?? meta.table_name ?? null,
+        column: columnFromMeta ?? columnFromMessage,
       })
       return
     }

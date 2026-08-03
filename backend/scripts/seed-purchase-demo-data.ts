@@ -4,7 +4,7 @@
  *
  *   npx tsx scripts/seed-purchase-demo-data.ts
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const TENANT_SLUG = process.env.SEED_TENANT_SLUG ?? 'vasant-trailers'
 

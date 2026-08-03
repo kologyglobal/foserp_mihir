@@ -1,6 +1,6 @@
 import request from 'supertest'
 import type { Express } from 'express'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { PERMISSIONS, type PermissionName } from '../../src/constants/permissions.js'
 
 export const dbAvailable = await prisma
@@ -87,6 +87,7 @@ export async function cleanupPurchaseTenant(tenantId: string) {
   await prisma.vendorInvoice.deleteMany({ where: { tenantId } })
   await prisma.purchaseInvoiceLine.deleteMany({ where: { tenantId } })
   await prisma.purchaseInvoice.deleteMany({ where: { tenantId } })
+  await prisma.purchaseQualityInspectionParameter.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.purchaseQualityInspectionLine.deleteMany({ where: { tenantId } })
   await prisma.purchaseQualityInspection.deleteMany({ where: { tenantId } })
   await prisma.purchaseReturnLine.deleteMany({ where: { tenantId } })

@@ -5,11 +5,11 @@
  * (returned qty deferred — treated as 0).
  */
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { AppError } from '../../../../utils/errors.js'
 import { add, compare, formatForPersistence, subtract as sub, toDecimal } from '../../shared/finance-decimal.js'
-import { resolveDispatchPostingPolicy } from '../../../dispatch/posting/dispatch-policy.js'
+import { resolveDispatchPostingPolicy, allowsConsolidatedInvoice } from '../../../dispatch/posting/dispatch-policy.js'
 import { assertPodAllowsInvoice, isPodStatusInvoiceReady } from '../../../dispatch/pod/dispatch-pod.service.js'
 
 export class InvoiceReadyQuantityExceededError extends AppError {
@@ -41,6 +41,10 @@ export interface DispatchLineInvoiceReady {
   /** Present when tenant requirePodBeforeInvoice — blocks Create Invoice until DELIVERED/PARTIALLY_DELIVERED. */
   podStatus: string | null
   podBlocksInvoice: boolean
+  /** Human-readable blockers for Invoice Ready UX (empty when line is creatable). */
+  blockers: string[]
+  /** True when invoiceReadyQty > 0 and no blockers. */
+  canCreateInvoice: boolean
 }
 
 export interface InvoiceReadyListQuery {
@@ -52,6 +56,22 @@ export interface InvoiceReadyListQuery {
   limit?: number
   /** When true, only rows with invoiceReadyQty > 0 */
   readyOnly?: boolean
+  /** When true (default with readyOnly), hide POD-blocked rows. Set false to surface waiting lines. */
+  excludePodBlocked?: boolean
+}
+
+export interface InvoiceReadyListResult {
+  items: DispatchLineInvoiceReady[]
+  total: number
+  page: number
+  limit: number
+  policy: {
+    invoiceMode: string
+    requirePodBeforeInvoice: boolean
+    allowPartialDispatch: boolean
+    allowMultipleDispatches: boolean
+    allowsMultiDispatchInvoice: boolean
+  }
 }
 
 function d(n: Prisma.Decimal | number | string): ReturnType<typeof toDecimal> {
@@ -149,7 +169,7 @@ export async function assertDispatchLineInvoiceReadyQty(
 export async function listInvoiceReadyDispatchLines(
   tenantId: string,
   query: InvoiceReadyListQuery = {},
-): Promise<{ items: DispatchLineInvoiceReady[]; total: number; page: number; limit: number }> {
+): Promise<InvoiceReadyListResult> {
   const { skip, take, page, limit } = getPagination({
     page: query.page ?? 1,
     limit: query.limit ?? 50,
@@ -254,6 +274,7 @@ export async function listInvoiceReadyDispatchLines(
   )
   const podMap = new Map(pods.map((p) => [p.outboundDispatchId, p.status]))
   const requirePod = policy.requirePodBeforeInvoice
+  const excludePodBlocked = query.excludePodBlocked ?? query.readyOnly !== false
 
   const mapped: DispatchLineInvoiceReady[] = []
   for (const line of lines) {
@@ -268,7 +289,17 @@ export async function listInvoiceReadyDispatchLines(
     const customerName = line.outboundDispatch.salesOrder?.company?.name ?? null
     const podStatus = podMap.get(line.outboundDispatch.id) ?? null
     const podBlocksInvoice = requirePod && !isPodStatusInvoiceReady(podStatus)
-    if (query.readyOnly !== false && podBlocksInvoice) continue
+    if (excludePodBlocked && podBlocksInvoice) continue
+
+    const blockers: string[] = []
+    if (compare(invoiceReadyQty, 0) <= 0) blockers.push('NO_REMAINING_QTY')
+    if (podBlocksInvoice) {
+      blockers.push(
+        podStatus
+          ? `POD_REQUIRED (${podStatus})`
+          : 'POD_REQUIRED (missing proof of delivery)',
+      )
+    }
 
     mapped.push({
       outboundDispatchId: line.outboundDispatch.id,
@@ -292,13 +323,27 @@ export async function listInvoiceReadyDispatchLines(
       deliveryChallanLineId: challanLine?.id ?? null,
       podStatus,
       podBlocksInvoice,
+      blockers,
+      canCreateInvoice: blockers.length === 0 && compare(invoiceReadyQty, 0) > 0,
     })
   }
 
-  const total = query.readyOnly === false ? totalRaw : mapped.length
+  const total = query.readyOnly === false && !excludePodBlocked ? totalRaw : mapped.length
   const pageItems = mapped.slice(skip, skip + take)
 
-  return { items: pageItems, total, page, limit }
+  return {
+    items: pageItems,
+    total,
+    page,
+    limit,
+    policy: {
+      invoiceMode: policy.invoiceMode,
+      requirePodBeforeInvoice: policy.requirePodBeforeInvoice,
+      allowPartialDispatch: policy.allowPartialDispatch,
+      allowMultipleDispatches: policy.allowMultipleDispatches,
+      allowsMultiDispatchInvoice: allowsConsolidatedInvoice(policy.invoiceMode),
+    },
+  }
 }
 
 /** Prefill payload for creating a Sales Invoice from one or more dispatch lines. */

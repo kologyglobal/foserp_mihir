@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { PERMISSIONS, ROLE_PERMISSIONS, type PermissionName } from '../../src/constants/permissions.js'
 import { OPTIONAL_AR_NUMBER_SERIES_TYPES } from '../../src/modules/accounting/shared/finance.constants.js'
 import * as receiptRepo from '../../src/modules/accounting/receivables/receipts/customer-receipt.repository.js'

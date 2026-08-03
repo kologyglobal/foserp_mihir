@@ -11,7 +11,7 @@ import type {
   PurchaseSettings,
   SelfApprovalPolicy,
 } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 export type PurchaseSettingsRow = PurchaseSettings
 export type PurchasePlantSettingsRow = PurchasePlantSettings
@@ -64,6 +64,7 @@ export const SERVER_DEFAULT_SETUP = {
   allowOverReceipt: false,
   overReceiptTolerancePct: 0,
   requireApprovalOnPoRevision: true,
+  requireApprovalOnPo: true,
   allowShortClose: true,
   requireVendorChallan: false,
   requireVehicleNumber: false,

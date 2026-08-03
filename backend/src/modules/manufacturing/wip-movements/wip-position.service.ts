@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { collectQualityBlockers, type QualityBlocker } from '../../quality/shared/blockers.service.js'
 import { addDec, subDec, toDecimal } from '../shared/quantity.service.js'

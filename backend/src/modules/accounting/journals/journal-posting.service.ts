@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { GeneralLedgerEntry } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { AuthorizationError } from '../../../utils/errors.js'
 import { auditFromRequest } from '../../../services/audit.service.js'
 import * as approvalRepo from '../approvals/approval.repository.js'

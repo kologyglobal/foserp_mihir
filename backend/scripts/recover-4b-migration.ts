@@ -1,4 +1,4 @@
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 /** Clean partial Phase 4B migration after MySQL identifier-length failure. */
 async function main() {

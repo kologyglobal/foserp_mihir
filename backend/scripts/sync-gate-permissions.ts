@@ -1,7 +1,7 @@
 /**
  * One-shot: upsert gate.* permission catalog rows and link them to seeded roles.
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { PERMISSIONS, ROLE_PERMISSIONS } from '../src/constants/permissions.js'
 
 async function main() {

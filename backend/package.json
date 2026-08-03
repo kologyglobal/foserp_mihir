@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "node ./scripts/build-production.mjs",
+    "build": "prisma generate && node scripts/clean-dist.mjs && node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --incremental false && node scripts/verify-dist-critical.mjs",
     "start": "node dist/server.js",
     "typecheck": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit",
     "test": "vitest run",
@@ -22,8 +22,15 @@
     "test:purchase-multi-unit-uom-live": "tsx scripts/test-purchase-multi-unit-uom-flow.ts",
     "test:grn-tolerance": "vitest run tests/purchase/grn-tolerance.test.ts",
     "test:grn-tolerance-live": "tsx scripts/test-grn-tolerance-flow.ts",
+    "test:fin-close-1-live": "tsx scripts/test-fin-close-1-grir-ppv-return-ap.ts",
+    "test:purchase-retro-cost-live": "vitest run tests/purchase-invoice-retro-cost-live.test.ts --no-file-parallelism --hookTimeout=120000",
+    "test:inventory-costing": "vitest run tests/inventory-moving-average.test.ts tests/inventory-fifo-layers.test.ts tests/inventory-costing-phasec.test.ts tests/inventory-fifo-return-restore.test.ts tests/inventory-fifo-opening-migration.test.ts tests/inventory-costing-uat1-controlled.test.ts tests/inventory-costing-golden-path-ma-fifo.test.ts --pool=forks --maxWorkers=1 --hookTimeout=120000",
+    "test:inventory-gl-recon-live": "vitest run tests/inventory-costing-gl-recon-parity.test.ts --pool=forks --maxWorkers=1 --hookTimeout=180000",
+    "test:inventory-costing-spa-uat": "tsx scripts/test-inventory-costing-spa-uat-harness.ts",
     "seed:grn-tolerance-review": "tsx scripts/seed-grn-tolerance-review-pack.ts",
     "test:crm-live": "tsx scripts/run-crm-live-tests.ts",
+    "test:auth-self-service": "vitest run tests/auth-hardening.test.ts tests/auth-self-service.test.ts",
+    "test:admin-iam-smoke": "vitest run tests/admin-tenants-users-roles-smoke.test.ts tests/admin-security-regression.test.ts",
     "test:backend-structure": "tsx scripts/test-backend-structure.ts",
     "swagger:generate": "tsx scripts/generate-swagger-paths.ts",
     "verify:finance-integrity": "tsx scripts/verify-finance-integrity.ts",
@@ -34,6 +41,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:purchase-demo": "tsx scripts/seed-purchase-demo-data.ts",
+    "db:seed:purchase-test-pack": "tsx scripts/seed-purchase-test-pack.ts",
     "db:sync-permissions": "tsx scripts/sync-permissions.ts",
     "db:setup": "npm run db:generate && tsx scripts/prisma-cli.ts migrate deploy && npm run db:seed",
     "db:studio": "tsx scripts/prisma-cli.ts studio"
@@ -47,6 +55,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.2.0",
     "@types/node": "^22.20.1",
+    "@types/nodemailer": "^8.0.1",
     "@types/ssh2-sftp-client": "^9.0.6",
     "@types/supertest": "^6.0.3",
     "@types/swagger-jsdoc": "^6.0.4",
@@ -62,13 +71,11 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",
     "nodemailer": "^9.0.3",
-    "@types/nodemailer": "^8.0.1",
     "prisma": "^6.19.3",
     "ssh2-sftp-client": "^12.1.1",
     "supertest": "^7.1.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "uuid": "^11.1.0",
     "vitest": "^3.2.3",
@@ -76,5 +83,8 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.1"
   }
 }

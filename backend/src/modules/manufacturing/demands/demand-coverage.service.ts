@@ -4,7 +4,7 @@
  * non-cancelled Work Orders (ProductionOrder) linked via demandId.
  */
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { toDecimal } from '../shared/quantity.service.js'
 
 const ACTIVE_WO_STATUSES = ['DRAFT', 'READY', 'IN_PROGRESS', 'ON_HOLD'] as const

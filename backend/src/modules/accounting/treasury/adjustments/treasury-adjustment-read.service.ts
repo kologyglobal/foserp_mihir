@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence } from '../../shared/finance-decimal.js'
 import { resolveTreasuryAdjustmentAllowedActions } from './treasury-adjustment-allowed-actions.js'
 import * as repo from './treasury-adjustment.repository.js'

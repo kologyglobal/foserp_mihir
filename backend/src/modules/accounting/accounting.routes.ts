@@ -21,6 +21,7 @@ import taxComplianceRoutes from './tax-compliance/tax-compliance.routes.js'
 import fixedAssetsRoutes from './fixed-assets/fixed-assets.routes.js'
 import budgetingRoutes from './budgeting/budgeting.routes.js'
 import accountingLookupRoutes from './lookups/accounting-lookup.routes.js'
+import inventoryGlReconciliationRoutes from './inventory-gl-reconciliation/inventory-gl-reconciliation.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -49,5 +50,6 @@ router.use('/tax-compliance', taxComplianceRoutes)
 router.use('/fixed-assets', fixedAssetsRoutes)
 router.use('/budgeting', budgetingRoutes)
 router.use('/posting-events', postingEventRoutes)
+router.use('/inventory-gl-reconciliation', inventoryGlReconciliationRoutes)
 
 export default router

@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import { permissionSetIncludes } from '../constants/permissions.js'
-import { prisma } from '../config/database.js'
+import { prisma } from '../config/prisma.js'
 import { createAuditLog } from '../services/audit.service.js'
 import { AuthenticationError, AuthorizationError } from '../utils/errors.js'
 

@@ -3,7 +3,7 @@ import type {
   AgeingReportDto,
   CreateCustomerCreditNoteInput,
   CreateSalesInvoiceInput,
-  DispatchLineInvoiceReadyDto,
+  InvoiceReadyListResultDto,
   InvoicePrefillFromDispatchDto,
   ListInvoiceReadyQuery,
   CreditNoteAllocationHistoryRow,
@@ -722,15 +722,20 @@ export async function reverseCustomerReceipt(
 
 export async function listInvoiceReadyDispatchLines(
   params?: Partial<ListInvoiceReadyQuery>,
-): Promise<DispatchLineInvoiceReadyDto[]> {
+): Promise<InvoiceReadyListResultDto> {
   if (isApiMode()) {
     try {
-      return unwrap(await api.listInvoiceReadyDispatchLines(params))
+      const res = await api.listInvoiceReadyDispatchLines(params)
+      const meta = res.meta as api.InvoiceReadyListApiMeta | null | undefined
+      return {
+        items: unwrap(res),
+        policy: meta?.policy ?? null,
+      }
     } catch (e) {
       rethrowMapped(e)
     }
   }
-  return []
+  return { items: [], policy: null }
 }
 
 export async function prefillInvoiceFromDispatch(

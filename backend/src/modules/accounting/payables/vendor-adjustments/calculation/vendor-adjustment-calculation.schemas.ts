@@ -72,6 +72,7 @@ export const vendorAdjustmentSourceLinkTypeSchema = z.enum([
   'PURCHASE_ORDER',
   'GOODS_RECEIPT',
   'PURCHASE_RECEIPT',
+  'PURCHASE_RETURN',
   'CONTRACT',
   'PROJECT',
   'OTHER',
