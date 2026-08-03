@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "npm run build:app",
-    "build:app": "prisma generate && node scripts/clean-dist.mjs --keep-tsbuildinfo && node --max-old-space-size=1536 ./node_modules/typescript/bin/tsc -p tsconfig.build.json && node scripts/verify-dist-critical.mjs",
+    "build:app": "prisma generate && node scripts/clean-dist.mjs && node scripts/compile-dist.mjs && node scripts/verify-dist-critical.mjs",
+    "build:app:tsc": "prisma generate && node scripts/clean-dist.mjs --keep-tsbuildinfo && node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.build.json && node scripts/verify-dist-critical.mjs",
     "build:with-migrate": "node scripts/migrate-deploy.mjs && npm run build:app",
     "start": "node dist/server.js",
     "typecheck": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit",
@@ -74,6 +75,7 @@
     "cors": "^2.8.5",
     "csv-parse": "^7.0.1",
     "dotenv": "^16.5.0",
+    "esbuild": "^0.25.12",
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",
