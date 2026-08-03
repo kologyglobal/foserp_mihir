@@ -65,10 +65,8 @@ if (!existsSync(prismaSchema)) {
   )
 }
 
-console.log('[build-hostinger] Installing backend dependencies (npm ci)…')
-runNpm(['ci'], backend)
-
-console.log('[build-hostinger] Backend compile (esbuild, no migrations)…')
+// Hostinger hPanel already ran Install — do not npm ci again (breaks when install used legacy-peer-deps).
+console.log('[build-hostinger] Backend compile (prisma generate + esbuild, no migrations)…')
 runNpm(['run', 'build:app'], backend)
 
 for (const entry of ['hostinger-start.mjs', 'start.sh']) {

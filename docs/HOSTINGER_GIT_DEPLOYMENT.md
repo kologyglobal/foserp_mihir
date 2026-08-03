@@ -10,6 +10,27 @@ This repository deploys as one Hostinger Node.js application:
 `frontend/dist`, `backend/dist`, and `backend/public` are generated during
 deployment and remain gitignored. A Git pull alone is not a deployment.
 
+## Hostinger directory layout (SSH)
+
+Hostinger does **not** keep a `backend/` folder at runtime. With **Output directory = `backend`**, the **contents** of `backend/` are published to:
+
+```text
+~/domains/<your-domain>/nodejs/          ← runtime app (entry file, dist/, prisma/)
+~/domains/<your-domain>/.builds/last-source/   ← full Git checkout (repo root)
+```
+
+Example for `stageapi.dhurandharcrm.com`:
+
+```bash
+# Runtime (start app, run migrate)
+cd ~/domains/stageapi.dhurandharcrm.com/nodejs
+
+# Full repo (re-run build manually)
+cd ~/domains/stageapi.dhurandharcrm.com/.builds/last-source
+```
+
+If `nodejs/` is missing or empty, the Git deploy **build failed** — fix hPanel build settings and redeploy; do not guess paths under `~/`.
+
 ## Hostinger hPanel settings
 
 In **Websites → Node.js Web App → Settings & Redeploy**:
@@ -20,8 +41,8 @@ In **Websites → Node.js Web App → Settings & Redeploy**:
 | Branch | `main` |
 | Project/root directory | repository root (`/`) |
 | Framework | Other / Express |
-| Node.js | 22.x (20.x minimum) |
-| Install command | `npm ci --prefix backend` (API-only) or `npm ci` at repo root for full SPA deploy |
+| Node.js | **22.x** (set explicitly — do **not** use 24.x; esbuild/prisma break on Node 24) |
+| Install command | `npm ci --prefix backend --omit=dev` (stage API) or `npm ci --prefix backend` (full build with scripts) |
 | Build command | `npm run build --prefix backend` |
 | Output directory | `backend` |
 | Entry file | `start.sh` (preferred) or `hostinger-start.mjs` |
@@ -71,11 +92,11 @@ Prisma **P3009** blocks deploy until the failed row is reconciled once.
 **SSH sequence** (export `DB_*` in the shell if hPanel vars are not injected):
 
 ```bash
-cd ~/domains/.../backend   # deployed backend path
+cd ~/domains/.../nodejs   # runtime app root (not .../backend)
 export DB_HOST=127.0.0.1 DB_NAME=... DB_USER=... DB_PASS=...
 npm run db:recover-known
 npm run db:migrate:deploy
-npx prisma migrate status
+npx prisma migrate status --schema=./prisma/schema.prisma
 ```
 
 Recovery verifies schema before updating `_prisma_migrations` (e.g. phase10 checks
@@ -107,19 +128,56 @@ Do **not** paste npm error logs into SSH — run commands one at a time.
 Hostinger executes the entry file directly (not via `node`). Use **`start.sh`** as the entry file, or after SSH:
 
 ```bash
-chmod +x ~/domains/YOUR_DOMAIN/backend/start.sh
-chmod +x ~/domains/YOUR_DOMAIN/backend/hostinger-start.mjs
+chmod +x ~/domains/YOUR_DOMAIN/nodejs/start.sh
+chmod +x ~/domains/YOUR_DOMAIN/nodejs/hostinger-start.mjs
 ```
 
-The build script sets execute bits automatically on redeploy.
+### `npm error EUSAGE` / lock file out of sync during build
+
+The build script **does not** run `npm ci` again. Hostinger Install must succeed once:
+
+```text
+npm ci --prefix backend --omit=dev
+```
+
+Commit `backend/package-lock.json` whenever `backend/package.json` changes.
+
+### `esbuild` Expected 0.28.1 but got 0.25.12
+
+Caused by **Node 24.x** and/or installing **devDependencies** (`tsx`) on the server. Fix:
+
+1. hPanel Node.js → **22.x** (not 24.x)
+2. Install → `npm ci --prefix backend --omit=dev` (skips tsx/vitest)
+
+Deprecated `inflight` / `glob` warnings are harmless — ignore them.
+
+### `npm error enoent` during deploy
+
+Usually the **Install** or **Build** command path is wrong, or the Git build never finished.
+
+1. Confirm `.builds/last-source/backend/package.json` exists after deploy.
+2. hPanel **Install**: `npm ci --prefix backend` (from repo root in `.builds/last-source`).
+3. hPanel **Build**: `npm run build --prefix backend`.
+4. After a successful build, `nodejs/package.json` and `nodejs/dist/server.js` must exist.
+
+Discover layout:
+
+```bash
+ls ~/domains/stageapi.dhurandharcrm.com/
+ls ~/domains/stageapi.dhurandharcrm.com/nodejs/
+ls ~/domains/stageapi.dhurandharcrm.com/.builds/last-source/
+```
 
 ### Manual start (SSH)
 
 ```bash
-cd ~/domains/stageapi.dhurandharcrm.com/backend   # adjust path
-export DB_HOST=127.0.0.1 DB_NAME=... DB_USER=... DB_PASS=...
+cd ~/domains/stageapi.dhurandharcrm.com/nodejs
+chmod +x start.sh hostinger-start.mjs
+export DB_HOST=127.0.0.1 DB_NAME=YOUR_REAL_DB DB_USER=YOUR_REAL_USER DB_PASS='YOUR_REAL_PASS'
 node hostinger-start.mjs
 ```
+
+Use your **real** hPanel database name and user — not placeholder values.
 
 ## What the build does
 
