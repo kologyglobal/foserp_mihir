@@ -13,7 +13,12 @@ import { loadSalesOrderSource } from '../source/sales-order-source.service.js'
 import { SalesInvoiceValidationFailedError } from './sales-invoice.errors.js'
 import type { CreateSalesInvoiceSourceLinkInput } from './sales-invoice-source-link.repository.js'
 
-export type SalesInvoiceSourceMode = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'PROFORMA_INVOICE'
+export type SalesInvoiceSourceMode =
+  | 'DIRECT'
+  | 'SALES_ORDER'
+  | 'OUTBOUND_DISPATCH'
+  | 'PROFORMA_INVOICE'
+  | 'CRM_TAX_INVOICE'
 
 export interface SourceLinkRequest {
   sourceType: 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'DELIVERY_CHALLAN'
@@ -64,6 +69,22 @@ export async function validateAndEnrichSalesInvoiceSourceLinks(input: {
       throw new SalesInvoiceValidationFailedError(
         'Proforma-sourced invoices cannot carry dispatch source links',
         [{ field: 'sourceLinks', message: 'Remove source links for PROFORMA_INVOICE invoices' }],
+      )
+    }
+    return { sourceLinks: [], warnings, primarySalesOrderId: null }
+  }
+
+  // CRM tax invoice convert — header sourceDocumentId only; no qty consumption links.
+  if (input.sourceType === 'CRM_TAX_INVOICE') {
+    if (!input.sourceDocumentId) {
+      throw new SalesInvoiceValidationFailedError('CRM tax invoice is required', [
+        { field: 'sourceDocumentId', message: 'sourceDocumentId is required for CRM_TAX_INVOICE' },
+      ])
+    }
+    if (links.length > 0) {
+      throw new SalesInvoiceValidationFailedError(
+        'CRM tax invoice convert does not use line source links',
+        [{ field: 'sourceLinks', message: 'Omit sourceLinks for CRM_TAX_INVOICE' }],
       )
     }
     return { sourceLinks: [], warnings, primarySalesOrderId: null }

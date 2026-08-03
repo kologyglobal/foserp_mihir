@@ -1,7 +1,12 @@
 /** Domain types for AR sales invoices — amounts as decimal strings in DTOs. */
 
 export type SalesInvoiceStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
-export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'PROFORMA_INVOICE'
+export type SalesInvoiceSourceType =
+  | 'DIRECT'
+  | 'SALES_ORDER'
+  | 'OUTBOUND_DISPATCH'
+  | 'PROFORMA_INVOICE'
+  | 'CRM_TAX_INVOICE'
 export type SalesInvoiceSettlementStatus =
   | 'NOT_APPLICABLE'
   | 'UNPAID'
