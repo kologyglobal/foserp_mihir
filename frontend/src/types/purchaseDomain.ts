@@ -2060,6 +2060,7 @@ export interface GoodsReceiptLine {
   warehouseId: string
   warehouseName: string
   bin: string
+  binId?: string | null
   locationId: string
   locationName: string
   inspectionStatus: GrnLineInspectionStatus
@@ -2722,6 +2723,7 @@ export type GrnInput = {
     warehouseId?: string
     warehouseName?: string
     bin?: string
+    binId?: string | null
     allowExcess?: boolean
     /** Close remaining open qty (short outside band → approval). */
     closeOpenQuantity?: boolean

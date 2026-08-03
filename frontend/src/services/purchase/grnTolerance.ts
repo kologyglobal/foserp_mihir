@@ -18,6 +18,7 @@ export type EvaluateGrnToleranceInput = {
   setupTolerancePct?: number | null
   allowOverReceipt?: boolean
   shortCloseRequested?: boolean
+  closeOpenQuantity?: boolean
 }
 
 export type EvaluateGrnToleranceResult = {
@@ -53,6 +54,7 @@ export function evaluateGrnLineTolerance(input: EvaluateGrnToleranceInput): Eval
   const open = Math.max(0, n(input.openQuantity))
   const received = Math.max(0, n(input.receivedQuantity))
   const tolerancePercentage = resolveReceivingTolerancePct(input)
+  const shortCloseRequested = Boolean(input.shortCloseRequested ?? input.closeOpenQuantity)
   const upperBound = open + (open > 0 ? (open * tolerancePercentage) / 100 : 0)
   const shortQuantity = Math.max(0, open - received)
   const excessQuantity = Math.max(0, received - open)
@@ -79,7 +81,7 @@ export function evaluateGrnLineTolerance(input: EvaluateGrnToleranceInput): Eval
       shortQuantity,
       excessQuantity: 0,
       toleranceStatus: 'PARTIAL',
-      requiresApproval: Boolean(input.shortCloseRequested),
+      requiresApproval: Boolean(shortCloseRequested),
     }
   }
 
@@ -91,7 +93,7 @@ export function evaluateGrnLineTolerance(input: EvaluateGrnToleranceInput): Eval
       shortQuantity: 0,
       excessQuantity: 0,
       toleranceStatus: 'EXACT',
-      requiresApproval: Boolean(input.shortCloseRequested),
+      requiresApproval: Boolean(shortCloseRequested),
     }
   }
 
@@ -103,7 +105,7 @@ export function evaluateGrnLineTolerance(input: EvaluateGrnToleranceInput): Eval
       shortQuantity: 0,
       excessQuantity,
       toleranceStatus: 'EXCESS_WITHIN_TOLERANCE',
-      requiresApproval: Boolean(input.shortCloseRequested),
+      requiresApproval: Boolean(shortCloseRequested),
     }
   }
 
@@ -139,6 +141,7 @@ export type GrnToleranceLineSnapshot = {
   setupTolerancePct?: number | null
   allowOverReceipt?: boolean
   shortCloseRequested?: boolean
+  closeOpenQuantity?: boolean
 }
 
 export type GrnDocumentToleranceSummary = {
@@ -165,7 +168,7 @@ export function evaluateGrnDocumentTolerance(
       receivingToleranceId: l.receivingToleranceId,
       setupTolerancePct: l.setupTolerancePct,
       allowOverReceipt: l.allowOverReceipt,
-      shortCloseRequested: l.shortCloseRequested,
+      shortCloseRequested: l.shortCloseRequested ?? l.closeOpenQuantity,
     })
     return { ...result, itemCode: l.itemCode }
   })

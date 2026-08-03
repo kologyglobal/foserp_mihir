@@ -93,6 +93,7 @@ import {
   PURCHASE_RETURN_REASON_LABELS,
   type PurchaseRequisitionApprovalStatus,
 } from '../../types/purchaseDomain'
+import { formatGrnStatusLabel } from './grnReceiptSummary'
 
 const EMPTY_PARTY = { id: '', code: '', name: '' }
 const EMPTY_LOCATION = { id: '', code: '', name: '', state: '', city: '' }
@@ -1539,6 +1540,7 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       warehouseId: l.warehouseId || api.warehouseId,
       warehouseName: api.warehouseName,
       bin: l.binCode || '',
+      binId: l.binId ?? null,
       locationId: l.storageLocationId || api.storageLocationId || '',
       locationName: api.storageLocationName || '',
       inspectionStatus: l.qcRequired ? 'pending' : 'not_required',
@@ -1577,6 +1579,10 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
 
 export function mapApiGoodsReceiptToListRow(api: ApiGoodsReceipt): GrnListRow {
   const status = mapApiGrnStatus(String(api.status))
+  const receiptLines = (api.lines ?? []).map((l) => ({
+    pendingQty: Number(l.openQuantity) || 0,
+    receivedQty: Number(l.receivedQuantity) || 0,
+  }))
   return {
     id: api.id,
     documentNumber: api.documentNumber || api.grnNumber,
@@ -1594,7 +1600,7 @@ export function mapApiGoodsReceiptToListRow(api: ApiGoodsReceipt): GrnListRow {
     totalRejectedQty: api.totalRejectedQty,
     totalAmount: api.totalAmount,
     status,
-    statusLabel: status.replace(/_/g, ' '),
+    statusLabel: formatGrnStatusLabel(status, receiptLines),
     inspectionRequired: api.inspectionRequired,
     qualityInspectionId: null,
   }
@@ -2208,6 +2214,8 @@ export function mapDomainGrnInputToApiPayload(input: GrnInput): Record<string, u
       excessQuantity: Number(line.excessQty) || 0,
       closeOpenQuantity: Boolean(line.closeOpenQuantity),
       warehouseId: line.warehouseId || input.warehouseId,
+      storageLocationId: line.storageLocationId ?? loc?.id ?? null,
+      binId: line.binId ?? null,
       batchNumber: line.batchNumber || null,
       lotNumber: line.lotNumber || null,
       serialNumber: line.serialNumber || null,

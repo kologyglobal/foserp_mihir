@@ -21,8 +21,32 @@ import type {
   ListReceiptsQuery,
   UpdateProformaInput,
 } from './commercial.validation.js'
+import { resolveGstStateCode } from '../../accounting/receivables/validation/state-code.validator.js'
+import { resolveEffectivePurchaseDefaults } from '../../purchase/shared/purchase-defaults.js'
 
-const COMPANY_STATE = 'Maharashtra'
+/** Fallback when tenant setup has no billing state configured. */
+const FALLBACK_COMPANY_STATE_CODE = '27'
+
+async function resolveTenantBillingStateCode(tenantId: string): Promise<string | null> {
+  const defaults = await resolveEffectivePurchaseDefaults(tenantId)
+  return (
+    resolveGstStateCode(defaults.placeOfSupplyStateCode) ??
+    resolveGstStateCode(defaults.placeOfSupplyState) ??
+    FALLBACK_COMPANY_STATE_CODE
+  )
+}
+
+function resolveCustomerPlaceOfSupplyCode(
+  customerState: string | null | undefined,
+  customerGstin: string | null | undefined,
+  explicitPlaceOfSupply?: string | null,
+): string | null {
+  return (
+    resolveGstStateCode(explicitPlaceOfSupply) ??
+    resolveGstStateCode(customerState) ??
+    resolveGstStateCode(customerGstin)
+  )
+}
 
 function parseDate(dateStr: string): Date {
   return new Date(`${dateStr.slice(0, 10)}T00:00:00.000Z`)
@@ -66,10 +90,17 @@ function computeLine(input: CreateInvoiceInput['lines'][number] | CreateProforma
   }
 }
 
-function buildGst(customerState: string, lines: Array<{ taxableNumber: number; gstNumber: number; taxPctNumber: number }>) {
+function buildGst(
+  companyStateCode: string | null,
+  customerPlaceOfSupplyCode: string | null,
+  lines: Array<{ taxableNumber: number; gstNumber: number; taxPctNumber: number }>,
+) {
   const taxable = lines.reduce((s, l) => s + l.taxableNumber, 0)
   const totalTax = lines.reduce((s, l) => s + l.gstNumber, 0)
-  const intra = (customerState || COMPANY_STATE).toLowerCase() === COMPANY_STATE.toLowerCase()
+  const intra =
+    companyStateCode && customerPlaceOfSupplyCode
+      ? companyStateCode === customerPlaceOfSupplyCode
+      : true
   if (intra) {
     const half = Math.round((totalTax / 2) * 100) / 100
     return {
@@ -212,8 +243,15 @@ async function buildProformaPayload(
         taxPctNumber: Number(l.taxPct),
       }))
 
-  const customerState = input.customerState ?? company.state ?? COMPANY_STATE
-  const gst = buildGst(customerState, computedLines)
+  const customerState = input.customerState ?? company.state ?? ''
+  const customerGstin = company.gstin ?? null
+  const companyStateCode = await resolveTenantBillingStateCode(tenantId)
+  const placeOfSupplyCode = resolveCustomerPlaceOfSupplyCode(
+    customerState,
+    customerGstin,
+    existing?.placeOfSupply ?? null,
+  )
+  const gst = buildGst(companyStateCode, placeOfSupplyCode, computedLines)
   const address = [company.addressLine1, company.city, company.state, company.pincode].filter(Boolean).join(', ')
   const proformaDate = (input.proformaDate ?? existing?.proformaDate.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
   const validUntil = (input.validUntil ?? existing?.validUntil.toISOString().slice(0, 10) ?? addDays(proformaDate, 30)).slice(0, 10)
@@ -239,6 +277,8 @@ async function buildProformaPayload(
   return {
     company,
     customerState,
+    placeOfSupplyCode,
+    companyStateCode,
     gst,
     address,
     proformaDate,
@@ -282,7 +322,7 @@ export async function createProforma(
       customerGstin: payload.company.gstin,
       customerState: payload.customerState,
       customerAddress: payload.address,
-      placeOfSupply: payload.customerState,
+      placeOfSupply: payload.placeOfSupplyCode ?? payload.customerState,
       billingAddress: input.billingAddress ?? payload.address,
       shippingAddress: input.shippingAddress ?? payload.address,
       deliveryTerms: input.deliveryTerms ?? null,
@@ -344,7 +384,7 @@ export async function updateProforma(
       customerGstin: payload.company.gstin,
       customerState: payload.customerState,
       customerAddress: payload.address,
-      placeOfSupply: payload.customerState,
+      placeOfSupply: payload.placeOfSupplyCode ?? payload.customerState,
       billingAddress: input.billingAddress ?? existing.billingAddress ?? payload.address,
       shippingAddress: input.shippingAddress ?? existing.shippingAddress ?? payload.address,
       deliveryTerms: input.deliveryTerms ?? existing.deliveryTerms,
@@ -462,8 +502,10 @@ export async function createInvoice(
   if (!company) throw new NotFoundError('Customer not found')
 
   const computedLines = input.lines.map((l, idx) => computeLine(l, idx + 1))
-  const customerState = input.customerState ?? company.state ?? COMPANY_STATE
-  const gst = buildGst(customerState, computedLines)
+  const customerState = input.customerState ?? company.state ?? ''
+  const companyStateCode = await resolveTenantBillingStateCode(tenantId)
+  const placeOfSupplyCode = resolveCustomerPlaceOfSupplyCode(customerState, company.gstin, null)
+  const gst = buildGst(companyStateCode, placeOfSupplyCode, computedLines)
   const invoiceDate = (input.invoiceDate ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
   const dueDate = (input.dueDate ?? addDays(invoiceDate, company.creditDays || 30)).slice(0, 10)
   const invoiceNo = await repo.nextDocumentNo(tenantId, 'INV-', 'invoice')
@@ -485,7 +527,7 @@ export async function createInvoice(
       customerGstin: company.gstin,
       customerState,
       customerAddress: address,
-      placeOfSupply: customerState,
+      placeOfSupply: placeOfSupplyCode ?? customerState,
       billingAddress: input.billingAddress ?? address,
       shippingAddress: input.shippingAddress ?? address,
       deliveryTerms: input.deliveryTerms ?? null,

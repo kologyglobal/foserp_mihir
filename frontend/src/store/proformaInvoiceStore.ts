@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { ProformaInvoice, ProformaInvoiceLine, ProformaInvoiceSource, ProformaInvoiceStatus } from '../types/proformaInvoice'
 import { DEFAULT_GST_RATE } from '../types/invoice'
 import { computeGst } from '../utils/gstEngine'
+import { DEFAULT_PURCHASE_SETUP } from '../data/purchase/purchaseSetupSeed'
 import { nextDocumentNo } from '../utils/documentNumbers'
 import { buildProformaLinesFromSalesOrder, computeProformaLineTotals, sumProformaTaxable } from '../utils/proformaInvoiceLines'
 import { useMasterStore } from './masterStore'
@@ -51,7 +52,12 @@ function buildGst(lines: ProformaInvoiceLine[], customerState: string) {
   const avgRate = lines.length
     ? lines.reduce((s, l) => s + l.taxPct, 0) / lines.length
     : DEFAULT_GST_RATE
-  return computeGst(taxable, customerState, avgRate)
+  return computeGst(
+    taxable,
+    customerState,
+    avgRate,
+    DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyStateCode || DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyState,
+  )
 }
 
 export interface ProformaInvoiceInput {

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowDownToLine, Package, ShoppingCart, TrendingDown } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
+import { ArrowDownToLine, Package, Paperclip, ShoppingCart, TrendingDown } from 'lucide-react'
 import { Entity360Shell, Entity360Panel } from '../../components/design-system/Entity360Shell'
 import { FactBox } from '../../components/design-system/FactBox'
 import { QuickActions } from '../../components/design-system/WorkspaceLayout'
@@ -15,15 +15,22 @@ import { useMasterStore } from '../../store/masterStore'
 import { EntityQrToolbar } from '../../components/qr/EntityQrToolbar'
 import { SerialGenealogyPanel } from '../../components/serial/SerialGenealogyPanel'
 import { EntityDocumentsPanel } from '../../components/dms/EntityDocumentsPanel'
+import { MasterItemImageField } from '../../components/masters/MasterItemImageField'
+import { Button } from '../../components/ui/Button'
 
-type Tab = 'overview' | 'inventory' | 'purchase' | 'consumption' | 'mrp' | 'transactions' | 'timeline'
+type Tab = 'overview' | 'inventory' | 'purchase' | 'consumption' | 'mrp' | 'transactions' | 'timeline' | 'attachments'
 
 export function Item360Page() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { hash } = useLocation()
   const data = useItem360(id)
   const getVendor = useMasterStore((s) => s.getVendor)
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<Tab>(() => (hash === '#attachments' ? 'attachments' : 'overview'))
+
+  useEffect(() => {
+    if (hash === '#attachments') setTab('attachments')
+  }, [hash])
 
   const item = data?.item
 
@@ -37,6 +44,7 @@ export function Item360Page() {
       { id: 'mrp', label: 'MRP', count: data.mrpLines.length },
       { id: 'transactions', label: 'Transactions', count: data.movements.length },
       { id: 'timeline', label: 'Timeline' },
+      { id: 'attachments', label: 'Attachments' },
     ]
   }, [data])
 
@@ -166,6 +174,28 @@ export function Item360Page() {
           <Entity360Panel title="Serialized Units">
             <div className="p-4">
               <SerialGenealogyPanel itemId={item.id} />
+            </div>
+          </Entity360Panel>
+        </div>
+      )}
+
+      {tab === 'attachments' && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Entity360Panel title="Product Image">
+            <div className="flex flex-col gap-4 p-4">
+              <MasterItemImageField
+                itemId={item.id}
+                imageUrl={item.imageUrl}
+                updatedAt={item.updatedAt}
+                disabled
+                layout="gallery"
+                className="w-full"
+              />
+              <Link to={`/masters/items/${item.id}/edit#attachments`}>
+                <Button variant="secondary" size="sm">
+                  Upload or change image
+                </Button>
+              </Link>
             </div>
           </Entity360Panel>
           <Entity360Panel title="Item Documents">

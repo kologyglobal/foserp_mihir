@@ -246,6 +246,10 @@ async function releasePo(
     if (appr.status !== 200) fail(`PO approve: ${JSON.stringify(appr.body)}`)
     status = String(appr.body.data.status)
   }
+  // Approve already releases PO (status SENT_TO_VENDOR) — skip redundant send-to-vendor.
+  if (['SENT_TO_VENDOR', 'PARTIALLY_RECEIVED', 'FULLY_RECEIVED'].includes(status)) {
+    return status
+  }
   const send = await request(app)
     .post(`${base}/orders/${poId}/send-to-vendor`)
     .set(auth(makerToken))

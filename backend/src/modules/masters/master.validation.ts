@@ -13,6 +13,7 @@ export const MASTER_REGISTRY_SLUGS = [
   'bins',
   'item-categories',
   'hsn-sac',
+  'receiving-tolerances',
   'gst-groups',
   'gst-rates',
   'products',

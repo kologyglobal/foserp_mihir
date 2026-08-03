@@ -32,6 +32,7 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   createVendorQuotation,
+  getPurchaseSetup,
   getRFQs,
   getVendorQuotationById,
   getVendors,
@@ -39,6 +40,9 @@ import {
   PurchaseServiceError,
   updateVendorQuotation,
 } from '@/services/purchase'
+import type { PurchaseSetup } from '@/types/purchaseDomain'
+import { formatPlaceOfSupplyLabel } from '@/utils/gstStateCode'
+import { determinePurchaseGstSupply } from '@/utils/gstSupply'
 import {
   QUOTATION_COMPLIANCE_STATUS_LABELS,
   VENDOR_QUOTATION_DOMAIN_STATUS_LABELS,
@@ -474,6 +478,8 @@ export function VendorQuotationEditorPage() {
   const [headerFreight, setHeaderFreight] = useState(0)
   const [headerOther, setHeaderOther] = useState(0)
   const [headerDiscount, setHeaderDiscount] = useState(0)
+  const [purchaseSetup, setPurchaseSetup] = useState<PurchaseSetup | null>(null)
+  const [placeOfSupply, setPlaceOfSupply] = useState('')
   const [lines, setLines] = useState<VendorQuotationLine[]>([emptyLine()])
 
   const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(true)
@@ -483,7 +489,18 @@ export function VendorQuotationEditorPage() {
     () => allVendors.find((v) => v.id === vendorId),
     [allVendors, vendorId],
   )
-  const isInterstate = selectedVendor?.isInterstate ?? false
+  const isInterstate = useMemo(
+    () =>
+      determinePurchaseGstSupply({
+        supplierState: selectedVendor?.state,
+        supplierStateCode: selectedVendor?.stateCode,
+        supplierGstin: selectedVendor?.gstin,
+        placeOfSupply,
+        defaultPlaceOfSupplyState: purchaseSetup?.tax.placeOfSupplyState,
+        defaultPlaceOfSupplyStateCode: purchaseSetup?.tax.placeOfSupplyStateCode,
+      }).isInterstate,
+    [selectedVendor, placeOfSupply, purchaseSetup],
+  )
 
   const vendorOptions = useMemo(() => {
     if (!selectedRfq) return allVendors.filter((v) => v.isActive)
@@ -547,9 +564,19 @@ export function VendorQuotationEditorPage() {
   }, [])
 
   useEffect(() => {
-    void Promise.all([getRFQs(), getVendors()]).then(([rfqRows, vendors]) => {
+    void Promise.all([getRFQs(), getVendors(), getPurchaseSetup()]).then(([rfqRows, vendors, setup]) => {
       setRfqs(rfqRows.filter((r) => r.status !== 'cancelled' && r.status !== 'draft'))
       setAllVendors(vendors.filter((v) => v.isActive))
+      setPurchaseSetup(setup)
+      if (isNew) {
+        setPlaceOfSupply((prev) =>
+          prev ||
+          formatPlaceOfSupplyLabel(
+            setup.tax.placeOfSupplyStateCode,
+            setup.tax.placeOfSupplyState,
+          ),
+        )
+      }
     })
   }, [])
 
@@ -947,6 +974,15 @@ export function VendorQuotationEditorPage() {
             value={vendorId}
             onChange={(e) => {
               setVendorId(e.target.value)
+              const vendor = vendorOptions.find((v) => v.id === e.target.value)
+              if (vendor && !placeOfSupply) {
+                setPlaceOfSupply(
+                  formatPlaceOfSupplyLabel(
+                    purchaseSetup?.tax.placeOfSupplyStateCode,
+                    purchaseSetup?.tax.placeOfSupplyState,
+                  ),
+                )
+              }
               markDirty()
             }}
           >
@@ -965,6 +1001,16 @@ export function VendorQuotationEditorPage() {
               setVendorReferenceNumber(e.target.value)
               markDirty()
             }}
+          />
+        </ErpFieldRow>
+        <ErpFieldRow label="Place of Supply">
+          <Input
+            value={placeOfSupply}
+            onChange={(e) => {
+              setPlaceOfSupply(e.target.value)
+              markDirty()
+            }}
+            placeholder="Buyer receiving state (billing / delivery)"
           />
         </ErpFieldRow>
         <ErpFieldRow label="GST scheme" readOnly>

@@ -15518,7 +15518,8 @@ a.crm-companies-table__name:hover {
 
 /* Prevent box-in-box when erp-input class leaks onto smart select wrapper */
 .erp-select-wrap--smart .erp-smart-select.erp-input,
-.erp-field-control > .erp-select-wrap--smart .erp-smart-select {
+.erp-field-control > .erp-select-wrap--smart .erp-smart-select,
+.erp-smart-select.erp-input {
   border: none;
   background: transparent;
   padding: 0;

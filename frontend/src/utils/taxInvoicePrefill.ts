@@ -1,6 +1,7 @@
 import type { CrmCommercialLine, CrmCommercialSource } from '../types/crmCommercial'
 import type { GstBreakdown } from '../types/invoice'
 import { DEFAULT_GST_RATE } from '../types/invoice'
+import { DEFAULT_PURCHASE_SETUP } from '../data/purchase/purchaseSetupSeed'
 import { useCrmCommercialStore } from '../store/crmCommercialStore'
 import { useMasterStore } from '../store/masterStore'
 import { useMrpStore } from '../store/mrpStore'
@@ -51,7 +52,12 @@ function buildGst(lines: CrmCommercialLine[], customerState: string): GstBreakdo
   const avgRate = lines.length
     ? lines.reduce((s, l) => s + l.taxPct, 0) / lines.length
     : DEFAULT_GST_RATE
-  return computeGst(taxable, customerState, avgRate)
+  return computeGst(
+    taxable,
+    customerState,
+    avgRate,
+    DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyStateCode || DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyState,
+  )
 }
 
 function applyLineQtys(lines: CrmCommercialLine[], lineQtys?: Record<string, number>): CrmCommercialLine[] {

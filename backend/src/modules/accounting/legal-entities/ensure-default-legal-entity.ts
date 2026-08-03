@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from '../../../config/prisma.js'
 
 export type DefaultLegalEntitySeed = {
@@ -79,7 +80,7 @@ export async function ensureDefaultLegalEntity(
         fiscalYearStartMonth: 4,
         isDefault: true,
         isActive: true,
-        registeredAddressJson: cfg.registeredAddressJson,
+        registeredAddressJson: cfg.registeredAddressJson as Prisma.InputJsonValue,
         branches: {
           create: {
             tenantId,

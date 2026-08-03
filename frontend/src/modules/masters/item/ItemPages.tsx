@@ -1,5 +1,5 @@
-import { useMemo, useState, useRef, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useMemo, useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { z } from 'zod'
 import { useForm, useWatch, type Resolver } from 'react-hook-form'
@@ -11,6 +11,8 @@ import {
   Package,
   Percent,
   ShieldCheck,
+  ShoppingCart,
+  Paperclip,
 } from 'lucide-react'
 import { MasterRegisterTable } from '../../../components/masters/MasterRegisterTable'
 import { MasterListShell, CoreMasterRowActions, STATUS_FILTER_OPTIONS, matchesStatusFilter } from '../../../components/masters/MasterListShell'
@@ -34,7 +36,6 @@ import { useLeafCategories, useActiveUoms, useEnrichedItems } from '../../../hoo
 import { enrichItemWithDefaults } from '../../../utils/itemMasterDefaults'
 import { buildMasterBreadcrumbs } from '../../../utils/masterNavigation'
 import { formatCurrency, formatNumber } from '../../../utils/formatters/currency'
-import { formatDate } from '../../../utils/dates/format'
 import {
   ENGINEERING_PRODUCT_TYPE_LABELS,
   INVENTORY_POSTING_TYPE_LABELS,
@@ -42,12 +43,14 @@ import {
   type EngineeringProductType,
   type InventoryPostingType,
 } from '../../../types/taxMaster'
-import type { Item, ItemSalesFulfilmentMethod, ItemType, SubAssemblyRule } from '../../../types/master'
+import type { Item, ItemCategory, ItemSalesFulfilmentMethod, ItemType, SubAssemblyRule, Uom } from '../../../types/master'
 import { SUB_ASSEMBLY_RULE_LABELS } from '../../../types/bom'
 import { EnterpriseMasterWorkspace, MasterStickyFooter } from '../shared/EnterpriseMasterShell'
 import { MasterCodeField } from '../../../components/masters/MasterCodeField'
 import { MasterItemImageField } from '../../../components/masters/MasterItemImageField'
+import { ItemPurchaseMultiUnitFields } from '../../../components/masters/ItemPurchaseMultiUnitFields'
 import type { MasterCodeSeriesHandle } from '../../../hooks/useMasterCodeSeries'
+import { handleInvalidSubmit, rhfErrorsToFieldMap, fieldErrorsToMessages } from '../../../utils/formValidation'
 
 const FULFILMENT_OPTIONS: { value: ItemSalesFulfilmentMethod; label: string }[] = [
   { value: 'STOCK', label: 'Stock' },
@@ -58,50 +61,66 @@ const FULFILMENT_OPTIONS: { value: ItemSalesFulfilmentMethod; label: string }[] 
   { value: 'MANUAL', label: 'Manual' },
 ]
 
+function emptyStringToNull(value: unknown) {
+  return value === '' ? null : value
+}
+
+function emptyToPositiveNumber(fallback: number) {
+  return (value: unknown) => {
+    if (value === '' || value === undefined || value === null) return fallback
+    return value
+  }
+}
+
 const schema = z.object({
   productType: z.enum(['boi', 'raw_material', 'sub_assembly', 'assembly_product', 'finish_product', 'scrap', 'service']),
   itemCode: z.string().min(1).max(30),
   itemName: z.string().min(1),
   itemName2: z.string().optional(),
-  itemDescription: z.string(),
+  itemDescription: z.string().default(''),
   categoryId: z.string().min(1),
   inventoryType: z.enum(['inventory', 'non_inventory', 'service']),
-  itemType: z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good', 'scrap', 'service']),
   isBlocked: z.boolean(),
   baseUomId: z.string().min(1),
   quantityPerUom: z.coerce.number().min(0),
-  purchaseUomId: z.string().nullable().optional(),
-  purchaseQtyPerUom: z.coerce.number().positive().default(1),
-  uomConversionFactor: z.coerce.number().positive().optional(),
-  receivingToleranceId: z.string().nullable().optional(),
+  purchaseUomId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
+  purchaseQtyPerUom: z.preprocess(emptyToPositiveNumber(1), z.coerce.number().positive()),
+  uomConversionFactor: z.preprocess(emptyToPositiveNumber(1), z.coerce.number().positive()),
+  receivingToleranceId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
   receivingTolerancePercentage: z.coerce.number().min(0).max(100).optional(),
   receiptEntryMode: z.enum(['UNIT_ONLY', 'WEIGHT_ONLY', 'UNIT_AND_WEIGHT']).optional(),
   standardWeightPerBaseUnit: z.coerce.number().min(0).optional(),
-  weightUomId: z.string().nullable().optional(),
+  weightUomId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
   requireWeightAtReceipt: z.boolean().optional(),
-  hsnId: z.string().nullable().optional(),
-  hsnCode: z.string(),
-  gstGroupId: z.string().nullable().optional(),
-  materialGrade: z.string(),
+  hsnId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
+  hsnCode: z.string().default(''),
+  gstGroupId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
+  materialGrade: z.string().default(''),
   reorderLevel: z.coerce.number().min(0),
   reorderQty: z.coerce.number().min(0),
   standardRate: z.coerce.number().min(0),
   salesDescription: z.string().optional(),
-  salesUomId: z.string().nullable().optional(),
+  salesUomId: z.preprocess(emptyStringToNull, z.string().uuid().nullable().optional()),
   defaultSalesRate: z.coerce.number().min(0),
   salesLeadDays: z.coerce.number().int().min(0),
   salesAllowed: z.boolean(),
-  defaultFulfilmentMethod: z.enum(['STOCK', 'PURCHASE', 'PRODUCTION', 'SUBCONTRACT', 'SERVICE', 'MANUAL']),
+  defaultFulfilmentMethod: z.preprocess(
+    (value) => (value === '' || value == null ? 'MANUAL' : value),
+    z.enum(['STOCK', 'PURCHASE', 'PRODUCTION', 'SUBCONTRACT', 'SERVICE', 'MANUAL']),
+  ),
   productionAllowed: z.boolean(),
   isPurchasable: z.boolean(),
   isStockable: z.boolean(),
   isActive: z.boolean(),
   qcRequired: z.boolean(),
-  qualityTestGroupCode: z.string().nullable().optional(),
-  productionBomId: z.string().nullable().optional(),
-  routingNo: z.string().nullable().optional(),
-  drawingNo: z.string().nullable().optional(),
-  subAssemblyRule: z.enum(['phantom', 'manufactured', 'purchased', 'subcontracted']).nullable().optional(),
+  qualityTestGroupCode: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
+  productionBomId: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
+  routingNo: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
+  drawingNo: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
+  subAssemblyRule: z.preprocess(
+    emptyStringToNull,
+    z.enum(['phantom', 'manufactured', 'purchased', 'subcontracted']).nullable().optional(),
+  ),
 }).superRefine((data, ctx) => {
   const mappedType = mapProductTypeToItemType(data.productType)
   if (mappedType === 'sub_assembly' && !data.subAssemblyRule) {
@@ -133,6 +152,96 @@ function defaultFulfilmentForProductType(pt: EngineeringProductType): ItemSalesF
 
 function defaultProductionAllowedForProductType(pt: EngineeringProductType): boolean {
   return pt === 'finish_product' || pt === 'sub_assembly' || pt === 'assembly_product'
+}
+
+function buildItemFormDefaults(
+  existing: Item | undefined,
+  leafCategories: ItemCategory[],
+  uoms: Uom[],
+): FormData {
+  if (existing) {
+    const productType = existing.productType ?? 'raw_material'
+    return {
+      ...existing,
+      productType,
+      inventoryType: existing.inventoryType ?? 'inventory',
+      itemName2: existing.itemName2 ?? '',
+      itemDescription: existing.itemDescription ?? '',
+      materialGrade: existing.materialGrade ?? '',
+      hsnCode: existing.hsnCode ?? '',
+      hsnId: existing.hsnId ?? '',
+      gstGroupId: existing.gstGroupId ?? '',
+      purchaseUomId: existing.purchaseUomId ?? existing.baseUomId,
+      qualityTestGroupCode: existing.qualityTestGroupCode ?? '',
+      productionBomId: existing.productionBomId ?? '',
+      routingNo: existing.routingNo ?? '',
+      drawingNo: existing.drawingNo ?? '',
+      subAssemblyRule: existing.subAssemblyRule ?? null,
+      isBlocked: existing.isBlocked ?? false,
+      qcRequired: existing.qcRequired ?? false,
+      quantityPerUom: existing.quantityPerUom ?? 1,
+      purchaseQtyPerUom: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
+      uomConversionFactor: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
+      receivingToleranceId: existing.receivingToleranceId ?? '',
+      receivingTolerancePercentage: existing.receivingTolerancePercentage ?? 0,
+      receiptEntryMode: existing.receiptEntryMode ?? 'UNIT_ONLY',
+      standardWeightPerBaseUnit: existing.standardWeightPerBaseUnit ?? 0,
+      weightUomId: existing.weightUomId ?? '',
+      requireWeightAtReceipt: existing.requireWeightAtReceipt ?? false,
+      salesDescription: existing.salesDescription ?? '',
+      salesUomId: existing.salesUomId ?? existing.baseUomId,
+      defaultSalesRate: existing.defaultSalesRate ?? 0,
+      salesLeadDays: existing.salesLeadDays ?? 0,
+      salesAllowed: existing.salesAllowed ?? defaultSalesAllowedForProductType(productType),
+      defaultFulfilmentMethod:
+        existing.defaultFulfilmentMethod ?? defaultFulfilmentForProductType(productType),
+      productionAllowed:
+        existing.productionAllowed ?? defaultProductionAllowedForProductType(productType),
+    }
+  }
+  return {
+    productType: 'raw_material' as EngineeringProductType,
+    itemCode: '',
+    itemName: '',
+    itemDescription: '',
+    materialGrade: '',
+    hsnCode: '',
+    inventoryType: 'inventory' as InventoryPostingType,
+    isBlocked: false,
+    isPurchasable: true,
+    isStockable: true,
+    isActive: true,
+    qcRequired: false,
+    qualityTestGroupCode: '',
+    quantityPerUom: 1,
+    purchaseQtyPerUom: 1,
+    uomConversionFactor: 1,
+    receivingToleranceId: '',
+    receivingTolerancePercentage: 0,
+    receiptEntryMode: 'UNIT_ONLY',
+    standardWeightPerBaseUnit: 0,
+    weightUomId: '',
+    requireWeightAtReceipt: false,
+    reorderLevel: 0,
+    reorderQty: 0,
+    standardRate: 0,
+    salesDescription: '',
+    defaultSalesRate: 0,
+    salesLeadDays: 0,
+    salesAllowed: false,
+    defaultFulfilmentMethod: 'PURCHASE' as ItemSalesFulfilmentMethod,
+    productionAllowed: false,
+    subAssemblyRule: null,
+    baseUomId: uoms[0]?.id ?? '',
+    purchaseUomId: uoms[0]?.id ?? '',
+    salesUomId: uoms[0]?.id ?? '',
+    categoryId: leafCategories[0]?.id ?? '',
+    hsnId: '',
+    gstGroupId: '',
+    productionBomId: '',
+    routingNo: '',
+    drawingNo: '',
+  }
 }
 
 export function ItemListPage() {
@@ -236,6 +345,7 @@ export function ItemListPage() {
 export function ItemFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { hash } = useLocation()
   const rawExisting = useMasterStore((s) => (id ? s.items.find((i) => i.id === id) : undefined))
   const existing = rawExisting ? enrichItemWithDefaults(rawExisting) : undefined
   const items = useMasterStore((s) => s.items)
@@ -243,90 +353,44 @@ export function ItemFormPage() {
   const uoms = useActiveUoms()
   const getHsn = useMasterStore((s) => s.getHsn)
   const getGstGroup = useMasterStore((s) => s.getGstGroup)
-  const receivingTolerances = useMasterStore((s) => s.receivingTolerances.filter((r) => r.isActive))
+  const receivingToleranceRows = useMasterStore((s) => s.receivingTolerances)
+  const receivingTolerances = useMemo(
+    () => receivingToleranceRows.filter((r) => r.isActive),
+    [receivingToleranceRows],
+  )
   const addItem = useMasterStore((s) => s.addItem)
   const updateItem = useMasterStore((s) => s.updateItem)
   const bomHeaders = useBomStore((s) => s.bomHeaders)
   const routingHeaders = useRoutingStore((s) => s.routingHeaders)
   const isEdit = Boolean(id && existing)
-  const [activeSection, setActiveSection] = useState('general')
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [attachmentsOpen, setAttachmentsOpen] = useState(
+    () => hash === '#attachments' || hash === '#item-section-attachments',
+  )
+  const [sectionForceOpen, setSectionForceOpen] = useState<Record<string, number>>({})
+  const formRootRef = useRef<HTMLDivElement>(null)
   const codeSeriesRef = useRef<MasterCodeSeriesHandle | null>(null)
 
-  const { register, handleSubmit, control, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
+  useEffect(() => {
+    if (hash === '#attachments' || hash === '#item-section-attachments') {
+      setAttachmentsOpen(true)
+    }
+  }, [hash])
+
+  const formDefaults = useMemo(
+    () => buildItemFormDefaults(existing, leafCategories, uoms),
+    [existing, leafCategories, uoms],
+  )
+
+  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
-    defaultValues: existing
-      ? {
-          ...existing,
-          productType: existing.productType ?? 'raw_material',
-          inventoryType: existing.inventoryType ?? 'inventory',
-          itemName2: existing.itemName2 ?? '',
-          hsnId: existing.hsnId ?? '',
-          gstGroupId: existing.gstGroupId ?? '',
-          purchaseUomId: existing.purchaseUomId ?? existing.baseUomId,
-          qualityTestGroupCode: existing.qualityTestGroupCode ?? '',
-          productionBomId: existing.productionBomId ?? '',
-          routingNo: existing.routingNo ?? '',
-          drawingNo: existing.drawingNo ?? '',
-          isBlocked: existing.isBlocked ?? false,
-          qcRequired: existing.qcRequired ?? false,
-          quantityPerUom: existing.quantityPerUom ?? 1,
-          purchaseQtyPerUom: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
-          uomConversionFactor: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
-          receivingToleranceId: existing.receivingToleranceId ?? '',
-          receivingTolerancePercentage: existing.receivingTolerancePercentage ?? 0,
-          receiptEntryMode: existing.receiptEntryMode ?? 'UNIT_ONLY',
-          standardWeightPerBaseUnit: existing.standardWeightPerBaseUnit ?? 0,
-          weightUomId: existing.weightUomId ?? '',
-          requireWeightAtReceipt: existing.requireWeightAtReceipt ?? false,
-          salesDescription: existing.salesDescription ?? '',
-          salesUomId: existing.salesUomId ?? existing.baseUomId,
-          defaultSalesRate: existing.defaultSalesRate ?? 0,
-          salesLeadDays: existing.salesLeadDays ?? 0,
-          salesAllowed: existing.salesAllowed ?? defaultSalesAllowedForProductType(existing.productType ?? 'raw_material'),
-          defaultFulfilmentMethod:
-            existing.defaultFulfilmentMethod ??
-            defaultFulfilmentForProductType(existing.productType ?? 'raw_material'),
-          productionAllowed:
-            existing.productionAllowed ??
-            defaultProductionAllowedForProductType(existing.productType ?? 'raw_material'),
-        }
-      : {
-          productType: 'raw_material' as EngineeringProductType,
-          itemCode: '',
-          inventoryType: 'inventory' as InventoryPostingType,
-          itemType: 'bought_out' as ItemType,
-          isBlocked: false,
-          isPurchasable: true,
-          isStockable: true,
-          isActive: true,
-          qcRequired: false,
-          qualityTestGroupCode: '',
-          quantityPerUom: 1,
-          purchaseQtyPerUom: 1,
-          uomConversionFactor: 1,
-          receivingToleranceId: '',
-          receivingTolerancePercentage: 0,
-          receiptEntryMode: 'UNIT_ONLY',
-          standardWeightPerBaseUnit: 0,
-          weightUomId: '',
-          requireWeightAtReceipt: false,
-          reorderLevel: 0,
-          reorderQty: 0,
-          standardRate: 0,
-          salesDescription: '',
-          defaultSalesRate: 0,
-          salesLeadDays: 0,
-          salesAllowed: false,
-          defaultFulfilmentMethod: 'PURCHASE' as ItemSalesFulfilmentMethod,
-          productionAllowed: false,
-          subAssemblyRule: null,
-          baseUomId: uoms[0]?.id ?? '',
-          purchaseUomId: uoms[0]?.id ?? '',
-          salesUomId: uoms[0]?.id ?? '',
-          categoryId: leafCategories[0]?.id ?? '',
-        },
+    defaultValues: formDefaults,
   })
+
+  useEffect(() => {
+    if (!existing) return
+    reset(buildItemFormDefaults(existing, leafCategories, uoms))
+  }, [existing?.id, existing?.updatedAt, leafCategories, uoms, reset])
 
   const watched = useWatch({ control })
   const productType = watch('productType')
@@ -334,6 +398,25 @@ export function ItemFormPage() {
   const gstGroupId = watch('gstGroupId') ?? ''
   const baseUomId = watch('baseUomId')
   const inventoryType = watch('inventoryType')
+  const purchaseUomId = watch('purchaseUomId') ?? ''
+  const uomConversionFactor = watch('uomConversionFactor') ?? 1
+
+  const baseUomCode = uoms.find((u) => u.id === baseUomId)?.uomCode ?? '—'
+  const purchaseUomCode = uoms.find((u) => u.id === (purchaseUomId || baseUomId))?.uomCode ?? baseUomCode
+
+  function onPurchaseUomChange(uomId: string) {
+    setValue('purchaseUomId', uomId || null, { shouldValidate: true })
+    if (!uomId || uomId === baseUomId) {
+      setValue('uomConversionFactor', 1, { shouldValidate: true })
+      setValue('purchaseQtyPerUom', 1, { shouldValidate: true })
+    }
+  }
+
+  function onConversionFactorChange(value: number) {
+    const next = Number.isFinite(value) && value > 0 ? value : 1
+    setValue('uomConversionFactor', next, { shouldValidate: true })
+    setValue('purchaseQtyPerUom', next, { shouldValidate: true })
+  }
 
   const categoryOptions = useMemo(
     () => leafCategories.map((c) => ({ value: c.id, label: `${c.categoryCode} — ${c.categoryName}`, searchText: c.categoryName.toLowerCase() })),
@@ -373,6 +456,45 @@ export function ItemFormPage() {
     }
   }
 
+  function bumpSection(sectionId: string) {
+    setSectionForceOpen((prev) => ({ ...prev, [sectionId]: (prev[sectionId] ?? 0) + 1 }))
+  }
+
+  const openSectionForErrors = useCallback((errs: Partial<Record<keyof FormData, unknown>>) => {
+    if (
+      errs.itemCode || errs.itemName || errs.categoryId || errs.baseUomId || errs.productType || errs.subAssemblyRule
+    ) {
+      bumpSection('item-section-general')
+      return
+    }
+    if (
+      errs.isPurchasable || errs.uomConversionFactor || errs.purchaseQtyPerUom || errs.receivingToleranceId
+      || errs.receivingTolerancePercentage || errs.standardRate
+    ) {
+      bumpSection('item-section-purchase')
+      return
+    }
+    if (errs.defaultFulfilmentMethod || errs.defaultSalesRate || errs.salesLeadDays || errs.salesUomId) {
+      bumpSection('item-section-sales')
+      return
+    }
+    if (errs.gstGroupId || errs.hsnId || errs.hsnCode) {
+      bumpSection('item-section-tax')
+      return
+    }
+    if (errs.reorderLevel || errs.reorderQty) {
+      bumpSection('item-section-inventory')
+      return
+    }
+    if (errs.qcRequired || errs.qualityTestGroupCode) {
+      bumpSection('item-section-quality')
+      return
+    }
+    if (errs.productionBomId || errs.routingNo || errs.drawingNo) {
+      bumpSection('item-section-manufacturing')
+    }
+  }, [])
+
   function save(mode: 'default' | 'new' | 'close' = 'default') {
     void handleSubmit(async (data) => {
       const validation = codeSeriesRef.current?.validateBeforeSave(data.itemCode, {
@@ -411,60 +533,72 @@ export function ItemFormPage() {
       } catch (err) {
         setSaveError(formatApiError(err))
       }
+    }, (errs) => {
+      openSectionForErrors(errs)
+      handleInvalidSubmit({
+        errors: rhfErrorsToFieldMap(errs),
+        fieldLabels: {
+          productType: 'Product type',
+          categoryId: 'Item category',
+          baseUomId: 'Unit of measure',
+          gstGroupId: 'GST group',
+          hsnId: 'HSN code',
+          subAssemblyRule: 'Sub-assembly rule',
+        },
+        root: formRootRef.current,
+      })
     })()
   }
 
-  const invQty = existing?.inventoryQty ?? 0
-  const validationErrors = [...Object.values(errors).map((e) => e?.message).filter(Boolean) as string[], ...(saveError ? [saveError] : [])]
+  const validationErrors = useMemo(
+    () => [
+      ...fieldErrorsToMessages(rhfErrorsToFieldMap(errors)),
+      ...(saveError ? [saveError] : []),
+    ],
+    [errors, saveError],
+  )
 
   function cancelForm() {
     codeSeriesRef.current?.releaseOnCancel()
     navigate('/masters/items')
   }
 
+  if (id && !existing && items.length > 0) {
+    return <MasterNotFound message="Item not found." />
+  }
+
   return (
     <EnterpriseMasterWorkspace
-      title={isEdit ? existing!.itemCode : 'New Item'}
-      subtitle={existing?.itemName ?? 'Engineering & inventory item setup'}
+      minimalChrome
+      title={isEdit ? 'Edit Item' : 'New Item'}
+      subtitle={
+        isEdit && existing
+          ? `${existing.itemCode} — ${existing.itemName}`
+          : 'Engineering & inventory item setup'
+      }
       breadcrumbs={buildMasterBreadcrumbs('inventory', isEdit ? 'Edit Item' : 'New Item')}
       validationErrors={validationErrors}
-      documentStrip={[
-        { label: 'Item Code', value: watched.itemCode?.trim() || '—', highlight: Boolean(watched.itemCode?.trim()) },
-        { label: 'Product Type', value: productType ? ENGINEERING_PRODUCT_TYPE_LABELS[productType] : '—' },
-        { label: 'HSN', value: hsnId ? getHsn(hsnId)?.code ?? '—' : watched.hsnCode ?? '—' },
-        { label: 'Status', value: watched.isBlocked ? 'Blocked' : watched.isActive ? 'Active' : 'Inactive' },
-      ]}
+      formId="item-master-form"
+      onSubmit={(e: FormEvent) => { e.preventDefault(); save('default') }}
+      onSaveShortcut={() => save('default')}
       commandBar={undefined}
-      sectionNavItems={[
-        { id: 'general', label: 'General', icon: Package, done: Boolean(watched.itemCode?.trim() && watched.itemName?.trim()) },
-        { id: 'tax', label: 'Tax', icon: Percent, done: Boolean(hsnId || watched.hsnCode) },
-        { id: 'inventory', label: 'Inventory', icon: Box, done: inventoryType === 'inventory' },
-        { id: 'quality', label: 'Quality', icon: ShieldCheck, done: !watched.qcRequired || Boolean(watched.qualityTestGroupCode) },
-        { id: 'manufacturing', label: 'Manufacturing', icon: Factory, done: Boolean(watched.productionBomId || watched.routingNo) },
-      ]}
-      activeSection={activeSection}
-      onSectionSelect={setActiveSection}
-      formMetrics={[
-        { label: 'On Hand', value: formatNumber(invQty), accent: 'blue' as const },
-        { label: 'Std Rate', value: formatCurrency(watched.standardRate ?? 0), accent: 'violet' as const },
-        { label: 'GST Group', value: gstGroupId ? getGstGroup(gstGroupId)?.code ?? '—' : '—', accent: 'amber' as const },
-      ]}
       factBoxTitle="Item insight"
       factBoxSummary={[
         { label: 'Used in', value: 'BOM, Purchase, Inventory, Production, Sales' },
         { label: 'Category', value: leafCategories.find((c) => c.id === watched.categoryId)?.categoryName ?? '—' },
         { label: 'UOM', value: uoms.find((u) => u.id === baseUomId)?.uomCode ?? '—' },
-        { label: 'Modified', value: existing ? formatDate(existing.updatedAt.slice(0, 10)) : 'New' },
+        { label: 'Modified', value: existing ? existing.updatedAt.slice(0, 10) : 'New' },
       ]}
       stickyFooter={
         <MasterStickyFooter
+          isEdit={isEdit}
           isSubmitting={isSubmitting}
           onSave={() => save('default')}
           onCancel={cancelForm}
         />
       }
     >
-      <form onSubmit={(e: FormEvent) => { e.preventDefault(); save('default') }}>
+      <div ref={formRootRef} className="space-y-3">
         <ErpCardSection
           id="item-section-general"
           title="General"
@@ -474,20 +608,17 @@ export function ItemFormPage() {
           columns={3}
           collapsible
           defaultOpen
+          forceOpenKey={sectionForceOpen['item-section-general']}
         >
-          <FormField label="Product Image" className="md:col-span-3">
-            <MasterItemImageField
-              itemId={id}
-              imageUrl={existing?.imageUrl}
-              updatedAt={existing?.updatedAt}
-            />
-          </FormField>
           <FormField label="Product Type" required>
             <Select
               {...register('productType')}
               onChange={(e) => {
                 register('productType').onChange(e)
-                setValue('itemType', mapProductTypeToItemType(e.target.value as EngineeringProductType))
+                const nextType = e.target.value as EngineeringProductType
+                if (nextType !== 'sub_assembly' && nextType !== 'assembly_product') {
+                  setValue('subAssemblyRule', null)
+                }
               }}
             >
               {Object.entries(ENGINEERING_PRODUCT_TYPE_LABELS).map(([k, v]) => (
@@ -533,26 +664,55 @@ export function ItemFormPage() {
           <FormField label="Quantity" error={errors.quantityPerUom?.message}>
             <Input type="number" step="0.001" {...register('quantityPerUom')} />
           </FormField>
-          <FormField label="Purchase Unit of Measure">
-            <UomMasterSelect value={watch('purchaseUomId') ?? ''} onChange={(v) => setValue('purchaseUomId', v)} />
+          <FormField label="Material Grade">
+            <Input {...register('materialGrade')} />
           </FormField>
-          <FormField
-            label="UOM Conversion Factor"
-            error={errors.uomConversionFactor?.message ?? errors.purchaseQtyPerUom?.message}
-          >
-            <Input
-              type="number"
-              step="0.001"
-              {...register('uomConversionFactor')}
-              onChange={(e) => {
-                const v = e.target.value
-                setValue('uomConversionFactor', Number(v) as never, { shouldValidate: true })
-                setValue('purchaseQtyPerUom', Number(v) as never, { shouldValidate: true })
-              }}
-            />
-            <p className="mt-1 text-xs text-erp-muted">
-              Vendor units per 1 stock unit (e.g. 3 Meter = 1 NOS). Use 1 when purchase UOM equals base UOM.
-            </p>
+          {(productType === 'sub_assembly' || productType === 'assembly_product') ? (
+            <FormField label="Sub-Assembly Rule" required error={errors.subAssemblyRule?.message}>
+              <Select {...register('subAssemblyRule')}>
+                <option value="">Select rule</option>
+                {Object.entries(SUB_ASSEMBLY_RULE_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </Select>
+            </FormField>
+          ) : null}
+          <FormField label="Blocked">
+            <Checkbox {...register('isBlocked')} label="Block item on documents" />
+          </FormField>
+          <FormField label="Active">
+            <Checkbox {...register('isActive')} label="Active" />
+          </FormField>
+          <FormField label="Description" className="col-span-full md:col-span-2 xl:col-span-3">
+            <Textarea rows={2} {...register('itemDescription')} />
+          </FormField>
+        </ErpCardSection>
+
+        <ErpCardSection
+          id="item-section-purchase"
+          title="Purchase"
+          subtitle="Vendor units, GRN tolerance, and receipt rules for procurement."
+          icon={ShoppingCart}
+          accent="amber"
+          columns={3}
+          collapsible
+          defaultOpen
+          forceOpenKey={sectionForceOpen['item-section-purchase']}
+        >
+          <FormField label="Purchasable" className="md:col-span-3">
+            <Checkbox {...register('isPurchasable')} label="Allow purchase on PO, GRN, and vendor documents" />
+          </FormField>
+          <ItemPurchaseMultiUnitFields
+            baseUomCode={baseUomCode}
+            purchaseUomId={purchaseUomId || baseUomId}
+            purchaseUomCode={purchaseUomCode}
+            uomConversionFactor={uomConversionFactor}
+            onPurchaseUomChange={onPurchaseUomChange}
+            onConversionFactorChange={onConversionFactorChange}
+            conversionError={errors.uomConversionFactor?.message ?? errors.purchaseQtyPerUom?.message}
+          />
+          <FormField label="Standard Rate">
+            <Input type="number" step="0.01" {...register('standardRate')} />
           </FormField>
           <FormField label="Receiving tolerance" error={errors.receivingToleranceId?.message}>
             <Select
@@ -591,34 +751,6 @@ export function ItemFormPage() {
           <FormField label="Require weight at receipt">
             <Checkbox {...register('requireWeightAtReceipt')} label="Weight mandatory on GRN" />
           </FormField>
-          <FormField label="Material Grade">
-            <Input {...register('materialGrade')} />
-          </FormField>
-          <FormField label="Standard Rate">
-            <Input type="number" step="0.01" {...register('standardRate')} />
-          </FormField>
-          {(productType === 'sub_assembly' || productType === 'assembly_product') ? (
-            <FormField label="Sub-Assembly Rule" required error={errors.subAssemblyRule?.message}>
-              <Select {...register('subAssemblyRule')}>
-                <option value="">Select rule</option>
-                {Object.entries(SUB_ASSEMBLY_RULE_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </Select>
-            </FormField>
-          ) : null}
-          <FormField label="Blocked">
-            <Checkbox {...register('isBlocked')} label="Block item on documents" />
-          </FormField>
-          <FormField label="Purchasable">
-            <Checkbox {...register('isPurchasable')} label="Allow purchase" />
-          </FormField>
-          <FormField label="Active">
-            <Checkbox {...register('isActive')} label="Active" />
-          </FormField>
-          <FormField label="Description" className="col-span-full md:col-span-2 xl:col-span-3">
-            <Textarea rows={2} {...register('itemDescription')} />
-          </FormField>
         </ErpCardSection>
 
         <ErpCardSection
@@ -629,7 +761,8 @@ export function ItemFormPage() {
           accent="blue"
           columns={3}
           collapsible
-          defaultOpen
+          defaultOpen={false}
+          forceOpenKey={sectionForceOpen['item-section-sales']}
         >
           <FormField label="Sales allowed">
             <Checkbox {...register('salesAllowed')} label="Allow on CRM / sales documents" />
@@ -639,7 +772,6 @@ export function ItemFormPage() {
           </FormField>
           <FormField label="Default fulfilment">
             <Select {...register('defaultFulfilmentMethod')}>
-              <option value="">— Select —</option>
               {FULFILMENT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
@@ -672,7 +804,8 @@ export function ItemFormPage() {
           accent="green"
           columns={3}
           collapsible
-          defaultOpen
+          defaultOpen={false}
+          forceOpenKey={sectionForceOpen['item-section-tax']}
         >
           <FormField label="GST Group Code" required error={errors.gstGroupId?.message}>
             <GstGroupSelect value={gstGroupId ?? ''} onChange={onGstGroupChange} allowEmpty />
@@ -699,7 +832,8 @@ export function ItemFormPage() {
           accent="violet"
           columns={3}
           collapsible
-          defaultOpen
+          defaultOpen={false}
+          forceOpenKey={sectionForceOpen['item-section-inventory']}
         >
           <FormField label="Inventory">
             <Input readOnly value={formatNumber(existing?.inventoryQty ?? 0)} />
@@ -729,7 +863,8 @@ export function ItemFormPage() {
           accent="amber"
           columns={3}
           collapsible
-          defaultOpen
+          defaultOpen={false}
+          forceOpenKey={sectionForceOpen['item-section-quality']}
         >
           <FormField label="QC Required">
             <Checkbox {...register('qcRequired')} label="Inspection required before use" />
@@ -755,7 +890,8 @@ export function ItemFormPage() {
           accent="teal"
           columns={3}
           collapsible
-          defaultOpen
+          defaultOpen={false}
+          forceOpenKey={sectionForceOpen['item-section-manufacturing']}
         >
           <FormField label="Production BOM">
             <ErpSmartSelect
@@ -779,7 +915,27 @@ export function ItemFormPage() {
             <Input {...register('drawingNo')} placeholder="DWG-ISO-26KL-001" />
           </FormField>
         </ErpCardSection>
-      </form>
+
+        <ErpCardSection
+          id="item-section-attachments"
+          title="Attachments"
+          subtitle="Product image for catalog, purchase, and shop-floor reference."
+          icon={Paperclip}
+          accent="slate"
+          columns={1}
+          collapsible
+          open={attachmentsOpen}
+          onOpenChange={setAttachmentsOpen}
+        >
+          <FormField label="Product image" className="md:col-span-3">
+            <MasterItemImageField
+              itemId={id}
+              imageUrl={existing?.imageUrl}
+              updatedAt={existing?.updatedAt}
+            />
+          </FormField>
+        </ErpCardSection>
+      </div>
     </EnterpriseMasterWorkspace>
   )
 }
@@ -798,15 +954,6 @@ export function ItemDetailPage() {
     <DetailLayout backTo="/masters/items" backLabel="Item Master" title={`${item.itemCode} — ${item.itemName}`} editTo={`/masters/items/${item.id}/edit`}>
       <DetailSection title="General">
         <DetailGrid>
-          <div className="col-span-full mb-2">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Product Image</p>
-            <MasterItemImageField
-              itemId={item.id}
-              imageUrl={item.imageUrl}
-              updatedAt={item.updatedAt}
-              disabled
-            />
-          </div>
           <DetailField label="Product Type" value={item.productType ? ENGINEERING_PRODUCT_TYPE_LABELS[item.productType] : '—'} />
           <DetailField label="Type" value={item.inventoryType ? INVENTORY_POSTING_TYPE_LABELS[item.inventoryType] : '—'} />
           <DetailField label="Category" value={getCategoryName(item.categoryId)} />
@@ -840,6 +987,17 @@ export function ItemDetailPage() {
           <DetailField label="Routing No" value={item.routingNo ?? '—'} />
           <DetailField label="Drawing No" value={item.drawingNo ?? '—'} />
         </DetailGrid>
+      </DetailSection>
+      <DetailSection title="Attachments">
+        <div className="max-w-lg">
+          <MasterItemImageField
+            itemId={item.id}
+            imageUrl={item.imageUrl}
+            updatedAt={item.updatedAt}
+            disabled
+            layout="gallery"
+          />
+        </div>
       </DetailSection>
     </DetailLayout>
   )
