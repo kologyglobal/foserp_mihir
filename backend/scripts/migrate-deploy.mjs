@@ -18,6 +18,12 @@ const backend = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 config({ path: join(backend, '.env') })
 
+// Temporary opt-out (SSH/manual migration workflow). Set SKIP_MIGRATE_DEPLOY=1
+if (process.env.SKIP_MIGRATE_DEPLOY === '1' || process.env.SKIP_MIGRATE_DEPLOY === 'true') {
+  console.warn('[migrate-deploy] SKIP_MIGRATE_DEPLOY is set — skipping prisma migrate deploy.')
+  process.exit(0)
+}
+
 function buildDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL
 

@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "node scripts/migrate-deploy.mjs && npm run build:app",
+    "build": "npm run build:app",
     "build:app": "prisma generate && node scripts/clean-dist.mjs && node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --incremental false && node scripts/verify-dist-critical.mjs",
+    "build:with-migrate": "node scripts/migrate-deploy.mjs && npm run build:app",
     "start": "node dist/server.js",
     "typecheck": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit",
     "test": "vitest run",
