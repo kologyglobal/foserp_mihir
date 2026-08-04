@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "incremental": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "src/config/swagger.ts",
+    "src/config/swagger.generated-paths.ts",
+    "src/modules/purchase/requisitions/requisition.repository.ts",
+    "src/modules/purchase/requisitions/requisition.service.ts",
+    "src/modules/purchase/requisitions/requisition.controller.ts",
+    "src/modules/purchase/requisitions/requisition.routes.ts",
+    "src/modules/purchase/shared/mappers.ts"
+  ]
+}

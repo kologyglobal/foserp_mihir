@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:hostinger": "vite build",
     "typecheck": "tsc -b --noEmit",
     "db:up": "bash scripts/db.sh up",
     "db:down": "bash scripts/db.sh down",

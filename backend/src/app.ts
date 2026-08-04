@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
 import fs from 'node:fs'
 import path from 'node:path'
-import swaggerUi from 'swagger-ui-express'
+import type { Express } from 'express'
 import { env } from './config/env.js'
 import { prisma } from './config/prisma.js'
 import { errorMiddleware } from './middleware/error.middleware.js'
@@ -50,7 +50,13 @@ import userRoutes from './modules/users/user.routes.js'
 import indiaMartWebhookRoutes from './modules/crm/integrations/indiamart/indiamart.webhook.routes.js'
 import mobileDeviceTokenRoutes from './modules/mobile/device-tokens/device-token.routes.js'
 import { sendError, sendSuccess } from './utils/response.js'
-import { swaggerSpec } from './config/swagger.js'
+/** Dev-only — excluded from production build (see tsconfig.build.json). */
+export async function setupDevSwagger(app: Express): Promise<void> {
+  if (!env.isDev) return
+  const swaggerUi = (await import('swagger-ui-express')).default
+  const { swaggerSpec } = await import('./config/swagger.js')
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+}
 
 export function createApp() {
   const app = express()
@@ -138,10 +144,6 @@ export function createApp() {
       environment: env.NODE_ENV,
     })
   })
-
-  if (env.isDev) {
-    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
-  }
 
   app.use('/api/v1/auth', authLimiter, authRoutes)
 

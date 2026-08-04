@@ -1,4 +1,4 @@
-import { createApp } from './app.js'
+import { createApp, setupDevSwagger } from './app.js'
 import { connectDatabase, disconnectDatabase } from './config/prisma.js'
 import { env } from './config/env.js'
 import { logger } from './config/logger.js'
@@ -18,6 +18,7 @@ import {
 async function main(): Promise<void> {
   await connectDatabase()
   const app = createApp()
+  await setupDevSwagger(app)
 
   const server = app.listen(env.PORT, '0.0.0.0', () => {
     logger.info(`FOS ERP backend listening on 0.0.0.0:${env.PORT}`)

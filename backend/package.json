@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20 <=22"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "npm run build:app",
-    "build:app": "prisma generate && node scripts/clean-dist.mjs && node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --incremental false && node scripts/verify-dist-critical.mjs",
+    "build": "node scripts/build-hostinger-deploy.mjs",
+    "build:app": "prisma generate --schema=./prisma/schema.prisma && node scripts/clean-dist.mjs && node scripts/compile-dist.mjs && node scripts/verify-dist-critical.mjs",
+    "build:app:tsc": "prisma generate --schema=./prisma/schema.prisma && node scripts/clean-dist.mjs --keep-tsbuildinfo && node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.build.json && node scripts/verify-dist-critical.mjs",
     "build:with-migrate": "node scripts/migrate-deploy.mjs && npm run build:app",
     "start": "node dist/server.js",
     "typecheck": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit",
@@ -45,6 +49,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:deploy:hostinger": "node scripts/migrate-deploy.mjs",
     "db:recover-known": "node scripts/migrate-recover-known-blockers.mjs",
+    "db:resolve-phase10": "node scripts/resolve-phase10-p3009.mjs",
     "db:recover-live-p3009": "tsx scripts/recover-live-p3009-blockers.ts",
     "db:recover-live-p3018": "tsx scripts/recover-live-p3018-blockers.ts",
     "db:audit-item-gst-hsn": "tsx scripts/audit-item-gst-hsn.ts",
@@ -73,6 +78,7 @@
     "cors": "^2.8.5",
     "csv-parse": "^7.0.1",
     "dotenv": "^16.5.0",
+    "esbuild": "^0.25.12",
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",
@@ -89,13 +95,14 @@
     "swagger-ui-express": "^5.0.1",
     "typescript": "^5.8.3",
     "uuid": "^11.1.0",
-    "vitest": "^3.2.3",
     "zod": "^3.25.67"
   },
   "prisma": {
+    "schema": "prisma/schema.prisma",
     "seed": "tsx prisma/seed.ts"
   },
   "devDependencies": {
-    "tsx": "^4.23.1"
+    "tsx": "^4.23.1",
+    "vitest": "^3.2.3"
   }
 }
