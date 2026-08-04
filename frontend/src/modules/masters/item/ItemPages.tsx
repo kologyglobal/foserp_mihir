@@ -55,11 +55,12 @@ import {
 } from '../../../components/masters/ItemUomConversionEditor'
 import type { MasterCodeSeriesHandle } from '../../../hooks/useMasterCodeSeries'
 import { handleInvalidSubmit, rhfErrorsToFieldMap, fieldErrorsToMessages } from '../../../utils/formValidation'
-import {
-  isRawMaterialProductType,
-  isValidRawMaterialItemName,
-  RAW_MATERIAL_ITEM_NAME_MESSAGE,
-} from '../../../utils/itemNamingRules'
+// HELD: MS_GRADE_SECTION validation paused — restore with superRefine block below.
+// import {
+//   isRawMaterialProductType,
+//   isValidRawMaterialItemName,
+//   RAW_MATERIAL_ITEM_NAME_MESSAGE,
+// } from '../../../utils/itemNamingRules'
 
 const FULFILMENT_OPTIONS: { value: ItemSalesFulfilmentMethod; label: string }[] = [
   { value: 'STOCK', label: 'Stock' },
@@ -201,9 +202,10 @@ const schema = z.object({
   if (!data.hsnId) {
     ctx.addIssue({ code: 'custom', message: 'HSN code is required', path: ['hsnId'] })
   }
-  if (isRawMaterialProductType(data.productType) && !isValidRawMaterialItemName(data.itemName)) {
-    ctx.addIssue({ code: 'custom', message: RAW_MATERIAL_ITEM_NAME_MESSAGE, path: ['itemName'] })
-  }
+  // HELD (2026-08-04): MS_GRADE_SECTION item name check paused until master data is normalized.
+  // if (isRawMaterialProductType(data.productType) && !isValidRawMaterialItemName(data.itemName)) {
+  //   ctx.addIssue({ code: 'custom', message: RAW_MATERIAL_ITEM_NAME_MESSAGE, path: ['itemName'] })
+  // }
 })
 
 type FormData = z.infer<typeof schema>
