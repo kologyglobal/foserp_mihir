@@ -39,7 +39,13 @@ type OrderWithRelations = PurchaseOrder & {
 export function mapPurchaseOrderToDto(
   order: OrderWithRelations,
   userNames?: Map<string, string>,
-  opts: { requireApprovalOnPo?: boolean } = {},
+  opts: {
+    requireApprovalOnPo?: boolean
+    requirePoReleaseWorkflow?: boolean
+    allowBackdatedPo?: boolean
+    backdatedPoDaysLimit?: number
+    requireApprovalForBackdatedPo?: boolean
+  } = {},
 ) {
   const warehouse = order.deliveryWarehouse ?? order.purchaseRequisition?.warehouse ?? null
   const warehouseId =
@@ -93,6 +99,12 @@ export function mapPurchaseOrderToDto(
     updatedAt: iso(order.updatedAt),
     allowedActions: allowedActions(order, {
       requireApprovalOnPo: opts.requireApprovalOnPo,
+      requirePoReleaseWorkflow: opts.requirePoReleaseWorkflow,
+      backdatePolicy: {
+        allowBackdatedPo: opts.allowBackdatedPo,
+        backdatedPoDaysLimit: opts.backdatedPoDaysLimit,
+        requireApprovalForBackdatedPo: opts.requireApprovalForBackdatedPo,
+      },
     }),
     revisions: (order.revisions ?? []).map((r) => ({
       id: r.id,

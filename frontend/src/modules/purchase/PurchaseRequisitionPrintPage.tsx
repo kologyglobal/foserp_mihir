@@ -4,12 +4,16 @@ import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
 import { PurchaseDocumentLetterhead } from '@/components/purchase/PurchaseDocumentLetterhead'
 import { getPurchaseRequisitionById } from '@/services/purchase'
 import type { PurchaseRequisition } from '@/types/purchaseDomain'
-import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
+import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { formatStatus } from '@/components/ui/Badge'
 import { notify } from '@/store/toastStore'
 import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
 import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
+import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
+import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
+import { getPurchaseLineBaseUomCode } from '@/utils/purchaseLineUom'
+import { useMasterStore } from '@/store/masterStore'
 
 export function PurchaseRequisitionPrintPage() {
   const { id } = useParams()
@@ -23,6 +27,15 @@ export function PurchaseRequisitionPrintPage() {
     let cancelled = false
     ;(async () => {
       setLoading(true)
+      try {
+        const store = useMasterStore.getState()
+        if (!store.items.length || !store.uoms.length) {
+          const { syncBatchMastersFromApi } = await import('@/services/bridges/masterBatchApiBridge')
+          await syncBatchMastersFromApi()
+        }
+      } catch {
+        /* fallback uom from line */
+      }
       const row = await getPurchaseRequisitionById(id)
       if (cancelled) return
       if (!row) {
@@ -103,7 +116,6 @@ export function PurchaseRequisitionPrintPage() {
               <th>Item</th>
               <th>Specification</th>
               <th className="num">Qty</th>
-              <th>UOM</th>
               <th className="num">Est. rate</th>
               <th className="num">Amount</th>
               <th>Required</th>
@@ -111,7 +123,13 @@ export function PurchaseRequisitionPrintPage() {
             </tr>
           </thead>
           <tbody>
-            {pr.lines.map((l) => (
+            {pr.lines.map((l) => {
+              const dual = resolveDualQtyForPrint({
+                stockQty: l.quantity,
+                stockUom: getPurchaseLineBaseUomCode(l.itemId) || l.uom,
+                itemId: l.itemId,
+              })
+              return (
               <tr key={l.id}>
                 <td className="num">{l.lineNo}</td>
                 <td className="mono">{l.itemCode}</td>
@@ -121,14 +139,14 @@ export function PurchaseRequisitionPrintPage() {
                     <span className="block text-[10px] text-erp-muted">{l.specification}</span>
                   ) : null}
                 </td>
-                <td className="num">{formatNumber(l.quantity)}</td>
-                <td>{l.uom}</td>
+                <PurchasePrintDualQtyCell {...dual} />
                 <td className="num">{formatCurrency(l.estimatedRate)}</td>
                 <td className="num">{formatCurrency(l.amount)}</td>
                 <td>{formatDate(l.requiredDate)}</td>
                 <td>{l.preferredVendorName || '—'}</td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
 

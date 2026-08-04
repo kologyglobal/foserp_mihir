@@ -29,6 +29,11 @@ export interface ApiPurchaseSetupGeneral {
   overReceiptTolerancePct: number
   requireApprovalOnPoRevision?: boolean
   requireApprovalOnPo?: boolean
+  requirePoReleaseWorkflow?: boolean
+  requireApprovalOnPrRevision?: boolean
+  allowBackdatedPo?: boolean
+  backdatedPoDaysLimit?: number
+  requireApprovalForBackdatedPo?: boolean
   allowShortClose: boolean
   requirePoWarehouse: boolean
   requireExpectedDeliveryDate: boolean

@@ -5,6 +5,8 @@ import { buildPaginationMeta } from '../../../utils/pagination.js'
 import { sendSuccess, sendPaginated, sendCreated } from '../../../utils/response.js'
 import * as service from './purchase-planning.service.js'
 import * as createPoService from './purchase-planning-create-po.service.js'
+import * as splitService from './purchase-planning-split.service.js'
+import { mapPlanningRowToDto } from './purchase-planning.mapper.js'
 
 export const listPlanningSheet = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
@@ -69,4 +71,11 @@ export const createPurchaseOrdersFromPlanning = asyncHandler(async (req: Request
   const { userId } = getContext(req)
   const data = await createPoService.createPurchaseOrdersFromPlanning(tenantId, userId, req.body)
   sendCreated(res, 'Purchase orders created from planning', data)
+})
+
+export const splitPlanningRow = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const { userId } = getContext(req)
+  const rows = await splitService.splitPlanningRow(tenantId, userId, getRouteParam(req, 'id'), req.body)
+  sendSuccess(res, 'Planning row split by vendor', rows.map(mapPlanningRowToDto))
 })

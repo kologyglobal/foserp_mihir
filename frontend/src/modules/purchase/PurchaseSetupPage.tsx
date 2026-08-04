@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Plus, Save, Trash2 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
@@ -144,15 +144,17 @@ function SectionCard({
   id,
 }: {
   title: string
-  description?: string
-  children: React.ReactNode
+  description?: ReactNode
+  children: ReactNode
   id?: string
 }) {
   return (
     <section id={id} className="rounded-md border border-erp-border p-4">
       <div className="mb-3">
         <h2 className="text-[15px] font-semibold text-erp-text">{title}</h2>
-        {description ? <p className="mt-0.5 text-[12px] text-erp-muted">{description}</p> : null}
+        {description ? (
+          <div className="mt-0.5 text-[12px] text-erp-muted">{description}</div>
+        ) : null}
       </div>
       {children}
     </section>
@@ -713,9 +715,41 @@ export function PurchaseSetupPage() {
                   onChange={(e) => patchGeneral('requireApprovalOnPo', e.target.checked)}
                 />
                 <Checkbox
+                  label="Require PO release before receiving"
+                  checked={setup.general.requirePoReleaseWorkflow !== false}
+                  onChange={(e) => patchGeneral('requirePoReleaseWorkflow', e.target.checked)}
+                />
+                <Checkbox
                   label="Require approval on PO revision"
                   checked={Boolean(setup.general.requireApprovalOnPoRevision)}
                   onChange={(e) => patchGeneral('requireApprovalOnPoRevision', e.target.checked)}
+                />
+                <Checkbox
+                  label="Require approval on PR revision"
+                  checked={setup.general.requireApprovalOnPrRevision !== false}
+                  onChange={(e) => patchGeneral('requireApprovalOnPrRevision', e.target.checked)}
+                />
+                <Checkbox
+                  label="Allow backdated PO"
+                  checked={Boolean(setup.general.allowBackdatedPo)}
+                  onChange={(e) => patchGeneral('allowBackdatedPo', e.target.checked)}
+                />
+                <FormField label="Backdated PO days limit" hint="Max calendar days in the past when backdated PO is allowed.">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={400}
+                    disabled={!setup.general.allowBackdatedPo}
+                    value={setup.general.backdatedPoDaysLimit ?? 0}
+                    onChange={(e) =>
+                      patchGeneral('backdatedPoDaysLimit', Math.max(0, Number(e.target.value) || 0))
+                    }
+                  />
+                </FormField>
+                <Checkbox
+                  label="Require approval for backdated PO"
+                  checked={setup.general.requireApprovalForBackdatedPo !== false}
+                  onChange={(e) => patchGeneral('requireApprovalForBackdatedPo', e.target.checked)}
                 />
                 <Checkbox
                   label="Require warehouse on PO"
@@ -1378,7 +1412,16 @@ export function PurchaseSetupPage() {
           {tab === 'receiving' && (
             <SectionCard
               title="Receiving Setup"
-              description="Gate-in and GRN capture rules under the default warehouse."
+              description={
+                <>
+                  Gate-in and GRN capture rules under the default warehouse. Item-level receiving
+                  tolerance is configured on{' '}
+                  <Link to="/masters/receiving-tolerances" className="text-sky-700 underline">
+                    Receiving Tolerance master
+                  </Link>{' '}
+                  and linked per item on the Item master Purchase tab.
+                </>
+              }
             >
               <FieldGrid>
                 <FormField

@@ -78,6 +78,39 @@ SET @sql := (SELECT IF(
 ));
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
+/* Migrate legacy toleranceStatus enum values before narrowing enum */
+SET @sql := (SELECT IF(
+  EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='goods_receipt_lines' AND COLUMN_NAME='toleranceStatus'),
+  'ALTER TABLE `goods_receipt_lines`
+     MODIFY COLUMN `toleranceStatus` ENUM(
+       ''OK'', ''PARTIAL'', ''NOT_RECEIVED'', ''SHORT_OUTSIDE'', ''EXCESS_WITHIN'', ''EXCESS_OUTSIDE'',
+       ''EXACT'', ''EXCESS_WITHIN_TOLERANCE'', ''EXCESS_OUTSIDE_TOLERANCE''
+     ) NOT NULL DEFAULT ''EXACT''',
+  'SELECT ''SKIP toleranceStatus enum expand'' AS msg'
+));
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+UPDATE `goods_receipt_lines` SET `toleranceStatus` = 'EXACT' WHERE `toleranceStatus` = 'OK';
+UPDATE `goods_receipt_lines` SET `toleranceStatus` = 'EXCESS_WITHIN_TOLERANCE' WHERE `toleranceStatus` = 'EXCESS_WITHIN';
+UPDATE `goods_receipt_lines` SET `toleranceStatus` = 'EXCESS_OUTSIDE_TOLERANCE' WHERE `toleranceStatus` = 'EXCESS_OUTSIDE';
+UPDATE `goods_receipt_lines` SET `toleranceStatus` = 'PARTIAL' WHERE `toleranceStatus` = 'SHORT_OUTSIDE';
+
+ALTER TABLE `goods_receipt_lines`
+  MODIFY COLUMN `toleranceStatus` ENUM(
+    'NOT_RECEIVED', 'PARTIAL', 'EXACT', 'EXCESS_WITHIN_TOLERANCE', 'EXCESS_OUTSIDE_TOLERANCE'
+  ) NOT NULL DEFAULT 'EXACT';
+
+UPDATE `goods_receipt_lines` SET `approvalReasons` = JSON_ARRAY() WHERE `approvalReasons` IS NULL;
+
+UPDATE `goods_receipt_lines`
+SET `requiresApproval` = true,
+    `approvalReasons` = JSON_ARRAY('UNIT_OVER_TOLERANCE')
+WHERE `toleranceStatus` = 'EXCESS_OUTSIDE_TOLERANCE';
+
+UPDATE `goods_receipt_lines`
+SET `shortCloseRequested` = `closeOpenQuantity`
+WHERE `closeOpenQuantity` = true;
+
 /* Seed system tolerances per tenant */
 INSERT INTO master_receiving_tolerances (id, tenantId, code, name, description, percentage, isSystem, status, createdAt, updatedAt)
 SELECT UUID(), t.id, v.code, v.name, v.description, v.percentage, true, 'ACTIVE', NOW(3), NOW(3)

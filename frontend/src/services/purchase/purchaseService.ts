@@ -158,6 +158,7 @@ import { getSessionUser } from '../../utils/permissions'
 import { mapPurchaseErrorMessage } from '../../utils/purchase/purchaseErrorMessages'
 import { buildPurchaseDashboardGrniRows } from './purchaseDashboardGrni'
 import { formatGrnStatusLabel } from './grnReceiptSummary'
+import { computePurchaseOrderReceivedPercentage } from './purchaseMappers'
 
 const LATENCY_MS = 35
 
@@ -362,6 +363,9 @@ function buildPlanningRowFromPrLine(
     currentStock,
     openPoQuantity,
     netPurchaseQuantity: net,
+    allocatedQuantity: net,
+    orderedQuantity: 0,
+    remainingQuantity: net,
     preferredVendorId: preferred?.id ?? null,
     preferredVendorName: preferred?.vendorName ?? line.preferredVendorName ?? null,
     preferredVendorCode: preferred?.vendorCode ?? (line.vendorNumber || null),
@@ -915,8 +919,6 @@ function applyPoMoney(
 }
 
 function toPurchaseOrderListRow(po: PurchaseOrder): PurchaseOrderListRow {
-  const ordered = po.lines.reduce((s, l) => s + l.quantity, 0)
-  const received = po.lines.reduce((s, l) => s + l.receivedQty, 0)
   const taxAmount = Number((po.cgst + po.sgst + po.igst).toFixed(2))
   return {
     id: po.id,
@@ -925,13 +927,13 @@ function toPurchaseOrderListRow(po: PurchaseOrder): PurchaseOrderListRow {
     vendorName: po.vendor.name,
     vendorGstin: po.vendor.gstin,
     locationName: po.purchaseLocation?.name ?? po.location.name,
-    buyerName: po.buyer?.name ?? po.requester.name,
+    createdByName: po.createdBy || '—',
     currency: po.currency,
     expectedDeliveryDate: po.expectedDeliveryDate,
     basicAmount: po.subtotal,
     taxAmount,
     totalAmount: po.totalAmount,
-    receivedPercentage: ordered > 0 ? Math.round((received / ordered) * 100) : 0,
+    receivedPercentage: computePurchaseOrderReceivedPercentage(po.lines),
     invoiceStatus: po.invoiceStatus,
     invoiceStatusLabel: PURCHASE_ORDER_INVOICE_STATUS_LABELS[po.invoiceStatus],
     approvalStatus: po.approvalStatus,
@@ -1073,6 +1075,62 @@ export async function updatePurchasePlanningSheetRow(
   return structuredClone(next)
 }
 
+export async function splitPurchasePlanningRowByVendor(
+  id: string,
+  splits: Array<{ vendorId: string; allocatedQuantity: number }>,
+): Promise<PurchasePlanningSheetRow[]> {
+  await delay()
+  const idx = state.planningSheet.findIndex((r) => r.id === id)
+  if (idx < 0) throw new PurchaseServiceError('PPS_NOT_FOUND', `Planning row not found: ${id}`)
+  const current = state.planningSheet[idx]
+  assertPlanningEditable(current)
+  if (current.orderedQuantity > 0) {
+    throw new PurchaseServiceError('PPS_SPLIT_NOT_ALLOWED', 'Cannot split after PO quantities are ordered.')
+  }
+  const allocated = current.allocatedQuantity || current.netPurchaseQuantity
+  const total = splits.reduce((s, x) => s + x.allocatedQuantity, 0)
+  if (Math.abs(total - allocated) > 1e-6) {
+    throw new PurchaseServiceError('PPS_SPLIT_SUM_EXCEEDS', 'Split quantities must equal allocated quantity.')
+  }
+  const [first, ...rest] = splits
+  const firstVendor = requireVendor(first.vendorId)
+  const updated: PurchasePlanningSheetRow = recomputePlanningAmounts({
+    ...current,
+    allocatedQuantity: first.allocatedQuantity,
+    remainingQuantity: first.allocatedQuantity,
+    preferredVendorId: firstVendor.id,
+    preferredVendorName: firstVendor.vendorName,
+    preferredVendorCode: firstVendor.vendorCode,
+    status: 'vendor_selected',
+    updatedAt: nowIso(),
+  })
+  state.planningSheet[idx] = updated
+  const created: PurchasePlanningSheetRow[] = [structuredClone(updated)]
+  for (const split of rest) {
+    const vendor = requireVendor(split.vendorId)
+    state.seq.pps += 1
+    const sibling = recomputePlanningAmounts({
+      ...current,
+      id: genId('pps'),
+      planningNumber: docNo('PPS', state.seq.pps),
+      allocatedQuantity: split.allocatedQuantity,
+      orderedQuantity: 0,
+      remainingQuantity: split.allocatedQuantity,
+      preferredVendorId: vendor.id,
+      preferredVendorName: vendor.vendorName,
+      preferredVendorCode: vendor.vendorCode,
+      status: 'vendor_selected',
+      purchaseOrderId: null,
+      purchaseOrderNumber: null,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    })
+    state.planningSheet.unshift(sibling)
+    created.push(structuredClone(sibling))
+  }
+  return created
+}
+
 export async function assignPurchasePlanningBuyer(
   id: string,
   buyerId: string,
@@ -1165,15 +1223,31 @@ export function canCreatePoFromPlanningRow(row: PurchasePlanningSheetRow): boole
   )
 }
 
+/** Remaining / net qty available to order on the next PO for this planning row. */
+export function planningOrderableQuantity(row: PurchasePlanningSheetRow): number {
+  return row.remainingQuantity > 0
+    ? row.remainingQuantity
+    : row.netPurchaseQuantity > 0
+      ? row.netPurchaseQuantity
+      : row.requiredQuantity
+}
+
 /** Selected planning rows ready for header Create PO. */
 export function canSelectPlanningRowForPo(row: PurchasePlanningSheetRow): boolean {
-  if (['completed', 'cancelled', 'po_created', 'partially_ordered'].includes(row.status)) {
+  if (['completed', 'cancelled', 'po_created'].includes(row.status)) {
     return false
   }
-  // Match backend PO-eligible statuses (vendor_selected / approved / po_pending).
-  if (!['vendor_selected', 'approved', 'po_pending'].includes(row.status)) return false
+  if (row.status === 'partially_ordered' && !(row.remainingQuantity > 0)) {
+    return false
+  }
+  // Match backend PO-eligible statuses (vendor_selected / approved / po_pending / partial remaining).
+  if (
+    !['vendor_selected', 'approved', 'po_pending', 'partially_ordered'].includes(row.status)
+  ) {
+    return false
+  }
   if (!row.preferredVendorId) return false
-  const qty = row.netPurchaseQuantity > 0 ? row.netPurchaseQuantity : row.requiredQuantity
+  const qty = planningOrderableQuantity(row)
   return qty > 0 && row.expectedRate > 0 && Boolean(row.requiredByDate)
 }
 
@@ -1224,7 +1298,14 @@ function stampPrLinesWithPurchaseOrder(
 
 export async function createPurchaseOrdersFromPlanningSelection(
   planningRowIds: string[],
-  options?: { seriesPrefix?: string },
+  options?: {
+    seriesPrefix?: string
+    orderDate?: string
+    deliveryWarehouseId?: string
+    deliveryAddress?: string
+    remarks?: string
+    orderQuantities?: Record<string, number>
+  },
 ): Promise<PurchaseOrder[]> {
   await delay()
   if (!planningRowIds.length) {
@@ -1294,16 +1375,27 @@ export async function createPurchaseOrdersFromPlanningSelection(
       purchaseRequisitionId: pr.id,
       purchaseRequisitionNumber: pr.documentNumber,
       expectedDeliveryDate: first.requiredByDate || todayDate(),
-      documentDate: first.orderDate || todayDate(),
+      documentDate: options?.orderDate || first.orderDate || todayDate(),
       paymentTerms: pr.paymentTerms,
       deliveryTerms: pr.deliveryTerms,
       location: pr.location,
       purchaseLocation: pr.location,
       deliveryLocation: pr.location,
       department: pr.department,
-      remarks: `Created from planning (${vendorRows.map((r) => r.planningNumber).join(', ')})`,
+      remarks: [
+        `Created from planning (${vendorRows.map((r) => r.planningNumber).join(', ')})`,
+        options?.deliveryAddress?.trim() ? `Delivery: ${options.deliveryAddress.trim()}` : '',
+        options?.remarks?.trim() ?? '',
+      ]
+        .filter(Boolean)
+        .join('. '),
       lines: vendorRows.map((row) => {
-        const qty = row.netPurchaseQuantity > 0 ? row.netPurchaseQuantity : row.requiredQuantity
+        const maxQty = planningOrderableQuantity(row)
+        const requested = options?.orderQuantities?.[row.id]
+        const qty =
+          requested != null && Number(requested) > 0
+            ? Math.min(Number(requested), maxQty)
+            : maxQty
         return {
           itemId: row.itemId,
           itemCode: row.itemCode,
@@ -1870,6 +1962,7 @@ export async function createPurchaseRequisition(
   const created: PurchaseRequisition = {
     id: genId('prd-pr'),
     documentNumber: doc,
+    revisionNo: 0,
     documentDate: input.documentDate ?? todayDate(),
     status: 'draft',
     location: input.location ?? { ...PURCHASE_DEMO_LOCATION },

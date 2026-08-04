@@ -10,7 +10,6 @@ import {
   Pencil,
   RefreshCw,
   ShoppingCart,
-  UserCheck,
   Users,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -37,7 +36,6 @@ import {
   type CreatePoModalForm,
 } from '@/components/purchase/PurchasePlanningCreatePoModal'
 import {
-  bulkAssignPurchasePlanningBuyer,
   bulkSelectPurchasePlanningVendor,
   bulkUpdatePurchasePlanningStatus,
   canSelectPlanningRowForPo,
@@ -49,6 +47,7 @@ import {
   getVendors,
   holdPurchasePlanningRow,
   recalculatePurchasePlanningRows,
+  splitPurchasePlanningRowByVendor,
   updatePurchasePlanningSheetRow,
   PurchaseServiceError,
   PURCHASE_PLANNING_PRIORITY_LABELS,
@@ -85,7 +84,6 @@ const DEFAULT_FILTERS: CrmFilterValues = {
   item: '',
   department: '',
   vendor: '',
-  buyer: '',
   priority: '',
   status: '',
   purchaseType: '',
@@ -170,7 +168,6 @@ function filterRows(rows: PurchasePlanningSheetRow[], f: CrmFilterValues) {
         r.itemName,
         r.department,
         r.preferredVendorName,
-        r.buyerName,
       ]
         .join(' ')
         .toLowerCase()
@@ -186,7 +183,6 @@ function filterRows(rows: PurchasePlanningSheetRow[], f: CrmFilterValues) {
     }
     if (f.department && r.department !== f.department) return false
     if (f.vendor && r.preferredVendorName !== f.vendor) return false
-    if (f.buyer && r.buyerName !== f.buyer) return false
     if (f.priority && r.priority !== f.priority) return false
     if (f.status) {
       if (r.status !== f.status) return false
@@ -239,8 +235,9 @@ export function PurchasePlanningSheetPage() {
   const perms = usePurchasePermissions()
   const [rows, setRows] = useState<PurchasePlanningSheetRow[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
-  const [warehouses, setWarehouses] = useState<Array<{ id: string; name: string }>>([])
-  const [buyers, setBuyers] = useState<Array<{ id: string; name: string }>>([])
+  const [warehouses, setWarehouses] = useState<
+    Array<{ id: string; name: string; address?: string }>
+  >([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<CrmFilterValues>(() => ({
@@ -258,10 +255,9 @@ export function PurchasePlanningSheetPage() {
   const [viewRow, setViewRow] = useState<PurchasePlanningSheetRow | null>(null)
   const [editRow, setEditRow] = useState<PurchasePlanningSheetRow | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
-  const [bulkBuyerOpen, setBulkBuyerOpen] = useState(false)
+  const [splittingEdit, setSplittingEdit] = useState(false)
   const [bulkVendorOpen, setBulkVendorOpen] = useState(false)
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false)
-  const [bulkBuyerId, setBulkBuyerId] = useState('')
   const [bulkVendorId, setBulkVendorId] = useState('')
   const [bulkStatus, setBulkStatus] = useState('po_pending')
 
@@ -286,14 +282,9 @@ export function PurchasePlanningSheetPage() {
       })
       setRows(enriched)
       setVendors(v)
-      setWarehouses(wh.map((w) => ({ id: w.id, name: w.name })))
-      const buyerMap = new Map<string, string>()
-      for (const row of enriched) {
-        if (row.buyerId && row.buyerName) buyerMap.set(row.buyerId, row.buyerName)
-      }
-      const nextBuyers = [...buyerMap.entries()].map(([id, name]) => ({ id, name }))
-      setBuyers(nextBuyers)
-      setBulkBuyerId((prev) => (prev && nextBuyers.some((b) => b.id === prev) ? prev : nextBuyers[0]?.id ?? ''))
+      setWarehouses(
+        wh.map((w) => ({ id: w.id, name: w.name, address: w.address || undefined })),
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load planning sheet')
       setRows([])
@@ -321,10 +312,6 @@ export function PurchasePlanningSheetPage() {
       .filter(Boolean)
     return [...new Set(fromRows)].sort()
   }, [rows, vendors])
-  const buyerOptions = useMemo(
-    () => [...new Set(rows.map((r) => r.buyerName).filter(Boolean))].sort(),
-    [rows],
-  )
 
   const filterFields = useMemo<CrmFilterField[]>(
     () => [
@@ -354,12 +341,6 @@ export function PurchasePlanningSheetPage() {
         label: 'Vendor',
         type: 'select',
         options: vendorOptions.map((v) => ({ value: v, label: v })),
-      },
-      {
-        key: 'buyer',
-        label: 'Buyer',
-        type: 'select',
-        options: buyerOptions.map((b) => ({ value: b, label: b })),
       },
       {
         key: 'priority',
@@ -392,7 +373,7 @@ export function PurchasePlanningSheetPage() {
       { key: 'poPending', label: 'PO Pending only', type: 'boolean' },
       { key: 'vendorPending', label: 'Vendor selection pending', type: 'boolean' },
     ],
-    [departmentOptions, vendorOptions, buyerOptions],
+    [departmentOptions, vendorOptions],
   )
 
   // Free-text fields: use search-select with empty options falls back poorly.
@@ -499,7 +480,7 @@ export function PurchasePlanningSheetPage() {
     }
   }
 
-  const confirmCreatePo = async (_form: CreatePoModalForm) => {
+  const confirmCreatePo = async (form: CreatePoModalForm) => {
     const series = seriesOptions[0]
     if (!series) {
       notify.error('Purchase Order number series is not configured in Setup')
@@ -509,7 +490,14 @@ export function PurchasePlanningSheetPage() {
     try {
       const orders = await createPurchaseOrdersFromPlanningSelection(
         poModalRows.map((r) => r.id),
-        { seriesPrefix: series.prefix },
+        {
+          seriesPrefix: series.prefix,
+          orderDate: form.poDate,
+          deliveryWarehouseId: form.warehouse || undefined,
+          deliveryAddress: form.deliveryAddress.trim() || undefined,
+          remarks: form.remarks.trim() || undefined,
+          orderQuantities: form.orderQuantities,
+        },
       )
       notify.success(
         orders.length === 1
@@ -560,6 +548,21 @@ export function PurchasePlanningSheetPage() {
     }
   }
 
+  const onSplitEdit = async (splits: Array<{ vendorId: string; allocatedQuantity: number }>) => {
+    if (!editRow) return
+    setSplittingEdit(true)
+    try {
+      await splitPurchasePlanningRowByVendor(editRow.id, splits)
+      notify.success('Planning row split by vendor')
+      setEditRow(null)
+      await load()
+    } catch (err) {
+      notify.error(err instanceof PurchaseServiceError ? err.message : 'Split failed')
+    } finally {
+      setSplittingEdit(false)
+    }
+  }
+
   const runRowAction = async (
     row: PurchasePlanningSheetRow,
     work: () => Promise<PurchasePlanningSheetRow | void>,
@@ -593,16 +596,6 @@ export function PurchasePlanningSheetPage() {
         label: 'Edit Planning',
         icon: Pencil,
         onClick: () => setEditRow(row),
-        disabled: !canEdit || terminal,
-      },
-      {
-        id: 'assign-buyer',
-        label: 'Assign Buyer',
-        icon: UserCheck,
-        onClick: () => {
-          setRowSelection({ [row.id]: true })
-          setBulkBuyerOpen(true)
-        },
         disabled: !canEdit || terminal,
       },
       {
@@ -827,6 +820,33 @@ export function PurchasePlanningSheetPage() {
         cell: ({ row }) => <span className="tabular-nums">{row.original.openPoQuantity}</span>,
       },
       {
+        id: 'allocatedQuantity',
+        accessorKey: 'allocatedQuantity',
+        header: 'Allocated',
+        meta: { columnLabel: 'Allocated', align: 'right' },
+        cell: ({ row }) => (
+          <span className="tabular-nums">{row.original.allocatedQuantity}</span>
+        ),
+      },
+      {
+        id: 'orderedQuantity',
+        accessorKey: 'orderedQuantity',
+        header: 'Ordered',
+        meta: { columnLabel: 'Ordered', align: 'right' },
+        cell: ({ row }) => (
+          <span className="tabular-nums">{row.original.orderedQuantity}</span>
+        ),
+      },
+      {
+        id: 'remainingQuantity',
+        accessorKey: 'remainingQuantity',
+        header: 'Remaining',
+        meta: { columnLabel: 'Remaining', align: 'right' },
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{row.original.remainingQuantity}</span>
+        ),
+      },
+      {
         id: 'netPurchaseQuantity',
         accessorKey: 'netPurchaseQuantity',
         header: 'Net Purchase Quantity',
@@ -909,7 +929,7 @@ export function PurchasePlanningSheetPage() {
     <>
       <OperationalPageShell
         title="Purchase Planning Sheet"
-        description="Plan approved direct-purchase requirements, assign vendors and buyers, and create Purchase Orders."
+        description="Plan approved direct-purchase requirements, assign vendors, and create Purchase Orders."
         badge="Purchase"
         variant="dynamics"
         breadcrumbs={purchaseBreadcrumbs('Purchase Planning Sheet')}
@@ -958,13 +978,6 @@ export function PurchasePlanningSheetPage() {
               },
             ]}
             moreActions={[
-              {
-                id: 'bulk-buyer',
-                label: 'Assign Buyer',
-                icon: UserCheck,
-                onClick: () => setBulkBuyerOpen(true),
-                disabled: selectedRows.length === 0 || !canEdit,
-              },
               {
                 id: 'bulk-vendor',
                 label: 'Select Vendor',
@@ -1099,10 +1112,11 @@ export function PurchasePlanningSheetPage() {
         open={Boolean(editRow)}
         row={editRow}
         vendors={vendors}
-        buyers={buyers}
         saving={savingEdit}
+        splitting={splittingEdit}
         onClose={() => setEditRow(null)}
         onSave={onSaveEdit}
+        onSplit={onSplitEdit}
       />
 
       <PurchasePlanningCreatePoModal
@@ -1117,61 +1131,6 @@ export function PurchasePlanningSheetPage() {
         }}
         onConfirm={(form) => void confirmCreatePo(form)}
       />
-
-      <Modal
-        open={bulkBuyerOpen}
-        onClose={() => setBulkBuyerOpen(false)}
-        title="Bulk Assign Buyer"
-        description={`${selectedRows.length} selected row(s)`}
-        size="sm"
-        footer={
-          <ErpButtonGroup className="justify-end">
-            <ErpButton type="button" variant="secondary" onClick={() => setBulkBuyerOpen(false)}>
-              Cancel
-            </ErpButton>
-            <ErpButton
-              type="button"
-              variant="primary"
-              disabled={!bulkBuyerId}
-              onClick={() =>
-                void (async () => {
-                  const buyer = buyers.find((b) => b.id === bulkBuyerId)
-                  if (!buyer) return
-                  try {
-                    await bulkAssignPurchasePlanningBuyer(
-                      selectedRows.map((r) => r.id),
-                      buyer.id,
-                      buyer.name,
-                    )
-                    notify.success(`Buyer assigned to ${selectedRows.length} row(s)`)
-                    setBulkBuyerOpen(false)
-                    setRowSelection({})
-                    await load()
-                  } catch (err) {
-                    notify.error(
-                      err instanceof PurchaseServiceError ? err.message : 'Bulk assign failed',
-                    )
-                  }
-                })()
-              }
-            >
-              Assign
-            </ErpButton>
-          </ErpButtonGroup>
-        }
-      >
-        <Select value={bulkBuyerId} onChange={(e) => setBulkBuyerId(e.target.value)}>
-          {buyers.length === 0 ? (
-            <option value="">No buyers on sheet yet</option>
-          ) : (
-            buyers.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))
-          )}
-        </Select>
-      </Modal>
 
       <Modal
         open={bulkVendorOpen}

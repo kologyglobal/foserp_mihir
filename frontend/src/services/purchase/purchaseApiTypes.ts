@@ -103,8 +103,12 @@ export interface ApiPurchaseRequisitionLine {
   itemId: string | null
   itemCode: string
   itemName: string
+  /** Item Master engineering product type (from linked item). */
+  productType?: string | null
   description: string | null
   requiredQuantity: number
+  orderedQuantity?: number
+  remainingQuantity?: number
   uomId: string | null
   estimatedRate: number
   estimatedAmount: number
@@ -123,9 +127,11 @@ export interface ApiPurchaseRequisitionLine {
 export interface ApiPurchaseRequisition {
   id: string
   requisitionNumber: string
+  revisionNo?: number
   requisitionDate: string
   departmentId: string | null
   requestedById: string | null
+  requestedByName?: string | null
   warehouseId: string | null
   requiredDate: string | null
   priority: ApiPurchasePriority
@@ -212,6 +218,7 @@ export interface ApiPurchasePlanningRow {
   purchaseRequisitionNumber: string
   departmentId: string | null
   requestedById: string | null
+  requestedByName?: string | null
   itemId: string | null
   itemCode: string
   itemName: string
@@ -221,6 +228,9 @@ export interface ApiPurchasePlanningRow {
   currentStockQuantity: number
   openPurchaseOrderQuantity: number
   netPurchaseQuantity: number
+  allocatedQuantity?: number
+  orderedQuantity?: number
+  remainingQuantity?: number
   preferredVendorId: string | null
   selectedVendorId: string | null
   lastPurchaseVendorId: string | null
@@ -769,6 +779,9 @@ export interface ApiPurchaseInvoiceLine {
   description: string | null
   quantity: number
   uomCodeSnapshot: string | null
+  uomQuantitySnapshot?: number | null
+  uomConversionFactorSnapshot?: number | null
+  purchaseUomCodeSnapshot?: string | null
   rate: number
   amount: number
   taxRatePct: number

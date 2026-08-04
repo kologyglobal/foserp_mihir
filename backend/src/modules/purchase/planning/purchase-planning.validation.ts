@@ -122,6 +122,25 @@ export const recalculatePlanningSchema = z
 
 export const createPoFromPlanningSchema = z.object({
   rowIds: z.array(z.string().uuid()).min(1, 'Select at least one eligible Planning row.'),
+  orderQuantities: z.record(z.string().uuid(), z.number().positive()).optional(),
+  orderDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'orderDate must be YYYY-MM-DD')
+    .optional(),
+  deliveryWarehouseId: z.string().uuid().optional(),
+  deliveryAddress: z.string().trim().max(2000).optional(),
+  remarks: z.string().trim().max(2000).optional(),
+})
+
+export const splitPlanningRowSchema = z.object({
+  splits: z
+    .array(
+      z.object({
+        vendorId: z.string().uuid(),
+        allocatedQuantity: z.number().positive(),
+      }),
+    )
+    .min(2, 'Provide at least two vendor splits.'),
 })
 
 export type ListPlanningSheetQuery = z.infer<typeof listPlanningSheetQuerySchema>
@@ -131,3 +150,4 @@ export type BulkSelectVendorInput = z.infer<typeof bulkSelectVendorSchema>
 export type BulkStatusInput = z.infer<typeof bulkStatusSchema>
 export type RecalculatePlanningInput = z.infer<typeof recalculatePlanningSchema>
 export type CreatePoFromPlanningInput = z.infer<typeof createPoFromPlanningSchema>
+export type SplitPlanningRowInput = z.infer<typeof splitPlanningRowSchema>

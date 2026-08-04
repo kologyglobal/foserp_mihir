@@ -94,6 +94,27 @@ export const lifecycleRemarksSchema = z
   })
   .default({})
 
+export const revisePurchaseRequisitionLineSchema = z.object({
+  id: z.string().uuid(),
+  requiredQuantity: z.number().positive().optional(),
+  estimatedRate: z.number().nonnegative().optional(),
+  requiredDate: optionalDate,
+  preferredVendorId: optionalUuid,
+  remarks: z.string().trim().optional().nullable(),
+})
+
+export const revisePurchaseRequisitionSchema = z.object({
+  reason: z.string().trim().min(1),
+  requiredDate: optionalDate,
+  priority: z.preprocess(
+    (v) => (typeof v === 'string' ? v.toUpperCase() : v),
+    z.enum(PURCHASE_PRIORITIES).optional(),
+  ),
+  purchasePurpose: z.string().trim().optional().nullable(),
+  remarks: z.string().trim().optional().nullable(),
+  lines: z.array(revisePurchaseRequisitionLineSchema).optional(),
+})
+
 export type ListPurchaseRequisitionsQuery = z.infer<typeof listPurchaseRequisitionsQuerySchema>
 export type CreatePurchaseRequisitionInput = z.infer<typeof createPurchaseRequisitionSchema>
 export type UpdatePurchaseRequisitionInput = z.infer<typeof updatePurchaseRequisitionSchema>
@@ -101,3 +122,4 @@ export type PurchaseRequisitionLineInput = z.infer<typeof purchaseRequisitionLin
 export type RejectPurchaseRequisitionInput = z.infer<typeof rejectPurchaseRequisitionSchema>
 export type SendBackPurchaseRequisitionInput = z.infer<typeof sendBackPurchaseRequisitionSchema>
 export type LifecycleRemarksInput = z.infer<typeof lifecycleRemarksSchema>
+export type RevisePurchaseRequisitionInput = z.infer<typeof revisePurchaseRequisitionSchema>

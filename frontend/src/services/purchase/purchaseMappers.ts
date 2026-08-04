@@ -3,6 +3,12 @@ import { mapPurchaseErrorMessage, isTechnicalPurchaseMessage } from '../../utils
 import { getStoredSession } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
 import { resolveUomCode } from '../../utils/purchaseLineUom'
+import {
+  mapEngineeringProductTypeToPurchaseCategory,
+  normalizeEngineeringProductType,
+} from '../../utils/purchaseProductType'
+import { prDepartmentLabel } from '../../utils/purchaseRequisitionValidation'
+import type { EngineeringProductType } from '../../types/taxMaster'
 import type {
   ApiPurchaseOrder,
   ApiPurchasePlanningRow,
@@ -33,6 +39,7 @@ import type {
   PurchaseRequisitionInput,
   PurchaseRequisitionLine,
   PurchaseRequisitionListRow,
+  PurchaseItemCategory,
   PurchaseRequisitionPriority,
   PurchaseRequisitionStatus,
   QuotationComparison,
@@ -239,7 +246,12 @@ function emptyMoney() {
   }
 }
 
-function resolveRequesterDisplayName(requestedById: string | null | undefined): string {
+function resolveRequesterDisplayName(
+  requestedById: string | null | undefined,
+  requestedByName?: string | null,
+): string {
+  const fromApi = (requestedByName ?? '').trim()
+  if (fromApi) return fromApi
   const id = (requestedById ?? '').trim()
   if (!id) return ''
   const session = getStoredSession()
@@ -301,7 +313,51 @@ function resolveUomId(line: { uomId?: string | null; uom?: string | null }): str
   return match?.id ?? null
 }
 
+function resolveProductTypeFromMasterItem(
+  itemId: string | null | undefined,
+): EngineeringProductType | '' {
+  const id = (itemId ?? '').trim()
+  if (!id) return ''
+  const item = useMasterStore.getState().items.find((i) => i.id === id)
+  if (!item) return ''
+  return (
+    normalizeEngineeringProductType(item.productType) ||
+    (item.itemType === 'raw' ? 'raw_material' : '') ||
+    (item.itemType === 'bought_out' ? 'boi' : '') ||
+    (item.itemType === 'sub_assembly' ? 'sub_assembly' : '') ||
+    (item.itemType === 'finished_good' ? 'finish_product' : '') ||
+    (item.itemType === 'service' ? 'service' : '') ||
+    (item.itemType === 'scrap' ? 'scrap' : '')
+  )
+}
+
+function resolvePrLineProductTypeAndCategory(line: ApiPurchaseRequisitionLine): {
+  productType: EngineeringProductType | ''
+  category: PurchaseItemCategory
+} {
+  const fromApi =
+    normalizeEngineeringProductType(line.productType) ||
+    resolveProductTypeFromMasterItem(line.itemId)
+  if (fromApi) {
+    return {
+      productType: fromApi,
+      category: mapEngineeringProductTypeToPurchaseCategory(fromApi) || 'raw_material',
+    }
+  }
+  return { productType: '', category: 'raw_material' }
+}
+
 export function mapApiLineToDomain(line: ApiPurchaseRequisitionLine): PurchaseRequisitionLine {
+  const { productType, category } = resolvePrLineProductTypeAndCategory(line)
+  const uomCode =
+    resolveUomCode(line.uomId ?? null, '') ||
+    (() => {
+      const item = useMasterStore.getState().items.find((i) => i.id === line.itemId)
+      if (!item?.baseUomId) return 'NOS'
+      return (
+        useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomCode ?? 'NOS'
+      )
+    })()
   return {
     id: line.id,
     lineNo: line.lineNumber,
@@ -310,12 +366,18 @@ export function mapApiLineToDomain(line: ApiPurchaseRequisitionLine): PurchaseRe
     itemCode: line.itemCode ?? '',
     itemName: line.itemName ?? '',
     specification: line.description ?? '',
-    category: 'consumable',
+    category,
+    productType,
     uomId: line.uomId ?? null,
-    uom: 'NOS',
+    uom: uomCode,
     hsnCode: '',
     sacCode: null,
     quantity: Number(line.requiredQuantity ?? 0),
+    orderedQuantity: Number(line.orderedQuantity ?? 0),
+    remainingQuantity: Number(
+      line.remainingQuantity ??
+        Math.max(0, Number(line.requiredQuantity ?? 0) - Number(line.orderedQuantity ?? 0)),
+    ),
     estimatedRate: Number(line.estimatedRate ?? 0),
     amount: Number(line.estimatedAmount ?? 0),
     currentStock: 0,
@@ -349,14 +411,15 @@ export function mapApiRequisitionToDomain(dto: ApiPurchaseRequisition): Purchase
   return {
     id: dto.id,
     documentNumber: dto.requisitionNumber,
+    revisionNo: Number(dto.revisionNo ?? 0),
     documentDate: dto.requisitionDate,
     status: mapPrStatus(dto.status),
     location: resolveWarehouseFromMaster(dto.warehouseId),
-    department: dto.departmentId ?? '',
+    department: prDepartmentLabel(dto.departmentId ?? ''),
     requester: {
       id: dto.requestedById ?? '',
       code: '',
-      name: resolveRequesterDisplayName(dto.requestedById),
+      name: resolveRequesterDisplayName(dto.requestedById, dto.requestedByName),
     },
     approver: null,
     expectedDeliveryDate: dto.requiredDate,
@@ -500,9 +563,9 @@ export function mapApiPlanningRowToDomain(row: ApiPurchasePlanningRow): Purchase
     purchaseRequisitionId: row.purchaseRequisitionId,
     purchaseRequisitionNumber: row.purchaseRequisitionNumber,
     purchaseRequisitionLineId: row.purchaseRequisitionLineId,
-    department: row.departmentId ?? '',
+    department: prDepartmentLabel(row.departmentId ?? ''),
     requestedById: row.requestedById ?? '',
-    requestedByName: resolveRequesterDisplayName(row.requestedById),
+    requestedByName: resolveRequesterDisplayName(row.requestedById, row.requestedByName),
     itemId: row.itemId ?? '',
     itemCode: row.itemCode ?? '',
     itemName: row.itemName ?? '',
@@ -514,6 +577,16 @@ export function mapApiPlanningRowToDomain(row: ApiPurchasePlanningRow): Purchase
     currentStock: Number(row.currentStockQuantity ?? 0),
     openPoQuantity: Number(row.openPurchaseOrderQuantity ?? 0),
     netPurchaseQuantity: Number(row.netPurchaseQuantity ?? 0),
+    allocatedQuantity: Number(row.allocatedQuantity ?? row.netPurchaseQuantity ?? 0),
+    orderedQuantity: Number(row.orderedQuantity ?? 0),
+    remainingQuantity: Number(
+      row.remainingQuantity ??
+        Math.max(
+          0,
+          Number(row.allocatedQuantity ?? row.netPurchaseQuantity ?? 0) -
+            Number(row.orderedQuantity ?? 0),
+        ),
+    ),
     preferredVendorId: selectedVendorId,
     preferredVendorName: selectedVendor.name,
     preferredVendorCode: selectedVendor.code,
@@ -1368,10 +1441,35 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
   }
 }
 
+/** Received % uses primary (stock) UOM — not vendor UOM (`receivedQty`). */
+export function computePurchaseOrderReceivedPercentage(
+  lines: Array<
+    Pick<
+      PurchaseOrderLine,
+      'quantity' | 'uomQuantity' | 'receivedQty' | 'receivedQtyBase' | 'uomConversionFactor'
+    >
+  >,
+): number {
+  let ordered = 0
+  let received = 0
+  for (const line of lines) {
+    const orderBase = Number(line.quantity) || 0
+    if (orderBase <= 0) continue
+    ordered += orderBase
+    if (line.receivedQtyBase != null) {
+      received += Number(line.receivedQtyBase) || 0
+      continue
+    }
+    const recv = Number(line.receivedQty) || 0
+    const factor = Number(line.uomConversionFactor) || 1
+    const uomQty = Number(line.uomQuantity) || orderBase
+    received += uomQty !== orderBase && factor > 0 ? recv / factor : recv
+  }
+  return ordered > 0 ? Math.round((received / ordered) * 100) : 0
+}
+
 export function mapApiPurchaseOrderToListRow(api: ApiPurchaseOrder): PurchaseOrderListRow {
   const domain = mapApiPurchaseOrderToDomain(api)
-  const ordered = domain.lines.reduce((s, l) => s + l.quantity, 0)
-  const received = domain.lines.reduce((s, l) => s + l.receivedQty, 0)
   return {
     id: domain.id,
     documentNumber: domain.documentNumber,
@@ -1379,13 +1477,13 @@ export function mapApiPurchaseOrderToListRow(api: ApiPurchaseOrder): PurchaseOrd
     vendorName: domain.vendor.name,
     vendorGstin: domain.vendor.gstin,
     locationName: domain.purchaseLocation.name || domain.deliveryLocation.name || '—',
-    buyerName: domain.buyer.name || '—',
+    createdByName: domain.createdBy || '—',
     currency: domain.currency,
     expectedDeliveryDate: domain.expectedDeliveryDate,
     basicAmount: domain.subtotal,
     taxAmount: Number(api.taxAmount) || 0,
     totalAmount: domain.totalAmount,
-    receivedPercentage: ordered > 0 ? Math.round((received / ordered) * 100) : 0,
+    receivedPercentage: computePurchaseOrderReceivedPercentage(domain.lines),
     invoiceStatus: domain.invoiceStatus,
     invoiceStatusLabel: PURCHASE_ORDER_INVOICE_STATUS_LABELS[domain.invoiceStatus],
     approvalStatus: domain.approvalStatus,
@@ -1759,6 +1857,9 @@ export function mapApiPurchaseInvoiceToDomain(api: ApiPurchaseInvoice): Purchase
         itemName: l.itemNameSnapshot || '',
         description: l.description || l.itemNameSnapshot || '',
         uom: l.uomCodeSnapshot || '',
+        uomQuantity: l.uomQuantitySnapshot ?? null,
+        uomConversionFactor: l.uomConversionFactorSnapshot ?? null,
+        purchaseUom: l.purchaseUomCodeSnapshot ?? null,
         hsnCode: '',
         sacCode: null,
         quantity: Number(l.quantity) || 0,

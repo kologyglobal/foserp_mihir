@@ -189,6 +189,7 @@ export async function getIncomingQueue(tenantId: string): Promise<{
   }
 
   const qiGrnIds = [...new Set(qis.map((q) => q.goodsReceiptId).filter(Boolean))] as string[]
+  const qiGrnIdSet = new Set(qiGrnIds)
   let qiGrnById = new Map<string, { id: string; grnNumber: string; vendorNameSnapshot: string }>()
   if (qiGrnIds.length) {
     try {
@@ -203,7 +204,9 @@ export async function getIncomingQueue(tenantId: string): Promise<{
   }
 
   const items: IncomingQueueRow[] = [
-    ...grns.map((g) => ({
+    ...grns
+      .filter((g) => !qiGrnIdSet.has(g.id))
+      .map((g) => ({
       kind: 'GRN' as const,
       id: g.id,
       number: g.grnNumber,
@@ -235,7 +238,7 @@ export async function getIncomingQueue(tenantId: string): Promise<{
       'Incoming QC uses Purchase GRN (QC_PENDING) and purchase quality inspections. Open a row to inspect or release stock.',
     items,
     counts: {
-      grnPending: grns.length,
+      grnPending: grns.filter((g) => !qiGrnIdSet.has(g.id)).length,
       purchaseQiPending: qis.length,
       total: items.length,
     },

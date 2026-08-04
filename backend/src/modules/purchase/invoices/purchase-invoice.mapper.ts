@@ -39,6 +39,9 @@ export function mapPurchaseInvoice(
     lines: invoice.lines.map((line) => ({
       ...line,
       quantity: invoiceQty(line.quantity),
+      uomQuantitySnapshot: line.uomQuantitySnapshot != null ? invoiceQty(line.uomQuantitySnapshot) : null,
+      uomConversionFactorSnapshot:
+        line.uomConversionFactorSnapshot != null ? invoiceQty(line.uomConversionFactorSnapshot) : null,
       rate: invoiceQty(line.rate),
       amount: invoiceQty(line.amount),
       taxRatePct: invoiceQty(line.taxRatePct),

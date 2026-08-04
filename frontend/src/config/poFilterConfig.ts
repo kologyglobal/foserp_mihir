@@ -119,9 +119,9 @@ export function buildPoFilterFields(input: {
     {
       type: 'search-select',
       key: 'buyerName',
-      label: 'Buyer',
+      label: 'Created By',
       options: input.buyerOptions.map((b) => ({ value: b, label: b })),
-      placeholder: 'Search buyer…',
+      placeholder: 'Search creator…',
     },
     { type: 'section', label: 'Dates' },
     {
@@ -187,5 +187,6 @@ export function poFilterChipLabelResolver(key: string, value: string): string | 
   if (key === 'origin') {
     return PURCHASE_ORDER_ORIGIN_LABELS[value as PurchaseOrderOrigin] ?? value
   }
+  if (key === 'buyerName') return `Created By: ${value}`
   return undefined
 }

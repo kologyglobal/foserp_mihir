@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, useEffect, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { z } from 'zod'
@@ -44,6 +44,10 @@ export function ReceivingToleranceListPage() {
   const deactivateRecord = useMasterStore((s) => s.deactivateReceivingTolerance)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
+
+  useEffect(() => {
+    void import('../../../services/bridges/masterBatchApiBridge').then((m) => m.syncBatchMastersFromApi())
+  }, [])
 
   const filtered = useMemo(
     () =>

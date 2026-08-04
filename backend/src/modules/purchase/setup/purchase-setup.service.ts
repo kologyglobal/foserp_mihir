@@ -416,6 +416,27 @@ function mergeScalarData(
         (g as { requireApprovalOnPo?: boolean } | undefined)?.requireApprovalOnPo ??
         (defaults as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ??
         true,
+      requirePoReleaseWorkflow:
+        (g as { requirePoReleaseWorkflow?: boolean } | undefined)?.requirePoReleaseWorkflow ??
+        (defaults as { requirePoReleaseWorkflow?: boolean }).requirePoReleaseWorkflow ??
+        true,
+      requireApprovalOnPrRevision:
+        (g as { requireApprovalOnPrRevision?: boolean } | undefined)?.requireApprovalOnPrRevision ??
+        (defaults as { requireApprovalOnPrRevision?: boolean }).requireApprovalOnPrRevision ??
+        true,
+      allowBackdatedPo:
+        (g as { allowBackdatedPo?: boolean } | undefined)?.allowBackdatedPo ??
+        (defaults as { allowBackdatedPo?: boolean }).allowBackdatedPo ??
+        false,
+      backdatedPoDaysLimit:
+        g?.backdatedPoDaysLimit ??
+        (defaults as { backdatedPoDaysLimit?: number }).backdatedPoDaysLimit ??
+        0,
+      requireApprovalForBackdatedPo:
+        (g as { requireApprovalForBackdatedPo?: boolean } | undefined)
+          ?.requireApprovalForBackdatedPo ??
+        (defaults as { requireApprovalForBackdatedPo?: boolean }).requireApprovalForBackdatedPo ??
+        true,
       allowShortClose: g?.allowShortClose ?? defaults.allowShortClose,
       requireVendorChallan: recv?.requireVendorChallan ?? defaults.requireVendorChallan,
       requireVehicleNumber: recv?.requireVehicleNumber ?? defaults.requireVehicleNumber,
@@ -496,6 +517,18 @@ function mergeScalarData(
       set('requireApprovalOnPoRevision', g.requireApprovalOnPoRevision)
     if ((g as { requireApprovalOnPo?: boolean }).requireApprovalOnPo !== undefined)
       set('requireApprovalOnPo', (g as { requireApprovalOnPo: boolean }).requireApprovalOnPo)
+    if ((g as { requirePoReleaseWorkflow?: boolean }).requirePoReleaseWorkflow !== undefined)
+      set('requirePoReleaseWorkflow', (g as { requirePoReleaseWorkflow: boolean }).requirePoReleaseWorkflow)
+    if ((g as { requireApprovalOnPrRevision?: boolean }).requireApprovalOnPrRevision !== undefined)
+      set('requireApprovalOnPrRevision', (g as { requireApprovalOnPrRevision: boolean }).requireApprovalOnPrRevision)
+    if ((g as { allowBackdatedPo?: boolean }).allowBackdatedPo !== undefined)
+      set('allowBackdatedPo', (g as { allowBackdatedPo: boolean }).allowBackdatedPo)
+    if (g.backdatedPoDaysLimit !== undefined) set('backdatedPoDaysLimit', g.backdatedPoDaysLimit)
+    if ((g as { requireApprovalForBackdatedPo?: boolean }).requireApprovalForBackdatedPo !== undefined)
+      set(
+        'requireApprovalForBackdatedPo',
+        (g as { requireApprovalForBackdatedPo: boolean }).requireApprovalForBackdatedPo,
+      )
     if (g.allowShortClose !== undefined) set('allowShortClose', g.allowShortClose)
     if (g.requirePoWarehouse !== undefined) set('requirePoWarehouse', g.requirePoWarehouse)
     if (g.requireExpectedDeliveryDate !== undefined)

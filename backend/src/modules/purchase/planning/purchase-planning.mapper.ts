@@ -29,6 +29,13 @@ export function mapPlanningRowToDto(row: PurchasePlanningRow) {
     currentStockQuantity: decimalToNumber(row.currentStockQuantity),
     openPurchaseOrderQuantity: decimalToNumber(row.openPurchaseOrderQuantity),
     netPurchaseQuantity: decimalToNumber(row.netPurchaseQuantity),
+    allocatedQuantity: decimalToNumber(row.allocatedQuantity) || decimalToNumber(row.netPurchaseQuantity),
+    orderedQuantity: decimalToNumber(row.orderedQuantity),
+    remainingQuantity: Math.max(
+      0,
+      (decimalToNumber(row.allocatedQuantity) || decimalToNumber(row.netPurchaseQuantity)) -
+        decimalToNumber(row.orderedQuantity),
+    ),
     preferredVendorId: row.preferredVendorId,
     selectedVendorId: row.selectedVendorId,
     lastPurchaseVendorId: row.lastPurchaseVendorId,
