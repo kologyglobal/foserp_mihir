@@ -86,11 +86,11 @@ export function ItemLedgerPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title="Item Ledger"
         description="Read-only item transaction history."
         breadcrumbs={[
-          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Store', to: '/inventory' },
           { label: 'Item Ledger' },
         ]}
         autoBreadcrumbs={false}
@@ -104,11 +104,11 @@ export function ItemLedgerPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={itemCode ? `${itemCode} — Item Ledger` : 'Item Ledger'}
       description={itemName || 'Read-only transaction history with document drill-down.'}
       breadcrumbs={[
-        { label: 'Inventory & Warehouse', to: '/inventory' },
+        { label: 'Store', to: '/inventory' },
         { label: 'Stock', to: '/inventory/stock' },
         { label: itemCode || 'Ledger' },
       ]}

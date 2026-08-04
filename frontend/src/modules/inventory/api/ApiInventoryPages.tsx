@@ -87,7 +87,7 @@ function refLabel(ref: { code: string; name: string } | undefined, id: string): 
 function AccessDenied({ title }: { title: string }) {
   return (
     <div className="erp-page">
-      <PageHeader title={title} breadcrumbs={[{ label: 'Inventory', to: '/inventory/stock' }]} />
+      <PageHeader title={title} breadcrumbs={[{ label: 'Store', to: '/inventory/stock' }]} />
       <EmptyState icon={Lock} title="Access denied" description="You do not hold the required inventory permission." />
     </div>
   )
@@ -163,7 +163,7 @@ export function ApiStockBalancesPage() {
       <PageHeader
         title="Stock on Hand"
         description="How much you have right now — on hand, reserved, and free to issue."
-        breadcrumbs={[{ label: 'Inventory' }, { label: 'Stock' }]}
+        breadcrumbs={[{ label: 'Store' }, { label: 'Stock' }]}
         actions={(
           <Button size="sm" variant="secondary" onClick={() => void load()}>
             <RefreshCw className="h-4 w-4" /> Refresh
@@ -316,7 +316,7 @@ export function ApiStockLedgerPage() {
       <PageHeader
         title="Stock Ledger"
         description="Live signed stock movements — opening, inward, issues and adjustments with running balance."
-        breadcrumbs={[{ label: 'Inventory' }, { label: 'Stock Ledger' }]}
+        breadcrumbs={[{ label: 'Store' }, { label: 'Stock Ledger' }]}
         actions={(
           <Button size="sm" variant="secondary" onClick={() => void load()}>
             <RefreshCw className="h-4 w-4" /> Refresh
@@ -534,7 +534,7 @@ export function ApiReservationsPage() {
       <PageHeader
         title="Stock Reservations"
         description="Live reservations against sales orders, work orders and dispatches. Fulfilment happens via issue / dispatch posting."
-        breadcrumbs={[{ label: 'Inventory' }, { label: 'Reservations' }]}
+        breadcrumbs={[{ label: 'Store' }, { label: 'Reservations' }]}
         actions={(
           <div className="flex gap-2">
             {perms.canManageReservations && (
@@ -828,7 +828,7 @@ export function ApiMovementPostPage({ kind }: { kind: MovementKind }) {
       <PageHeader
         title={cfg.title}
         description={cfg.description}
-        breadcrumbs={[{ label: 'Inventory' }, { label: cfg.title }]}
+        breadcrumbs={[{ label: 'Store' }, { label: cfg.title }]}
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -1106,7 +1106,7 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
               ? 'Physical stock count — create, count, approve variance, then post.'
               : 'Correct on-hand quantity — create, approve if needed, then post.'
         }
-        breadcrumbs={[{ label: 'Inventory', to: '/inventory/stock' }, { label: cfg.title }]}
+        breadcrumbs={[{ label: 'Store', to: '/inventory/stock' }, { label: cfg.title }]}
         actions={(
           <div className="flex gap-2">
             {cfg.canCreate ? (

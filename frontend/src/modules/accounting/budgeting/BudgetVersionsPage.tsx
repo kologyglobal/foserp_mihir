@@ -14,6 +14,7 @@ import { BUDGET_VERSION_KIND_LABELS, BUDGET_VERSION_STATUS_LABELS } from '@/type
 import { useBudgetingPermissions } from '@/utils/permissions/budgeting'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
+import { systemPrompt } from '@/utils/systemConfirm'
 import { cn } from '@/utils/cn'
 
 function StatusBadge({ status, isPrimary }: { status: BudgetVersionStatus; isPrimary?: boolean }) {
@@ -62,12 +63,21 @@ export function BudgetVersionsPage() {
     if (!perms.canCreate) return
     setCreating(true)
     try {
-      const name = window.prompt('New budget version name', 'Revised Budget Q2')
+      const name = await systemPrompt({
+        title: 'New budget version name',
+        defaultValue: 'Revised Budget Q2',
+        required: true,
+        confirmLabel: 'Continue',
+      })
       if (!name?.trim()) return
-      const kind = (window.prompt(
-        'Kind: original | revised | forecast_1 | forecast_2 | best_case | expected_case | worst_case',
-        'revised',
-      ) ?? 'revised') as BudgetVersionKind
+      const kindRaw = await systemPrompt({
+        title: 'Budget version kind',
+        description: 'original | revised | forecast_1 | forecast_2 | best_case | expected_case | worst_case',
+        defaultValue: 'revised',
+        required: true,
+        confirmLabel: 'Create',
+      })
+      const kind = (kindRaw?.trim() || 'revised') as BudgetVersionKind
       await createBudgetVersion({
         name: name.trim(),
         kind,

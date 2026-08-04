@@ -37,6 +37,7 @@ import { defaultFormatSegments, previewFormat } from '../../../utils/codeSeriesF
 import { previewNextCode, validateUniqueActiveEntity, adminResetSeries } from '../../../services/codeSeriesService'
 import { canCodeSeriesPermission, CODE_SERIES_PERMISSION_LABELS } from '../../../utils/codeSeriesPermissions'
 import { getSessionUser } from '../../../utils/permissions'
+import { systemPrompt } from '../../../utils/systemConfirm'
 import { EnterpriseMasterWorkspace, MasterForm, MasterStickyFooter } from '../shared/EnterpriseMasterShell'
 import { notify } from '../../../store/toastStore'
 
@@ -427,8 +428,17 @@ export function CodeSeriesFormPage() {
                   type="button"
                   className="inline-flex items-center gap-1 rounded-md border border-erp-border px-3 py-2 text-sm text-erp-primary hover:bg-erp-surface-alt"
                   onClick={() => {
-                    const reason = window.prompt('Reset reason (required):')
-                    if (reason && id) adminResetSeries(id, reason)
+                    void (async () => {
+                      const reason = await systemPrompt({
+                        title: 'Reset series counter',
+                        description: 'Reset reason is required for the audit trail.',
+                        fieldLabel: 'Reason',
+                        required: true,
+                        confirmLabel: 'Reset counter',
+                        variant: 'danger',
+                      })
+                      if (reason && id) adminResetSeries(id, reason)
+                    })()
                   }}
                 >
                   <RefreshCw className="h-4 w-4" /> Reset series counter

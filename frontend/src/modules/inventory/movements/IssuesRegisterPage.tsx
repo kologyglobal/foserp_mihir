@@ -63,17 +63,17 @@ export function IssuesRegisterPage() {
   ], [navigate, perms])
 
   if (!perms.canViewIssues) {
-    return <OperationalPageShell variant="dynamics" layout="enterprise" badge="Inventory" title="Issues" breadcrumbs={[{ label: 'Inventory', to: '/inventory' }, { label: 'Issues' }]} autoBreadcrumbs={false}><EmptyState icon={ArrowUpFromLine} title="Access denied" /></OperationalPageShell>
+    return <OperationalPageShell variant="dynamics" layout="enterprise" badge="Store" title="Issues" breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Issues' }]} autoBreadcrumbs={false}><EmptyState icon={ArrowUpFromLine} title="Access denied" /></OperationalPageShell>
   }
 
   return (
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Material Issues Register"
       description="Issues to production, sales, maintenance and transfers."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Issues' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Issues' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/movements/issues"
       commandBar={<ErpCommandBar inline sticky={false} primaryAction={perms.canCreateIssue ? { id: 'new', label: 'Quick Issue', icon: Plus, onClick: () => navigate('/inventory/movements/issues/new') } : undefined} secondaryActions={[{ id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => setRefreshToken((n) => n + 1) }]} />}

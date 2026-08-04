@@ -28,6 +28,7 @@ export function canAccessAdminShell(): boolean {
     || canAdminPermission('role.view')
     || canAdminPermission('tenant.view')
     || canAdminPermission('module.view')
+    || canAdminPermission('platform.document_governance.view')
     || isSuperAdminUser()
   )
 }
@@ -43,6 +44,9 @@ export function canViewAdminNavItem(path: string): boolean {
   }
   if (path === '/admin/roles' || path.startsWith('/admin/roles/')) {
     return canAdminPermission('role.view')
+  }
+  if (path.startsWith('/admin/document-governance')) {
+    return canAdminPermission('platform.document_governance.view')
   }
   // Overview, Organization, Tenant Profile — any admin-shell access
   return true

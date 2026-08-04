@@ -33,7 +33,7 @@ export const SIDEBAR_ICON_MENU: {
   { categoryId: 'quality', label: 'Quality', icon: ShieldCheck },
   { categoryId: 'maintenance', label: 'Maintenance', icon: Wrench },
   { categoryId: 'hrms', label: 'HRMS', icon: Users },
-  { categoryId: 'inventory', label: 'Inventory & Warehouse', icon: Warehouse },
+  { categoryId: 'inventory', label: 'Store', icon: Warehouse },
   { categoryId: 'dispatch', label: 'Logistics', icon: Box },
   { categoryId: 'gate', label: 'Gate & Security', icon: HardHat },
   // { categoryId: 'engineering', label: 'Eng', icon: GitBranch },

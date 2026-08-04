@@ -1,0 +1,436 @@
+/**
+ * Store / Inventory module — Zoho Books–style dense professional chrome.
+ * Scoped under:
+ *   `.store-zoho-register` — lists, hubs, registers (OperationalPageShell)
+ *   `.enterprise-workspace--store` — card forms (ErpCardFormPage on /inventory)
+ * Flat white surfaces, left-accent sections, tight grids — no purple/glow.
+ */
+
+.store-zoho-register,
+.enterprise-workspace--store {
+  --store-zoho-radius: 8px;
+  --store-zoho-gap: 10px;
+  --store-zoho-header-bg: color-mix(in srgb, var(--erp-primary, #0078d4) 4.5%, #fff);
+  --store-zoho-soft: var(--erp-surface-alt, #f8fafc);
+  --store-zoho-line: var(--erp-border, #e2e8f0);
+  --store-zoho-ink: var(--erp-text, #0f172a);
+  --store-zoho-muted: var(--erp-muted, #64748b);
+}
+
+/* ── Register / hub pages ─────────────────────────────────────────────────── */
+
+.store-zoho-register .erp-page-content,
+.store-zoho-register.erp-page--enterprise .erp-page-content {
+  gap: var(--store-zoho-gap);
+}
+
+.store-zoho-register .ent-register-shell,
+.store-zoho-register .enterprise-register-table-shell,
+.store-zoho-register [class*='EnterpriseRegister'] {
+  border-radius: var(--store-zoho-radius);
+}
+
+.store-zoho-register .erp-data-grid,
+.store-zoho-register .enterprise-table-wrap,
+.store-zoho-register .ent-data-grid {
+  border: 1px solid var(--store-zoho-line);
+  border-radius: var(--store-zoho-radius);
+  background: #fff;
+  overflow: hidden;
+}
+
+.store-zoho-register .erp-data-grid thead th,
+.store-zoho-register .ent-data-grid thead th,
+.store-zoho-register table thead th {
+  background: var(--store-zoho-soft) !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--store-zoho-muted) !important;
+  border-bottom: 1px solid var(--store-zoho-line) !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+
+.store-zoho-register table tbody td {
+  font-size: 12.5px;
+  padding-top: 7px !important;
+  padding-bottom: 7px !important;
+  border-color: color-mix(in srgb, var(--store-zoho-line) 80%, #fff) !important;
+}
+
+.store-zoho-register tbody tr {
+  transition: background 0.1s ease;
+}
+
+.store-zoho-register tbody tr:hover,
+.store-zoho-register tbody tr:hover td {
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 3.5%, #fff) !important;
+}
+
+.store-zoho-register .ent-kpi-strip .ent-kpi-card,
+.store-zoho-register .ent-kpi-card {
+  border-radius: var(--store-zoho-radius) !important;
+  border: 1px solid var(--store-zoho-line) !important;
+  box-shadow: none !important;
+  background: #fff !important;
+}
+
+.store-zoho-register .crm-list-filter-bar,
+.store-zoho-register [class*='CrmListFilterBar'],
+.store-zoho-register .erp-register-filter-bar,
+.store-zoho-register .erp-page-hero-filter > * {
+  border: 1px solid var(--store-zoho-line);
+  border-radius: var(--store-zoho-radius);
+  background: #fff;
+}
+
+.store-zoho-register .dyn-dashboard-panel,
+.store-zoho-register [class*='DynamicsDashboardPanel'] {
+  border: 1px solid var(--store-zoho-line) !important;
+  border-radius: var(--store-zoho-radius) !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.store-zoho-register .dyn-dashboard-panel__header,
+.store-zoho-register [class*='DynamicsDashboardPanel'] header {
+  border-bottom: 1px solid var(--store-zoho-line);
+  background: var(--store-zoho-header-bg);
+  min-height: 40px;
+}
+
+.store-zoho-register .empty-state {
+  border-radius: var(--store-zoho-radius);
+  border: 1px dashed var(--erp-border, #d0d5dd);
+  background: #fafbfc;
+}
+
+.store-zoho-register .erp-btn--primary {
+  border-radius: 7px;
+  font-weight: 650;
+  box-shadow: none;
+}
+
+.store-zoho-register .erp-btn--secondary {
+  border-radius: 7px;
+  background: #fff;
+}
+
+/* Store home shortcuts bar */
+.store-zoho-register .inv-hub {
+  gap: var(--store-zoho-gap);
+}
+
+.store-zoho-register .inv-hub-shortcuts {
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--store-zoho-line);
+  border-radius: var(--store-zoho-radius);
+  background: #fff;
+  box-shadow: none;
+}
+
+.store-zoho-register .inv-hub-shortcut {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 7px;
+  border: 1px solid var(--store-zoho-line);
+  font-size: 12px;
+  font-weight: 650;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.store-zoho-register .inv-hub-shortcut:hover {
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 45%, var(--store-zoho-line));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 5%, #fff);
+  color: var(--erp-primary, #0078d4);
+}
+
+.store-zoho-register .inv-hub-shortcut--primary {
+  border-color: var(--erp-primary, #0078d4);
+  background: var(--erp-primary, #0078d4);
+  color: #fff;
+  box-shadow: none;
+}
+
+.store-zoho-register .inv-hub-shortcut--primary:hover {
+  border-color: #106ebe;
+  background: #106ebe;
+  color: #fff;
+}
+
+.store-zoho-register .inv-hub-meta {
+  font-size: 11.5px;
+  color: var(--store-zoho-muted);
+}
+
+.store-zoho-register .inv-hub-table thead th {
+  background: var(--store-zoho-soft) !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em;
+  color: var(--store-zoho-muted) !important;
+}
+
+.store-zoho-register .inv-hub-table tbody td {
+  font-size: 12.5px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.store-zoho-register .inv-hub-badge {
+  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+/* Tab rails / subnav on store pages */
+.store-zoho-register .dyn-tabs,
+.store-zoho-register [class*='DynamicsTabs'] {
+  border-radius: var(--store-zoho-radius);
+  border: 1px solid var(--store-zoho-line);
+  background: #fff;
+  padding: 4px;
+}
+
+/* Soft panels used by store hubs */
+.store-zoho-register .rounded-xl,
+.store-zoho-register .rounded-2xl {
+  border-radius: var(--store-zoho-radius) !important;
+}
+
+.store-zoho-register .shadow-sm,
+.store-zoho-register .shadow,
+.store-zoho-register .shadow-md {
+  box-shadow: none !important;
+}
+
+/* ── Card forms (receive/issue/transfer/count editors) ────────────────────── */
+
+.enterprise-workspace--store.erp-card-form-page .erp-page-content,
+.store-zoho-register.erp-card-form-page .erp-page-content {
+  gap: var(--store-zoho-gap);
+}
+
+.enterprise-workspace--store .erp-card-section,
+.store-zoho-register.erp-card-form-page .erp-card-section {
+  border: 1px solid var(--store-zoho-line) !important;
+  border-radius: var(--store-zoho-radius) !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.enterprise-workspace--store .erp-card-section__header,
+.store-zoho-register.erp-card-form-page .erp-card-section__header {
+  border-bottom: 1px solid var(--store-zoho-line);
+  background: var(--store-zoho-header-bg) !important;
+}
+
+.enterprise-workspace--store .erp-card-section__header-btn,
+.store-zoho-register.erp-card-form-page .erp-card-section__header-btn {
+  padding: 8px 12px !important;
+  border-left: 3px solid var(--erp-primary, #0078d4);
+  min-height: 0;
+}
+
+.enterprise-workspace--store .erp-card-section__title,
+.store-zoho-register.erp-card-form-page .erp-card-section__title {
+  font-size: 11px !important;
+  font-weight: 750 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  color: var(--store-zoho-ink) !important;
+}
+
+.enterprise-workspace--store .erp-card-section__body,
+.store-zoho-register.erp-card-form-page .erp-card-section__body {
+  padding: 12px !important;
+  background: #fff;
+}
+
+.enterprise-workspace--store .erp-card-section__grid,
+.store-zoho-register.erp-card-form-page .erp-card-section__grid {
+  gap: 8px 10px !important;
+}
+
+.enterprise-workspace--store .erp-field-row__label,
+.enterprise-workspace--store label.erp-label,
+.enterprise-workspace--store .form-field > label,
+.store-zoho-register.erp-card-form-page .erp-field-row__label,
+.store-zoho-register.erp-card-form-page label.erp-label {
+  font-size: 11px !important;
+  font-weight: 650 !important;
+  letter-spacing: 0.01em;
+  color: var(--store-zoho-muted) !important;
+}
+
+.enterprise-workspace--store input:not([type='checkbox']):not([type='radio']),
+.enterprise-workspace--store select,
+.enterprise-workspace--store textarea,
+.store-zoho-register.erp-card-form-page input:not([type='checkbox']):not([type='radio']),
+.store-zoho-register.erp-card-form-page select,
+.store-zoho-register.erp-card-form-page textarea {
+  border-radius: 6px !important;
+  border-color: var(--store-zoho-line) !important;
+  font-size: 12.5px !important;
+  min-height: 34px;
+}
+
+.enterprise-workspace--store input:not([type='checkbox']):not([type='radio']):focus,
+.enterprise-workspace--store select:focus,
+.enterprise-workspace--store textarea:focus,
+.store-zoho-register.erp-card-form-page input:not([type='checkbox']):not([type='radio']):focus,
+.store-zoho-register.erp-card-form-page select:focus,
+.store-zoho-register.erp-card-form-page textarea:focus {
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 55%, #fff) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--erp-primary, #0078d4) 16%, transparent) !important;
+}
+
+.enterprise-workspace--store table thead th,
+.store-zoho-register.erp-card-form-page table thead th {
+  background: var(--store-zoho-soft) !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--store-zoho-muted) !important;
+}
+
+.enterprise-workspace--store .erp-card-form-page__footer,
+.store-zoho-register.erp-card-form-page .erp-card-form-page__footer,
+.enterprise-workspace--store .erp-card-form-page__footer-sticky,
+.store-zoho-register.erp-card-form-page .erp-card-form-page__footer-sticky {
+  border-top: 1px solid var(--store-zoho-line) !important;
+  background: color-mix(in srgb, #fff 94%, var(--store-zoho-soft)) !important;
+  backdrop-filter: blur(6px);
+  padding: 10px 14px !important;
+  box-shadow: 0 -4px 16px color-mix(in srgb, #0f172a 4%, transparent);
+}
+
+.enterprise-workspace--store .erp-card-form-page__factbox,
+.enterprise-workspace--store .enterprise-business-factbox {
+  border: 1px solid var(--store-zoho-line) !important;
+  border-radius: var(--store-zoho-radius) !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+/* Dense plain field grids on transfer/return demos */
+.enterprise-workspace--store .grid.gap-6,
+.store-zoho-register.erp-card-form-page .grid.gap-6 {
+  gap: 12px !important;
+}
+
+.enterprise-workspace--store .space-y-4 > :not([hidden]) ~ :not([hidden]),
+.store-zoho-register.erp-card-form-page .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 10px !important;
+}
+
+.enterprise-workspace--store .rounded-lg.border,
+.store-zoho-register.erp-card-form-page .rounded-lg.border,
+.enterprise-workspace--store .rounded-xl.border,
+.store-zoho-register.erp-card-form-page .rounded-xl.border {
+  border-radius: var(--store-zoho-radius) !important;
+  border-color: var(--store-zoho-line) !important;
+  background: #fff;
+  box-shadow: none !important;
+}
+
+/* 360 / stock detail metrics */
+.store-zoho-register .dyn-form-metrics,
+.store-zoho-register [class*='form-metrics'] {
+  gap: 8px;
+}
+
+.store-zoho-register .dyn-form-metrics > *,
+.store-zoho-register [class*='metric-card'] {
+  border-radius: var(--store-zoho-radius);
+  border: 1px solid var(--store-zoho-line);
+  box-shadow: none;
+}
+
+/* Operation hub choice cards (Receive / Issue / Transfer pickers) */
+.store-zoho-register .store-op-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.store-zoho-register .store-op-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 14px;
+  text-align: left;
+  border: 1px solid var(--store-zoho-line);
+  border-radius: var(--store-zoho-radius);
+  background: #fff;
+  box-shadow: none;
+  transition: border-color 0.12s ease, background 0.12s ease;
+  cursor: pointer;
+}
+
+.store-zoho-register .store-op-choice:hover {
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 40%, var(--store-zoho-line));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 4%, #fff);
+}
+
+.store-zoho-register .store-op-choice__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--erp-primary, #0078d4) 18%, var(--store-zoho-line));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 6%, #fff);
+  color: var(--erp-primary, #0078d4);
+  flex-shrink: 0;
+}
+
+.store-zoho-register .store-op-choice__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--store-zoho-ink);
+  letter-spacing: -0.01em;
+}
+
+.store-zoho-register .store-op-choice__desc {
+  font-size: 12px;
+  color: var(--store-zoho-muted);
+  line-height: 1.4;
+}
+
+.store-zoho-register .store-op-choice__badge {
+  display: inline-flex;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--erp-primary, #0078d4) 22%, var(--store-zoho-line));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 8%, #fff);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--erp-primary, #0078d4);
+}
+
+/* Consolidated stock / dense grids */
+.store-zoho-register .inventory-consolidated-stock-table .ent-data-grid .erp-table thead th {
+  background: var(--store-zoho-soft) !important;
+}
+
+@media (max-width: 900px) {
+  .enterprise-workspace--store .erp-card-section__body,
+  .store-zoho-register.erp-card-form-page .erp-card-section__body {
+    padding: 10px !important;
+  }
+
+  .store-zoho-register .inv-hub-shortcuts {
+    padding: 8px;
+  }
+}

@@ -145,9 +145,9 @@ export function QuickReceiptPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={isEdit ? `Edit Receipt — ${existing?.documentNumber}` : 'Quick Receipt'}
-      breadcrumbs={[{ label: 'Inventory', to: '/inventory' }, { label: 'Receipts', to: '/inventory/movements/receipts' }, { label: isEdit ? 'Edit' : 'New' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Receipts', to: '/inventory/movements/receipts' }, { label: isEdit ? 'Edit' : 'New' }]}
       autoBreadcrumbs={false}
       commandBar={(
         <ErpCommandBar
@@ -229,9 +229,9 @@ export function ReceiptDetailPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={doc.documentNumber}
-      breadcrumbs={[{ label: 'Inventory', to: '/inventory' }, { label: 'Receipts', to: '/inventory/movements/receipts' }, { label: doc.documentNumber }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Receipts', to: '/inventory/movements/receipts' }, { label: doc.documentNumber }]}
       autoBreadcrumbs={false}
       commandBar={<ErpCommandBar inline sticky={false} secondaryActions={[
         ...(doc.status === 'draft' && perms.canEditReceipt ? [{ id: 'edit', label: 'Edit', onClick: () => navigate(`/inventory/movements/receipts/${id}/edit`) }] : []),

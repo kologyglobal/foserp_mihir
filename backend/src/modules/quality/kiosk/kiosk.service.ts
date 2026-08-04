@@ -9,8 +9,12 @@ export type KioskInspectionCard = {
   status: string
   title: string
   productionOrderId: string | null
+  productionOrderNumber: string | null
   stageId: string | null
+  stageName: string | null
   itemId: string | null
+  itemCode: string | null
+  itemName: string | null
   inspectedQty: string | null
   requestedAt: string
   planCode: string | null
@@ -56,8 +60,12 @@ export async function listQcKioskQueue(
       status: insp.status,
       title: insp.title,
       productionOrderId: insp.productionOrderId,
+      productionOrderNumber: insp.productionOrderNumber ?? null,
       stageId: insp.stageId,
+      stageName: insp.stageName ?? null,
       itemId: insp.itemId,
+      itemCode: insp.itemCode ?? null,
+      itemName: insp.itemName ?? null,
       inspectedQty: insp.inspectedQty ?? null,
       requestedAt: insp.requestedAt,
       planCode: insp.inspectionPlan?.planCode ?? null,

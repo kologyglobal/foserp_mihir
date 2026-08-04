@@ -33,6 +33,13 @@ export const PERMISSIONS = [
   'module.view',
   'module.manage',
 
+  /** Document Governance (config framework) — does not grant document date exception powers in modules until integrated. */
+  'platform.document_governance.view',
+  'platform.document_governance.manage',
+  'platform.document_governance.activate',
+  'platform.document_governance.approve',
+  'platform.document_governance.override',
+
   'role.view',
   'role.create',
   'role.update',

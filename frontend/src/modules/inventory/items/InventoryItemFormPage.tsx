@@ -191,10 +191,10 @@ export function InventoryItemFormPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title={isEdit ? 'Edit Item' : 'New Item'}
         breadcrumbs={[
-          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Store', to: '/inventory' },
           { label: 'Items', to: '/inventory/items' },
           { label: isEdit ? 'Edit' : 'New' },
         ]}
@@ -219,11 +219,11 @@ export function InventoryItemFormPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={isEdit ? 'Edit Item' : 'New Item'}
       description="Business Central–style item card. Expand sections as needed."
       breadcrumbs={[
-        { label: 'Inventory & Warehouse', to: '/inventory' },
+        { label: 'Store', to: '/inventory' },
         { label: 'Items', to: '/inventory/items' },
         { label: isEdit ? 'Edit' : 'New' },
       ]}

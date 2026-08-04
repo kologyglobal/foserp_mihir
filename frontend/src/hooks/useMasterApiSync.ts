@@ -20,9 +20,16 @@ export function useMasterApiSync() {
 
     async function sync() {
       try {
+        // Unblock the shell after core masters (uoms, warehouses, geography).
+        // Batch masters (items/vendors/HSN) continue in the background.
         await hydrateCoreMastersFromApi()
-        await hydrateBatchMastersFromApi()
         if (!cancelled) setStatus('ready')
+        void hydrateBatchMastersFromApi().catch((e) => {
+          if (cancelled) return
+          if (isPermissionDeniedError(e)) return
+          // Soft-fail batch: keep shell usable; items load on demand via APIs.
+          console.warn('[masters] batch hydrate deferred/failed:', formatApiError(e))
+        })
       } catch (e) {
         if (!cancelled) {
           if (isPermissionDeniedError(e)) {

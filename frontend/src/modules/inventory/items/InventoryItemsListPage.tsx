@@ -210,9 +210,9 @@ export function InventoryItemsListPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title="Items Register"
-        breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Items' }]}
+        breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Items' }]}
         autoBreadcrumbs={false}
       >
         <EmptyState
@@ -228,10 +228,10 @@ export function InventoryItemsListPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Items Register"
       description="Inventory-enriched item master with stock snapshot, tracking and costing."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Items' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Items' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/items"
       commandBar={(

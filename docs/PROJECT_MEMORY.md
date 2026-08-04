@@ -1,6 +1,6 @@
 # FOS ERP — Project Memory
 
-> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-08-04** (Store & Inventory Operations hub — FE over existing engines; ledger remains SoT). Prior **2026-07-31** (HRMS Phase 11 Exit & Full/Final Settlement in code — READY WITH CONDITIONS; Phases 1–10; Hostinger deploy remains human). Prior **2026-07-31**: Phase 10 Employee Loans & Salary Advances; Phase 9 Payslip/Payroll Accounting/Salary Payment; Phase 8 Statutory; Phase 7 Payroll. Prior **2026-07-30**: Phase 6 Salary Structures; Phase 5 OT. Prior **2026-07-29**: FIN-CLOSE-1 stop; MFG Fuel Tank golden path.
+> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-08-04** (Admin People & Access permission workspace — DENY wired into request-context + JWT, invite wizard, access-review buckets — **READY WITH CONDITIONS**). Prior: Document Governance Date Control configuration framework. Prior **2026-07-31** (HRMS Phase 11).
 
 ---
 

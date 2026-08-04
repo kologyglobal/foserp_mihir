@@ -507,5 +507,6 @@ export async function cancelInspection(req: Request, tenantId: string, id: strin
     return row
   })
 
-  return mapInspection(updated)
+  const fresh = await repo.getInspection(tenantId, id)
+  return mapInspection(fresh ?? updated)
 }

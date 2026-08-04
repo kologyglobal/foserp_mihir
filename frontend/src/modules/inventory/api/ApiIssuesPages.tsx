@@ -132,7 +132,7 @@ function refLabel(ref: { code: string; name: string } | undefined, id: string): 
 function AccessDenied({ title }: { title: string }) {
   return (
     <div className="erp-page">
-      <PageHeader title={title} breadcrumbs={[{ label: 'Inventory', to: '/inventory/stock' }]} />
+      <PageHeader title={title} breadcrumbs={[{ label: 'Store', to: '/inventory/stock' }]} />
       <EmptyState icon={Lock} title="Access denied" description="You do not hold the required inventory permission." />
     </div>
   )
@@ -863,12 +863,12 @@ export function ApiIssuesRegisterPage() {
   return (
     <OperationalPageShell
       title="Issue Stock"
-      badge="Inventory"
+      badge="Store"
       variant="dynamics"
       pageGuide={null}
       favoritePath="/inventory/movements/issues"
       breadcrumbs={[
-        { label: 'Inventory', to: '/inventory' },
+        { label: 'Store', to: '/inventory' },
         { label: 'Issue Stock' },
       ]}
       commandBar={commandBar}
@@ -1517,7 +1517,7 @@ export function ApiIssuePostPage() {
         title="New Issue"
         description="General stock issue, or issue multiple materials against a work order (partial or full)."
         breadcrumbs={[
-          { label: 'Inventory', to: '/inventory/stock' },
+          { label: 'Store', to: '/inventory/stock' },
           { label: 'Issues', to: '/inventory/movements/issues' },
           { label: 'New' },
         ]}
@@ -1966,7 +1966,7 @@ export function ApiIssueDetailPage() {
   if (loading) {
     return (
       <div className="erp-page">
-        <PageHeader title="Issue" breadcrumbs={[{ label: 'Inventory' }, { label: 'Issues', to: '/inventory/movements/issues' }]} />
+        <PageHeader title="Issue" breadcrumbs={[{ label: 'Store' }, { label: 'Issues', to: '/inventory/movements/issues' }]} />
         <LoadingState variant="table" />
       </div>
     )
@@ -1975,7 +1975,7 @@ export function ApiIssueDetailPage() {
   if (missing || !row) {
     return (
       <div className="erp-page">
-        <PageHeader title="Issue" breadcrumbs={[{ label: 'Inventory' }, { label: 'Issues', to: '/inventory/movements/issues' }]} />
+        <PageHeader title="Issue" breadcrumbs={[{ label: 'Store' }, { label: 'Issues', to: '/inventory/movements/issues' }]} />
         <EmptyState
           icon={ArrowUpFromLine}
           title="Issue not found"
@@ -1996,7 +1996,7 @@ export function ApiIssueDetailPage() {
         title={row.movementNumber}
         description={`Stock issue · ${row.referenceType} · ${formatDate(row.movementDate)}`}
         breadcrumbs={[
-          { label: 'Inventory', to: '/inventory/stock' },
+          { label: 'Store', to: '/inventory/stock' },
           { label: 'Issues', to: '/inventory/movements/issues' },
           { label: row.movementNumber },
         ]}

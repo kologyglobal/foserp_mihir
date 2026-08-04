@@ -143,10 +143,10 @@ export function InventorySetupPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Inventory Setup"
       description="Configure warehouses, tracking, quality, planning and approvals. Advanced features disabled by default."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Setup' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Setup' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/setup"
       commandBar={(

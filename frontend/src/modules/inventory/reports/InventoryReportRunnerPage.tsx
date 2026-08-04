@@ -119,7 +119,7 @@ export function InventoryReportRunnerPage() {
 
   if (!reportId || !entry) {
     return (
-      <OperationalPageShell title="Report not found" breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Reports', to: '/inventory/reports' }]}>
+      <OperationalPageShell title="Report not found" breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Reports', to: '/inventory/reports' }]}>
         <Link to="/inventory/reports" className="text-erp-primary underline">Back to reports</Link>
       </OperationalPageShell>
     )
@@ -138,11 +138,11 @@ export function InventoryReportRunnerPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={entry.title}
       description={entry.description}
       breadcrumbs={[
-        { label: 'Inventory & Warehouse', to: '/inventory' },
+        { label: 'Store', to: '/inventory' },
         { label: 'Reports', to: '/inventory/reports' },
         { label: entry.title },
       ]}

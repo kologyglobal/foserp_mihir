@@ -20,6 +20,7 @@ import { FY_MONTHS, sumMonths } from '@/types/budgeting'
 import { useBudgetingPermissions } from '@/utils/permissions/budgeting'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { notify } from '@/store/toastStore'
+import { systemPrompt } from '@/utils/systemConfirm'
 
 export function AnnualBudgetPage() {
   const perms = useBudgetingPermissions()
@@ -88,7 +89,12 @@ export function AnnualBudgetPage() {
     if (!perms.canEdit) return
     let growth = 0
     if (mode === 'growth') {
-      const raw = window.prompt('Growth % on previous year actual', '8')
+      const raw = await systemPrompt({
+        title: 'Growth % on previous year actual',
+        defaultValue: '8',
+        required: true,
+        confirmLabel: 'Allocate',
+      })
       if (raw == null) return
       growth = Number(raw) || 0
     }
@@ -103,7 +109,14 @@ export function AnnualBudgetPage() {
 
   const onImport = async () => {
     if (!perms.canEdit) return
-    const text = window.prompt('Paste CSV (header + rows) for preview parse', 'account,Apr,May\n4001,100,200')
+    const text = await systemPrompt({
+      title: 'Import annual budget CSV',
+      description: 'Paste CSV (header + rows) for preview parse.',
+      defaultValue: 'account,Apr,May\n4001,100,200',
+      fieldLabel: 'CSV content',
+      required: true,
+      confirmLabel: 'Parse preview',
+    })
     if (!text) return
     const res = await importAnnualPreview(text)
     if (res.ok) notify.success(res.message)

@@ -13,7 +13,20 @@ function dec(value: unknown): string | null {
 type InspectionWithExtras = ManufacturingQualityInspection & {
   parameterResults?: QualityInspectionParameterResult[]
   inspectionPlan?: Pick<QualityInspectionPlan, 'id' | 'planCode' | 'planName' | 'category' | 'status'> | null
+  productionOrder?: { id: string; orderNumber: string } | null
+  item?: { id: string; code: string; name: string } | null
+  stage?: { id: string; name: string } | null
+  operation?: { id: string; code: string; name: string; sequence: number } | null
 }
+
+export const inspectionDetailInclude = {
+  parameterResults: { orderBy: { sortOrder: 'asc' as const } },
+  inspectionPlan: { select: { id: true, planCode: true, planName: true, category: true, status: true } },
+  productionOrder: { select: { id: true, orderNumber: true } },
+  item: { select: { id: true, code: true, name: true } },
+  stage: { select: { id: true, name: true } },
+  operation: { select: { id: true, code: true, name: true, sequence: true } },
+} as const
 
 export function mapInspection(row: InspectionWithExtras) {
   return {
@@ -23,10 +36,17 @@ export function mapInspection(row: InspectionWithExtras) {
     status: row.status,
     decision: row.decision,
     productionOrderId: row.productionOrderId,
+    productionOrderNumber: row.productionOrder?.orderNumber ?? null,
     jobWorkOrderId: row.jobWorkOrderId,
     stageId: row.stageId,
+    stageName: row.stage?.name ?? null,
     operationId: row.operationId,
+    operationCode: row.operation?.code ?? null,
+    operationName: row.operation?.name ?? null,
+    operationSequence: row.operation?.sequence ?? null,
     itemId: row.itemId,
+    itemCode: row.item?.code ?? null,
+    itemName: row.item?.name ?? null,
     inspectionPlanId: row.inspectionPlanId,
     inspectionPlan: row.inspectionPlan
       ? {

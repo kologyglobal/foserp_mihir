@@ -189,14 +189,14 @@ export function InventoryPlanningPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Inventory Planning"
       description={
         live
           ? 'Reorder suggestions from live stock balances and item reorder levels. Open PO / production projections are not included yet.'
           : 'Simple replenishment suggestions — no advanced MRP. Projected Stock = Available + Expected Receipts − Reserved − Planned Consumption.'
       }
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Planning' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Planning' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/planning"
       commandBar={(

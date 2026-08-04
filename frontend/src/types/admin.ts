@@ -18,6 +18,8 @@ export interface AdminUser {
   department: string | null
   departmentId: string | null
   status: AdminUserStatus
+  /** OWN…ALL when API returns People & Access fields */
+  dataAccessLevel?: string
   emailVerified: boolean
   lastLoginAt: string | null
   createdBy: string | null
@@ -25,6 +27,10 @@ export interface AdminUser {
   createdAt: string
   updatedAt: string
   roles: AdminUserRoleRef[]
+  overrideCount?: number
+  activeSessionCount?: number
+  primaryBranchName?: string | null
+  sensitiveAccess?: boolean
 }
 
 export interface AdminDepartment {

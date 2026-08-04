@@ -30,6 +30,7 @@ export interface SafeUser {
   department: string | null
   departmentId: string | null
   status: string
+  dataAccessLevel?: string
   emailVerified: boolean
   lastLoginAt: Date | null
   createdBy: string | null
@@ -37,9 +38,22 @@ export interface SafeUser {
   createdAt: Date
   updatedAt: Date
   roles: Array<{ id: string; name: string; description: string | null; isSystem: boolean }>
+  /** Present on list/detail when hydrated (People & Access register columns). */
+  overrideCount?: number
+  activeSessionCount?: number
+  primaryBranchName?: string | null
+  sensitiveAccess?: boolean
 }
 
-export function sanitizeUser(user: UserWithRoles): SafeUser {
+export function sanitizeUser(
+  user: UserWithRoles & { dataAccessLevel?: string },
+  extras?: {
+    overrideCount?: number
+    activeSessionCount?: number
+    primaryBranchName?: string | null
+    sensitiveAccess?: boolean
+  },
+): SafeUser {
   return {
     id: user.id,
     tenantId: user.tenantId,
@@ -51,6 +65,7 @@ export function sanitizeUser(user: UserWithRoles): SafeUser {
     department: user.department,
     departmentId: user.departmentId,
     status: user.status,
+    dataAccessLevel: user.dataAccessLevel ?? 'ALL',
     emailVerified: user.emailVerified,
     lastLoginAt: user.lastLoginAt,
     createdBy: user.createdBy,
@@ -63,6 +78,10 @@ export function sanitizeUser(user: UserWithRoles): SafeUser {
       description: ur.role.description,
       isSystem: ur.role.isSystem,
     })),
+    overrideCount: extras?.overrideCount,
+    activeSessionCount: extras?.activeSessionCount,
+    primaryBranchName: extras?.primaryBranchName,
+    sensitiveAccess: extras?.sensitiveAccess,
   }
 }
 
@@ -89,8 +108,96 @@ async function assertNotLastAdminLockout(
 
 export async function listUsers(tenantId: string, query: ListUsersQuery) {
   const { items, total } = await userRepository.findUsers(tenantId, query)
+  const userIds = items.map((u) => u.id)
+  const extrasByUser = new Map<
+    string,
+    {
+      overrideCount: number
+      activeSessionCount: number
+      primaryBranchName: string | null
+      sensitiveAccess: boolean
+    }
+  >()
+
+  if (userIds.length) {
+    const [overrideGroups, sessions, branches, rolePermRows] = await Promise.all([
+      prisma.userPermissionOverride.groupBy({
+        by: ['userId'],
+        where: { tenantId, userId: { in: userIds }, deletedAt: null },
+        _count: { _all: true },
+      }),
+      prisma.refreshToken.groupBy({
+        by: ['userId'],
+        where: {
+          tenantId,
+          userId: { in: userIds },
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        _count: { _all: true },
+      }),
+      prisma.userBranchAccess.findMany({
+        where: { tenantId, userId: { in: userIds }, deletedAt: null },
+        include: { branch: { select: { name: true, code: true } } },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.userRole.findMany({
+        where: { tenantId, userId: { in: userIds } },
+        include: {
+          role: {
+            include: {
+              rolePermissions: { include: { permission: { select: { name: true } } } },
+            },
+          },
+        },
+      }),
+    ])
+
+    const { isSensitivePermission } = await import(
+      '../effective-access/sensitive-permissions.js'
+    )
+
+    for (const id of userIds) {
+      extrasByUser.set(id, {
+        overrideCount: 0,
+        activeSessionCount: 0,
+        primaryBranchName: null,
+        sensitiveAccess: false,
+      })
+    }
+    for (const g of overrideGroups) {
+      const cur = extrasByUser.get(g.userId)
+      if (cur) cur.overrideCount = g._count._all
+    }
+    for (const g of sessions) {
+      const cur = extrasByUser.get(g.userId)
+      if (cur) cur.activeSessionCount = g._count._all
+    }
+    for (const b of branches) {
+      const cur = extrasByUser.get(b.userId)
+      if (cur && !cur.primaryBranchName) {
+        cur.primaryBranchName = b.branch.name || b.branch.code
+      }
+    }
+    const permsByUser = new Map<string, Set<string>>()
+    for (const ur of rolePermRows) {
+      let set = permsByUser.get(ur.userId)
+      if (!set) {
+        set = new Set()
+        permsByUser.set(ur.userId, set)
+      }
+      for (const rp of ur.role.rolePermissions) {
+        set.add(rp.permission.name)
+      }
+    }
+    for (const [userId, perms] of permsByUser) {
+      const cur = extrasByUser.get(userId)
+      if (cur) cur.sensitiveAccess = [...perms].some(isSensitivePermission)
+    }
+  }
+
   return {
-    items: items.map(sanitizeUser),
+    items: items.map((u) => sanitizeUser(u, extrasByUser.get(u.id))),
     meta: buildPaginationMeta(total, query.page, query.limit),
   }
 }

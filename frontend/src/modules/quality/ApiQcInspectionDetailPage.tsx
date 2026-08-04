@@ -16,12 +16,15 @@ import {
   kioskSecondaryBtn,
   kioskWarnBtn,
 } from '@/modules/mobile/kiosk/kioskCss'
+import { useWorkspacePageHeaderSetters } from '@/context/WorkspacePageHeaderContext'
 import { notify } from '@/store/toastStore'
 import {
   decideInspection,
   getInspection,
   type QualityInspection,
+  type QualityInspectionCategory,
   type QualityInspectionDecision,
+  type QualityInspectionStatus,
   type QualityParameterSnapshot,
 } from '@/services/api/qualityApi'
 import { formatDateTime } from '@/utils/dates/format'
@@ -35,6 +38,58 @@ const QC_DECISIONS: Array<{ value: QualityInspectionDecision; label: string }> =
   { value: 'HOLD', label: 'QC Hold' },
 ]
 
+function formatCategory(category: QualityInspectionCategory | string): string {
+  switch (category) {
+    case 'IN_PROCESS':
+      return 'In-process QC'
+    case 'FINAL':
+      return 'Final QC'
+    case 'INCOMING':
+      return 'Incoming QC'
+    case 'SUBCONTRACT_RETURN':
+      return 'Subcontract return QC'
+    default:
+      return String(category).replace(/_/g, ' ')
+  }
+}
+
+function formatStatusLabel(status: QualityInspectionStatus | string): string {
+  switch (status) {
+    case 'PENDING':
+      return 'Awaiting decision'
+    case 'PASSED':
+      return 'Passed'
+    case 'REWORK':
+      return 'Rework required'
+    case 'REJECTED':
+      return 'Rejected'
+    case 'CANCELLED':
+      return 'Cancelled'
+    default:
+      return String(status).replace(/_/g, ' ')
+  }
+}
+
+function formatDecisionLabel(decision: QualityInspectionDecision | string | null | undefined): string | null {
+  if (!decision) return null
+  switch (decision) {
+    case 'PASS':
+      return 'Pass'
+    case 'CONDITIONAL_PASS':
+      return 'Conditional pass'
+    case 'REWORK':
+      return 'Rework'
+    case 'REJECT':
+      return 'Reject'
+    case 'HOLD':
+      return 'Hold'
+    case 'USE_AS_IS':
+      return 'Use as is'
+    default:
+      return String(decision).replace(/_/g, ' ')
+  }
+}
+
 function decisionTone(value: QualityInspectionDecision, selected: boolean) {
   if (!selected) return kioskSecondaryBtn
   if (value === 'PASS' || value === 'CONDITIONAL_PASS') return kioskPrimaryBtn
@@ -42,10 +97,28 @@ function decisionTone(value: QualityInspectionDecision, selected: boolean) {
   return kioskWarnBtn
 }
 
-/** Shopfloor kiosk-style QC inspection decide page (API mode). */
+function buildInspectionSubtitle(inspection: QualityInspection): string {
+  const parts: string[] = [formatCategory(inspection.category)]
+  if (inspection.itemCode || inspection.itemName) {
+    parts.push([inspection.itemCode, inspection.itemName].filter(Boolean).join(' — '))
+  } else if (inspection.stageName) {
+    parts.push(inspection.stageName)
+  } else if (inspection.title) {
+    // Title often already includes category prefix — show clean business text only.
+    const stripped = inspection.title
+      .replace(/^(In-process|Final|Incoming)\s+QC\s*[—–-]\s*/i, '')
+      .trim()
+    if (stripped) parts.push(stripped)
+  }
+  return parts.join(' · ')
+}
+
+/** Shopfloor QC inspection decide page (API mode). */
 export function ApiQcInspectionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const headerSetters = useWorkspacePageHeaderSetters()
+  const setHeader = headerSetters?.setHeader
   const [loading, setLoading] = useState(true)
   const [inspection, setInspection] = useState<QualityInspection | null>(null)
   const [drafts, setDrafts] = useState<QcParameterDraft[]>([])
@@ -87,16 +160,83 @@ export function ApiQcInspectionDetailPage() {
     void load()
   }, [load])
 
+  const decided = inspection != null && inspection.status !== 'PENDING' && inspection.status !== 'REWORK'
+  const backTo = inspection?.status === 'REWORK' ? '/quality/rework' : '/quality/queue'
+  const backLabel = inspection?.status === 'REWORK' ? 'Rework Workbench' : 'QC Queue'
+  const planLabel =
+    inspection?.inspectionPlan?.planName ||
+    inspection?.inspectionPlan?.planCode ||
+    inspection?.planCodeSnapshot ||
+    '—'
+  const workOrderLabel = inspection?.productionOrderNumber || null
+  const itemLabel = [inspection?.itemCode, inspection?.itemName].filter(Boolean).join(' — ') || null
+  const stageOpLabel =
+    inspection?.operationName ||
+    inspection?.stageName ||
+    (inspection?.operationSequence != null ? `Seq ${inspection.operationSequence}` : null)
+
+  useEffect(() => {
+    if (!setHeader) return
+    if (!inspection) {
+      setHeader({
+        meta: {
+          title: 'Quality Inspection',
+          badge: 'Quality',
+          favoritePath: id ? `/quality/inspections/${id}` : '/quality/queue',
+          breadcrumbs: [
+            { label: 'Quality', to: '/quality' },
+            { label: 'QC Queue', to: '/quality/queue' },
+            { label: 'Inspection' },
+          ],
+        },
+        commandBar: null,
+        actions: null,
+      })
+      return
+    }
+    const statusBit = formatStatusLabel(inspection.status)
+    const decisionBit = formatDecisionLabel(inspection.decision)
+    setHeader({
+      meta: {
+        title: inspection.inspectionNumber,
+        badge: 'Quality',
+        favoritePath: `/quality/inspections/${inspection.id}`,
+        breadcrumbs: [
+          { label: 'Quality', to: '/quality' },
+          { label: 'QC Queue', to: '/quality/queue' },
+          { label: inspection.inspectionNumber },
+        ],
+      },
+      commandBar: null,
+      actions: decided ? (
+        <button
+          type="button"
+          className="rounded-md border border-erp-border bg-white px-3 py-1.5 text-sm font-semibold text-erp-primary hover:bg-slate-50"
+          onClick={() => navigate(`/quality/inspections/${inspection.id}/report`)}
+        >
+          QC Report
+        </button>
+      ) : (
+        <span className="hidden text-sm text-erp-muted sm:inline">
+          {statusBit}
+          {decisionBit ? ` · ${decisionBit}` : ''}
+        </span>
+      ),
+    })
+  }, [setHeader, inspection, decided, id, navigate])
+
+  useEffect(() => {
+    if (!setHeader) return
+    return () => setHeader({ meta: null, commandBar: null, actions: null })
+  }, [setHeader])
+
   const snapshotById = useMemo(() => {
     const map = new Map<string, QualityParameterSnapshot>()
     for (const s of inspection?.parameterSnapshot ?? []) map.set(s.parameterId, s)
     return map
   }, [inspection])
 
-  const decided = inspection != null && inspection.status !== 'PENDING' && inspection.status !== 'REWORK'
   const snapshot = Array.isArray(inspection?.parameterSnapshot) ? inspection.parameterSnapshot : []
-  const backTo = inspection?.status === 'REWORK' ? '/quality/rework' : '/quality/queue'
-  const backLabel = inspection?.status === 'REWORK' ? 'Rework Workbench' : 'QC Queue'
 
   async function submit() {
     if (!inspection) return
@@ -119,7 +259,7 @@ export function ApiQcInspectionDetailPage() {
         reworkQty: qcDecision === 'REWORK' ? qty : undefined,
         parameterResults: parameterResults.length ? parameterResults : undefined,
       })
-      notify.success(`Inspection ${qcDecision}`)
+      notify.success(`Inspection ${formatDecisionLabel(qcDecision) ?? qcDecision}`)
       if (qcDecision === 'PASS' || qcDecision === 'CONDITIONAL_PASS') {
         navigate(`/quality/inspections/${inspection.id}/report`)
         return
@@ -144,19 +284,22 @@ export function ApiQcInspectionDetailPage() {
     )
   }
 
+  const decisionLabel = formatDecisionLabel(inspection.decision)
+  const statusLabel = formatStatusLabel(inspection.status)
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f3f2f1] pb-32">
       <div className="mx-auto max-w-3xl px-4 py-5 sm:px-6">
         <PageBackLink to={backTo} label={backLabel} />
 
         <header className="mt-4 mb-5">
-          <p className="text-xs font-bold uppercase tracking-wide text-[#605e5c]">Quality inspection</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#605e5c]">
+            {formatCategory(inspection.category)}
+          </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#242424] sm:text-3xl">
             {inspection.inspectionNumber}
           </h1>
-          <p className="mt-1 text-base text-[#605e5c]">
-            {inspection.category.replace(/_/g, ' ')} · {inspection.title}
-          </p>
+          <p className="mt-1 text-base text-[#605e5c]">{buildInspectionSubtitle(inspection)}</p>
         </header>
 
         <div className="grid gap-4">
@@ -170,11 +313,11 @@ export function ApiQcInspectionDetailPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-[#605e5c]">Status</p>
                 <p className="mt-1 text-xl font-bold text-[#242424]">
-                  {inspection.status}
-                  {inspection.decision ? (
+                  {statusLabel}
+                  {decisionLabel ? (
                     <>
                       <span className="mx-2 font-normal text-[#c8c6c4]">·</span>
-                      <span className="text-base">{inspection.decision.replace(/_/g, ' ')}</span>
+                      <span className="text-base font-semibold">{decisionLabel}</span>
                     </>
                   ) : null}
                 </p>
@@ -192,12 +335,7 @@ export function ApiQcInspectionDetailPage() {
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Plan</dt>
-                <dd className="mt-0.5 text-base font-semibold text-[#242424]">
-                  {inspection.inspectionPlan?.planName ??
-                    inspection.inspectionPlan?.planCode ??
-                    inspection.planCodeSnapshot ??
-                    '—'}
-                </dd>
+                <dd className="mt-0.5 text-base font-semibold text-[#242424]">{planLabel}</dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Inspected qty</dt>
@@ -207,19 +345,35 @@ export function ApiQcInspectionDetailPage() {
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Work order</dt>
-                <dd className="mt-0.5 font-mono text-sm text-[#242424]">
-                  {inspection.productionOrderId ? (
+                <dd className="mt-0.5 text-base font-semibold text-[#242424]">
+                  {workOrderLabel && inspection.productionOrderId ? (
                     <Link
                       to={`/manufacturing/work-orders/${inspection.productionOrderId}`}
-                      className="font-semibold text-[#0078d4] hover:underline"
+                      className="text-[#0078d4] hover:underline"
                     >
-                      {inspection.productionOrderId.slice(0, 8)}…
+                      {workOrderLabel}
                     </Link>
                   ) : (
                     '—'
                   )}
                 </dd>
               </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Product</dt>
+                <dd className="mt-0.5 text-base font-semibold text-[#242424]">{itemLabel ?? '—'}</dd>
+              </div>
+              {stageOpLabel ? (
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">
+                    {inspection.operationName ? 'Operation' : 'Stage'}
+                  </dt>
+                  <dd className="mt-0.5 text-base font-semibold text-[#242424]">
+                    {inspection.operationCode
+                      ? `${inspection.operationCode} — ${stageOpLabel}`
+                      : stageOpLabel}
+                  </dd>
+                </div>
+              ) : null}
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Requested</dt>
                 <dd className="mt-0.5 text-sm text-[#242424]">{formatDateTime(inspection.requestedAt)}</dd>
@@ -270,7 +424,7 @@ export function ApiQcInspectionDetailPage() {
             <div className={kioskCardClass}>
               <p className="text-sm font-bold uppercase tracking-wide text-[#605e5c]">Decision recorded</p>
               <p className="mt-2 text-lg font-semibold text-[#242424]">
-                {inspection.decision?.replace(/_/g, ' ') ?? inspection.status}
+                {decisionLabel ?? statusLabel}
               </p>
               {(inspection.decisionRemarks || inspection.remarks) && (
                 <p className="mt-2 whitespace-pre-wrap text-base text-[#605e5c]">

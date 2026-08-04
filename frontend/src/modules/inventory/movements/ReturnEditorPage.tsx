@@ -144,7 +144,7 @@ export function ReturnEditorPage() {
 
   if (loading) {
     return (
-      <OperationalPageShell title="Return" badge="Inventory">
+      <OperationalPageShell title="Return" badge="Store">
         <LoadingState variant="card" />
       </OperationalPageShell>
     )
@@ -155,13 +155,13 @@ export function ReturnEditorPage() {
   return (
     <ErpCardFormPage
       variant="dynamics"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={isNew ? 'Source-Driven Return' : `Return ${doc?.documentNumber ?? ''}`}
       description="Select source document — vendor, customer and lines load automatically."
       recordNo={doc?.documentNumber}
       statusChip={<StatusDot label={statusLabel} tone={statusToneFromLabel(statusLabel)} />}
       breadcrumbs={[
-        { label: 'Inventory & Warehouse', to: '/inventory' },
+        { label: 'Store', to: '/inventory' },
         { label: 'Returns', to: '/inventory/movements/returns' },
         { label: isNew ? 'New' : doc?.documentNumber ?? 'Detail' },
       ]}

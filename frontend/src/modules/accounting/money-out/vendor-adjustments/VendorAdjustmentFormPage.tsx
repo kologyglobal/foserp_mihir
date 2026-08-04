@@ -17,6 +17,7 @@ import {
 } from '@/services/bridges/payablesApiBridge'
 import { useActiveVendors } from '@/hooks/useMasterLists'
 import { notify } from '@/store/toastStore'
+import { resolveBlockedNavigation } from '@/utils/appConfirmLeave'
 import type { CreateVendorAdjustmentInput, VendorAdjustmentType } from '@/types/moneyOut'
 import { useMoneyOutPermissions } from '@/utils/permissions/moneyOut'
 import { VendorInvoiceTotalsPanel } from '../components/VendorInvoiceTotalsPanel'
@@ -135,9 +136,7 @@ export function VendorAdjustmentFormPage({ mode }: { mode: 'create' | 'edit' }) 
 
   useEffect(() => {
     if (blocker.state !== 'blocked') return
-    const ok = window.confirm('You have unsaved changes. Leave this page?')
-    if (ok) blocker.proceed()
-    else blocker.reset()
+    return resolveBlockedNavigation(blocker)
   }, [blocker])
 
   useEffect(() => {

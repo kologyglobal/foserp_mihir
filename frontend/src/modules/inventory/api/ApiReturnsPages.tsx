@@ -102,9 +102,9 @@ function AccessDenied({ title }: { title: string }) {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={title}
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: title }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: title }]}
       autoBreadcrumbs={false}
     >
       <EmptyState icon={Lock} title="Access denied" description="You do not hold the required inventory permission." />
@@ -195,10 +195,10 @@ export function ApiReturnsRegisterPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Returns"
       description="Live material returns from work orders. You can also return from the Work Order Materials tab."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Returns' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Returns' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/movements/returns"
       commandBar={(
@@ -401,7 +401,7 @@ export function ApiReturnPostPage() {
         title="New Return"
         description="Posts a return-from-work-order movement to live stock."
         breadcrumbs={[
-          { label: 'Inventory', to: '/inventory/stock' },
+          { label: 'Store', to: '/inventory/stock' },
           { label: 'Returns', to: '/inventory/movements/returns' },
           { label: 'New' },
         ]}
@@ -554,7 +554,7 @@ export function ApiReturnDetailPage() {
   if (loading) {
     return (
       <div className="erp-page">
-        <PageHeader title="Return" breadcrumbs={[{ label: 'Inventory' }, { label: 'Returns', to: '/inventory/movements/returns' }]} />
+        <PageHeader title="Return" breadcrumbs={[{ label: 'Store' }, { label: 'Returns', to: '/inventory/movements/returns' }]} />
         <LoadingState variant="table" />
       </div>
     )
@@ -563,7 +563,7 @@ export function ApiReturnDetailPage() {
   if (missing || !row) {
     return (
       <div className="erp-page">
-        <PageHeader title="Return" breadcrumbs={[{ label: 'Inventory' }, { label: 'Returns', to: '/inventory/movements/returns' }]} />
+        <PageHeader title="Return" breadcrumbs={[{ label: 'Store' }, { label: 'Returns', to: '/inventory/movements/returns' }]} />
         <EmptyState
           icon={RotateCcw}
           title="Return not found"
@@ -584,7 +584,7 @@ export function ApiReturnDetailPage() {
         title={row.movementNumber}
         description={`Return from work order · ${formatDate(row.movementDate)}`}
         breadcrumbs={[
-          { label: 'Inventory', to: '/inventory/stock' },
+          { label: 'Store', to: '/inventory/stock' },
           { label: 'Returns', to: '/inventory/movements/returns' },
           { label: row.movementNumber },
         ]}

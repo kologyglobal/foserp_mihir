@@ -78,9 +78,9 @@ export function StockCountRegisterPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title="Stock Count"
-        breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Stock Count' }]}
+        breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Stock Count' }]}
         autoBreadcrumbs={false}
       >
         <EmptyState icon={ShieldOff} title="Access denied" description="Missing stock count view permission." />
@@ -92,10 +92,10 @@ export function StockCountRegisterPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Stock Count"
       description="Physical verification, cycle counts, blind counts and variance approval."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Stock Count' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Stock Count' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/stock-count"
       commandBar={(

@@ -91,17 +91,17 @@ export function ReceiptsRegisterPage() {
   ], [navigate, perms])
 
   if (!perms.canViewReceipts) {
-    return <OperationalPageShell variant="dynamics" layout="enterprise" badge="Inventory" title="Receipts" breadcrumbs={[{ label: 'Inventory', to: '/inventory' }, { label: 'Receipts' }]} autoBreadcrumbs={false}><EmptyState icon={Package} title="Access denied" /></OperationalPageShell>
+    return <OperationalPageShell variant="dynamics" layout="enterprise" badge="Store" title="Receipts" breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Receipts' }]} autoBreadcrumbs={false}><EmptyState icon={Package} title="Access denied" /></OperationalPageShell>
   }
 
   return (
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Receipts Register"
       description="Material receipts from purchase, production, transfers and returns."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Receipts' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Receipts' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/movements/receipts"
       commandBar={<ErpCommandBar inline sticky={false} primaryAction={perms.canCreateReceipt ? { id: 'new', label: 'Quick Receipt', icon: Plus, onClick: () => navigate('/inventory/movements/receipts/new') } : undefined} secondaryActions={[{ id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => setRefreshToken((n) => n + 1) }]} />}

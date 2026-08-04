@@ -156,9 +156,9 @@ export function QuickIssuePage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={isEdit ? `Edit Issue — ${existing?.documentNumber}` : 'Quick Material Issue'}
-      breadcrumbs={[{ label: 'Inventory', to: '/inventory' }, { label: 'Issues', to: '/inventory/movements/issues' }, { label: isEdit ? 'Edit' : 'New' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Issues', to: '/inventory/movements/issues' }, { label: isEdit ? 'Edit' : 'New' }]}
       autoBreadcrumbs={false}
       commandBar={(
         <ErpCommandBar
@@ -242,9 +242,9 @@ export function IssueDetailPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={doc.documentNumber}
-      breadcrumbs={[{ label: 'Inventory', to: '/inventory' }, { label: 'Issues', to: '/inventory/movements/issues' }, { label: doc.documentNumber }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Issues', to: '/inventory/movements/issues' }, { label: doc.documentNumber }]}
       autoBreadcrumbs={false}
       commandBar={<ErpCommandBar inline sticky={false} secondaryActions={[
         ...(doc.status === 'draft' && perms.canEditIssue ? [{ id: 'edit', label: 'Edit', onClick: () => navigate(`/inventory/movements/issues/${id}/edit`) }] : []),

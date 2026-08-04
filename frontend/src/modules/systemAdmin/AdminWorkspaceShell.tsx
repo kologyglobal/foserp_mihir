@@ -10,13 +10,16 @@ import { adminBreadcrumbs } from '@/components/admin/adminNav'
 import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import { shouldNavigate } from '@/utils/safeState'
 
-export type AdminWorkspaceId = 'overview' | 'people' | 'organization' | 'security'
+export type AdminWorkspaceId = 'overview' | 'people' | 'organization' | 'security' | 'document-governance'
 
 const WORKSPACE_TABS: Record<AdminWorkspaceId, DynamicsTabItem[]> = {
   overview: [{ label: 'Overview', path: '/admin' }],
   people: [
     { label: 'Users', path: '/admin/users' },
     { label: 'Roles', path: '/admin/roles' },
+    { label: 'Permission Matrix', path: '/admin/permission-matrix' },
+    { label: 'Data Scopes', path: '/admin/data-scopes' },
+    { label: 'Approval Authority', path: '/admin/approval-authority' },
     { label: 'Invitations', path: '/admin/invitations' },
     { label: 'Responsibilities', path: '/admin/responsibilities' },
     { label: 'Access Review', path: '/admin/access-review' },
@@ -35,9 +38,13 @@ const WORKSPACE_TABS: Record<AdminWorkspaceId, DynamicsTabItem[]> = {
     { label: 'Locked Accounts', path: '/admin/security/locked-accounts' },
     { label: 'Audit', path: '/admin/security/audit' },
   ],
+  'document-governance': [
+    { label: 'Date Controls', path: '/admin/document-governance/date-controls' },
+  ],
 }
 
 export function resolveAdminWorkspace(pathname: string): AdminWorkspaceId {
+  if (pathname.startsWith('/admin/document-governance')) return 'document-governance'
   if (pathname.startsWith('/admin/security')) return 'security'
   if (
     pathname.startsWith('/admin/companies') ||
@@ -54,7 +61,10 @@ export function resolveAdminWorkspace(pathname: string): AdminWorkspaceId {
     pathname.startsWith('/admin/roles') ||
     pathname.startsWith('/admin/invitations') ||
     pathname.startsWith('/admin/responsibilities') ||
-    pathname.startsWith('/admin/access-review')
+    pathname.startsWith('/admin/access-review') ||
+    pathname.startsWith('/admin/permission-matrix') ||
+    pathname.startsWith('/admin/data-scopes') ||
+    pathname.startsWith('/admin/approval-authority')
   ) {
     return 'people'
   }

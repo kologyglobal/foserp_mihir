@@ -133,7 +133,7 @@ export function AdjustmentEditorPage() {
 
   if (loading) {
     return (
-      <OperationalPageShell title="Adjustment" badge="Inventory">
+      <OperationalPageShell title="Adjustment" badge="Store">
         <LoadingState variant="card" />
       </OperationalPageShell>
     )
@@ -144,13 +144,13 @@ export function AdjustmentEditorPage() {
   return (
     <ErpCardFormPage
       variant="dynamics"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={isNew ? 'Quick Adjustment' : `Adjustment ${doc?.documentNumber ?? ''}`}
       description="Enter item, warehouse, adjustment qty and reason — system calculates value and approval requirement."
       recordNo={doc?.documentNumber}
       statusChip={<StatusDot label={statusLabel} tone={statusToneFromLabel(statusLabel)} />}
       breadcrumbs={[
-        { label: 'Inventory & Warehouse', to: '/inventory' },
+        { label: 'Store', to: '/inventory' },
         { label: 'Adjustments', to: '/inventory/movements/adjustments' },
         { label: isNew ? 'New' : doc?.documentNumber ?? 'Detail' },
       ]}

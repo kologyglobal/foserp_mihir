@@ -9,6 +9,7 @@ import { FinanceLegalEntitySwitcher } from '@/modules/accounting/settings/Financ
 import { resolveLegalEntityId } from '@/services/bridges/financeApiBridge'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { notify } from '@/store/toastStore'
+import { appPromptNote } from '@/store/confirmDialogStore'
 import { useTreasuryAdjustmentPermissions } from '@/utils/permissions/treasuryAdjustment'
 import {
   closeDayClose,
@@ -91,7 +92,13 @@ export function ApiLiquidityDashboardPage() {
 
   const onReopenDay = async () => {
     if (!dayClose || !perms.canManageClosing) return
-    const reason = window.prompt('Reason to reopen this treasury day close?')
+    const reason = await appPromptNote({
+      title: 'Reopen treasury day close?',
+      description: 'Provide a reason to reopen this day.',
+      confirmLabel: 'Reopen day',
+      tone: 'warning',
+      note: { required: true, label: 'Reason' },
+    })
     if (!reason?.trim()) return
     setBusy(true)
     try {

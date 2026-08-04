@@ -10,8 +10,11 @@ export interface EffectivePermissionGrant {
   module: string
   description: string | null
   sensitive: boolean
-  /** Role names that grant this permission */
+  /** Role names that grant this permission (before overrides). */
   sources: string[]
+  /** Final source of effective grant after allow/deny. */
+  grantSource: 'ROLE' | 'USER_ALLOW' | 'USER_DENY' | 'DENIED'
+  effect: 'ALLOW' | 'DENY'
 }
 
 export interface EffectiveAccessReport {
@@ -23,16 +26,20 @@ export interface EffectiveAccessReport {
     status: string
     department: string | null
     departmentId: string | null
+    dataAccessLevel?: string
   }
   roles: Array<{ id: string; name: string; isSystem: boolean; permissionCount: number }>
   permissions: EffectivePermissionGrant[]
   permissionCount: number
+  /** Permissions denied by explicit user override */
+  deniedPermissions: string[]
   sensitivePermissions: string[]
   modules: Array<{ module: string; count: number; sensitiveCount: number }>
   scopes: UserDataScope
   responsibilities: Awaited<ReturnType<typeof listUserResponsibilities>>
   /** Catalog keys where this user is a designated module administrator */
   moduleAdministrations: string[]
+  overrides: Array<{ permissionName: string; effect: 'ALLOW' | 'DENY'; reason: string | null }>
   explain: {
     summary: string
     notes: string[]
@@ -87,20 +94,71 @@ export async function getEffectiveAccess(tenantId: string, userId: string): Prom
     }
   })
 
-  const permissions: EffectivePermissionGrant[] = [...sourceMap.values()]
-    .map(({ perm, roles: roleSet }) => ({
+  const overrideRows = await prisma.userPermissionOverride.findMany({
+    where: {
+      tenantId,
+      userId,
+      deletedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    include: { permission: true },
+  })
+  const overrides = overrideRows.map((o) => ({
+    permissionName: o.permission.name,
+    effect: o.effect as 'ALLOW' | 'DENY',
+    reason: o.reason,
+  }))
+  const allowSet = new Set(overrides.filter((o) => o.effect === 'ALLOW').map((o) => o.permissionName))
+  const denySet = new Set(overrides.filter((o) => o.effect === 'DENY').map((o) => o.permissionName))
+
+  // Apply overrides: DENY removes role grants; ALLOW adds permission not from roles.
+  const permissions: EffectivePermissionGrant[] = []
+  for (const { perm, roles: roleSet } of sourceMap.values()) {
+    if (denySet.has(perm.name)) {
+      permissions.push({
+        name: perm.name,
+        module: perm.module,
+        description: perm.description,
+        sensitive: isSensitivePermission(perm.name),
+        sources: [...roleSet].sort(),
+        grantSource: 'USER_DENY',
+        effect: 'DENY',
+      })
+      continue
+    }
+    permissions.push({
       name: perm.name,
       module: perm.module,
       description: perm.description,
       sensitive: isSensitivePermission(perm.name),
       sources: [...roleSet].sort(),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+      grantSource: 'ROLE',
+      effect: 'ALLOW',
+    })
+  }
+  for (const o of overrides.filter((x) => x.effect === 'ALLOW')) {
+    if (sourceMap.has(o.permissionName) || denySet.has(o.permissionName)) continue
+    const p = overrideRows.find((r) => r.permission.name === o.permissionName)?.permission
+    if (!p) continue
+    permissions.push({
+      name: p.name,
+      module: p.module,
+      description: p.description,
+      sensitive: isSensitivePermission(p.name),
+      sources: ['User override'],
+      grantSource: 'USER_ALLOW',
+      effect: 'ALLOW',
+    })
+  }
+  permissions.sort((a, b) => a.name.localeCompare(b.name))
 
-  const sensitivePermissions = permissions.filter((p) => p.sensitive).map((p) => p.name)
+  const allowedPermissions = permissions.filter((p) => p.effect === 'ALLOW')
+  const deniedPermissions = permissions.filter((p) => p.effect === 'DENY').map((p) => p.name)
+
+  const sensitivePermissions = allowedPermissions.filter((p) => p.sensitive).map((p) => p.name)
 
   const moduleMap = new Map<string, { count: number; sensitiveCount: number }>()
-  for (const p of permissions) {
+  for (const p of allowedPermissions) {
     const cur = moduleMap.get(p.module) ?? { count: 0, sensitiveCount: 0 }
     cur.count += 1
     if (p.sensitive) cur.sensitiveCount += 1
@@ -117,13 +175,17 @@ export async function getEffectiveAccess(tenantId: string, userId: string): Prom
   ])
 
   const notes: string[] = [
-    'Permissions are granted only through assigned roles (no direct user permission overrides in Phase 7).',
+    'Explicit DENY overrides always win over role grants and ALLOW overrides.',
+    overrides.length
+      ? `${overrides.length} user override(s) applied (${allowSet.size} ALLOW, ${denySet.size} DENY).`
+      : 'No user permission overrides (roles only).',
     scopes.unrestricted
-      ? 'Data scope is unrestricted (fail-open): empty LE/branch/warehouse grants allow all tenant org units.'
+      ? 'Data scope is unrestricted (empty LE/branch/warehouse grants allow all tenant org units).'
       : `Data scope is limited: ${scopes.legalEntities.length} company(ies), ${scopes.branches.length} branch(es), ${scopes.warehouses.length} warehouse(s).`,
+    `Data access level: ${user.dataAccessLevel ?? 'ALL'}.`,
   ]
   if (roles.length === 0) {
-    notes.push('User has no roles — effective permission set is empty.')
+    notes.push('User has no roles — effective permission set depends only on ALLOW overrides.')
   }
   if (sensitivePermissions.length > 0 && scopes.unrestricted) {
     notes.push('Attention: sensitive permissions with unrestricted data scope.')
@@ -144,11 +206,13 @@ export async function getEffectiveAccess(tenantId: string, userId: string): Prom
   const summary = [
     `${user.firstName} ${user.lastName}`,
     `${roles.length} role(s)`,
-    `${permissions.length} permission(s)`,
+    `${allowedPermissions.length} allowed permission(s)`,
+    deniedPermissions.length ? `${deniedPermissions.length} denied` : null,
     scopes.unrestricted ? 'unrestricted scope' : 'scoped',
-    `${responsibilities.length} responsibility(ies)`,
-    `${moduleAdministrations.length} module admin designation(s)`,
-  ].join(' · ')
+    user.dataAccessLevel ?? 'ALL',
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return {
     user: {
@@ -159,15 +223,18 @@ export async function getEffectiveAccess(tenantId: string, userId: string): Prom
       status: user.status,
       department: user.department,
       departmentId: user.departmentId,
+      dataAccessLevel: user.dataAccessLevel,
     },
     roles,
     permissions,
-    permissionCount: permissions.length,
+    permissionCount: allowedPermissions.length,
+    deniedPermissions,
     sensitivePermissions,
     modules,
     scopes,
     responsibilities,
     moduleAdministrations,
+    overrides,
     explain: { summary, notes },
     generatedAt: new Date().toISOString(),
   }

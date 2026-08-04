@@ -35,7 +35,7 @@ export function WarehouseOpsDashboardPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory"
+      badge="Store"
       title="Warehouse Operations"
       description="Consolidated stock health by warehouse — balances only, not document registers."
       breadcrumbs={[

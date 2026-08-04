@@ -1,6 +1,7 @@
 import type { QualityInspectionCategory, ManufacturingQualityInspectionStatus } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../../../config/prisma.js'
+import { inspectionDetailInclude } from '../shared/mappers.js'
 import type { ListInspectionsQuery } from './inspection.schemas.js'
 
 export async function listInspections(tenantId: string, query: ListInspectionsQuery) {
@@ -18,6 +19,7 @@ export async function listInspections(tenantId: string, query: ListInspectionsQu
       orderBy: { requestedAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
+      include: inspectionDetailInclude,
     }),
     prisma.manufacturingQualityInspection.count({ where }),
   ])
@@ -27,20 +29,14 @@ export async function listInspections(tenantId: string, query: ListInspectionsQu
 export async function getInspection(tenantId: string, id: string) {
   return prisma.manufacturingQualityInspection.findFirst({
     where: { id, tenantId },
-    include: {
-      parameterResults: { orderBy: { sortOrder: 'asc' } },
-      inspectionPlan: { select: { id: true, planCode: true, planName: true, category: true, status: true } },
-    },
+    include: inspectionDetailInclude,
   })
 }
 
 export async function findByIdempotencyKey(tenantId: string, idempotencyKey: string) {
   return prisma.manufacturingQualityInspection.findFirst({
     where: { tenantId, idempotencyKey },
-    include: {
-      parameterResults: { orderBy: { sortOrder: 'asc' } },
-      inspectionPlan: { select: { id: true, planCode: true, planName: true, category: true, status: true } },
-    },
+    include: inspectionDetailInclude,
   })
 }
 
@@ -96,10 +92,7 @@ export async function createInspection(
       createdBy: data.createdBy ?? null,
       status: 'PENDING',
     },
-    include: {
-      parameterResults: { orderBy: { sortOrder: 'asc' } },
-      inspectionPlan: { select: { id: true, planCode: true, planName: true, category: true, status: true } },
-    },
+    include: inspectionDetailInclude,
   })
 }
 

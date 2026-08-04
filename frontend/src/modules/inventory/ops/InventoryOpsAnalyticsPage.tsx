@@ -50,7 +50,7 @@ export function InventoryOpsAnalyticsPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory"
+      badge="Store"
       title="Operations Analytics"
       description="Summary widgets from balanced stock + purchase/GRN documents (documents remain unmerged)."
       breadcrumbs={[

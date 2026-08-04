@@ -38,10 +38,10 @@ export function InventoryReportsHubPage() {
           ? 'Live stock, movement, tracking and planning reports from Inventory balances and ledger.'
           : 'Stock, movement, tracking, exception and planning reports — demo mock data.'
       }
-      badge="Inventory & Warehouse"
+      badge="Store"
       variant="dynamics"
       favoritePath="/inventory/reports"
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Reports' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Reports' }]}
       autoBreadcrumbs={false}
       insights={[
         { label: 'Categories', value: catalog.length, accent: 'blue' },

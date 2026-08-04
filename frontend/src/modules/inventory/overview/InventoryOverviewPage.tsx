@@ -87,7 +87,7 @@ export function InventoryOverviewPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Store Home"
       description="See stock health at a glance, then receive, issue, or clear today’s production requests."
       breadcrumbs={[{ label: 'Store', to: '/inventory' }]}

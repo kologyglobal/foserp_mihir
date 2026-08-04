@@ -69,10 +69,10 @@ export function InventoryStockDetailPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title="Stock Details"
         breadcrumbs={[
-          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Store', to: '/inventory' },
           { label: 'Stock Availability', to: '/inventory/stock' },
           { label: 'Details' },
         ]}
@@ -94,10 +94,10 @@ export function InventoryStockDetailPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title="Stock Details"
         breadcrumbs={[
-          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Store', to: '/inventory' },
           { label: 'Stock Availability', to: '/inventory/stock' },
           { label: 'Details' },
         ]}
@@ -137,11 +137,11 @@ export function InventoryStockDetailPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title={`${item.itemCode} — Stock`}
         description={`${item.itemName} · ${INVENTORY_ITEM_TYPE_LABELS[item.itemType]}`}
         breadcrumbs={[
-          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Store', to: '/inventory' },
           { label: 'Stock Availability', to: '/inventory/stock' },
           { label: item.itemCode },
         ]}

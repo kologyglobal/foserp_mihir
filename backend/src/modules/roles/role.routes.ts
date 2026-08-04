@@ -39,6 +39,13 @@ router.patch(
   asyncHandler(roleController.update),
 )
 
+router.post(
+  '/:roleId/clone',
+  requirePermission('role.create'),
+  validateParams(roleIdParamSchema),
+  asyncHandler(roleController.clone),
+)
+
 router.delete(
   '/:roleId',
   requirePermission('role.delete'),

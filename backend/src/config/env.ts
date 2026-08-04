@@ -134,6 +134,15 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .optional()
     .transform((v) => v === 'true'),
+  /**
+   * Document Governance — Date Control integration master switch.
+   * Default OFF. When OFF, evaluators always report currentBehaviour and document flows are unchanged.
+   * Admin may configure policies regardless; live enforcement requires ON + per-module wiring (not shipped).
+   */
+  DOCUMENT_GOVERNANCE_DATE_CONTROL: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
 })
 
 const parsed = envSchema.safeParse(process.env)

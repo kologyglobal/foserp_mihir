@@ -20,6 +20,7 @@ import { PurchasePageTip } from '../purchase/PurchasePageTip'
 import { ErpPageGuide } from '../erp/ErpPageGuide'
 import { shouldShowPageTip } from '../../utils/crmPageTipStorage'
 import { isPurchasePath } from '../../utils/purchasePageTip'
+import { isStorePath } from '../../utils/isStorePath'
 
 interface OperationalPageShellProps {
   title: string
@@ -144,6 +145,11 @@ export function OperationalPageShell({
     Boolean(!isEnterprise && !mergeHeader && commandBar)
 
   const isPurchaseSurface = badge === 'Purchase' || isPurchasePath(pathname)
+  const isStoreSurface =
+    badge === 'Store' ||
+    badge === 'Inventory' ||
+    badge === 'Inventory & Warehouse' ||
+    isStorePath(pathname)
 
   return (
     <div
@@ -152,6 +158,7 @@ export function OperationalPageShell({
         variant === 'dynamics' && 'dyn-page-shell',
         isEnterprise && 'erp-page--enterprise',
         isPurchaseSurface && 'purchase-zoho-register',
+        isStoreSurface && 'store-zoho-register enterprise-workspace--store',
         className,
       )}
     >

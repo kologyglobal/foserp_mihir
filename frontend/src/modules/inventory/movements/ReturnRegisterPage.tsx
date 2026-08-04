@@ -124,10 +124,10 @@ export function ReturnRegisterPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Returns Register"
       description="Source-driven purchase, sales, production and transfer returns."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Returns' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Returns' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/movements/returns"
       commandBar={(

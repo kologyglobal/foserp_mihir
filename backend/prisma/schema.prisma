@@ -28,6 +28,23 @@ enum UserStatus {
   ARCHIVED
 }
 
+/// Record / visibility data access level (People & Access scopes).
+enum DataAccessLevel {
+  OWN
+  TEAM
+  DEPARTMENT
+  BRANCH
+  LEGAL_ENTITY
+  WAREHOUSE
+  ALL
+}
+
+/// User-level permission override effect. Missing row = INHERIT from roles.
+enum PermissionOverrideEffect {
+  ALLOW
+  DENY
+}
+
 enum CodeSeriesEntity {
   USER
   LEAD
@@ -156,6 +173,8 @@ model Tenant {
   userLegalEntityAccess                  UserLegalEntityAccess[]
   userBranchAccess                       UserBranchAccess[]
   userWarehouseAccess                    UserWarehouseAccess[]
+  userPermissionOverrides                UserPermissionOverride[]
+  approvalAuthorityRules                 ApprovalAuthorityRule[]
   responsibilities                       Responsibility[]
   userResponsibilities                   UserResponsibility[]
   loginActivities                        LoginActivity[]
@@ -568,6 +587,12 @@ model Tenant {
   knowledgePermissions    KnowledgePermission[]
   knowledgeActivityLogs   KnowledgeActivityLog[]
 
+  // Document Governance — date control configuration only (no live enforcement by default)
+  documentDatePolicies           DocumentDatePolicy[]
+  documentDatePolicyProfiles     DocumentDatePolicyProfile[]
+  documentDatePolicyAllowances   DocumentDatePolicyAllowance[]
+  documentDateExceptionRequests  DocumentDateExceptionRequest[]
+
   // Mobile push token registration (Expo)
   mobileDeviceTokens      MobileDeviceToken[]
   // In-app CRM + ops notifications (tenant-scoped)
@@ -594,6 +619,8 @@ model User {
   department          String?    @db.VarChar(100)
   departmentId        String?
   status              UserStatus @default(INVITED)
+  /// Default visibility tier (OWN…ALL). Org membership still via branch/LE/warehouse tables.
+  dataAccessLevel     DataAccessLevel @default(ALL)
   emailVerified       Boolean    @default(false)
   lastLoginAt         DateTime?
   /// Consecutive failed password attempts; reset on successful login / unlock (Phase 8 admin).
@@ -623,10 +650,13 @@ model User {
   responsibilities       UserResponsibility[]
   moduleAdministrations  ModuleAdministrator[]
   purchaseApproverLimits PurchaseApproverLimit[]
+  permissionOverrides    UserPermissionOverride[]
+  approvalAuthorityRules ApprovalAuthorityRule[] @relation("ApprovalAuthorityUser")
   hrEmployeeLinks        HrEmployee[]            @relation("HrEmployeeUser")
   notificationsReceived  Notification[]          @relation("NotificationRecipient")
   notificationPreferences NotificationPreference[]
   mobileDeviceTokens       MobileDeviceToken[]
+  documentDatePolicyAllowances DocumentDatePolicyAllowance[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -634,6 +664,60 @@ model User {
   @@index([tenantId, deletedAt])
   @@index([departmentId])
   @@map("users")
+}
+
+/// Exception-based allow/deny over role grants. DENY wins over role ALLOW and user ALLOW.
+model UserPermissionOverride {
+  id           String                   @id @default(uuid())
+  tenantId     String
+  userId       String
+  permissionId String
+  effect       PermissionOverrideEffect
+  reason       String?                  @db.VarChar(500)
+  expiresAt    DateTime?
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  deletedAt    DateTime?
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, permissionId])
+  @@index([tenantId, userId])
+  @@index([tenantId, deletedAt])
+  @@map("user_permission_overrides")
+}
+
+/// Document-wise approval amount bands for People & Access Authority register.
+model ApprovalAuthorityRule {
+  id                  String    @id @default(uuid())
+  tenantId            String
+  documentType        String    @db.VarChar(64)
+  amountFrom          Decimal   @default(0) @db.Decimal(18, 2)
+  amountTo            Decimal?  @db.Decimal(18, 2)
+  roleId              String?
+  userId              String?
+  branchId            String?
+  legalEntityId       String?
+  selfApprovalAllowed Boolean   @default(false)
+  isActive            Boolean   @default(true)
+  notes               String?   @db.VarChar(500)
+  createdBy           String?
+  updatedBy           String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role   Role?  @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  user   User?  @relation("ApprovalAuthorityUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, documentType])
+  @@index([tenantId, deletedAt])
+  @@map("approval_authority_rules")
 }
 
 /// Tenant org unit for people admin (not CRM departments).
@@ -795,6 +879,8 @@ model Role {
   tenant          Tenant?          @relation(fields: [tenantId], references: [id])
   userRoles       UserRole[]
   rolePermissions RolePermission[]
+  documentDatePolicyAllowances DocumentDatePolicyAllowance[]
+  approvalAuthorityRules ApprovalAuthorityRule[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -809,6 +895,7 @@ model Permission {
   createdAt   DateTime @default(now())
 
   rolePermissions RolePermission[]
+  userOverrides   UserPermissionOverride[]
 
   @@map("permissions")
 }
@@ -21370,4 +21457,136 @@ model KnowledgeActivityLog {
   @@index([tenantId, entityType, entityId])
   @@index([tenantId, createdAt])
   @@map("knowledge_activity_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Document Governance — Date Control (configuration framework only)
+// Defaults: policyEnabled=false, modes=CURRENT_BEHAVIOUR.
+// Live document workflows MUST NOT call evaluate until DOCUMENT_GOVERNANCE_DATE_CONTROL=ON
+// and module integration is intentionally wired per document type.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Reusable profile templates (STRICT / STANDARD / RELAXED / CUSTOM). Not auto-assigned.
+model DocumentDatePolicyProfile {
+  id                    String    @id @default(uuid())
+  tenantId              String
+  /// STRICT | STANDARD | RELAXED | CUSTOM | tenant-defined code
+  code                  String    @db.VarChar(32)
+  name                  String    @db.VarChar(120)
+  description           String?   @db.Text
+  futureDateMode        String    @default("CURRENT_BEHAVIOUR") @db.VarChar(32)
+  pastDateMode          String    @default("CURRENT_BEHAVIOUR") @db.VarChar(32)
+  maxFutureDays         Int?
+  maxBackDateDays       Int?
+  approvalRequired      Boolean   @default(false)
+  allowEmergencyOverride Boolean  @default(false)
+  active                Boolean   @default(true)
+  createdBy             String?
+  updatedBy             String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  policies DocumentDatePolicy[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, active])
+  @@map("document_date_policy_profiles")
+}
+
+/// Platform document date policy — scoped by tenant + optional LE/branch + module + document type.
+model DocumentDatePolicy {
+  id                     String    @id @default(uuid())
+  tenantId               String
+  legalEntityId          String?   @db.VarChar(36)
+  branchId               String?   @db.VarChar(36)
+  moduleKey              String    @db.VarChar(64)
+  documentType           String    @db.VarChar(64)
+  /// Master switch — when false, evaluators always return currentBehavior.
+  policyEnabled          Boolean   @default(false)
+  /// CURRENT_BEHAVIOUR | ALLOW | BLOCK | REQUIRE_APPROVAL
+  futureDateMode         String    @default("CURRENT_BEHAVIOUR") @db.VarChar(32)
+  /// CURRENT_BEHAVIOUR | ALLOW | BLOCK | REQUIRE_APPROVAL
+  pastDateMode           String    @default("CURRENT_BEHAVIOUR") @db.VarChar(32)
+  maxFutureDays          Int?
+  maxBackDateDays        Int?
+  approvalRequired       Boolean   @default(false)
+  allowEmergencyOverride Boolean   @default(false)
+  /// Optional free-text profile label (redundant with profileId for snapshot ergonomics)
+  policyProfile          String?   @db.VarChar(32)
+  profileId              String?
+  effectiveFrom          DateTime?
+  effectiveTo            DateTime?
+  /// Soft active for list filters; deactivate via lifecycle endpoints also sets policyEnabled=false path.
+  active                 Boolean   @default(true)
+  createdBy              String?
+  updatedBy              String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  tenant      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile     DocumentDatePolicyProfile?   @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  allowances  DocumentDatePolicyAllowance[]
+
+  @@index([tenantId])
+  @@index([tenantId, moduleKey, documentType])
+  @@index([tenantId, active, policyEnabled])
+  @@index([tenantId, legalEntityId, branchId])
+  @@index([profileId])
+  @@map("document_date_policies")
+}
+
+/// Role/user mapping for allowed / approver / override — configuration only; does not change RBAC.
+model DocumentDatePolicyAllowance {
+  id        String   @id @default(uuid())
+  tenantId  String
+  policyId  String
+  /// ALLOWED_ROLE | ALLOWED_USER | APPROVER_ROLE | OVERRIDE_ROLE
+  kind      String   @db.VarChar(32)
+  roleId    String?
+  userId    String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  policy DocumentDatePolicy  @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  role   Role?               @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user   User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, kind, roleId, userId])
+  @@index([tenantId])
+  @@index([policyId])
+  @@index([tenantId, kind])
+  @@map("document_date_policy_allowances")
+}
+
+/// Generic date-exception request for future integration — not wired to document save/post.
+model DocumentDateExceptionRequest {
+  id                     String    @id @default(uuid())
+  tenantId               String
+  moduleKey              String    @db.VarChar(64)
+  documentType           String    @db.VarChar(64)
+  documentId             String?   @db.VarChar(36)
+  requestedDocumentDate  DateTime  @db.Date
+  businessDate           DateTime  @db.Date
+  /// FUTURE_DATE | BACK_DATE
+  requestType            String    @db.VarChar(32)
+  reason                 String    @db.Text
+  requestedBy            String
+  /// PENDING | APPROVED | REJECTED | CANCELLED
+  status                 String    @default("PENDING") @db.VarChar(32)
+  approvedBy             String?
+  approvedAt             DateTime?
+  rejectionReason        String?   @db.Text
+  policySnapshot         Json?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, moduleKey, documentType])
+  @@index([tenantId, documentId])
+  @@map("document_date_exception_requests")
 }

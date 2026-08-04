@@ -17,10 +17,10 @@ export function InventoryPlaceholderPage({
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={title}
       description={description}
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: title }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: title }]}
       autoBreadcrumbs={false}
       favoritePath={`/inventory/${title.toLowerCase().replace(/\s+/g, '-')}`}
     >

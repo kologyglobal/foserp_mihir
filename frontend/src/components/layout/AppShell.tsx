@@ -40,7 +40,7 @@ export function AppShell() {
   const closeMobileNav = useUIStore((s) => s.closeMobileNav)
   const { status: apiSyncStatus, error: apiSyncError } = useCrmApiSync()
   const { status: masterSyncStatus, error: masterSyncError } = useMasterApiSync()
-  const { status: adminSyncStatus, error: adminSyncError } = useAdminApiSync()
+  useAdminApiSync()
   const [continueDespiteSyncError, setContinueDespiteSyncError] = useState(false)
 
   useEffect(() => {
@@ -61,14 +61,16 @@ export function AppShell() {
     void useTenantProfileStore.getState().hydrate()
   }, [])
 
-  if (isApiMode() && (apiSyncStatus === 'loading' || masterSyncStatus === 'loading' || adminSyncStatus === 'loading')) {
-    return <Loader fullScreen size="lg" label="Loading data from server" />
+  if (isApiMode() && (apiSyncStatus === 'loading' || masterSyncStatus === 'loading')) {
+    return <Loader fullScreen size="lg" label="Loading workspace…" />
   }
 
+  // Admin hydration is best-effort — never block the shell waiting for it.
+  // Soft failures on admin also must not trap users off work screens.
   const syncFailed =
     isApiMode() &&
-    (apiSyncStatus === 'error' || masterSyncStatus === 'error' || adminSyncStatus === 'error')
-  const syncErrorDetail = apiSyncError ?? masterSyncError ?? adminSyncError ?? 'Unknown error'
+    (apiSyncStatus === 'error' || masterSyncStatus === 'error')
+  const syncErrorDetail = apiSyncError ?? masterSyncError ?? 'Unknown error'
   const looksLikeOffline =
     /failed to fetch|networkerror|load failed/i.test(syncErrorDetail) ||
     /not routing \/api|backend running|expected json/i.test(syncErrorDetail)

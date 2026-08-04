@@ -6,6 +6,7 @@ import { EXPERIENCE_ROLE_LABELS } from '../../types/roleExperience'
 import { useMobileDraftStore } from '../../store/mobileDraftStore'
 import { mobileTaskCount } from '../../utils/mobileTasks'
 import { useEffect } from 'react'
+import { appPromptNote } from '../../store/confirmDialogStore'
 
 const SHIFT_LABELS = ['Shift A', 'Shift B', 'Shift C'] as const
 
@@ -313,8 +314,15 @@ export function MobileApprovalCard({
             type="button"
             className="mob-btn mob-btn-danger"
             onClick={() => {
-              const remarks = window.prompt('Rejection remarks (required):')
-              if (remarks?.trim()) onReject(remarks.trim())
+              void (async () => {
+                const remarks = await appPromptNote({
+                  title: 'Reject request?',
+                  confirmLabel: 'Reject',
+                  tone: 'danger',
+                  note: { required: true, label: 'Rejection remarks' },
+                })
+                if (remarks?.trim()) onReject(remarks.trim())
+              })()
             }}
           >
             Reject

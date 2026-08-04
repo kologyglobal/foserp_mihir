@@ -170,6 +170,20 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       },
     ],
   },
+  {
+    id: 'document-governance',
+    title: 'Document Governance',
+    items: [
+      {
+        id: 'date-controls',
+        label: 'Date Controls',
+        path: '/admin/document-governance/date-controls',
+        icon: SlidersHorizontal,
+        available: true,
+        description: 'Configure document date policies (configuration-only)',
+      },
+    ],
+  },
 ]
 
 export function adminBreadcrumbs(...crumbs: Array<{ label: string; to?: string }>) {

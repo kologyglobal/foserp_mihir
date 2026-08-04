@@ -1,6 +1,15 @@
 /** Incoming Quality command center — operational UI for supplier QC (Purchase QI under the hood). */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ComponentPropsWithoutRef, type ElementType, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  ClipboardCheck,
+  Package,
+  Play,
+  PlusCircle,
+  RotateCcw,
+  UserPlus,
+  AlertTriangle,
+} from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { Button } from '@/components/ui/Button'
@@ -21,6 +30,7 @@ import {
 import { notify } from '@/store/toastStore'
 import { useIncomingPendingInspections } from '@/hooks/useStableStoreData'
 import { TableLink } from '@/components/ui/AppLink'
+import { cn } from '@/utils/cn'
 
 function AgeingChip({ days, band }: { days: number; band: string }) {
   const tone =
@@ -48,6 +58,38 @@ function StatusChip({ status }: { status: string }) {
           ? 'bg-violet-50 text-violet-900'
           : 'bg-slate-100 text-slate-700'
   return <span className={`inline-flex rounded px-1.5 py-0.5 text-[11px] font-semibold ${tone}`}>{status}</span>
+}
+
+type QueueActionTone = 'primary' | 'secondary' | 'success' | 'neutral' | 'warning' | 'danger'
+
+type QueueRowActionProps<T extends ElementType> = {
+  as?: T
+  tone?: QueueActionTone
+  icon?: typeof UserPlus
+  children: ReactNode
+  className?: string
+} & Omit<ComponentPropsWithoutRef<T>, 'as' | 'className' | 'children'>
+
+/** Dense Dynamics-style row action control used in the incoming QC queue. */
+function QueueRowAction<T extends ElementType = 'button'>({
+  as,
+  tone = 'neutral',
+  icon: Icon,
+  children,
+  className,
+  ...rest
+}: QueueRowActionProps<T>) {
+  const Comp = as ?? 'button'
+  return (
+    <Comp
+      className={cn('qi-queue-action', `qi-queue-action--${tone}`, className)}
+      {...(Comp === 'button' ? { type: 'button' as const } : {})}
+      {...rest}
+    >
+      {Icon ? <Icon className="qi-queue-action__icon" aria-hidden /> : null}
+      <span className="qi-queue-action__label">{children}</span>
+    </Comp>
+  )
 }
 
 export function IncomingQcQueuePage() {
@@ -330,20 +372,22 @@ export function IncomingQcQueuePage() {
                     <td>{row.priority}</td>
                     <td className="max-w-[100px] truncate">{row.inspectorName ?? '—'}</td>
                     <td>{row.result ?? '—'}</td>
-                    <td className="whitespace-nowrap text-right">
-                      <div className="inline-flex flex-wrap justify-end gap-1">
+                    <td className="qi-queue-actions-cell">
+                      <div className="qi-queue-actions" role="group" aria-label="Row actions">
                         {!row.qualityInspectionId ? (
-                          <Link
-                            className="rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-900"
+                          <QueueRowAction
+                            as={Link}
                             to={row.hrefCreateQi}
+                            tone="secondary"
+                            icon={PlusCircle}
                           >
                             Create QI
-                          </Link>
+                          </QueueRowAction>
                         ) : null}
                         {row.allowedActions.includes('ASSIGN') ? (
-                          <button
-                            type="button"
-                            className="rounded border border-slate-200 px-1.5 py-0.5 text-[11px] font-semibold"
+                          <QueueRowAction
+                            tone="neutral"
+                            icon={UserPlus}
                             onClick={() => {
                               setAssignOpen(row)
                               setInspectorId(row.inspectorId ?? '')
@@ -352,47 +396,53 @@ export function IncomingQcQueuePage() {
                             }}
                           >
                             Assign
-                          </button>
+                          </QueueRowAction>
                         ) : null}
                         {row.allowedActions.includes('START') && row.qualityInspectionId ? (
-                          <button
-                            type="button"
-                            className="rounded border border-slate-200 px-1.5 py-0.5 text-[11px] font-semibold"
+                          <QueueRowAction
+                            tone="success"
+                            icon={Play}
                             onClick={() => void doStart(row)}
                           >
                             Start
-                          </button>
+                          </QueueRowAction>
                         ) : null}
                         {row.hrefQi ? (
-                          <Link
-                            className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-900"
+                          <QueueRowAction
+                            as={Link}
                             to={row.hrefQi}
+                            tone="primary"
+                            icon={ClipboardCheck}
                           >
                             Inspect
-                          </Link>
+                          </QueueRowAction>
                         ) : null}
-                        <button
-                          type="button"
-                          className="rounded border border-slate-200 px-1.5 py-0.5 text-[11px] font-semibold"
+                        <QueueRowAction
+                          tone="neutral"
+                          icon={Package}
                           onClick={() => void openStock(row)}
                         >
                           Stock
-                        </button>
+                        </QueueRowAction>
                         {row.qualityInspectionId && row.allowedActions.includes('CREATE_NCR') ? (
-                          <Link
-                            className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-950"
+                          <QueueRowAction
+                            as={Link}
                             to={`/purchase/quality-inspections/${row.qualityInspectionId}`}
+                            tone="warning"
+                            icon={AlertTriangle}
                           >
                             NCR
-                          </Link>
+                          </QueueRowAction>
                         ) : null}
                         {row.qualityInspectionId && row.allowedActions.includes('CREATE_RETURN') ? (
-                          <Link
-                            className="rounded border border-slate-200 px-1.5 py-0.5 text-[11px] font-semibold"
+                          <QueueRowAction
+                            as={Link}
                             to={`/purchase/returns/new?qualityInspectionId=${row.qualityInspectionId}`}
+                            tone="danger"
+                            icon={RotateCcw}
                           >
                             Return
-                          </Link>
+                          </QueueRowAction>
                         ) : null}
                       </div>
                     </td>
