@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { ErpButton } from '@/components/erp/ErpButton'
-import { Input, Select } from '@/components/forms/Inputs'
+import { DecimalInput, Input, Select } from '@/components/forms/Inputs'
 import type { Vendor } from '@/types/purchaseDomain'
 import type { FeConsolidatedGroup } from '@/utils/purchase/purchasePlanningConsolidation'
 import {
@@ -181,12 +181,10 @@ export function PurchasePlanningAllocateModal({
                     </Select>
                   </td>
                   <td className="px-2 py-1.5">
-                    <Input
-                      type="number"
+                    <DecimalInput
                       min={0}
-                      step="any"
                       value={line.quantity}
-                      onChange={(e) => patchLine(index, { quantity: Number(e.target.value) || 0 })}
+                      onChange={(v) => patchLine(index, { quantity: v })}
                     />
                   </td>
                   <td className="px-2 py-1.5">

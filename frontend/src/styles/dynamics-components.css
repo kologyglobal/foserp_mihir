@@ -13145,6 +13145,54 @@ a.crm-companies-table__name:hover {
   border-radius: 8px;
 }
 
+/* Sales Order create — Customer PO row (4-up grid, label above control) */
+.so-qe-po-group {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--erp-border, #d0d5dd) 90%, transparent);
+  background: color-mix(in srgb, #fff 92%, var(--erp-surface-alt, #f8fafc));
+}
+
+.so-qe-po-group .erp-field-group__label {
+  margin-bottom: 2px;
+  color: #64748b;
+}
+
+.so-qe-po-group .erp-field-row {
+  min-width: 0;
+}
+
+.so-qe-po-group .erp-field-row__control-wrap,
+.so-qe-po-group .erp-field-control,
+.so-qe-po-group .erp-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.so-qe-po-group .erp-form-grid {
+  gap: 12px 14px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .so-qe-po-group .erp-form-grid--cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 899px) {
+  .so-qe-po-group .erp-form-grid--cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 559px) {
+  .so-qe-po-group .erp-form-grid--cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* Quotation Validity / SO commercial: keep 4-up row even when Smart Context / factbox is open.
    Global factbox rules clamp cols-4 → 2; override like CRM quick-entry so Validity stays one row. */
 @media (min-width: 900px) {

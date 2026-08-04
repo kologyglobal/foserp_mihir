@@ -14,7 +14,7 @@ import {
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpViewField } from '@/components/erp/card-form'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { Input, Select, Textarea } from '@/components/forms/Inputs'
+import { DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/design-system/components/Modal'
@@ -325,7 +325,7 @@ export function QualityInspectionDetailPage() {
         ) : null
       }
     >
-      <ErpCardSection title="Header" defaultOpen>
+      <ErpCardSection title="Header" defaultOpen columns={1}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <ErpViewField label="Inspection Number" value={qi.documentNumber} />
           <ErpViewField label="Inspection Date" value={formatDate(qi.documentDate)} />
@@ -343,24 +343,24 @@ export function QualityInspectionDetailPage() {
           {canEdit ? (
             <>
               <ErpFieldRow label="Sample Qty">
-                <Input
-                  type="number"
+                <DecimalInput
+                  min={0}
                   value={sampleQty}
-                  onChange={(e) => setSampleQty(Number(e.target.value))}
+                  onChange={setSampleQty}
                 />
               </ErpFieldRow>
               <ErpFieldRow label="Accepted Qty">
-                <Input
-                  type="number"
+                <DecimalInput
+                  min={0}
                   value={acceptedQty}
-                  onChange={(e) => setAcceptedQty(Number(e.target.value))}
+                  onChange={setAcceptedQty}
                 />
               </ErpFieldRow>
               <ErpFieldRow label="Rejected Qty">
-                <Input
-                  type="number"
+                <DecimalInput
+                  min={0}
                   value={rejectedQty}
-                  onChange={(e) => setRejectedQty(Number(e.target.value))}
+                  onChange={setRejectedQty}
                 />
               </ErpFieldRow>
               <ErpFieldRow label="Inspection Plan" className="sm:col-span-2 lg:col-span-3">
@@ -391,43 +391,40 @@ export function QualityInspectionDetailPage() {
         </div>
       </ErpCardSection>
 
-      <ErpCardSection title="Parameters" defaultOpen>
+      <ErpCardSection title="Parameters" defaultOpen columns={1}>
         {parameters.length === 0 ? (
           <p className="text-sm text-erp-muted">
             No parameter checklist on this inspection yet. Save after create seeds Visual / Documentation defaults.
           </p>
         ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b text-xs text-erp-muted">
+        <div className="w-full min-w-0 overflow-x-auto rounded-md border border-erp-border">
+          <table className="erp-table w-full min-w-[52rem] text-[12px]">
+            <thead>
               <tr>
-                <th className="px-2 py-2">Parameter</th>
-                <th className="px-2 py-2">Specification</th>
-                <th className="px-2 py-2">Min</th>
-                <th className="px-2 py-2">Max</th>
-                <th className="px-2 py-2">Observed</th>
-                <th className="px-2 py-2">Unit</th>
-                <th className="px-2 py-2">Result</th>
-                <th className="px-2 py-2">Remarks</th>
+                <th className="min-w-[8rem] text-left">Parameter</th>
+                <th className="min-w-[10rem] text-left">Specification</th>
+                <th className="num w-28">Min</th>
+                <th className="num w-28">Max</th>
+                <th className="num w-28">Observed</th>
+                <th className="w-20">Unit</th>
+                <th className="w-28">Result</th>
+                <th className="min-w-[10rem]">Remarks</th>
               </tr>
             </thead>
             <tbody>
               {parameters.map((p, i) => (
-                <tr key={p.id} className="border-b align-top">
-                  <td className="px-2 py-2">{p.parameter}</td>
-                  <td className="px-2 py-2">{p.specification}</td>
-                  <td className="px-2 py-2">
+                <tr key={p.id} className="align-top">
+                  <td>{p.parameter}</td>
+                  <td>{p.specification}</td>
+                  <td className="num">
                     {canEdit ? (
-                      <Input
-                        type="number"
-                        className="w-20"
-                        value={p.minValue ?? ''}
-                        onChange={(e) => {
+                      <DecimalInput
+                        min={0}
+                        className="h-8 w-full min-w-[5rem] text-right"
+                        value={p.minValue ?? 0}
+                        onChange={(v) => {
                           const next = [...parameters]
-                          next[i] = {
-                            ...p,
-                            minValue: e.target.value === '' ? null : Number(e.target.value),
-                          }
+                          next[i] = { ...p, minValue: v }
                           setParameters(next)
                         }}
                       />
@@ -435,18 +432,15 @@ export function QualityInspectionDetailPage() {
                       p.minValue ?? '—'
                     )}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="num">
                     {canEdit ? (
-                      <Input
-                        type="number"
-                        className="w-20"
-                        value={p.maxValue ?? ''}
-                        onChange={(e) => {
+                      <DecimalInput
+                        min={0}
+                        className="h-8 w-full min-w-[5rem] text-right"
+                        value={p.maxValue ?? 0}
+                        onChange={(v) => {
                           const next = [...parameters]
-                          next[i] = {
-                            ...p,
-                            maxValue: e.target.value === '' ? null : Number(e.target.value),
-                          }
+                          next[i] = { ...p, maxValue: v }
                           setParameters(next)
                         }}
                       />
@@ -454,18 +448,15 @@ export function QualityInspectionDetailPage() {
                       p.maxValue ?? '—'
                     )}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="num">
                     {canEdit ? (
-                      <Input
-                        type="number"
-                        className="w-20"
-                        value={p.observedValue ?? ''}
-                        onChange={(e) => {
+                      <DecimalInput
+                        min={0}
+                        className="h-8 w-full min-w-[5rem] text-right"
+                        value={p.observedValue ?? 0}
+                        onChange={(v) => {
                           const next = [...parameters]
-                          next[i] = {
-                            ...p,
-                            observedValue: e.target.value === '' ? null : Number(e.target.value),
-                          }
+                          next[i] = { ...p, observedValue: v }
                           setParameters(next)
                         }}
                       />
@@ -473,10 +464,11 @@ export function QualityInspectionDetailPage() {
                       p.observedValue ?? '—'
                     )}
                   </td>
-                  <td className="px-2 py-2">{p.unit || '—'}</td>
-                  <td className="px-2 py-2">
+                  <td>{p.unit || '—'}</td>
+                  <td>
                     {canEdit ? (
                       <Select
+                        className="h-8 min-w-[6.5rem] text-[12px]"
                         value={p.result}
                         onChange={(e) => {
                           const next = [...parameters]
@@ -495,10 +487,10 @@ export function QualityInspectionDetailPage() {
                       p.result
                     )}
                   </td>
-                  <td className="px-2 py-2">
+                  <td>
                     {canEdit ? (
                       <Input
-                        className="w-40"
+                        className="h-8 w-full min-w-[8rem]"
                         value={p.remarks}
                         onChange={(e) => {
                           const next = [...parameters]

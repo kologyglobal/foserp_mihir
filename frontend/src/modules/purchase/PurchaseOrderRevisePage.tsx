@@ -4,7 +4,7 @@ import { AlertTriangle, RotateCw } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import { ErpCardSection, ErpFieldRow } from '@/components/erp/card-form'
 import { FormActionBar } from '@/components/erp/FormActionBar'
-import { Input, Textarea } from '@/components/forms/Inputs'
+import { DecimalInput, Input, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
@@ -408,19 +408,15 @@ export function PurchaseOrderRevisePage() {
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       <label className="text-[11px] text-erp-muted">
                         Qty ({l.uom})
-                        <Input
-                          type="number"
+                        <DecimalInput
                           min={minVendorQty}
-                          step="any"
                           className={cn(
                             'mt-1 h-9 text-right',
                             qtyChanged && 'border-erp-warning-border',
                             belowRecv && 'border-red-400',
                           )}
                           value={l.uomQuantity}
-                          onChange={(e) =>
-                            patchLine(l.id, { uomQuantity: Number(e.target.value) })
-                          }
+                          onChange={(v) => patchLine(l.id, { uomQuantity: v })}
                         />
                         <ChangedHint
                           changed={qtyChanged}
@@ -501,19 +497,15 @@ export function PurchaseOrderRevisePage() {
                           {l.originalUomQuantity}
                         </td>
                         <td className="num">
-                          <Input
-                            type="number"
+                          <DecimalInput
                             min={minVendorQty}
-                            step="any"
                             className={cn(
                               'h-8 w-full min-w-[5rem] max-w-[7rem] text-right text-[12px]',
                               qtyChanged && 'border-erp-warning-border',
                               belowRecv && 'border-red-400',
                             )}
                             value={l.uomQuantity}
-                            onChange={(e) =>
-                              patchLine(l.id, { uomQuantity: Number(e.target.value) })
-                            }
+                            onChange={(v) => patchLine(l.id, { uomQuantity: v })}
                             aria-label={`New qty for ${l.itemCode}`}
                           />
                         </td>

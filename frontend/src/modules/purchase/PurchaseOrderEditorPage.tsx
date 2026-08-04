@@ -20,6 +20,14 @@ import {
 } from '@/components/purchase/PurchaseDocumentFactBox'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { PurchaseOrderLinesTable } from '@/components/purchase/PurchaseOrderLinesTable'
+import {
+  computePoOrderDocumentTotals,
+  emptyPurchaseOrderAdjustments,
+  orderAdjustmentsFromPoCharges,
+  PurchaseOrderAdjustmentsBlock,
+  type PoLineForOrderAdjust,
+  type PurchaseOrderAdjustmentsState,
+} from '@/components/purchase/PurchaseOrderAdjustmentsBlock'
 import { PurchaseDocumentWorkflowStrip } from '@/components/purchase/PurchaseDocumentWorkflowStrip'
 import {
   PurchaseDocumentAttachments,
@@ -277,35 +285,29 @@ function computeLines(lines: PoEditorLine[], isInterstate: boolean) {
 }
 
 function aggregateTotals(
-  lines: PoEditorLine[],
-  tradeDiscount: number,
-  freight: number,
-  packingCharges: number,
+  orderTotals: ReturnType<typeof computePoOrderDocumentTotals>,
+  isInterstate: boolean,
   insuranceCharges: number,
-  otherCharges: number,
   tcsAmount: number,
 ) {
-  const subtotal = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.rate) || 0), 0)
-  const lineDiscount = lines.reduce((s, l) => s + (Number(l.discountAmount) || 0), 0)
-  const discount = lineDiscount + tradeDiscount
-  const taxableAmount = lines.reduce((s, l) => s + l.taxableAmount, 0)
-  const cgst = lines.reduce((s, l) => s + l.cgst, 0)
-  const sgst = lines.reduce((s, l) => s + l.sgst, 0)
-  const igst = lines.reduce((s, l) => s + l.igst, 0)
-  const rawTotal =
-    taxableAmount + cgst + sgst + igst + freight + packingCharges + insuranceCharges + otherCharges + tcsAmount
+  const insurance = Number(insuranceCharges) || 0
+  const tcs = Number(tcsAmount) || 0
+  const gst = orderTotals.gstAmount
+  const half = Number((gst / 2).toFixed(2))
+  const rawTotal = orderTotals.grandTotal + insurance + tcs
   const totalAmount = Math.round(rawTotal)
   const roundOff = Number((totalAmount - rawTotal).toFixed(2))
   return {
-    subtotal: Number(subtotal.toFixed(2)),
-    lineDiscount: Number(lineDiscount.toFixed(2)),
-    discount: Number(discount.toFixed(2)),
-    taxableAmount: Number(taxableAmount.toFixed(2)),
-    cgst: Number(cgst.toFixed(2)),
-    sgst: Number(sgst.toFixed(2)),
-    igst: Number(igst.toFixed(2)),
+    subtotal: orderTotals.basicAmount,
+    lineDiscount: orderTotals.itemDiscountAmount,
+    discount: orderTotals.itemDiscountAmount + orderTotals.orderDiscount.calculatedAmount,
+    taxableAmount: orderTotals.discountedTaxableAmount,
+    cgst: isInterstate ? 0 : half,
+    sgst: isInterstate ? 0 : half,
+    igst: isInterstate ? gst : 0,
     roundOff,
     totalAmount,
+    orderTotals,
   }
 }
 
@@ -479,6 +481,9 @@ export function PurchaseOrderEditorPage() {
 
   const [header, setHeader] = useState<PoEditorHeader>(defaultHeader)
   const [lines, setLines] = useState<PoEditorLine[]>(() => (isNew ? createBlankPoLines(3) : []))
+  const [orderAdjustments, setOrderAdjustments] = useState<PurchaseOrderAdjustmentsState>(
+    emptyPurchaseOrderAdjustments,
+  )
   const [attachments, setAttachments] = useState<PurchaseDocumentAttachmentRow[]>([])
   const [, setActiveSection] = useState('general')
   const [attemptedMode, setAttemptedMode] = useState<'draft' | 'submit' | null>(null)
@@ -629,18 +634,19 @@ export function PurchaseOrderEditorPage() {
   )
   const showErrors = attemptedMode !== null
   const activeValidation = attemptedMode === 'draft' ? draftValidation : validation
+  const orderDocumentTotals = useMemo(
+    () => computePoOrderDocumentTotals(computedLines, orderAdjustments),
+    [computedLines, orderAdjustments],
+  )
   const totals = useMemo(
     () =>
       aggregateTotals(
-        computedLines,
-        Number(header.tradeDiscount) || 0,
-        Number(header.freight) || 0,
-        Number(header.packingCharges) || 0,
+        orderDocumentTotals,
+        isInterstate,
         Number(header.insuranceCharges) || 0,
-        Number(header.otherCharges) || 0,
         Number(header.tcsAmount) || 0,
       ),
-    [computedLines, header.tradeDiscount, header.freight, header.packingCharges, header.insuranceCharges, header.otherCharges, header.tcsAmount],
+    [orderDocumentTotals, isInterstate, header.insuranceCharges, header.tcsAmount],
   )
 
   const gstTotal = totals.cgst + totals.sgst + totals.igst
@@ -997,7 +1003,9 @@ export function PurchaseOrderEditorPage() {
       setStatus(po.status)
       setRevisionNo(po.revisionNo)
       setOriginMode(po.origin)
-      setHeader(headerFromPo(po))
+      const loadedHeader = headerFromPo(po)
+      setHeader(loadedHeader)
+      setOrderAdjustments(orderAdjustmentsFromPoCharges(loadedHeader))
       setLines(linesFromPo(po))
       setAttachments(purchaseAttachmentRowsFromIds(po.attachmentIds ?? [], { uploadedBy: ACTOR.name }))
       setCreatedMeta({ by: po.createdBy, at: po.createdAt })
@@ -1048,13 +1056,13 @@ export function PurchaseOrderEditorPage() {
       internalNotes: header.internalNotes,
       remarks: header.remarks,
       attachmentIds,
-      freight: Number(header.freight) || 0,
-      otherCharges: Number(header.otherCharges) || 0,
-      packingCharges: Number(header.packingCharges) || 0,
+      freight: orderDocumentTotals.freight.calculatedAmount,
+      otherCharges: orderDocumentTotals.otherCharges.calculatedAmount,
+      packingCharges: orderDocumentTotals.installation.calculatedAmount,
       insuranceCharges: Number(header.insuranceCharges) || 0,
-      tradeDiscount: Number(header.tradeDiscount) || 0,
+      tradeDiscount: orderDocumentTotals.orderDiscount.calculatedAmount,
       tcsAmount: Number(header.tcsAmount) || 0,
-      discount: totals.lineDiscount + (Number(header.tradeDiscount) || 0),
+      discount: totals.discount,
       lines: computedLines
         .filter((l) => l.itemId || l.itemCode.trim() || l.itemName.trim())
         .map(({ key: _key, productType: _productType, ...rest }) => ({
@@ -1064,7 +1072,7 @@ export function PurchaseOrderEditorPage() {
             'raw_material') as PurchaseItemCategory,
         })),
     }
-  }, [attachmentIds, computedLines, header, totals.lineDiscount, locationOptions, ACTOR])
+  }, [attachmentIds, computedLines, header, orderDocumentTotals, totals.discount, locationOptions, ACTOR])
 
   const revealValidation = useCallback(
     (result: typeof validation, mode: 'draft' | 'submit') => {
@@ -1592,6 +1600,19 @@ export function PurchaseOrderEditorPage() {
                 </p>
               ) : null}
             </div>
+            <PurchaseOrderAdjustmentsBlock
+              className="mt-4"
+              lines={computedLines}
+              value={orderAdjustments}
+              readOnly={!editable}
+              computeTotals={(lines, adj) =>
+                computePoOrderDocumentTotals(lines as PoLineForOrderAdjust[], adj)
+              }
+              onChange={(next) => {
+                setOrderAdjustments(next)
+                markDirty()
+              }}
+            />
           </ErpCardSection>
 
           <ErpCardSection
@@ -1621,28 +1642,32 @@ export function PurchaseOrderEditorPage() {
                   value: formatCurrency(totals.lineDiscount),
                 },
                 {
-                  id: 'tradeDiscount',
-                  label: 'Trade Discount',
-                  kind: 'input',
-                  value: header.tradeDiscount,
-                  disabled: !editable,
-                  onChange: (v) => patchHeader({ tradeDiscount: v }),
+                  id: 'orderDiscount',
+                  label: 'Order Discount',
+                  kind: 'value',
+                  value: formatCurrency(orderDocumentTotals.orderDiscount.calculatedAmount),
+                  hidden: orderDocumentTotals.orderDiscount.calculatedAmount <= 0,
                 },
                 {
                   id: 'freight',
                   label: 'Freight',
-                  kind: 'input',
-                  value: header.freight,
-                  disabled: !editable,
-                  onChange: (v) => patchHeader({ freight: v }),
+                  kind: 'value',
+                  value: formatCurrency(orderDocumentTotals.freight.calculatedAmount),
+                  hidden: orderDocumentTotals.freight.calculatedAmount <= 0,
                 },
                 {
-                  id: 'packing',
-                  label: 'Packing Charges',
-                  kind: 'input',
-                  value: header.packingCharges,
-                  disabled: !editable,
-                  onChange: (v) => patchHeader({ packingCharges: v }),
+                  id: 'installation',
+                  label: 'Installation',
+                  kind: 'value',
+                  value: formatCurrency(orderDocumentTotals.installation.calculatedAmount),
+                  hidden: orderDocumentTotals.installation.calculatedAmount <= 0,
+                },
+                {
+                  id: 'other',
+                  label: 'Other Charges',
+                  kind: 'value',
+                  value: formatCurrency(orderDocumentTotals.otherCharges.calculatedAmount),
+                  hidden: orderDocumentTotals.otherCharges.calculatedAmount <= 0,
                 },
                 {
                   id: 'insurance',
@@ -1651,14 +1676,6 @@ export function PurchaseOrderEditorPage() {
                   value: header.insuranceCharges,
                   disabled: !editable,
                   onChange: (v) => patchHeader({ insuranceCharges: v }),
-                },
-                {
-                  id: 'other',
-                  label: 'Other Charges',
-                  kind: 'input',
-                  value: header.otherCharges,
-                  disabled: !editable,
-                  onChange: (v) => patchHeader({ otherCharges: v }),
                 },
                 {
                   id: 'tcs',

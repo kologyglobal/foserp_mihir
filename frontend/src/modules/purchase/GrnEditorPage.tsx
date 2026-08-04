@@ -19,7 +19,7 @@ import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared
 import { ErpCardSection, ErpFieldRow, ErpFormSpan } from '@/components/erp/card-form'
 import { ErpSmartSelect } from '@/components/erp/ErpSmartSelect'
 import { FormActionBar } from '@/components/erp/FormActionBar'
-import { Input, Select, Textarea } from '@/components/forms/Inputs'
+import { DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
@@ -1245,15 +1245,14 @@ export function GrnEditorPage() {
                   <td className="num">{formatNumber(l.previouslyReceivedQty)}</td>
                   <td className="num">{formatNumber(l.pendingQty)}</td>
                   <td className="num">
-                    <Input
-                      type="number"
+                    <DecimalInput
                       className="w-24"
                       min={0}
-                      value={l.receivedUomQty ?? l.receivedQty}
-                      onChange={(e) =>
+                      value={Number(l.receivedUomQty ?? l.receivedQty) || 0}
+                      onChange={(v) =>
                         updateLine(i, {
-                          receivedUomQty: Number(e.target.value),
-                          receivedQty: Number(e.target.value),
+                          receivedUomQty: v,
+                          receivedQty: v,
                         })
                       }
                     />
@@ -1287,26 +1286,26 @@ export function GrnEditorPage() {
                   </td>
                   <td>
                     <div className="flex gap-1">
-                      <Input
-                        type="number"
+                      <DecimalInput
                         className="w-16"
+                        min={0}
                         title="Short"
-                        value={l.shortQty}
-                        onChange={(e) => updateLine(i, { shortQty: Number(e.target.value) })}
+                        value={Number(l.shortQty) || 0}
+                        onChange={(v) => updateLine(i, { shortQty: v })}
                       />
-                      <Input
-                        type="number"
+                      <DecimalInput
                         className="w-16"
+                        min={0}
                         title="Excess"
-                        value={l.excessQty}
-                        onChange={(e) => updateLine(i, { excessQty: Number(e.target.value) })}
+                        value={Number(l.excessQty) || 0}
+                        onChange={(v) => updateLine(i, { excessQty: v })}
                       />
-                      <Input
-                        type="number"
+                      <DecimalInput
                         className="w-16"
+                        min={0}
                         title="Damaged"
-                        value={l.damagedQty}
-                        onChange={(e) => updateLine(i, { damagedQty: Number(e.target.value) })}
+                        value={Number(l.damagedQty) || 0}
+                        onChange={(v) => updateLine(i, { damagedQty: v })}
                       />
                     </div>
                   </td>

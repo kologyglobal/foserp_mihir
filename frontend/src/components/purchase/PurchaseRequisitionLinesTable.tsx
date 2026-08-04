@@ -6,6 +6,7 @@ import {
   type PurchaseItemCodeCatalogOption,
 } from '@/components/purchase/PurchaseItemCodeCell'
 import { Select } from '@/components/forms/Inputs'
+import { PurchaseLineQtyCell } from '@/components/purchase/PurchaseLineQtyCell'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableLink } from '@/components/ui/AppLink'
 import { useBinCodeOptions } from '@/hooks/usePurchaseMasters'
@@ -23,6 +24,10 @@ import {
 } from '@/types/taxMaster'
 import type { Vendor } from '@/types/purchaseDomain'
 import { formatDate } from '@/utils/dates/format'
+import {
+  getPurchaseLineUomOptions,
+  purchaseQtyToBaseQty,
+} from '@/utils/purchaseLineUom'
 
 export type PurchaseRequisitionLinesTableProps = {
   lines: PrEditorLine[]
@@ -127,12 +132,6 @@ export function PurchaseRequisitionLinesTable({
     productType: EngineeringProductType | '' | null | undefined,
     selectedItemId?: string,
   ) => {
-    if (!productType) {
-      if (!selectedItemId) return []
-      const selected = catalogItems.find((i) => i.id === selectedItemId)
-      return selected ? [selected] : []
-    }
-    // Strict filter by row Product Type (matches PO / Item Master engineering types).
     const filtered = filterPurchaseCatalogByProductType(catalogItems, productType)
     if (!selectedItemId) return filtered
     if (filtered.some((i) => i.id === selectedItemId)) return filtered
@@ -152,6 +151,7 @@ export function PurchaseRequisitionLinesTable({
         itemName: '',
         uomId: null,
         uom: 'NOS',
+        uomConversionFactor: 1,
         hsnCode: '',
         sacCode: null,
         estimatedRate: 0,
@@ -182,6 +182,7 @@ export function PurchaseRequisitionLinesTable({
       itemName: '',
       uomId: null,
       uom: 'NOS',
+      uomConversionFactor: 1,
       hsnCode: '',
       sacCode: null,
       estimatedRate: 0,
@@ -352,11 +353,18 @@ export function PurchaseRequisitionLinesTable({
                           emptyCatalogHint={
                             line.productType
                               ? 'No items for this product type'
-                              : 'No matching items'
+                              : 'No items in catalog'
                           }
                           onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
                           onClearCatalog={() =>
-                            patch(line.key, { itemId: '', itemCode: '', itemName: '' })
+                            patch(line.key, {
+                              itemId: '',
+                              itemCode: '',
+                              itemName: '',
+                              uomId: null,
+                              uom: 'NOS',
+                              uomConversionFactor: 1,
+                            })
                           }
                           onManualCodeChange={() => undefined}
                         />
@@ -397,28 +405,79 @@ export function PurchaseRequisitionLinesTable({
                       onKeyDown={rowEditable ? onCellKeyDown : undefined}
                     >
                       {rowEditable ? (
-                        <input
-                          type="number"
-                          min={0}
-                          step="any"
-                          className="erp-input h-8 w-20 text-right text-[12px]"
-                          value={line.quantity}
-                          onChange={(e) => patch(line.key, { quantity: Number(e.target.value) })}
+                        <PurchaseLineQtyCell
+                          line={{
+                            itemId: line.itemId,
+                            uom: line.uom,
+                            uomQuantity: line.quantity,
+                            quantity: purchaseQtyToBaseQty(
+                              line.quantity,
+                              line.uomConversionFactor ?? 1,
+                            ),
+                            uomConversionFactor: line.uomConversionFactor ?? 1,
+                          }}
+                          editable
+                          disabled={!rowEditable}
+                          onChange={(v) => patch(line.key, { quantity: v })}
                         />
                       ) : (
-                        <span className="tabular-nums">{line.quantity}</span>
+                        <PurchaseLineQtyCell
+                          line={{
+                            itemId: line.itemId,
+                            uom: line.uom,
+                            uomQuantity: line.quantity,
+                            quantity: purchaseQtyToBaseQty(
+                              line.quantity,
+                              line.uomConversionFactor ?? 1,
+                            ),
+                            uomConversionFactor: line.uomConversionFactor ?? 1,
+                          }}
+                        />
                       )}
                     </td>
                     <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
-                      {rowEditable ? (
-                        <input
-                          className="erp-input h-8 w-16 text-[12px]"
-                          value={line.uom}
-                          onChange={(e) => patch(line.key, { uom: e.target.value })}
-                        />
-                      ) : (
-                        displayOrDash(line.uom)
-                      )}
+                      {(() => {
+                        const uomOptions = getPurchaseLineUomOptions(line.itemId)
+                        const multi = uomOptions.length > 1
+                        const uomCode =
+                          uomOptions.find((o) => o.id === line.uomId)?.code || line.uom || '—'
+                        if (!rowEditable || !line.itemId) {
+                          return (
+                            <span className="block text-center text-[11px] font-medium uppercase text-erp-text">
+                              {line.uom || '—'}
+                            </span>
+                          )
+                        }
+                        if (multi) {
+                          return (
+                            <Select
+                              className="h-8 w-full max-w-[4.5rem] px-0.5 text-center text-[10px]"
+                              value={line.uomId || uomOptions[0]?.id || ''}
+                              title="Select purchase unit from Item Master"
+                              onChange={(e) => {
+                                const opt = uomOptions.find((o) => o.id === e.target.value)
+                                if (!opt) return
+                                patch(line.key, {
+                                  uomId: opt.id,
+                                  uom: opt.code,
+                                  uomConversionFactor: opt.factor,
+                                })
+                              }}
+                            >
+                              {uomOptions.map((o) => (
+                                <option key={o.id} value={o.id}>
+                                  {o.code}
+                                </option>
+                              ))}
+                            </Select>
+                          )
+                        }
+                        return (
+                          <span className="block text-center text-[11px] font-medium uppercase text-erp-text">
+                            {uomCode}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="num" onKeyDown={rowEditable ? onCellKeyDown : undefined}>
                       {rowEditable ? (

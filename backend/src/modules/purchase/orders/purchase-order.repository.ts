@@ -3,25 +3,31 @@ import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListPurchaseOrdersQuery } from './purchase-order.validation.js'
 
-const includeOrderBase = {
+const includeOrderLineList = {
+  uom: { select: { id: true, code: true, name: true } },
+  bin: { select: { id: true, code: true, name: true } },
+} as const
+
+const includeOrderLineDetail = {
+  ...includeOrderLineList,
+  prSources: {
+    orderBy: { createdAt: 'asc' as const },
+    select: {
+      id: true,
+      purchaseRequisitionId: true,
+      purchaseRequisitionLineId: true,
+      purchasePlanningRowId: true,
+      requisitionNumber: true,
+      planningNumber: true,
+      quantity: true,
+    },
+  },
+} as const
+
+const includeOrderList = {
   lines: {
     orderBy: { lineNumber: 'asc' as const },
-    include: {
-      uom: { select: { id: true, code: true, name: true } },
-      bin: { select: { id: true, code: true, name: true } },
-      prSources: {
-        orderBy: { createdAt: 'asc' as const },
-        select: {
-          id: true,
-          purchaseRequisitionId: true,
-          purchaseRequisitionLineId: true,
-          purchasePlanningRowId: true,
-          requisitionNumber: true,
-          planningNumber: true,
-          quantity: true,
-        },
-      },
-    },
+    include: includeOrderLineList,
   },
   vendor: {
     select: {
@@ -50,11 +56,16 @@ const includeOrderBase = {
   },
 } as const
 
-/** List: skip revision snapshots (lighter). Detail/update: include history. */
-const includeOrderList = includeOrderBase
-
+/** Detail/update: line PR traceability + revision history. */
 const includeOrderDetail = {
-  ...includeOrderBase,
+  lines: {
+    orderBy: { lineNumber: 'asc' as const },
+    include: includeOrderLineDetail,
+  },
+  vendor: includeOrderList.vendor,
+  purchaseRequisition: includeOrderList.purchaseRequisition,
+  requestForQuotation: includeOrderList.requestForQuotation,
+  deliveryWarehouse: includeOrderList.deliveryWarehouse,
   revisions: {
     orderBy: { revisionNo: 'desc' as const },
     take: 50,
