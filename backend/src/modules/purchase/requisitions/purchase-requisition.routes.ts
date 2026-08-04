@@ -11,6 +11,7 @@ import {
   rejectPurchaseRequisitionSchema,
   sendBackPurchaseRequisitionSchema,
   updatePurchaseRequisitionSchema,
+  revisePurchaseRequisitionSchema,
 } from './purchase-requisition.validation.js'
 
 const router = Router({ mergeParams: true })
@@ -96,6 +97,21 @@ router.post(
   validateParams(uuidParamSchema),
   validateBody(lifecycleRemarksSchema),
   controller.reopenPurchaseRequisition,
+)
+
+router.get(
+  '/:id/revisions',
+  requirePermission('purchase.pr.view'),
+  validateParams(uuidParamSchema),
+  controller.listPurchaseRequisitionRevisions,
+)
+
+router.post(
+  '/:id/revise',
+  requirePermission('purchase.pr.revise'),
+  validateParams(uuidParamSchema),
+  validateBody(revisePurchaseRequisitionSchema),
+  controller.revisePurchaseRequisition,
 )
 
 router.post(

@@ -4,6 +4,7 @@ import { PurchaseModuleDashboard } from '../modules/purchase/PurchaseModuleDashb
 import {
   PurchaseRequisitionListPage,
   PurchaseRequisitionDetailPage,
+  PurchaseRequisitionRevisePage,
 } from '../modules/purchase/PurchasePages'
 import { RfqListPage } from '../modules/purchase/RfqListPage'
 import { RfqDetailPage } from '../modules/purchase/RfqDetailPage'
@@ -73,6 +74,7 @@ export const purchaseRouteChildren = [
   { path: 'requisitions', element: <PurchaseRequisitionListPage /> },
   { path: 'requisitions/new', element: <PurchaseRequisitionFormPage /> },
   { path: 'requisitions/:id/edit', element: <PurchaseRequisitionEditPage /> },
+  { path: 'requisitions/:id/revise', element: <PurchaseRequisitionRevisePage /> },
   { path: 'requisitions/:id/print', element: <PurchaseRequisitionPrintPage /> },
   { path: 'requisitions/:id', element: <PurchaseRequisitionDetailPage /> },
   { path: 'planning-sheet', element: <PurchasePlanningSheetPage /> },

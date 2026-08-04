@@ -4,6 +4,7 @@ import { asyncHandler } from '../../../utils/asyncHandler.js'
 import { buildPaginationMeta } from '../../../utils/pagination.js'
 import { sendCreated, sendPaginated, sendSuccess } from '../../../utils/response.js'
 import * as service from './purchase-requisition.service.js'
+import * as revisionService from './purchase-requisition-revision.service.js'
 import { convertPurchaseRequisitionToRfq } from '../rfq/rfq.service.js'
 
 export const listPurchaseRequisitions = asyncHandler(async (req: Request, res: Response) => {
@@ -119,6 +120,27 @@ export const reopenPurchaseRequisition = asyncHandler(async (req: Request, res: 
     req.body ?? {},
   )
   sendSuccess(res, 'Purchase requisition reopened', data)
+})
+
+export const listPurchaseRequisitionRevisions = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const data = await revisionService.listPurchaseRequisitionRevisions(
+    tenantId,
+    getRouteParam(req, 'id'),
+  )
+  sendSuccess(res, 'Purchase requisition revisions retrieved', data)
+})
+
+export const revisePurchaseRequisition = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const { userId } = getContext(req)
+  const data = await revisionService.revisePurchaseRequisition(
+    tenantId,
+    getRouteParam(req, 'id'),
+    userId,
+    req.body,
+  )
+  sendSuccess(res, 'Purchase requisition revised', data)
 })
 
 export const convertPrToRfq = asyncHandler(async (req: Request, res: Response) => {

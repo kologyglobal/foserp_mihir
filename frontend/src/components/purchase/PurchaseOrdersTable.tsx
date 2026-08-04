@@ -3,6 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import {
   Ban,
   Eye,
+  PackagePlus,
   Pencil,
   Printer,
   RotateCcw,
@@ -21,7 +22,10 @@ import { CrmListFilterBar, type CrmListFilterBarProps } from '../crm/CrmListFilt
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { cn } from '../../utils/cn'
-import type { PurchaseOrderListRow } from '../../types/purchaseDomain'
+import type {
+  PurchaseOrderDomainStatus,
+  PurchaseOrderListRow,
+} from '../../types/purchaseDomain'
 import {
   canPurchasePermission,
   getPurchasePermissionDenialReason,
@@ -32,11 +36,20 @@ export interface PurchaseOrderRowHandlers {
   onEdit: (row: PurchaseOrderListRow) => void
   onSubmit: (row: PurchaseOrderListRow) => void
   onPrint: (row: PurchaseOrderListRow) => void
+  onCreateGrn: (row: PurchaseOrderListRow) => void
   onReopen: (row: PurchaseOrderListRow) => void
   /** Withdraws a Pending Approved order back to Open. */
   onCancel: (row: PurchaseOrderListRow) => void
   onDelete: (row: PurchaseOrderListRow) => void
 }
+
+const PO_RECEIVABLE_STATUSES: PurchaseOrderDomainStatus[] = [
+  'approved',
+  'released',
+  'partially_received',
+  'fully_received',
+  'invoiced',
+]
 
 function buildRowActions(
   row: PurchaseOrderListRow,
@@ -56,6 +69,9 @@ function buildRowActions(
 
   const canEditPerm = canPurchasePermission('purchase.po.edit')
   const canCancelPerm = canPurchasePermission('purchase.po.cancel')
+  const canCreateGrnPerm = canPurchasePermission('purchase.grn.create')
+  const canCreateGrn =
+    PO_RECEIVABLE_STATUSES.includes(status) && row.receivedPercentage < 100
 
   return [
     { id: 'view', label: 'View', icon: Eye, onClick: () => handlers.onView(row) },
@@ -106,6 +122,18 @@ function buildRowActions(
         : `${statusLabel} purchase orders cannot be deleted`,
     },
     { id: 'print', label: 'Print', icon: Printer, onClick: () => handlers.onPrint(row) },
+    {
+      id: 'create-grn',
+      label: 'Create GRN',
+      icon: PackagePlus,
+      onClick: () => handlers.onCreateGrn(row),
+      disabled: !canCreateGrnPerm || !canCreateGrn,
+      disabledReason: !canCreateGrnPerm
+        ? getPurchasePermissionDenialReason('purchase.grn.create')
+        : row.receivedPercentage >= 100
+          ? 'Purchase order is fully received'
+          : `${statusLabel} purchase orders cannot receive goods`,
+    },
     {
       id: 'reopen',
       label: 'Reopen',
@@ -201,11 +229,11 @@ export function PurchaseOrdersTable({
         ),
       },
       {
-        accessorKey: 'buyerName',
-        header: 'Buyer',
-        meta: { columnLabel: 'Buyer' },
+        accessorKey: 'createdByName',
+        header: 'Created By',
+        meta: { columnLabel: 'Created By' },
         cell: ({ row }) => (
-          <span className="whitespace-nowrap">{row.original.buyerName || '—'}</span>
+          <span className="whitespace-nowrap">{row.original.createdByName || '—'}</span>
         ),
       },
       {

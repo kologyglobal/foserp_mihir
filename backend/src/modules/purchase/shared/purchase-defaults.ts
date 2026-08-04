@@ -36,7 +36,12 @@ export type EffectivePurchaseDefaults = {
   allowOverReceipt: boolean
   overReceiptTolerancePct: number
   requireApprovalOnPoRevision: boolean
+  requireApprovalOnPrRevision: boolean
   requireApprovalOnPo: boolean
+  requirePoReleaseWorkflow: boolean
+  allowBackdatedPo: boolean
+  backdatedPoDaysLimit: number
+  requireApprovalForBackdatedPo: boolean
   allowShortClose: boolean
   requireVendorChallan: boolean
   requireVehicleNumber: boolean
@@ -136,9 +141,24 @@ function mapTenantSetup(tenantSetup: NonNullable<
     requireApprovalOnPoRevision: Boolean(
       (tenantSetup as { requireApprovalOnPoRevision?: boolean }).requireApprovalOnPoRevision ?? true,
     ),
+    requireApprovalOnPrRevision: Boolean(
+      (tenantSetup as { requireApprovalOnPrRevision?: boolean }).requireApprovalOnPrRevision ?? true,
+    ),
     requireApprovalOnPo: Boolean(
       (tenantSetup as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
     ),
+    requirePoReleaseWorkflow: Boolean(
+      (tenantSetup as { requirePoReleaseWorkflow?: boolean }).requirePoReleaseWorkflow !== false,
+    ),
+    allowBackdatedPo: Boolean(
+      (tenantSetup as { allowBackdatedPo?: boolean }).allowBackdatedPo ?? false,
+    ),
+    backdatedPoDaysLimit: Number(
+      (tenantSetup as { backdatedPoDaysLimit?: number }).backdatedPoDaysLimit ?? 0,
+    ),
+    requireApprovalForBackdatedPo:
+      (tenantSetup as { requireApprovalForBackdatedPo?: boolean }).requireApprovalForBackdatedPo !==
+      false,
     allowShortClose: tenantSetup.allowShortClose,
     requireVendorChallan: tenantSetup.requireVendorChallan,
     requireVehicleNumber: tenantSetup.requireVehicleNumber,

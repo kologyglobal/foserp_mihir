@@ -69,3 +69,13 @@ export async function recalculatePlanningApi(payload: ApiRecalculatePlanningPayl
     body: JSON.stringify({ rowIds: payload.rowIds ?? [] }),
   })
 }
+
+export async function splitPlanningRowApi(
+  id: string,
+  payload: { splits: Array<{ vendorId: string; allocatedQuantity: number }> },
+) {
+  return apiRequest<ApiPurchasePlanningRow[]>(`${base()}/${id}/split`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}

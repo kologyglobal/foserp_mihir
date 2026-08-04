@@ -30,6 +30,7 @@ export const PURCHASE_AUDIT_ACTION = {
   PR_REJECTED: 'PR_REJECTED',
   PR_SENT_BACK: 'PR_SENT_BACK',
   PR_REOPENED: 'PR_REOPENED',
+  PR_REVISED: 'PR_REVISED',
   PR_CANCELLED: 'PR_CANCELLED',
   PR_RFQ_DECISION_CHANGED: 'PR_RFQ_DECISION_CHANGED',
   // Planning
@@ -96,6 +97,7 @@ export const PURCHASE_AUDIT_ACTION_LABELS: Record<string, string> = {
   PR_REJECTED: 'Rejected',
   PR_SENT_BACK: 'Sent back',
   PR_REOPENED: 'Reopened',
+  PR_REVISED: 'Revised',
   PR_CANCELLED: 'Cancelled',
   PR_RFQ_DECISION_CHANGED: 'RFQ decision changed',
   PPS_ROW_GENERATED: 'Planning row generated',

@@ -106,6 +106,7 @@ async function createPlanningRowFromLine(
       currentStockQuantity,
       openPurchaseOrderQuantity,
       netPurchaseQuantity,
+      allocatedQuantity: netPurchaseQuantity,
       preferredVendorId: line.preferredVendorId,
       selectedVendorId: line.preferredVendorId,
       lastPurchaseVendorId: line.preferredVendorId,

@@ -454,6 +454,7 @@ function normalizeSeedPr(raw: Record<string, unknown>): PurchaseRequisition {
   return {
     id: String(raw.id),
     documentNumber: String(raw.documentNumber),
+    revisionNo: Number(raw.revisionNo ?? 0),
     documentDate: String(raw.documentDate),
     status: raw.status as PurchaseRequisition['status'],
     location: (raw.location as PurchaseRequisition['location']) ?? { ...PURCHASE_DEMO_LOCATION },

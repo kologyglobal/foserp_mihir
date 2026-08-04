@@ -109,3 +109,17 @@ export async function sendBackPurchaseRequisitionApi(
     body: JSON.stringify(payload),
   })
 }
+
+export async function listPurchaseRequisitionRevisionsApi(id: string) {
+  return apiRequest<unknown[]>(`${base()}/${id}/revisions`)
+}
+
+export async function revisePurchaseRequisitionApi(
+  id: string,
+  payload: Record<string, unknown>,
+) {
+  return apiRequest<ApiPurchaseRequisition>(`${base()}/${id}/revise`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}

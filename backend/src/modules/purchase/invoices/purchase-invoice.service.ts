@@ -92,10 +92,29 @@ async function resolveReferences(
   const vendor = await prisma.masterVendor.findFirst({ where: { id: input.vendorId, ...tenantActiveFilter(tenantId), status: 'ACTIVE' } })
   if (!vendor) throw new PurchaseInvoiceValidationError('Vendor not found or inactive.', [{ field: 'vendorId', message: 'Vendor not found or inactive.' }])
   const po = input.purchaseOrderId
-    ? await prisma.purchaseOrder.findFirst({ where: { id: input.purchaseOrderId, ...tenantActiveFilter(tenantId), vendorId: input.vendorId }, include: { lines: true } })
+    ? await prisma.purchaseOrder.findFirst({
+        where: { id: input.purchaseOrderId, ...tenantActiveFilter(tenantId), vendorId: input.vendorId },
+        include: {
+          lines: {
+            include: {
+              uom: { select: { code: true } },
+              item: { include: { baseUom: { select: { code: true } }, purchaseUom: { select: { code: true } } } },
+            },
+          },
+        },
+      })
     : null
   const grn = input.goodsReceiptId
-    ? await prisma.goodsReceipt.findFirst({ where: { id: input.goodsReceiptId, ...tenantActiveFilter(tenantId), vendorId: input.vendorId }, include: { lines: true } })
+    ? await prisma.goodsReceipt.findFirst({
+        where: { id: input.goodsReceiptId, ...tenantActiveFilter(tenantId), vendorId: input.vendorId },
+        include: {
+          lines: {
+            include: {
+              item: { include: { baseUom: { select: { code: true } }, purchaseUom: { select: { code: true } } } },
+            },
+          },
+        },
+      })
     : null
   if (input.purchaseOrderId && !po) throw new PurchaseInvoiceValidationError('Purchase order does not belong to this tenant and vendor.', [{ field: 'purchaseOrderId', message: 'Invalid purchase order.' }])
   if (input.goodsReceiptId && !grn) throw new PurchaseInvoiceValidationError('Goods receipt does not belong to this tenant and vendor.', [{ field: 'goodsReceiptId', message: 'Invalid goods receipt.' }])
@@ -107,6 +126,54 @@ async function resolveReferences(
   if (defaults.requireGrnMatch && !grn) errors.push({ field: 'goodsReceiptId', message: 'Goods receipt match is required.' })
   if (errors.length) throw new PurchaseInvoiceValidationError('Invoice matching requirements are not met.', errors)
   return { vendor, po, grn, direct }
+}
+
+function dualUomSnapshots(
+  quantity: number,
+  poLine?: {
+    quantity: unknown
+    uomQuantity: unknown
+    uomConversionFactor: unknown
+    uom?: { code?: string | null } | null
+    item?: { baseUom?: { code?: string | null } | null; purchaseUom?: { code?: string | null } | null } | null
+  },
+  grnLine?: {
+    receivedQuantity: unknown
+    receivedUomQuantity: unknown
+    uomConversionFactor: unknown
+    uomCodeSnapshot: string
+    item?: { baseUom?: { code?: string | null } | null; purchaseUom?: { code?: string | null } | null } | null
+  },
+  inputUom?: string,
+) {
+  const factor = Number(poLine?.uomConversionFactor ?? grnLine?.uomConversionFactor ?? 1) || 1
+  const purchaseUom = (
+    poLine?.uom?.code ??
+    poLine?.item?.purchaseUom?.code ??
+    grnLine?.uomCodeSnapshot ??
+    inputUom ??
+    ''
+  ).trim().toUpperCase()
+  const stockUom = (
+    poLine?.item?.baseUom?.code ??
+    grnLine?.item?.baseUom?.code ??
+    inputUom ??
+    purchaseUom
+  ).trim().toUpperCase()
+  const poBase = Number(poLine?.quantity) || 0
+  const grnBase = Number(grnLine?.receivedQuantity) || 0
+  let uomQty = factor === 1 ? quantity : quantity * factor
+  if (poLine && poBase > 0) {
+    uomQty = (Number(poLine.uomQuantity) / poBase) * quantity
+  } else if (grnLine && grnBase > 0) {
+    uomQty = (Number(grnLine.receivedUomQuantity) / grnBase) * quantity
+  }
+  return {
+    uomCodeSnapshot: stockUom || inputUom || '',
+    purchaseUomCodeSnapshot: purchaseUom || null,
+    uomQuantitySnapshot: uomQty,
+    uomConversionFactorSnapshot: factor,
+  }
 }
 
 function buildLines(
@@ -126,6 +193,7 @@ function buildLines(
     const rate = invoiceQty(input.rate)
     const amount = invoiceMoney(quantity * rate)
     const taxAmount = invoiceMoney(amount * invoiceQty(input.taxRatePct) / 100)
+    const dual = dualUomSnapshots(quantity, poLine, grnLine, input.uomCode)
     return {
       lineNumber: index + 1,
       purchaseOrderLineId: poLine?.id ?? null,
@@ -134,7 +202,11 @@ function buildLines(
       itemCodeSnapshot: input.itemCode || grnLine?.itemCodeSnapshot || poLine?.itemCodeSnapshot || '',
       itemNameSnapshot: input.itemName || grnLine?.itemNameSnapshot || poLine?.itemNameSnapshot || '',
       description: input.description ?? poLine?.description ?? null,
-      quantity, uomCodeSnapshot: input.uomCode ?? grnLine?.uomCodeSnapshot ?? '',
+      quantity,
+      uomCodeSnapshot: dual.uomCodeSnapshot,
+      uomQuantitySnapshot: dual.uomQuantitySnapshot,
+      uomConversionFactorSnapshot: dual.uomConversionFactorSnapshot,
+      purchaseUomCodeSnapshot: dual.purchaseUomCodeSnapshot,
       rate, amount, taxRatePct: invoiceQty(input.taxRatePct), taxAmount,
       lineTotal: invoiceMoney(amount + taxAmount), remarks: input.remarks?.trim() || null,
     }

@@ -51,6 +51,27 @@ export function computeEstimatedAmount(netPurchaseQuantity: number, expectedRate
   return Number((netPurchaseQuantity * expectedRate).toFixed(2))
 }
 
+export function planningAllocatedQuantity(
+  row: Pick<PurchasePlanningRow, 'allocatedQuantity' | 'netPurchaseQuantity'>,
+): number {
+  const allocated = Number(row.allocatedQuantity)
+  if (allocated > 0) return allocated
+  return Number(row.netPurchaseQuantity) || 0
+}
+
+export function planningRemainingQuantity(
+  row: Pick<PurchasePlanningRow, 'allocatedQuantity' | 'orderedQuantity' | 'netPurchaseQuantity'>,
+): number {
+  return Math.max(0, planningAllocatedQuantity(row) - (Number(row.orderedQuantity) || 0))
+}
+
+export function prLineRemainingQuantity(line: {
+  requiredQuantity: unknown
+  orderedQuantity: unknown
+}): number {
+  return Math.max(0, (Number(line.requiredQuantity) || 0) - (Number(line.orderedQuantity) || 0))
+}
+
 export function parseDateInput(value: string | null | undefined): Date | null | undefined {
   if (value === undefined) return undefined
   if (value === null || value === '') return null
@@ -136,6 +157,8 @@ export type PlanningRowForPo = Pick<
   | 'deletedAt'
   | 'selectedVendorId'
   | 'netPurchaseQuantity'
+  | 'allocatedQuantity'
+  | 'orderedQuantity'
   | 'expectedRate'
   | 'negotiatedRate'
   | 'requiredDate'
@@ -180,14 +203,21 @@ export function assertPlanningRowReadyForPo(
     )
   }
 
-  if (row.status === 'PO_CREATED' || row.status === 'PARTIALLY_ORDERED' || row.status === 'COMPLETED') {
+  if (row.status === 'PO_CREATED' || row.status === 'COMPLETED') {
     throw new PlanningNotEligibleError(
       purchaseMessage(PURCHASE_ERROR_CODE.PO_ALREADY_CONVERTED),
       PURCHASE_ERROR_CODE.PO_ALREADY_CONVERTED,
     )
   }
 
-  if (!PO_ELIGIBLE_PLANNING_STATUSES.includes(row.status)) {
+  if (row.status === 'PARTIALLY_ORDERED') {
+    if (!(planningRemainingQuantity(row) > 0)) {
+      throw new PlanningNotEligibleError(
+        purchaseMessage(PURCHASE_ERROR_CODE.PO_ALREADY_CONVERTED),
+        PURCHASE_ERROR_CODE.PO_ALREADY_CONVERTED,
+      )
+    }
+  } else if (!PO_ELIGIBLE_PLANNING_STATUSES.includes(row.status)) {
     throw new PlanningNotEligibleError()
   }
 
@@ -199,8 +229,8 @@ export function assertPlanningRowReadyForPo(
     )
   }
 
-  const netQty = Number(row.netPurchaseQuantity)
-  if (!(netQty > 0)) {
+  const remaining = planningRemainingQuantity(row)
+  if (!(remaining > 0)) {
     throw new PlanningPoNotReadyError(
       purchaseMessage(PURCHASE_ERROR_CODE.PPS_NET_QTY_INVALID),
       PURCHASE_ERROR_CODE.PPS_NET_QTY_INVALID,
@@ -304,6 +334,25 @@ export function derivePrConversionStatus(
     s === 'PO_CREATED' || s === 'COMPLETED' || s === 'PARTIALLY_ORDERED',
   )
   if (converted.length === 0) return null
-  if (converted.length === planningStatuses.length) return 'CONVERTED_TO_PO'
+  if (converted.length === planningStatuses.length) {
+    const allFullyOrdered = planningStatuses.every((s) => s === 'PO_CREATED' || s === 'COMPLETED')
+    return allFullyOrdered ? 'CONVERTED_TO_PO' : 'PARTIALLY_CONVERTED'
+  }
   return 'PARTIALLY_CONVERTED'
+}
+
+/** Derive PR header conversion from line ordered vs required quantities. */
+export function derivePrHeaderConversionFromLines(
+  lines: Array<{ requiredQuantity: unknown; orderedQuantity: unknown; status: string }>,
+): 'CONVERTED_TO_PO' | 'PARTIALLY_CONVERTED' | null {
+  const active = lines.filter((l) => l.status !== 'CANCELLED')
+  if (!active.length) return null
+  const anyOrdered = active.some((l) => (Number(l.orderedQuantity) || 0) > 0)
+  if (!anyOrdered) return null
+  const allDone = active.every(
+    (l) =>
+      l.status === 'CONVERTED' ||
+      (Number(l.orderedQuantity) || 0) >= (Number(l.requiredQuantity) || 0),
+  )
+  return allDone ? 'CONVERTED_TO_PO' : 'PARTIALLY_CONVERTED'
 }

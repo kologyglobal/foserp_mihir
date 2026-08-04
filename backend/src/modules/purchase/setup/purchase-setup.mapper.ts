@@ -174,6 +174,16 @@ export function mapPurchaseSettingsToDto(
       requireApprovalOnPo: Boolean(
         (d as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
       ),
+      requirePoReleaseWorkflow: Boolean(
+        (d as { requirePoReleaseWorkflow?: boolean }).requirePoReleaseWorkflow !== false,
+      ),
+      requireApprovalOnPrRevision: Boolean(
+        (d as { requireApprovalOnPrRevision?: boolean }).requireApprovalOnPrRevision ?? true,
+      ),
+      allowBackdatedPo: Boolean((d as { allowBackdatedPo?: boolean }).allowBackdatedPo ?? false),
+      backdatedPoDaysLimit: Number((d as { backdatedPoDaysLimit?: number }).backdatedPoDaysLimit ?? 0),
+      requireApprovalForBackdatedPo:
+        (d as { requireApprovalForBackdatedPo?: boolean }).requireApprovalForBackdatedPo !== false,
       allowShortClose: d.allowShortClose,
         requirePoWarehouse: d.requirePoWarehouse,
         requireExpectedDeliveryDate: d.requireExpectedDeliveryDate,
@@ -292,6 +302,16 @@ export function mapPurchaseSettingsToDto(
       requireApprovalOnPo: Boolean(
         (row as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
       ),
+      requirePoReleaseWorkflow: Boolean(
+        (row as { requirePoReleaseWorkflow?: boolean }).requirePoReleaseWorkflow !== false,
+      ),
+      requireApprovalOnPrRevision: Boolean(
+        (row as { requireApprovalOnPrRevision?: boolean }).requireApprovalOnPrRevision ?? true,
+      ),
+      allowBackdatedPo: Boolean((row as { allowBackdatedPo?: boolean }).allowBackdatedPo ?? false),
+      backdatedPoDaysLimit: Number((row as { backdatedPoDaysLimit?: number }).backdatedPoDaysLimit ?? 0),
+      requireApprovalForBackdatedPo:
+        (row as { requireApprovalForBackdatedPo?: boolean }).requireApprovalForBackdatedPo !== false,
       allowShortClose: row.allowShortClose,
       requirePoWarehouse: row.requirePoWarehouse,
       requireExpectedDeliveryDate: row.requireExpectedDeliveryDate,

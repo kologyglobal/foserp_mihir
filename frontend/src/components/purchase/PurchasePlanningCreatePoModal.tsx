@@ -1,31 +1,58 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ShoppingCart } from 'lucide-react'
+import { isApiMode } from '@/config/apiConfig'
 import { Modal } from '@/design-system/components/Modal'
 import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
-import { canSelectPlanningRowForPo } from '@/services/purchase'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
+import { syncCoreMastersFromApi } from '@/services/bridges/masterApiBridge'
+import {
+  canSelectPlanningRowForPo,
+  planningOrderableQuantity,
+} from '@/services/purchase'
 import type { PurchasePlanningSheetRow, Vendor } from '@/types/purchaseDomain'
+import type { Location } from '@/types/master'
+import { useMasterStore } from '@/store/masterStore'
 import { formatCurrency } from '@/utils/formatters/currency'
+import {
+  filterLocationsByUsage,
+  formatLocationAddress,
+  locationDisplayLabel,
+} from '@/utils/locationUtils'
 
 export type CreatePoModalForm = {
   poDate: string
   warehouse: string
+  deliveryAddressOptionId: string
   deliveryAddress: string
-  paymentTerms: string
-  deliveryTerms: string
+  orderQuantities: Record<string, number>
   remarks: string
+}
+
+type WarehouseOption = {
+  id: string
+  name: string
+  address?: string
+}
+
+type DeliveryAddressOption = {
+  id: string
+  label: string
+  address: string
 }
 
 type Props = {
   open: boolean
   rows: PurchasePlanningSheetRow[]
-  warehouses: { id: string; name: string }[]
+  warehouses: WarehouseOption[]
   /** Used to resolve vendor display names when row.preferredVendorName is empty (API mode). */
   vendors?: Vendor[]
   creating?: boolean
   onClose: () => void
   onConfirm: (form: CreatePoModalForm) => void
 }
+
+const CUSTOM_ADDRESS_ID = '__custom__'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -49,6 +76,70 @@ function vendorLabel(
   return fromRow || vendorId
 }
 
+function buildDeliveryAddressOptions(
+  warehouseId: string,
+  warehouses: WarehouseOption[],
+  locations: Location[],
+): DeliveryAddressOption[] {
+  const options: DeliveryAddressOption[] = []
+  const purchaseLocs = filterLocationsByUsage(locations, 'purchase')
+
+  const appendWarehouse = (wh: WarehouseOption) => {
+    const address = wh.address?.trim() || wh.name?.trim()
+    if (!address) return
+    options.push({
+      id: `wh:${wh.id}`,
+      label: `${wh.name} (warehouse)`,
+      address,
+    })
+  }
+
+  const appendLocation = (loc: Location) => {
+    const address = formatLocationAddress(loc)
+    if (!address.trim()) return
+    options.push({
+      id: `loc:${loc.id}`,
+      label: locationDisplayLabel(loc),
+      address,
+    })
+  }
+
+  if (warehouseId) {
+    const wh = warehouses.find((w) => w.id === warehouseId)
+    if (wh) appendWarehouse(wh)
+    purchaseLocs
+      .filter((loc) => loc.warehouseId === warehouseId)
+      .forEach(appendLocation)
+  }
+
+  for (const wh of warehouses) {
+    if (wh.id === warehouseId) continue
+    appendWarehouse(wh)
+  }
+
+  if (!warehouseId) {
+    purchaseLocs.forEach(appendLocation)
+  }
+
+  const seen = new Set<string>()
+  const unique = options.filter((o) => {
+    if (seen.has(o.address)) return false
+    seen.add(o.address)
+    return true
+  })
+
+  return [
+    ...unique,
+    { id: CUSTOM_ADDRESS_ID, label: 'Custom address…', address: '' },
+  ]
+}
+
+function initialOrderQuantities(rows: PurchasePlanningSheetRow[]): Record<string, number> {
+  return Object.fromEntries(
+    rows.map((r) => [r.id, planningOrderableQuantity(r)]),
+  )
+}
+
 export function PurchasePlanningCreatePoModal({
   open,
   rows,
@@ -58,29 +149,125 @@ export function PurchasePlanningCreatePoModal({
   onClose,
   onConfirm,
 }: Props) {
+  const storeLocations = useMasterStore((s) => s.locations)
+  const [masterLocations, setMasterLocations] = useState<Location[]>([])
   const [form, setForm] = useState<CreatePoModalForm>({
     poDate: today(),
-    warehouse: warehouses[0]?.id ?? '',
+    warehouse: '',
+    deliveryAddressOptionId: '',
     deliveryAddress: '',
-    paymentTerms: 'Net 30',
-    deliveryTerms: 'Ex-Works',
+    orderQuantities: {},
     remarks: '',
   })
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    ;(async () => {
+      if (storeLocations.length > 0 || !isApiMode()) {
+        setMasterLocations(storeLocations)
+        return
+      }
+      try {
+        await syncCoreMastersFromApi()
+        if (!cancelled) {
+          setMasterLocations(useMasterStore.getState().locations)
+        }
+      } catch {
+        if (!cancelled) setMasterLocations([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, storeLocations])
+
+  const locations = masterLocations.length > 0 ? masterLocations : storeLocations
+
+  const addressOptions = useMemo(
+    () => buildDeliveryAddressOptions(form.warehouse, warehouses, locations),
+    [form.warehouse, warehouses, locations],
+  )
+
+  useEffect(() => {
+    if (!open) return
+    const defaultWarehouseId = warehouses[0]?.id ?? ''
+    setForm({
+      poDate: today(),
+      warehouse: defaultWarehouseId,
+      deliveryAddressOptionId: '',
+      deliveryAddress: '',
+      orderQuantities: initialOrderQuantities(rows),
+      remarks: '',
+    })
+  }, [open, rows, warehouses])
+
+  useEffect(() => {
+    if (!open || !form.warehouse) return
+    const options = buildDeliveryAddressOptions(form.warehouse, warehouses, locations)
+    const first = options.find((o) => o.id !== CUSTOM_ADDRESS_ID)
+    if (!first) return
+    setForm((f) => {
+      if (f.deliveryAddress.trim() && f.deliveryAddressOptionId) return f
+      return {
+        ...f,
+        deliveryAddressOptionId: first.id,
+        deliveryAddress: first.address,
+      }
+    })
+  }, [open, form.warehouse, warehouses, locations])
+
+  const onWarehouseChange = (warehouseId: string) => {
+    const options = buildDeliveryAddressOptions(warehouseId, warehouses, locations)
+    const first = options.find((o) => o.id !== CUSTOM_ADDRESS_ID)
+    setForm((f) => ({
+      ...f,
+      warehouse: warehouseId,
+      deliveryAddressOptionId: first?.id ?? CUSTOM_ADDRESS_ID,
+      deliveryAddress: first?.address ?? '',
+    }))
+  }
+
+  const onAddressOptionChange = (optionId: string) => {
+    const match = addressOptions.find((o) => o.id === optionId)
+    setForm((f) => ({
+      ...f,
+      deliveryAddressOptionId: optionId,
+      deliveryAddress: optionId === CUSTOM_ADDRESS_ID ? f.deliveryAddress : match?.address ?? '',
+    }))
+  }
+
+  const setRowQty = (rowId: string, value: number, max: number) => {
+    const qty = Math.max(0, Math.min(max, value))
+    setForm((f) => ({
+      ...f,
+      orderQuantities: { ...f.orderQuantities, [rowId]: qty },
+    }))
+  }
 
   const analysis = useMemo(() => {
     const errors: string[] = []
     const ineligible = rows.filter((r) => !canSelectPlanningRowForPo(r))
     for (const r of ineligible) {
       const gaps: string[] = []
-      if (!['vendor_selected', 'approved', 'po_pending'].includes(r.status)) {
+      if (!['vendor_selected', 'approved', 'po_pending', 'partially_ordered'].includes(r.status)) {
         gaps.push('ready status')
       }
       if (!r.preferredVendorId) gaps.push('vendor')
-      const qty = r.netPurchaseQuantity > 0 ? r.netPurchaseQuantity : r.requiredQuantity
-      if (!(qty > 0)) gaps.push('quantity')
+      if (!(planningOrderableQuantity(r) > 0)) gaps.push('quantity')
       if (!(r.expectedRate > 0)) gaps.push('rate')
       if (!r.requiredByDate) gaps.push('required date')
       errors.push(`${r.planningNumber}: missing ${gaps.join(', ') || 'eligibility'}`)
+    }
+
+    for (const r of rows) {
+      const max = planningOrderableQuantity(r)
+      const qty = form.orderQuantities[r.id] ?? 0
+      if (!(qty > 0)) {
+        errors.push(`${r.planningNumber}: PO quantity must be greater than zero`)
+      } else if (qty > max + 1e-6) {
+        errors.push(`${r.planningNumber}: PO quantity cannot exceed ${max}`)
+      }
     }
 
     const byVendor = new Map<string, PurchasePlanningSheetRow[]>()
@@ -95,15 +282,26 @@ export function PurchasePlanningCreatePoModal({
       vendorId,
       vendorName: vendorLabel(vendorId, items[0]?.preferredVendorName, vendors),
       items,
-      amount: items.reduce((s, i) => s + i.estimatedAmount, 0),
+      amount: items.reduce((s, i) => {
+        const qty = form.orderQuantities[i.id] ?? planningOrderableQuantity(i)
+        const rate = i.negotiatedRate ?? i.expectedRate
+        return s + qty * rate
+      }, 0),
     }))
 
     const vendorCount = vendorGroups.filter((g) => g.vendorId !== '__none__').length
     const poCount = vendorCount
-    const allEligible = ineligible.length === 0 && rows.length > 0
+    const allValid =
+      ineligible.length === 0 &&
+      rows.length > 0 &&
+      rows.every((r) => {
+        const max = planningOrderableQuantity(r)
+        const qty = form.orderQuantities[r.id] ?? 0
+        return qty > 0 && qty <= max + 1e-6
+      })
 
-    return { errors, vendorGroups, vendorCount, poCount, allEligible }
-  }, [rows, vendors])
+    return { errors, vendorGroups, vendorCount, poCount, allEligible: allValid }
+  }, [rows, vendors, form.orderQuantities])
 
   return (
     <Modal
@@ -111,7 +309,7 @@ export function PurchasePlanningCreatePoModal({
       onClose={() => !creating && onClose()}
       closeDisabled={creating}
       title="Create Purchase Order"
-      description="Review selection and commercial defaults before creating POs."
+      description="Set PO quantities, date, and delivery address before creating POs."
       size="lg"
       footer={
         <ErpButtonGroup className="justify-end">
@@ -125,7 +323,7 @@ export function PurchasePlanningCreatePoModal({
             disabled={creating || !analysis.allEligible}
             disabledReason={
               !analysis.allEligible
-                ? 'Fix missing data on all selected rows before creating POs'
+                ? 'Fix missing data and PO quantities before creating POs'
                 : undefined
             }
             onClick={() => onConfirm(form)}
@@ -164,7 +362,8 @@ export function PurchasePlanningCreatePoModal({
         </div>
 
         <p className="rounded-md border border-sky-200 bg-sky-50/80 px-3 py-2 text-[12px] text-erp-text">
-          The system will create one Purchase Order for each selected vendor.
+          One PO per vendor. Adjust PO quantity per line (defaults to remaining qty). Payment and
+          delivery terms come from Purchase Setup and vendor master.
         </p>
 
         {analysis.errors.length > 0 ? (
@@ -179,24 +378,53 @@ export function PurchasePlanningCreatePoModal({
         ) : null}
 
         <div>
-          <p className="mb-2 text-[12px] font-semibold text-erp-text">Vendor-grouped preview</p>
-          <div className="max-h-48 space-y-2 overflow-auto rounded-md border border-erp-border">
+          <p className="mb-2 text-[12px] font-semibold text-erp-text">Lines & PO quantities</p>
+          <div className="max-h-56 space-y-2 overflow-auto rounded-md border border-erp-border">
             {analysis.vendorGroups.map((g) => (
               <div key={g.vendorId} className="border-b border-erp-border px-3 py-2 last:border-b-0">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-erp-text">{g.vendorName}</span>
                   <span className="tabular-nums text-erp-muted">
-                    {g.items.length} item{g.items.length === 1 ? '' : 's'} ·{' '}
                     {formatCurrency(g.amount)}
                   </span>
                 </div>
-                <ul className="mt-1 space-y-0.5 text-[12px] text-erp-muted">
-                  {g.items.map((i) => (
-                    <li key={i.id}>
-                      {i.itemCode} — {i.itemName} · qty{' '}
-                      {i.netPurchaseQuantity || i.requiredQuantity}
-                    </li>
-                  ))}
+                <ul className="mt-2 space-y-2">
+                  {g.items.map((i) => {
+                    const max = planningOrderableQuantity(i)
+                    const qty = form.orderQuantities[i.id] ?? max
+                    return (
+                      <li
+                        key={i.id}
+                        className="grid gap-2 rounded border border-erp-border/60 bg-erp-surface-alt/30 p-2 sm:grid-cols-[1fr_7rem_5rem]"
+                      >
+                        <div className="min-w-0 text-[12px]">
+                          <span className="font-mono text-erp-text">{i.itemCode}</span>
+                          <span className="text-erp-muted"> — {i.itemName}</span>
+                          <div className="mt-0.5 text-[11px] text-erp-muted">
+                            Remaining {max} {i.uom}
+                          </div>
+                        </div>
+                        <label className="block">
+                          <span className="mb-0.5 block text-[11px] font-medium text-erp-muted">
+                            PO qty
+                          </span>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={max}
+                            step="any"
+                            value={qty}
+                            onChange={(e) =>
+                              setRowQty(i.id, Number(e.target.value) || 0, max)
+                            }
+                          />
+                        </label>
+                        <div className="self-end text-right text-[11px] tabular-nums text-erp-muted">
+                          {i.uom}
+                        </div>
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             ))}
@@ -213,11 +441,11 @@ export function PurchasePlanningCreatePoModal({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-[12px] font-medium text-erp-muted">Warehouse</span>
-            <Select
-              value={form.warehouse}
-              onChange={(e) => setForm((f) => ({ ...f, warehouse: e.target.value }))}
-            >
+            <span className="mb-1 block text-[12px] font-medium text-erp-muted">
+              Delivery warehouse
+            </span>
+            <Select value={form.warehouse} onChange={(e) => onWarehouseChange(e.target.value)}>
+              <option value="">{SELECT_PLACEHOLDER}</option>
               {warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
                   {w.name}
@@ -229,24 +457,33 @@ export function PurchasePlanningCreatePoModal({
             <span className="mb-1 block text-[12px] font-medium text-erp-muted">
               Delivery address
             </span>
+            <Select
+              value={form.deliveryAddressOptionId}
+              onChange={(e) => onAddressOptionChange(e.target.value)}
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {addressOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="mb-1 block text-[12px] font-medium text-erp-muted">
+              Address details
+            </span>
             <Textarea
-              rows={2}
+              rows={3}
               value={form.deliveryAddress}
-              onChange={(e) => setForm((f) => ({ ...f, deliveryAddress: e.target.value }))}
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-[12px] font-medium text-erp-muted">Payment terms</span>
-            <Input
-              value={form.paymentTerms}
-              onChange={(e) => setForm((f) => ({ ...f, paymentTerms: e.target.value }))}
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-[12px] font-medium text-erp-muted">Delivery terms</span>
-            <Input
-              value={form.deliveryTerms}
-              onChange={(e) => setForm((f) => ({ ...f, deliveryTerms: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  deliveryAddress: e.target.value,
+                  deliveryAddressOptionId: CUSTOM_ADDRESS_ID,
+                }))
+              }
+              placeholder="Pick an address above or type a custom delivery address"
             />
           </label>
           <label className="block sm:col-span-2">

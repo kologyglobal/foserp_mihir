@@ -115,6 +115,11 @@ export async function listPurchaseOrderRevisionsApi(id: string) {
 /** Create PO(s) from Planning Sheet selection — server-side grouping. */
 export async function createPurchaseOrdersFromPlanningApi(payload: {
   rowIds: string[]
+  orderQuantities?: Record<string, number>
+  orderDate?: string
+  deliveryWarehouseId?: string
+  deliveryAddress?: string
+  remarks?: string
 }) {
   return apiRequest<{
     orders: ApiPurchaseOrder[]

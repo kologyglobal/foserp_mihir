@@ -22,12 +22,18 @@ import {
   resolveDocumentApprovalRoles,
 } from '../shared/purchase-setup-enforcement.js'
 import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
+import { enrichPoLinesWithItemUomMappings } from '../shared/item-uom-resolution.js'
 import {
   PurchaseOrderNotFoundError,
   PurchaseOrderValidationError,
   PurchaseOrderWorkflowError,
 } from './purchase-order.errors.js'
 import { ValidationError } from '../../../utils/errors.js'
+import {
+  assertBackdatedPoReleasedThroughApproval,
+  assertPoOrderDateAllowed,
+  toPoBackdatePolicy,
+} from './purchase-order-backdate.js'
 import { mapPurchaseOrderToDto } from './purchase-order.mapper.js'
 import * as repo from './purchase-order.repository.js'
 import type {
@@ -291,40 +297,13 @@ async function fillItemSnapshots(
 }
 
 /**
- * Default purchase UOM + conversion factor from item master onto line inputs
- * before normalizeLineInputs (client may omit factor / send base UOM).
+ * Default purchase UOM + conversion factor from item UOM mappings onto line inputs.
  */
 async function enrichLinesWithItemUom(
   tenantId: string,
   lines: CreatePurchaseOrderInput['lines'],
 ): Promise<CreatePurchaseOrderInput['lines']> {
-  const itemIds = [...new Set(lines.map((l) => l.itemId).filter((v): v is string => Boolean(v)))]
-  if (!itemIds.length) return lines
-  const items = await prisma.masterItem.findMany({
-    where: { tenantId, id: { in: itemIds }, deletedAt: null },
-    select: {
-      id: true,
-      baseUomId: true,
-      purchaseUomId: true,
-      uomConversionFactor: true,
-      purchaseQtyPerUom: true,
-    },
-  })
-  const byId = new Map(items.map((i) => [i.id, i]))
-  return lines.map((line) => {
-    if (!line.itemId) return line
-    const item = byId.get(line.itemId)
-    if (!item) return line
-    const purchaseUomId = item.purchaseUomId ?? item.baseUomId
-    const sameUom = !item.purchaseUomId || item.purchaseUomId === item.baseUomId
-    const factorRaw = Number(item.uomConversionFactor ?? item.purchaseQtyPerUom ?? 1)
-    const factor = sameUom ? 1 : factorRaw > 0 ? factorRaw : 1
-    return {
-      ...line,
-      uomId: line.uomId ?? purchaseUomId,
-      uomConversionFactor: line.uomConversionFactor ?? factor,
-    }
-  })
+  return enrichPoLinesWithItemUomMappings(tenantId, lines)
 }
 
 function computeTotals(
@@ -363,7 +342,17 @@ async function toPurchaseOrderDto(
   const requireApprovalOnPo = Boolean(
     (settings as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
   )
-  return mapPurchaseOrderToDto(order, userNames, { requireApprovalOnPo })
+  const requirePoReleaseWorkflow = Boolean(
+    (settings as { requirePoReleaseWorkflow?: boolean }).requirePoReleaseWorkflow !== false,
+  )
+  return mapPurchaseOrderToDto(order, userNames, {
+    requireApprovalOnPo,
+    requirePoReleaseWorkflow,
+    allowBackdatedPo: (settings as { allowBackdatedPo?: boolean }).allowBackdatedPo,
+    backdatedPoDaysLimit: (settings as { backdatedPoDaysLimit?: number }).backdatedPoDaysLimit,
+    requireApprovalForBackdatedPo: (settings as { requireApprovalForBackdatedPo?: boolean })
+      .requireApprovalForBackdatedPo,
+  })
 }
 
 export async function listPurchaseOrders(tenantId: string, query: ListPurchaseOrdersQuery) {
@@ -422,6 +411,9 @@ export async function createPurchaseOrder(
   }
   if (deliveryWarehouseId) await assertWarehouseActive(tenantId, deliveryWarehouseId)
 
+  const orderDate = parseDateInput(input.orderDate) ?? new Date()
+  assertPoOrderDateAllowed(orderDate, toPoBackdatePolicy(settings))
+
   const totals = computeTotals(lines, input.taxAmount ?? 0, input.freightAmount ?? 0)
   const orderNumber = await nextPurchaseDocumentNumber(tenantId, 'PURCHASE_ORDER', 'PO')
 
@@ -430,7 +422,7 @@ export async function createPurchaseOrder(
       data: {
         tenantId,
         orderNumber,
-        orderDate: parseDateInput(input.orderDate) ?? new Date(),
+        orderDate,
         vendorId: input.vendorId,
         origin: input.purchaseRequisitionId ? 'PURCHASE_REQUISITION' : 'MANUAL',
         status: 'DRAFT',
@@ -519,6 +511,12 @@ export async function updatePurchaseOrder(
     })
   }
 
+  const settings = await resolveEffectivePurchaseDefaults(
+    tenantId,
+    existing.deliveryWarehouse?.plantId,
+  )
+  const backdatePolicy = toPoBackdatePolicy(settings)
+
   const effectiveLines = lines ?? existing.lines.map((l) => ({ amount: Number(l.amount) }))
   const totals = computeTotals(
     effectiveLines,
@@ -533,6 +531,8 @@ export async function updatePurchaseOrder(
   if (input.orderDate !== undefined) {
     data.orderDate = parseDateInput(input.orderDate) ?? existing.orderDate
   }
+  const nextOrderDate = (data.orderDate as Date | undefined) ?? existing.orderDate
+  assertPoOrderDateAllowed(nextOrderDate, backdatePolicy)
   if (input.vendorId !== undefined) data.vendorId = input.vendorId
   if (input.expectedDeliveryDate !== undefined) {
     data.expectedDeliveryDate = parseDateInput(input.expectedDeliveryDate) ?? null
@@ -548,7 +548,6 @@ export async function updatePurchaseOrder(
   }
   if (input.remarks !== undefined) data.remarks = input.remarks?.trim() || null
 
-  const settings = await resolveEffectivePurchaseDefaults(tenantId)
   const effectiveWarehouseId =
     input.deliveryWarehouseId !== undefined
       ? input.deliveryWarehouseId
@@ -901,6 +900,12 @@ export async function sendPurchaseOrderToVendor(
   )
   const requireApprovalOnPo = Boolean(
     (settings as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
+  )
+  const backdatePolicy = toPoBackdatePolicy(settings)
+  assertBackdatedPoReleasedThroughApproval(
+    existing.orderDate,
+    existing.status,
+    backdatePolicy,
   )
   assertSendableToVendor(existing, { requireApprovalOnPo })
   return applyLifecycleTransition(tenantId, actorId, existing, {

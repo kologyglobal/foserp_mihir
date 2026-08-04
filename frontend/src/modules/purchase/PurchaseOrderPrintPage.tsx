@@ -4,12 +4,15 @@ import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
 import { PurchaseDocumentLetterhead } from '@/components/purchase/PurchaseDocumentLetterhead'
 import { getPurchaseOrderById } from '@/services/purchase'
 import type { PurchaseOrder } from '@/types/purchaseDomain'
-import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
+import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { formatStatus } from '@/components/ui/Badge'
 import { notify } from '@/store/toastStore'
 import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
 import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
+import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
+import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
+import { getPurchaseLineBaseUomCode } from '@/utils/purchaseLineUom'
 
 export function PurchaseOrderPrintPage() {
   const { id } = useParams()
@@ -53,9 +56,17 @@ export function PurchaseOrderPrintPage() {
     return <div className="erp-page p-12 text-center text-erp-muted">Loading purchase order…</div>
   }
 
-  const showVendorUom = po.lines.some(
-    (l) => Number(l.uomConversionFactor ?? 1) > 1 && Number(l.uomQuantity ?? 0) > 0,
-  )
+  const showDualQtyHint = po.lines.some((l) => {
+    const dual = resolveDualQtyForPrint({
+      stockQty: l.quantity,
+      stockUom: getPurchaseLineBaseUomCode(l.itemId) || l.uom,
+      purchaseQty: l.uomQuantity,
+      purchaseUom: l.uom,
+      uomConversionFactor: l.uomConversionFactor,
+      itemId: l.itemId,
+    })
+    return dual.showDual
+  })
 
   return (
     <DocumentPrintShell
@@ -97,6 +108,9 @@ export function PurchaseOrderPrintPage() {
             <p>PR Ref: {po.purchaseRequisitionNumber ?? '—'}</p>
             <p>RFQ Ref: {po.rfqNumber ?? '—'}</p>
             <p>Buyer: {po.buyer.name}</p>
+            {showDualQtyHint ? (
+              <p className="po-print-hint">Qty: purchase unit on top · stock unit below</p>
+            ) : null}
           </section>
         </div>
 
@@ -107,9 +121,7 @@ export function PurchaseOrderPrintPage() {
               <th>Item</th>
               <th>Description</th>
               <th>HSN</th>
-              {showVendorUom ? <th className="num">Vendor qty</th> : null}
               <th className="num">Qty</th>
-              <th>UOM</th>
               <th className="num">Rate</th>
               <th className="num">Taxable</th>
               <th className="num">GST</th>
@@ -118,24 +130,30 @@ export function PurchaseOrderPrintPage() {
             </tr>
           </thead>
           <tbody>
-            {po.lines.map((l) => (
+            {po.lines.map((l) => {
+              const dual = resolveDualQtyForPrint({
+                stockQty: l.quantity,
+                stockUom: getPurchaseLineBaseUomCode(l.itemId) || l.uom,
+                purchaseQty: l.uomQuantity,
+                purchaseUom: l.uom,
+                uomConversionFactor: l.uomConversionFactor,
+                itemId: l.itemId,
+              })
+              return (
               <tr key={l.id}>
                 <td className="num">{l.lineNo}</td>
                 <td className="mono">{l.itemCode}</td>
                 <td>{l.itemName}</td>
                 <td>{l.hsnCode || l.sacCode || '—'}</td>
-                {showVendorUom ? (
-                  <td className="num">{formatNumber(l.uomQuantity ?? l.quantity)}</td>
-                ) : null}
-                <td className="num">{formatNumber(l.quantity)}</td>
-                <td>{l.uom}</td>
+                <PurchasePrintDualQtyCell {...dual} />
                 <td className="num">{formatCurrency(l.rate)}</td>
                 <td className="num">{formatCurrency(l.taxableAmount)}</td>
                 <td className="num">{formatCurrency(l.cgst + l.sgst + l.igst)}</td>
                 <td className="num">{formatCurrency(l.lineTotal)}</td>
                 <td>{formatDate(l.requiredDate)}</td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
 

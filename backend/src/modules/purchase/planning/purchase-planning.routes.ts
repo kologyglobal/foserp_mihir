@@ -11,6 +11,7 @@ import {
   recalculatePlanningSchema,
   updatePlanningRowSchema,
   createPoFromPlanningSchema,
+  splitPlanningRowSchema,
 } from './purchase-planning.validation.js'
 
 const router = Router({ mergeParams: true })
@@ -65,6 +66,14 @@ router.post(
   requirePermission('purchase.planning.create_po'),
   validateBody(createPoFromPlanningSchema),
   controller.createPurchaseOrdersFromPlanning,
+)
+
+router.post(
+  '/:id/split',
+  requirePermission('purchase.planning.edit'),
+  validateParams(uuidParamSchema),
+  validateBody(splitPlanningRowSchema),
+  controller.splitPlanningRow,
 )
 
 router.get(

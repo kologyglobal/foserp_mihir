@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
+  CheckCircle2,
   ClipboardCheck,
   Eye,
   Package,
@@ -10,6 +11,7 @@ import {
   RefreshCw,
   Send,
   Trash2,
+  XCircle,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
@@ -39,7 +41,13 @@ import {
   type GrnSortKey,
 } from '@/config/grnFilterConfig'
 import { useCrmFilterDrawer } from '@/hooks/useCrmFilterDrawer'
-import { getGrnList, submitGRN, PurchaseServiceError } from '@/services/purchase'
+import {
+  approveToleranceGRN,
+  getGrnList,
+  rejectToleranceGRN,
+  submitGRN,
+  PurchaseServiceError,
+} from '@/services/purchase'
 import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
 import type { GrnListRow } from '@/types/purchaseDomain'
@@ -116,6 +124,36 @@ export function GrnListPage() {
         await load()
       } catch (err) {
         notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
+      }
+    },
+    [load],
+  )
+
+  const handleApproveTolerance = useCallback(
+    async (row: GrnListRow) => {
+      try {
+        await approveToleranceGRN(row.id)
+        notify.success(`${row.documentNumber} — tolerance approved`)
+        await load()
+      } catch (err) {
+        notify.error(
+          err instanceof PurchaseServiceError ? err.message : 'Approve tolerance failed',
+        )
+      }
+    },
+    [load],
+  )
+
+  const handleRejectTolerance = useCallback(
+    async (row: GrnListRow) => {
+      try {
+        await rejectToleranceGRN(row.id, 'Rejected')
+        notify.success(`${row.documentNumber} returned to draft`)
+        await load()
+      } catch (err) {
+        notify.error(
+          err instanceof PurchaseServiceError ? err.message : 'Reject tolerance failed',
+        )
       }
     },
     [load],
@@ -210,6 +248,28 @@ export function GrnListPage() {
                   : 'You do not have permission to submit GRNs',
             },
             {
+              id: 'approve-tolerance',
+              label: 'Approve Tolerance',
+              icon: CheckCircle2,
+              onClick: () => void handleApproveTolerance(r),
+              disabled: r.status !== 'pending_tolerance_approval' || !perms.canPostGrn,
+              disabledReason:
+                r.status !== 'pending_tolerance_approval'
+                  ? `${statusLabel} GRNs do not need tolerance approval`
+                  : 'You do not have permission to approve tolerance',
+            },
+            {
+              id: 'reject-tolerance',
+              label: 'Reject Tolerance',
+              icon: XCircle,
+              onClick: () => void handleRejectTolerance(r),
+              disabled: r.status !== 'pending_tolerance_approval' || !perms.canPostGrn,
+              disabledReason:
+                r.status !== 'pending_tolerance_approval'
+                  ? `${statusLabel} GRNs do not need tolerance approval`
+                  : 'You do not have permission to reject tolerance',
+            },
+            {
               id: 'edit',
               label: 'Edit',
               icon: Pencil,
@@ -243,7 +303,14 @@ export function GrnListPage() {
         },
       },
     ],
-    [navigate, handleSubmit, perms.canCreateGrn],
+    [
+      navigate,
+      handleSubmit,
+      handleApproveTolerance,
+      handleRejectTolerance,
+      perms.canCreateGrn,
+      perms.canPostGrn,
+    ],
   )
 
   const shellProps = {
