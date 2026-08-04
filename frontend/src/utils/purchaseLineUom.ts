@@ -66,6 +66,36 @@ export function getPurchaseLineUomOptions(itemId: string | null | undefined): Pu
   return optionsFromConversions(master, useMasterStore.getState().uoms)
 }
 
+/** Default purchase UOM from Item Master conversions (or legacy purchaseUomId). */
+export function resolveDefaultPurchaseUom(
+  itemId: string | null | undefined,
+): PurchaseLineUomOption | null {
+  if (!itemId) return null
+  const options = getPurchaseLineUomOptions(itemId)
+  if (!options.length) return null
+  const master = useMasterStore.getState().items.find((i) => i.id === itemId)
+  const defaultConversion = master?.uomConversions?.find(
+    (row) => row.isPurchaseAllowed && row.isDefaultPurchase,
+  )
+  if (defaultConversion) {
+    const hit = options.find((o) => o.id === defaultConversion.uomId)
+    if (hit) return hit
+  }
+  if (master?.purchaseUomId) {
+    const hit = options.find((o) => o.id === master.purchaseUomId)
+    if (hit) return hit
+  }
+  return options[0] ?? null
+}
+
+/** Primary/base qty from purchase qty + conversion factor (vendor units per 1 base). */
+export function purchaseQtyToBaseQty(purchaseQty: number, factor: number): number {
+  const f = Number(factor) > 0 ? Number(factor) : 1
+  const q = Number(purchaseQty) || 0
+  if (f === 1) return q
+  return Number((q / f).toFixed(4))
+}
+
 export function resolveUomCode(uomId: string | null | undefined, fallback = ''): string {
   if (!uomId) return fallback
   const u = useMasterStore.getState().uoms.find((row) => row.id === uomId)

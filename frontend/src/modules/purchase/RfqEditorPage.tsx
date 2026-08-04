@@ -23,7 +23,7 @@ import {
 } from '@/components/erp/card-form'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { FormActionBar } from '@/components/erp/FormActionBar'
-import { Checkbox, Input, Select, Textarea } from '@/components/forms/Inputs'
+import { Checkbox, DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { Badge } from '@/components/ui/Badge'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
@@ -929,11 +929,11 @@ export function RfqEditorPage() {
                     />
                   </td>
                   <td>
-                    <input
-                      type="number"
-                      className="erp-input h-8 w-16 text-right text-[12px]"
+                    <DecimalInput
+                      min={0}
+                      className="h-8 w-16 text-right text-[12px]"
                       value={line.quantity}
-                      onChange={(e) => patchLine(line.id, { quantity: Number(e.target.value) })}
+                      onChange={(v) => patchLine(line.id, { quantity: v })}
                     />
                   </td>
                   <td>

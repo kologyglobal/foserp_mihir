@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import { ErpCardSection, ErpFieldRow } from '@/components/erp/card-form'
 import { FormActionBar } from '@/components/erp/FormActionBar'
-import { Input, Textarea } from '@/components/forms/Inputs'
+import { DecimalInput, Input, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import {
   getPurchaseRequisitionById,
@@ -148,14 +148,10 @@ export function PurchaseRequisitionRevisePage() {
                 <p className="font-mono text-[12px]">{line.itemCode}</p>
                 <p className="text-sm">{line.itemName}</p>
               </div>
-              <Input
-                type="number"
+              <DecimalInput
                 min={0}
-                step="any"
                 value={lineQty[line.id] ?? line.quantity}
-                onChange={(e) =>
-                  setLineQty((prev) => ({ ...prev, [line.id]: Number(e.target.value) || 0 }))
-                }
+                onChange={(v) => setLineQty((prev) => ({ ...prev, [line.id]: v }))}
               />
             </div>
           ))}

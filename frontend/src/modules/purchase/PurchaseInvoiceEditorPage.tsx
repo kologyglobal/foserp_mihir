@@ -30,7 +30,7 @@ import {
 } from '@/components/erp/card-form'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { FormActionBar } from '@/components/erp/FormActionBar'
-import { Input, Select, Textarea } from '@/components/forms/Inputs'
+import { DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { Badge } from '@/components/ui/Badge'
 import {
   commercialTermsSummary,
@@ -1065,10 +1065,10 @@ export function PurchaseInvoiceEditorPage() {
                       />
                     </td>
                     <td className="p-2">
-                      <Input
-                        type="number"
+                      <DecimalInput
+                        min={0}
                         value={line.quantity}
-                        onChange={(e) => patchLine(line.key, { quantity: Number(e.target.value) || 0 })}
+                        onChange={(v) => patchLine(line.key, { quantity: v })}
                       />
                     </td>
                     <td className="p-2">

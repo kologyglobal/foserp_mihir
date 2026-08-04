@@ -1304,6 +1304,8 @@ export interface PurchaseRequisitionLine {
   /** Master UOM UUID — required by purchase APIs when line has an item/qty. */
   uomId?: string | null
   uom: string
+  /** Vendor units per 1 base unit — editor hint for multi-UOM; not stored on PR API. */
+  uomConversionFactor?: number
   hsnCode: string
   sacCode: string | null
   quantity: number

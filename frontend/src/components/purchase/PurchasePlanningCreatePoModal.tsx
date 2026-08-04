@@ -3,7 +3,7 @@ import { ShoppingCart } from 'lucide-react'
 import { isApiMode } from '@/config/apiConfig'
 import { Modal } from '@/design-system/components/Modal'
 import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
-import { Input, Select, Textarea } from '@/components/forms/Inputs'
+import { DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { syncCoreMastersFromApi } from '@/services/bridges/masterApiBridge'
 import {
@@ -408,15 +408,12 @@ export function PurchasePlanningCreatePoModal({
                           <span className="mb-0.5 block text-[11px] font-medium text-erp-muted">
                             PO qty
                           </span>
-                          <Input
-                            type="number"
+                          <DecimalInput
                             min={0}
                             max={max}
-                            step="any"
+                            className="h-8 w-full text-right"
                             value={qty}
-                            onChange={(e) =>
-                              setRowQty(i.id, Number(e.target.value) || 0, max)
-                            }
+                            onChange={(v) => setRowQty(i.id, v, max)}
                           />
                         </label>
                         <div className="self-end text-right text-[11px] tabular-nums text-erp-muted">

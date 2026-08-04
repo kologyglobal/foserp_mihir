@@ -98,10 +98,7 @@ export function ChargeEditor({
         <ModeToggle
           mode={mode}
           readOnly={readOnly || disabled}
-          onChange={(m) => {
-            onModeChange(m)
-            onValueChange(0)
-          }}
+          onChange={onModeChange}
           pctLabel={modePctLabel}
         />
       </div>

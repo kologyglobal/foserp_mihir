@@ -94,6 +94,10 @@ import {
 import { resolveCatalogItemProductType } from '@/utils/purchaseCatalogFilter'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
+import {
+  getPurchaseLineUomOptions,
+  resolveDefaultPurchaseUom,
+} from '@/utils/purchaseLineUom'
 import { notify } from '@/store/toastStore'
 import { systemConfirm } from '@/utils/systemConfirm'
 import { getSessionUser } from '@/utils/permissions'
@@ -181,6 +185,7 @@ function emptyLine(partial?: Partial<PrEditorLine>): PrEditorLine {
     category: '',
     uomId: null,
     uom: 'NOS',
+    uomConversionFactor: 1,
     hsnCode: '',
     sacCode: null,
     quantity: 0,
@@ -282,6 +287,14 @@ function headerFromPr(pr: PurchaseRequisition): PrEditorHeader {
   }
 }
 
+function resolveLineUomConversionFactor(itemId: string, uomId: string | null | undefined): number {
+  if (!itemId) return 1
+  const options = getPurchaseLineUomOptions(itemId)
+  if (!options.length) return 1
+  const hit = options.find((o) => o.id === uomId)
+  return hit?.factor ?? options[0]?.factor ?? 1
+}
+
 function linesFromPr(pr: PurchaseRequisition): PrEditorLine[] {
   return pr.lines.map((l) => {
     const productType =
@@ -292,6 +305,7 @@ function linesFromPr(pr: PurchaseRequisition): PrEditorLine[] {
       key: l.id || crypto.randomUUID(),
       productType,
       category: l.category || mapEngineeringProductTypeToPurchaseCategory(productType),
+      uomConversionFactor: resolveLineUomConversionFactor(l.itemId, l.uomId),
       actionMessage: false,
     }
   })
@@ -879,14 +893,16 @@ export function PurchaseRequisitionEditorPage() {
     const vendor = item.preferredVendorId
       ? vendors.find((v) => v.id === item.preferredVendorId)
       : undefined
+    const defaultUom = resolveDefaultPurchaseUom(item.id)
     patchLine(key, {
       itemId: item.id,
       itemCode: item.itemCode,
       itemName: item.itemName,
       productType,
       category,
-      uomId: item.uomId,
-      uom: item.uom,
+      uomId: defaultUom?.id ?? item.uomId,
+      uom: defaultUom?.code ?? item.uom,
+      uomConversionFactor: defaultUom?.factor ?? 1,
       hsnCode: item.hsnCode,
       sacCode: item.sacCode,
       estimatedRate: item.standardRate,
@@ -915,13 +931,15 @@ export function PurchaseRequisitionEditorPage() {
       const quantity = Number(qty) || 1
       const estimatedRate = Number(rate) || 0
       const matched = catalogItems.find((i) => i.itemCode === code)
+      const defaultUom = matched ? resolveDefaultPurchaseUom(matched.id) : null
       return emptyLine({
         lineNo: index + 1,
         itemId: matched?.id ?? '',
         itemCode: code || matched?.itemCode || '',
         itemName: name || matched?.itemName || code || 'Imported item',
-        uomId: matched?.uomId ?? null,
-        uom: uom || matched?.uom || 'NOS',
+        uomId: defaultUom?.id ?? matched?.uomId ?? null,
+        uom: uom || defaultUom?.code || matched?.uom || 'NOS',
+        uomConversionFactor: defaultUom?.factor ?? 1,
         quantity,
         estimatedRate: estimatedRate || matched?.standardRate || 0,
         hsnCode: matched?.hsnCode ?? '',

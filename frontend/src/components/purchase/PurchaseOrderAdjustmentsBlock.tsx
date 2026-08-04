@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import {
   ChargeEditor,
   OrderAdjustmentsPanel,
@@ -58,12 +58,40 @@ export type PrLineForOrderAdjust = {
   itemName?: string
 }
 
+export type PoLineForOrderAdjust = {
+  uomQuantity?: number
+  quantity?: number
+  rate: number
+  discountPct?: number
+  gstRatePct?: number
+  itemId?: string
+  itemCode?: string
+  itemName?: string
+}
+
 function isUsableLine(line: PrLineForOrderAdjust): boolean {
   return Boolean(
     (line.itemName ?? '').trim() ||
       (line.itemCode ?? '').trim() ||
       (line.itemId ?? '').trim(),
   )
+}
+
+function isUsablePoLine(line: PoLineForOrderAdjust): boolean {
+  return isUsableLine({
+    quantity: line.quantity ?? 0,
+    estimatedRate: line.rate,
+    itemId: line.itemId,
+    itemCode: line.itemCode,
+    itemName: line.itemName,
+  })
+}
+
+function poLinePurchaseQty(line: PoLineForOrderAdjust): number {
+  if (line.uomQuantity !== undefined && line.uomQuantity !== null) {
+    return Number(line.uomQuantity) || 0
+  }
+  return Number(line.quantity) || 0
 }
 
 function modeToCalcType(mode: OrderDiscountMode) {
@@ -116,13 +144,77 @@ export function computePrOrderDocumentTotals(
   return { ...totals, totalQty }
 }
 
+/** PO lines: purchase qty × rate, per-line discount % and GST %. */
+export function computePoOrderDocumentTotals(
+  lines: PoLineForOrderAdjust[],
+  adj: PurchaseOrderAdjustmentsState,
+): OrderDocumentTotals & { totalQty: number } {
+  const usable = lines.filter(isUsablePoLine)
+  const totalQty = usable.reduce((s, l) => s + poLinePurchaseQty(l), 0)
+  const totals = calcOrderDocumentTotals(
+    usable.map((l) => ({
+      qty: poLinePurchaseQty(l),
+      unitPrice: Number(l.rate) || 0,
+      discountPct: Number(l.discountPct) || 0,
+      taxPct: Number(l.gstRatePct) || 0,
+    })),
+    {
+      orderDiscount: {
+        calculationType: modeToCalcType(adj.orderDiscountMode),
+        value: adj.orderDiscountInput,
+      },
+      freight: {
+        calculationType: modeToCalcType(adj.freightMode),
+        value: adj.freightValue,
+        isTaxable: adj.freightIsTaxable,
+        taxRate: adj.freightTaxRate,
+      },
+      installation: {
+        calculationType: modeToCalcType(adj.installationMode),
+        value: adj.installationValue,
+        isTaxable: adj.installationIsTaxable,
+        taxRate: adj.installationTaxRate,
+      },
+      otherCharges: {
+        calculationType: modeToCalcType(adj.customChargesMode),
+        value: adj.customChargesValue,
+        isTaxable: adj.customChargesIsTaxable,
+        taxRate: adj.customChargesTaxRate,
+      },
+    },
+  )
+  return { ...totals, totalQty }
+}
+
+/** Hydrate adjustment UI from persisted PO header charge amounts (flat mode). */
+export function orderAdjustmentsFromPoCharges(header: {
+  tradeDiscount?: number
+  freight?: number
+  packingCharges?: number
+  otherCharges?: number
+}): PurchaseOrderAdjustmentsState {
+  return {
+    ...emptyPurchaseOrderAdjustments(),
+    orderDiscountInput: Number(header.tradeDiscount) || 0,
+    freightValue: Number(header.freight) || 0,
+    installationValue: Number(header.packingCharges) || 0,
+    customChargesValue: Number(header.otherCharges) || 0,
+  }
+}
+
 export type PurchaseOrderAdjustmentsBlockProps = {
-  lines: PrLineForOrderAdjust[]
+  lines: PrLineForOrderAdjust[] | PoLineForOrderAdjust[]
   value: PurchaseOrderAdjustmentsState
   onChange: (next: PurchaseOrderAdjustmentsState) => void
   readOnly?: boolean
   taxPct?: number
   className?: string
+  /** PO editor supplies per-line GST; default uses PR estimate tax %. */
+  computeTotals?: (
+    lines: PrLineForOrderAdjust[] | PoLineForOrderAdjust[],
+    adj: PurchaseOrderAdjustmentsState,
+    taxPct?: number,
+  ) => OrderDocumentTotals & { totalQty: number }
 }
 
 /**
@@ -136,14 +228,20 @@ export function PurchaseOrderAdjustmentsBlock({
   readOnly = false,
   taxPct = PR_ESTIMATE_TAX_PCT,
   className,
+  computeTotals,
 }: PurchaseOrderAdjustmentsBlockProps) {
-  const orderSummary = useMemo(
-    () => computePrOrderDocumentTotals(lines, value, taxPct),
-    [lines, value, taxPct],
-  )
+  const orderSummary = useMemo(() => {
+    if (computeTotals) return computeTotals(lines, value, taxPct)
+    return computePrOrderDocumentTotals(lines as PrLineForOrderAdjust[], value, taxPct)
+  }, [lines, value, taxPct, computeTotals])
+
+  const valueRef = useRef(value)
+  valueRef.current = value
 
   const patch = (partial: Partial<PurchaseOrderAdjustmentsState>) => {
-    onChange({ ...value, ...partial })
+    const next = { ...valueRef.current, ...partial }
+    valueRef.current = next
+    onChange(next)
   }
 
   return (

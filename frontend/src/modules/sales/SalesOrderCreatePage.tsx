@@ -1301,24 +1301,29 @@ export function SalesOrderNewPage() {
       ) : null}
 
       <ErpFieldGroup label="Customer purchase order" className="so-qe-po-group" columns={4}>
-        <ErpFieldRow label="Customer PO Number" dataField="customerPoNumber" fieldError={validationErrors.customerPoNumber}>
+        <ErpFieldRow
+          label="Customer PO Number"
+          horizontal={false}
+          dataField="customerPoNumber"
+          fieldError={validationErrors.customerPoNumber}
+        >
           <Input
             value={customerPoNumber}
             onChange={(e) => setCustomerPoNumber(e.target.value)}
             placeholder="e.g. PO/2026/1842"
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Customer PO Date">
+        <ErpFieldRow label="Customer PO Date" horizontal={false}>
           <Input type="date" value={customerPoDate} onChange={(e) => setCustomerPoDate(e.target.value)} />
         </ErpFieldRow>
-        <ErpFieldRow label="Expected Delivery Date">
+        <ErpFieldRow label="Expected Delivery Date" horizontal={false}>
           <Input
             type="date"
             value={expectedDeliveryDate}
             onChange={(e) => setExpectedDeliveryDate(e.target.value)}
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Create Mode" readOnly>
+        <ErpFieldRow label="Create Mode" horizontal={false} readOnly>
           <Input value={modeBadgeLabel} readOnly />
         </ErpFieldRow>
       </ErpFieldGroup>

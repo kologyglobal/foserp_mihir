@@ -128,6 +128,10 @@ async function resolveReferences(
   return { vendor, po, grn, direct }
 }
 
+function safeInvoiceDecimal(value: number): number | null {
+  return Number.isFinite(value) ? value : null
+}
+
 function dualUomSnapshots(
   quantity: number,
   poLine?: {
@@ -171,8 +175,8 @@ function dualUomSnapshots(
   return {
     uomCodeSnapshot: stockUom || inputUom || '',
     purchaseUomCodeSnapshot: purchaseUom || null,
-    uomQuantitySnapshot: uomQty,
-    uomConversionFactorSnapshot: factor,
+    uomQuantitySnapshot: safeInvoiceDecimal(uomQty),
+    uomConversionFactorSnapshot: safeInvoiceDecimal(factor) ?? 1,
   }
 }
 

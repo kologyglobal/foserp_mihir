@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { inputClassName } from '../forms/FormField'
@@ -6,6 +6,7 @@ import { useFilterBarField } from '../design-system/filterBarContext'
 import { ErpSmartSelect } from '../erp/ErpSmartSelect'
 import { parseSelectOptions, toSmartSelectOptions } from '../../utils/parseSelectOptions'
 import { resolveSelectPlaceholder, SELECT_PLACEHOLDER } from './selectStandards'
+import { isPartialDecimalText, parseDecimalInput } from '../../utils/parseDecimalInput'
 
 /** Layout/width utilities belong on the wrapper so filters sit inline beside search boxes. */
 const SELECT_WRAP_CLASS = /^(w-|min-w-|max-w-|shrink-|grow-|basis-|flex-|mt-|mb-|ml-|mr-|m-|self-)/
@@ -28,6 +29,111 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 export function Input({ className, error, ...props }: InputProps) {
   return (
     <input className={cn('erp-input', inputClassName(error), className)} {...props} />
+  )
+}
+
+interface DecimalInputProps
+  extends Omit<
+    React.InputHTMLAttributes<HTMLInputElement>,
+    'type' | 'value' | 'onChange'
+  > {
+  value: number
+  onChange: (value: number) => void
+  error?: boolean
+  /** Focus on a zero value starts blank so typing "29" does not become "029". Default true. */
+  clearZeroOnFocus?: boolean
+  /** Select existing text on focus when non-zero. Default true. */
+  selectAllOnFocus?: boolean
+}
+
+function normalizeDecimalDraft(raw: string): string {
+  if (raw === '' || raw.endsWith('.') || raw === '-' || raw === '-.') return raw
+  if (!isPartialDecimalText(raw)) return raw
+  return String(parseDecimalInput(raw))
+}
+
+/**
+ * Quantity field: native number spinners + draft while focused.
+ * Strips leading zeros (029 → 29) and avoids snapping empty input back to 0 mid-typing.
+ */
+export function DecimalInput({
+  className,
+  error,
+  value,
+  onChange,
+  clearZeroOnFocus = true,
+  selectAllOnFocus = true,
+  min,
+  max,
+  step = 'any',
+  disabled,
+  onFocus,
+  onBlur,
+  ...props
+}: DecimalInputProps) {
+  const [focused, setFocused] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  const clamp = (n: number) => {
+    let out = n
+    if (min !== undefined) out = Math.max(Number(min), out)
+    if (max !== undefined) out = Math.min(Number(max), out)
+    return out
+  }
+
+  const commit = (raw: string) => {
+    onChange(clamp(parseDecimalInput(raw)))
+  }
+
+  const applyDraft = (raw: string) => {
+    const normalized = normalizeDecimalDraft(raw)
+    setDraft(normalized)
+    commit(normalized)
+  }
+
+  const displayValue = focused
+    ? draft
+    : Number.isFinite(value)
+      ? value
+      : 0
+
+  return (
+    <input
+      {...props}
+      type="number"
+      step={step}
+      min={min}
+      max={max}
+      autoComplete="off"
+      disabled={disabled}
+      className={cn('erp-input', inputClassName(error), className)}
+      value={focused && draft === '' ? '' : displayValue}
+      onFocus={(e) => {
+        setFocused(true)
+        const start =
+          clearZeroOnFocus && value === 0 ? '' : String(Number.isFinite(value) ? value : 0)
+        setDraft(start)
+        onFocus?.(e)
+        if (selectAllOnFocus && start !== '') {
+          requestAnimationFrame(() => e.target.select())
+        }
+      }}
+      onChange={(e) => {
+        const next = e.target.value
+        if (next === '') {
+          setDraft('')
+          commit('')
+          return
+        }
+        if (!isPartialDecimalText(next)) return
+        applyDraft(next)
+      }}
+      onBlur={(e) => {
+        applyDraft(draft)
+        setFocused(false)
+        onBlur?.(e)
+      }}
+    />
   )
 }
 

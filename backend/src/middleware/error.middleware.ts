@@ -117,9 +117,8 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
 
   if (err instanceof Prisma.PrismaClientValidationError) {
     logger.error('Prisma validation error', err)
-    // Dev: surface a short, non-SQL hint so UI/API debugging is not a blank 400.
     const hint =
-      !env.isProd && typeof err.message === 'string'
+      typeof err.message === 'string'
         ? err.message
             .split('\n')
             .map((l) => l.trim())
@@ -128,9 +127,10 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
     sendError(
       res,
       400,
-      hint ? `Invalid request data: ${hint.slice(0, 200)}` : 'Invalid request data',
+      hint && !env.isProd ? `Invalid request data: ${hint.slice(0, 200)}` : 'Invalid request data',
       undefined,
       'PRISMA_VALIDATION',
+      hint ? { prismaHint: hint.slice(0, 300) } : undefined,
     )
     return
   }

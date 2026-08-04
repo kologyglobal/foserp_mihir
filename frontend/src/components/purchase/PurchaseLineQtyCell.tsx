@@ -5,6 +5,7 @@ import {
   purchaseLineHasDualUom,
 } from '@/utils/purchaseLineUom'
 import { cn } from '@/utils/cn'
+import { DecimalInput } from '@/components/forms/Inputs'
 
 type LineQty = Pick<PurchaseOrderLine, 'itemId' | 'uom' | 'uomQuantity' | 'quantity' | 'uomConversionFactor'>
 
@@ -38,16 +39,14 @@ export function PurchaseLineQtyCell({
     return (
       <div className={cn('min-w-[10rem] text-right', className)}>
         <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-          <input
+          <DecimalInput
             id={inputId}
-            type="number"
             min={0}
-            step="any"
-            className="erp-input h-8 w-[4.5rem] shrink-0 text-right text-[11px]"
+            className="h-8 w-[4.5rem] shrink-0 text-right text-[11px]"
             disabled={disabled}
             title="Purchase quantity"
             value={purchaseQty}
-            onChange={(e) => onChange?.(Number(e.target.value))}
+            onChange={(v) => onChange?.(v)}
           />
           <span className="min-w-[2.75rem] shrink-0 text-left text-[11px] font-semibold uppercase tracking-wide text-erp-text">
             {purchaseUom}

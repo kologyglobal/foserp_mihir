@@ -20,7 +20,7 @@ import {
 import { ErpCardSection, ErpFieldRow, ErpFormSpan } from '@/components/erp/card-form'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { FormActionBar } from '@/components/erp/FormActionBar'
-import { Checkbox, Input, Select, Textarea } from '@/components/forms/Inputs'
+import { Checkbox, DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
@@ -1057,10 +1057,10 @@ export function PurchaseReturnEditorPage() {
                     <td className="tabular-nums">{l.receivedQty}</td>
                     <td className="tabular-nums">{l.availableReturnQty}</td>
                     <td>
-                      <Input
-                        type="number"
+                      <DecimalInput
+                        min={0}
                         value={l.returnQty}
-                        onChange={(e) => patchLine(l.key, { returnQty: Number(e.target.value) || 0 })}
+                        onChange={(v) => patchLine(l.key, { returnQty: v })}
                         disabled={!editable}
                       />
                     </td>
@@ -1091,12 +1091,10 @@ export function PurchaseReturnEditorPage() {
                       </Select>
                     </td>
                     <td>
-                      <Input
-                        type="number"
+                      <DecimalInput
+                        min={0}
                         value={l.replacementQty}
-                        onChange={(e) =>
-                          patchLine(l.key, { replacementQty: Number(e.target.value) || 0 })
-                        }
+                        onChange={(v) => patchLine(l.key, { replacementQty: v })}
                         disabled={!editable}
                       />
                     </td>
