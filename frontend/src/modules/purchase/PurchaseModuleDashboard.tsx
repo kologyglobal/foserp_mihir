@@ -8,8 +8,10 @@ import {
   IndianRupee,
   MapPin,
   PackageCheck,
+  PackageX,
   Plus,
   RefreshCw,
+  RotateCcw,
   ShoppingCart,
   Truck,
 } from 'lucide-react'
@@ -29,8 +31,16 @@ import { TableLink } from '../../components/ui/AppLink'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingState } from '../../design-system/components/LoadingState'
 import type { EnterpriseKpiItem } from '../../design-system/enterprise/enterpriseKpiTypes'
-import { getPurchaseDashboard, PurchaseServiceError } from '../../services/purchase'
-import type { PurchaseDashboardData, PurchaseDashboardFilters } from '../../types/purchaseDomain'
+import {
+  getPurchaseDashboard,
+  getSupplierQualityDashboardWidgets,
+  PurchaseServiceError,
+} from '../../services/purchase'
+import type {
+  PurchaseDashboardData,
+  PurchaseDashboardFilters,
+  SupplierQualityDashboardWidgets,
+} from '../../types/purchaseDomain'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { cn } from '../../utils/cn'
@@ -111,6 +121,159 @@ function DashboardShell({
   )
 }
 
+function SupplierQualityDashboardPanel({
+  widgets,
+  navigate,
+}: {
+  widgets: SupplierQualityDashboardWidgets
+  navigate: ReturnType<typeof useNavigate>
+}) {
+  return (
+    <>
+      <DynamicsDashboardPanel
+        title="Supplier quality"
+        actions={
+          <button
+            type="button"
+            className="text-[12px] font-medium text-erp-primary hover:underline"
+            onClick={() => navigate('/purchase/returns')}
+          >
+            Returns register →
+          </button>
+        }
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              label: 'Pending returns',
+              value: widgets.pendingReturns,
+              icon: RotateCcw,
+              href: '/purchase/returns?status=open',
+              accent: widgets.pendingReturns > 0,
+            },
+            {
+              label: 'Rejected stock qty',
+              value: widgets.rejectedStockQty || widgets.rejectedStockValue,
+              icon: PackageX,
+              href: '/inventory/stock',
+              accent: widgets.rejectedStockQty > 0,
+            },
+            {
+              label: 'Replacement pending',
+              value: widgets.replacementPending,
+              icon: PackageCheck,
+              href: '/purchase/returns?returnType=REPLACEMENT',
+              accent: widgets.replacementPending > 0,
+            },
+            {
+              label: 'Vendor adjustments pending',
+              value: widgets.vendorAdjustmentsPending,
+              icon: IndianRupee,
+              href: '/accounting/money-out/vendor-adjustments',
+              accent: widgets.vendorAdjustmentsPending > 0,
+            },
+          ].map((kpi) => (
+            <button
+              key={kpi.label}
+              type="button"
+              onClick={() => navigate(kpi.href)}
+              className="rounded-md border border-erp-border px-3 py-2.5 text-left hover:border-erp-primary/40 hover:bg-erp-primary-soft/60"
+            >
+              <span className="flex items-center gap-1.5 text-[11px] text-erp-muted">
+                <kpi.icon className="h-3.5 w-3.5" />
+                {kpi.label}
+              </span>
+              <span
+                className={cn(
+                  'mt-1 block text-[20px] font-semibold tabular-nums',
+                  kpi.accent ? 'text-erp-warning-fg' : 'text-erp-text',
+                )}
+              >
+                {kpi.value}
+              </span>
+            </button>
+          ))}
+        </div>
+      </DynamicsDashboardPanel>
+
+      <DynamicsDashboardGrid>
+        <DynamicsDashboardPanel title="Top rejected vendors" noPadding>
+          {widgets.topRejectedVendors.length === 0 ? (
+            <p className="dyn-empty-hint px-4 py-6">No rejected vendor rankings for this tenant.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="erp-table">
+                <thead>
+                  <tr>
+                    <th>Vendor</th>
+                    <th className="num">Rejected</th>
+                    <th className="num">Reject %</th>
+                    <th className="num">Inspections</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {widgets.topRejectedVendors.map((row) => (
+                    <tr key={row.vendorId}>
+                      <td>
+                        <TableLink to={`/masters/vendors/${row.vendorId}`}>
+                          {row.vendorName || row.vendorCode || row.vendorId.slice(0, 8)}
+                        </TableLink>
+                      </td>
+                      <td className="num">{row.rejectedQty}</td>
+                      <td className="num">{row.rejectRatePct}%</td>
+                      <td className="num">{row.inspectionCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DynamicsDashboardPanel>
+        <DynamicsDashboardPanel title="Most rejected items" noPadding>
+          {widgets.mostRejectedItems.length === 0 ? (
+            <p className="dyn-empty-hint px-4 py-6">No rejected item rankings for this tenant.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="erp-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th className="num">Rejected</th>
+                    <th className="num">Reject %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {widgets.mostRejectedItems.map((row) => {
+                    const isUuid =
+                      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                        row.itemKey,
+                      )
+                    return (
+                      <tr key={row.itemKey}>
+                        <td>
+                          {isUuid ? (
+                            <TableLink to={`/inventory/stock/${row.itemKey}`}>
+                              {row.itemCode || row.itemName || row.itemKey.slice(0, 8)}
+                            </TableLink>
+                          ) : (
+                            row.itemCode || row.itemName || row.itemKey
+                          )}
+                        </td>
+                        <td className="num">{row.rejectedQty}</td>
+                        <td className="num">{row.rejectRatePct}%</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DynamicsDashboardPanel>
+      </DynamicsDashboardGrid>
+    </>
+  )
+}
+
 export function PurchaseModuleDashboard() {
   const navigate = useNavigate()
   const [filters, setFilters] = useState<PurchaseDashboardFilters>({
@@ -119,6 +282,7 @@ export function PurchaseModuleDashboard() {
     locationId: '',
   })
   const [data, setData] = useState<PurchaseDashboardData | null>(null)
+  const [sqWidgets, setSqWidgets] = useState<SupplierQualityDashboardWidgets | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -135,7 +299,10 @@ export function PurchaseModuleDashboard() {
     setLoadState('loading')
     setErrorMessage(null)
     try {
-      const result = await getPurchaseDashboard(queryFilters)
+      const [result, widgets] = await Promise.all([
+        getPurchaseDashboard(queryFilters),
+        getSupplierQualityDashboardWidgets().catch(() => null),
+      ])
       if (signal?.cancelled) return
       const empty =
         result.kpis.openRequisitions === 0 &&
@@ -145,6 +312,7 @@ export function PurchaseModuleDashboard() {
         result.upcomingDeliveries.length === 0 &&
         result.recentActivity.length === 0
       setData(result)
+      setSqWidgets(widgets)
       setLoadState(empty ? 'empty' : 'ready')
     } catch (err) {
       if (signal?.cancelled) return
@@ -156,6 +324,7 @@ export function PurchaseModuleDashboard() {
             : 'Failed to load purchase dashboard'
       setErrorMessage(message)
       setData(null)
+      setSqWidgets(null)
       setLoadState('error')
     }
   }, [queryFilters])
@@ -190,6 +359,21 @@ export function PurchaseModuleDashboard() {
           label: 'Refresh',
           icon: RefreshCw,
           onClick: refresh,
+        },
+        {
+          id: 'ops-receipts',
+          label: 'Receipt summary',
+          onClick: () => navigate('/purchase/ops/receipts'),
+        },
+        {
+          id: 'ops-item-summary',
+          label: 'Item summary',
+          onClick: () => navigate('/purchase/ops/item-summary'),
+        },
+        {
+          id: 'ops-vendors',
+          label: 'Vendor ops',
+          onClick: () => navigate('/purchase/ops/vendors'),
         },
       ]}
     />
@@ -303,6 +487,11 @@ export function PurchaseModuleDashboard() {
             </button>
           }
         />
+        {sqWidgets ? (
+          <div className="mt-4">
+            <SupplierQualityDashboardPanel widgets={sqWidgets} navigate={navigate} />
+          </div>
+        ) : null}
       </DashboardShell>
     )
   }
@@ -388,6 +577,24 @@ export function PurchaseModuleDashboard() {
     <DashboardShell commandBar={commandBar} kpiStrip={kpiStrip}>
       {filterBar}
 
+      <div className="mb-4 flex flex-wrap gap-2">
+        {[
+          { label: 'Receipt summary', href: '/purchase/ops/receipts' },
+          { label: 'Purchase item summary', href: '/purchase/ops/item-summary' },
+          { label: 'Vendor ops', href: '/purchase/ops/vendors' },
+          { label: 'Consolidated stock', href: '/inventory/stock' },
+        ].map((t) => (
+          <button
+            key={t.href}
+            type="button"
+            className="erp-btn erp-btn-secondary h-8 px-3 text-[12px]"
+            onClick={() => navigate(t.href)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <DynamicsDashboardPanel title="Pending Actions">
         {data.pendingActions.length === 0 ? (
           <p className="flex items-center gap-2 text-[13px] text-erp-success-fg">
@@ -426,6 +633,8 @@ export function PurchaseModuleDashboard() {
           </ul>
         )}
       </DynamicsDashboardPanel>
+
+      {sqWidgets ? <SupplierQualityDashboardPanel widgets={sqWidgets} navigate={navigate} /> : null}
 
       <DynamicsDashboardPanel
         title="GRNs awaiting invoice (GRNI)"

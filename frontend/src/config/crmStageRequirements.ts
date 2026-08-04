@@ -93,12 +93,12 @@ export const LEAD_STAGE_REQUIREMENTS: Record<LeadStage, readonly string[]> = {
  * Terminal won/lost keep commercial gates elsewhere (approved quotation / lost reason UI);
  * lost still lists `lostReason` here so config consumers can surface it uniformly.
  *
- * Qualified does not require scope text — capture requirement at Requirement Discussion.
+ * Qualified does not require close date or scope text — capture commercial detail later.
  * Item/product lines remain optional until Technical Review / Quotation.
  */
 export const OPPORTUNITY_STAGE_REQUIREMENTS: Record<OpportunityStage, readonly string[]> = {
   new_lead: ['opportunityName', 'customerId', 'ownerId'],
-  qualified: ['expectedCloseDate', 'priority'],
+  qualified: ['priority'],
   requirement_discussion: ['productRequirement', 'contactId', 'value', 'expectedCloseDate'],
   technical_review: ['productRequirement', 'lines'],
   quotation_prepared: ['lines', 'value'],

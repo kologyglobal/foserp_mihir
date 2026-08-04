@@ -6,6 +6,7 @@
  * (tenant isolation + accounting.bank_cash.* permissions). UI gating alone is not security.
  */
 
+import { accountingDemoOrEmpty, accountingDemoOrFactory, isAccountingDemoDataEnabled } from '@/utils/accounting/accountingDemoData'
 import {
   seedBankAccounts,
   seedBankCashAudit,
@@ -63,21 +64,37 @@ export class BankCashServiceError extends Error {
   }
 }
 
-const COMPANY_NAME = 'Vasant Trailers Pvt Ltd'
-const delay = () => new Promise((r) => setTimeout(r, 80 + Math.floor(Math.random() * 70)))
+const COMPANY_NAME = isAccountingDemoDataEnabled() ? 'Vasant Trailers Pvt Ltd' : 'Company'
+const delay = () => new Promise((r) => setTimeout(r, isAccountingDemoDataEnabled() ? 80 + Math.floor(Math.random() * 70) : 0))
 
-let bankAccountsStore = seedBankAccounts()
-let cashAccountsStore = seedCashAccounts()
-let transactionsStore = seedBankCashTransactions()
-let fundTransfersStore = seedFundTransfers()
-let statementsStore = seedBankStatements()
-let statementLinesStore = seedBankStatementLines()
-let reconciliationsStore = seedReconciliations()
-let chequesStore = seedCheques()
-let depositsStore = seedBankDeposits()
-let cashCountsStore = seedCashCounts()
-let setupStore = seedBankCashSetup()
-let auditStore = seedBankCashAudit()
+let bankAccountsStore = accountingDemoOrEmpty(seedBankAccounts)
+let cashAccountsStore = accountingDemoOrEmpty(seedCashAccounts)
+let transactionsStore = accountingDemoOrEmpty(seedBankCashTransactions)
+let fundTransfersStore = accountingDemoOrEmpty(seedFundTransfers)
+let statementsStore = accountingDemoOrEmpty(seedBankStatements)
+let statementLinesStore = accountingDemoOrEmpty(seedBankStatementLines)
+let reconciliationsStore = accountingDemoOrEmpty(seedReconciliations)
+let chequesStore = accountingDemoOrEmpty(seedCheques)
+let depositsStore = accountingDemoOrEmpty(seedBankDeposits)
+let cashCountsStore = accountingDemoOrEmpty(seedCashCounts)
+let setupStore = accountingDemoOrFactory(seedBankCashSetup, () => ({
+  companyName: '',
+  defaultCurrency: 'INR',
+  financialYearStartMonth: 4,
+  autoReconciliationEnabled: true,
+  requireDualApprovalAbove: 500_000,
+  allowNegativeCash: false,
+  defaultTransferMode: 'NEFT' as const,
+  chequeSeriesPrefix: 'CHQ-',
+  depositSlipPrefix: 'DEP-',
+  fundTransferPrefix: 'FTR-',
+  reconciliationTolerance: 1,
+  statementImportFormats: ['CSV', 'MT940', 'Excel'],
+  notifyOnVariance: true,
+  notifyOnBouncedCheque: true,
+  approvalWorkflowEnabled: true,
+}))
+let auditStore = accountingDemoOrEmpty(seedBankCashAudit)
 
 function clone<T>(value: T): T {
   return structuredClone(value)
@@ -1508,16 +1525,32 @@ export async function getBankCashLookups(): Promise<BankCashLookups> {
 }
 
 export function resetBankCashDemo(): void {
-  bankAccountsStore = seedBankAccounts()
-  cashAccountsStore = seedCashAccounts()
-  transactionsStore = seedBankCashTransactions()
-  fundTransfersStore = seedFundTransfers()
-  statementsStore = seedBankStatements()
-  statementLinesStore = seedBankStatementLines()
-  reconciliationsStore = seedReconciliations()
-  chequesStore = seedCheques()
-  depositsStore = seedBankDeposits()
-  cashCountsStore = seedCashCounts()
-  setupStore = seedBankCashSetup()
-  auditStore = seedBankCashAudit()
+  bankAccountsStore = accountingDemoOrEmpty(seedBankAccounts)
+  cashAccountsStore = accountingDemoOrEmpty(seedCashAccounts)
+  transactionsStore = accountingDemoOrEmpty(seedBankCashTransactions)
+  fundTransfersStore = accountingDemoOrEmpty(seedFundTransfers)
+  statementsStore = accountingDemoOrEmpty(seedBankStatements)
+  statementLinesStore = accountingDemoOrEmpty(seedBankStatementLines)
+  reconciliationsStore = accountingDemoOrEmpty(seedReconciliations)
+  chequesStore = accountingDemoOrEmpty(seedCheques)
+  depositsStore = accountingDemoOrEmpty(seedBankDeposits)
+  cashCountsStore = accountingDemoOrEmpty(seedCashCounts)
+  setupStore = accountingDemoOrFactory(seedBankCashSetup, () => ({
+    companyName: '',
+    defaultCurrency: 'INR',
+    financialYearStartMonth: 4,
+    autoReconciliationEnabled: true,
+    requireDualApprovalAbove: 500_000,
+    allowNegativeCash: false,
+    defaultTransferMode: 'NEFT' as const,
+    chequeSeriesPrefix: 'CHQ-',
+    depositSlipPrefix: 'DEP-',
+    fundTransferPrefix: 'FTR-',
+    reconciliationTolerance: 1,
+    statementImportFormats: ['CSV', 'MT940', 'Excel'],
+    notifyOnVariance: true,
+    notifyOnBouncedCheque: true,
+    approvalWorkflowEnabled: true,
+  }))
+  auditStore = accountingDemoOrEmpty(seedBankCashAudit)
 }

@@ -80,7 +80,38 @@ if (skipFrontend) {
   )
 } else if (existsSync(join(frontend, 'package.json'))) {
   console.log('[build-hostinger] Building Vite frontend…')
-  runNpm(['ci', '--include=dev'], frontend, frontendInstallEnv())
+  // Prefer existing deps: on Windows a running Vite/dev server locks
+  // @rolldown native .node bindings, so `npm ci` fails with EPERM unlink.
+  // Hostinger: set FORCE_FRONTEND_NPM_CI=1 for a clean install every build.
+  // Locally: leave deps as-is unless node_modules is missing.
+  const forceFrontendCi =
+    process.env.FORCE_FRONTEND_NPM_CI === '1'
+    || process.env.FORCE_FRONTEND_NPM_CI === 'true'
+  const frontendViteReady = existsSync(join(frontend, 'node_modules', 'vite', 'package.json'))
+  if (forceFrontendCi || !frontendViteReady) {
+    if (!frontendViteReady) {
+      console.log('[build-hostinger] Frontend node_modules missing — npm ci --include=dev…')
+    } else {
+      console.log('[build-hostinger] FORCE_FRONTEND_NPM_CI — npm ci --include=dev…')
+    }
+    try {
+      runNpm(['ci', '--include=dev'], frontend, frontendInstallEnv())
+    } catch (err) {
+      if (frontendViteReady) {
+        console.warn(
+          '[build-hostinger] npm ci failed (often EPERM while Vite/dev is running). '
+            + 'Reusing existing frontend node_modules and continuing with vite build.',
+        )
+      } else {
+        throw err
+      }
+    }
+  } else {
+    console.log(
+      '[build-hostinger] Frontend deps already present — skipping npm ci '
+        + '(set FORCE_FRONTEND_NPM_CI=1 to reinstall).',
+    )
+  }
   const viteEnv = {
     ...frontendInstallEnv(),
     VITE_USE_API: process.env.VITE_USE_API ?? 'true',

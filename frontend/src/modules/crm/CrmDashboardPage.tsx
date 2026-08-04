@@ -62,6 +62,7 @@ import { applyApiDashboardOverlay, useCrmDashboardApiMetrics } from '../../hooks
 import { applyApiDashboardPanelOverlay } from '../../utils/crmDashboardApiPanels'
 import { buildCrmDashboardChartSeries } from '../../utils/crmDashboardApiCharts'
 import { useApiMode } from '@/hooks/useApiMode'
+import { resolveCatalogProductLabel } from '../../utils/catalogProductLabel'
 
 export function CrmDashboardPage() {
   const apiMode = useApiMode()
@@ -77,6 +78,7 @@ export function CrmDashboardPage() {
   const rescheduleFollowUp = useCrmStore((s) => s.rescheduleFollowUp)
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
+  const items = useMasterStore((s) => s.items)
 
   const availableModes = useMemo(() => getAvailableCrmViewModes(), [])
   const [viewMode, setViewMode] = useState<CrmDashboardViewMode>(getDefaultCrmViewMode())
@@ -131,9 +133,9 @@ export function CrmDashboardPage() {
   const lookup = useMemo(
     () => ({
       customerName: (id: string) => customers.find((c) => c.id === id)?.customerName ?? id,
-      productName: (id: string) => products.find((p) => p.id === id)?.productName ?? id,
+      productName: (id: string) => resolveCatalogProductLabel(id, { items, products }),
     }),
-    [customers, products],
+    [customers, items, products],
   )
 
   const approvalPending = apiMode

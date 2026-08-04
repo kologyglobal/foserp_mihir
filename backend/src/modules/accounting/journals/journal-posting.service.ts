@@ -161,7 +161,7 @@ export async function postJournal(
 
 export async function getJournalLedger(tenantId: string, journalId: string): Promise<GeneralLedgerEntry[]> {
   await repo.findJournalByIdOrThrow(tenantId, journalId)
-  return postingReadService.getVoucherLedger(tenantId, journalId)
+  return postingReadService.getVoucherLedgerRaw(tenantId, journalId)
 }
 
 export async function findPostingEventIdForJournal(tenantId: string, journalId: string): Promise<string | null> {

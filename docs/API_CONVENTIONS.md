@@ -2,7 +2,7 @@
 
 Authoritative patterns from `backend/src/app.ts` and module routes. Base URL: **`/api/v1`**.
 
-**Live OpenAPI (dev):** http://localhost:5000/api/docs — OpenAPI **1.5.0**. Hand-written entries live in `backend/src/config/swagger.ts`; remaining Express routes are filled by auto-generated stubs in `swagger.generated-paths.ts`. Regenerate stubs after adding routes:
+**Live OpenAPI (dev):** http://localhost:5000/api/docs — OpenAPI **1.7.0**. Hand-written entries live in `backend/src/config/swagger.ts`; remaining Express routes are filled by auto-generated stubs in `swagger.generated-paths.ts` (covers all `app.ts` mounts including `/kb`, `/notifications`, `/mobile/device-tokens`, HRMS, maintenance, etc.). Regenerate stubs after adding routes:
 
 ```bash
 cd backend && npm run swagger:generate
@@ -605,3 +605,18 @@ Session stored in `localStorage` key `fos-erp-auth`.
 ## Field naming: API ↔ frontend
 
 Backend CRM DTOs often use **frontend-compatible aliases** (e.g. `customerName` → company `name`, `customerId` → `companyId`). Mapping documented in `FRONTEND_BACKEND_INTEGRATION.md`. When adding fields, update **both** validation schema and bridge mapper.
+
+## CRM commercial → Money In receipts
+
+Base: **`/api/v1/t/:tenantSlug`**
+
+| Method | Path | Permission |
+|--------|------|------------|
+| GET | `/crm/commercial/receipts/:id/accounting-status` | `crm.commercial.receipt.view` |
+| GET | `/crm/commercial/receipts/:id/accounting-duplicate-check` | `crm.commercial.receipt.view` |
+| POST | `/crm/commercial/receipts/:id/create-accounting-draft` | `crm.commercial.receipt.accounting_draft.create` **and** `finance.ar.receipt.create` |
+| POST | `/crm/commercial/receipts/:id/retry-accounting-draft` | same as create draft |
+| POST | `/crm/commercial/receipts/:id/mark-non-accounting` | `crm.commercial.receipt.accounting_draft.create` |
+| GET | `/accounting/receivables/crm-receipt-migration` | `finance.ar.crm_receipt_migration.view` |
+
+See `docs/CRM_ACCOUNTING_RECEIPT_ARCHITECTURE.md`. Create draft **never posts** GL.

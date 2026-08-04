@@ -98,6 +98,7 @@ export function mapQuotationToDto(
     opportunityNo: quotation.opportunity?.opportunityCode ?? null,
     customerId: quotation.companyId,
     customerName: quotation.company?.name?.trim() || null,
+    customerCode: quotation.company?.companyCode?.trim() || null,
     itemId: quotation.itemId,
     qty: decimalToNumber(quotation.qty),
     revisionNo: quotation.revisionNo,

@@ -20,6 +20,7 @@ import {
   buildCalculationInputFromRequest,
   buildCalculationInputFromStoredInvoice,
   parseCalculationContext,
+  resolveCalculationContext,
 } from './sales-invoice-validation.service.js'
 import { ValidationError } from '../../../../utils/errors.js'
 import { validateAndEnrichSalesInvoiceSourceLinks } from './sales-invoice-source-validation.service.js'
@@ -109,7 +110,10 @@ export async function createSalesInvoiceDraft(req: Request, tenantId: string, in
   })
   metaWarnings = [...metaWarnings, ...enrichedLinks.warnings]
 
-  const calcInput = buildCalculationInputFromRequest(input, legalEntity.stateCode)
+  const calcInput = buildCalculationInputFromRequest(
+    input,
+    input.legalEntityStateCode ?? legalEntity.stateCode,
+  )
   const calc = calculateSalesInvoice(calcInput)
   throwOnCalcFailure(calc)
 
@@ -139,7 +143,15 @@ export async function createSalesInvoiceDraft(req: Request, tenantId: string, in
     sourceLinks: enrichedLinks.sourceLinks,
   })
 
+  // Legacy CRM_TAX_INVOICE convert path: stamp legacy ids only (no dual ledger going forward).
   if (input.sourceType === 'CRM_TAX_INVOICE' && input.sourceDocumentId) {
+    await prisma.salesInvoice.update({
+      where: { id: invoice.id },
+      data: {
+        legacyCrmTaxInvoiceId: input.sourceDocumentId,
+        createdChannel: 'CRM',
+      },
+    })
     const { linkCrmTaxInvoiceToSalesInvoice } = await import('../source/crm-tax-invoice-ar.service.js')
     await linkCrmTaxInvoiceToSalesInvoice({
       tenantId,
@@ -182,7 +194,7 @@ export async function updateSalesInvoiceDraft(
 
   const calcInput = buildCalculationInputFromRequest(
     { ...input, legalEntityId: existing.legalEntityId },
-    legalEntity.stateCode,
+    input.legalEntityStateCode ?? legalEntity.stateCode,
   )
   const calc = calculateSalesInvoice(calcInput)
   throwOnCalcFailure(calc)
@@ -258,8 +270,9 @@ export async function markSalesInvoiceReady(req: Request, tenantId: string, id: 
 
   const calc = preview.calculation
   let invoice = existing
-  const context = parseCalculationContext(existing.calculationContext)
-  if (context && amountsDrift(existing, calc)) {
+  const storedContext = parseCalculationContext(existing.calculationContext)
+  const context = resolveCalculationContext(existing)
+  if (context && storedContext && amountsDrift(existing, calc)) {
     invoice = await repo.persistRecalculatedAmounts(tenantId, id, calc, context, req.context?.userId)
   }
 

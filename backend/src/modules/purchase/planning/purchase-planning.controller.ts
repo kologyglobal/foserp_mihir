@@ -73,6 +73,13 @@ export const createPurchaseOrdersFromPlanning = asyncHandler(async (req: Request
   sendCreated(res, 'Purchase orders created from planning', data)
 })
 
+export const createPurchaseOrdersFromConsolidation = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const { userId } = getContext(req)
+  const data = await createPoService.createPurchaseOrdersFromConsolidation(tenantId, userId, req.body)
+  sendCreated(res, 'Purchase orders created from consolidated allocation', data)
+})
+
 export const splitPlanningRow = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const { userId } = getContext(req)

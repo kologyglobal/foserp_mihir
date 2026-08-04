@@ -30,7 +30,7 @@ export function ConvertQuotationToSOAction({
 
   const gate = useMemo(
     () => resolveCreateSalesOrderGateForQuotationDocument(documentId),
-    [documentId, doc?.status, doc?.salesOrderId],
+    [documentId, doc?.status, doc?.salesOrderId, doc?.opportunityId],
   )
 
   if (!doc) return null
@@ -52,15 +52,7 @@ export function ConvertQuotationToSOAction({
     )
   }
 
-  if (variant === 'inline' && !doc.opportunityId) {
-    return (
-      <p className={`text-xs text-muted-foreground ${className ?? ''}`}>
-        {gate.disabledReason ?? 'Link this quotation to an opportunity to create a sales order.'}
-      </p>
-    )
-  }
-
-  if (!gate.showCreate && !doc.opportunityId) return null
+  if (!gate.showCreate) return null
 
   return (
     <>
@@ -85,9 +77,7 @@ export function ConvertQuotationToSOAction({
             return
           }
           // Fallback when list/card has no conversion dialog host — open SO create with prefill.
-          if (doc.opportunityId) {
-            navigate(buildSalesOrderNewUrl(doc.opportunityId, documentId, { fromCrm }))
-          }
+          navigate(buildSalesOrderNewUrl(doc.opportunityId, documentId, { fromCrm }))
         }}
       >
         Convert to Sales Order

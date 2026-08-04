@@ -80,6 +80,7 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { appPromptNote } from '@/store/confirmDialogStore'
 import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
+import { PoReceiptRollupPanel } from '@/components/purchase/PoReceiptRollupPanel'
 
 const REVISABLE_STATUSES: PurchaseOrder['status'][] = [
   'released',
@@ -147,7 +148,7 @@ function PurchaseOrderDetailSkeleton() {
         subtitle="Identity, vendor, locations, and commercial terms"
         collapsible
         defaultOpen
-        columns={4}
+        columns={6}
       >
         {skeletonFields(24)}
       </ErpCardSection>
@@ -194,6 +195,10 @@ function PurchaseOrderDetailSkeleton() {
         </div>
       </ErpCardSection>
 
+      {collapsedSection(
+        'Receipts by item',
+        'Ordered / received / pending per line — expand for individual GRNs',
+      )}
       {collapsedSection('Inventory Reservations', 'Stock reserved for this purchase order')}
       {collapsedSection('Terms & Notes')}
       {collapsedSection('Attachments')}
@@ -241,6 +246,7 @@ export function PurchaseOrderDetailPage() {
   const [approveRemarks, setApproveRemarks] = useState('')
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const [receiptRefreshToken, setReceiptRefreshToken] = useState(0)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -264,6 +270,7 @@ export function PurchaseOrderDetailPage() {
       setLinked(linkedDocs)
       setVendorMaster(vendors.find((v) => v.id === row.vendor.id) ?? null)
       setRequireApprovalOnPo(setup?.general.requireApprovalOnPo ?? true)
+      setReceiptRefreshToken((n) => n + 1)
     } finally {
       setLoading(false)
     }
@@ -670,7 +677,7 @@ export function PurchaseOrderDetailPage() {
           subtitle="Identity, vendor, locations, and commercial terms"
           collapsible
           defaultOpen
-          columns={4}
+          columns={6}
         >
           <ErpViewField label="PO Number" value={po.documentNumber} />
           <ErpViewField label="PO Date" value={formatDate(po.documentDate)} />
@@ -804,6 +811,26 @@ export function PurchaseOrderDetailPage() {
                         <div className="truncate text-[12px] text-erp-muted" title={l.itemName}>
                           {l.itemName}
                         </div>
+                        {l.prSources && l.prSources.length > 0 ? (
+                          <details className="mt-1 rounded border border-erp-border bg-erp-surface-alt/40 px-2 py-1 text-[11px]">
+                            <summary className="cursor-pointer font-medium text-erp-primary">
+                              PR breakdown ({l.prSources.length})
+                            </summary>
+                            <ul className="mt-1 space-y-0.5 text-erp-text">
+                              {l.prSources.map((s) => (
+                                <li key={s.id} className="flex justify-between gap-3 font-mono">
+                                  <Link
+                                    className="text-erp-primary hover:underline"
+                                    to={`/purchase/requisitions/${s.purchaseRequisitionId}`}
+                                  >
+                                    {s.requisitionNumber}
+                                  </Link>
+                                  <span className="tabular-nums">{s.quantity}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        ) : null}
                       </td>
                       <td className="purchase-order-detail-lines__col-uom">{l.uom}</td>
                       <td className="num purchase-order-detail-lines__col-qty">
@@ -997,6 +1024,16 @@ export function PurchaseOrderDetailPage() {
             <ErpViewField label="Round Off" value={formatCurrency(po.roundOff)} />
             <ErpViewField label="Grand Total" value={formatCurrency(po.totalAmount)} />
           </div>
+        </ErpCardSection>
+
+        <ErpCardSection
+          title="Receipts by item"
+          subtitle="Ordered / received / pending per line — expand for individual GRNs"
+          columns={1}
+          collapsible
+          defaultOpen
+        >
+          <PoReceiptRollupPanel purchaseOrderId={po.id} refreshToken={receiptRefreshToken} />
         </ErpCardSection>
 
         <ErpCardSection

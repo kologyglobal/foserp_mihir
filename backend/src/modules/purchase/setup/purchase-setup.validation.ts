@@ -90,6 +90,7 @@ const generalSchema = z.object({
   requirePoWarehouse: z.boolean().optional(),
   requireExpectedDeliveryDate: z.boolean().optional(),
   requirePaymentTerms: z.boolean().optional(),
+  planningConsolidationEnabled: z.boolean().optional(),
 })
 
 const requisitionSchema = z.object({
@@ -166,7 +167,22 @@ const numberSeriesSchema = z.object({
   purchaseReturn: numberSeriesConfigSchema.optional(),
 })
 
-/** Nested PUT body — notifications intentionally excluded from persistence. */
+const channelFlagsSchema = z.object({
+  inApp: z.boolean(),
+  email: z.boolean(),
+})
+
+const notificationsSchema = z.object({
+  prPendingApproval: channelFlagsSchema.optional(),
+  rfqResponseDue: channelFlagsSchema.optional(),
+  poDeliveryApproaching: channelFlagsSchema.optional(),
+  poOverdue: channelFlagsSchema.optional(),
+  grnPendingInspection: channelFlagsSchema.optional(),
+  invoiceMismatch: channelFlagsSchema.optional(),
+  invoicePendingApproval: channelFlagsSchema.optional(),
+})
+
+/** Nested PUT body — includes tenant notification event toggles. */
 export const upsertPurchaseSetupSchema = z.object({
   version: z.coerce.number().int().min(0).optional(),
   selfApprovalPolicy: z.enum(SELF_APPROVAL_POLICIES).optional(),
@@ -181,6 +197,7 @@ export const upsertPurchaseSetupSchema = z.object({
   receiving: receivingSchema.optional(),
   quality: qualitySchema.optional(),
   print: printSchema.optional(),
+  notifications: notificationsSchema.optional(),
 })
 
 export type UpsertPurchaseSetupInput = z.infer<typeof upsertPurchaseSetupSchema>

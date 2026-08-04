@@ -25,6 +25,7 @@ import type {
   WipRow,
 } from '../types/accounting'
 import { buildAccountingSeed } from '../data/accounting/seed'
+import { isApiMode } from '../config/apiConfig'
 import {
   buildLedgerEntriesFromVoucher,
   genAccountingId,
@@ -118,7 +119,35 @@ function currentUserLabel(): string {
 export const useAccountingStore = create<AccountingState>()(
   persist(
     (set, get) => {
-      const seed = buildAccountingSeed()
+      const seed = isApiMode()
+        ? {
+            accounts: [] as ReturnType<typeof buildAccountingSeed>['accounts'],
+            vouchers: [] as ReturnType<typeof buildAccountingSeed>['vouchers'],
+            ledgerEntries: [] as ReturnType<typeof buildAccountingSeed>['ledgerEntries'],
+            receivables: [] as ReturnType<typeof buildAccountingSeed>['receivables'],
+            payables: [] as ReturnType<typeof buildAccountingSeed>['payables'],
+            bankAccounts: [] as ReturnType<typeof buildAccountingSeed>['bankAccounts'],
+            bankStatementLines: [] as ReturnType<typeof buildAccountingSeed>['bankStatementLines'],
+            bankReconciliations: [] as ReturnType<typeof buildAccountingSeed>['bankReconciliations'],
+            inventoryValuation: [] as ReturnType<typeof buildAccountingSeed>['inventoryValuation'],
+            wip: [] as ReturnType<typeof buildAccountingSeed>['wip'],
+            costVariance: [] as ReturnType<typeof buildAccountingSeed>['costVariance'],
+            grni: [] as ReturnType<typeof buildAccountingSeed>['grni'],
+            invVsGl: [] as ReturnType<typeof buildAccountingSeed>['invVsGl'],
+            productionOrderCosts: [] as ReturnType<typeof buildAccountingSeed>['productionOrderCosts'],
+            gstSummary: [] as ReturnType<typeof buildAccountingSeed>['gstSummary'],
+            tdsEntries: [] as ReturnType<typeof buildAccountingSeed>['tdsEntries'],
+            periodCloseChecklist: {
+              id: 'empty',
+              period: '',
+              tasks: [],
+              isLocked: false,
+            } as ReturnType<typeof buildAccountingSeed>['periodCloseChecklist'],
+            postingSetupRules: [] as ReturnType<typeof buildAccountingSeed>['postingSetupRules'],
+            dimensions: [] as ReturnType<typeof buildAccountingSeed>['dimensions'],
+            periods: [] as ReturnType<typeof buildAccountingSeed>['periods'],
+          }
+        : buildAccountingSeed()
 
       return {
         accounts: seed.accounts,
@@ -529,6 +558,11 @@ export const useAccountingStore = create<AccountingState>()(
       name: ERP_STORAGE_KEYS.accounting,
       storage: erpStorage,
       version: ERP_PERSIST_VERSION,
+      // Never rehydrate seeded demo accounting data when API mode is on.
+      merge: (persisted, current) => {
+        if (isApiMode()) return current
+        return { ...current, ...(persisted as object) }
+      },
     },
   ),
 )

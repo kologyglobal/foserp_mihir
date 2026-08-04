@@ -112,6 +112,8 @@ export interface QuotationDto {
   customerId: string
   /** Resolved from CRM company for list/detail consumers (mobile/web). */
   customerName: string | null
+  /** CRM companyCode when available. */
+  customerCode?: string | null
   itemId: string
   qty: number
   revisionNo: number

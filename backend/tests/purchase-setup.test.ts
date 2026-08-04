@@ -230,7 +230,8 @@ describe.skipIf(!dbAvailable)('Purchase setup (full persistence)', () => {
     expect(res.body.data.isConfigured).toBe(false)
     expect(res.body.data.general.defaultCurrency).toBe('INR')
     expect(res.body.data.version).toBe(0)
-    expect(res.body.data.notifications.status).toBe('ON_HOLD')
+    expect(res.body.data.notifications.prPendingApproval.inApp).toBe(true)
+    expect(res.body.data.notifications.status).toBeUndefined()
     expect(res.body.data.numberSeries.purchaseOrder.prefix).toBeTruthy()
     const after = await prisma.purchaseSettings.count({ where: { tenantId } })
     expect(after).toBe(before)
@@ -324,7 +325,8 @@ describe.skipIf(!dbAvailable)('Purchase setup (full persistence)', () => {
     expect(res.body.data.numberSeries.purchaseOrder.prefix).toBe('POX')
     expect(res.body.data.numberSeries.purchaseOrder.padLength).toBe(5)
     expect(res.body.data.requisition.autoCompleteRef).toBe(true)
-    expect(res.body.data.notifications.status).toBe('ON_HOLD')
+    expect(res.body.data.notifications.prPendingApproval.inApp).toBe(true)
+    expect(res.body.data.notifications.status).toBeUndefined()
 
     const row = await prisma.purchaseSettings.findUnique({ where: { tenantId } })
     expect(row?.defaultWarehouseId).toBe(warehouseId)
@@ -490,21 +492,29 @@ describe.skipIf(!dbAvailable)('Purchase setup (full persistence)', () => {
     expect(res.status).toBe(400)
   })
 
-  it('ignores notifications payload and keeps ON_HOLD', async () => {
+  it('persists notification preferences on PUT and GET', async () => {
     const current = await request(app).get(setupBase()).set(auth())
+    const version = current.body.data.version
     const res = await request(app)
       .put(setupBase())
       .set(auth())
       .send({
-        version: current.body.data.version,
+        version,
         notifications: {
-          prPendingApproval: { inApp: true, email: true },
+          prPendingApproval: { inApp: false, email: true },
+          poOverdue: { inApp: true, email: false },
         },
       })
-    // Nested schema strips unknown notifications; save still succeeds with version bump if other fields absent
-    expect([200, 400]).toContain(res.status)
+    expect(res.status).toBe(200)
+    expect(res.body.data.notifications.prPendingApproval).toEqual({ inApp: false, email: true })
+    expect(res.body.data.notifications.poOverdue).toEqual({ inApp: true, email: false })
+    // Unspecified events keep defaults
+    expect(res.body.data.notifications.rfqResponseDue.inApp).toBe(true)
+
     const after = await request(app).get(setupBase()).set(auth())
-    expect(after.body.data.notifications.status).toBe('ON_HOLD')
+    expect(after.body.data.notifications.prPendingApproval).toEqual({ inApp: false, email: true })
+    expect(after.body.data.notifications.poOverdue).toEqual({ inApp: true, email: false })
+    expect(after.body.data.notifications.status).toBeUndefined()
   })
 
   it('upserts plant override and validates plant–warehouse match', async () => {

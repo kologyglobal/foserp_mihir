@@ -45,7 +45,7 @@ export class ChartOfAccountsServiceError extends Error {
 
 const delay = (ms = 120) => new Promise((r) => setTimeout(r, ms))
 
-let accountsStore: ChartOfAccount[] = seedChartOfAccountsDemo()
+let accountsStore: ChartOfAccount[] = isApiMode() ? [] : seedChartOfAccountsDemo()
 let importHistory: { at: string; fileName: string; rowCount: number }[] = []
 
 function currentUser(): string {
@@ -898,6 +898,15 @@ export async function exportAccounts(
 
 export async function getDimensionLookups() {
   await delay(40)
+  if (isApiMode()) {
+    return {
+      plants: [],
+      locations: [],
+      departments: [],
+      costCentres: [],
+      projects: [],
+    }
+  }
   return seedCoaDimensionLookups()
 }
 
@@ -948,7 +957,7 @@ export async function downloadImportTemplate(): Promise<void> {
 }
 
 export function resetChartOfAccountsDemo(): void {
-  accountsStore = seedChartOfAccountsDemo()
+  accountsStore = isApiMode() ? [] : seedChartOfAccountsDemo()
   importHistory = []
 }
 

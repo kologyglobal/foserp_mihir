@@ -203,7 +203,7 @@ export function RfqDocumentPage() {
           subtitle="RFQ header and workflow status"
           icon={ClipboardList}
           accent="blue"
-          columns={2}
+          columns={6}
           collapsible
           defaultOpen
         >
@@ -313,7 +313,7 @@ export function RfqDocumentPage() {
       </ErpCardSection>
     ),
     terms: (
-      <ErpCardSection id={purchaseSectionId('terms')} title="Commercial terms" subtitle="Payment and delivery conditions" icon={ClipboardList} accent="amber" columns={2} collapsible defaultOpen>
+      <ErpCardSection id={purchaseSectionId('terms')} title="Commercial terms" subtitle="Payment and delivery conditions" icon={ClipboardList} accent="amber" columns={5} collapsible defaultOpen>
         <ErpViewField label="Payment Terms" value="Net 30" />
         <ErpViewField label="Incoterms" value="Ex-Works" />
         <ErpViewField label="Validity" value="14 days from RFQ date" />
@@ -739,7 +739,7 @@ export function PurchaseOrderDocumentPage() {
   const sectionContent: Record<string, ReactNode> = {
     general: (
       <>
-        <ErpCardSection id={purchaseSectionId('general')} title="General" subtitle="PO header, vendor, and references" icon={ClipboardList} accent="blue" columns={2} collapsible defaultOpen>
+        <ErpCardSection id={purchaseSectionId('general')} title="General" subtitle="PO header, vendor, and references" icon={ClipboardList} accent="blue" columns={6} collapsible defaultOpen>
           <ErpViewField label="PO No" value={po.poNo} />
           <ErpViewField label="Revision" value={`Rev ${po.revisionNo}`} />
           <ErpViewField label="Status" value={poStatusLabel(po.status)} />
@@ -822,7 +822,7 @@ export function PurchaseOrderDocumentPage() {
       </ErpCardSection>
     ),
     delivery: (
-      <ErpCardSection id={purchaseSectionId('delivery')} title="Delivery" subtitle="Shipping and fulfillment" icon={Truck} accent="amber" columns={2} collapsible defaultOpen>
+      <ErpCardSection id={purchaseSectionId('delivery')} title="Delivery" subtitle="Shipping and fulfillment" icon={Truck} accent="amber" columns={5} collapsible defaultOpen>
         <ErpViewField label="Expected Date" value={formatDate(po.expectedDate)} />
         <ErpViewField label="Incoterms" value="Ex-Works Pune" />
         <ErpViewField label="Ship To" value={getWarehouse(po.lines[0]?.warehouseId)?.warehouseName} />
@@ -830,7 +830,7 @@ export function PurchaseOrderDocumentPage() {
       </ErpCardSection>
     ),
     commercial: (
-      <ErpCardSection id={purchaseSectionId('commercial')} title="Commercial" subtitle="Payment terms and value" icon={ClipboardList} accent="violet" columns={2} collapsible defaultOpen>
+      <ErpCardSection id={purchaseSectionId('commercial')} title="Commercial" subtitle="Payment terms and value" icon={ClipboardList} accent="violet" columns={5} collapsible defaultOpen>
         <ErpViewField label="Payment Terms" value={po.paymentTerms || 'Net 30'} />
         <ErpViewField label="Currency" value="INR" />
         <ErpViewField label="PO Value" value={formatCurrency(poValue)} />
@@ -838,14 +838,14 @@ export function PurchaseOrderDocumentPage() {
       </ErpCardSection>
     ),
     tax: (
-      <ErpCardSection id={purchaseSectionId('tax')} title="Tax" subtitle="GST and statutory charges" icon={ClipboardList} accent="slate" columns={2} collapsible defaultOpen={false}>
+      <ErpCardSection id={purchaseSectionId('tax')} title="Tax" subtitle="GST and statutory charges" icon={ClipboardList} accent="slate" columns={5} collapsible defaultOpen={false}>
         <ErpViewField label="GST" value="18% (item level)" />
         <ErpViewField label="Freight" value="As per quote" />
         <ErpViewField label="TDS" value="As applicable" />
       </ErpCardSection>
     ),
     approval: (
-      <ErpCardSection id={purchaseSectionId('approval')} title="Approval" subtitle="Workflow status and sign-off" icon={CheckCircle} accent="green" columns={2} className="col-span-2" collapsible defaultOpen>
+      <ErpCardSection id={purchaseSectionId('approval')} title="Approval" subtitle="Workflow status and sign-off" icon={CheckCircle} accent="green" columns={5} className="col-span-2" collapsible defaultOpen>
         <ErpViewField label="Approval Status" value={po.approvedByName ? 'Approved' : po.status === 'submitted' ? 'Pending' : undefined} />
         <ErpViewField label="Approved By" value={po.approvedByName ?? undefined} />
         <ErpViewField label="Approved Date" value={po.approvedAt ? formatDate(po.approvedAt) : undefined} />
@@ -1103,7 +1103,7 @@ export function GrnDocumentPage() {
   const sectionContent: Record<string, ReactNode> = {
     general: (
       <>
-        <ErpCardSection id={purchaseSectionId('general')} title="General" subtitle="Gate entry, GRN header, and receipt details" icon={ClipboardList} accent="blue" columns={2} collapsible defaultOpen>
+        <ErpCardSection id={purchaseSectionId('general')} title="General" subtitle="Gate entry, GRN header, and receipt details" icon={ClipboardList} accent="blue" columns={6} collapsible defaultOpen>
           <ErpViewField label="GRN No" value={grn.grnNo} />
           <ErpViewField label="Status" value={grnStatusLabel(grn.status)} />
           <ErpViewField label="GRN Date" value={formatDate(grn.grnDate)} />
@@ -1186,7 +1186,7 @@ export function GrnDocumentPage() {
       </ErpCardSection>
     ),
     gate: (
-      <ErpCardSection id={purchaseSectionId('gate')} title="Gate entry" subtitle="Material delivered → gate entry (Planned fields) + GRN" icon={Truck} accent="amber" columns={2} collapsible defaultOpen>
+      <ErpCardSection id={purchaseSectionId('gate')} title="Gate entry" subtitle="Material delivered → gate entry (Planned fields) + GRN" icon={Truck} accent="amber" columns={5} collapsible defaultOpen>
         <ErpViewField label="Gate Entry No" value="Planned — not assigned in demo" />
         <ErpViewField label="Vehicle No" value="Planned" />
         <ErpViewField label="LR / Challan" value="Planned" />
@@ -1197,7 +1197,7 @@ export function GrnDocumentPage() {
       </ErpCardSection>
     ),
     qc: (
-      <ErpCardSection id={purchaseSectionId('qc')} title="Quality inspection" subtitle="Canonical step 14 — inspection before stock post" icon={CheckCircle} accent="green" columns={2} collapsible defaultOpen>
+      <ErpCardSection id={purchaseSectionId('qc')} title="Quality inspection" subtitle="Canonical step 14 — inspection before stock post" icon={CheckCircle} accent="green" columns={5} collapsible defaultOpen>
         <ErpViewField label="QC Required" value={grn.qcRequired ? 'Yes' : 'No'} />
         <ErpViewField label="Accepted Qty" value={formatNumber(totalAccepted)} />
         <ErpViewField label="Rejected Qty" value={formatNumber(totalRejected)} />
@@ -1216,7 +1216,7 @@ export function GrnDocumentPage() {
       </ErpCardSection>
     ),
     putaway: (
-      <ErpCardSection id={purchaseSectionId('putaway')} title="Accepted stock posted" subtitle="Canonical step 15 — demo stock post (inventory ledger deferred)" icon={Package} accent="teal" columns={2} collapsible defaultOpen>
+      <ErpCardSection id={purchaseSectionId('putaway')} title="Accepted stock posted" subtitle="Canonical step 15 — demo stock post (inventory ledger deferred)" icon={Package} accent="teal" columns={5} collapsible defaultOpen>
         <ErpViewField label="Target Warehouse" value={getWarehouse(grn.warehouseId)?.warehouseName} />
         <ErpViewField label="Stock Post" value={grn.status === 'posted' ? 'Accepted stock posted (demo)' : 'Pending QC / post'} />
       </ErpCardSection>

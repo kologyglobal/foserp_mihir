@@ -36,6 +36,7 @@ export const DEFAULT_PURCHASE_SETUP: PurchaseSetup = {
     requirePoWarehouse: false,
     requireExpectedDeliveryDate: false,
     requirePaymentTerms: false,
+    planningConsolidationEnabled: true,
   },
   numberSeries: {
     purchaseRequisition: { prefix: 'PR', nextNumber: 1004, padLength: 4 },
@@ -149,9 +150,6 @@ export const DEFAULT_PURCHASE_SETUP: PurchaseSetup = {
     orientation: 'portrait',
   },
   notifications: {
-    status: 'ON_HOLD',
-    message:
-      'Purchase notifications are not implemented yet. This tab is visible for planning only and is not saved.',
     prPendingApproval: { inApp: true, email: true },
     rfqResponseDue: { inApp: true, email: true },
     poDeliveryApproaching: { inApp: true, email: false },

@@ -13,7 +13,9 @@ function readEnv(key: string): string | undefined {
 
 /** Keep API host in sync with the page host (localhost vs 127.0.0.1) to avoid failed fetches. */
 function resolveApiBaseUrl(): string {
-  const configured = readEnv('VITE_API_BASE_URL') ?? 'http://127.0.0.1:5000/api/v1'
+  const configured = (readEnv('VITE_API_BASE_URL') ?? 'http://127.0.0.1:5000/api/v1').replace(/\/$/, '')
+  // Same-origin paths (preferred in Vite dev via proxy) — never rewrite
+  if (configured.startsWith('/')) return configured
   if (typeof window === 'undefined') return configured
   const pageHost = window.location.hostname
   if (pageHost !== 'localhost' && pageHost !== '127.0.0.1') return configured

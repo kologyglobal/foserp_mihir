@@ -71,6 +71,9 @@ describe('Phase 15 — purchase unit (qty, grouping, conversion, line validity)'
     expect(derivePrConversionStatus(['PO_CREATED', 'VENDOR_SELECTED'])).toBe('PARTIALLY_CONVERTED')
     expect(derivePrConversionStatus(['PO_CREATED', 'PO_CREATED'])).toBe('CONVERTED_TO_PO')
     expect(derivePrConversionStatus(['PO_CREATED', 'COMPLETED'])).toBe('CONVERTED_TO_PO')
+    // Partial raise on a single planning row must not close the PR as fully converted
+    expect(derivePrConversionStatus(['PARTIALLY_ORDERED'])).toBe('PARTIALLY_CONVERTED')
+    expect(derivePrConversionStatus(['PARTIALLY_ORDERED', 'PO_CREATED'])).toBe('PARTIALLY_CONVERTED')
   })
 
   it('sync service is exported for integration coverage', () => {

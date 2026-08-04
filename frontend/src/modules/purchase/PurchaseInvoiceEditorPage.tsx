@@ -836,6 +836,7 @@ export function PurchaseInvoiceEditorPage() {
         collapsible
         defaultOpen
         dense
+        columns={6}
       >
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Document</p>

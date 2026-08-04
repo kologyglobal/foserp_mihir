@@ -35,6 +35,7 @@ import accountingRoutes from './modules/accounting/accounting.routes.js'
 import organisationRoutes from './modules/organisation/organisation.routes.js'
 import manufacturingRoutes from './modules/manufacturing/manufacturing.routes.js'
 import maintenanceRoutes from './modules/maintenance/maintenance.routes.js'
+import knowledgeRoutes from './modules/knowledge/knowledge.routes.js'
 import hrmsRoutes from './modules/hrms/hrms.routes.js'
 import inventoryRoutes from './modules/inventory/inventory.routes.js'
 import qualityRoutes from './modules/quality/quality.routes.js'
@@ -47,6 +48,7 @@ import roleRoutes from './modules/roles/role.routes.js'
 import tenantRoutes from './modules/tenants/tenant.routes.js'
 import userRoutes from './modules/users/user.routes.js'
 import indiaMartWebhookRoutes from './modules/crm/integrations/indiamart/indiamart.webhook.routes.js'
+import mobileDeviceTokenRoutes from './modules/mobile/device-tokens/device-token.routes.js'
 import { sendError, sendSuccess } from './utils/response.js'
 /** Dev-only — excluded from production build (see tsconfig.build.json). */
 export async function setupDevSwagger(app: Express): Promise<void> {
@@ -161,6 +163,7 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/modules', moduleRoutes)
   app.use('/api/v1/tenants/:tenantId/roles', roleRoutes)
   app.use('/api/v1/tenants/:tenantId/crm', crmRoutes)
+  app.use('/api/v1/tenants/:tenantId/mobile/device-tokens', mobileDeviceTokenRoutes)
   app.use('/api/v1/tenants/:tenantId/notifications', notificationRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/items', itemRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/vendors', vendorRoutes)
@@ -178,6 +181,7 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/organisation', organisationRoutes)
   app.use('/api/v1/tenants/:tenantId/manufacturing', manufacturingRoutes)
   app.use('/api/v1/tenants/:tenantId/maintenance', maintenanceRoutes)
+  app.use('/api/v1/tenants/:tenantId/kb', knowledgeRoutes)
   app.use('/api/v1/tenants/:tenantId/hrms', hrmsRoutes)
   app.use('/api/v1/tenants/:tenantId/purchase', purchaseRoutes)
   app.use('/api/v1/tenants/:tenantId/quality', qualityRoutes)
@@ -201,6 +205,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/modules', moduleRoutes)
   app.use('/api/v1/t/:tenantSlug/roles', roleRoutes)
   app.use('/api/v1/t/:tenantSlug/crm', crmRoutes)
+  app.use('/api/v1/t/:tenantSlug/mobile/device-tokens', mobileDeviceTokenRoutes)
   app.use('/api/v1/t/:tenantSlug/notifications', notificationRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/items', itemRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/vendors', vendorRoutes)
@@ -216,6 +221,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/organisation', organisationRoutes)
   app.use('/api/v1/t/:tenantSlug/manufacturing', manufacturingRoutes)
   app.use('/api/v1/t/:tenantSlug/maintenance', maintenanceRoutes)
+  app.use('/api/v1/t/:tenantSlug/kb', knowledgeRoutes)
   app.use('/api/v1/t/:tenantSlug/hrms', hrmsRoutes)
   app.use('/api/v1/t/:tenantSlug/purchase', purchaseRoutes)
   app.use('/api/v1/t/:tenantSlug/quality', qualityRoutes)

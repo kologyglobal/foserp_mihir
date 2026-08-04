@@ -108,3 +108,13 @@ export function formatPlaceOfSupplyLabel(
   }
   return name || code || ''
 }
+
+/** Sorted options for place-of-supply / legal-entity state selects. */
+export function listGstStateSelectOptions(): { value: string; label: string }[] {
+  return [...INDIAN_GST_STATE_CODES]
+    .sort()
+    .map((code) => ({
+      value: code,
+      label: formatPlaceOfSupplyLabel(code) || code,
+    }))
+}

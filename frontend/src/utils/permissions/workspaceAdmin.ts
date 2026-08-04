@@ -15,5 +15,11 @@ const WORKSPACE_ADMIN_ROLES = new Set([
 
 export function hasWorkspaceAdminRole(session?: AuthSession | null): boolean {
   const roles = (session ?? getStoredSession())?.user.roles ?? []
-  return roles.some((r) => WORKSPACE_ADMIN_ROLES.has(r.trim().toLowerCase()))
+  return roles.some((r) => {
+    const n = r.trim().toLowerCase()
+    if (!n) return false
+    if (WORKSPACE_ADMIN_ROLES.has(n)) return true
+    // Partial match covers "Platform Super Admin", "Tenant Admin (All)", etc.
+    return n.includes('super admin') || n.includes('tenant admin')
+  })
 }

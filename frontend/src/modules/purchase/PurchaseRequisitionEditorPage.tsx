@@ -4,7 +4,7 @@ import {
   Banknote,
   ClipboardList,
   FileText,
-  Layers,
+  MapPin,
   Package,
   Paperclip,
 } from 'lucide-react'
@@ -20,6 +20,13 @@ import {
   purchaseStatusTone,
 } from '@/components/purchase/purchaseCardFormShared'
 import { PurchaseRequisitionLinesTable } from '@/components/purchase/PurchaseRequisitionLinesTable'
+import {
+  emptyPurchaseOrderAdjustments,
+  computePrOrderDocumentTotals,
+  PurchaseOrderAdjustmentsBlock,
+  PR_ESTIMATE_TAX_PCT,
+  type PurchaseOrderAdjustmentsState,
+} from '@/components/purchase/PurchaseOrderAdjustmentsBlock'
 import { PurchaseRequisitionPathBanner } from '@/components/purchase/PurchaseRequisitionPathBanner'
 import {
   PurchaseDocumentAttachments,
@@ -28,10 +35,8 @@ import {
 import {
   ErpCardSection,
   ErpFieldRow,
-  ErpFormSpan,
-  ErpViewField,
 } from '@/components/erp/card-form'
-import { FormActionBar } from '@/components/erp/FormActionBar'
+import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Textarea, Select } from '@/components/forms/Inputs'
 import {
   approvalActivitySummary,
@@ -54,6 +59,7 @@ import {
   getVendors,
   previewNextPurchaseRequisitionNumber,
   PurchaseServiceError,
+  submitPurchaseRequisition,
   updatePurchaseRequisition,
   PURCHASE_REQUISITION_ATTACHMENT_KIND_LABELS,
   PURCHASE_REQUISITION_PRIORITY_LABELS,
@@ -83,7 +89,9 @@ import {
 import {
   mapEngineeringProductTypeToPurchaseCategory,
   mapPurchaseCategoryToEngineeringProductType,
+  normalizeEngineeringProductType,
 } from '@/utils/purchaseProductType'
+import { resolveCatalogItemProductType } from '@/utils/purchaseCatalogFilter'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
@@ -303,6 +311,10 @@ export function PurchaseRequisitionEditorPage() {
   const [status, setStatus] = useState<PurchaseRequisition['status']>('draft')
   const [header, setHeader] = useState<PrEditorHeader>(defaultHeader)
   const [lines, setLines] = useState<PrEditorLine[]>([])
+  /** Client-side estimate only — not persisted on PR save/API yet. */
+  const [orderAdjustments, setOrderAdjustments] = useState<PurchaseOrderAdjustmentsState>(
+    emptyPurchaseOrderAdjustments,
+  )
   const [attachments, setAttachments] = useState<PurchaseRequisitionAttachmentPlaceholder[]>([])
   const [history, setHistory] = useState<ApprovalHistory[]>([])
   const [createdMeta, setCreatedMeta] = useState({ by: ACTOR.name, at: '' })
@@ -312,7 +324,6 @@ export function PurchaseRequisitionEditorPage() {
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>([])
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
   const [, setLastSavedAt] = useState<Date | null>(null)
-  const [forceOpenAdditionalKey, setForceOpenAdditionalKey] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const editable = status === 'draft' || status === 'rejected'
@@ -361,19 +372,23 @@ export function PurchaseRequisitionEditorPage() {
   )
   const showErrors = attemptedSubmit
   const summary = useMemo(() => summarizePrLines(lines), [lines])
+  const orderTotals = useMemo(
+    () => computePrOrderDocumentTotals(lines, orderAdjustments, PR_ESTIMATE_TAX_PCT),
+    [lines, orderAdjustments],
+  )
   const financeDefaultOpen = hasMeaningfulTaxTotals(
-    summary.estimatedSubtotal,
-    summary.estimatedTaxes,
-    summary.estimatedTotal,
+    orderTotals.basicAmount,
+    orderTotals.gstAmount,
+    orderTotals.grandTotal,
   )
   const financeSummaryText = useMemo(
     () =>
       taxTotalsSummary({
-        subtotal: summary.estimatedSubtotal,
-        tax: summary.estimatedTaxes,
-        total: summary.estimatedTotal,
+        subtotal: orderTotals.basicAmount,
+        tax: orderTotals.gstAmount,
+        total: orderTotals.grandTotal,
       }),
-    [summary.estimatedSubtotal, summary.estimatedTaxes, summary.estimatedTotal],
+    [orderTotals.basicAmount, orderTotals.gstAmount, orderTotals.grandTotal],
   )
   const attachmentsSummaryText = useMemo(
     () => attachmentsSummary(attachments.length),
@@ -386,16 +401,6 @@ export function PurchaseRequisitionEditorPage() {
         historyCount: history.length,
       }),
     [status, history.length],
-  )
-  const additionalDefaultOpen =
-    status === 'pending_approval' || status === 'approved' || history.length > 0
-  const additionalSummaryText = useMemo(
-    () =>
-      joinFastTabSummary([
-        PURCHASE_REQUISITION_STATUS_LABELS[status],
-        approvalSummaryText || false,
-      ]),
-    [status, approvalSummaryText],
   )
   const quickEntrySummaryText = useMemo(
     () =>
@@ -436,29 +441,42 @@ export function PurchaseRequisitionEditorPage() {
       },
       {
         label: 'Total Qty',
-        value: String(summary.totalQuantity),
+        value: String(orderTotals.totalQty),
         accent: 'slate' as const,
       },
       {
         label: 'Est. Subtotal',
-        value: formatCurrency(summary.estimatedSubtotal),
+        value: formatCurrency(orderTotals.basicAmount),
         accent: 'blue' as const,
       },
       {
         label: 'Est. Taxes',
-        value: formatCurrency(summary.estimatedTaxes),
+        value: formatCurrency(orderTotals.gstAmount),
         accent: 'violet' as const,
-        hint: '18% provisional',
+        hint: `${PR_ESTIMATE_TAX_PCT}% provisional`,
       },
       {
         label: 'Est. Total',
-        value: formatCurrency(summary.estimatedTotal),
+        value: formatCurrency(orderTotals.grandTotal),
         accent: 'amber' as const,
-        highlight: summary.estimatedTotal > 0,
+        highlight: orderTotals.grandTotal > 0,
       },
     ],
-    [summary],
+    [summary.totalLines, orderTotals],
   )
+
+  const deliveryRisk = useMemo(() => {
+    if (header.priority === 'urgent') return { label: 'Elevated', highlight: true as const }
+    if (!header.expectedDeliveryDate) return { label: 'Not set', highlight: false as const }
+    const needBy = new Date(`${header.expectedDeliveryDate}T00:00:00`)
+    if (Number.isNaN(needBy.getTime())) return { label: 'Not set', highlight: false as const }
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const diffDays = Math.round((needBy.getTime() - today.getTime()) / 86_400_000)
+    if (diffDays < 0) return { label: 'Overdue need-by', highlight: true as const }
+    if (diffDays <= 3) return { label: 'Due within 3 days', highlight: true as const }
+    return { label: 'On track', highlight: false as const }
+  }, [header.priority, header.expectedDeliveryDate])
 
   const documentTitle = isNew
     ? 'New Purchase Requisition'
@@ -525,23 +543,27 @@ export function PurchaseRequisitionEditorPage() {
   }
 
   useEffect(() => {
-    void Promise.all([getPurchaseItems(), getVendors(), getPurchaseWarehouses()]).then(
-      ([items, v, warehouses]) => {
-        setCatalogItems(items)
-        setVendors(v)
-        if (warehouses.length) {
-          setLocationOptions(
-            warehouses.map((w) => ({
-              id: w.id,
-              code: w.code,
-              name: w.name,
-              state: w.state,
-              city: w.city,
-            })),
-          )
-        }
-      },
-    )
+    // Include non-purchasable master rows (Finish Product / Sub Assembly) so Product Type
+    // filters match Item Master — same as PO editors.
+    void Promise.all([
+      getPurchaseItems({ forceRefresh: true, purchasableOnly: false }),
+      getVendors(),
+      getPurchaseWarehouses(),
+    ]).then(([items, v, warehouses]) => {
+      setCatalogItems(items)
+      setVendors(v)
+      if (warehouses.length) {
+        setLocationOptions(
+          warehouses.map((w) => ({
+            id: w.id,
+            code: w.code,
+            name: w.name,
+            state: w.state,
+            city: w.city,
+          })),
+        )
+      }
+    })
   }, [])
 
   const threeEmptyLines = (loc?: { locationId: string; locationName: string }) =>
@@ -710,22 +732,24 @@ export function PurchaseRequisitionEditorPage() {
     }
   }, [attachments, header, lines, session, summary.estimatedTaxPct])
 
-  const saveDraft = async () => {
-    if (!editable || saving) return
+  const persistDraft = async (): Promise<PurchaseRequisition | null> => {
+    if (!editable || saving) return null
     setAttemptedSubmit(true)
     if (validation.errors.length) {
       const section =
         validation.fieldErrors.department ||
-        validation.fieldErrors.locationId ||
         validation.fieldErrors.requesterId ||
-        validation.fieldErrors.expectedDeliveryDate
-          ? 'general'
-          : validation.errors.some((e) => /line|quantity|item|uom/i.test(e))
-            ? 'lines'
-            : 'general'
+        validation.fieldErrors.purpose ||
+        validation.fieldErrors.documentDate
+          ? 'request'
+          : validation.fieldErrors.locationId || validation.fieldErrors.expectedDeliveryDate
+            ? 'delivery'
+            : validation.errors.some((e) => /line|quantity|item|uom/i.test(e))
+              ? 'lines'
+              : 'request'
       focusValidationSection(section)
       notify.error(validation.errors[0] ?? 'Fix validation errors before saving')
-      return
+      return null
     }
     setSaving(true)
     try {
@@ -734,40 +758,79 @@ export function PurchaseRequisitionEditorPage() {
         setDocumentNumber(updated.documentNumber)
         setStatus(updated.status)
         setUpdatedMeta({ by: updated.updatedBy ?? '', at: updated.updatedAt ?? '' })
-        notify.success(`Saved · ${updated.documentNumber}`)
         setLastSavedAt(new Date())
-      } else {
-        const created = await createPurchaseRequisition(toInput())
-        setRecordId(created.id)
-        setDocumentNumber(created.documentNumber)
-        setStatus(created.status)
-        setCreatedMeta({ by: created.createdBy, at: created.createdAt })
-        notify.success(`Saved · ${created.documentNumber}`)
-        setLastSavedAt(new Date())
+        resetDirty()
+        return updated
       }
+      const created = await createPurchaseRequisition(toInput())
+      setRecordId(created.id)
+      setDocumentNumber(created.documentNumber)
+      setStatus(created.status)
+      setCreatedMeta({ by: created.createdBy, at: created.createdAt })
+      setLastSavedAt(new Date())
       resetDirty()
-      navigate(PURCHASE_FORM_ROUTES.requisition.list, { replace: true })
+      return created
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
+      return null
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveDraft = async () => {
+    const saved = await persistDraft()
+    if (!saved) return
+    notify.success(`Saved · ${saved.documentNumber}`)
+    if (!id && saved.id) {
+      navigate(PURCHASE_FORM_ROUTES.requisition.edit(saved.id), { replace: true })
+    }
+  }
+
+  const saveAndClose = async () => {
+    const saved = await persistDraft()
+    if (!saved) return
+    notify.success(`Saved · ${saved.documentNumber}`)
+    navigate(PURCHASE_FORM_ROUTES.requisition.list, { replace: true })
+  }
+
+  const canSubmitForApproval = editable && (status === 'draft' || status === 'rejected')
+
+  const submitForApproval = async () => {
+    if (!canSubmitForApproval || saving) return
+    const saved = await persistDraft()
+    if (!saved) return
+    if (saved.status !== 'draft' && saved.status !== 'rejected') {
+      notify.success(`${saved.documentNumber} is already ${purchaseRequisitionApprovalStatusLabel(saved.status)}`)
+      return
+    }
+    setSaving(true)
+    try {
+      const submitted = await submitPurchaseRequisition(saved.id)
+      setStatus(submitted.status)
+      setDocumentNumber(submitted.documentNumber)
+      setUpdatedMeta({ by: submitted.updatedBy ?? '', at: submitted.updatedAt ?? '' })
+      notify.success(`${submitted.documentNumber} submitted for approval`)
+      resetDirty()
+      navigate(`/purchase/requisitions/${submitted.id}`, { replace: true })
+    } catch (err) {
+      notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
     } finally {
       setSaving(false)
     }
   }
 
   const focusValidationSection = useCallback(
-    (section: 'general' | 'lines') => {
-      const needsAdditional =
-        section === 'general' &&
-        (Boolean(validation.fieldErrors.productionOrderNo) ||
-          Boolean(validation.fieldErrors.maintenanceOrderNo))
-      if (needsAdditional) {
-        setForceOpenAdditionalKey((k) => k + 1)
-      }
+    (section: 'request' | 'procurement' | 'delivery' | 'lines' | 'notes' | 'general') => {
+      const mapped =
+        section === 'general' || section === 'procurement'
+          ? 'request'
+          : section
       window.requestAnimationFrame(() => {
-        scrollToPurchaseSection(needsAdditional ? 'costing' : section)
+        scrollToPurchaseSection(mapped)
       })
     },
-    [validation.fieldErrors.productionOrderNo, validation.fieldErrors.maintenanceOrderNo],
+    [],
   )
 
   const focusValidationItem = useCallback(
@@ -778,35 +841,39 @@ export function PurchaseRequisitionEditorPage() {
         /description/i.test(message) ||
         /unit/i.test(message) ||
         /At least one line/i.test(message)
-      const needsAdditional =
-        !looksLikeLine &&
-        (Boolean(validation.fieldErrors.productionOrderNo) ||
-          Boolean(validation.fieldErrors.maintenanceOrderNo))
-      if (needsAdditional) {
-        setForceOpenAdditionalKey((k) => k + 1)
-      }
+      const looksLikeDelivery =
+        /location|warehouse|required date|need.?by|delivery/i.test(message)
       window.requestAnimationFrame(() => {
         scrollToPurchaseSection(
-          looksLikeLine ? 'lines' : needsAdditional ? 'costing' : 'general',
+          looksLikeLine ? 'lines' : looksLikeDelivery ? 'delivery' : 'request',
         )
       })
     },
-    [validation.fieldErrors.productionOrderNo, validation.fieldErrors.maintenanceOrderNo],
+    [],
   )
 
   const applyItemCatalog = (key: string, itemId: string) => {
     const line = lines.find((l) => l.key === key)
     const item = catalogItems.find((i) => i.id === itemId)
     if (!item || !line) return
-    // Prefer Item Master product type; if master has none, keep the filter the user already chose.
+    // Guard: Product Type filter is strict — do not accept cross-type picks.
+    const itemProductType = resolveCatalogItemProductType(item)
+    if (
+      line.productType &&
+      itemProductType &&
+      itemProductType !== normalizeEngineeringProductType(line.productType)
+    ) {
+      return
+    }
+    // Prefer line Product Type when set; else Item Master type / category fallback.
     const productType =
-      item.productType ||
-      line.productType ||
+      normalizeEngineeringProductType(line.productType) ||
+      itemProductType ||
       mapPurchaseCategoryToEngineeringProductType(item.category) ||
       ''
     const category =
-      item.category ||
       mapEngineeringProductTypeToPurchaseCategory(productType) ||
+      item.category ||
       line.category ||
       ''
     const vendor = item.preferredVendorId
@@ -916,7 +983,7 @@ export function PurchaseRequisitionEditorPage() {
                 /description/i.test(message) ||
                 /unit/i.test(message) ||
                 /At least one line/i.test(message)
-              const sectionLabel = looksLikeLine ? 'Item Details' : 'Requisition Header'
+              const sectionLabel = looksLikeLine ? 'Line Items' : 'Request Details'
               return {
                 id: `pr-err-${i}`,
                 label: `${sectionLabel} · ${message}`,
@@ -932,13 +999,28 @@ export function PurchaseRequisitionEditorPage() {
         })),
       ]}
       commandBar={null}
+      className="crm-lead-form-page purchase-pr-form-page enterprise-workspace--dynamics-form"
+      factBoxLabel="Smart Context"
+      factBoxSubtitle="Path, approval, and delivery summary for this requisition."
       factBox={
         <PurchaseEnterpriseFactBox
-          title="PR insight"
+          title="Smart Context"
           metrics={formMetrics}
           summary={[
-            { label: 'PR No.', value: documentNumber ?? (isNew ? 'Loading…' : '—') },
-            { label: 'Status', value: purchaseRequisitionApprovalStatusLabel(status) },
+            {
+              label: 'PR Path',
+              value: header.rfqRequired ? 'RFQ Purchase Path' : 'Direct Purchase Planning Path',
+              highlight: !header.rfqRequired,
+            },
+            {
+              label: 'RFQ Required',
+              value: header.rfqRequired ? 'Yes' : 'No',
+              highlight: header.rfqRequired,
+            },
+            {
+              label: 'Approval Status',
+              value: purchaseRequisitionApprovalStatusLabel(status),
+            },
             {
               label: 'Department',
               value: header.department ? prDepartmentLabel(header.department) : '—',
@@ -950,241 +1032,374 @@ export function PurchaseRequisitionEditorPage() {
               highlight: header.priority === 'urgent',
             },
             {
-              label: 'Process path',
-              value: header.rfqRequired ? 'RFQ Purchase Path' : 'Direct Purchase Planning Path',
-              highlight: !header.rfqRequired,
+              label: 'Line Count',
+              value: String(summary.totalLines),
             },
             {
-              label: 'Est. Total',
-              value: formatCurrency(summary.estimatedTotal),
+              label: 'Estimated Total',
+              value: formatCurrency(orderTotals.grandTotal),
               highlight: true,
+            },
+            {
+              label: 'Delivery Risk',
+              value: deliveryRisk.label,
+              highlight: deliveryRisk.highlight,
             },
             ...(dirty
               ? [{ label: 'Changes', value: 'Unsaved', highlight: true as const }]
               : []),
           ]}
         >
-          <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] text-erp-muted">
-            <li>PR Number is reserved from the series and confirmed on save.</li>
-            <li>Urgent PRs require Purpose before submit.</li>
-          </ul>
-          {dirty ? (
-            <div className="mt-2">
-              <Badge color="orange">Unsaved changes</Badge>
-            </div>
-          ) : null}
+          <div className="purchase-pr-smart-context__footer mt-3 space-y-2 border-t border-erp-border pt-3 text-[11px] text-erp-muted">
+            <p>PR number is reserved from the series and confirmed on save.</p>
+            <p>Urgent PRs require Purpose before submit.</p>
+            {dirty ? <Badge color="orange">Unsaved changes</Badge> : null}
+          </div>
         </PurchaseEnterpriseFactBox>
       }
       stickyFooter
       footer={
-        <FormActionBar
-          sticky
-          cancelFirst
-          busy={saving}
-          dirty={dirty}
-          disabled={!editable}
-          disabledReason={!editable ? 'Document is read-only' : undefined}
-          onCancel={() => {
-            resetDirty()
-            navigate(PURCHASE_FORM_ROUTES.requisition.list)
-          }}
-          onSave={saveDraft}
-        />
+        <div className="erp-form-footer erp-form-footer-sticky flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+            <ErpButton
+              type="button"
+              variant="secondary"
+              disabled={saving}
+              onClick={() => {
+                void (async () => {
+                  if (dirty) {
+                    const leave = await systemConfirm({
+                      title: 'Discard changes?',
+                      description: 'You have unsaved changes. Discard them and leave this page?',
+                      confirmLabel: 'Discard',
+                      cancelLabel: 'Keep editing',
+                      variant: 'danger',
+                    })
+                    if (!leave) return
+                  }
+                  resetDirty()
+                  navigate(PURCHASE_FORM_ROUTES.requisition.list)
+                })()
+              }}
+            >
+              Cancel
+            </ErpButton>
+            <span className="text-[12px] text-erp-muted">
+              {editable ? 'Ctrl+S Save draft' : 'Read-only for this status'}
+              {dirty ? ' · Unsaved changes' : ''}
+            </span>
+          </div>
+          {editable ? (
+            <ErpButtonGroup className="w-full sm:w-auto">
+              <ErpButton
+                type="button"
+                variant="secondary"
+                disabled={saving}
+                onClick={() => void saveDraft()}
+              >
+                {saving ? 'Saving…' : 'Save Draft'}
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={() => void saveAndClose()}
+              >
+                Save & Close
+              </ErpButton>
+              {canSubmitForApproval ? (
+                <ErpButton
+                  type="button"
+                  variant="primary"
+                  disabled={saving}
+                  onClick={() => void submitForApproval()}
+                >
+                  Submit for Approval
+                </ErpButton>
+              ) : null}
+            </ErpButtonGroup>
+          ) : null}
+        </div>
       }
       onSaveShortcut={() => void saveDraft()}
+      onSaveCloseShortcut={() => void saveAndClose()}
     >
-      <div className="space-y-3">
-          <PurchaseRequisitionPathBanner rfqRequired={header.rfqRequired} />
+      <div className="purchase-pr-form-canvas space-y-4">
+        <PurchaseRequisitionPathBanner
+          rfqRequired={header.rfqRequired}
+          className="purchase-pr-path-banner"
+        />
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (!file) return
-              void file.text().then(importCsvText)
-              e.target.value = ''
-            }}
-          />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (!file) return
+            void file.text().then(importCsvText)
+            e.target.value = ''
+          }}
+        />
 
-          <ErpCardSection
-            id={purchaseSectionId('general')}
-            title="Requisition Header"
-            subtitle="PR identity, warehouse, priority, and RFQ path"
-            collapsedSummary={quickEntrySummaryText || undefined}
-            icon={FileText}
-            accent="blue"
-            collapsible
-            defaultOpen
-            dense
-            columns={3}
+        <ErpCardSection
+          id={purchaseSectionId('request')}
+          title="Request Details"
+          subtitle="Who is requesting and how this demand will be fulfilled"
+          collapsedSummary={quickEntrySummaryText || undefined}
+          icon={FileText}
+          accent="blue"
+          collapsible
+          defaultOpen
+          dense
+          columns={6}
+          className="crm-lead-zoho-section purchase-pr-request-section"
+        >
+          <ErpFieldRow
+            label="PR Number"
+            readOnly
+            horizontal={false}
+            hint={isNew ? 'Preview from number series — assigned when you save' : undefined}
           >
-            <ErpFieldRow
-              label="PR Number"
+            <Input
+              value={documentNumber ?? ''}
+              placeholder="Loading number…"
               readOnly
-              horizontal={false}
-              hint={isNew ? 'Preview from number series — assigned when you save' : undefined}
+              className="bg-erp-surface-alt"
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label="Requestor" readOnly horizontal={false}>
+            <Input value={header.requesterName} readOnly className="bg-erp-surface-alt" />
+          </ErpFieldRow>
+          <ErpFieldRow
+            label="Department"
+            required
+            horizontal={false}
+            fieldError={showErrors ? validation.fieldErrors.department : undefined}
+            fieldState={showErrors && validation.fieldErrors.department ? 'error' : 'idle'}
+          >
+            <Select
+              value={header.department}
+              disabled={!editable}
+              onChange={(e) => patchHeader({ department: e.target.value })}
             >
-              <Input
-                value={documentNumber ?? ''}
-                placeholder="Loading number…"
-                readOnly
-                className="bg-erp-surface-alt"
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Requisition Date" required horizontal={false}>
-              <Input
-                type="date"
-                value={header.documentDate}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ documentDate: e.target.value })}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow
-              label="Department"
-              required
-              horizontal={false}
-              fieldError={showErrors ? validation.fieldErrors.department : undefined}
-              fieldState={showErrors && validation.fieldErrors.department ? 'error' : 'idle'}
-            >
-              <Select
-                value={header.department}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ department: e.target.value })}
-              >
-                <option value="">Select department</option>
-                {PR_DEPARTMENT_OPTIONS.map((d) => (
-                  <option key={d.value} value={d.value}>
-                    {d.label}
-                  </option>
-                ))}
-              </Select>
-            </ErpFieldRow>
-            <ErpFieldRow label="Requested By" readOnly horizontal={false}>
-              <Input value={header.requesterName} readOnly className="bg-erp-surface-alt" />
-            </ErpFieldRow>
-            <ErpFieldRow
-              label="Required By Date"
-              horizontal={false}
-              fieldError={showErrors ? validation.fieldErrors.expectedDeliveryDate : undefined}
-              fieldState={
-                showErrors && validation.fieldErrors.expectedDeliveryDate ? 'error' : 'idle'
+              <option value="">Select department</option>
+              {PR_DEPARTMENT_OPTIONS.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </Select>
+          </ErpFieldRow>
+          <ErpFieldRow label="Request Date" required horizontal={false}>
+            <Input
+              type="date"
+              value={header.documentDate}
+              disabled={!editable}
+              onChange={(e) => patchHeader({ documentDate: e.target.value })}
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label="Priority" horizontal={false}>
+            <Select
+              value={header.priority}
+              disabled={!editable}
+              onChange={(e) =>
+                patchHeader({ priority: e.target.value as PrEditorHeader['priority'] })
               }
             >
-              <Input
-                type="date"
-                value={header.expectedDeliveryDate}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ expectedDeliveryDate: e.target.value })}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow
-              label="Warehouse"
-              required
-              horizontal={false}
-              fieldError={showErrors ? validation.fieldErrors.locationId : undefined}
-              fieldState={showErrors && validation.fieldErrors.locationId ? 'error' : 'idle'}
-            >
-              <Select
-                value={header.locationId}
-                disabled={!editable}
-                onChange={(e) => {
-                  const loc = locationOptions.find((l) => l.id === e.target.value)
-                  if (!loc) return
-                  patchHeader({
-                    locationId: loc.id,
-                    locationCode: loc.code,
-                    locationName: loc.name,
-                    locationState: loc.state,
-                    locationCity: loc.city,
-                  })
-                }}
-              >
-                {locationOptions.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </Select>
-            </ErpFieldRow>
-            <ErpFieldRow label="Priority" horizontal={false}>
-              <Select
-                value={header.priority}
-                disabled={!editable}
-                onChange={(e) =>
-                  patchHeader({ priority: e.target.value as PrEditorHeader['priority'] })
-                }
-              >
-                {Object.entries(PURCHASE_REQUISITION_PRIORITY_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </ErpFieldRow>
-            <ErpFieldRow
-              label="RFQ Required?"
-              required
-              horizontal={false}
-              hint={
-                header.rfqRequired
-                  ? 'RFQ is required to create PO'
-                  : 'Create Direct PO'
-              }
-            >
-              <Select
-                value={header.rfqRequired ? 'yes' : 'no'}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ rfqRequired: e.target.value === 'yes' })}
-              >
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-              </Select>
-            </ErpFieldRow>
-            <ErpFieldRow
-              label="Purchase Purpose"
-              required={header.priority === 'urgent'}
-              horizontal={false}
-              fieldError={showErrors ? validation.fieldErrors.purpose : undefined}
-              fieldState={showErrors && validation.fieldErrors.purpose ? 'error' : 'idle'}
-            >
-              <Input
-                value={header.purpose}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ purpose: e.target.value })}
-                placeholder={
-                  header.priority === 'urgent' ? 'Required for urgent PRs' : 'Brief justification'
-                }
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Remarks" horizontal={false} colSpan={3}>
-              <Textarea
-                value={header.remarks}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ remarks: e.target.value })}
-                rows={2}
-              />
-            </ErpFieldRow>
-          </ErpCardSection>
-
-          <ErpCardSection
-            id={purchaseSectionId('lines')}
-            title="Item Details"
-            subtitle="Item code, name, qty, rate, vendor, warehouse, BIN, and need-by date"
-            icon={Package}
-            accent="blue"
-            collapsible
-            defaultOpen
-            dense
-            columns={1}
-            badge={
-              <span className="text-[11px] tabular-nums text-erp-muted">
-                {lines.length} line{lines.length === 1 ? '' : 's'}
-              </span>
+              {Object.entries(PURCHASE_REQUISITION_PRIORITY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </ErpFieldRow>
+          <ErpFieldRow
+            label="RFQ Required"
+            required
+            horizontal={false}
+            hint={
+              header.rfqRequired
+                ? 'RFQ is required to create PO'
+                : 'Create Direct PO'
             }
           >
+            <Select
+              value={header.rfqRequired ? 'yes' : 'no'}
+              disabled={!editable}
+              onChange={(e) => patchHeader({ rfqRequired: e.target.value === 'yes' })}
+            >
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </Select>
+          </ErpFieldRow>
+          <ErpFieldRow label="Purchase Type" horizontal={false}>
+            <Select
+              value={header.requisitionType}
+              disabled={!editable}
+              onChange={(e) =>
+                patchHeader({
+                  requisitionType: e.target.value as PrEditorHeader['requisitionType'],
+                })
+              }
+            >
+              {Object.entries(PURCHASE_REQUISITION_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </ErpFieldRow>
+          <ErpFieldRow label="Source" horizontal={false}>
+            <Select
+              value={header.source}
+              disabled={!editable}
+              onChange={(e) =>
+                patchHeader({ source: e.target.value as PrEditorHeader['source'] })
+              }
+            >
+              {Object.entries(PURCHASE_REQUISITION_SOURCE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </ErpFieldRow>
+          <ErpFieldRow
+            label="Required By"
+            horizontal={false}
+            fieldError={showErrors ? validation.fieldErrors.expectedDeliveryDate : undefined}
+            fieldState={
+              showErrors && validation.fieldErrors.expectedDeliveryDate ? 'error' : 'idle'
+            }
+          >
+            <Input
+              type="date"
+              value={header.expectedDeliveryDate}
+              disabled={!editable}
+              onChange={(e) => patchHeader({ expectedDeliveryDate: e.target.value })}
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label="Reference" horizontal={false}>
+            <Input
+              value={header.referenceNumber}
+              disabled={!editable}
+              onChange={(e) => patchHeader({ referenceNumber: e.target.value })}
+              placeholder="Optional reference"
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label="Project" horizontal={false}>
+            <Input
+              value={header.project}
+              disabled={!editable}
+              onChange={(e) => patchHeader({ project: e.target.value })}
+              placeholder="Optional project"
+            />
+          </ErpFieldRow>
+          <ErpFieldRow
+            label="Purpose"
+            required={header.priority === 'urgent'}
+            horizontal={false}
+            className="erp-field-row--span-2"
+            fieldError={showErrors ? validation.fieldErrors.purpose : undefined}
+            fieldState={showErrors && validation.fieldErrors.purpose ? 'error' : 'idle'}
+          >
+            <Input
+              value={header.purpose}
+              disabled={!editable}
+              onChange={(e) => patchHeader({ purpose: e.target.value })}
+              placeholder={
+                header.priority === 'urgent' ? 'Required for urgent PRs' : 'Brief justification'
+              }
+            />
+          </ErpFieldRow>
+        </ErpCardSection>
+
+        <ErpCardSection
+          id={purchaseSectionId('delivery')}
+          title="Delivery Details"
+          subtitle="Where material is needed"
+          icon={MapPin}
+          accent="blue"
+          collapsible
+          defaultOpen
+          columns={3}
+          className="crm-lead-zoho-section"
+        >
+          <ErpFieldRow
+            label="Warehouse"
+            required
+            horizontal={false}
+            fieldError={showErrors ? validation.fieldErrors.locationId : undefined}
+            fieldState={showErrors && validation.fieldErrors.locationId ? 'error' : 'idle'}
+          >
+            <Select
+              value={header.locationId}
+              disabled={!editable}
+              onChange={(e) => {
+                const loc = locationOptions.find((l) => l.id === e.target.value)
+                if (!loc) return
+                patchHeader({
+                  locationId: loc.id,
+                  locationCode: loc.code,
+                  locationName: loc.name,
+                  locationState: loc.state,
+                  locationCity: loc.city,
+                })
+              }}
+            >
+              {locationOptions.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </Select>
+          </ErpFieldRow>
+          <ErpFieldRow label="Delivery Location" readOnly horizontal={false}>
+            <Input
+              value={
+                [header.locationName, header.locationCity, header.locationState]
+                  .filter(Boolean)
+                  .join(', ') || '—'
+              }
+              readOnly
+              className="bg-erp-surface-alt"
+            />
+          </ErpFieldRow>
+          <ErpFieldRow
+            label="Need By Date"
+            horizontal={false}
+            fieldError={showErrors ? validation.fieldErrors.expectedDeliveryDate : undefined}
+            fieldState={
+              showErrors && validation.fieldErrors.expectedDeliveryDate ? 'error' : 'idle'
+            }
+          >
+            <Input
+              type="date"
+              value={header.expectedDeliveryDate}
+              disabled={!editable}
+              onChange={(e) => patchHeader({ expectedDeliveryDate: e.target.value })}
+            />
+          </ErpFieldRow>
+        </ErpCardSection>
+
+        <ErpCardSection
+          id={purchaseSectionId('lines')}
+          title="Line Items"
+          subtitle="Catalog or manual lines for this requisition"
+          icon={Package}
+          accent="blue"
+          collapsible
+          defaultOpen
+          columns={1}
+          className="crm-lead-zoho-section purchase-doc-lines-section purchase-pr-lines-section"
+          badge={
+            <span className="text-[11px] tabular-nums text-erp-muted">
+              {lines.length} line{lines.length === 1 ? '' : 's'}
+            </span>
+          }
+        >
             <PurchaseRequisitionLinesTable
               lines={lines}
               catalogItems={catalogItemsForPicker}
@@ -1194,7 +1409,7 @@ export function PurchaseRequisitionEditorPage() {
               showErrors={showErrors}
               lineErrors={validation.lineErrors}
               formatCurrency={formatCurrency}
-              estimatedTotal={summary.estimatedTotal}
+              estimatedTotal={orderTotals.grandTotal}
               onAddLine={() =>
                 setLinesDirty([
                   ...lines,
@@ -1266,6 +1481,17 @@ export function PurchaseRequisitionEditorPage() {
               }}
               onSelectCatalogItem={applyItemCatalog}
             />
+            <PurchaseOrderAdjustmentsBlock
+              className="mt-4"
+              lines={lines}
+              value={orderAdjustments}
+              readOnly={!editable}
+              taxPct={PR_ESTIMATE_TAX_PCT}
+              onChange={(next) => {
+                setOrderAdjustments(next)
+                markDirty()
+              }}
+            />
             {showErrors &&
             validation.errors.some(
               (e) =>
@@ -1278,142 +1504,119 @@ export function PurchaseRequisitionEditorPage() {
             ) ? (
               <p className="mt-2 text-[12px] text-erp-danger-fg">Fix line errors before submit.</p>
             ) : null}
-          </ErpCardSection>
+        </ErpCardSection>
 
-          <ErpCardSection
-            id={purchaseSectionId('finance')}
-            title="Commercial Information"
-            subtitle="Provisional totals from estimated line amounts"
-            collapsedSummary={financeSummaryText || undefined}
-            icon={Banknote}
-            accent="blue"
-            collapsible
-            defaultOpen={financeDefaultOpen}
-            dense
-          >
-            <ErpFormSpan span={3}>
-              <p className="erp-field-group__label">Estimate</p>
-            </ErpFormSpan>
-            <ErpFieldRow label="Lines" readOnly>
-              <Input value={String(summary.totalLines)} readOnly className="bg-erp-surface-alt" />
-            </ErpFieldRow>
-            <ErpFieldRow label="Total Qty" readOnly>
-              <Input value={String(summary.totalQuantity)} readOnly className="bg-erp-surface-alt" />
-            </ErpFieldRow>
-            <ErpFieldRow label="Est. Subtotal" readOnly>
-              <Input
-                value={formatCurrency(summary.estimatedSubtotal)}
-                readOnly
-                className="bg-erp-surface-alt"
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Est. Taxes (18%)" readOnly>
-              <Input
-                value={formatCurrency(summary.estimatedTaxes)}
-                readOnly
-                className="bg-erp-surface-alt"
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Est. Total" readOnly>
-              <Input
-                value={formatCurrency(summary.estimatedTotal)}
-                readOnly
-                className="bg-erp-primary-soft font-semibold text-erp-primary"
-              />
-            </ErpFieldRow>
-          </ErpCardSection>
-
-          <ErpCardSection
-            id={purchaseSectionId('attachments')}
-            title="Attachments"
-            subtitle="Supporting files for this requisition (demo stub upload)"
-            collapsedSummary={attachmentsSummaryText || undefined}
-            icon={Paperclip}
-            accent="blue"
-            collapsible
-            defaultOpen={false}
-            dense
-            columns={1}
-          >
-            <PurchaseDocumentAttachments
-              files={prPlaceholdersToRows(attachments, header.requesterName || createdMeta.by || 'User')}
+        <ErpCardSection
+          id={purchaseSectionId('notes')}
+          title="Notes"
+          subtitle="Internal remarks and provisional totals"
+          collapsedSummary={
+            financeSummaryText || (header.remarks.trim() ? 'Remarks set' : undefined)
+          }
+          icon={Banknote}
+          accent="blue"
+          collapsible
+          defaultOpen={financeDefaultOpen || Boolean(header.remarks.trim())}
+          columns={3}
+          className="crm-lead-zoho-section"
+        >
+          <ErpFieldRow label="Remarks" horizontal={false} className="erp-field-row--wide">
+            <Textarea
+              value={header.remarks}
               disabled={!editable}
-              uploadedBy={header.requesterName || createdMeta.by || 'User'}
-              hint="Technical specs, drawings, requirement docs, and supporting files"
-              onChange={(next) => {
-                setAttachments(rowsToPrPlaceholders(next, attachments))
-                markDirty()
-              }}
+              onChange={(e) => patchHeader({ remarks: e.target.value })}
+              rows={3}
+              placeholder="Optional notes for purchase team"
             />
-          </ErpCardSection>
+          </ErpFieldRow>
+          <ErpFieldRow label="Lines" readOnly horizontal={false}>
+            <Input value={String(summary.totalLines)} readOnly className="bg-erp-surface-alt" />
+          </ErpFieldRow>
+          <ErpFieldRow label="Total Qty" readOnly horizontal={false}>
+            <Input value={String(orderTotals.totalQty)} readOnly className="bg-erp-surface-alt" />
+          </ErpFieldRow>
+          <ErpFieldRow label="Est. Subtotal" readOnly horizontal={false}>
+            <Input
+              value={formatCurrency(orderTotals.basicAmount)}
+              readOnly
+              className="bg-erp-surface-alt"
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label={`Est. Taxes (${PR_ESTIMATE_TAX_PCT}%)`} readOnly horizontal={false}>
+            <Input
+              value={formatCurrency(orderTotals.gstAmount)}
+              readOnly
+              className="bg-erp-surface-alt"
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label="Grand total" readOnly horizontal={false}>
+            <Input
+              value={formatCurrency(orderTotals.grandTotal)}
+              readOnly
+              className="bg-erp-primary-soft font-semibold text-erp-primary"
+            />
+          </ErpFieldRow>
+        </ErpCardSection>
 
-          <ErpCardSection
-            id={purchaseSectionId('costing')}
-            title="Status"
-            subtitle="Approval-stage status for this requisition"
-            collapsedSummary={additionalSummaryText || undefined}
-            icon={Layers}
-            accent="blue"
-            collapsible
-            defaultOpen={additionalDefaultOpen}
-            forceOpenKey={forceOpenAdditionalKey || undefined}
-            dense
-          >
-            <ErpViewField
-              label="Status"
-              value={purchaseRequisitionApprovalStatusLabel(status)}
-            />
-            <ErpViewField
-              label="Current approver"
-              value={status === 'pending_approval' ? 'Sneha Kulkarni (Purchase Head)' : '—'}
-            />
-            <ErpViewField label="Created by" value={createdMeta.by || '—'} />
-            <ErpViewField
-              label="Created date"
-              value={createdMeta.at ? formatDate(createdMeta.at.slice(0, 10)) : '—'}
-            />
-            <ErpViewField label="Last modified by" value={updatedMeta.by || '—'} />
-            <ErpViewField
-              label="Last modified date"
-              value={updatedMeta.at ? formatDate(updatedMeta.at.slice(0, 10)) : '—'}
-            />
-          </ErpCardSection>
+        <ErpCardSection
+          id={purchaseSectionId('attachments')}
+          title="Attachments"
+          subtitle="Supporting files for this requisition"
+          collapsedSummary={attachmentsSummaryText || undefined}
+          icon={Paperclip}
+          accent="blue"
+          collapsible
+          defaultOpen={false}
+          columns={1}
+          className="crm-lead-zoho-section"
+        >
+          <PurchaseDocumentAttachments
+            files={prPlaceholdersToRows(attachments, header.requesterName || createdMeta.by || 'User')}
+            disabled={!editable}
+            uploadedBy={header.requesterName || createdMeta.by || 'User'}
+            hint="Technical specs, drawings, requirement docs, and supporting files"
+            onChange={(next) => {
+              setAttachments(rowsToPrPlaceholders(next, attachments))
+              markDirty()
+            }}
+          />
+        </ErpCardSection>
 
-          <ErpCardSection
-            id={purchaseSectionId('timeline')}
-            title="Timeline"
-            subtitle="Approval and activity history"
-            collapsedSummary={approvalSummaryText || undefined}
-            icon={ClipboardList}
-            accent="blue"
-            collapsible
-            defaultOpen={history.length > 0}
-            dense
-            columns={1}
-          >
-            {history.length === 0 ? (
-              <p className="text-[12px] text-erp-muted">No approval activity yet.</p>
-            ) : (
-              <ul className="divide-y divide-erp-border rounded-md border border-erp-border">
-                {history.map((h) => (
-                  <li key={h.id} className="flex justify-between gap-3 px-3 py-2 text-[12px]">
-                    <span>
-                      <span className="font-medium capitalize text-erp-text">
-                        {h.action.replace(/_/g, ' ')}
-                      </span>
-                      <span className="text-erp-muted"> · {h.actorName}</span>
-                      {h.remarks ? (
-                        <span className="block text-erp-muted">{h.remarks}</span>
-                      ) : null}
+        <ErpCardSection
+          id={purchaseSectionId('timeline')}
+          title="Timeline"
+          subtitle="Approval and activity history"
+          collapsedSummary={approvalSummaryText || undefined}
+          icon={ClipboardList}
+          accent="blue"
+          collapsible
+          defaultOpen={history.length > 0}
+          columns={1}
+          className="crm-lead-zoho-section"
+        >
+          {history.length === 0 ? (
+            <p className="text-[12px] text-erp-muted">No approval activity yet.</p>
+          ) : (
+            <ul className="divide-y divide-erp-border rounded-lg border border-erp-border bg-white">
+              {history.map((h) => (
+                <li key={h.id} className="flex justify-between gap-3 px-3 py-2.5 text-[12px]">
+                  <span>
+                    <span className="font-medium capitalize text-erp-text">
+                      {h.action.replace(/_/g, ' ')}
                     </span>
-                    <span className="shrink-0 tabular-nums text-erp-muted">
-                      {formatDate(h.actedAt.slice(0, 10))}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </ErpCardSection>
+                    <span className="text-erp-muted"> · {h.actorName}</span>
+                    {h.remarks ? (
+                      <span className="block text-erp-muted">{h.remarks}</span>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-erp-muted">
+                    {formatDate(h.actedAt.slice(0, 10))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </ErpCardSection>
       </div>
     </PurchaseCardFormShell>
   )

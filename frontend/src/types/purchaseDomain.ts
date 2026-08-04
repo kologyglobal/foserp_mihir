@@ -352,6 +352,7 @@ export type PurchaseReturnDomainStatus =
   | 'draft'
   | 'pending_approval'
   | 'approved'
+  | 'shipped'
   | 'posted'
   | 'closed'
   | 'cancelled'
@@ -360,6 +361,7 @@ export const PURCHASE_RETURN_DOMAIN_STATUSES: readonly PurchaseReturnDomainStatu
   'draft',
   'pending_approval',
   'approved',
+  'shipped',
   'posted',
   'closed',
   'cancelled',
@@ -369,10 +371,20 @@ export const PURCHASE_RETURN_DOMAIN_STATUS_LABELS: Record<PurchaseReturnDomainSt
   draft: 'Draft',
   pending_approval: 'Pending Approval',
   approved: 'Approved',
-  posted: 'Posted',
+  shipped: 'Shipped',
+  posted: 'Completed',
   closed: 'Closed',
   cancelled: 'Cancelled',
 }
+
+/** Money Out / AP handoff after return complete (backend `accountingStatus`). */
+export type PurchaseReturnAccountingStatus =
+  | 'NONE'
+  | 'DRAFT'
+  | 'POSTED'
+  | 'ADJUSTED'
+  | 'CANCELLED'
+  | string
 
 /** How / why a purchase return was initiated. */
 export type PurchaseReturnOrigin =
@@ -794,6 +806,8 @@ export interface PurchaseSetupGeneral {
   requirePoWarehouse: boolean
   requireExpectedDeliveryDate: boolean
   requirePaymentTerms: boolean
+  /** When true, Planning Sheet shows consolidated item demand with multi-vendor allocation. */
+  planningConsolidationEnabled: boolean
 }
 
 export interface PurchaseSetupNumberSeries {
@@ -906,10 +920,6 @@ export interface PurchaseNotificationChannelFlags {
 }
 
 export interface PurchaseSetupNotifications {
-  /** From API: ON_HOLD means notifications are read-only and never persisted. */
-  status?: 'ON_HOLD'
-  /** From API: explanation shown on the Notifications tab when on hold. */
-  message?: string
   prPendingApproval: PurchaseNotificationChannelFlags
   rfqResponseDue: PurchaseNotificationChannelFlags
   poDeliveryApproaching: PurchaseNotificationChannelFlags
@@ -919,11 +929,8 @@ export interface PurchaseSetupNotifications {
   invoicePendingApproval: PurchaseNotificationChannelFlags
 }
 
-/** Event keys of `PurchaseSetupNotifications` (excludes API status/message metadata). */
-export type PurchaseNotificationEventKey = Exclude<
-  keyof PurchaseSetupNotifications,
-  'status' | 'message'
->
+/** Event keys of `PurchaseSetupNotifications`. */
+export type PurchaseNotificationEventKey = keyof PurchaseSetupNotifications
 
 export const PURCHASE_NOTIFICATION_EVENT_KEYS: readonly PurchaseNotificationEventKey[] = [
   'prPendingApproval',
@@ -1514,6 +1521,8 @@ export interface PurchasePlanningSheetRow {
   createdAt: IsoDateTime
   updatedBy: string | null
   updatedAt: IsoDateTime | null
+  /** Delivery / warehouse for consolidation group (item+UOM+location). */
+  deliveryLocationId?: string | null
 }
 
 export type PurchasePlanningSheetInput = Partial<
@@ -1905,6 +1914,16 @@ export interface PurchaseOrderLine {
   rfqLineId: string | null
   vendorQuotationLineId: string | null
   remarks: string
+  /** Originating PR breakdown for consolidated lines (planning consolidation). */
+  prSources?: Array<{
+    id: string
+    purchaseRequisitionId: string
+    purchaseRequisitionLineId: string
+    purchasePlanningRowId: string | null
+    requisitionNumber: string
+    planningNumber: string | null
+    quantity: number
+  }>
 }
 
 export interface PurchaseOrderChangeEntry {
@@ -2456,6 +2475,12 @@ export interface PurchaseReturn extends PurchaseMoneyTotals, PurchaseAuditFields
   qualityInspectionNumber: string | null
   /** Header-level return reason. */
   returnReason: PurchaseReturnReason
+  /** CREDIT | REPLACEMENT | REPAIR | INSPECTION | SCRAP_VENDOR */
+  returnType?: string
+  accountingStatus?: PurchaseReturnAccountingStatus
+  vendorAdjustmentId?: string | null
+  vendorAdjustmentHref?: string | null
+  replacementGoodsReceiptId?: string | null
   transportDetails: string
   debitNoteRequired: boolean
   replacementRequired: boolean
@@ -2632,6 +2657,104 @@ export interface PurchaseDashboardData {
   currency: IndianCurrencyCode
   asOf: IsoDateTime
   filtersApplied: PurchaseDashboardFilters
+}
+
+/* -------------------------------------------------------------------------- */
+/* Supplier quality (backend `/purchase/supplier-quality/*`)                  */
+/* -------------------------------------------------------------------------- */
+
+export interface SupplierQualityVendorRejectRow {
+  vendorId: string
+  rejectedQty: number
+  acceptedQty: number
+  inspectionCount: number
+  rejectRatePct: number
+  vendorName?: string
+  vendorCode?: string
+}
+
+export interface SupplierQualityItemRejectRow {
+  itemKey: string
+  rejectedQty: number
+  acceptedQty: number
+  rejectRatePct: number
+  itemCode?: string
+  itemName?: string
+}
+
+export interface SupplierQualityDashboardWidgets {
+  pendingReturns: number
+  rejectedStockQty: number
+  /** Backend uses rejected stock quantity (value column deferred). */
+  rejectedStockValue: number
+  replacementPending: number
+  vendorAdjustmentsPending: number
+  topRejectedVendors: SupplierQualityVendorRejectRow[]
+  mostRejectedItems: SupplierQualityItemRejectRow[]
+}
+
+export interface VendorQualityScorecard {
+  vendorId: string
+  vendorCode: string | null
+  vendorName: string | null
+  totalDeliveries: number
+  totalGrnQty: number
+  acceptedQty: number
+  rejectedQty: number
+  returnQty: number
+  replacementReturnCount: number
+  inspectionPassPct: number
+  averageQualityScore: number
+  qualityRating: 'A' | 'B' | 'C' | 'D'
+  openQiCount: number
+  openReturnCount: number
+  openAdjustmentCount: number
+  avgInspectionTurnaroundHours: number | null
+  onTimeDeliveryPct: number | null
+}
+
+export interface SupplierQualityTimelineEvent {
+  at: string
+  type: string
+  number: string
+  status: string
+  href: string
+  detail?: string
+}
+
+export interface ItemSupplierQualityHistory {
+  itemId: string
+  timeline: SupplierQualityTimelineEvent[]
+}
+
+/** Wizard prefill for Purchase Return create (`GET /purchase/returns/wizard-prefill`). */
+export interface ReturnWizardPrefillLine {
+  goodsReceiptLineId: string | null
+  purchaseOrderLineId: string | null
+  itemId: string
+  itemCode: string
+  itemName: string
+  returnQty: number
+  unitCost: number
+  batchLotNo: string
+  serialNumber: string
+  availableReturnQty: number
+}
+
+export interface ReturnWizardPrefill {
+  vendorId: string
+  purchaseOrderId: string | null
+  goodsReceiptId: string | null
+  qualityInspectionId: string | null
+  qualityInspectionNumber: string | null
+  warehouseId: string | null
+  suggestedReturnType: 'CREDIT' | 'REPLACEMENT' | string
+  replacementRequired: boolean
+  reason: string
+  totalRejected: number
+  totalReturned: number
+  totalRemaining: number
+  lines: ReturnWizardPrefillLine[]
 }
 
 /** Inputs accepted by create/update service methods (partial headers + lines). */
@@ -2856,6 +2979,8 @@ export type PurchaseReturnInput = {
   qualityInspectionId?: string | null
   documentDate?: IsoDate
   returnReason: PurchaseReturnReason
+  /** Backend returnType when known (CREDIT / REPLACEMENT / …). */
+  returnType?: 'CREDIT' | 'REPLACEMENT' | 'REPAIR' | 'INSPECTION' | 'SCRAP_VENDOR' | string
   warehouseId?: string
   warehouseName?: string
   transportDetails?: string

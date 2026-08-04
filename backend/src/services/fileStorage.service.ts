@@ -97,3 +97,29 @@ export function itemImageContentType(storageKey: string): string {
   if (lower.endsWith('.gif')) return 'image/gif'
   return 'image/jpeg'
 }
+
+const KB_BASE_DIR = env.KB_UPLOAD_DIR ?? path.join(process.cwd(), 'uploads', 'knowledge')
+
+/** Persist a knowledge document binary under `{tenantId}/{documentId}{ext}`. Returns relative storageKey. */
+export async function saveKnowledgeDocumentFile(
+  tenantId: string,
+  documentId: string,
+  buffer: Buffer,
+  ext: string,
+): Promise<string> {
+  const dir = path.join(KB_BASE_DIR, tenantId)
+  await mkdir(dir, { recursive: true })
+  const safeExt = ext && ext.startsWith('.') ? ext.slice(0, 32) : ext ? `.${ext.slice(0, 31)}` : ''
+  const filename = `${documentId}${safeExt}`
+  const fullPath = path.join(dir, filename)
+  await writeFile(fullPath, buffer)
+  return path.join(tenantId, filename).replace(/\\/g, '/')
+}
+
+export async function readKnowledgeDocumentFile(storageKey: string): Promise<Buffer> {
+  return readFile(path.join(KB_BASE_DIR, storageKey))
+}
+
+export async function knowledgeDocumentAbsolutePath(storageKey: string): Promise<string> {
+  return path.join(KB_BASE_DIR, storageKey)
+}

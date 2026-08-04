@@ -306,7 +306,6 @@ export const MONEY_IN_WORKSPACE_TABS = [
   { label: 'Overview', path: '/accounting/money-in' },
   { label: 'Invoices', path: '/accounting/money-in/invoices' },
   { label: 'Invoice Ready', path: '/accounting/money-in/invoice-ready' },
-  { label: 'CRM Tax Invoices', path: '/accounting/money-in/crm-pending' },
   { label: 'Receipts', path: '/accounting/money-in/receipts' },
   { label: 'Credit Notes', path: '/accounting/money-in/credit-notes' },
   { label: 'Recurring', path: '/accounting/money-in/recurring-invoices' },

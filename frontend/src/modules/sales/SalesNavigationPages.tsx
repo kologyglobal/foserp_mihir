@@ -45,6 +45,7 @@ import { buildOrderStatusKpis } from '../../utils/salesModuleKpis'
 import { resolveSalesOrderValue } from '../../components/sales/SalesOrder360Sections'
 import type { SalesOrder, SalesOrderStatus } from '../../types/mrp'
 import { cn } from '../../utils/cn'
+import { resolveCatalogProductLabel } from '../../utils/catalogProductLabel'
 import { SaaSPageShell } from '../../components/saas'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { OPERATIONAL_REPORTS } from '../../types/reports'
@@ -79,6 +80,7 @@ export function SalesOrderStatusPage() {
   const inspections = useQualityStore((s) => s.inspections)
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
+  const items = useMasterStore((s) => s.items)
   const openDetailPanel = useUIStore((s) => s.openDetailPanel)
 
   const [search, setSearch] = useState('')
@@ -93,8 +95,8 @@ export function SalesOrderStatusPage() {
     [customers],
   )
   const productName = useMemo(
-    () => (id: string) => products.find((p) => p.id === id)?.productName ?? id,
-    [products],
+    () => (id: string) => resolveCatalogProductLabel(id, { items, products }),
+    [items, products],
   )
 
   const atRiskOrders = useMemo(

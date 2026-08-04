@@ -52,15 +52,27 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Unified Sales Invoice (CRM + Money In) (2026-08-04)
+
+| Field | Value |
+|-------|-------|
+| Module | CRM Commercial / Money In AR |
+| Description | Single canonical `SalesInvoice`; CRM create/post facade; legacy CRM TI redirect; convert queue retired |
+| Doc | `docs/accounting/UNIFIED_SALES_INVOICE.md` |
+| Status | **done** in code — **condition**: migrate `20260804020000_unify_sales_invoice_commercial` + optional `migrate-crm-tax-invoices-to-sales-invoices.ts` |
+| Next step | Live UAT: CRM create → same id in Money In; allocate; no dual INV/SINV rows |
+
+---
+
 ## Done recently — CRM Tax Invoice → Money In bridge (2026-07-30)
 
 | Field | Value |
 |-------|-------|
 | Module | CRM Commercial / Money In AR |
-| Description | Posted CRM tax invoices appear in Money In CRM queue (creator tag) → Accounting converts to SI (`CRM_TAX_INVOICE`) → receipt/allocation syncs payment back to Sales + Customer 360 |
-| Doc | `docs/accounting/CRM_TAX_INVOICE_MONEY_IN_BRIDGE.md` |
-| Status | **done** in code — **condition**: migrate deploy `20260730160000_crm_tax_invoice_ar_bridge` on stage |
-| Next step | Stage migrate + UAT: post CRM INV → crm-pending → Convert → post SI → allocate → verify CRM payment status |
+| Description | **Superseded by unified Sales Invoice (2026-08-04).** Former bridge: posted CRM TI → convert → SI + payment sync |
+| Doc | `docs/accounting/UNIFIED_SALES_INVOICE.md` |
+| Status | **retired** — use unified path |
+| Next step | n/a |
 
 ---
 

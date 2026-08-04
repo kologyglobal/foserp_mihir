@@ -9,7 +9,7 @@ import type { CustomerReceiptAllowedActions } from './customer-receipt-allowed-a
 
 export type CustomerReceiptStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
 export type CustomerReceiptPaymentMethod = 'BANK_TRANSFER' | 'CASH' | 'CHEQUE' | 'UPI' | 'CARD' | 'OTHER'
-export type CustomerReceiptSourceType = 'DIRECT' | 'BANK_IMPORT'
+export type CustomerReceiptSourceType = 'DIRECT' | 'BANK_IMPORT' | 'CRM_PAYMENT_RECEIPT'
 export type CustomerReceiptAllocationStatus = 'DRAFT' | 'POSTED' | 'REVERSED'
 export type CustomerReceiptDeductionType = 'BANK_CHARGE' | 'OTHER_DEDUCTION'
 

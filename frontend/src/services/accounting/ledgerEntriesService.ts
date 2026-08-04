@@ -1,11 +1,12 @@
 /**
- * Ledger Entries mock service — Promise-based for future API swap.
- * Demo / UI only. Does NOT post real GL or enforce statutory compliance.
+ * Ledger Entries service — demo in-memory store OR live voucher ledger when `VITE_USE_API=true`.
  *
- * SECURITY: All reads, exports, and saved views must also be enforced by the future backend
- * (tenant isolation + accounting.ledger.* permissions). UI gating alone is not security.
+ * SECURITY: All reads, exports, and saved views must also be enforced by the backend
+ * (tenant isolation + accounting.ledger.* / finance.gl.view). UI gating alone is not security.
  */
 
+import { isApiMode } from '@/config/apiConfig'
+import { isAccountingDemoDataEnabled, accountingDemoOrEmpty } from '@/utils/accounting/accountingDemoData'
 import {
   LEDGER_LOOKUP_COST_CENTRES,
   LEDGER_LOOKUP_DEPARTMENTS,
@@ -18,13 +19,16 @@ import type {
   AccountLedgerSummary,
   CostCentreLedgerSummary,
   LedgerEntry,
+  LedgerEntryAccount,
   LedgerEntryAuditEvent,
   LedgerEntryFilter,
   LedgerEntryParty,
   LedgerEntrySourceDocument,
   LedgerExportRequest,
   LedgerPrintPreview,
+  LedgerSourceModule,
   LedgerSummary,
+  LedgerVoucherType,
   ManufacturingLedgerSummary,
   PartyLedgerSummary,
   ProjectLedgerSummary,
@@ -36,6 +40,12 @@ import {
   resolveLedgerDateRange,
 } from '../../utils/accounting/indianFinancialYear'
 import { getSessionUser } from '../../utils/permissions'
+import {
+  getAccountingVoucherLedger,
+  type AccountingVoucherLedgerHeader,
+  type AccountingVoucherLedgerLine,
+  type AccountingVoucherLedgerResponse,
+} from '../api/financeApi'
 
 export { DEFAULT_LEDGER_FILTER }
 
@@ -46,14 +56,15 @@ export class LedgerEntriesServiceError extends Error {
   }
 }
 
-const COMPANY_NAME = 'Vasant Trailers Pvt Ltd'
-const CONFIDENTIALITY_NOTE =
-  'Confidential — for internal use only. Demo data; not a statutory financial statement.'
-const AUDIT_USER = 'Rahul Mehta'
+const COMPANY_NAME = isAccountingDemoDataEnabled() ? 'Vasant Trailers Pvt Ltd' : 'Company'
+const CONFIDENTIALITY_NOTE = isAccountingDemoDataEnabled()
+  ? 'Confidential — for internal use only. Demo data; not a statutory financial statement.'
+  : 'Confidential — for internal use only.'
+const AUDIT_USER = 'System'
 
-const delay = () => new Promise((r) => setTimeout(r, 80 + Math.floor(Math.random() * 70)))
+const delay = () => new Promise((r) => setTimeout(r, isAccountingDemoDataEnabled() ? 80 + Math.floor(Math.random() * 70) : 0))
 
-let entriesStore: LedgerEntry[] = seedLedgerEntries()
+let entriesStore: LedgerEntry[] = accountingDemoOrEmpty(seedLedgerEntries)
 
 const SEED_SAVED_VIEWS: SavedLedgerView[] = [
   {
@@ -128,7 +139,9 @@ const SEED_SAVED_VIEWS: SavedLedgerView[] = [
   },
 ]
 
-let savedViewsStore: SavedLedgerView[] = structuredClone(SEED_SAVED_VIEWS)
+let savedViewsStore: SavedLedgerView[] = isAccountingDemoDataEnabled()
+  ? structuredClone(SEED_SAVED_VIEWS)
+  : []
 
 function currentUser(): string {
   try {
@@ -553,7 +566,272 @@ export async function getAccountLedgerSummary(
   return buildAccountLedgerSummary(accountId, filter)
 }
 
+function numAmount(value: string | number | null | undefined): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (value == null || value === '') return 0
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
+function dateOnlyStr(value: string | null | undefined): string {
+  return (value ?? '').slice(0, 10)
+}
+
+function mapApiCategory(category: string | undefined): LedgerEntryAccount['category'] {
+  const key = (category ?? '').toUpperCase()
+  if (key === 'ASSET') return 'Asset'
+  if (key === 'LIABILITY') return 'Liability'
+  if (key === 'EQUITY') return 'Equity'
+  if (key === 'INCOME' || key === 'REVENUE') return 'Income'
+  if (key === 'EXPENSE') return 'Expense'
+  return 'Asset'
+}
+
+function mapApiVoucherType(
+  type: string,
+  sourceModule?: string | null,
+  sourceDocumentType?: string | null,
+): LedgerVoucherType {
+  const t = (type ?? '').toUpperCase()
+  if (t === 'JOURNAL') return 'Journal'
+  if (t === 'RECEIPT') return 'Receipt'
+  if (t === 'PAYMENT') return 'Payment'
+  if (t === 'CONTRA') return 'Contra'
+  if (t === 'OPENING_BALANCE') return 'Opening'
+  if (t === 'REVERSAL') return 'Reversal'
+  if (t === 'GST') return 'GST'
+  if (t === 'TDS') return 'TDS'
+  if (t === 'SYSTEM' || t === 'DEBIT_NOTE' || t === 'CREDIT_NOTE') {
+    const doc = (sourceDocumentType ?? '').toUpperCase()
+    const mod = (sourceModule ?? '').toUpperCase()
+    if (doc.includes('SALES_INVOICE') || mod.includes('RECEIVABLE') || mod.includes('AR')) {
+      return 'Sales Invoice'
+    }
+    if (doc.includes('VENDOR_INVOICE') || mod.includes('PAYABLE') || mod.includes('AP')) {
+      return 'Purchase Invoice'
+    }
+    if (doc.includes('RECEIPT') || mod.includes('RECEIPT')) return 'Receipt'
+    if (doc.includes('PAYMENT') || mod.includes('PAYMENT')) return 'Payment'
+    if (t === 'CREDIT_NOTE' || t === 'DEBIT_NOTE') return 'Journal'
+    return 'Journal'
+  }
+  return 'Journal'
+}
+
+function mapApiPartyType(partyType: string | null | undefined): LedgerEntryParty['partyType'] {
+  const t = (partyType ?? '').toUpperCase()
+  if (t === 'CUSTOMER') return 'Customer'
+  if (t === 'VENDOR') return 'Vendor'
+  if (t === 'EMPLOYEE') return 'Employee'
+  if (t === 'BANK') return 'Bank'
+  return 'Other'
+}
+
+function mapApiSourceModule(module: string | null | undefined): LedgerSourceModule {
+  const m = (module ?? '').toUpperCase()
+  if (m.includes('PURCHASE') || m.includes('PAYABLE') || m.includes('AP')) return 'Purchase'
+  if (m.includes('SALES') || m.includes('RECEIVABLE') || m.includes('AR') || m.includes('CRM')) return 'Sales'
+  if (m.includes('INVENTORY') || m.includes('STOCK')) return 'Inventory'
+  if (m.includes('PRODUCTION') || m.includes('MFG') || m.includes('MANUFACTUR')) return 'Production'
+  if (m.includes('ASSET')) return 'Fixed Assets'
+  if (m.includes('PAYROLL') || m.includes('HRMS')) return 'Payroll'
+  if (m.includes('BANK') || m.includes('TREASURY') || m.includes('CASH')) return 'Banking'
+  if (m.includes('GST') || m.includes('TDS') || m.includes('TAX')) return 'GST and TDS'
+  if (m.includes('OPENING')) return 'Opening Balance'
+  return 'Manual Voucher'
+}
+
+function mapSourceDocumentHref(
+  header: AccountingVoucherLedgerHeader,
+  line: AccountingVoucherLedgerLine,
+): string | null {
+  const docType = (line.sourceDocumentType ?? header.sourceDocumentType ?? '').toUpperCase()
+  const docId = line.sourceDocumentId ?? header.sourceDocumentId
+  if (!docId) return null
+  if (docType.includes('SALES_INVOICE')) return `/accounting/money-in/invoices/${docId}`
+  if (docType.includes('CUSTOMER_RECEIPT') || docType.includes('RECEIPT')) {
+    return `/accounting/money-in/receipts/${docId}`
+  }
+  if (docType.includes('CREDIT_NOTE')) return `/accounting/money-in/credit-notes/${docId}`
+  if (docType.includes('VENDOR_INVOICE')) return `/accounting/money-out/vendor-invoices/${docId}`
+  if (docType.includes('VENDOR_PAYMENT') || docType.includes('PAYMENT')) {
+    return `/accounting/money-out/vendor-payments/${docId}`
+  }
+  return null
+}
+
+function emptyDimensions(): LedgerEntry['dimensions'] {
+  return {
+    company: null,
+    locationId: null,
+    locationName: null,
+    plantId: null,
+    plantName: null,
+    departmentId: null,
+    departmentName: null,
+    costCentreId: null,
+    costCentreCode: null,
+    costCentreName: null,
+    projectId: null,
+    projectCode: null,
+    projectName: null,
+    businessUnit: null,
+  }
+}
+
+function emptyManufacturing(): LedgerEntry['manufacturing'] {
+  return {
+    productionOrder: null,
+    workCentre: null,
+    machineCentre: null,
+    itemCode: null,
+    itemName: null,
+    itemCategory: null,
+    batchNumber: null,
+    jobWorkOrder: null,
+    manufacturingAccountType: null,
+    costType: null,
+  }
+}
+
+function emptyTax(): LedgerEntry['tax'] {
+  return {
+    gstApplicable: false,
+    gstType: null,
+    gstRate: null,
+    tdsApplicable: false,
+    tdsSection: null,
+    taxableAmount: null,
+  }
+}
+
+function mapApiVoucherLedgerToEntries(payload: AccountingVoucherLedgerResponse): LedgerEntry[] {
+  const header = payload.voucher
+  const narration = header.narration?.trim() || ''
+  const voucherType = mapApiVoucherType(header.voucherType, header.sourceModule, header.sourceDocumentType)
+  const status: LedgerEntry['status'] =
+    header.status === 'REVERSED' ? 'Reversed' : header.status === 'POSTED' ? 'Posted' : 'System Generated'
+
+  return (payload.entries ?? []).map((line) => {
+    const debit = numAmount(line.debitAmount)
+    const credit = numAmount(line.creditAmount)
+    const baseDebit = numAmount(line.baseDebitAmount)
+    const baseCredit = numAmount(line.baseCreditAmount)
+    const amount = Math.max(debit, credit, baseDebit, baseCredit)
+    const account = line.account
+    const party: LedgerEntryParty | null =
+      line.partyId || line.partyNameSnapshot
+        ? {
+            partyType: mapApiPartyType(line.partyType),
+            partyId: line.partyId ?? '',
+            partyCode: '',
+            partyName: line.partyNameSnapshot ?? '—',
+            gstNumber: null,
+          }
+        : null
+
+    const sourceHref = mapSourceDocumentHref(header, line)
+    const sourceDocument: LedgerEntrySourceDocument | null =
+      line.sourceDocumentId || header.sourceDocumentId || header.voucherNumber
+        ? {
+            module: mapApiSourceModule(line.sourceModule ?? header.sourceModule),
+            documentType: line.sourceDocumentType ?? header.sourceDocumentType ?? voucherType,
+            documentNumber:
+              header.referenceNumber ||
+              header.externalReference ||
+              header.voucherNumber ||
+              line.voucherNumber ||
+              '—',
+            documentDate: dateOnlyStr(line.documentDate ?? header.documentDate),
+            partyName: party?.partyName ?? null,
+            amount,
+            status: header.status,
+            href: sourceHref,
+          }
+        : null
+
+    const dimensions = emptyDimensions()
+    if (line.costCentreId) dimensions.costCentreId = line.costCentreId
+    if (line.projectReference) {
+      dimensions.projectId = line.projectReference
+      dimensions.projectCode = line.projectReference
+    }
+    if (line.departmentReference) {
+      dimensions.departmentId = line.departmentReference
+      dimensions.departmentName = line.departmentReference
+    }
+
+    return {
+      id: line.id,
+      entryNumber: `${line.voucherNumber || header.voucherNumber || 'VCH'}-${String(line.lineNumber).padStart(3, '0')}`,
+      postingDate: dateOnlyStr(line.postingDate ?? header.postingDate),
+      documentDate: dateOnlyStr(line.documentDate ?? header.documentDate),
+      voucherId: line.voucherId || header.id,
+      voucherNumber: line.voucherNumber || header.voucherNumber || '—',
+      voucherType,
+      referenceNumber: header.referenceNumber ?? '',
+      externalDocumentNumber: header.externalReference ?? '',
+      narration: narration,
+      debit,
+      credit,
+      runningBalance: 0,
+      runningBalanceSide: 'Dr' as const,
+      status: line.isReversal ? 'Reversal Entry' : status,
+      account: {
+        accountId: account?.id ?? line.accountId,
+        code: account?.code ?? '—',
+        name: account?.name ?? 'Account',
+        category: mapApiCategory(account?.category),
+        accountType: account?.isGroup ? 'Group' : 'Posting',
+        normalBalance: account?.normalBalance?.toUpperCase() === 'CREDIT' ? 'Credit' : 'Debit',
+        controlAccountType: account?.isControlAccount ? 'Control' : null,
+      },
+      party,
+      dimensions,
+      manufacturing: emptyManufacturing(),
+      tax: emptyTax(),
+      sourceDocument,
+      reversal:
+        line.isReversal || line.reversalOfEntryId || line.reversedByEntryId
+          ? {
+              originalEntryId: line.reversalOfEntryId,
+              originalVoucherNumber: null,
+              reversalEntryId: line.reversedByEntryId,
+              reversalVoucherNumber: null,
+              reversalDate: null,
+              reversalReason: header.reversalReason,
+            }
+          : null,
+      currency: line.currencyCode || header.currencyCode || 'INR',
+      exchangeRate: numAmount(line.exchangeRate || header.exchangeRate) || 1,
+      baseCurrencyAmount: Math.max(baseDebit, baseCredit, debit, credit),
+      createdBy: line.postedBy ?? header.postedBy ?? 'System',
+      createdAt: line.postedAt ?? header.postedAt ?? nowIso(),
+      postedBy: line.postedBy ?? header.postedBy ?? 'System',
+      postedAt: line.postedAt ?? header.postedAt ?? nowIso(),
+      hasAttachments: false,
+      isPreviewOnly: false,
+    }
+  })
+}
+
 export async function getVoucherEntries(voucherId: string): Promise<LedgerEntry[]> {
+  if (!voucherId?.trim()) return []
+
+  if (isApiMode()) {
+    try {
+      const res = await getAccountingVoucherLedger(voucherId)
+      if (!res.success || !res.data) {
+        throw new LedgerEntriesServiceError(res.message || 'Failed to load voucher ledger')
+      }
+      return mapApiVoucherLedgerToEntries(res.data)
+    } catch (err) {
+      if (err instanceof LedgerEntriesServiceError) throw err
+      const message = err instanceof Error ? err.message : 'Failed to load voucher ledger'
+      throw new LedgerEntriesServiceError(message)
+    }
+  }
+
   await delay()
   return clone(
     sortEntries(entriesStore.filter((e) => e.voucherId === voucherId && !e.isPreviewOnly)),
@@ -804,11 +1082,11 @@ export async function getLedgerLookups(): Promise<{
     }
   }
   return {
-    costCentres: clone(LEDGER_LOOKUP_COST_CENTRES),
-    projects: clone(LEDGER_LOOKUP_PROJECTS),
-    plants: clone(LEDGER_LOOKUP_PLANTS),
-    departments: clone(LEDGER_LOOKUP_DEPARTMENTS),
-    parties: clone(LEDGER_LOOKUP_PARTIES),
+    costCentres: isAccountingDemoDataEnabled() ? clone(LEDGER_LOOKUP_COST_CENTRES) : [],
+    projects: isAccountingDemoDataEnabled() ? clone(LEDGER_LOOKUP_PROJECTS) : [],
+    plants: isAccountingDemoDataEnabled() ? clone(LEDGER_LOOKUP_PLANTS) : [],
+    departments: isAccountingDemoDataEnabled() ? clone(LEDGER_LOOKUP_DEPARTMENTS) : [],
+    parties: isAccountingDemoDataEnabled() ? clone(LEDGER_LOOKUP_PARTIES) : [],
     vouchers: [...voucherMap.values()].sort((a, b) => a.number.localeCompare(b.number)),
   }
 }
@@ -832,6 +1110,6 @@ export async function getFinancialPeriodContext(): Promise<{
 
 /** Reset in-memory demo stores (tests / dev). */
 export function resetLedgerEntriesDemo(): void {
-  entriesStore = seedLedgerEntries()
-  savedViewsStore = structuredClone(SEED_SAVED_VIEWS)
+  entriesStore = accountingDemoOrEmpty(seedLedgerEntries)
+  savedViewsStore = isAccountingDemoDataEnabled() ? structuredClone(SEED_SAVED_VIEWS) : []
 }

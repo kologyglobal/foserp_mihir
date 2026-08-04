@@ -60,3 +60,23 @@ export * from './movementService'
 export * from './transferAdjustmentReturnService'
 export * from './stockCountService'
 export * from './traceabilityService'
+
+export {
+  stockHealthStatus,
+  listConsolidatedStock,
+  getItemStock360,
+  getItemReceiptSummary,
+  listItemReceiptSummaries,
+  listWarehouseOpsSummaries,
+  listVendorOpsSummaries,
+  getItemPurchaseSummary,
+  listItemPurchaseSummaries,
+  getOperationalAnalytics,
+  searchItemOpsSnapshot,
+} from './operationalViewsService'
+export type { ConsolidatedStockFilter } from './operationalViewsService'
+
+export { getStoreDashboard } from './storeOperationsService'
+export type { StoreDashboardData, StoreDashKpi } from './storeOperationsService'
+export { listPutAwayQueue } from './putAwayService'
+export type { PutAwayCard, PutAwayQueueKind } from './putAwayService'

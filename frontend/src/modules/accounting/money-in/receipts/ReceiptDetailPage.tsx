@@ -1,10 +1,25 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Pencil } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  CheckCircle2,
+  ClipboardCheck,
+  Download,
+  FileText,
+  Pencil,
+  Printer,
+  Send,
+  Undo2,
+  XCircle,
+} from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpStatusChip } from '@/components/erp/ErpStatusChip'
 import { Textarea } from '@/components/forms/Inputs'
+import { PageBackLink } from '@/components/ui/PageBackLink'
+import { TableLink } from '@/components/ui/AppLink'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { entity360CustomerPath } from '@/config/entity360Routes'
 import {
   cancelCustomerReceipt,
   getCustomerReceipt,
@@ -17,11 +32,50 @@ import {
 } from '@/services/bridges/receivablesApiBridge'
 import type { CustomerReceiptDto, CustomerReceiptValidationPreview, ReceiptAllocationHistoryRow } from '@/types/moneyIn'
 import { formatCurrency } from '@/utils/formatters/currency'
+import { formatDate } from '@/utils/dates/format'
+import { downloadCustomerReceiptPdf, printCustomerReceiptDocument } from '@/utils/customerReceiptExport'
 import { mergeAllowedAction, useMoneyInPermissions } from '@/utils/permissions/moneyIn'
 import { notify } from '@/store/toastStore'
-import { RECEIPT_STATUS_LABELS, receiptDisplayNumber, receiptStatusTone, parseDecimal, summarizeReceiptValidationToast } from '../moneyInUi'
+import { cn } from '@/utils/cn'
+import {
+  RECEIPT_STATUS_LABELS,
+  receiptDisplayNumber,
+  receiptStatusTone,
+  parseDecimal,
+  summarizeReceiptValidationToast,
+} from '../moneyInUi'
 import { ValidationDrawer } from '../components/ValidationDrawer'
 import { MoneyInWorkspaceShell } from '../MoneyInWorkspaceShell'
+import {
+  CUSTOMER_RECEIPT_PAYMENT_METHOD_LABELS,
+  CustomerReceiptDocument,
+} from './CustomerReceiptDocument'
+
+function SideMeta({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mi-receipt-detail-meta">
+      <dt className="mi-receipt-detail-meta__label">{label}</dt>
+      <dd className="mi-receipt-detail-meta__value">{children}</dd>
+    </div>
+  )
+}
+
+function SideCard({
+  title,
+  children,
+  className,
+}: {
+  title?: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <section className={cn('mi-receipt-detail-side-card', className)}>
+      {title ? <h3 className="mi-receipt-detail-side-card__title">{title}</h3> : null}
+      {children}
+    </section>
+  )
+}
 
 export function ReceiptDetailPage() {
   const { id } = useParams()
@@ -32,6 +86,7 @@ export function ReceiptDetailPage() {
   const [history, setHistory] = useState<ReceiptAllocationHistoryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [showValidate, setShowValidate] = useState(false)
   const [showPost, setShowPost] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
@@ -53,6 +108,8 @@ export function ReceiptDetailPage() {
         } catch {
           setHistory([])
         }
+      } else {
+        setHistory([])
       }
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load receipt')
@@ -169,6 +226,19 @@ export function ReceiptDetailPage() {
     }
   }
 
+  const handlePdf = async () => {
+    if (!receipt) return
+    setExporting(true)
+    try {
+      notify.info('Preparing PDF…')
+      const result = await downloadCustomerReceiptPdf(receipt)
+      if (result.ok) notify.success(`Downloaded ${result.fileName}`)
+      else notify.error(result.error ?? 'PDF download failed')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (!perms.canViewReceipt) {
     return (
       <MoneyInWorkspaceShell title="Receipt">
@@ -186,6 +256,17 @@ export function ReceiptDetailPage() {
   }
 
   const actions = receipt.allowedActions
+  const receiptNo = receiptDisplayNumber(receipt)
+  const canEdit = mergeAllowedAction(perms.canEditReceipt, actions?.edit)
+  const canAllocate = mergeAllowedAction(perms.canAllocate, actions?.allocate)
+  const canValidate = mergeAllowedAction(perms.canViewReceipt, actions?.validate)
+  const canMarkReady = mergeAllowedAction(perms.canEditReceipt, actions?.markReady)
+  const canPost = mergeAllowedAction(perms.canPostReceipt, actions?.post)
+  const canCancel = mergeAllowedAction(perms.canCancelReceipt, actions?.cancel)
+  const canReverse = mergeAllowedAction(perms.canReverseReceipt, actions?.reverse)
+  const hasAccountingLink =
+    (receipt.status === 'POSTED' || receipt.status === 'REVERSED') && Boolean(receipt.accountingVoucherId)
+
   const statusBanner =
     receipt.status === 'POSTED'
       ? 'Posted to GL — read-only. Allocate against open invoices or view the accounting voucher.'
@@ -197,165 +278,387 @@ export function ReceiptDetailPage() {
             ? 'Reversed — a reversing voucher was posted and the receipt credit was closed. Read-only.'
             : null
 
+  const primaryAction = canPost
+    ? {
+        id: 'post',
+        label: 'Post',
+        icon: Send,
+        onClick: () => setShowPost(true),
+        disabled: acting,
+      }
+    : canAllocate
+      ? {
+          id: 'allocate',
+          label: 'Allocate',
+          icon: ArrowLeftRight,
+          onClick: () => navigate(`/accounting/money-in/receipts/${id}/allocate`),
+        }
+      : {
+          id: 'pdf',
+          label: 'Export PDF',
+          icon: Download,
+          onClick: () => void handlePdf(),
+          disabled: exporting,
+        }
+
   return (
     <MoneyInWorkspaceShell
-      title={receiptDisplayNumber(receipt)}
-      actions={
-        <div className="flex flex-wrap gap-2">
-          {mergeAllowedAction(perms.canEditReceipt, actions?.edit) && (
-            <ErpButton variant="secondary" icon={Pencil} onClick={() => navigate(`/accounting/money-in/receipts/${id}/edit`)}>
-              Edit
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canViewReceipt, actions?.validate) && (
-            <ErpButton variant="secondary" onClick={() => void runValidate()}>
-              Validate
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canEditReceipt, actions?.markReady) && (
-            <ErpButton variant="secondary" onClick={() => void runMarkReady()} disabled={acting}>
-              Mark Ready
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canPostReceipt, actions?.post) && (
-            <ErpButton variant="primary" onClick={() => setShowPost(true)} disabled={acting}>
-              Post
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canCancelReceipt, actions?.cancel) && (
-            <ErpButton variant="ghost" onClick={() => setShowCancel(true)}>
-              Cancel
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canAllocate, actions?.allocate) && (
-            <ErpButton variant="primary" onClick={() => navigate(`/accounting/money-in/receipts/${id}/allocate`)}>
-              Allocate
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canReverseReceipt, actions?.reverse) && (
-            <ErpButton variant="ghost" onClick={() => setShowReverse(true)} disabled={acting}>
-              Reverse Document
-            </ErpButton>
-          )}
-          {(receipt.status === 'POSTED' || receipt.status === 'REVERSED') && receipt.accountingVoucherId && (
-            <Link to={`/accounting/ledger-entries/voucher/${receipt.accountingVoucherId}`}>
-              <ErpButton variant="secondary">View Accounting</ErpButton>
-            </Link>
-          )}
-        </div>
-      }
+      title={receiptNo}
+      contentClassName="border-0 bg-transparent p-0 shadow-none"
     >
-      {statusBanner && (
-        <div className="mb-3 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-900">{statusBanner}</div>
-      )}
+      <div className="mi-receipt-detail-page">
+        <PageBackLink to="/accounting/money-in/receipts" label="Back to Receipts" className="no-print" />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <ErpStatusChip label={RECEIPT_STATUS_LABELS[receipt.status]} tone={receiptStatusTone(receipt.status)} />
-        <span className="text-[13px] text-erp-muted">{receipt.customerNameSnapshot}</span>
-        <span className="text-[13px] text-erp-muted">{receipt.paymentMethod.replace(/_/g, ' ')}</span>
-        <span className="text-[13px] tabular-nums text-erp-muted">Receipt date: {receipt.receiptDate}</span>
-        {receipt.paymentMethod === 'CHEQUE' && receipt.chequeNumber && (
-          <span className="text-[13px] text-erp-muted">Cheque: {receipt.chequeNumber} ({receipt.chequeDate})</span>
-        )}
-        {receipt.transactionReference && (
-          <span className="text-[13px] text-erp-muted">Txn ref: {receipt.transactionReference}</span>
-        )}
-      </div>
+        {statusBanner ? (
+          <div className="mi-receipt-detail-banner no-print" role="status">
+            {statusBanner}
+          </div>
+        ) : null}
 
-      <div className="rounded border border-erp-border bg-slate-50 p-3">
-        <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-erp-muted">Amounts</h3>
-        <dl className="grid gap-2 text-[12px] sm:grid-cols-3">
-          <div>
-            <dt className="text-erp-muted">Bank/cash amount</dt>
-            <dd className="font-medium tabular-nums">{formatCurrency(parseDecimal(receipt.bankCashAmount))}</dd>
+        {receipt.sourceType === 'CRM_PAYMENT_RECEIPT' && receipt.sourceDocumentId ? (
+          <div className="mi-receipt-detail-source no-print">
+            <div className="mi-receipt-detail-source__title">Source: CRM Payment Receipt</div>
+            <div className="mi-receipt-detail-source__body">
+              CRM document: {receipt.sourceDocumentNumberSnapshot || receipt.sourceDocumentId}
+              {' · '}
+              <Link className="mi-receipt-detail-source__link" to={`/sales/receipts/${receipt.sourceDocumentId}`}>
+                Open CRM Receipt
+              </Link>
+            </div>
           </div>
-          <div>
-            <dt className="text-erp-muted">Customer TDS</dt>
-            <dd className="font-medium tabular-nums">{formatCurrency(parseDecimal(receipt.customerTdsAmount))}</dd>
-          </div>
-          <div>
-            <dt className="text-erp-muted">Bank charges</dt>
-            <dd className="font-medium tabular-nums">{formatCurrency(parseDecimal(receipt.bankChargeAmount))}</dd>
-          </div>
-          <div>
-            <dt className="text-erp-muted">Other deductions</dt>
-            <dd className="font-medium tabular-nums">{formatCurrency(parseDecimal(receipt.otherDeductionAmount))}</dd>
-          </div>
-          <div>
-            <dt className="text-erp-muted">Gross receipt amount</dt>
-            <dd className="font-semibold tabular-nums">{formatCurrency(parseDecimal(receipt.grossReceiptAmount))}</dd>
-          </div>
-        </dl>
-        {receipt.narration && <p className="mt-3 text-[12px] text-erp-muted">Narration: {receipt.narration}</p>}
-      </div>
+        ) : null}
 
-      {receipt.status === 'POSTED' && (
-        <div className="mt-4 rounded border border-erp-border bg-slate-50 p-3">
-          <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-erp-muted">Allocation</h3>
-          <dl className="grid gap-2 text-[12px] sm:grid-cols-3">
-            <div>
-              <dt className="text-erp-muted">Allocatable</dt>
-              <dd className="font-medium tabular-nums">{formatCurrency(parseDecimal(receipt.allocatableAmount))}</dd>
+        <header className="mi-receipt-detail-toolbar no-print">
+          <div className="mi-receipt-detail-toolbar__identity">
+            <div className="mi-receipt-detail-toolbar__title-row">
+              <h1 className="mi-receipt-detail-toolbar__title">{receiptNo}</h1>
+              <ErpStatusChip label={RECEIPT_STATUS_LABELS[receipt.status]} tone={receiptStatusTone(receipt.status)} />
             </div>
-            <div>
-              <dt className="text-erp-muted">Allocated</dt>
-              <dd className="font-medium tabular-nums">{formatCurrency(parseDecimal(receipt.allocatedAmount))}</dd>
-            </div>
-            <div>
-              <dt className="text-erp-muted">Unallocated (customer advance)</dt>
-              <dd className="font-medium tabular-nums">{formatCurrency(parseDecimal(receipt.unallocatedAmount))}</dd>
-            </div>
-          </dl>
+            <p className="mi-receipt-detail-toolbar__subtitle">
+              {receipt.customerNameSnapshot}
+              <span aria-hidden> · </span>
+              {CUSTOMER_RECEIPT_PAYMENT_METHOD_LABELS[receipt.paymentMethod]}
+              <span aria-hidden> · </span>
+              {formatDate(receipt.receiptDate)}
+            </p>
+          </div>
 
-          {actions?.viewAllocations && history.length > 0 && (
-            <div className="mt-3 overflow-x-auto">
-              <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Allocation history</h4>
-              <table className="w-full min-w-[560px] text-left text-[12px]">
-                <thead>
-                  <tr className="border-b border-erp-border text-erp-muted">
-                    <th className="py-1.5 pr-2">Date</th>
-                    <th className="py-1.5 pr-2">Invoice</th>
-                    <th className="py-1.5 pr-2 text-right">Amount</th>
-                    <th className="py-1.5 pr-2 text-right">Invoice outstanding after</th>
-                    <th className="py-1.5 pr-2">Status</th>
-                    {perms.canReverseAllocation && <th className="py-1.5">Action</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((row) => (
-                    <tr key={row.allocationId} className="border-b border-erp-border/60">
-                      <td className="py-1.5 pr-2 tabular-nums">{row.allocationDate}</td>
-                      <td className="py-1.5 pr-2">{row.invoiceNumber ?? '—'}</td>
-                      <td className="py-1.5 pr-2 text-right tabular-nums">{formatCurrency(parseDecimal(row.allocatedAmount))}</td>
-                      <td className="py-1.5 pr-2 text-right tabular-nums">
-                        {row.invoiceOutstandingAfter ? formatCurrency(parseDecimal(row.invoiceOutstandingAfter)) : '—'}
-                      </td>
-                      <td className="py-1.5 pr-2">{row.status}</td>
-                      {perms.canReverseAllocation && (
-                        <td className="py-1.5">
-                          {row.status === 'POSTED' && row.batchId && (
-                            <button
-                              type="button"
-                              className="text-[12px] font-medium text-rose-700 hover:underline"
-                              onClick={() => {
-                                setReverseBatchId(row.batchId)
-                                setAllocReverseReason('')
-                              }}
-                              disabled={acting}
-                            >
-                              Reverse batch
-                            </button>
-                          )}
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <ErpCommandBar
+            sticky={false}
+            className="mi-receipt-detail-toolbar__actions"
+            maxHeaderActions={4}
+            primaryAction={primaryAction}
+            secondaryActions={[
+              ...(canEdit
+                ? [
+                    {
+                      id: 'edit',
+                      label: 'Edit',
+                      icon: Pencil,
+                      pin: true,
+                      onClick: () => navigate(`/accounting/money-in/receipts/${id}/edit`),
+                    },
+                  ]
+                : []),
+              ...(canAllocate && primaryAction.id !== 'allocate'
+                ? [
+                    {
+                      id: 'allocate-secondary',
+                      label: 'Allocate',
+                      icon: ArrowLeftRight,
+                      pin: true,
+                      onClick: () => navigate(`/accounting/money-in/receipts/${id}/allocate`),
+                    },
+                  ]
+                : []),
+              {
+                id: 'print',
+                label: 'Print',
+                icon: Printer,
+                pin: true,
+                onClick: () => printCustomerReceiptDocument({ fileName: receiptNo }),
+              },
+              ...(primaryAction.id !== 'pdf'
+                ? [
+                    {
+                      id: 'pdf-secondary',
+                      label: 'PDF',
+                      icon: Download,
+                      pin: true,
+                      onClick: () => void handlePdf(),
+                      disabled: exporting,
+                    },
+                  ]
+                : []),
+              ...(canValidate
+                ? [
+                    {
+                      id: 'validate',
+                      label: 'Validate',
+                      icon: ClipboardCheck,
+                      onClick: () => void runValidate(),
+                    },
+                  ]
+                : []),
+              ...(canMarkReady
+                ? [
+                    {
+                      id: 'mark-ready',
+                      label: 'Mark Ready',
+                      icon: CheckCircle2,
+                      onClick: () => void runMarkReady(),
+                      disabled: acting,
+                    },
+                  ]
+                : []),
+              ...(hasAccountingLink
+                ? [
+                    {
+                      id: 'accounting',
+                      label: 'View Accounting',
+                      icon: FileText,
+                      onClick: () =>
+                        navigate(`/accounting/ledger-entries/voucher/${receipt.accountingVoucherId}`),
+                    },
+                  ]
+                : []),
+            ]}
+            destructiveActions={[
+              ...(canCancel
+                ? [
+                    {
+                      id: 'cancel',
+                      label: 'Cancel',
+                      icon: XCircle,
+                      onClick: () => setShowCancel(true),
+                    },
+                  ]
+                : []),
+              ...(canReverse
+                ? [
+                    {
+                      id: 'reverse',
+                      label: 'Reverse Document',
+                      icon: Undo2,
+                      onClick: () => setShowReverse(true),
+                      disabled: acting,
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </header>
+
+        <div className="mi-receipt-detail-layout">
+          <main className="mi-receipt-detail-main">
+            <div className="ti-preview-canvas">
+              <div className="ti-preview-canvas__sheet">
+                <CustomerReceiptDocument receipt={receipt} allocations={history} />
+              </div>
             </div>
-          )}
+
+            {receipt.status === 'POSTED' && actions?.viewAllocations && history.length > 0 ? (
+              <SideCard title="Allocation history" className="mi-receipt-detail-history no-print">
+                <div className="mi-receipt-detail-history__scroll">
+                  <table className="mi-receipt-detail-history__table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Invoice</th>
+                        <th className="mi-receipt-detail-history__num">Amount</th>
+                        <th className="mi-receipt-detail-history__num">Outstanding after</th>
+                        <th>Status</th>
+                        {perms.canReverseAllocation ? <th>Action</th> : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((row) => (
+                        <tr key={row.allocationId}>
+                          <td className="tabular-nums">{row.allocationDate}</td>
+                          <td>{row.invoiceNumber ?? '—'}</td>
+                          <td className="mi-receipt-detail-history__num tabular-nums">
+                            {formatCurrency(parseDecimal(row.allocatedAmount))}
+                          </td>
+                          <td className="mi-receipt-detail-history__num tabular-nums">
+                            {row.invoiceOutstandingAfter
+                              ? formatCurrency(parseDecimal(row.invoiceOutstandingAfter))
+                              : '—'}
+                          </td>
+                          <td>{row.status}</td>
+                          {perms.canReverseAllocation ? (
+                            <td>
+                              {row.status === 'POSTED' && row.batchId ? (
+                                <button
+                                  type="button"
+                                  className="mi-receipt-detail-history__reverse"
+                                  onClick={() => {
+                                    setReverseBatchId(row.batchId)
+                                    setAllocReverseReason('')
+                                  }}
+                                  disabled={acting}
+                                >
+                                  Reverse batch
+                                </button>
+                              ) : null}
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </SideCard>
+            ) : null}
+          </main>
+
+          <aside className="mi-receipt-detail-rail no-print">
+            <SideCard className="mi-receipt-detail-amount-card">
+              <p className="mi-receipt-detail-amount-card__label">Gross receipt</p>
+              <p className="mi-receipt-detail-amount-card__amount">
+                {formatCurrency(parseDecimal(receipt.grossReceiptAmount))}
+              </p>
+              <p className="mi-receipt-detail-amount-card__meta">
+                Bank {formatCurrency(parseDecimal(receipt.bankCashAmount))}
+                {parseDecimal(receipt.customerTdsAmount) > 0
+                  ? ` · TDS ${formatCurrency(parseDecimal(receipt.customerTdsAmount))}`
+                  : ''}
+              </p>
+              {receipt.status === 'POSTED' ? (
+                <p className="mi-receipt-detail-amount-card__meta">
+                  Unallocated {formatCurrency(parseDecimal(receipt.unallocatedAmount))}
+                </p>
+              ) : null}
+            </SideCard>
+
+            <SideCard title="Customer">
+              <TableLink to={entity360CustomerPath(receipt.customerId)} className="mi-receipt-detail-customer-link">
+                {receipt.customerNameSnapshot}
+              </TableLink>
+              {receipt.customerGstinSnapshot ? (
+                <p className="mi-receipt-detail-muted">GSTIN {receipt.customerGstinSnapshot}</p>
+              ) : null}
+              {receipt.customerCodeSnapshot ? (
+                <p className="mi-receipt-detail-muted">Code {receipt.customerCodeSnapshot}</p>
+              ) : null}
+            </SideCard>
+
+            <SideCard title="Receipt details">
+              <dl className="mi-receipt-detail-meta-list">
+                <SideMeta label="Receipt date">{formatDate(receipt.receiptDate)}</SideMeta>
+                <SideMeta label="Posting date">
+                  {receipt.postingDate ? formatDate(receipt.postingDate) : '—'}
+                </SideMeta>
+                <SideMeta label="Payment method">
+                  {CUSTOMER_RECEIPT_PAYMENT_METHOD_LABELS[receipt.paymentMethod]}
+                </SideMeta>
+                <SideMeta label="Currency">{receipt.currencyCode}</SideMeta>
+                <SideMeta label="Transaction ref">{receipt.transactionReference || '—'}</SideMeta>
+                {receipt.paymentMethod === 'CHEQUE' ? (
+                  <SideMeta label="Cheque">
+                    {receipt.chequeNumber || '—'}
+                    {receipt.chequeDate ? ` · ${formatDate(receipt.chequeDate)}` : ''}
+                  </SideMeta>
+                ) : null}
+              </dl>
+            </SideCard>
+
+            {receipt.status === 'POSTED' ? (
+              <SideCard title="Allocation summary">
+                <dl className="mi-receipt-detail-meta-list">
+                  <SideMeta label="Allocatable">
+                    {formatCurrency(parseDecimal(receipt.allocatableAmount))}
+                  </SideMeta>
+                  <SideMeta label="Allocated">
+                    {formatCurrency(parseDecimal(receipt.allocatedAmount))}
+                  </SideMeta>
+                  <SideMeta label="Unallocated">
+                    {formatCurrency(parseDecimal(receipt.unallocatedAmount))}
+                  </SideMeta>
+                </dl>
+              </SideCard>
+            ) : null}
+
+            <SideCard title="Linked documents">
+              <dl className="mi-receipt-detail-meta-list">
+                {receipt.sourceType === 'CRM_PAYMENT_RECEIPT' && receipt.sourceDocumentId ? (
+                  <SideMeta label="CRM receipt">
+                    <TableLink to={`/sales/receipts/${receipt.sourceDocumentId}`}>
+                      {receipt.sourceDocumentNumberSnapshot || 'Open'}
+                    </TableLink>
+                  </SideMeta>
+                ) : null}
+                {hasAccountingLink ? (
+                  <SideMeta label="Accounting voucher">
+                    <TableLink to={`/accounting/ledger-entries/voucher/${receipt.accountingVoucherId}`}>
+                      Open voucher
+                    </TableLink>
+                  </SideMeta>
+                ) : null}
+                {receipt.reversalVoucherId ? (
+                  <SideMeta label="Reversal voucher">
+                    <TableLink to={`/accounting/ledger-entries/voucher/${receipt.reversalVoucherId}`}>
+                      Open reversal
+                    </TableLink>
+                  </SideMeta>
+                ) : null}
+                {receipt.sourceType !== 'CRM_PAYMENT_RECEIPT' && !hasAccountingLink && !receipt.reversalVoucherId ? (
+                  <p className="mi-receipt-detail-muted">No linked documents</p>
+                ) : null}
+              </dl>
+            </SideCard>
+
+            <SideCard title="More actions">
+              <div className="mi-receipt-detail-actions">
+                {canEdit ? (
+                  <ErpButton
+                    variant="secondary"
+                    icon={Pencil}
+                    className="w-full justify-center"
+                    onClick={() => navigate(`/accounting/money-in/receipts/${id}/edit`)}
+                  >
+                    Edit
+                  </ErpButton>
+                ) : null}
+                {canAllocate ? (
+                  <ErpButton
+                    variant="secondary"
+                    icon={ArrowLeftRight}
+                    className="w-full justify-center"
+                    onClick={() => navigate(`/accounting/money-in/receipts/${id}/allocate`)}
+                  >
+                    Allocate
+                  </ErpButton>
+                ) : null}
+                <ErpButton
+                  variant="secondary"
+                  icon={Printer}
+                  className="w-full justify-center"
+                  onClick={() => printCustomerReceiptDocument({ fileName: receiptNo })}
+                >
+                  Print
+                </ErpButton>
+                <ErpButton
+                  variant="secondary"
+                  icon={Download}
+                  className="w-full justify-center"
+                  onClick={() => void handlePdf()}
+                  disabled={exporting}
+                >
+                  Download PDF
+                </ErpButton>
+                <ErpButton
+                  variant="ghost"
+                  icon={FileText}
+                  className="w-full justify-center"
+                  onClick={() => navigate(entity360CustomerPath(receipt.customerId))}
+                >
+                  Customer 360
+                </ErpButton>
+              </div>
+            </SideCard>
+          </aside>
         </div>
-      )}
+      </div>
 
       <ValidationDrawer open={showValidate} onClose={() => setShowValidate(false)} report={report} />
 
@@ -364,7 +667,7 @@ export function ReceiptDetailPage() {
           <div className="w-full max-w-md rounded border border-erp-border bg-white p-5 shadow-lg">
             <h2 className="text-[15px] font-semibold text-erp-text">Post customer receipt?</h2>
             <p className="mt-2 text-[13px] text-erp-muted">
-              Posting <strong>{receiptDisplayNumber(receipt)}</strong> for{' '}
+              Posting <strong>{receiptNo}</strong> for{' '}
               <strong>₹{Number(receipt.grossReceiptAmount).toLocaleString('en-IN')}</strong> will create a system
               voucher, GL entries, and a credit open item that can be allocated to open invoices. If needed later, a
               posted receipt can be reversed (after reversing any allocations), which posts a reversing voucher.
@@ -385,7 +688,13 @@ export function ReceiptDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <div className="w-full max-w-md rounded border border-erp-border bg-white p-4">
             <h3 className="text-[14px] font-semibold">Cancel customer receipt</h3>
-            <Textarea className="mt-2" rows={3} placeholder="Reason" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+            <Textarea
+              className="mt-2"
+              rows={3}
+              placeholder="Reason"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
             <div className="mt-3 flex justify-end gap-2">
               <ErpButton variant="secondary" onClick={() => setShowCancel(false)}>
                 Close
@@ -403,8 +712,8 @@ export function ReceiptDetailPage() {
           <div className="w-full max-w-md rounded border border-erp-border bg-white p-5 shadow-lg">
             <h3 className="text-[15px] font-semibold text-erp-text">Reverse customer receipt?</h3>
             <p className="mt-2 text-[13px] text-erp-muted">
-              Reversing <strong>{receiptDisplayNumber(receipt)}</strong> posts a reversing voucher, closes the receipt
-              credit open item, and marks the receipt REVERSED. All posted allocations must be reversed first.
+              Reversing <strong>{receiptNo}</strong> posts a reversing voucher, closes the receipt credit open item,
+              and marks the receipt REVERSED. All posted allocations must be reversed first.
             </p>
             <Textarea
               className="mt-3"

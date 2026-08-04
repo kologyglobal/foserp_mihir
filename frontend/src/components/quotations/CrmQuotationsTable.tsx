@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table'
 import { Copy, Eye, FileText, GitBranch, Pencil, Printer, Send, Trash2, Calendar, CheckCircle2, ThumbsUp, XCircle } from 'lucide-react'
 import { ErpDataGrid } from '../erp/ErpDataGrid'
+import { TableLink } from '../ui/AppLink'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
-import { formatDate } from '../../utils/dates/format'
+import { formatDate, formatDateTime } from '../../utils/dates/format'
 import { quotationStatusLabel } from './QuotationCrmCard'
 import type { QuotationListItem } from './QuotationCrmCard'
 import { quotationRevisionLabel } from './Quotation360Sections'
@@ -19,16 +20,24 @@ import { BulkActionToolbar } from '../../design-system/list-page/BulkActionToolb
 import { buildEnterpriseBulkActions } from '../../design-system/list-page/buildEnterpriseBulkActions'
 import { CrmListFilterBar, type CrmListFilterBarProps } from '@/components/crm/CrmListFilterBar'
 import { cn } from '../../utils/cn'
-import { StatusBadge } from '../../design-system/list-page'
+import { StatusBadge, StageBadge } from '../../design-system/list-page'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
 import { isQuotationDeletableStatus } from '../../utils/quotationDeletePolicy'
 import { resolveQuotationRevisionPolicy } from '../../utils/quotationRevisionPolicy'
+import { opportunityStageLabel } from '../../utils/opportunityUtils'
+import { entity360CustomerPath } from '../../config/entity360Routes'
+import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
 
 function listStatusLabel(item: QuotationListItem): string {
   if (item.document.status === 'sent' && item.customerApproval === 'approved') {
     return 'Customer Approved'
   }
   return quotationStatusLabel(item.document.status)
+}
+
+function customerApprovalLabel(value?: string | null): string {
+  if (!value) return '—'
+  return value.replace(/_/g, ' ')
 }
 
 export interface CrmQuotationsTableProps {
@@ -120,58 +129,191 @@ export function CrmQuotationsTable({
         id: 'quotation',
         header: 'Quotation',
         accessorFn: (r) => r.quotationNo,
+        enableSorting: enableColumnSorting,
         meta: { columnLabel: 'Quotation' },
         cell: ({ row }) => (
           <button type="button" className="text-left" onClick={(e) => { e.stopPropagation(); onView(row.original) }}>
             <EnterpriseIdCell id={row.original.quotationNo} />
-            <p className="mt-0.5 text-[11px] font-medium text-erp-muted">
-              {quotationRevisionLabel(row.original.document.revisionNo)}
-              {row.original.revisionCount > 1 ? ` · ${row.original.revisionCount} versions` : null}
-            </p>
-            {row.original.opportunityName ? (
-              <p className="mt-0.5 max-w-[200px] truncate text-[12px] text-erp-muted">{row.original.opportunityName}</p>
+            {row.original.document.locked ? (
+              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-erp-muted">Locked</p>
             ) : null}
           </button>
+        ),
+      },
+      {
+        id: 'revision',
+        header: 'Rev',
+        accessorFn: (r) => r.document.revisionNo,
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Revision' },
+        cell: ({ row }) => (
+          <EnterpriseRecordCell
+            primary={quotationRevisionLabel(row.original.document.revisionNo)}
+            subtitle={row.original.revisionCount > 1 ? `${row.original.revisionCount} versions` : undefined}
+          />
         ),
       },
       {
         id: 'customer',
         header: 'Customer',
         accessorFn: (r) => r.customerName,
-        cell: ({ row }) => (
-          <EnterpriseRecordCell
-            primary={row.original.customerName}
-            subtitle={row.original.opportunityName ?? quotationRevisionLabel(row.original.document.revisionNo)}
-          />
-        ),
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Customer' },
+        cell: ({ row }) => {
+          const { customerName, customerId } = row.original
+          if (customerId) {
+            return (
+              <TableLink to={entity360CustomerPath(customerId)}>
+                <EnterpriseRecordCell primary={customerName} />
+              </TableLink>
+            )
+          }
+          return <EnterpriseRecordCell primary={customerName} />
+        },
+      },
+      {
+        id: 'opportunity',
+        header: 'Opportunity',
+        accessorFn: (r) => r.opportunityName ?? r.opportunityNo ?? '',
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Opportunity' },
+        cell: ({ row }) => {
+          const { opportunityName, opportunityNo, opportunityId } = row.original
+          const label = opportunityName || opportunityNo || '—'
+          if (label === '—') return <span className="text-[13px] text-erp-muted">—</span>
+          if (opportunityId) {
+            return (
+              <TableLink to={`/crm/opportunities/${opportunityId}`}>
+                <EnterpriseRecordCell
+                  primary={opportunityName || opportunityNo || '—'}
+                  subtitle={opportunityNo && opportunityName ? opportunityNo : undefined}
+                />
+              </TableLink>
+            )
+          }
+          return (
+            <EnterpriseRecordCell
+              primary={opportunityName || opportunityNo || '—'}
+              subtitle={opportunityNo && opportunityName ? opportunityNo : undefined}
+            />
+          )
+        },
+      },
+      {
+        id: 'oppStage',
+        header: 'Opp Stage',
+        accessorFn: (r) => r.opportunityStage ?? '',
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Opportunity Stage' },
+        cell: ({ row }) => {
+          const stage = row.original.opportunityStage
+          if (!stage) return <span className="text-[13px] text-erp-muted">—</span>
+          return <StageBadge label={opportunityStageLabel(stage)} stage={stage} />
+        },
       },
       {
         id: 'quotationDate',
-        header: 'Quotation Date',
+        header: 'Date',
         accessorFn: (r) => r.quotationDate,
+        enableSorting: enableColumnSorting,
         meta: { columnLabel: 'Quotation Date' },
-        cell: ({ row }) => formatDate(row.original.quotationDate),
+        cell: ({ row }) => (
+          <span className="text-[13px] text-erp-text">{formatDate(row.original.quotationDate)}</span>
+        ),
       },
       {
         id: 'expiryDate',
-        header: 'Expiry',
+        header: 'Valid Until',
         accessorFn: (r) => r.expiryDate,
-        meta: { columnLabel: 'Expiry Date' },
-        cell: ({ row }) => formatDate(row.original.expiryDate),
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Valid Until' },
+        cell: ({ row }) => {
+          const { expiryDate } = row.original
+          if (!expiryDate) return <span className="text-[13px] text-erp-muted">—</span>
+          const overdue = expiryDate < new Date().toISOString().slice(0, 10)
+            && row.original.document.status !== 'converted'
+            && row.original.document.status !== 'superseded'
+          return (
+            <span className={cn('text-[13px] text-erp-text', overdue && 'font-semibold text-erp-critical')}>
+              {formatDate(expiryDate)}
+            </span>
+          )
+        },
+      },
+      {
+        id: 'lines',
+        header: 'Lines',
+        accessorFn: (r) => r.document.priceLines?.length ?? 0,
+        enableSorting: enableColumnSorting,
+        meta: entNumericMeta('Lines'),
+        cell: ({ row }) => (
+          <EnterpriseNumericCell value={String(row.original.document.priceLines?.length ?? 0)} />
+        ),
+      },
+      {
+        id: 'qty',
+        header: 'Qty',
+        accessorFn: (r) => r.qty ?? 0,
+        enableSorting: enableColumnSorting,
+        meta: entNumericMeta('Qty'),
+        cell: ({ row }) => {
+          const qty = row.original.qty
+          if (qty == null) return <span className="text-[13px] text-erp-muted">—</span>
+          return <EnterpriseNumericCell value={String(qty)} />
+        },
+      },
+      {
+        id: 'subtotal',
+        header: 'Subtotal',
+        accessorFn: (r) => r.subtotalAmount ?? 0,
+        enableSorting: enableColumnSorting,
+        meta: entNumericMeta('Subtotal'),
+        cell: ({ row }) => {
+          const v = row.original.subtotalAmount
+          if (v == null) return <span className="text-[13px] text-erp-muted">—</span>
+          return <EnterpriseNumericCell value={formatCrmCurrency(v)} />
+        },
+      },
+      {
+        id: 'tax',
+        header: 'Tax',
+        accessorFn: (r) => r.taxAmount ?? 0,
+        enableSorting: enableColumnSorting,
+        meta: entNumericMeta('Tax'),
+        cell: ({ row }) => {
+          const v = row.original.taxAmount
+          if (v == null) return <span className="text-[13px] text-erp-muted">—</span>
+          return <EnterpriseNumericCell value={formatCrmCurrency(v)} />
+        },
       },
       {
         id: 'total',
         header: 'Amount',
         accessorFn: (r) => r.document.totalAmount,
+        enableSorting: enableColumnSorting,
         meta: entNumericMeta('Amount'),
         cell: ({ row }) => (
           <EnterpriseNumericCell value={formatCrmCurrency(row.original.document.totalAmount)} className="font-semibold text-erp-primary" />
         ),
       },
       {
+        id: 'currency',
+        header: 'Curr',
+        accessorFn: (r) => r.currencyCode ?? 'INR',
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Currency' },
+        cell: ({ row }) => (
+          <span className="text-[12px] font-semibold uppercase text-erp-text">
+            {row.original.currencyCode || 'INR'}
+          </span>
+        ),
+      },
+      {
         id: 'status',
         header: 'Status',
         accessorFn: listStatusLabel,
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Status' },
         cell: ({ row }) => (
           <StatusBadge
             label={listStatusLabel(row.original)}
@@ -184,12 +326,81 @@ export function CrmQuotationsTable({
         ),
       },
       {
+        id: 'customerApproval',
+        header: 'Cust. Approval',
+        accessorFn: (r) => r.customerApproval ?? '',
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Customer Approval' },
+        cell: ({ row }) => {
+          const approval = row.original.customerApproval
+          if (!approval) return <span className="text-[13px] text-erp-muted">—</span>
+          return <StatusBadge label={customerApprovalLabel(approval)} status={approval} />
+        },
+      },
+      {
         id: 'owner',
         header: 'Owner',
         accessorFn: (r) => r.ownerName,
+        enableSorting: enableColumnSorting,
         meta: { columnLabel: 'Owner' },
         cell: ({ row }) => (
-          <EnterpriseRecordCell primary={row.original.ownerName} />
+          <span className="text-[13px] text-erp-text">{row.original.ownerName}</span>
+        ),
+      },
+      {
+        id: 'paymentTerms',
+        header: 'Payment',
+        accessorFn: (r) => r.paymentTerms ?? '',
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Payment Terms' },
+        cell: ({ row }) => (
+          <span className="max-w-[140px] truncate text-[12px] text-erp-text" title={row.original.paymentTerms ?? undefined}>
+            {row.original.paymentTerms?.trim() || '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'deliveryTime',
+        header: 'Delivery',
+        accessorFn: (r) => r.deliveryTime ?? '',
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Delivery Time' },
+        cell: ({ row }) => (
+          <span className="max-w-[120px] truncate text-[12px] text-erp-text" title={row.original.deliveryTime ?? undefined}>
+            {row.original.deliveryTime?.trim() || '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'salesOrder',
+        header: 'Sales Order',
+        accessorFn: (r) => r.salesOrderNo ?? r.document.salesOrderNo ?? '',
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Sales Order' },
+        cell: ({ row }) => {
+          const soNo = row.original.salesOrderNo ?? row.original.document.salesOrderNo
+          const soId = row.original.document.salesOrderId
+          if (!soNo && !soId) return <span className="text-[13px] text-erp-muted">—</span>
+          if (soId) {
+            return (
+              <TableLink to={resolveSalesOrderDetailPath(soId, true)}>
+                <EnterpriseIdCell id={soNo || soId} />
+              </TableLink>
+            )
+          }
+          return <EnterpriseIdCell id={soNo || '—'} />
+        },
+      },
+      {
+        id: 'lastModified',
+        header: 'Last Modified',
+        accessorFn: (r) => r.lastModified ?? r.document.modifiedAt ?? r.document.createdAt ?? '',
+        enableSorting: enableColumnSorting,
+        meta: { columnLabel: 'Last Modified' },
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap text-[12px] text-erp-text">
+            {formatDateTime(row.original.lastModified ?? row.original.document.modifiedAt ?? row.original.document.createdAt)}
+          </span>
         ),
       },
       {

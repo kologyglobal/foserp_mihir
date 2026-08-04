@@ -19,7 +19,12 @@ Related: [`UI_VIEW_PAGE_STANDARD.md`](UI_VIEW_PAGE_STANDARD.md) · [`purchase-wo
 | Status from shared labels (`purchaseStatusLabels` / domain labels) | Ad-hoc badge colors and copy per page |
 | `appConfirm` / `appPromptNote` | `window.alert` / `confirm` / `prompt` |
 
-Visual system = **Dynamics tokens** in `frontend/src/styles/dynamics-tokens.css` + existing ERP button/table classes.
+Visual system = **Dynamics tokens** in `frontend/src/styles/dynamics-tokens.css` + existing ERP button/table classes
++ Zoho-dense purchase layer (`frontend/src/styles/purchase-zoho.css` — form **body**/sections via `.enterprise-workspace--purchase`, registers via `.purchase-zoho-register`).
+
+**Record header (locked):** sticky document header must stay identical to CRM
+(`crm-sticky-record-header` via `PurchaseDocumentRecordHeader`). Do **not** restyle title,
+star, status/meta row, or actions for Purchase-only themes. Zoho density applies below the header only.
 
 ---
 
@@ -60,10 +65,11 @@ Every purchase **view**:
 
 Every purchase **edit**:
 
-1. Sticky record header (doc no + status + key facts)
+1. Sticky record header (doc no + status + key facts) — CRM chrome, do not restyle
 2. FastTabs: General / Lines first; Commercial & Remarks **collapsed by default**
-3. Lines: empty + Add line (no giant empty grid)
-4. Validation: summary + field highlight (PR/PO pattern), not toast-only when shell supports it
+3. **Header / General field grids:** use `ErpCardSection` `columns={5}` or `columns={6}` for dense multi-field metadata (Zoho/modern ERP density). Responsive cascade: 1 → 3 → 5/6. Keep `columns={1}` for line tables and notes-only blocks.
+4. Lines: empty + Add line (no giant empty grid)
+5. Validation: summary + field highlight (PR/PO pattern), not toast-only when shell supports it
 
 ---
 

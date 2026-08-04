@@ -7,6 +7,7 @@
  */
 
 import { isApiMode } from '../../config/apiConfig'
+import { accountingDemoOrEmpty, accountingDemoOrFactory, isAccountingDemoDataEnabled } from '@/utils/accounting/accountingDemoData'
 import {
   PAYABLE_BANK_ACCOUNTS,
   PAYABLES_REPORT_CATALOG,
@@ -80,18 +81,18 @@ export class PayablesServiceError extends Error {
 
 const delay = () => new Promise((r) => setTimeout(r, 60 + Math.floor(Math.random() * 80)))
 
-let vendorsStore = seedPayableVendors()
-let invoicesStore = seedPayableInvoices()
-let proposalsStore = seedPaymentProposals()
-let paymentsStore = seedVendorPayments()
-let advancesStore = seedVendorAdvances()
-let debitNotesStore = seedPayableDebitNotes()
-let disputesStore = seedVendorDisputes()
-let holdsStore = seedPaymentHolds()
-let bankDetailsStore = seedVendorBankDetails()
-let threeWayMatchStore = seedThreeWayMatches()
-let setupStore = seedPayablesSetup()
-let auditStore = seedPayablesAudit()
+let vendorsStore = accountingDemoOrEmpty(seedPayableVendors)
+let invoicesStore = accountingDemoOrEmpty(seedPayableInvoices)
+let proposalsStore = accountingDemoOrEmpty(seedPaymentProposals)
+let paymentsStore = accountingDemoOrEmpty(seedVendorPayments)
+let advancesStore = accountingDemoOrEmpty(seedVendorAdvances)
+let debitNotesStore = accountingDemoOrEmpty(seedPayableDebitNotes)
+let disputesStore = accountingDemoOrEmpty(seedVendorDisputes)
+let holdsStore = accountingDemoOrEmpty(seedPaymentHolds)
+let bankDetailsStore = accountingDemoOrEmpty(seedVendorBankDetails)
+let threeWayMatchStore = accountingDemoOrEmpty(seedThreeWayMatches)
+let setupStore = accountingDemoOrFactory(seedPayablesSetup, seedPayablesSetup)
+let auditStore = accountingDemoOrEmpty(seedPayablesAudit)
 
 function clone<T>(value: T): T {
   return structuredClone(value)
@@ -737,7 +738,7 @@ export async function getPayablesAgeing(filter: Partial<PayableFilter> = {}): Pr
     ageingBasis: basis,
     summary,
     vendorWise,
-    msmeWise: seedMsmeAgeingRows(),
+    msmeWise: isAccountingDemoDataEnabled() ? seedMsmeAgeingRows() : [],
     invoiceWise: openInvs,
   })
 }

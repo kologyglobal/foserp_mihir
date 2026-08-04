@@ -15,6 +15,11 @@ import {
   type AdjustmentCalcType,
   type OrderDocumentTotals,
 } from './orderAdjustmentsCalc'
+import {
+  formatCodeNameLabel,
+  isLikelyUuid,
+  resolveCatalogProductLabel,
+} from './catalogProductLabel'
 
 export function taxCategoryToPct(tax: TaxCategory | string | undefined): number {
   if (tax === 'gst_12') return 12
@@ -557,14 +562,46 @@ export function resolveOpportunityLines(opportunity: Opportunity, product?: Prod
 
 export function getPrimaryItemLabel(opportunity: Opportunity, product?: Product): string {
   const lines = resolveOpportunityLines(opportunity, product)
-  if (!lines.length) return opportunity.productRequirement || '—'
-  return lines[0]!.productOrItem || lines[0]!.description || '—'
+  if (!lines.length) {
+    const headerLabel = resolveCatalogProductLabel(
+      { productId: opportunity.productId, itemId: opportunity.productId },
+      {
+        getItem: (id) => useMasterStore.getState().getItem(id),
+        getProduct: (id) => useMasterStore.getState().getProduct(id),
+      },
+    )
+    if (headerLabel !== '—') return headerLabel
+    return opportunityRequirementDisplay(opportunity.productRequirement) || '—'
+  }
+  const line = lines[0]!
+  if (line.itemCode?.trim()) {
+    const name = line.productOrItem?.trim()
+    if (name && !isLikelyUuid(name) && name !== line.itemCode.trim()) {
+      return formatCodeNameLabel(line.itemCode, name) ?? line.itemCode.trim()
+    }
+    return line.itemCode.trim()
+  }
+  const fromMaster = resolveCatalogProductLabel(
+    {
+      itemId: line.itemId,
+      productId: line.productId ?? opportunity.productId,
+      productOrItem: line.productOrItem,
+    },
+    {
+      getItem: (id) => useMasterStore.getState().getItem(id),
+      getProduct: (id) => useMasterStore.getState().getProduct(id),
+    },
+  )
+  if (fromMaster !== '—') return fromMaster
+  const free = line.productOrItem?.trim() || line.description?.trim() || ''
+  if (free && !isLikelyUuid(free)) return free
+  return opportunityRequirementDisplay(opportunity.productRequirement) || '—'
 }
 
 export function getOpportunityItemSummary(opportunity: Opportunity, product?: Product): string {
   const lines = resolveOpportunityLines(opportunity, product)
-  if (!lines.length) return '—'
   const primary = getPrimaryItemLabel(opportunity, product)
+  if (!lines.length) return primary
   if (lines.length === 1) return primary
   return `${primary} + ${lines.length - 1} more`
 }

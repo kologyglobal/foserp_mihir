@@ -1303,6 +1303,7 @@ export function PurchaseOrderEditorPage() {
             defaultOpen
             forceOpenKey={forceOpenSections.general}
             dense
+            columns={6}
           >
             <ErpFieldRow label="PO Number" readOnly hint={isNew ? 'Preview from number series — assigned when you save' : undefined}>
               <Input

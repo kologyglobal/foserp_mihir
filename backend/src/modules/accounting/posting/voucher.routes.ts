@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../../../middleware/auth.middleware.js'
 import { attachRequestContext } from '../../../middleware/request-context.middleware.js'
-import { requirePermission } from '../../../middleware/permission.middleware.js'
+import { requireAnyPermission, requirePermission } from '../../../middleware/permission.middleware.js'
 import { resolveTenant, requireTenantAccess } from '../../../middleware/tenant.middleware.js'
 import { validateParams } from '../../../middleware/validation.middleware.js'
 import { tenantRouteParamSchema, uuidParamSchema } from '../../../utils/pagination.js'
@@ -27,7 +27,13 @@ router.get(
 router.get(
   '/:id/ledger',
   validateParams(uuidParamSchema),
-  requirePermission('finance.gl.view'),
+  requireAnyPermission(
+    'finance.gl.view',
+    'finance.voucher.view',
+    'finance.view',
+    'finance.ar.invoice.view',
+    'finance.ap.invoice.view',
+  ),
   controller.getVoucherLedger,
 )
 

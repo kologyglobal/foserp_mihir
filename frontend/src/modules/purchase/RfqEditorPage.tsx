@@ -665,7 +665,7 @@ export function RfqEditorPage() {
         collapsible
         defaultOpen
         dense
-        columns={3}
+        columns={6}
         collapsedSummary={joinFastTabSummary([
           documentNumber ?? 'New RFQ',
           formatFastTabDate(documentDate),
@@ -782,7 +782,7 @@ export function RfqEditorPage() {
         collapsible
         defaultOpen={false}
         dense
-        columns={3}
+        columns={6}
         collapsedSummary={commercialPeek || undefined}
       >
         <ErpFieldRow label="Payment Terms" horizontal={false}>

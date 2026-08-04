@@ -234,6 +234,15 @@ export async function postCustomerReceipt(
       })
     }
 
+    try {
+      const { markCrmPaymentReceiptMigratedOnPost } = await import(
+        '../../source/crm-payment-receipt-ar.service.js'
+      )
+      await markCrmPaymentReceiptMigratedOnPost(input.tenantId, input.receiptId, input.userId)
+    } catch {
+      // Non-fatal — receipt is already posted.
+    }
+
     return loadPostedResult(req, input.tenantId, input.receiptId, posting, false)
   } catch (error) {
     const eventKey = buildCustomerReceiptPostEventKey(input.receiptId)

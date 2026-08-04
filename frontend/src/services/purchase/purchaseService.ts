@@ -1454,6 +1454,184 @@ export async function createPurchaseOrdersFromPlanningSelection(
   return createdOrders
 }
 
+/**
+ * Demo: consolidated multi-vendor PO create (FIFO allocation + prSources on lines).
+ */
+export async function createPurchaseOrdersFromConsolidation(payload: {
+  planningRowIds: string[]
+  allocations: Array<{ vendorId: string; quantity: number; rate: number }>
+}): Promise<PurchaseOrder[]> {
+  await delay()
+  const {
+    allocateVendorQtyFifo,
+    assertAllocationBalances,
+  } = await import('../../utils/purchase/purchasePlanningConsolidation')
+
+  const selected = payload.planningRowIds.map((id) => {
+    const row = state.planningSheet.find((r) => r.id === id)
+    if (!row) throw new PurchaseServiceError('PPS_NOT_FOUND', `Planning row not found: ${id}`)
+    return row
+  })
+  const rowOpenQty = (r: (typeof selected)[number]) =>
+    r.netPurchaseQuantity > 0 ? r.netPurchaseQuantity : r.requiredQuantity
+
+  // PARTIALLY_ORDERED rows stay eligible while net open qty > 0.
+  const openRows = selected.filter(
+    (r) => !['po_created', 'completed', 'cancelled'].includes(r.status) && rowOpenQty(r) > 0,
+  )
+  if (!openRows.length) {
+    throw new PurchaseServiceError('PO_NO_ELIGIBLE_ROWS', 'No eligible planning rows for consolidation.')
+  }
+  const totalNet = openRows.reduce((s, r) => s + rowOpenQty(r), 0)
+  try {
+    assertAllocationBalances(totalNet, payload.allocations)
+  } catch (e) {
+    throw new PurchaseServiceError(
+      'PPS_NET_QTY_INVALID',
+      e instanceof Error ? e.message : 'Invalid allocation',
+    )
+  }
+
+  const pool = openRows.map((r) => ({
+    planningRowId: r.id,
+    purchaseRequisitionId: r.purchaseRequisitionId,
+    purchaseRequisitionLineId: r.purchaseRequisitionLineId,
+    purchaseRequisitionNumber: r.purchaseRequisitionNumber,
+    planningNumber: r.planningNumber,
+    remainingQty: rowOpenQty(r),
+    requiredDate: r.requiredByDate || null,
+  }))
+
+  const first = openRows[0]
+  const prefix = state.setup.numberSeries.purchaseOrder.prefix || 'PO'
+  const created: PurchaseOrder[] = []
+  const orderedByPlanning = new Map<string, number>()
+  const lastOrderByPlanning = new Map<
+    string,
+    { id: string; number: string; vendorId: string }
+  >()
+
+  for (const alloc of payload.allocations) {
+    const { slices, members } = allocateVendorQtyFifo(pool, alloc.quantity)
+    for (const m of members) {
+      const p = pool.find((x) => x.planningRowId === m.planningRowId)
+      if (p) p.remainingQty = m.remainingQty
+    }
+    if (!slices.length) continue
+
+    const series = state.setup.numberSeries.purchaseOrder
+    const nextNum = Math.max(series.nextNumber, state.seq.po)
+    const documentNumber = `${prefix}-2526-${nextNum}`
+    const pr = state.requisitions.find((r) => r.id === first.purchaseRequisitionId)
+    if (!pr) throw new PurchaseServiceError('PR_NOT_FOUND', 'Linked PR not found')
+
+    const order = await createPurchaseOrder({
+      vendorId: alloc.vendorId,
+      documentNumber,
+      origin: 'purchase_requisition',
+      purchaseRequisitionId: pr.id,
+      purchaseRequisitionNumber: pr.documentNumber,
+      expectedDeliveryDate: first.requiredByDate || todayDate(),
+      documentDate: todayDate(),
+      paymentTerms: pr.paymentTerms,
+      deliveryTerms: pr.deliveryTerms,
+      location: pr.location,
+      purchaseLocation: pr.location,
+      deliveryLocation: pr.location,
+      department: pr.department,
+      remarks: `Consolidated planning (${slices.map((s) => s.purchaseRequisitionNumber).join(', ')})`,
+      lines: [
+        {
+          itemId: first.itemId,
+          itemCode: first.itemCode,
+          itemName: first.itemName,
+          description: first.itemName,
+          specification: first.specification,
+          uom: first.uom,
+          quantity: alloc.quantity,
+          rate: alloc.rate,
+          requiredDate: first.requiredByDate,
+          prLineId: slices[0].purchaseRequisitionLineId,
+          requisitionNo:
+            slices.length > 1 ? `${slices.length} PRs` : slices[0].purchaseRequisitionNumber,
+        },
+      ],
+    })
+
+    const oIdx = state.orders.findIndex((o) => o.id === order.id)
+    if (oIdx >= 0 && state.orders[oIdx].lines[0]) {
+      state.orders[oIdx].lines[0] = {
+        ...state.orders[oIdx].lines[0],
+        prSources: slices.map((s, i) => ({
+          id: `src-${order.id}-${i}`,
+          purchaseRequisitionId: s.purchaseRequisitionId,
+          purchaseRequisitionLineId: s.purchaseRequisitionLineId,
+          purchasePlanningRowId: s.planningRowId,
+          requisitionNumber: s.purchaseRequisitionNumber,
+          planningNumber: s.planningNumber,
+          quantity: s.quantity,
+        })),
+      }
+    }
+
+    state.setup.numberSeries.purchaseOrder = { ...series, nextNumber: nextNum + 1 }
+    for (const slice of slices) {
+      orderedByPlanning.set(
+        slice.planningRowId,
+        (orderedByPlanning.get(slice.planningRowId) ?? 0) + slice.quantity,
+      )
+      lastOrderByPlanning.set(slice.planningRowId, {
+        id: order.id,
+        number: order.documentNumber,
+        vendorId: alloc.vendorId,
+      })
+    }
+    created.push(structuredClone(state.orders.find((o) => o.id === order.id) ?? order))
+  }
+
+  // Reduce residual open qty; partial rows stay partially_ordered with remaining net.
+  for (const row of openRows) {
+    const ordered = orderedByPlanning.get(row.id) ?? 0
+    if (ordered <= 0) continue
+    const last = lastOrderByPlanning.get(row.id)
+    if (!last) continue
+    const need = rowOpenQty(row)
+    const residual = Number(Math.max(0, need - ordered).toFixed(4))
+    const full = residual <= 0.0001
+    const idx = state.planningSheet.findIndex((r) => r.id === row.id)
+    if (idx < 0) continue
+    const cur = state.planningSheet[idx]
+    state.planningSheet[idx] = {
+      ...cur,
+      status: full ? 'po_created' : 'partially_ordered',
+      netPurchaseQuantity: full ? 0 : residual,
+      openPoQuantity: (cur.openPoQuantity || 0) + ordered,
+      estimatedAmount: full ? 0 : residual * ((cur.negotiatedRate ?? cur.expectedRate) || 0),
+      actionMessage: false,
+      purchaseOrderId: last.id,
+      purchaseOrderNumber: last.number,
+      preferredVendorId: last.vendorId,
+      updatedBy: PURCHASE_DOMAIN_ACTORS.buyer.name,
+      updatedAt: nowIso(),
+    }
+  }
+
+  // PR conversion: convert only when every linked planning row is fully PO-created (partial stays approved).
+  for (const prId of new Set(openRows.map((r) => r.purchaseRequisitionId))) {
+    const pr = state.requisitions.find((r) => r.id === prId)
+    if (!pr) continue
+    const linked = state.planningSheet.filter((r) => r.purchaseRequisitionId === prId)
+    const fully = linked.filter((r) => r.status === 'po_created' || r.status === 'completed')
+    if (fully.length === linked.length && fully.length > 0) {
+      pr.status = 'converted_to_po'
+      pr.convertedPoId = created[created.length - 1]?.id ?? pr.convertedPoId
+      pr.updatedAt = nowIso()
+    }
+  }
+
+  return created
+}
+
 export async function createPurchaseOrderFromPlanningRow(id: string): Promise<PurchaseOrder> {
   await delay()
   const idx = state.planningSheet.findIndex((r) => r.id === id)

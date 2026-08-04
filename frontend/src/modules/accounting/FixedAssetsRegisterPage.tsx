@@ -35,27 +35,48 @@ export function FixedAssetsRegisterPage() {
   const [location, setLocation] = useState('')
   const [department, setDepartment] = useState('')
 
+  // Load categories once (do not put `categories` in filter reload deps — empty arrays
+  // are new references and would re-trigger load forever).
+  useEffect(() => {
+    let cancelled = false
+    void getCategories()
+      .then((cats) => {
+        if (!cancelled) setCategories(cats)
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [refreshToken])
+
   const load = useCallback(async (signal?: { cancelled: boolean }) => {
     setLoadState('loading')
     try {
-      const [list, cats] = await Promise.all([
-        getAssets({ ...DEFAULT_FIXED_ASSETS_FILTER, search, categoryId, status, location, department }),
-        categories.length ? Promise.resolve(categories) : getCategories(),
-      ])
+      const list = await getAssets({
+        ...DEFAULT_FIXED_ASSETS_FILTER,
+        search,
+        categoryId,
+        status,
+        location,
+        department,
+      })
       if (signal?.cancelled) return
       setRows(list)
-      setCategories(cats)
       setLoadState(list.length === 0 ? 'empty' : 'ready')
     } catch {
       if (signal?.cancelled) return
       setLoadState('error')
     }
-  }, [search, categoryId, status, location, department, categories])
+  }, [search, categoryId, status, location, department])
 
   useEffect(() => {
     const signal = { cancelled: false }
     void load(signal)
-    return () => { signal.cancelled = true }
+    return () => {
+      signal.cancelled = true
+    }
   }, [load, refreshToken])
 
   const locations = useMemo(() => [...new Set(rows.map((r) => r.location))].sort(), [rows])
@@ -138,49 +159,98 @@ export function FixedAssetsRegisterPage() {
         </div>
 
         {loadState === 'loading' ? <LoadingState variant="table" rows={10} /> : null}
-        {loadState === 'error' ? <FixedAssetsEmptyState title="Load failed" /> : null}
+        {loadState === 'error' ? (
+          <FixedAssetsEmptyState
+            title="Could not load register"
+            description="Check API connectivity, finance.fa.view permission, and that a legal entity is configured."
+            actions={
+              <button
+                type="button"
+                className="rounded-md bg-erp-primary px-3 py-1.5 text-[12px] font-semibold text-white"
+                onClick={() => setRefreshToken((n) => n + 1)}
+              >
+                Retry
+              </button>
+            }
+          />
+        ) : null}
 
-        <div className="overflow-x-auto rounded-md border border-erp-border bg-white">
-          <table className="min-w-full text-left text-[12px]">
-            <thead className="sticky top-0 z-[1] bg-erp-surface text-[11px] uppercase tracking-wide text-erp-muted">
-              <tr>
-                <th className="px-3 py-2 font-semibold">Asset Number</th>
-                <th className="px-3 py-2 font-semibold">Asset Name</th>
-                <th className="px-3 py-2 font-semibold">Category</th>
-                <th className="px-3 py-2 font-semibold">Location</th>
-                <th className="px-3 py-2 font-semibold">Department</th>
-                <th className="px-3 py-2 font-semibold">Custodian</th>
-                <th className="px-3 py-2 text-right font-semibold">Acquisition Cost</th>
-                <th className="px-3 py-2 text-right font-semibold">Accum. Dep.</th>
-                <th className="px-3 py-2 text-right font-semibold">Net Book Value</th>
-                <th className="px-3 py-2 font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="cursor-pointer border-t border-erp-border/80 hover:bg-erp-surface-alt/50" onClick={() => navigate(`/accounting/fixed-assets/register/${row.id}`)}>
-                  <td className="px-3 py-2">
-                    <Link className="font-medium text-erp-primary hover:underline" to={`/accounting/fixed-assets/register/${row.id}`} onClick={(e) => e.stopPropagation()}>
-                      {row.assetNumber}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 font-medium">{row.name}</td>
-                  <td className="px-3 py-2 text-erp-muted">{row.categoryName}</td>
-                  <td className="px-3 py-2">{row.location}</td>
-                  <td className="px-3 py-2">{row.department}</td>
-                  <td className="px-3 py-2">{row.custodian}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.acquisitionCost)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.accumulatedDepreciation)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(row.netBookValue)}</td>
-                  <td className="px-3 py-2"><AssetStatusBadge status={row.status} /></td>
+        {loadState !== 'error' ? (
+          <div className="overflow-x-auto rounded-md border border-erp-border bg-white">
+            <table className="min-w-full text-left text-[12px]">
+              <thead className="sticky top-0 z-[1] bg-erp-surface text-[11px] uppercase tracking-wide text-erp-muted">
+                <tr>
+                  <th className="px-3 py-2 font-semibold">Asset Number</th>
+                  <th className="px-3 py-2 font-semibold">Asset Name</th>
+                  <th className="px-3 py-2 font-semibold">Category</th>
+                  <th className="px-3 py-2 font-semibold">Location</th>
+                  <th className="px-3 py-2 font-semibold">Department</th>
+                  <th className="px-3 py-2 font-semibold">Custodian</th>
+                  <th className="px-3 py-2 text-right font-semibold">Acquisition Cost</th>
+                  <th className="px-3 py-2 text-right font-semibold">Accum. Dep.</th>
+                  <th className="px-3 py-2 text-right font-semibold">Net Book Value</th>
+                  <th className="px-3 py-2 font-semibold">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length === 0 && loadState !== 'loading' ? (
-            <FixedAssetsEmptyState title="No assets match" description="Adjust filters to see fixed assets." />
-          ) : null}
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="cursor-pointer border-t border-erp-border/80 hover:bg-erp-surface-alt/50"
+                    onClick={() => navigate(`/accounting/fixed-assets/register/${row.id}`)}
+                  >
+                    <td className="px-3 py-2">
+                      <Link
+                        className="font-medium text-erp-primary hover:underline"
+                        to={`/accounting/fixed-assets/register/${row.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {row.assetNumber}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 font-medium">{row.name}</td>
+                    <td className="px-3 py-2 text-erp-muted">{row.categoryName}</td>
+                    <td className="px-3 py-2">{row.location}</td>
+                    <td className="px-3 py-2">{row.department}</td>
+                    <td className="px-3 py-2">{row.custodian}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.acquisitionCost)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.accumulatedDepreciation)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(row.netBookValue)}</td>
+                    <td className="px-3 py-2">
+                      <AssetStatusBadge status={row.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {rows.length === 0 && loadState !== 'loading' ? (
+              <FixedAssetsEmptyState
+                title="No fixed assets yet"
+                description={
+                  categories.length === 0
+                    ? 'Create an asset category first, then acquire or capitalize assets for this legal entity.'
+                    : 'No assets match the current filters for this legal entity.'
+                }
+                actions={
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Link
+                      to="/accounting/fixed-assets/categories"
+                      className="rounded-md bg-erp-primary px-3 py-1.5 text-[12px] font-semibold text-white"
+                    >
+                      Categories
+                    </Link>
+                    <Link
+                      to="/accounting/fixed-assets/acquisition"
+                      className="rounded-md border border-erp-border bg-white px-3 py-1.5 text-[12px] font-semibold text-erp-text"
+                    >
+                      Acquisition
+                    </Link>
+                  </div>
+                }
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </OperationalPageShell>
   )

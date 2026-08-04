@@ -1,11 +1,14 @@
 import { z } from 'zod'
 import { paginationSchema } from '../../../utils/pagination.js'
 export const PURCHASE_RETURN_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'SHIPPED', 'COMPLETED', 'CANCELLED', 'CLOSED'] as const
+export const PURCHASE_RETURN_TYPES = ['CREDIT', 'REPLACEMENT', 'REPAIR', 'INSPECTION', 'SCRAP_VENDOR'] as const
 export const listPurchaseReturnsQuerySchema = paginationSchema.extend({
   status: z.enum(PURCHASE_RETURN_STATUSES).optional(),
+  returnType: z.enum(PURCHASE_RETURN_TYPES).optional(),
   vendorId: z.string().uuid().optional(),
   purchaseOrderId: z.string().uuid().optional(),
   goodsReceiptId: z.string().uuid().optional(),
+  qualityInspectionId: z.string().uuid().optional(),
   search: z.string().trim().max(200).optional(),
 })
 export const purchaseReturnLineSchema = z.object({
@@ -26,12 +29,22 @@ export const createPurchaseReturnSchema = z.object({
   qualityInspectionId: z.string().uuid().optional().nullable(),
   warehouseId: z.string().uuid().optional().nullable(),
   plantId: z.string().uuid().optional().nullable(),
-  reason: z.string().trim().max(5000).optional().nullable(),
+  returnType: z.enum(PURCHASE_RETURN_TYPES).default('CREDIT'),
+  decisionCode: z.string().trim().max(40).optional().nullable(),
+  ncrId: z.string().uuid().optional().nullable(),
+  replacedReturnId: z.string().uuid().optional().nullable(),
+  reason: z.string().trim().min(1).max(5000),
   remarks: z.string().trim().max(5000).optional().nullable(),
   lines: z.array(purchaseReturnLineSchema).min(1),
 })
-export const updatePurchaseReturnSchema = createPurchaseReturnSchema.partial().extend({ lines: z.array(purchaseReturnLineSchema).min(1).optional() })
+export const updatePurchaseReturnSchema = createPurchaseReturnSchema.partial().extend({
+  lines: z.array(purchaseReturnLineSchema).min(1).optional(),
+  reason: z.string().trim().min(1).max(5000).optional(),
+})
 export const purchaseReturnRemarksSchema = z.object({ remarks: z.string().trim().max(2000).optional() }).default({})
+export const linkReplacementGrnSchema = z.object({
+  goodsReceiptId: z.string().uuid(),
+})
 export type ListPurchaseReturnsQuery = z.infer<typeof listPurchaseReturnsQuerySchema>
 export type CreatePurchaseReturnInput = z.infer<typeof createPurchaseReturnSchema>
 export type UpdatePurchaseReturnInput = z.infer<typeof updatePurchaseReturnSchema>

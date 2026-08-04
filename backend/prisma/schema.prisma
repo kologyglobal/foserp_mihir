@@ -509,6 +509,7 @@ model Tenant {
   vendorComparisonLines               VendorComparisonLine[]
   purchaseOrders                      PurchaseOrder[]
   purchaseOrderLines                  PurchaseOrderLine[]
+  purchaseOrderLinePrSources          PurchaseOrderLinePrSource[]
   purchaseOrderRevisions              PurchaseOrderRevision[]
   purchaseRequisitionRevisions        PurchaseRequisitionRevision[]
   purchaseRequisitionArchived         PurchaseRequisitionArchived[]
@@ -551,6 +552,24 @@ model Tenant {
   gateApprovals         GateApproval[]
   gateActivities        GateActivity[]
 
+
+  // Knowledge Base / OpenKB Wave 1
+  knowledgeCategories     KnowledgeCategory[]
+  knowledgeTags           KnowledgeTag[]
+  knowledgeSources        KnowledgeSource[]
+  knowledgeDocuments      KnowledgeDocument[]
+  knowledgeVersions       KnowledgeVersion[]
+  knowledgeChunks         KnowledgeChunk[]
+  knowledgeEmbeddings     KnowledgeEmbedding[]
+  knowledgeDocumentTags   KnowledgeDocumentTag[]
+  knowledgeChatSessions   KnowledgeChatSession[]
+  knowledgeChatMessages   KnowledgeChatMessage[]
+  knowledgeFeedback       KnowledgeFeedback[]
+  knowledgePermissions    KnowledgePermission[]
+  knowledgeActivityLogs   KnowledgeActivityLog[]
+
+  // Mobile push token registration (Expo)
+  mobileDeviceTokens      MobileDeviceToken[]
   // In-app CRM + ops notifications (tenant-scoped)
   notifications              Notification[]
   notificationPreferences    NotificationPreference[]
@@ -607,6 +626,7 @@ model User {
   hrEmployeeLinks        HrEmployee[]            @relation("HrEmployeeUser")
   notificationsReceived  Notification[]          @relation("NotificationRecipient")
   notificationPreferences NotificationPreference[]
+  mobileDeviceTokens       MobileDeviceToken[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -839,6 +859,30 @@ model RefreshToken {
   @@index([tenantId])
   @@index([tokenHash])
   @@map("refresh_tokens")
+}
+
+/// Expo push token registration only (M3.1). Delivery engine is not implemented.
+model MobileDeviceToken {
+  id            String    @id @default(uuid())
+  tenantId      String
+  userId        String
+  expoPushToken String    @db.VarChar(512)
+  deviceId      String?   @db.VarChar(128)
+  platform      String    @db.VarChar(32)
+  appVersion    String?   @db.VarChar(32)
+  status        String    @default("ACTIVE") @db.VarChar(16)
+  revokedAt     DateTime?
+  lastSeenAt    DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, expoPushToken])
+  @@index([tenantId, userId])
+  @@index([tenantId, status])
+  @@map("mobile_device_tokens")
 }
 
 model PasswordResetToken {
@@ -2163,6 +2207,18 @@ enum CrmProformaSource {
   sales_order
 }
 
+/// CRM commercial receipt → optional Money In handoff metadata (no GL from CRM).
+enum CrmPaymentReceiptAccountingMigrationStatus {
+  UNREVIEWED
+  NON_ACCOUNTING
+  READY_TO_MIGRATE
+  DRAFT_CREATED
+  MIGRATED
+  DUPLICATE
+  REJECTED
+  FAILED
+}
+
 model CrmPaymentReceipt {
   id                   String                   @id @default(uuid())
   tenantId             String
@@ -2178,6 +2234,14 @@ model CrmPaymentReceipt {
   unallocatedAmount    Decimal                  @db.Decimal(18, 2)
   remarks              String?                  @db.Text
   attachmentName       String?                  @db.VarChar(255)
+  /// Soft link to Accounting CustomerReceipt (no Prisma FK).
+  accountingReceiptId  String?
+  accountingMigrationStatus CrmPaymentReceiptAccountingMigrationStatus @default(UNREVIEWED)
+  accountingMigrationError  String?             @db.Text
+  accountingMigratedAt      DateTime?
+  accountingMigratedBy      String?
+  /// True until user explicitly records the receipt in Money In (or marks non-accounting).
+  commercialOnly            Boolean             @default(true)
   createdBy            String?
   updatedBy            String?
   createdAt            DateTime                 @default(now())
@@ -2190,9 +2254,14 @@ model CrmPaymentReceipt {
   allocations     CrmPaymentAllocation[]
 
   @@unique([tenantId, receiptNo])
+  @@unique([tenantId, accountingReceiptId])
   @@index([tenantId])
   @@index([tenantId, companyId])
   @@index([tenantId, proformaInvoiceId])
+  @@index([tenantId, accountingReceiptId])
+  @@index([tenantId, accountingMigrationStatus])
+  @@index([tenantId, receiptDate])
+  @@index([tenantId, transactionRef])
   @@index([tenantId, deletedAt])
   @@map("crm_payment_receipts")
 }
@@ -2282,6 +2351,8 @@ model CrmProformaInvoiceLine {
   @@map("crm_proforma_invoice_lines")
 }
 
+/// @deprecated Dual-ledger commercial tax invoice. Canonical invoice is SalesInvoice (sales_invoices).
+/// Kept for historical rows / migration redirect via SalesInvoice.legacyCrmTaxInvoiceId. Do not create new rows.
 model CrmTaxInvoice {
   id                    String                        @id @default(uuid())
   tenantId              String
@@ -2325,6 +2396,8 @@ model CrmTaxInvoice {
   salesInvoiceNumber    String?                       @db.VarChar(64)
   accountingSubmittedAt DateTime?
   accountingConvertedAt DateTime?
+  /// Last AR-synced payment date (mirror only; written by Accounting sync).
+  lastPaymentDate       DateTime?                     @db.Date
   createdByNameSnapshot String?                       @db.VarChar(200)
   postedAt              DateTime?
   cancelledAt           DateTime?
@@ -5055,7 +5128,16 @@ enum SalesInvoiceSourceType {
   SALES_ORDER
   OUTBOUND_DISPATCH
   PROFORMA_INVOICE
+  /// Historical provenance only — new invoices must not use this (unified SI create).
   CRM_TAX_INVOICE
+}
+
+/// Which UI/channel created the canonical SalesInvoice (badge / filter only).
+enum SalesInvoiceCreatedChannel {
+  CRM
+  ACCOUNTING
+  DISPATCH
+  RECURRING
 }
 
 enum SalesInvoiceSupplyType {
@@ -5195,6 +5277,21 @@ model SalesInvoice {
   reversedBy        String?
   reversalReason    String?   @db.VarChar(500)
 
+  /// Commercial metadata (unified CRM + Accounting invoice).
+  quotationId         String?
+  quotationNo         String?                     @db.VarChar(64)
+  proformaInvoiceId   String?
+  proformaNo          String?                     @db.VarChar(64)
+  salesOrderId        String?
+  salesOrderNo        String?                     @db.VarChar(64)
+  deliveryTerms       String?                     @db.VarChar(500)
+  paymentTerms        String?                     @db.VarChar(500)
+  /// Legacy CRM tax invoice UUID for redirects / migration map (not a second ledger).
+  legacyCrmTaxInvoiceId String?                   @unique
+  legacyCrmInvoiceNo    String?                   @db.VarChar(64)
+  createdChannel        SalesInvoiceCreatedChannel @default(ACCOUNTING)
+  commercialMetadata    Json?
+
   createdBy String?
   updatedBy String?
   createdAt DateTime @default(now())
@@ -5229,6 +5326,9 @@ model SalesInvoice {
   @@index([sourceType, sourceDocumentId], map: "sales_inv_src_doc_idx")
   @@index([financialYearId])
   @@index([createdBy])
+  @@index([tenantId, createdChannel])
+  @@index([tenantId, salesOrderId])
+  @@index([tenantId, legacyCrmInvoiceNo])
   @@map("sales_invoices")
 }
 
@@ -5852,6 +5952,8 @@ enum CustomerReceiptPaymentMethod {
 enum CustomerReceiptSourceType {
   DIRECT
   BANK_IMPORT
+  /// Soft link to CrmPaymentReceipt via sourceDocumentId (draft handoff; no auto-post).
+  CRM_PAYMENT_RECEIPT
 }
 
 enum CustomerReceiptAllocationStatus {
@@ -6011,11 +6113,14 @@ model CustomerReceipt {
 
   @@unique([legalEntityId, receiptNumber], map: "cust_rcpt_le_number_key")
   @@unique([legalEntityId, draftReference], map: "cust_rcpt_le_draft_ref_key")
+  /// Idempotent CRM → Money In draft handoff (nullable sourceDocumentId allows multiple DIRECT rows).
+  @@unique([tenantId, sourceType, sourceDocumentId], map: "cust_rcpt_tenant_source_key")
   @@index([tenantId])
   @@index([tenantId, legalEntityId])
   @@index([legalEntityId, status])
   @@index([legalEntityId, customerId])
   @@index([legalEntityId, receiptDate])
+  @@index([tenantId, sourceType, sourceDocumentId], map: "cust_rcpt_src_doc_idx")
   @@index([financialYearId])
   @@index([bankCashAccountId])
   @@index([createdBy])
@@ -6364,6 +6469,7 @@ model PurchaseRequisition {
   productionMaterials ProductionOrderMaterial[]
   revisions             PurchaseRequisitionRevision[]
   archivedHeaders       PurchaseRequisitionArchived[]
+  poLinePrSources       PurchaseOrderLinePrSource[]
 
   @@unique([tenantId, requisitionNumber])
   @@index([tenantId])
@@ -6414,6 +6520,7 @@ model PurchaseRequisitionLine {
   planningRows        PurchasePlanningRow[]
   rfqLines            RequestForQuotationLine[]
   purchaseOrderLines  PurchaseOrderLine[]
+  poLinePrSources     PurchaseOrderLinePrSource[]
 
   @@unique([tenantId, purchaseRequisitionId, lineNumber])
   @@index([tenantId])
@@ -6565,6 +6672,7 @@ model PurchasePlanningRow {
   lastPurchaseVendor      MasterVendor?           @relation("PlanningLastPurchaseVendor", fields: [lastPurchaseVendorId], references: [id])
   purchaseOrder           PurchaseOrder?          @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderLines      PurchaseOrderLine[]
+  poLinePrSources         PurchaseOrderLinePrSource[]
 
   @@unique([tenantId, planningNumber])
   @@index([tenantId])
@@ -6942,6 +7050,8 @@ model PurchaseOrderLine {
   hsn                     MasterHsnCode?           @relation(fields: [hsnId], references: [id])
   bin                     MasterBin?               @relation(fields: [binId], references: [id])
   goodsReceiptLines       GoodsReceiptLine[]
+  /// Traceability for consolidated PO lines (Item demand from multiple PRs).
+  prSources               PurchaseOrderLinePrSource[]
 
   @@unique([tenantId, purchaseOrderId, lineNumber])
   @@index([tenantId])
@@ -6953,6 +7063,34 @@ model PurchaseOrderLine {
   @@index([tenantId, hsnId])
   @@index([tenantId, binId])
   @@map("purchase_order_lines")
+}
+
+/// Links a (possibly consolidated) PO line back to originating PR line / planning qty slices.
+/// When planning consolidation is used, one PO line may have many sources; PO line quantity =
+/// sum of source quantities for that vendor allocation.
+model PurchaseOrderLinePrSource {
+  id                        String   @id @default(uuid())
+  tenantId                  String
+  purchaseOrderLineId       String
+  purchaseRequisitionId     String
+  purchaseRequisitionLineId String
+  purchasePlanningRowId     String?
+  requisitionNumber         String   @default("") @db.VarChar(64)
+  planningNumber            String?  @db.VarChar(64)
+  quantity                  Decimal  @default(0) @db.Decimal(18, 4)
+  createdAt                 DateTime @default(now())
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  purchaseOrderLine       PurchaseOrderLine        @relation(fields: [purchaseOrderLineId], references: [id], onDelete: Cascade)
+  purchaseRequisition     PurchaseRequisition      @relation(fields: [purchaseRequisitionId], references: [id])
+  purchaseRequisitionLine PurchaseRequisitionLine  @relation(fields: [purchaseRequisitionLineId], references: [id])
+  purchasePlanningRow     PurchasePlanningRow?     @relation(fields: [purchasePlanningRowId], references: [id])
+  @@index([tenantId], map: "pol_pr_src_tenant_idx")
+  @@index([tenantId, purchaseOrderLineId], map: "pol_pr_src_tenant_pol_idx")
+  @@index([tenantId, purchaseRequisitionId], map: "pol_pr_src_tenant_pr_idx")
+  @@index([tenantId, purchaseRequisitionLineId], map: "pol_pr_src_tenant_prl_idx")
+  @@index([tenantId, purchasePlanningRowId], map: "pol_pr_src_tenant_plan_idx")
+  @@map("purchase_order_line_pr_sources")
 }
 
 /// Immutable snapshot of a PO amendment (Rev N). Live PO stays the current document.
@@ -7421,6 +7559,9 @@ model PurchaseSettings {
   requirePoWarehouse             Boolean                     @default(false)
   requireExpectedDeliveryDate    Boolean                     @default(false)
   requirePaymentTerms            Boolean                     @default(false)
+  /// When true, Planning Sheet prefers consolidated demand (item+UOM+location) with multi-vendor allocation.
+  /// Document-level PPS rows and PR audit links are preserved; buyers can still switch to document lines on the sheet.
+  planningConsolidationEnabled   Boolean                     @default(true)
   allowOverReceipt               Boolean                     @default(false)
   overReceiptTolerancePct        Decimal                     @default(0) @db.Decimal(5, 2)
   /// When true, revising a released PO returns it to PENDING_APPROVAL.
@@ -7475,6 +7616,8 @@ model PurchaseSettings {
   printDefaultCopies             Int                         @default(1)
   printPaperSize                 PurchasePrintPaperSize      @default(A4)
   printOrientation               PurchasePrintOrientation    @default(PORTRAIT)
+  /// In-app / email toggles per purchase event key (JSON object). Null → server defaults.
+  notificationPreferences        Json?
   selfApprovalPolicy             SelfApprovalPolicy          @default(PERMISSION_ONLY)
   version                        Int                         @default(1)
   createdById                    String?                     @db.VarChar(36)
@@ -7606,26 +7749,40 @@ model PurchasePlantSettings {
 }
 
 model PurchaseQualityInspection {
-  id               String                  @id @default(uuid())
-  tenantId         String
-  inspectionNumber String                  @db.VarChar(64)
-  inspectionDate   DateTime                @db.Date
-  goodsReceiptId   String?
-  purchaseOrderId  String?
-  vendorId         String?
-  status           QualityInspectionStatus @default(DRAFT)
-  warehouseId      String?
-  inspectionPlan   String?                 @db.VarChar(300)
-  remarks          String?                 @db.Text
-  deviationRemarks String?                 @db.Text
-  inspectedById    String?                 @db.VarChar(36)
-  inspectedByName  String?                 @db.VarChar(200)
-  completedAt      DateTime?
-  createdById      String?                 @db.VarChar(36)
-  updatedById      String?                 @db.VarChar(36)
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  deletedAt        DateTime?
+  id                         String                  @id @default(uuid())
+  tenantId                   String
+  inspectionNumber           String                  @db.VarChar(64)
+  inspectionDate             DateTime                @db.Date
+  goodsReceiptId             String?
+  purchaseOrderId            String?
+  vendorId                   String?
+  status                     QualityInspectionStatus @default(DRAFT)
+  /// Disposition/result after completion: ACCEPT | PARTIAL | REJECT | HOLD
+  result                     String?                 @db.VarChar(32)
+  /// Fine-grained decision: ACCEPT | PARTIAL | REJECT | DEVIATION_ACCEPT | QUARANTINE | REWORK | RETURN_TO_VENDOR | REPLACEMENT_REQUIRED
+  decisionCode               String?                 @db.VarChar(40)
+  decisionReason             String?                 @db.Text
+  priority                   String                  @default("NORMAL") @db.VarChar(16)
+  warehouseId                String?
+  /// Shared master plan reference (snapshot parameters on create — do not live-edit)
+  inspectionPlanId           String?
+  inspectionPlanRevisionId   String?
+  planCodeSnapshot           String?                 @db.VarChar(64)
+  planRevisionSnapshot       String?                 @db.VarChar(32)
+  /// Free-text plan label (legacy + display)
+  inspectionPlan             String?                 @db.VarChar(300)
+  remarks                    String?                 @db.Text
+  deviationRemarks           String?                 @db.Text
+  inspectedById              String?                 @db.VarChar(36)
+  inspectedByName            String?                 @db.VarChar(200)
+  assignedAt                 DateTime?
+  startedAt                  DateTime?
+  completedAt                DateTime?
+  createdById                String?                 @db.VarChar(36)
+  updatedById                String?                 @db.VarChar(36)
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
+  deletedAt                  DateTime?
 
   tenant     Tenant                               @relation(fields: [tenantId], references: [id])
   lines      PurchaseQualityInspectionLine[]
@@ -7637,6 +7794,8 @@ model PurchaseQualityInspection {
   @@index([tenantId, deletedAt])
   @@index([tenantId, goodsReceiptId])
   @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, inspectedById])
+  @@index([tenantId, inspectionPlanId])
   @@map("purchase_quality_inspections")
 }
 
@@ -7667,12 +7826,15 @@ model PurchaseQualityInspectionLine {
   @@map("purchase_quality_inspection_lines")
 }
 
-/// Free-form incoming QI parameter checklist (not linked to manufacturing QualityParameter masters).
+/// Incoming QI parameter checklist — free-form or snapshotted from shared QualityParameter masters.
 model PurchaseQualityInspectionParameter {
   id                  String   @id @default(uuid())
   tenantId            String
   qualityInspectionId String
   lineNumber          Int
+  /// Source master parameter when snapped from inspection plan (never live-linked)
+  sourceParameterId   String?
+  parameterCode       String?  @db.VarChar(64)
   parameterName       String   @db.VarChar(200)
   specification       String   @default("") @db.VarChar(500)
   minValue            Decimal? @db.Decimal(18, 4)
@@ -7794,14 +7956,25 @@ model PurchaseReturn {
   goodsReceiptId           String?
   qualityInspectionId      String?
   status                   PurchaseReturnStatus @default(DRAFT)
+  /// CREDIT | REPLACEMENT | REPAIR | INSPECTION | SCRAP_VENDOR
+  returnType               String               @default("CREDIT") @db.VarChar(32)
+  /// QI/decision reference code snapshot
+  decisionCode             String?              @db.VarChar(40)
   warehouseId              String?
   reason                   String?              @db.Text
   remarks                  String?              @db.Text
-  /// FIN-CLOSE-1 — soft link to the Accounting VendorAdjustment (debit note) raised for
-  /// the invoiced portion of this return. Null when no posted invoice exists (no AP effect).
+  /// FIN-CLOSE-1 — soft link to the Accounting VendorAdjustment (debit note)
   vendorAdjustmentId       String?              @db.VarChar(36)
   vendorAdjustmentDraftRef String?              @db.VarChar(64)
+  /// NONE | DRAFT | POSTED | ADJUSTED | CANCELLED
+  accountingStatus          String               @default("NONE") @db.VarChar(24)
+  /// Optional NCR opened with this rejection cycle
+  ncrId                    String?              @db.VarChar(36)
+  /// Replacement flow: GRN that settled replacement, original return id
+  replacementGoodsReceiptId String?             @db.VarChar(36)
+  replacedReturnId         String?              @db.VarChar(36)
   submittedAt              DateTime?
+  shippedAt                DateTime?
   completedAt              DateTime?
   cancelledAt              DateTime?
   createdById              String?              @db.VarChar(36)
@@ -7820,6 +7993,10 @@ model PurchaseReturn {
   @@index([tenantId, vendorId])
   @@index([tenantId, purchaseOrderId])
   @@index([tenantId, goodsReceiptId])
+  @@index([tenantId, returnType])
+  @@index([tenantId, qualityInspectionId])
+  @@index([tenantId, replacedReturnId])
+  @@index([tenantId, accountingStatus])
   @@map("purchase_returns")
 }
 
@@ -14758,6 +14935,7 @@ model QualityNcr {
   title               String                 @db.VarChar(200)
   description         String?                @db.Text
   productionOrderId   String?
+  /// Manufacturing quality inspection id when source is mfg QC
   inspectionId        String?
   itemId              String?
   reportedByUserId    String?
@@ -14774,6 +14952,10 @@ model QualityNcr {
   targetDate          DateTime?
   jobWorkOrderId      String?
   supplierId          String?
+  /// PURCHASE_QI | MFG_INSPECTION | MANUAL | …
+  sourceType          String?                @db.VarChar(64)
+  sourceId            String?
+  goodsReceiptId      String?
   effectivenessReview String?                @db.Text
   dispositionNotes    String?                @db.Text
   createdBy           String?
@@ -14791,6 +14973,9 @@ model QualityNcr {
   @@index([tenantId, status])
   @@index([tenantId, productionOrderId])
   @@index([tenantId, jobWorkOrderId])
+  @@index([tenantId, sourceType, sourceId])
+  @@index([tenantId, goodsReceiptId])
+  @@index([tenantId, supplierId])
   @@map("quality_ncrs")
 }
 
@@ -20817,4 +21002,372 @@ model NotificationTenantSettings {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("notification_tenant_settings")
+}
+
+
+// ─── Knowledge Base / OpenKB (Wave 1 foundation) ─────────────────────────────
+
+enum KnowledgeDocumentStatus {
+  DRAFT
+  PROCESSING
+  READY
+  FAILED
+  ARCHIVED
+}
+
+enum KnowledgeDocumentKind {
+  UPLOAD
+  URL
+  HTML
+  MARKDOWN
+  TEXT
+  ERP_LINK
+}
+
+enum KnowledgeSourceType {
+  MANUAL
+  URL
+  UPLOAD
+  ERP_MODULE
+  OPENKB
+}
+
+enum KnowledgeChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum KnowledgeFeedbackRating {
+  UP
+  DOWN
+  SCORE
+}
+
+enum KnowledgePermissionPrincipalType {
+  USER
+  ROLE
+  ALL_TENANT
+}
+
+enum KnowledgePermissionAction {
+  VIEW
+  EDIT
+  ADMIN
+  CHAT
+}
+
+model KnowledgeCategory {
+  id          String    @id @default(uuid())
+  tenantId    String
+  parentId    String?
+  code        String    @db.VarChar(64)
+  name        String    @db.VarChar(200)
+  description String?   @db.Text
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id])
+  parent    KnowledgeCategory?   @relation("KnowledgeCategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  KnowledgeCategory[]  @relation("KnowledgeCategoryTree")
+  documents KnowledgeDocument[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, parentId])
+  @@map("knowledge_categories")
+}
+
+model KnowledgeTag {
+  id        String    @id @default(uuid())
+  tenantId  String
+  name      String    @db.VarChar(100)
+  slug      String    @db.VarChar(120)
+  createdBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant    Tenant                @relation(fields: [tenantId], references: [id])
+  documents KnowledgeDocumentTag[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@map("knowledge_tags")
+}
+
+model KnowledgeSource {
+  id          String              @id @default(uuid())
+  tenantId    String
+  name        String              @db.VarChar(200)
+  sourceType  KnowledgeSourceType @default(MANUAL)
+  baseUrl     String?             @db.VarChar(1000)
+  configJson  Json?
+  isActive    Boolean             @default(true)
+  lastSyncAt  DateTime?
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  deletedAt   DateTime?
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id])
+  documents KnowledgeDocument[]
+
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, sourceType])
+  @@map("knowledge_sources")
+}
+
+model KnowledgeDocument {
+  id               String                  @id @default(uuid())
+  tenantId         String
+  categoryId       String?
+  sourceId         String?
+  title            String                  @db.VarChar(500)
+  description      String?                 @db.Text
+  kind             KnowledgeDocumentKind   @default(UPLOAD)
+  status           KnowledgeDocumentStatus @default(DRAFT)
+  /// MIME of original binary when kind=UPLOAD
+  mimeType         String?                 @db.VarChar(128)
+  originalFilename String?                 @db.VarChar(500)
+  storageKey       String?                 @db.VarChar(500)
+  fileSize         Int                     @default(0)
+  /// External URL when kind=URL
+  sourceUrl        String?                 @db.VarChar(2000)
+  language         String?                 @db.VarChar(16)
+  currentVersionId String?
+  ownerUserId      String?
+  indexingError    String?                 @db.Text
+  indexedAt        DateTime?
+  publishedAt      DateTime?
+  createdBy        String?
+  updatedBy        String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  deletedAt        DateTime?
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  category    KnowledgeCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  source      KnowledgeSource?       @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  versions    KnowledgeVersion[]
+  chunks      KnowledgeChunk[]
+  tags        KnowledgeDocumentTag[]
+  permissions KnowledgePermission[]
+  feedback    KnowledgeFeedback[]
+
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, status])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, ownerUserId])
+  @@index([tenantId, createdAt])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeVersion {
+  id              String   @id @default(uuid())
+  tenantId        String
+  documentId      String
+  versionNo       Int
+  /// Markdown content of this revision (may be large)
+  markdownContent String?  @db.LongText
+  contentHash     String?  @db.VarChar(64)
+  changeSummary   String?  @db.VarChar(500)
+  createdBy       String?
+  createdAt       DateTime @default(now())
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id])
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunks   KnowledgeChunk[]
+
+  @@unique([tenantId, documentId, versionNo])
+  @@index([tenantId])
+  @@index([tenantId, documentId])
+  @@map("knowledge_versions")
+}
+
+model KnowledgeChunk {
+  id          String   @id @default(uuid())
+  tenantId    String
+  documentId  String
+  versionId   String?
+  chunkIndex  Int
+  headingPath String?  @db.VarChar(500)
+  contentMd   String   @db.LongText
+  tokenCount  Int?
+  charStart   Int?
+  charEnd     Int?
+  metadataJson Json?
+  createdAt   DateTime @default(now())
+
+  tenant     Tenant               @relation(fields: [tenantId], references: [id])
+  document   KnowledgeDocument    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version    KnowledgeVersion?    @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  embeddings KnowledgeEmbedding[]
+
+  @@unique([tenantId, documentId, chunkIndex])
+  @@index([tenantId])
+  @@index([tenantId, documentId])
+  @@index([tenantId, versionId])
+  @@map("knowledge_chunks")
+}
+
+model KnowledgeEmbedding {
+  id            String   @id @default(uuid())
+  tenantId      String
+  chunkId       String
+  /// Embedding model id (e.g. text-embedding-3-small)
+  modelId       String   @db.VarChar(120)
+  dimensions    Int
+  /// Float array as JSON (MySQL 8 — no native ANN in Wave 1)
+  vectorJson    Json
+  contentHash   String?  @db.VarChar(64)
+  createdAt     DateTime @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  chunk  KnowledgeChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, chunkId, modelId])
+  @@index([tenantId])
+  @@index([tenantId, modelId])
+  @@map("knowledge_embeddings")
+}
+
+model KnowledgeDocumentTag {
+  id         String   @id @default(uuid())
+  tenantId   String
+  documentId String
+  tagId      String
+  createdAt  DateTime @default(now())
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id])
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag      KnowledgeTag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, documentId, tagId])
+  @@index([tenantId])
+  @@index([tenantId, tagId])
+  @@map("knowledge_document_tags")
+}
+
+model KnowledgeChatSession {
+  id           String    @id @default(uuid())
+  tenantId     String
+  userId       String
+  title        String?   @db.VarChar(300)
+  /// Optional ERP context for copilot sessions
+  contextJson  Json?
+  lastMessageAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  tenant   Tenant                 @relation(fields: [tenantId], references: [id])
+  messages KnowledgeChatMessage[]
+  feedback KnowledgeFeedback[]
+
+  @@index([tenantId])
+  @@index([tenantId, userId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, lastMessageAt])
+  @@map("knowledge_chat_sessions")
+}
+
+/// Rows in knowledge_chat_history (product name); model maps to that table.
+model KnowledgeChatMessage {
+  id         String            @id @default(uuid())
+  tenantId   String
+  sessionId  String
+  role       KnowledgeChatRole
+  content    String            @db.LongText
+  /// Citations / sources blob for ASSISTANT turns
+  citationsJson Json?
+  modelId    String?           @db.VarChar(120)
+  tokenIn    Int?
+  tokenOut   Int?
+  createdAt  DateTime          @default(now())
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id])
+  session  KnowledgeChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  feedback KnowledgeFeedback[]
+
+  @@index([tenantId])
+  @@index([tenantId, sessionId])
+  @@index([tenantId, createdAt])
+  @@map("knowledge_chat_history")
+}
+
+model KnowledgeFeedback {
+  id         String                   @id @default(uuid())
+  tenantId   String
+  userId     String?
+  sessionId  String?
+  messageId  String?
+  documentId String?
+  rating     KnowledgeFeedbackRating  @default(UP)
+  score      Int?
+  comment    String?                  @db.Text
+  createdAt  DateTime                 @default(now())
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id])
+  session  KnowledgeChatSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  message  KnowledgeChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  document KnowledgeDocument?    @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, sessionId])
+  @@index([tenantId, documentId])
+  @@index([tenantId, createdAt])
+  @@map("knowledge_feedback")
+}
+
+model KnowledgePermission {
+  id             String                          @id @default(uuid())
+  tenantId       String
+  documentId     String?
+  categoryId     String?
+  principalType  KnowledgePermissionPrincipalType
+  principalId    String?                         @db.VarChar(64)
+  action         KnowledgePermissionAction       @default(VIEW)
+  createdBy      String?
+  createdAt      DateTime                        @default(now())
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id])
+  document KnowledgeDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, documentId])
+  @@index([tenantId, principalType, principalId])
+  @@map("knowledge_permissions")
+}
+
+model KnowledgeActivityLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String?
+  action     String   @db.VarChar(64)
+  entityType String?  @db.VarChar(64)
+  entityId   String?
+  message    String?  @db.VarChar(500)
+  metaJson   Json?
+  ipAddress  String?  @db.VarChar(64)
+  userAgent  String?  @db.VarChar(500)
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, action])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, createdAt])
+  @@map("knowledge_activity_logs")
 }

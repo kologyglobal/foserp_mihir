@@ -20,23 +20,30 @@ type Props = {
 }
 
 export function filtersForSummaryCard(key: PlanningSummaryFilterKey): CrmFilterValues {
+  const base: CrmFilterValues = {
+    status: '',
+    priority: '',
+    overdue: false,
+    vendorPending: false,
+    poPending: false,
+  }
   switch (key) {
     case 'pending':
-      return { status: 'draft', overdue: false, priority: '' }
+      return { ...base, status: 'draft' }
     case 'critical':
-      return { priority: 'critical', overdue: false }
+      return { ...base, priority: 'critical' }
     case 'overdue':
-      return { overdue: true, status: '' }
+      return { ...base, overdue: true }
     case 'vendorPending':
-      return { vendorPending: true, overdue: false }
+      return { ...base, vendorPending: true }
     case 'poPending':
-      return { status: 'po_pending', overdue: false, vendorPending: false }
+      return { ...base, status: 'po_pending' }
     case 'poCreated':
-      return { status: 'po_created', overdue: false, vendorPending: false }
+      return { ...base, status: 'po_created' }
     case 'value':
-      return { overdue: false, vendorPending: false }
+      return base
     default:
-      return {}
+      return base
   }
 }
 

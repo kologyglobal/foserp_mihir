@@ -7,6 +7,7 @@ import { useMasterStore } from '../../store/masterStore'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import type { Quotation } from '../../types/sales'
+import { resolveCatalogProductDisplay } from '../../utils/catalogProductLabel'
 import {
   EnterpriseIdCell,
   EnterpriseNumericCell,
@@ -44,6 +45,7 @@ export function SalesQuotationsTable({
 }: SalesQuotationsTableProps) {
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
+  const items = useMasterStore((s) => s.items)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const selectedRows = useMemo(() => {
@@ -102,11 +104,11 @@ export function SalesQuotationsTable({
         header: 'Product',
         meta: { columnLabel: 'Product' },
         cell: ({ row }) => {
-          const p = products.find((x) => x.id === row.original.productId)
+          const display = resolveCatalogProductDisplay(row.original, { items, products })
           return (
             <EnterpriseRecordCell
-              primary={p?.productName ?? row.original.productId}
-              subtitle={p?.productFamily}
+              primary={display.code || display.label}
+              subtitle={display.code ? display.name || undefined : undefined}
             />
           )
         },
@@ -169,7 +171,7 @@ export function SalesQuotationsTable({
         },
       },
     ],
-    [customers, products, onView, onEdit, onDuplicate, onPreview, onBulkEmail],
+    [customers, products, items, onView, onEdit, onDuplicate, onPreview, onBulkEmail],
   )
 
   return (

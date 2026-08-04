@@ -85,9 +85,20 @@ export async function fetchCommercialInvoices(params?: Record<string, string | u
   return apiRequest<CrmTaxInvoice[]>(`${tenantPath('/crm/commercial/invoices')}${buildQuery(params)}`)
 }
 
+export async function fetchCommercialInvoice(id: string) {
+  return apiRequest<CrmTaxInvoice>(tenantPath(`/crm/commercial/invoices/${id}`))
+}
+
 export async function createCommercialInvoice(body: Record<string, unknown>) {
   return apiRequest<CrmTaxInvoice>(tenantPath('/crm/commercial/invoices'), {
     method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updateCommercialInvoice(id: string, body: Record<string, unknown>) {
+  return apiRequest<CrmTaxInvoice>(tenantPath(`/crm/commercial/invoices/${id}`), {
+    method: 'PATCH',
     body: JSON.stringify(body),
   })
 }
@@ -115,5 +126,63 @@ export async function allocateCommercialPayments(body: {
 export async function reverseCommercialAllocation(id: string) {
   return apiRequest<CrmPaymentAllocation>(tenantPath(`/crm/commercial/allocations/${id}/reverse`), {
     method: 'POST',
+  })
+}
+
+export async function fetchReceiptAccountingStatus(id: string) {
+  return apiRequest<{
+    crmPaymentReceiptId: string
+    accountingMigrationStatus: string
+    accountingReceiptId: string | null
+    redirectUrl: string | null
+    commercialOnly: boolean
+    accountingReceipt: {
+      id: string
+      status: string
+      receiptNumber: string | null
+      draftReference: string | null
+      allocatedAmount: string
+      unallocatedAmount: string
+    } | null
+  }>(tenantPath(`/crm/commercial/receipts/${id}/accounting-status`))
+}
+
+export async function checkReceiptAccountingDuplicates(id: string) {
+  return apiRequest<{
+    level: string
+    matches: unknown[]
+    allowCreate: boolean
+    requiresOverride: boolean
+    message: string | null
+  }>(tenantPath(`/crm/commercial/receipts/${id}/accounting-duplicate-check`))
+}
+
+export async function createReceiptAccountingDraft(
+  id: string,
+  body: {
+    bankCashAccountId: string
+    legalEntityId?: string
+    branchId?: string | null
+    customerReceivableAccountId?: string | null
+    overrideDuplicate?: boolean
+    overrideReason?: string | null
+  },
+) {
+  return apiRequest<{
+    crmPaymentReceiptId: string
+    customerReceiptId: string
+    status: string
+    redirectUrl: string
+    reused?: boolean
+  }>(tenantPath(`/crm/commercial/receipts/${id}/create-accounting-draft`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function markReceiptNonAccounting(id: string, reason?: string) {
+  return apiRequest(tenantPath(`/crm/commercial/receipts/${id}/mark-non-accounting`), {
+    method: 'POST',
+    body: JSON.stringify({ reason: reason ?? null }),
   })
 }

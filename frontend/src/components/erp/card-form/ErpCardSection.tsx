@@ -33,8 +33,8 @@ export interface ErpCardSectionProps {
    */
   forceOpenKey?: number
   dense?: boolean
-  /** Field grid columns. Dense defaults to 3 (tablet 2 / mobile 1 via CSS). */
-  columns?: 1 | 2 | 3 | 4
+  /** Field grid columns. Dense defaults to 3 (tablet 2 / mobile 1 via CSS). Use 5–6 for Zoho-dense ERP headers. */
+  columns?: 1 | 2 | 3 | 4 | 5 | 6
   accent?: 'blue' | 'teal' | 'green' | 'amber' | 'violet' | 'slate'
 }
 
@@ -150,6 +150,8 @@ export function ErpCardSection({
               gridColumns === 2 && 'erp-card-section__grid--cols-2',
               gridColumns === 3 && 'erp-card-section__grid--cols-3',
               gridColumns === 4 && 'erp-card-section__grid--cols-4',
+              gridColumns === 5 && 'erp-card-section__grid--cols-5',
+              gridColumns === 6 && 'erp-card-section__grid--cols-6',
             )}
           >
             {children}

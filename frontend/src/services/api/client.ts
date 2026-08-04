@@ -242,6 +242,42 @@ function looksLikeHtml(text: string): boolean {
 const HTML_INSTEAD_OF_JSON_MESSAGE =
   'API returned a web page instead of JSON. The server is not routing /api/ to the backend (check nginx/.htaccess and that Node is running).'
 
+const BACKEND_UNAVAILABLE_MESSAGE =
+  'API server unavailable on port 5000. Start the backend (`npm run dev` in backend), or wait a few seconds if it is restarting.'
+
+function isTransientGatewayStatus(status: number): boolean {
+  return status === 502 || status === 503 || status === 504
+}
+
+function nonJsonApiMessage(res: Response, raw: string): string {
+  const contentType = res.headers.get('content-type') ?? 'unknown'
+  if (isTransientGatewayStatus(res.status) || /ECONNREFUSED|ENOTFOUND|socket hang up|proxy error/i.test(raw)) {
+    return BACKEND_UNAVAILABLE_MESSAGE
+  }
+  if (!raw.trim()) {
+    return `Empty API response (HTTP ${res.status}). Is the backend running on port 5000?`
+  }
+  return `Invalid API response (expected JSON, got ${contentType}). Is the backend running?`
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** GET/HEAD only — covers Vite proxy 502 while `tsx watch` restarts the API. */
+async function fetchWithGatewayRetry(url: string, init: RequestInit, maxAttempts = 3): Promise<Response> {
+  const method = (init.method ?? 'GET').toUpperCase()
+  const canRetry = method === 'GET' || method === 'HEAD'
+  let res = await fetch(url, init)
+  if (!canRetry || !isTransientGatewayStatus(res.status)) return res
+  for (let attempt = 1; attempt < maxAttempts; attempt++) {
+    await sleep(200 * attempt)
+    res = await fetch(url, init)
+    if (!isTransientGatewayStatus(res.status)) return res
+  }
+  return res
+}
+
 async function parseErrorBody(res: Response): Promise<{
   message: string
   errors?: ApiResponse<unknown>['errors']
@@ -261,7 +297,7 @@ async function parseErrorBody(res: Response): Promise<{
       missingFields: body.missingFields ?? undefined,
     }
   } catch {
-    return { message: `API error ${res.status}` }
+    return { message: nonJsonApiMessage(res, raw) }
   }
 }
 
@@ -273,10 +309,7 @@ async function parseJsonBody<T>(res: Response): Promise<ApiResponse<T>> {
   try {
     return JSON.parse(raw) as ApiResponse<T>
   } catch {
-    throw new ApiError(
-      `Invalid API response (expected JSON, got ${res.headers.get('content-type') ?? 'unknown'}). Is the backend running?`,
-      res.status || 502,
-    )
+    throw new ApiError(nonJsonApiMessage(res, raw), res.status || 502)
   }
 }
 
@@ -303,13 +336,14 @@ export async function apiRequest<T>(
     headers.set('Authorization', `Bearer ${accessToken}`)
   }
 
-  let res = await fetch(`${API_CONFIG.baseUrl}${path}`, { ...options, headers })
+  const url = `${API_CONFIG.baseUrl}${path}`
+  let res = await fetchWithGatewayRetry(url, { ...options, headers })
 
   if (res.status === 401 && session?.refreshToken) {
     const newToken = await refreshAfterUnauthorized()
     if (newToken) {
       headers.set('Authorization', `Bearer ${newToken}`)
-      res = await fetch(`${API_CONFIG.baseUrl}${path}`, { ...options, headers })
+      res = await fetchWithGatewayRetry(url, { ...options, headers })
     } else {
       throw new ApiError(SESSION_EXPIRED_NOTICE, 401)
     }

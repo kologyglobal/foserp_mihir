@@ -51,7 +51,7 @@ export function VoucherLedgerPage() {
       if (signal?.cancelled) return
       setRows(list)
       setLoading(false)
-      if (list.length === 0) setError('No ledger lines found for this voucher')
+      // Empty is a valid state for an unposted draft voucher — show empty UI without error.
     } catch (err) {
       if (signal?.cancelled) return
       setError(err instanceof Error ? err.message : 'Failed to load voucher entries')
@@ -182,6 +182,14 @@ export function VoucherLedgerPage() {
           icon={ClipboardList}
           title="Voucher ledger not available"
           description={error}
+          action={<Link to="/accounting/ledger-entries" className="erp-btn erp-btn-primary h-9 px-4 text-[13px]">Back</Link>}
+        />
+      ) : null}
+      {!loading && !error && rows.length === 0 ? (
+        <EmptyState
+          icon={ClipboardList}
+          title="No ledger lines"
+          description="This voucher has no posted general ledger lines yet."
           action={<Link to="/accounting/ledger-entries" className="erp-btn erp-btn-primary h-9 px-4 text-[13px]">Back</Link>}
         />
       ) : null}

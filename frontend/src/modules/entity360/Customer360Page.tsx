@@ -85,12 +85,13 @@ import type { SalesInvoice } from '../../types/invoice'
 import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { useCrmCommercialStore } from '../../store/crmCommercialStore'
 import {
-  CRM_TAX_INVOICE_STATUS_LABELS,
-  CRM_INVOICE_PAYMENT_STATUS_LABELS,
-  CRM_PAYMENT_MODE_LABELS,
-  PROFORMA_PAYMENT_STATUS_LABELS,
-} from '../../types/crmCommercial'
-import { PROFORMA_STATUS_LABELS } from '../../types/proformaInvoice'
+  Customer360LedgerRegister,
+  Customer360OutstandingRegister,
+  Customer360PaymentAllocationRegister,
+  Customer360PaymentReceiptRegister,
+  Customer360ProformaRegister,
+  Customer360TaxInvoiceRegister,
+} from './Customer360CommercialRegisters'
 
 type Tab =
   | 'overview'
@@ -1140,305 +1141,43 @@ export function Customer360Page() {
       )}
 
       {tab === 'proformas' && (
-        <Entity360Panel title="Proforma Invoices">
-          <DataGrid
-            data={customerProformas}
-            columns={[
-              {
-                accessorKey: 'proformaNo',
-                header: 'Proforma',
-                cell: ({ row }) => (
-                  <TableLink to={`/sales/proforma-invoices/${row.original.id}`}>{row.original.proformaNo}</TableLink>
-                ),
-              },
-              {
-                accessorKey: 'status',
-                header: 'Status',
-                cell: ({ row }) => PROFORMA_STATUS_LABELS[row.original.status],
-              },
-              {
-                id: 'payment',
-                header: 'Payment',
-                cell: ({ row }) => {
-                  const summary = getProformaPaymentSummary(row.original.id)
-                  return summary ? PROFORMA_PAYMENT_STATUS_LABELS[summary.paymentStatus] : '—'
-                },
-              },
-              {
-                id: 'total',
-                header: 'Amount',
-                cell: ({ row }) => formatCurrency(row.original.gst.grandTotal),
-              },
-              {
-                accessorKey: 'proformaDate',
-                header: 'Date',
-                cell: ({ row }) => formatDate(row.original.proformaDate),
-              },
-            ]}
-            compact
-            emptyMessage="No proforma invoices for this customer."
-          />
-        </Entity360Panel>
+        <Customer360ProformaRegister
+          rows={customerProformas}
+          getPaymentStatus={(proformaId) => getProformaPaymentSummary(proformaId)?.paymentStatus ?? null}
+        />
       )}
 
       {tab === 'invoices' && (
-        <Entity360Panel title="Tax Invoices">
-          {canCrmPermission('crm.commercial.invoice.create') ? (
-            <div className="mb-3">
-              <ErpButton
-                variant="secondary"
-                icon={Plus}
-                onClick={() =>
-                  navigate(
-                    isServices
-                      ? `/accounting/money-in/invoices/new?customerId=${customer.id}`
-                      : `/sales/invoices/new?customerId=${customer.id}`,
-                  )
-                }
-              >
-                Create Invoice
-              </ErpButton>
-            </div>
-          ) : null}
-          <DataGrid
-            data={commercialInvoices}
-            columns={[
-              {
-                accessorKey: 'invoiceNo',
-                header: 'Invoice',
-                cell: ({ row }) => (
-                  <TableLink to={`/sales/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink>
-                ),
-              },
-              {
-                accessorKey: 'status',
-                header: 'Status',
-                cell: ({ row }) => CRM_TAX_INVOICE_STATUS_LABELS[row.original.status],
-              },
-              {
-                id: 'payment',
-                header: 'Payment',
-                cell: ({ row }) => CRM_INVOICE_PAYMENT_STATUS_LABELS[row.original.paymentStatus],
-              },
-              {
-                id: 'accounting',
-                header: 'Accounting',
-                cell: ({ row }) => {
-                  const status = row.original.accountingStatus ?? 'none'
-                  if (status === 'converted' && row.original.salesInvoiceId) {
-                    return (
-                      <TableLink to={`/accounting/money-in/invoices/${row.original.salesInvoiceId}`}>
-                        {row.original.salesInvoiceNumber || 'Money In'}
-                      </TableLink>
-                    )
-                  }
-                  if (status === 'pending_review') return 'Pending Accounting'
-                  return '—'
-                },
-              },
-              {
-                id: 'total',
-                header: 'Amount',
-                cell: ({ row }) => formatCurrency(row.original.gst.grandTotal),
-              },
-              {
-                id: 'balance',
-                header: 'Balance',
-                cell: ({ row }) => formatCurrency(row.original.balanceDue),
-              },
-              {
-                accessorKey: 'invoiceDate',
-                header: 'Date',
-                cell: ({ row }) => formatDate(row.original.invoiceDate),
-              },
-            ]}
-            compact
-            emptyMessage="No CRM tax invoices yet."
-          />
-        </Entity360Panel>
+        <Customer360TaxInvoiceRegister
+          rows={commercialInvoices}
+          customerId={customer.id}
+          canCreate={canCrmPermission('crm.commercial.invoice.create')}
+          onCreate={() =>
+            navigate(
+              isServices
+                ? `/accounting/money-in/invoices/new?customerId=${customer.id}`
+                : `/sales/invoices/new?customerId=${customer.id}`,
+            )
+          }
+        />
       )}
 
-      {tab === 'receipts' && (
-        <Entity360Panel title="Payment Receipts">
-          <DataGrid
-            data={commercialReceipts}
-            columns={[
-              {
-                accessorKey: 'receiptNo',
-                header: 'Receipt',
-                cell: ({ row }) => (
-                  <TableLink to={`/sales/receipts/${row.original.id}`}>{row.original.receiptNo}</TableLink>
-                ),
-              },
-              {
-                accessorKey: 'paymentMode',
-                header: 'Mode',
-                cell: ({ row }) => CRM_PAYMENT_MODE_LABELS[row.original.paymentMode],
-              },
-              {
-                id: 'amount',
-                header: 'Amount',
-                cell: ({ row }) => formatCurrency(row.original.amount),
-              },
-              {
-                id: 'unalloc',
-                header: 'Unallocated',
-                cell: ({ row }) => formatCurrency(row.original.unallocatedAmount),
-              },
-              {
-                id: 'pi',
-                header: 'Proforma',
-                cell: ({ row }) =>
-                  row.original.proformaInvoiceId ? (
-                    <TableLink to={`/sales/proforma-invoices/${row.original.proformaInvoiceId}`}>
-                      {row.original.proformaNo}
-                    </TableLink>
-                  ) : (
-                    '—'
-                  ),
-              },
-              {
-                accessorKey: 'receiptDate',
-                header: 'Date',
-                cell: ({ row }) => formatDate(row.original.receiptDate),
-              },
-            ]}
-            compact
-            emptyMessage="No payment receipts recorded."
-          />
-        </Entity360Panel>
-      )}
+      {tab === 'receipts' && <Customer360PaymentReceiptRegister rows={commercialReceipts} />}
 
       {tab === 'allocations' && (
-        <Entity360Panel title="Payment Allocations">
-          <div className="mb-3">
-            <ErpButton
-              variant="secondary"
-              icon={ArrowLeftRight}
-              onClick={() =>
-                navigate(
-                  isServices
-                    ? `/accounting/money-in/customers/${customer.id}`
-                    : `/sales/payment-allocation?customerId=${customer.id}`,
-                )
-              }
-            >
-              Open Allocation Workspace
-            </ErpButton>
-          </div>
-          <DataGrid
-            data={commercialAllocations}
-            columns={[
-              {
-                accessorKey: 'allocationDate',
-                header: 'Date',
-                cell: ({ row }) => formatDate(row.original.allocationDate),
-              },
-              { accessorKey: 'receiptNo', header: 'Receipt' },
-              { accessorKey: 'invoiceNo', header: 'Invoice' },
-              {
-                id: 'amount',
-                header: 'Allocated',
-                cell: ({ row }) => formatCurrency(row.original.amount),
-              },
-              {
-                id: 'status',
-                header: 'Status',
-                cell: ({ row }) => (row.original.reversedAt ? 'Reversed' : 'Posted'),
-              },
-            ]}
-            compact
-            emptyMessage="No payment allocations yet."
-          />
-        </Entity360Panel>
+        <Customer360PaymentAllocationRegister
+          rows={commercialAllocations}
+          customerId={customer.id}
+          isServices={isServices}
+        />
       )}
 
       {tab === 'outstanding' && (
-        <Entity360Panel title="Outstanding Summary">
-          <DynamicsKpiRow columns={4}>
-            <DynamicsKpiTile label="Invoice Total" value={formatCurrency(commercialOutstanding.invoiceTotal)} tone="primary" />
-            <DynamicsKpiTile label="Amount Paid" value={formatCurrency(commercialOutstanding.amountPaid)} tone="success" />
-            <DynamicsKpiTile label="Outstanding" value={formatCurrency(commercialOutstanding.outstanding)} tone="warning" />
-            <DynamicsKpiTile label="Open Invoices" value={commercialOutstanding.openInvoiceCount} tone="primary" />
-          </DynamicsKpiRow>
-          <DataGrid
-            data={commercialInvoices.filter((i) => i.status !== 'draft' && i.status !== 'cancelled' && i.balanceDue > 0)}
-            columns={[
-              {
-                accessorKey: 'invoiceNo',
-                header: 'Invoice',
-                cell: ({ row }) => (
-                  <TableLink to={`/sales/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink>
-                ),
-              },
-              {
-                id: 'total',
-                header: 'Invoice Amount',
-                cell: ({ row }) => formatCurrency(row.original.gst.grandTotal),
-              },
-              {
-                id: 'paid',
-                header: 'Allocated',
-                cell: ({ row }) => formatCurrency(row.original.amountPaid),
-              },
-              {
-                id: 'balance',
-                header: 'Balance Outstanding',
-                cell: ({ row }) => formatCurrency(row.original.balanceDue),
-              },
-            ]}
-            compact
-            emptyMessage="No outstanding invoices."
-          />
-        </Entity360Panel>
+        <Customer360OutstandingRegister invoices={commercialInvoices} summary={commercialOutstanding} />
       )}
 
       {tab === 'ledger' && (
-        <Entity360Panel title="Customer Ledger">
-          <DataGrid
-            data={commercialLedger}
-            columns={[
-              {
-                accessorKey: 'date',
-                header: 'Date',
-                cell: ({ row }) => formatDate(row.original.date),
-              },
-              { accessorKey: 'type', header: 'Type' },
-              { accessorKey: 'reference', header: 'Reference' },
-              {
-                id: 'debit',
-                header: 'Debit',
-                cell: ({ row }) => (row.original.debit ? formatCurrency(row.original.debit) : '—'),
-              },
-              {
-                id: 'credit',
-                header: 'Credit',
-                cell: ({ row }) => (row.original.credit ? formatCurrency(row.original.credit) : '—'),
-              },
-              {
-                id: 'balance',
-                header: 'Balance',
-                cell: ({ row }) => formatCurrency(row.original.balance),
-              },
-            ]}
-            compact
-            emptyMessage="Ledger is empty — invoices and receipts will appear here."
-          />
-          {commercialTimeline.length > 0 ? (
-            <div className="mt-4 space-y-2">
-              <p className="text-[12px] font-semibold uppercase tracking-wide text-erp-muted">Commercial timeline</p>
-              {commercialTimeline.slice(0, 12).map((ev) => (
-                <div key={ev.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-erp-border px-3 py-2 text-[13px]">
-                  <div>
-                    {ev.refPath ? <TableLink to={ev.refPath}>{ev.title}</TableLink> : ev.title}
-                    <div className="text-[12px] text-erp-muted">{ev.subtitle}</div>
-                  </div>
-                  <span>{ev.amount != null ? formatCurrency(ev.amount) : formatDate(ev.at.slice(0, 10))}</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </Entity360Panel>
+        <Customer360LedgerRegister rows={commercialLedger} timeline={commercialTimeline} />
       )}
 
       {tab === 'production' && (

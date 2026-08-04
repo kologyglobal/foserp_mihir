@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Trash2, UserPlus } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
+import { ErpSegmentedControl } from '@/components/erp/ErpSegmentedControl'
 import { ErpSmartSelect, type ErpSmartSelectOption } from '@/components/erp/ErpSmartSelect'
 import { Checkbox, CurrencyInput, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { FormField } from '@/components/forms/FormField'
@@ -12,6 +13,7 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { CustomerMasterSelect } from '@/components/masters/CustomerMasterSelect'
 import { QuickCompanyCreateModal } from '@/components/crm/QuickCompanyCreateModal'
 import { canQuickCreateEntity } from '@/utils/quickCreatePermissions'
+import type { Customer } from '@/types/master'
 import {
   createRecurringSchedule,
   createSalesInvoice,
@@ -19,7 +21,12 @@ import {
   updateSalesInvoice,
 } from '@/services/bridges/receivablesApiBridge'
 import type { RecurringInvoiceFrequency } from '@/services/api/receivablesApi'
-import { resolveLegalEntityId } from '@/services/bridges/financeApiBridge'
+import {
+  ensureLegalEntity,
+  resolveLegalEntityId,
+  updateLegalEntity,
+} from '@/services/bridges/financeApiBridge'
+import type { LegalEntity } from '@/types/financeSetup'
 import { listSalesOrderLookups, type AccountingSalesOrderLookup } from '@/services/api/accountingLookupsApi'
 import { isApiMode } from '@/config/apiConfig'
 import { useMoneyInPermissions } from '@/utils/permissions/moneyIn'
@@ -28,7 +35,7 @@ import { useMrpStore } from '@/store/mrpStore'
 import type { SalesOrder, SalesOrderStatus } from '@/types/mrp'
 import type { SalesInvoiceSourceLinkInput, SalesInvoiceSourceType } from '@/types/moneyIn'
 import { notify } from '@/store/toastStore'
-import { PartyMasterCard } from '@/modules/accounting/shared/invoices'
+import { partyMasterRoute } from '@/modules/accounting/shared/invoices'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { previewInterLineTotal, previewLineTotal, moneyInPath } from '../moneyInUi'
 import { TotalsPanel } from '../components/TotalsPanel'
@@ -36,10 +43,16 @@ import { MoneyInWorkspaceShell } from '../MoneyInWorkspaceShell'
 import { RECURRING_FREQUENCY_LABELS } from '../recurring-invoices/RecurringInvoiceListPage'
 import { useAccountingCustomerLookups } from '@/hooks/useAccountingLookups'
 import { gstStateCodeFromGstin } from '@/utils/customerUtils'
+import {
+  formatPlaceOfSupplyLabel,
+  listGstStateSelectOptions,
+  resolveGstStateCode,
+  validateStateCode,
+} from '@/utils/gstStateCode'
 import { cn } from '@/utils/cn'
 import type { DispatchInvoicePrefillState, CrmTaxInvoicePrefillState } from './invoicePrefillState'
 import { useTenantProfileStore } from '@/store/tenantProfileStore'
-import { resolveTaxInvoiceFromProforma, type TaxInvoicePrefill } from '@/utils/taxInvoicePrefill'
+import { ensureTaxInvoiceFromProforma, type TaxInvoicePrefill } from '@/utils/taxInvoicePrefill'
 
 const CURRENCY_OPTIONS = [
   { value: 'INR', label: 'INR — Indian Rupee' },
@@ -75,23 +88,34 @@ const STATE_NAME_TO_CODE: Record<string, string> = {
   goa: '30',
 }
 
+const GST_STATE_OPTIONS = listGstStateSelectOptions()
+
 function resolvePlaceOfSupplyFromCustomer(opts: {
   lookupStateCode?: string | null
   lookupGstin?: string | null
   storeGstin?: string | null
   storeState?: string | null
 }): string | null {
-  if (opts.lookupStateCode && /^\d{2}$/.test(opts.lookupStateCode.trim())) {
-    return opts.lookupStateCode.trim()
+  if (opts.lookupStateCode) {
+    const fromLookup = resolveGstStateCode(opts.lookupStateCode)
+    if (fromLookup) return fromLookup
   }
   const gstin = opts.lookupGstin || opts.storeGstin
   if (gstin && gstin.trim().length >= 2) {
-    const code = gstStateCodeFromGstin(gstin)
-    if (/^\d{2}$/.test(code)) return code
+    const code = validateStateCode(gstStateCodeFromGstin(gstin))
+    if (code) return code
   }
-  const stateName = opts.storeState?.trim().toLowerCase()
-  if (stateName && STATE_NAME_TO_CODE[stateName]) return STATE_NAME_TO_CODE[stateName]
-  return null
+  return resolveGstStateCode(opts.storeState) ?? (opts.storeState ? STATE_NAME_TO_CODE[opts.storeState.trim().toLowerCase()] ?? null : null)
+}
+
+function deriveSupplyTypeFromStates(
+  legalEntityStateCode: string | null | undefined,
+  placeOfSupply: string | null | undefined,
+): 'INTRA_STATE' | 'INTER_STATE' | null {
+  const le = validateStateCode(legalEntityStateCode)
+  const pos = validateStateCode(placeOfSupply)
+  if (!le || !pos) return null
+  return le === pos ? 'INTRA_STATE' : 'INTER_STATE'
 }
 
 const lineSchema = z.object({
@@ -113,6 +137,10 @@ const formSchema = z.object({
   projectNameSnapshot: z.string().optional(),
   supplyType: z.enum(['INTRA_STATE', 'INTER_STATE']),
   taxTreatment: z.enum(['REGISTERED', 'UNREGISTERED']),
+  placeOfSupply: z
+    .string()
+    .min(1, 'Place of supply is required')
+    .refine((v) => Boolean(validateStateCode(v)), 'Select a valid GST state code'),
   currencyCode: z.string().min(1),
   freightAmount: z.string().optional(),
   otherChargesAmount: z.string().optional(),
@@ -141,7 +169,7 @@ const INVOICEABLE_SO_STATUSES: SalesOrderStatus[] = ['confirmed', 'in_production
 
 const EMPTY_LINE = { itemId: '', description: '', quantity: '1', unitPrice: '0', hsnCode: '', uom: '' }
 
-/** Zoho-flat document card — white, subtle border, soft-blue left accent header. Shared by all sections on this page. */
+/** Zoho-flat document card — dense header + tight body. Shared by all sections on this page. */
 function FormSection({
   title,
   subtitle,
@@ -156,17 +184,53 @@ function FormSection({
   className?: string
 }) {
   return (
-    <section className={cn('sales-invoice-zoho-form__section rounded-md border border-erp-border bg-white', className)}>
-      <header className="sales-invoice-zoho-form__section-header flex flex-wrap items-center justify-between gap-2 border-b border-erp-border px-4 py-2">
+    <section
+      className={cn(
+        'sales-invoice-zoho-form__section mi-create-section rounded-md border border-erp-border bg-white',
+        className,
+      )}
+    >
+      <header className="sales-invoice-zoho-form__section-header mi-create-section__header flex flex-wrap items-center justify-between gap-2 border-b border-erp-border">
         <div>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-erp-text">{title}</h3>
           {subtitle && <p className="text-[11px] text-erp-muted">{subtitle}</p>}
         </div>
         {actions}
       </header>
-      <div className="p-4">{children}</div>
+      <div className="mi-create-section__body">{children}</div>
     </section>
   )
+}
+
+function customerInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+}
+
+function formatCustomerBillingAddress(c: Customer): string {
+  return [c.addressLine1, c.addressLine2, [c.city, c.state].filter(Boolean).join(', '), c.pincode, c.country]
+    .filter(Boolean)
+    .join('\n')
+}
+
+function formatCustomerShippingAddress(c: Customer): string {
+  if (c.shippingAddress?.trim()) {
+    return [
+      c.shippingAddress,
+      c.shippingAddressLine2,
+      [c.shippingCity, c.shippingState].filter(Boolean).join(', '),
+      c.shippingPincode,
+      c.shippingCountry,
+    ]
+      .filter(Boolean)
+      .join('\n')
+  }
+  return formatCustomerBillingAddress(c)
 }
 
 /** Read-only master-derived value shown as a form field for layout parity. */
@@ -229,6 +293,8 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [recurringFrequency, setRecurringFrequency] = useState<RecurringInvoiceFrequency>('MONTHLY')
   const [recurringEndDate, setRecurringEndDate] = useState('')
   const [showQuickCreateCustomer, setShowQuickCreateCustomer] = useState(false)
+  const [legalEntity, setLegalEntity] = useState<LegalEntity | null>(null)
+  const [companyStateCode, setCompanyStateCode] = useState('')
 
   const salesOrders = useMrpStore((s) => s.salesOrders)
   const items = useMasterStore((s) => s.items)
@@ -244,6 +310,7 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       postingDate: today(),
       supplyType: 'INTRA_STATE',
       taxTreatment: 'REGISTERED',
+      placeOfSupply: '',
       currencyCode: 'INR',
       freightAmount: '0',
       otherChargesAmount: '0',
@@ -254,17 +321,48 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' })
   const watched = form.watch()
 
+  useEffect(() => {
+    let cancelled = false
+    void ensureLegalEntity()
+      .then((le) => {
+        if (cancelled) return
+        setLegalEntity(le)
+        const code =
+          validateStateCode(le.stateCode) ||
+          (le.gstin ? validateStateCode(gstStateCodeFromGstin(le.gstin)) : null) ||
+          ''
+        setCompanyStateCode(code)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLegalEntity(null)
+          setCompanyStateCode('')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // Zoho-style form: posting date is not user-facing — it always trails invoice date.
   useEffect(() => {
     if (watched.invoiceDate) form.setValue('postingDate', watched.invoiceDate, { shouldValidate: false })
   }, [watched.invoiceDate, form])
+
+  /** Keep supply type in sync when both LE + place of supply are known. */
+  useEffect(() => {
+    const next = deriveSupplyTypeFromStates(companyStateCode, watched.placeOfSupply)
+    if (next && next !== watched.supplyType) {
+      form.setValue('supplyType', next, { shouldDirty: true })
+    }
+  }, [companyStateCode, watched.placeOfSupply, watched.supplyType, form])
 
   const invoiceableOrders = useMemo(
     () => salesOrders.filter((so) => INVOICEABLE_SO_STATUSES.includes(so.status)),
     [salesOrders],
   )
 
-  /** Auto-fill tax treatment + due date from the Customer Master on pick. */
+  /** Auto-fill tax treatment, due date, and place of supply from the Customer Master on pick. */
   const applyCustomerDefaults = useCallback(
     (customerId: string) => {
       form.setValue('customerId', customerId, { shouldDirty: true, shouldValidate: true })
@@ -277,6 +375,15 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       if (creditDays && creditDays > 0) {
         const base = form.getValues('invoiceDate') || today()
         form.setValue('dueDate', addDays(base, creditDays), { shouldDirty: true })
+      }
+      const pos = resolvePlaceOfSupplyFromCustomer({
+        lookupStateCode: lookup?.stateCode,
+        lookupGstin: lookup?.gstin,
+        storeGstin: store?.gstin,
+        storeState: store?.state,
+      })
+      if (pos) {
+        form.setValue('placeOfSupply', pos, { shouldDirty: true, shouldValidate: true })
       }
     },
     [accountingCustomers, customers, form],
@@ -319,29 +426,41 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   /** Sales → Proforma Invoices → ⋯ → Create Tax Invoice: full detail carry-over (Money-In / services tenants). */
   useEffect(() => {
     if (mode !== 'create' || !proformaId || proformaSource) return
-    const result = resolveTaxInvoiceFromProforma(proformaId)
-    if (!result.ok) {
-      notify.error(result.error)
-      return
+    let cancelled = false
+    setLoading(true)
+    void ensureTaxInvoiceFromProforma(proformaId)
+      .then((result) => {
+        if (cancelled) return
+        if (!result.ok) {
+          notify.error(result.error)
+          return
+        }
+        const data = result.data
+        setProformaSource(data)
+        applyCustomerDefaults(data.customerId)
+        if (data.customerPoNumber) form.setValue('customerPoNumber', data.customerPoNumber, { shouldDirty: true })
+        if (data.remarks) form.setValue('narration', data.remarks, { shouldDirty: true })
+        form.setValue(
+          'lines',
+          data.lines.map((l) => ({
+            itemId: l.itemId || '',
+            description: l.description,
+            quantity: String(l.qty),
+            unitPrice: String(l.unitPrice),
+            hsnCode: l.hsnCode || '',
+            uom: l.uom || '',
+          })),
+          { shouldDirty: true },
+        )
+        if (data.salesOrderId) setSalesOrderId(data.salesOrderId)
+        setSourceMode('PROFORMA_INVOICE')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-    const data = result.data
-    setProformaSource(data)
-    applyCustomerDefaults(data.customerId)
-    if (data.customerPoNumber) form.setValue('customerPoNumber', data.customerPoNumber, { shouldDirty: true })
-    if (data.remarks) form.setValue('narration', data.remarks, { shouldDirty: true })
-    form.setValue(
-      'lines',
-      data.lines.map((l) => ({
-        itemId: l.itemId || '',
-        description: l.description,
-        quantity: String(l.qty),
-        unitPrice: String(l.unitPrice),
-        hsnCode: l.hsnCode || '',
-        uom: l.uom || '',
-      })),
-      { shouldDirty: true },
-    )
-    setSourceMode('PROFORMA_INVOICE')
   }, [applyCustomerDefaults, form, mode, proformaId, proformaSource])
 
   useEffect(() => {
@@ -400,24 +519,49 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   }, [mode, sourceMode])
 
   const soOptions: ErpSmartSelectOption<string>[] = useMemo(() => {
-    if (isApiMode()) {
-      return (soLookups ?? []).map((so) => ({
-        value: so.id,
-        label: so.orderNumber,
-        subtitle:
-          [so.status.replace(/_/g, ' '), so.customerPoNumber ? `PO ${so.customerPoNumber}` : null]
-            .filter(Boolean)
-            .join(' · ') || undefined,
-        searchText: `${so.orderNumber} ${so.customerPoNumber ?? ''}`.toLowerCase(),
-      }))
+    const resolveParty = (customerId: string, fallbackName?: string | null) => {
+      const lookup = accountingCustomers?.find((c) => c.id === customerId)
+      const store = customers.find((c) => c.id === customerId)
+      const name = (lookup?.name || store?.customerName || fallbackName || '').trim()
+      const city = (lookup?.city || store?.city || '').trim()
+      return { name, city }
     }
-    return invoiceableOrders.map((so) => ({
-      value: so.id,
-      label: so.salesOrderNo,
-      subtitle: [so.customerCode, so.status.replace(/_/g, ' ')].filter(Boolean).join(' · ') || undefined,
-      searchText: `${so.salesOrderNo} ${so.customerCode ?? ''} ${so.customerPoNumber ?? ''}`.toLowerCase(),
-    }))
-  }, [invoiceableOrders, soLookups])
+
+    if (isApiMode()) {
+      return (soLookups ?? []).map((so) => {
+        const { name, city } = resolveParty(so.customerId)
+        const status = so.status.replace(/_/g, ' ')
+        // Primary: SO number · Secondary: Customer · City · status · PO (omit missing parts)
+        const subtitle =
+          [
+            name || null,
+            city || null,
+            status,
+            so.customerPoNumber ? `PO ${so.customerPoNumber}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || undefined
+        return {
+          value: so.id,
+          label: so.orderNumber,
+          subtitle,
+          searchText: `${so.orderNumber} ${name} ${city} ${so.customerPoNumber ?? ''}`.toLowerCase(),
+        }
+      })
+    }
+    return invoiceableOrders.map((so) => {
+      const { name, city } = resolveParty(so.customerId, so.customerName)
+      const status = so.status.replace(/_/g, ' ')
+      const subtitle =
+        [name || so.customerCode || null, city || null, status].filter(Boolean).join(' · ') || undefined
+      return {
+        value: so.id,
+        label: so.salesOrderNo,
+        subtitle,
+        searchText: `${so.salesOrderNo} ${name} ${city} ${so.customerCode ?? ''} ${so.customerPoNumber ?? ''}`.toLowerCase(),
+      }
+    })
+  }, [accountingCustomers, customers, invoiceableOrders, soLookups])
 
   const itemOptions: ErpSmartSelectOption<string>[] = useMemo(
     () =>
@@ -452,6 +596,8 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     [customerLookup, customerStore],
   )
   const customerCreditDays = customerLookup?.creditDays ?? customerStore?.creditDays ?? null
+  const companyStateMissing = !validateStateCode(companyStateCode)
+  const placeOfSupplyMissing = !validateStateCode(watched.placeOfSupply)
 
   const applySalesOrder = useCallback(
     (so: SalesOrder) => {
@@ -591,6 +737,7 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
         projectNameSnapshot: inv.projectNameSnapshot ?? '',
         supplyType: inv.supplyType === 'INTER_STATE' ? 'INTER_STATE' : 'INTRA_STATE',
         taxTreatment: inv.taxTreatment === 'UNREGISTERED' ? 'UNREGISTERED' : 'REGISTERED',
+        placeOfSupply: validateStateCode(inv.placeOfSupply) ?? inv.placeOfSupply ?? '',
         currencyCode: inv.currencyCode || 'INR',
         freightAmount: inv.freightAmount,
         otherChargesAmount: inv.otherChargesAmount,
@@ -623,12 +770,14 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     const linkedItem = (itemId?: string) => (itemId ? items.find((i) => i.id === itemId) : undefined)
     const lookup = accountingCustomers?.find((c) => c.id === values.customerId)
     const storeCustomer = customers.find((c) => c.id === values.customerId)
-    const placeOfSupply = resolvePlaceOfSupplyFromCustomer({
-      lookupStateCode: lookup?.stateCode,
-      lookupGstin: lookup?.gstin,
-      storeGstin: storeCustomer?.gstin,
-      storeState: storeCustomer?.state,
-    })
+    const placeOfSupply =
+      validateStateCode(values.placeOfSupply) ||
+      resolvePlaceOfSupplyFromCustomer({
+        lookupStateCode: lookup?.stateCode,
+        lookupGstin: lookup?.gstin,
+        storeGstin: storeCustomer?.gstin,
+        storeState: storeCustomer?.state,
+      })
     const prefillLineByIndex = dispatchPrefill?.lines ?? []
     const proformaLineByIndex = fromProforma ? (proformaSource?.lines ?? []) : []
     return {
@@ -674,6 +823,7 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       dueDate: values.dueDate || null,
       customerPoNumber: values.customerPoNumber || null,
       placeOfSupply,
+      legalEntityStateCode: validateStateCode(companyStateCode) || null,
       supplyType: values.supplyType,
       taxTreatment: values.taxTreatment,
       currencyCode: values.currencyCode || 'INR',
@@ -706,12 +856,14 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     const linkedItem = (itemId?: string) => (itemId ? items.find((i) => i.id === itemId) : undefined)
     const lookup = accountingCustomers?.find((c) => c.id === values.customerId)
     const storeCustomer = customers.find((c) => c.id === values.customerId)
-    const placeOfSupply = resolvePlaceOfSupplyFromCustomer({
-      lookupStateCode: lookup?.stateCode,
-      lookupGstin: lookup?.gstin,
-      storeGstin: storeCustomer?.gstin,
-      storeState: storeCustomer?.state,
-    })
+    const placeOfSupply =
+      validateStateCode(values.placeOfSupply) ||
+      resolvePlaceOfSupplyFromCustomer({
+        lookupStateCode: lookup?.stateCode,
+        lookupGstin: lookup?.gstin,
+        storeGstin: storeCustomer?.gstin,
+        storeState: storeCustomer?.state,
+      })
     return {
       frequency: recurringFrequency,
       startDate: values.invoiceDate,
@@ -746,6 +898,27 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const onSave = form.handleSubmit(async (values) => {
     setSaving(true)
     try {
+      const leState = validateStateCode(companyStateCode)
+      if (!leState) {
+        notify.error(
+          'Legal entity state code is required. Select company state below (or set it under Accounting → Setup → Legal Entities).',
+        )
+        setSaving(false)
+        return
+      }
+      if (legalEntity && validateStateCode(legalEntity.stateCode) !== leState) {
+        try {
+          const updatedLe = await updateLegalEntity(legalEntity.id, {
+            stateCode: leState,
+            gstin: legalEntity.gstin ?? undefined,
+          })
+          setLegalEntity(updatedLe)
+          setCompanyStateCode(validateStateCode(updatedLe.stateCode) || leState)
+        } catch {
+          // Invoice still carries legalEntityStateCode for this draft if master update is denied.
+        }
+      }
+
       if (mode === 'create' && isRecurring) {
         await createRecurringSchedule(buildRecurringPayload(values))
         notify.success('Recurring invoice schedule created — first occurrence is in Upcoming')
@@ -805,191 +978,237 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   const lineErrors = form.formState.errors.lines
 
+  const customerLocked =
+    (sourceMode === 'SALES_ORDER' && Boolean(salesOrderId)) ||
+    (sourceMode === 'OUTBOUND_DISPATCH' && Boolean(watched.customerId)) ||
+    (sourceMode === 'PROFORMA_INVOICE' && Boolean(watched.customerId)) ||
+    (sourceMode === 'CRM_TAX_INVOICE' && Boolean(watched.customerId))
+
+  const canSwitchSource =
+    mode === 'create' &&
+    sourceMode !== 'OUTBOUND_DISPATCH' &&
+    sourceMode !== 'PROFORMA_INVOICE' &&
+    sourceMode !== 'CRM_TAX_INVOICE'
+
+  const customerDisplayName = customerStore?.customerName || customerLookup?.name || 'Customer'
+  const customerCode = customerStore?.customerCode || customerLookup?.code || null
+  const customerGstin = customerLookup?.gstin ?? customerStore?.gstin ?? null
+  const billingAddress = customerStore ? formatCustomerBillingAddress(customerStore) : '—'
+  const shippingAddress = customerStore ? formatCustomerShippingAddress(customerStore) : '—'
+
   return (
     <MoneyInWorkspaceShell title={mode === 'create' ? 'New Invoice' : 'Edit Invoice'}>
       {wasReady && (
-        <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+        <p className="mi-create-banner mi-create-banner--warn mb-2">
           Editing a Ready to Post invoice returns it to Draft — mark ready again before posting.
-        </div>
+        </p>
       )}
 
       {sourceMode === 'OUTBOUND_DISPATCH' && dispatchSourceDocumentId && (
-        <div className="mb-3 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-900">
+        <p className="mi-create-banner mi-create-banner--info mb-2">
           Sourced from outbound dispatch — {dispatchSourceLinks.length} line
-          {dispatchSourceLinks.length === 1 ? '' : 's'} linked. Quantities are capped by invoice-ready dispatch qty on save.
-        </div>
+          {dispatchSourceLinks.length === 1 ? '' : 's'} linked. Quantities are capped by invoice-ready dispatch qty on
+          save.
+        </p>
       )}
 
       {sourceMode === 'PROFORMA_INVOICE' && proformaSource && (
-        <div className="mb-3 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-900">
+        <p className="mi-create-banner mi-create-banner--info mb-2">
           Sourced from proforma invoice {proformaSource.proformaNo} — {proformaSource.lines.length} line
-          {proformaSource.lines.length === 1 ? '' : 's'} carried over from the proforma. Review before saving.
-        </div>
+          {proformaSource.lines.length === 1 ? '' : 's'} carried over. Review before saving.
+        </p>
       )}
 
       {sourceMode === 'CRM_TAX_INVOICE' && crmTaxInvoiceId && (
-        <div className="mb-3 rounded border border-violet-200 bg-violet-50 px-3 py-2 text-[12px] text-violet-950">
-          Converting CRM tax invoice — created by{' '}
-          <strong>CRM · {crmCreatedByName || 'user'}</strong>. Save creates a Money In draft linked for
-          Accounting approval / post. Receipts &amp; allocations sync payment status back to Sales and Customer 360.
+        <p className="mi-create-banner mi-create-banner--crm mb-2">
+          Converting CRM tax invoice — created by <strong>CRM · {crmCreatedByName || 'user'}</strong>. Save creates a
+          Money In draft linked for Accounting approval / post.
+        </p>
+      )}
+
+      {canSwitchSource && (
+        <div className="mi-create-toolbar mb-2">
+          <div className="mi-create-toolbar__group">
+            <span className="mi-create-toolbar__label">Source</span>
+            <ErpSegmentedControl<'DIRECT' | 'SALES_ORDER'>
+              variant="pills"
+              name="Invoice source"
+              value={sourceMode === 'SALES_ORDER' ? 'SALES_ORDER' : 'DIRECT'}
+              onChange={(next) => {
+                setSourceMode(next)
+                if (next === 'DIRECT') setSalesOrderId('')
+              }}
+              options={[
+                { value: 'DIRECT', label: 'Direct' },
+                { value: 'SALES_ORDER', label: 'Sales Order', disabled: isRecurring },
+              ]}
+            />
+          </div>
+          <div className="mi-create-toolbar__group">
+            <Checkbox
+              label="Recurring"
+              checked={isRecurring}
+              onChange={(e) => {
+                const checked = e.target.checked
+                setIsRecurring(checked)
+                if (checked) {
+                  setSourceMode('DIRECT')
+                  setSalesOrderId('')
+                }
+              }}
+            />
+          </div>
         </div>
       )}
 
-      <form onSubmit={onSave} className="sales-invoice-zoho-form space-y-3">
-        {/* ── Customer & invoice details (Zoho-style compact document header) ── */}
+      <form onSubmit={onSave} className="sales-invoice-zoho-form mi-create-form">
         <FormSection
           title="Customer & Invoice Details"
-          subtitle="Party, source document, dates, and GST classification — defaults pulled from the Customer Master."
-          actions={
-            mode === 'create' &&
-            sourceMode !== 'OUTBOUND_DISPATCH' &&
-            sourceMode !== 'PROFORMA_INVOICE' &&
-            sourceMode !== 'CRM_TAX_INVOICE' ? (
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="inline-flex overflow-hidden rounded border border-erp-border" role="group" aria-label="Invoice source">
-                  <button
-                    type="button"
-                    className={cn(
-                      'px-3 py-1 text-[12px] font-medium transition-colors',
-                      sourceMode === 'DIRECT' ? 'bg-erp-accent text-white' : 'bg-white text-erp-muted hover:bg-erp-surface-alt',
-                    )}
-                    onClick={() => {
-                      setSourceMode('DIRECT')
-                      setSalesOrderId('')
-                    }}
-                  >
-                    Direct invoice
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isRecurring}
-                    className={cn(
-                      'border-l border-erp-border px-3 py-1 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                      sourceMode === 'SALES_ORDER' ? 'bg-erp-accent text-white' : 'bg-white text-erp-muted hover:bg-erp-surface-alt',
-                    )}
-                    onClick={() => setSourceMode('SALES_ORDER')}
-                  >
-                    From Sales Order
-                  </button>
-                </div>
-                <Checkbox
-                  label="Recurring invoice"
-                  checked={isRecurring}
-                  onChange={(e) => {
-                    const checked = e.target.checked
-                    setIsRecurring(checked)
-                    if (checked) {
-                      setSourceMode('DIRECT')
-                      setSalesOrderId('')
-                    }
-                  }}
-                />
-              </div>
-            ) : undefined
-          }
+          subtitle="Party, dates, and GST — defaults from Customer Master."
         >
-          {sourceMode === 'OUTBOUND_DISPATCH' && (
-            <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <ReadonlyField
-                label="Outbound dispatch"
-                value={dispatchSourceDocumentId ?? '—'}
-                hint="Primary dispatch document for this invoice"
-              />
-              <ReadonlyField label="Linked lines" value={String(dispatchSourceLinks.length)} />
-              {salesOrderId && selectedSo && (
-                <>
-                  <ReadonlyField label="Sales order" value={selectedSo.number} />
-                  <ReadonlyField label="SO status" value={selectedSo.status.replace(/_/g, ' ')} />
-                </>
-              )}
-            </div>
-          )}
-
-          {sourceMode === 'PROFORMA_INVOICE' && proformaSource && (
-            <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <ReadonlyField
-                label="Proforma invoice"
-                value={proformaSource.proformaNo ?? '—'}
-                hint="Source document for this invoice"
-              />
-              <ReadonlyField label="Lines carried over" value={String(proformaSource.lines.length)} />
-              {proformaSource.salesOrderNo && <ReadonlyField label="Sales order" value={proformaSource.salesOrderNo} />}
-              {proformaSource.quotationNo && <ReadonlyField label="Quotation" value={proformaSource.quotationNo} />}
-            </div>
-          )}
-
-          {sourceMode === 'SALES_ORDER' && (
-            <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <FormField
-                label="Sales order"
-                className="sm:col-span-2"
-                hint={mode === 'edit' ? 'Source document is fixed after creation.' : undefined}
-              >
-                {mode === 'create' ? (
-                  <ErpSmartSelect
-                    options={soOptions}
-                    value={salesOrderId}
-                    onChange={onPickSalesOrder}
-                    placeholder="Select sales order…"
-                    emptyMessage="No invoiceable sales orders (confirmed → dispatched)"
-                    allowEmpty
-                  />
-                ) : (
-                  <Input value={selectedSo?.number ?? salesOrderId} readOnly disabled />
+          <div className="mi-create-commercial__body">
+            {sourceMode === 'OUTBOUND_DISPATCH' && (
+              <div className="mi-create-source-chips">
+                <span className="mi-create-source-chip">
+                  <span className="mi-create-source-chip__label">Dispatch</span>
+                  {dispatchSourceDocumentId ?? '—'}
+                </span>
+                <span className="mi-create-source-chip">
+                  <span className="mi-create-source-chip__label">Lines</span>
+                  {dispatchSourceLinks.length}
+                </span>
+                {selectedSo && (
+                  <span className="mi-create-source-chip">
+                    <span className="mi-create-source-chip__label">SO</span>
+                    {selectedSo.number}
+                  </span>
                 )}
-              </FormField>
-              {selectedSo && (
-                <>
-                  <ReadonlyField label="SO status" value={selectedSo.status.replace(/_/g, ' ')} />
-                  <ReadonlyField label="SO customer PO" value={selectedSo.customerPoNumber ?? '—'} />
-                </>
-              )}
-            </div>
-          )}
+              </div>
+            )}
 
-          <div className="sales-invoice-zoho-form__header-grid">
-            {/* Left: prominent customer picker + Bill To address block */}
-            <div className="sales-invoice-zoho-form__customer-col">
-              <FormField label="Customer" required error={form.formState.errors.customerId?.message}>
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <CustomerMasterSelect
-                      value={watched.customerId}
-                      onChange={applyCustomerDefaults}
-                      disabled={
-                        (sourceMode === 'SALES_ORDER' && Boolean(salesOrderId)) ||
-                        (sourceMode === 'OUTBOUND_DISPATCH' && Boolean(watched.customerId)) ||
-                        (sourceMode === 'PROFORMA_INVOICE' && Boolean(watched.customerId)) ||
-                        (sourceMode === 'CRM_TAX_INVOICE' && Boolean(watched.customerId))
-                      }
+            {sourceMode === 'PROFORMA_INVOICE' && proformaSource && (
+              <div className="mi-create-source-chips">
+                <span className="mi-create-source-chip">
+                  <span className="mi-create-source-chip__label">Proforma</span>
+                  {proformaSource.proformaNo ?? '—'}
+                </span>
+                <span className="mi-create-source-chip">
+                  <span className="mi-create-source-chip__label">Lines</span>
+                  {proformaSource.lines.length}
+                </span>
+                {proformaSource.salesOrderNo && (
+                  <span className="mi-create-source-chip">
+                    <span className="mi-create-source-chip__label">SO</span>
+                    {proformaSource.salesOrderNo}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {sourceMode === 'SALES_ORDER' && (
+              <div className="mi-create-source-row">
+                <FormField
+                  label="Sales order"
+                  hint={mode === 'edit' ? 'Source document is fixed after creation.' : undefined}
+                >
+                  {mode === 'create' ? (
+                    <ErpSmartSelect
+                      options={soOptions}
+                      value={salesOrderId}
+                      onChange={onPickSalesOrder}
+                      placeholder="Select sales order…"
+                      emptyMessage="No invoiceable sales orders (confirmed → dispatched)"
                       allowEmpty
-                      source="accounting"
                     />
-                  </div>
-                  {mode === 'create' && sourceMode === 'DIRECT' && canQuickCreateEntity('customer') && (
-                    <ErpButton
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      icon={UserPlus}
-                      onClick={() => setShowQuickCreateCustomer(true)}
-                    >
-                      New
-                    </ErpButton>
+                  ) : (
+                    <Input value={selectedSo?.number ?? salesOrderId} readOnly disabled />
                   )}
-                </div>
-              </FormField>
+                </FormField>
+                {selectedSo && (
+                  <>
+                    <ReadonlyField label="SO status" value={selectedSo.status.replace(/_/g, ' ')} />
+                    <ReadonlyField label="SO customer PO" value={selectedSo.customerPoNumber ?? '—'} />
+                  </>
+                )}
+              </div>
+            )}
 
-              {watched.customerId && (
-                <div className="sales-invoice-zoho-form__bill-to">
-                  <p className="sales-invoice-zoho-form__bill-to-label">Bill To</p>
-                  <PartyMasterCard variant="crm" partyId={watched.customerId} showQuickCreate />
-                </div>
+            <div className="mi-create-customer-row">
+              <FormField label="Customer" required error={form.formState.errors.customerId?.message}>
+                <CustomerMasterSelect
+                  value={watched.customerId}
+                  onChange={applyCustomerDefaults}
+                  disabled={customerLocked}
+                  allowEmpty
+                  source="accounting"
+                />
+              </FormField>
+              {mode === 'create' && sourceMode === 'DIRECT' && canQuickCreateEntity('customer') && (
+                <ErpButton
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={UserPlus}
+                  onClick={() => setShowQuickCreateCustomer(true)}
+                >
+                  New
+                </ErpButton>
               )}
             </div>
 
-            {/* Right: dates, currency, and GST classification in a tight grid */}
-            <div className="sales-invoice-zoho-form__fields-col grid gap-3 sm:grid-cols-2">
+            {watched.customerId && (
+              <aside className="mi-create-party" aria-label="Selected customer">
+                <div className="mi-create-party__avatar" aria-hidden>
+                  {customerInitials(customerDisplayName)}
+                </div>
+                <div className="mi-create-party__main">
+                  <div className="mi-create-party__title-row">
+                    <h3 className="mi-create-party__name">
+                      {customerCode ? `${customerCode} — ` : ''}
+                      {customerDisplayName}
+                    </h3>
+                    <Link to={partyMasterRoute('crm', watched.customerId)} className="mi-create-party__360">
+                      Customer 360
+                    </Link>
+                  </div>
+                  <div className="mi-create-party__chips">
+                    <span className="mi-create-party__chip">
+                      <span className="mi-create-party__chip-label">GSTIN</span>
+                      {customerGstin || '—'}
+                    </span>
+                    <span className="mi-create-party__chip">
+                      <span className="mi-create-party__chip-label">Place of supply</span>
+                      {watched.placeOfSupply
+                        ? formatPlaceOfSupplyLabel(watched.placeOfSupply)
+                        : customerPlaceOfSupply
+                          ? formatPlaceOfSupplyLabel(customerPlaceOfSupply)
+                          : '—'}
+                    </span>
+                    {customerCreditDays ? (
+                      <span className="mi-create-party__chip">
+                        <span className="mi-create-party__chip-label">Credit</span>
+                        {customerCreditDays} days
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </aside>
+            )}
+
+            {watched.customerId && (
+              <div className="mi-create-addresses">
+                <div className="mi-create-address">
+                  <p className="mi-create-address__label">Bill to</p>
+                  <p className="mi-create-address__body">{billingAddress || '—'}</p>
+                </div>
+                <div className="mi-create-address">
+                  <p className="mi-create-address__label">Ship to</p>
+                  <p className="mi-create-address__body">{shippingAddress || '—'}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="mi-create-commercial__grid">
               <FormField
                 label={isRecurring ? 'Next invoice date' : 'Invoice date'}
                 required
@@ -1017,7 +1236,10 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   </FormField>
                 </>
               ) : (
-                <FormField label="Due date" hint={customerCreditDays ? `Auto-set from ${customerCreditDays}-day credit terms` : undefined}>
+                <FormField
+                  label="Due date"
+                  hint={customerCreditDays ? `Auto-set from ${customerCreditDays}-day credit terms` : undefined}
+                >
                   <Input type="date" {...form.register('dueDate')} />
                 </FormField>
               )}
@@ -1029,6 +1251,9 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                     </option>
                   ))}
                 </Select>
+              </FormField>
+              <FormField label="Customer PO">
+                <Input placeholder="Optional PO reference" {...form.register('customerPoNumber')} />
               </FormField>
               <FormField label="Supply type">
                 <Select {...form.register('supplyType')}>
@@ -1042,24 +1267,69 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   <option value="UNREGISTERED">Unregistered</option>
                 </Select>
               </FormField>
-              <ReadonlyField
+              <FormField
+                label="Company state"
+                required
+                error={companyStateMissing ? 'Required to determine CGST/SGST vs IGST' : undefined}
+                hint={
+                  legalEntity
+                    ? `Legal entity: ${legalEntity.displayName}`
+                    : 'From Accounting → Setup → Legal Entities'
+                }
+              >
+                <Select
+                  value={companyStateCode}
+                  onChange={(e) => {
+                    setCompanyStateCode(e.target.value)
+                  }}
+                >
+                  <option value="">— Select —</option>
+                  {GST_STATE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField
                 label="Place of supply"
-                value={customerPlaceOfSupply ? `State code ${customerPlaceOfSupply}` : '—'}
-                hint="Resolved from GSTIN / state"
-              />
-              <ReadonlyField
-                label="GSTIN"
-                value={customerLookup?.gstin ?? customerStore?.gstin ?? '—'}
-                hint="From Customer Master"
-              />
+                required
+                error={form.formState.errors.placeOfSupply?.message}
+                hint={
+                  customerPlaceOfSupply
+                    ? `Suggested: ${formatPlaceOfSupplyLabel(customerPlaceOfSupply)}`
+                    : 'Enter customer state / GSTIN state'
+                }
+              >
+                <Select {...form.register('placeOfSupply')}>
+                  <option value="">— Select —</option>
+                  {GST_STATE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              {(companyStateMissing || placeOfSupplyMissing) && (
+                <p className="mi-create-commercial__hint">
+                  Company state and place of supply are required to calculate tax (intra vs inter-state).
+                  {legalEntity ? null : (
+                    <>
+                      {' '}
+                      <Link className="underline" to="/accounting/settings/legal-entities">
+                        Open legal entities
+                      </Link>
+                    </>
+                  )}
+                </p>
+              )}
             </div>
           </div>
         </FormSection>
 
-        {/* ── Lines ──────────────────────────────────────────────────────── */}
         <FormSection
           title="Item Details"
-          subtitle="Picking an item fills description, HSN, UOM, and standard rate from the Item Master."
+          subtitle="Item pick fills description, HSN, UOM, and rate from the Item Master."
         >
           {/* Column headers (md+) — Zoho-style table header row */}
           <div
@@ -1155,34 +1425,34 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
           </p>
         </FormSection>
 
-        {/* ── Notes, charges & totals (Zoho-style bottom split) ─────────────── */}
-        <div className="sales-invoice-zoho-form__footer-grid grid gap-3 lg:grid-cols-[1.4fr_1fr]">
-          <FormSection title="Notes & Charges" subtitle="Header-level charges added on top of line totals.">
-            <div className="grid gap-3 sm:grid-cols-2">
+        <div className="sales-invoice-zoho-form__footer-grid grid gap-2.5 lg:grid-cols-[1.4fr_1fr]">
+          <FormSection title="Notes & Charges" subtitle="Header charges on top of line totals.">
+            <div className="grid gap-2 sm:grid-cols-2">
               {showFreight ? (
                 <FormField label="Freight">
                   <CurrencyInput {...form.register('freightAmount')} />
                 </FormField>
               ) : null}
               <FormField label="Narration" className={cn(showFreight ? undefined : 'sm:col-span-2')}>
-                <Textarea rows={3} placeholder="Internal narration printed on the voucher…" {...form.register('narration')} />
+                <Textarea rows={2} placeholder="Internal narration…" {...form.register('narration')} />
               </FormField>
             </div>
           </FormSection>
 
-          <div className="space-y-3">
-            <TotalsPanel {...previewTotals} preview />
-            <details className="rounded-md border border-erp-border bg-white p-3">
-              <summary className="cursor-pointer text-[12px] font-semibold text-erp-muted">Accounting (collapsed)</summary>
-              <p className="mt-2 text-[12px] text-erp-muted">
+          <div className="space-y-2">
+            <div className="mi-create-totals">
+              <TotalsPanel {...previewTotals} preview />
+            </div>
+            <details className="rounded-md border border-erp-border bg-white px-3 py-2">
+              <summary className="cursor-pointer text-[11px] font-semibold text-erp-muted">Accounting</summary>
+              <p className="mt-1.5 text-[11px] text-erp-muted">
                 Revenue and receivable accounts resolve from default mappings on save/post (server).
               </p>
             </details>
           </div>
         </div>
 
-        {/* ── Actions ────────────────────────────────────────────────────── */}
-        <div className="sales-invoice-zoho-form__sticky-footer flex items-center justify-end gap-2 rounded-md border border-erp-border bg-erp-surface-alt/60 px-4 py-3">
+        <div className="sales-invoice-zoho-form__sticky-footer flex items-center justify-end gap-2 rounded-md border border-erp-border">
           <ErpButton type="button" variant="secondary" onClick={() => navigate(-1)}>
             Cancel
           </ErpButton>

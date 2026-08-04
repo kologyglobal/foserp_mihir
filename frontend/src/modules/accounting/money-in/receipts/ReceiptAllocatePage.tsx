@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { Input } from '@/components/forms/Inputs'
+import { PageBackLink } from '@/components/ui/PageBackLink'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { allocateReceipt, getCustomerReceipt, listCustomerOpenItems, previewReceiptAllocation } from '@/services/bridges/receivablesApiBridge'
 import type { CustomerReceiptDto, OutstandingOpenItemDto, ReceiptAllocationPreview } from '@/types/moneyIn'
@@ -13,6 +14,13 @@ import { MoneyInWorkspaceShell } from '../MoneyInWorkspaceShell'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function customerInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase()
 }
 
 export function ReceiptAllocatePage() {
@@ -70,7 +78,17 @@ export function ReceiptAllocatePage() {
     [amounts, openItems],
   )
 
+  const unallocated = receipt ? parseDecimal(receipt.unallocatedAmount) : 0
   const totalSelected = selectedLines.reduce((s, l) => s + Number(l.amount), 0)
+  const remainingAfter = unallocated - totalSelected
+  const balanceState =
+    totalSelected <= 0
+      ? 'idle'
+      : remainingAfter < -0.0001
+        ? 'over'
+        : remainingAfter > 0.0001
+          ? 'under'
+          : 'exact'
 
   const runPreview = async () => {
     if (!id || selectedLines.length === 0) {
@@ -108,6 +126,20 @@ export function ReceiptAllocatePage() {
     }
   }
 
+  const setAmount = (openItemId: string, value: string) => {
+    setAmounts((prev) => ({ ...prev, [openItemId]: value }))
+    setPreview(null)
+  }
+
+  const fillOutstanding = (item: OutstandingOpenItemDto) => {
+    const outstanding = parseDecimal(item.outstandingAmount)
+    const alreadyOnOthers = Object.entries(amounts)
+      .filter(([key]) => key !== item.openItemId)
+      .reduce((s, [, v]) => s + (Number(v) > 0 ? Number(v) : 0), 0)
+    const maxForRow = Math.max(0, Math.min(outstanding, unallocated - alreadyOnOthers))
+    setAmount(item.openItemId, maxForRow > 0 ? maxForRow.toFixed(2) : '')
+  }
+
   if (!perms.canAllocate) {
     return (
       <MoneyInWorkspaceShell title="Allocate Receipt">
@@ -127,85 +159,201 @@ export function ReceiptAllocatePage() {
   if (receipt.status !== 'POSTED') {
     return (
       <MoneyInWorkspaceShell title={`Allocate ${receiptDisplayNumber(receipt)}`}>
-        <p className="text-[13px] text-erp-muted">Only posted receipts can be allocated.</p>
+        <div className="mi-allocate">
+          <PageBackLink to={`/accounting/money-in/receipts/${id}`} label="Back to receipt" />
+          <p className="mi-allocate-empty">Only posted receipts can be allocated.</p>
+        </div>
       </MoneyInWorkspaceShell>
     )
   }
 
+  const receiptNo = receiptDisplayNumber(receipt)
+
   return (
-    <MoneyInWorkspaceShell title={`Allocate ${receiptDisplayNumber(receipt)}`}>
-      <div className="mb-4 flex flex-wrap items-center gap-4 rounded border border-erp-border bg-slate-50 p-3 text-[12px]">
-        <span className="text-erp-muted">Customer: <strong className="text-erp-text">{receipt.customerNameSnapshot}</strong></span>
-        <span className="text-erp-muted">Unallocated: <strong className="text-erp-text">{formatCurrency(parseDecimal(receipt.unallocatedAmount))}</strong></span>
-        <label className="flex items-center gap-2 text-erp-muted">
-          Allocation date
-          <Input type="date" className="h-8 text-[12px]" value={allocationDate} onChange={(e) => setAllocationDate(e.target.value)} />
-        </label>
-      </div>
+    <MoneyInWorkspaceShell title={`Allocate ${receiptNo}`}>
+      <div className="mi-allocate">
+        <PageBackLink to={`/accounting/money-in/receipts/${id}`} label="Back to receipt" />
 
-      {openItems.length === 0 ? (
-        <p className="text-[13px] text-erp-muted">No outstanding invoices found for this customer.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-[12px]">
-            <thead>
-              <tr className="border-b border-erp-border text-erp-muted">
-                <th className="py-2 pr-3 font-medium">Invoice</th>
-                <th className="py-2 pr-3 font-medium">Date</th>
-                <th className="py-2 pr-3 text-right font-medium">Outstanding</th>
-                <th className="py-2 font-medium">Allocate amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {openItems.map((item) => (
-                <tr key={item.openItemId} className="border-b border-erp-border/60">
-                  <td className="py-2 pr-3 font-medium">{item.invoiceNumber ?? '—'}</td>
-                  <td className="py-2 pr-3 tabular-nums">{item.invoiceDate}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(parseDecimal(item.outstandingAmount))}</td>
-                  <td className="py-2">
-                    <Input
-                      className="h-8 w-32 text-[12px]"
-                      placeholder="0.00"
-                      value={amounts[item.openItemId] ?? ''}
-                      onChange={(e) => setAmounts((prev) => ({ ...prev, [item.openItemId]: e.target.value }))}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <section className="mi-allocate-context" aria-label="Receipt allocation context">
+          <div className="mi-allocate-context__avatar" aria-hidden>
+            {customerInitials(receipt.customerNameSnapshot)}
+          </div>
+          <div className="mi-allocate-context__main">
+            <div className="mi-allocate-context__title-row">
+              <h2 className="mi-allocate-context__name">{receipt.customerNameSnapshot}</h2>
+              <span className="mi-allocate-context__receipt">{receiptNo}</span>
+            </div>
+            <div className="mi-allocate-context__chips">
+              <span className="mi-allocate-chip">
+                <span className="mi-allocate-chip__label">Receipt date</span>
+                <span className="tabular-nums">{receipt.receiptDate}</span>
+              </span>
+              <span className="mi-allocate-chip mi-allocate-chip--unallocated">
+                <span className="mi-allocate-chip__label">Unallocated</span>
+                <span className="tabular-nums">{formatCurrency(unallocated)}</span>
+              </span>
+              {receipt.currencyCode ? (
+                <span className="mi-allocate-chip">
+                  <span className="mi-allocate-chip__label">Currency</span>
+                  <span>{receipt.currencyCode}</span>
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <label className="mi-allocate-date">
+            <span className="mi-allocate-date__label">Allocation date</span>
+            <Input
+              type="date"
+              className="mi-allocate-date__input"
+              value={allocationDate}
+              onChange={(e) => {
+                setAllocationDate(e.target.value)
+                setPreview(null)
+              }}
+            />
+          </label>
+        </section>
+
+        {openItems.length === 0 ? (
+          <p className="mi-allocate-empty">No outstanding invoices found for this customer.</p>
+        ) : (
+          <section className="mi-allocate-panel" aria-label="Invoice allocations">
+            <div className="mi-allocate-panel__head">
+              <h3 className="mi-allocate-panel__title">Open invoices</h3>
+              <span className="mi-allocate-panel__meta">{openItems.length} open</span>
+            </div>
+            <div className="mi-allocate-table-wrap">
+              <table className="mi-allocate-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Invoice</th>
+                    <th scope="col">Date</th>
+                    <th scope="col" className="mi-allocate-table__num">
+                      Outstanding
+                    </th>
+                    <th scope="col" className="mi-allocate-table__alloc">
+                      Allocate amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {openItems.map((item) => {
+                    const rowAmount = amounts[item.openItemId] ?? ''
+                    const rowVal = Number(rowAmount)
+                    const outstanding = parseDecimal(item.outstandingAmount)
+                    const overOutstanding = rowVal > outstanding + 0.0001
+                    return (
+                      <tr key={item.openItemId} className={rowVal > 0 ? 'mi-allocate-table__row--active' : undefined}>
+                        <td className="mi-allocate-table__invoice">{item.invoiceNumber ?? '—'}</td>
+                        <td className="mi-allocate-table__date tabular-nums">{item.invoiceDate}</td>
+                        <td className="mi-allocate-table__num tabular-nums">{formatCurrency(outstanding)}</td>
+                        <td className="mi-allocate-table__alloc">
+                          <div className="mi-allocate-amount">
+                            <Input
+                              className={`mi-allocate-amount__input${overOutstanding ? ' mi-allocate-amount__input--warn' : ''}`}
+                              placeholder="0.00"
+                              inputMode="decimal"
+                              aria-label={`Allocate to ${item.invoiceNumber ?? 'invoice'}`}
+                              value={rowAmount}
+                              onChange={(e) => setAmount(item.openItemId, e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="mi-allocate-amount__fill"
+                              onClick={() => fillOutstanding(item)}
+                              title="Fill up to outstanding / remaining unallocated"
+                            >
+                              Max
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        <div
+          className={`mi-allocate-totals mi-allocate-totals--${balanceState}`}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="mi-allocate-totals__item">
+            <span className="mi-allocate-totals__label">Unallocated</span>
+            <span className="mi-allocate-totals__value tabular-nums">{formatCurrency(unallocated)}</span>
+          </div>
+          <div className="mi-allocate-totals__item mi-allocate-totals__item--primary">
+            <span className="mi-allocate-totals__label">Total to allocate</span>
+            <span className="mi-allocate-totals__value tabular-nums">{formatCurrency(totalSelected)}</span>
+          </div>
+          <div className="mi-allocate-totals__item">
+            <span className="mi-allocate-totals__label">
+              {balanceState === 'over' ? 'Over by' : 'Remaining after'}
+            </span>
+            <span className="mi-allocate-totals__value tabular-nums">
+              {formatCurrency(Math.abs(remainingAfter))}
+            </span>
+          </div>
+          {balanceState === 'over' ? (
+            <p className="mi-allocate-totals__hint">Allocation exceeds the unallocated receipt balance.</p>
+          ) : null}
+          {balanceState === 'under' ? (
+            <p className="mi-allocate-totals__hint">
+              {formatCurrency(remainingAfter)} will remain unallocated on this receipt.
+            </p>
+          ) : null}
+          {balanceState === 'exact' ? (
+            <p className="mi-allocate-totals__hint">Fully allocating the available receipt balance.</p>
+          ) : null}
         </div>
-      )}
 
-      <div className="mt-3 flex items-center justify-between rounded border border-erp-border bg-slate-50 px-3 py-2 text-[12px]">
-        <span className="text-erp-muted">Total to allocate</span>
-        <span className="font-semibold tabular-nums text-erp-text">{formatCurrency(totalSelected)}</span>
-      </div>
+        {preview && (
+          <div
+            className={`mi-allocate-preview ${preview.valid ? 'mi-allocate-preview--ok' : 'mi-allocate-preview--bad'}`}
+          >
+            <p className="mi-allocate-preview__title">{preview.valid ? 'Preview valid' : 'Preview has issues'}</p>
+            <p className="mi-allocate-preview__line">
+              Unallocated after: {formatCurrency(parseDecimal(preview.receiptUnallocatedAfter))}
+            </p>
+            {preview.errors.length > 0 && (
+              <ul className="mi-allocate-preview__errors">
+                {preview.errors.map((e, i) => (
+                  <li key={i}>{e.message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
-      {preview && (
-        <div className={`mt-3 rounded border px-3 py-2 text-[12px] ${preview.valid ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}>
-          <p className="font-medium">{preview.valid ? 'Preview valid' : 'Preview has issues'}</p>
-          <p className="mt-1">Unallocated after: {formatCurrency(parseDecimal(preview.receiptUnallocatedAfter))}</p>
-          {preview.errors.length > 0 && (
-            <ul className="mt-1 list-inside list-disc">
-              {preview.errors.map((e, i) => (
-                <li key={i}>{e.message}</li>
-              ))}
-            </ul>
-          )}
+        <div className="mi-allocate-actions">
+          <ErpButton
+            type="button"
+            variant="primary"
+            className="mi-allocate-actions__primary"
+            onClick={() => void runAllocate()}
+            disabled={allocating || selectedLines.length === 0 || balanceState === 'over'}
+          >
+            {allocating ? 'Allocating…' : 'Allocate'}
+          </ErpButton>
+          <ErpButton
+            type="button"
+            variant="secondary"
+            onClick={() => void runPreview()}
+            disabled={previewing || selectedLines.length === 0}
+          >
+            {previewing ? 'Previewing…' : 'Preview'}
+          </ErpButton>
+          <button
+            type="button"
+            className="mi-allocate-actions__back"
+            onClick={() => navigate(`/accounting/money-in/receipts/${id}`)}
+          >
+            Back
+          </button>
         </div>
-      )}
-
-      <div className="mt-4 flex gap-2">
-        <ErpButton type="button" variant="secondary" onClick={() => void runPreview()} disabled={previewing || selectedLines.length === 0}>
-          {previewing ? 'Previewing…' : 'Preview'}
-        </ErpButton>
-        <ErpButton type="button" variant="primary" onClick={() => void runAllocate()} disabled={allocating || selectedLines.length === 0}>
-          {allocating ? 'Allocating…' : 'Allocate'}
-        </ErpButton>
-        <ErpButton type="button" variant="ghost" onClick={() => navigate(`/accounting/money-in/receipts/${id}`)}>
-          Back
-        </ErpButton>
       </div>
     </MoneyInWorkspaceShell>
   )

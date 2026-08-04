@@ -8,10 +8,13 @@ import {
   createInvoiceSchema,
   createProformaSchema,
   createReceiptSchema,
+  createAccountingDraftBodySchema,
+  markNonAccountingBodySchema,
   listAllocationsQuerySchema,
   listInvoicesQuerySchema,
   listProformasQuerySchema,
   listReceiptsQuerySchema,
+  updateInvoiceSchema,
   updateProformaSchema,
 } from './commercial.validation.js'
 
@@ -29,10 +32,44 @@ router.post('/proformas/:id/cancel', requirePermission('crm.commercial.invoice.c
 router.get('/receipts', requirePermission('crm.commercial.receipt.view'), validateQuery(listReceiptsQuerySchema), controller.listReceipts)
 router.post('/receipts', requirePermission('crm.commercial.receipt.create'), validateBody(createReceiptSchema), controller.createReceipt)
 router.get('/receipts/:id', requirePermission('crm.commercial.receipt.view'), validateParams(uuidParamSchema), controller.getReceipt)
+router.get(
+  '/receipts/:id/accounting-status',
+  requirePermission('crm.commercial.receipt.view'),
+  validateParams(uuidParamSchema),
+  controller.getReceiptAccountingStatus,
+)
+router.get(
+  '/receipts/:id/accounting-duplicate-check',
+  requirePermission('crm.commercial.receipt.view'),
+  validateParams(uuidParamSchema),
+  controller.checkReceiptAccountingDuplicates,
+)
+router.post(
+  '/receipts/:id/create-accounting-draft',
+  requirePermission('crm.commercial.receipt.accounting_draft.create', 'finance.ar.receipt.create'),
+  validateParams(uuidParamSchema),
+  validateBody(createAccountingDraftBodySchema),
+  controller.createReceiptAccountingDraft,
+)
+router.post(
+  '/receipts/:id/retry-accounting-draft',
+  requirePermission('crm.commercial.receipt.accounting_draft.create', 'finance.ar.receipt.create'),
+  validateParams(uuidParamSchema),
+  validateBody(createAccountingDraftBodySchema),
+  controller.retryReceiptAccountingDraft,
+)
+router.post(
+  '/receipts/:id/mark-non-accounting',
+  requirePermission('crm.commercial.receipt.accounting_draft.create'),
+  validateParams(uuidParamSchema),
+  validateBody(markNonAccountingBodySchema),
+  controller.markReceiptNonAccounting,
+)
 
 router.get('/invoices', requirePermission('crm.commercial.invoice.view'), validateQuery(listInvoicesQuerySchema), controller.listInvoices)
 router.post('/invoices', requirePermission('crm.commercial.invoice.create'), validateBody(createInvoiceSchema), controller.createInvoice)
 router.get('/invoices/:id', requirePermission('crm.commercial.invoice.view'), validateParams(uuidParamSchema), controller.getInvoice)
+router.patch('/invoices/:id', requirePermission('crm.commercial.invoice.create'), validateParams(uuidParamSchema), validateBody(updateInvoiceSchema), controller.updateInvoice)
 router.post('/invoices/:id/post', requirePermission('crm.commercial.invoice.post'), validateParams(uuidParamSchema), controller.postInvoice)
 router.post('/invoices/:id/cancel', requirePermission('crm.commercial.invoice.cancel'), validateParams(uuidParamSchema), controller.cancelInvoice)
 

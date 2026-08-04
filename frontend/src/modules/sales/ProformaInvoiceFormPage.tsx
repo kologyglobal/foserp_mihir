@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
@@ -32,7 +32,7 @@ import { useActiveCustomers, useSellableItems } from '../../hooks/useMasterLists
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { computeProformaLineTotals } from '../../utils/proformaInvoiceLines'
-import { resolveSalesOrderProformaPrefill } from '../../utils/proformaInvoicePrefill'
+import { resolveSalesOrderProformaPrefill, ensureSalesOrderProformaPrefill, type ProformaSalesOrderPrefill } from '../../utils/proformaInvoicePrefill'
 import type { ProformaInvoiceLine } from '../../types/proformaInvoice'
 import { computeGst, gstSchemeLabel } from '../../utils/gstEngine'
 import { canUseItemInSales } from '../../utils/opportunityItemOptions'
@@ -48,6 +48,7 @@ import {
   type OrderDiscountMode,
 } from '../../utils/opportunityLineCalc'
 import { ChargeEditor, OrderAdjustmentsPanel } from '../../components/erp/OrderAdjustmentsGrid'
+import { notify } from '../../store/toastStore'
 
 type PiCreateMode = 'direct' | 'sales_order'
 
@@ -127,54 +128,110 @@ export function ProformaInvoiceFormPage() {
   const today = new Date().toISOString().slice(0, 10)
   const [mode, setMode] = useState<PiCreateMode>(initialSoId ? 'sales_order' : 'direct')
   const [salesOrderId, setSalesOrderId] = useState(initialSoId)
-  const [customerId, setCustomerId] = useState(() => {
-    const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
-    return prefill?.customerId ?? ''
-  })
+  const [customerId, setCustomerId] = useState('')
   const [proformaDate, setProformaDate] = useState(today)
   const [validUntil, setValidUntil] = useState(() => addDays(today, DEFAULT_VALIDITY_DAYS))
-  const [paymentTerms, setPaymentTerms] = useState(() => {
-    const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
-    return prefill?.paymentTerms ?? ''
-  })
-  const [deliveryTerms, setDeliveryTerms] = useState(() => {
-    const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
-    return prefill?.deliveryTerms ?? ''
-  })
-  const [customerPoNumber, setCustomerPoNumber] = useState(() => {
-    const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
-    return prefill?.customerPoNumber ?? ''
-  })
+  const [paymentTerms, setPaymentTerms] = useState('')
+  const [deliveryTerms, setDeliveryTerms] = useState('')
+  const [customerPoNumber, setCustomerPoNumber] = useState('')
+  const [billingAddress, setBillingAddress] = useState<string | null>(null)
+  const [shippingAddress, setShippingAddress] = useState<string | null>(null)
   const [remarks, setRemarks] = useState('')
   const [freightMode, setFreightMode] = useState<OrderDiscountMode>('flat')
   const [freightAmount, setFreightAmount] = useState(0)
   const [orderDiscountMode, setOrderDiscountMode] = useState<OrderDiscountMode>('flat')
   const [orderDiscountInput, setOrderDiscountInput] = useState(0)
-  const { locationId, setLocationId } = useDocumentLocation(
-    'sales',
-    initialSoId ? resolveSalesOrderProformaPrefill(initialSoId)?.locationId : null,
-  )
+  const { locationId, setLocationId } = useDocumentLocation('sales', null)
   const showLocationField = !useTenantProfileStore((s) => s.isServices())
-  const [lineRows, setLineRows] = useState<PiLineRow[]>(() => {
-    const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
-    if (prefill?.lines.length) return toLineRows(prefill.lines)
-    return [{
-      key: crypto.randomUUID(),
-      itemId: '',
-      qty: '1',
-      unitPrice: '0',
-      discountPct: '0',
-      taxPct: '18',
-    }]
-  })
+  const [lineRows, setLineRows] = useState<PiLineRow[]>(() => [{
+    key: crypto.randomUUID(),
+    itemId: '',
+    qty: '1',
+    unitPrice: '0',
+    discountPct: '0',
+    taxPct: '18',
+  }])
   const [toast, setToast] = useState<string | null>(null)
   const [errors, setErrors] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const linkedSo = useMemo(
-    () => (salesOrderId ? resolveSalesOrderProformaPrefill(salesOrderId) : null),
-    [salesOrderId],
+  const [prefillLoading, setPrefillLoading] = useState(Boolean(initialSoId))
+  const [linkedSoMeta, setLinkedSoMeta] = useState<{ salesOrderId: string; salesOrderNo: string } | null>(
+    () => {
+      if (!initialSoId) return null
+      const prefill = resolveSalesOrderProformaPrefill(initialSoId)
+      return prefill ? { salesOrderId: prefill.salesOrderId, salesOrderNo: prefill.salesOrderNo } : null
+    },
   )
+
+  const linkedSo = useMemo(() => {
+    if (linkedSoMeta && linkedSoMeta.salesOrderId === salesOrderId) return linkedSoMeta
+    const fromStore = salesOrderId ? resolveSalesOrderProformaPrefill(salesOrderId) : null
+    return fromStore
+      ? { salesOrderId: fromStore.salesOrderId, salesOrderNo: fromStore.salesOrderNo }
+      : null
+  }, [salesOrderId, linkedSoMeta, salesOrders])
+
+  function applyPrefillData(prefill: ProformaSalesOrderPrefill) {
+    setMode('sales_order')
+    setSalesOrderId(prefill.salesOrderId)
+    setCustomerId(prefill.customerId)
+    setPaymentTerms(prefill.paymentTerms)
+    setDeliveryTerms(prefill.deliveryTerms)
+    setCustomerPoNumber(prefill.customerPoNumber ?? '')
+    setBillingAddress(prefill.billingAddress)
+    setShippingAddress(prefill.shippingAddress)
+    setRemarks(prefill.remarks)
+    if (prefill.locationId) setLocationId(prefill.locationId)
+    // Do not invent SO-level freight / order discount — SO header has no charge fields.
+    setFreightMode('flat')
+    setFreightAmount(0)
+    setOrderDiscountMode('flat')
+    setOrderDiscountInput(0)
+    setLineRows(
+      prefill.lines.length
+        ? toLineRows(prefill.lines)
+        : [{
+            key: crypto.randomUUID(),
+            itemId: '',
+            qty: '1',
+            unitPrice: '0',
+            discountPct: '0',
+            taxPct: '18',
+          }],
+    )
+    setLinkedSoMeta({ salesOrderId: prefill.salesOrderId, salesOrderNo: prefill.salesOrderNo })
+  }
+
+  async function loadSoPrefill(soId: string, opts?: { announceSuccess?: boolean }) {
+    if (!soId) {
+      setPrefillLoading(false)
+      return
+    }
+    setPrefillLoading(true)
+    setErrors([])
+    try {
+      const result = await ensureSalesOrderProformaPrefill(soId)
+      if (!result.ok) {
+        setLinkedSoMeta(null)
+        notify.error(result.error)
+        show(result.error)
+        return
+      }
+      applyPrefillData(result.data)
+      if (opts?.announceSuccess) {
+        notify.success(`Filled from sales order ${result.data.salesOrderNo}`)
+      }
+    } finally {
+      setPrefillLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!initialSoId) return
+    void loadSoPrefill(initialSoId)
+    // Deep-link SO prefill once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSoId])
 
   const eligibleSalesOrders = useMemo(
     () => salesOrders.filter((so) => !['closed', 'cancelled'].includes(so.status)),
@@ -276,22 +333,16 @@ export function ProformaInvoiceFormPage() {
   }
 
   function applySoPrefill(soId: string) {
-    const prefill = resolveSalesOrderProformaPrefill(soId)
-    if (!prefill) return
-    setMode('sales_order')
-    setSalesOrderId(soId)
-    setCustomerId(prefill.customerId)
-    setPaymentTerms(prefill.paymentTerms)
-    setDeliveryTerms(prefill.deliveryTerms)
-    setCustomerPoNumber(prefill.customerPoNumber ?? '')
-    if (prefill.locationId) setLocationId(prefill.locationId)
-    setLineRows(toLineRows(prefill.lines))
+    void loadSoPrefill(soId, { announceSuccess: true })
   }
 
   function switchCreateMode(next: PiCreateMode) {
     setMode(next)
     if (next === 'direct') {
       setSalesOrderId('')
+      setLinkedSoMeta(null)
+      setBillingAddress(null)
+      setShippingAddress(null)
     }
   }
 
@@ -327,6 +378,7 @@ export function ProformaInvoiceFormPage() {
   }
 
   async function saveProforma() {
+    if (prefillLoading) return
     const errs = validate()
     setErrors(errs)
     if (errs.length) return
@@ -339,18 +391,23 @@ export function ProformaInvoiceFormPage() {
       paymentTerms,
       deliveryTerms,
       customerPoNumber: customerPoNumber || null,
+      billingAddress,
+      shippingAddress,
       remarks,
       locationId: locationId || null,
       lines,
     }
 
-    const linkedSo = salesOrderId ? salesOrders.find((s) => s.id === salesOrderId) : undefined
+    const linkedSoNo =
+      linkedSoMeta?.salesOrderId === salesOrderId
+        ? linkedSoMeta.salesOrderNo
+        : salesOrders.find((s) => s.id === salesOrderId)?.salesOrderNo
     let r: { ok: boolean; error?: string; id?: string }
     if (isApiMode()) {
       r = await apiCreateProforma({
         ...payload,
         salesOrderId: mode === 'sales_order' ? salesOrderId || null : null,
-        salesOrderNo: linkedSo?.salesOrderNo ?? null,
+        salesOrderNo: linkedSoNo ?? null,
         source: mode === 'sales_order' ? 'sales_order' : 'direct',
       })
     } else {
@@ -617,7 +674,7 @@ export function ProformaInvoiceFormPage() {
           <ErpStickySaveBar
             cancelTo="/sales/proforma-invoices"
             submitLabel="Save Proforma"
-            isSubmitting={isSubmitting}
+            isSubmitting={isSubmitting || prefillLoading}
             onSave={() => saveProforma()}
             hint={(
               <span className="text-[12px] text-erp-muted">
@@ -661,6 +718,15 @@ export function ProformaInvoiceFormPage() {
           </nav>
 
           <div className="crm-lead-zoho-canvas pi-zoho-canvas">
+        {prefillLoading ? (
+          <div
+            className="mb-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[13px] text-sky-900"
+            role="status"
+            aria-live="polite"
+          >
+            Loading sales order details…
+          </div>
+        ) : null}
         <div id="pi-section-source">
         <ErpCardSection
           title="Source & Dates"
@@ -698,8 +764,14 @@ export function ProformaInvoiceFormPage() {
                 options={soOptions}
                 value={salesOrderId}
                 onChange={(v) => { if (v) applySoPrefill(v) }}
-                placeholder="Search sales order no, customer…"
+                placeholder={prefillLoading ? 'Loading sales order…' : 'Search sales order no, customer…'}
                 appearance="dropdown"
+                disabled={prefillLoading}
+                resolveOrphanLabel={(id) =>
+                  linkedSoMeta?.salesOrderId === id
+                    ? linkedSoMeta.salesOrderNo
+                    : salesOrders.find((s) => s.id === id)?.salesOrderNo
+                }
               />
             </ErpFieldRow>
           ) : (

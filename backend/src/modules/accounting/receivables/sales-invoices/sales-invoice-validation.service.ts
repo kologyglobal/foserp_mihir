@@ -1,7 +1,12 @@
-import type { SalesInvoice, SalesInvoiceLine } from '@prisma/client'
+import type { Prisma, SalesInvoice, SalesInvoiceLine } from '@prisma/client'
+import { add, isZero, toDecimal } from '../../shared/finance-decimal.js'
 import type { SalesInvoiceCalculationInput } from '../calculation/sales-invoice-calculation.types.js'
 import type { CreateSalesInvoiceInput, SalesInvoiceLineRequest, UpdateSalesInvoiceInput } from './sales-invoice.schemas.js'
-import type { SalesInvoiceCalculationContext, SalesInvoiceWithLines } from './sales-invoice.types.js'
+import type {
+  SalesInvoiceCalculationContext,
+  SalesInvoiceLineRequestContext,
+  SalesInvoiceWithLines,
+} from './sales-invoice.types.js'
 
 export function buildCalculationContextFromRequest(
   input: CreateSalesInvoiceInput | UpdateSalesInvoiceInput,
@@ -180,14 +185,94 @@ export function buildCalculationInputFromRequest(
 
 export function parseCalculationContext(value: unknown): SalesInvoiceCalculationContext | null {
   if (!value || typeof value !== 'object') return null
-  return value as SalesInvoiceCalculationContext
+  const ctx = value as SalesInvoiceCalculationContext
+  if (!Array.isArray(ctx.lines) || ctx.lines.length === 0) return null
+  return ctx
+}
+
+function decString(value: Prisma.Decimal | string | number | null | undefined): string {
+  if (value == null) return '0'
+  return toDecimal(value).toString()
+}
+
+/** GST % for calc engine = IGST when present, else CGST + SGST (intra-state split). */
+function deriveGstRateFromStoredLine(line: SalesInvoiceLine): string {
+  const igst = toDecimal(line.igstRate)
+  if (igst.gt(0)) return igst.toString()
+  return add(line.cgstRate, line.sgstRate).toString()
+}
+
+/**
+ * Rebuild commercial calc context from persisted header + lines when
+ * `calculationContext` was never stored (e.g. CRM tax-invoice migration).
+ * Uses document snapshots only — does not invent amounts.
+ */
+export function reconstructCalculationContextFromStoredInvoice(
+  invoice: SalesInvoiceWithLines,
+): SalesInvoiceCalculationContext | null {
+  if (!invoice.lines?.length) return null
+
+  const lines: SalesInvoiceLineRequestContext[] = invoice.lines.map((line) => {
+    const discountPct = toDecimal(line.discountPercent)
+    const discountAmt = toDecimal(line.discountAmount)
+    const usePercent = discountPct.gt(0) || discountAmt.lte(0)
+    return {
+      lineNumber: line.lineNumber,
+      sourceLineId: line.sourceLineId ?? null,
+      itemId: line.itemId ?? null,
+      itemCode: line.itemCodeSnapshot ?? null,
+      itemName: line.itemNameSnapshot ?? null,
+      description: line.description,
+      hsnCode: line.hsnCodeSnapshot ?? null,
+      uom: line.uomSnapshot ?? null,
+      quantity: decString(line.quantity),
+      unitPrice: decString(line.unitRate),
+      lineDiscountType: usePercent ? 'PERCENTAGE' : 'AMOUNT',
+      lineDiscountValue: usePercent ? decString(line.discountPercent) : decString(line.discountAmount),
+      gstRate: deriveGstRateFromStoredLine(line),
+      cessRate: decString(line.cessRate),
+      isTaxInclusive: false,
+      revenueAccountId: line.revenueAccountId ?? null,
+      costCentreId: line.costCentreId ?? null,
+    }
+  })
+
+  const hasRoundOff = !isZero(invoice.roundOffAmount)
+  const hasOther = !isZero(invoice.otherChargesAmount)
+
+  return {
+    taxPricingMode: 'EXCLUSIVE',
+    freightMode: 'NON_TAXABLE',
+    freightTaxRate: null,
+    freightRevenueAccountId: null,
+    roundingMode: hasRoundOff ? 'MANUAL' : 'NONE',
+    manualRoundOff: hasRoundOff ? decString(invoice.roundOffAmount) : undefined,
+    otherCharges: hasOther
+      ? [
+          {
+            code: 'OTHER',
+            description: 'Other charges',
+            amount: decString(invoice.otherChargesAmount),
+            includeInTaxableValue: false,
+          },
+        ]
+      : undefined,
+    lines,
+  }
+}
+
+/** Stored context when valid; otherwise rebuild from line/header snapshots. */
+export function resolveCalculationContext(
+  invoice: SalesInvoiceWithLines,
+): SalesInvoiceCalculationContext | null {
+  return parseCalculationContext(invoice.calculationContext) ?? reconstructCalculationContextFromStoredInvoice(invoice)
 }
 
 export function buildCalculationInputFromStoredInvoice(
   invoice: SalesInvoiceWithLines,
   legalEntityStateCode?: string | null,
 ): SalesInvoiceCalculationInput | null {
-  const context = parseCalculationContext(invoice.calculationContext)
+  const context = resolveCalculationContext(invoice)
   if (!context) return null
   return buildCalculationInput(invoice, context, legalEntityStateCode)
 }

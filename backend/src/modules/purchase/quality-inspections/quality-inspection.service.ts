@@ -48,6 +48,8 @@ function defaultQiParameters(itemCode: string): QualityInspectionParameterInput[
 function buildQiParameters(inputs: QualityInspectionParameterInput[]) {
   return inputs.map((p, index) => ({
     lineNumber: index + 1,
+    sourceParameterId: p.sourceParameterId ?? null,
+    parameterCode: p.parameterCode?.trim() || null,
     parameterName: p.parameter.trim(),
     specification: p.specification?.trim() || '',
     minValue: p.minValue ?? null,
@@ -57,6 +59,79 @@ function buildQiParameters(inputs: QualityInspectionParameterInput[]) {
     result: p.result ?? 'na',
     remarks: p.remarks?.trim() || null,
   }))
+}
+
+/** Snapshot shared QualityInspectionPlan lines into Purchase QI parameters (never live-linked). */
+async function snapshotInspectionPlan(
+  tenantId: string,
+  planId: string,
+): Promise<{
+  inspectionPlanId: string
+  inspectionPlanRevisionId: string | null
+  planCodeSnapshot: string
+  planRevisionSnapshot: string | null
+  inspectionPlanLabel: string
+  parameters: ReturnType<typeof buildQiParameters>
+}> {
+  const plan = await prisma.qualityInspectionPlan.findFirst({
+    where: { id: planId, tenantId, deletedAt: null },
+    include: {
+      lines: {
+        orderBy: { sortOrder: 'asc' },
+        include: { parameter: true },
+      },
+      revisions: {
+        where: { status: 'ACTIVE' },
+        orderBy: { revisionNumber: 'desc' },
+        take: 1,
+      },
+    },
+  })
+  if (!plan) throw new QualityInspectionValidationError('Inspection plan not found.')
+  if (plan.status !== 'ACTIVE' && plan.category !== 'INCOMING') {
+    // Allow ACTIVE or INCOMING-category plans; still allow ACTIVE only preferred
+  }
+  const rev = plan.revisions[0] ?? null
+  const paramInputs: QualityInspectionParameterInput[] = plan.lines
+    .filter((l) => l.parameter && !l.parameter.deletedAt && l.parameter.active)
+    .map((l) => {
+      const p = l.parameter!
+      const min = l.minValueOverride ?? p.minValue
+      const max = l.maxValueOverride ?? p.maxValue
+      return {
+        parameter: p.parameterName,
+        parameterCode: p.parameterCode,
+        sourceParameterId: p.id,
+        specification: [p.parameterCode, min != null || max != null ? `[${min ?? '—'}..${max ?? '—'}]` : null]
+          .filter(Boolean)
+          .join(' '),
+        minValue: min != null ? Number(min) : null,
+        maxValue: max != null ? Number(max) : null,
+        observedValue: null,
+        unit: p.uomCode ?? '',
+        result: 'na' as const,
+        remarks: '',
+      }
+    })
+  if (!paramInputs.length) {
+    throw new QualityInspectionValidationError('Inspection plan has no active parameters to snapshot.')
+  }
+  return {
+    inspectionPlanId: plan.id,
+    inspectionPlanRevisionId: rev?.id ?? null,
+    planCodeSnapshot: plan.planCode,
+    planRevisionSnapshot: rev?.revisionCode ?? plan.revision ?? null,
+    inspectionPlanLabel: `${plan.planCode} — ${plan.planName}`,
+    parameters: buildQiParameters(paramInputs),
+  }
+}
+
+function resultFromStatus(status: QualityInspectionStatus): string | null {
+  if (status === 'ACCEPTED') return 'ACCEPT'
+  if (status === 'PARTIALLY_ACCEPTED') return 'PARTIAL'
+  if (status === 'REJECTED') return 'REJECT'
+  if (status === 'DEVIATION_PENDING') return 'HOLD'
+  return null
 }
 
 async function loadOrThrow(tenantId: string, id: string) {
@@ -220,13 +295,25 @@ export async function createQualityInspection(tenantId: string, actorId: string,
     (await resolveInspectorName(tenantId, input.inspectedById?.trim() || actorId))
   const inspectionNumber = await nextCode(tenantId, 'QUALITY_INSPECTION')
   const firstItemCode = lines[0]?.itemCodeSnapshot || ''
+
+  let planSnap: Awaited<ReturnType<typeof snapshotInspectionPlan>> | null = null
+  if (input.inspectionPlanId) {
+    planSnap = await snapshotInspectionPlan(tenantId, input.inspectionPlanId)
+  }
+
   const parameterInputs = input.parameters?.length
     ? input.parameters
-    : defaultQiParameters(firstItemCode)
-  const parameters = buildQiParameters(parameterInputs)
+    : planSnap
+      ? null
+      : defaultQiParameters(firstItemCode)
+  const parameters = parameterInputs
+    ? buildQiParameters(parameterInputs)
+    : planSnap!.parameters
   const inspectionPlan =
+    planSnap?.inspectionPlanLabel ||
     input.inspectionPlan?.trim() ||
     (firstItemCode ? `Incoming inspection — ${firstItemCode}` : 'Incoming inspection')
+  const assignNow = Boolean(input.inspectedById?.trim())
   const created = await prisma.$transaction(async (tx) => {
     const row = await tx.purchaseQualityInspection.create({ data: {
       tenantId, inspectionNumber, inspectionDate: qiDate(input.inspectionDate) ?? new Date(),
@@ -235,11 +322,17 @@ export async function createQualityInspection(tenantId: string, actorId: string,
       vendorId: grn?.vendorId ?? input.vendorId ?? null,
       warehouseId: grn?.warehouseId ?? input.warehouseId ?? defaults.defaultWarehouseId,
       status: 'DRAFT',
+      priority: input.priority?.trim() || 'NORMAL',
+      inspectionPlanId: planSnap?.inspectionPlanId ?? input.inspectionPlanId ?? null,
+      inspectionPlanRevisionId: planSnap?.inspectionPlanRevisionId ?? null,
+      planCodeSnapshot: planSnap?.planCodeSnapshot ?? null,
+      planRevisionSnapshot: planSnap?.planRevisionSnapshot ?? null,
       inspectionPlan,
       remarks: input.remarks?.trim() || null,
       deviationRemarks: input.deviationRemarks?.trim() || null,
       inspectedById: input.inspectedById?.trim() || actorId,
       inspectedByName,
+      assignedAt: assignNow ? new Date() : null,
       createdById: actorId, updatedById: actorId,
       lines: { create: lines.map((line) => ({ ...line, tenantId })) },
       parameters: { create: parameters.map((parameter) => ({ ...parameter, tenantId })) },
@@ -280,7 +373,13 @@ export async function updateQualityInspection(tenantId: string, id: string, acto
 
 export async function completeQualityInspection(
   tenantId: string, id: string, actorId: string,
-  body: { outcome?: 'AUTO' | 'ACCEPT' | 'REJECT'; remarks?: string; deviationRemarks?: string } = {},
+  body: {
+    outcome?: 'AUTO' | 'ACCEPT' | 'REJECT'
+    decisionCode?: string
+    decisionReason?: string
+    remarks?: string
+    deviationRemarks?: string
+  } = {},
 ) {
   const existing = await loadOrThrow(tenantId, id)
   if (!['DRAFT', 'PENDING', 'IN_PROGRESS', 'DEVIATION_PENDING'].includes(existing.status)) throw new QualityInspectionWorkflowError(`Quality inspection cannot be completed from ${existing.status}.`)
@@ -305,6 +404,24 @@ export async function completeQualityInspection(
   }
   const accepted = lines.reduce((sum, line) => sum + line.acceptedQuantity + (defaults.allowAcceptanceUnderDeviation ? line.deviationQuantity : 0), 0)
   const status: QualityInspectionStatus = rejected && accepted ? 'PARTIALLY_ACCEPTED' : rejected ? 'REJECTED' : 'ACCEPTED'
+  let result = resultFromStatus(status)
+  let decisionCode = body.decisionCode?.trim() || null
+  if (!decisionCode) {
+    if (status === 'ACCEPTED') decisionCode = deviations ? 'DEVIATION_ACCEPT' : 'ACCEPT'
+    else if (status === 'PARTIALLY_ACCEPTED') decisionCode = 'PARTIAL'
+    else decisionCode = 'REJECT'
+  }
+  if (decisionCode === 'QUARANTINE' || decisionCode === 'REWORK') result = 'HOLD'
+  if (decisionCode === 'RETURN_TO_VENDOR' || decisionCode === 'REPLACEMENT_REQUIRED') result = 'REJECT'
+  if (decisionCode === 'DEVIATION_ACCEPT') result = 'ACCEPT'
+  const decisionReason =
+    body.decisionReason?.trim() ||
+    body.remarks?.trim() ||
+    existing.remarks?.trim() ||
+    ''
+  if (!decisionReason) {
+    throw new QualityInspectionValidationError('Decision reason is required for every quality disposition.')
+  }
   const grn = existing.goodsReceiptId
     ? await prisma.goodsReceipt.findFirst({
         where: { id: existing.goodsReceiptId, tenantId, deletedAt: null },
@@ -344,7 +461,7 @@ export async function completeQualityInspection(
         tx,
       )
       await repo.updateQualityInspection(tenantId, id, {
-        status, completedAt: new Date(), updatedById: actorId,
+        status, result, decisionCode, decisionReason, completedAt: new Date(), updatedById: actorId,
         remarks: body.remarks?.trim() || existing.remarks,
         deviationRemarks: body.deviationRemarks?.trim() || existing.deviationRemarks,
       }, tx)
@@ -363,7 +480,7 @@ export async function completeQualityInspection(
         tx,
       )
       await repo.updateQualityInspection(tenantId, id, {
-        status, completedAt: new Date(), updatedById: actorId,
+        status, result, decisionCode, decisionReason, completedAt: new Date(), updatedById: actorId,
         remarks: body.remarks?.trim() || existing.remarks,
         deviationRemarks: body.deviationRemarks?.trim() || existing.deviationRemarks,
       }, tx)
@@ -495,4 +612,182 @@ export async function cancelQualityInspection(tenantId: string, id: string, acto
   }
   await transitionQi(tenantId, existing, actorId, 'CANCELLED', 'QI_CANCELLED', body.remarks)
   return toQiDto(tenantId, await loadOrThrow(tenantId, id))
+}
+
+export async function assignQualityInspector(
+  tenantId: string,
+  id: string,
+  actorId: string,
+  body: { inspectedById: string; inspectedByName?: string; priority?: string },
+) {
+  const existing = await loadOrThrow(tenantId, id)
+  if (!['DRAFT', 'PENDING', 'IN_PROGRESS', 'DEVIATION_PENDING'].includes(existing.status)) {
+    throw new QualityInspectionWorkflowError(`Cannot assign inspector from ${existing.status}.`)
+  }
+  const name =
+    body.inspectedByName?.trim() ||
+    (await resolveInspectorName(tenantId, body.inspectedById)) ||
+    body.inspectedById
+  await prisma.$transaction(async (tx) => {
+    await repo.updateQualityInspection(
+      tenantId,
+      id,
+      {
+        inspectedById: body.inspectedById,
+        inspectedByName: name,
+        assignedAt: new Date(),
+        priority: body.priority?.trim() || existing.priority || 'NORMAL',
+        status: existing.status === 'DRAFT' ? 'PENDING' : existing.status,
+        updatedById: actorId,
+      },
+      tx,
+    )
+    await repo.addQiHistory(
+      tenantId,
+      id,
+      existing.inspectionNumber,
+      'QI_ASSIGNED',
+      existing.status,
+      existing.status === 'DRAFT' ? 'PENDING' : existing.status,
+      actorId,
+      `Assigned to ${name}`,
+      tx,
+    )
+  })
+  return toQiDto(tenantId, await loadOrThrow(tenantId, id))
+}
+
+export async function startQualityInspection(tenantId: string, id: string, actorId: string) {
+  const existing = await loadOrThrow(tenantId, id)
+  if (!['DRAFT', 'PENDING'].includes(existing.status)) {
+    if (existing.status === 'IN_PROGRESS') return toQiDto(tenantId, existing)
+    throw new QualityInspectionWorkflowError(`Cannot start inspection from ${existing.status}.`)
+  }
+  await prisma.$transaction(async (tx) => {
+    await repo.updateQualityInspection(
+      tenantId,
+      id,
+      {
+        status: 'IN_PROGRESS',
+        startedAt: existing.startedAt ?? new Date(),
+        assignedAt: existing.assignedAt ?? new Date(),
+        updatedById: actorId,
+      },
+      tx,
+    )
+    await repo.addQiHistory(
+      tenantId,
+      id,
+      existing.inspectionNumber,
+      'QI_STARTED',
+      existing.status,
+      'IN_PROGRESS',
+      actorId,
+      undefined,
+      tx,
+    )
+  })
+  return toQiDto(tenantId, await loadOrThrow(tenantId, id))
+}
+
+/** Prefill payload for Purchase Return from rejected QI quantities. */
+export async function getPurchaseReturnPrefillFromQi(tenantId: string, id: string) {
+  const qi = await loadOrThrow(tenantId, id)
+  const { computeRemainingReturnable } = await import(
+    '../returns/returnable-quantity.service.js'
+  )
+  const returnable = await computeRemainingReturnable(tenantId, {
+    qualityInspectionId: qi.id,
+    goodsReceiptId: qi.goodsReceiptId,
+  })
+  if (!returnable.lines.some((l) => l.remainingReturnableQuantity > 0)) {
+    throw new QualityInspectionValidationError('No remaining rejected quantity available for purchase return.')
+  }
+  return {
+    vendorId: qi.vendorId ?? returnable.vendorId,
+    purchaseOrderId: qi.purchaseOrderId ?? returnable.purchaseOrderId,
+    goodsReceiptId: qi.goodsReceiptId ?? returnable.goodsReceiptId,
+    qualityInspectionId: qi.id,
+    qualityInspectionNumber: qi.inspectionNumber,
+    warehouseId: qi.warehouseId ?? returnable.warehouseId,
+    returnType:
+      qi.decisionCode === 'REPLACEMENT_REQUIRED' ? 'REPLACEMENT' : 'CREDIT',
+    decisionCode: qi.decisionCode,
+    reason: qi.decisionReason || qi.remarks || `Rejected on ${qi.inspectionNumber}`,
+    totalRejected: returnable.totalRejected,
+    totalReturned: returnable.totalReturned,
+    totalRemaining: returnable.totalRemaining,
+    lines: returnable.lines
+      .filter((l) => l.remainingReturnableQuantity > 0)
+      .map((l) => ({
+        goodsReceiptLineId: l.goodsReceiptLineId,
+        purchaseOrderLineId: l.purchaseOrderLineId,
+        itemId: l.itemId,
+        itemCode: l.itemCode,
+        itemName: l.itemName,
+        returnQuantity: l.remainingReturnableQuantity,
+        remainingReturnableQuantity: l.remainingReturnableQuantity,
+        rate: l.rate,
+        batchNumber: l.batchNumber,
+        serialNumber: l.serialNumber,
+      })),
+    nextActions: {
+      createPurchaseReturn: true,
+      createNcr: ['REJECTED', 'PARTIALLY_ACCEPTED', 'DEVIATION_PENDING'].includes(qi.status),
+      createBoth: true,
+    },
+  }
+}
+
+/**
+ * Optional NCR from Purchase QI (user action — never auto-create on reject).
+ */
+export async function createNcrFromPurchaseQi(
+  tenantId: string,
+  id: string,
+  actorId: string,
+  body: { title?: string; description?: string; severity?: 'CRITICAL' | 'MAJOR' | 'MINOR'; itemId?: string } = {},
+) {
+  const qi = await loadOrThrow(tenantId, id)
+  if (!['REJECTED', 'PARTIALLY_ACCEPTED', 'DEVIATION_PENDING', 'ACCEPTED', 'IN_PROGRESS'].includes(qi.status)) {
+    throw new QualityInspectionWorkflowError(`Cannot open NCR from inspection status ${qi.status}.`)
+  }
+  const itemId =
+    body.itemId ||
+    qi.lines.find((l) => qiQty(l.rejectedQuantity) > 0)?.itemId ||
+    qi.lines[0]?.itemId ||
+    null
+  const ncrNumber = await nextCode(tenantId, 'QUALITY_NCR')
+  const ncr = await prisma.qualityNcr.create({
+    data: {
+      tenantId,
+      ncrNumber,
+      severity: body.severity ?? 'MAJOR',
+      title: body.title?.trim() || `Incoming reject ${qi.inspectionNumber}`,
+      description:
+        body.description?.trim() ||
+        qi.remarks ||
+        qi.deviationRemarks ||
+        `NCR from purchase quality inspection ${qi.inspectionNumber}`,
+      itemId,
+      supplierId: qi.vendorId,
+      sourceType: 'PURCHASE_QI',
+      sourceId: qi.id,
+      goodsReceiptId: qi.goodsReceiptId,
+      reportedByUserId: actorId,
+      createdBy: actorId,
+      updatedBy: actorId,
+    },
+  })
+  return {
+    id: ncr.id,
+    ncrNumber: ncr.ncrNumber,
+    status: ncr.status,
+    sourceType: ncr.sourceType,
+    sourceId: ncr.sourceId,
+    goodsReceiptId: ncr.goodsReceiptId,
+    supplierId: ncr.supplierId,
+    itemId: ncr.itemId,
+    href: `/quality/ncr/${ncr.id}`,
+  }
 }

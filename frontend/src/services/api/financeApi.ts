@@ -994,3 +994,86 @@ export async function reverseJournal(id: string, reason: string) {
 export async function getJournalLedger(id: string) {
   return apiRequest<JournalLedgerEntry[]>(tenantPath(`/accounting/journals/${id}/ledger`))
 }
+
+// ─── Accounting vouchers (posted GL drill-through) ──────────────────────────
+
+export interface AccountingVoucherLedgerAccount {
+  id: string
+  code: string
+  name: string
+  category: string
+  accountType: string
+  isGroup: boolean
+  normalBalance: string
+  isControlAccount: boolean
+}
+
+export interface AccountingVoucherLedgerLine {
+  id: string
+  voucherId: string
+  voucherLineId: string
+  voucherType: string
+  voucherNumber: string
+  lineNumber: number
+  postingDate: string | null
+  documentDate: string | null
+  accountId: string
+  account: AccountingVoucherLedgerAccount | null
+  partyType: string | null
+  partyId: string | null
+  partyNameSnapshot: string | null
+  debitAmount: string
+  creditAmount: string
+  baseDebitAmount: string
+  baseCreditAmount: string
+  currencyCode: string
+  exchangeRate: string
+  costCentreId: string | null
+  projectReference: string | null
+  departmentReference: string | null
+  sourceModule: string | null
+  sourceDocumentType: string | null
+  sourceDocumentId: string | null
+  isReversal: boolean
+  reversalOfEntryId: string | null
+  reversedByEntryId: string | null
+  postedBy: string | null
+  postedAt: string | null
+}
+
+export interface AccountingVoucherLedgerHeader {
+  id: string
+  voucherNumber: string | null
+  voucherType: string
+  status: string
+  documentDate: string | null
+  postingDate: string | null
+  referenceNumber: string | null
+  externalReference: string | null
+  narration: string | null
+  currencyCode: string
+  exchangeRate: string
+  sourceModule: string | null
+  sourceDocumentType: string | null
+  sourceDocumentId: string | null
+  reversalOfVoucherId: string | null
+  reversedByVoucherId: string | null
+  reversalReason: string | null
+  postedAt: string | null
+  postedBy: string | null
+  totalDebit: string
+  totalCredit: string
+}
+
+export interface AccountingVoucherLedgerResponse {
+  voucher: AccountingVoucherLedgerHeader
+  entries: AccountingVoucherLedgerLine[]
+}
+
+export async function getAccountingVoucher(id: string) {
+  return apiRequest<Record<string, unknown>>(tenantPath(`/accounting/vouchers/${id}`))
+}
+
+export async function getAccountingVoucherLedger(id: string) {
+  return apiRequest<AccountingVoucherLedgerResponse>(tenantPath(`/accounting/vouchers/${id}/ledger`))
+}

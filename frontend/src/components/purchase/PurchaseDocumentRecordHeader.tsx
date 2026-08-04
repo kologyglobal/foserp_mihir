@@ -24,8 +24,9 @@ export type PurchaseDocumentRecordHeaderProps = {
 }
 
 /**
- * CRM Quotation-style sticky document header for Purchase create/edit.
- * Single dense row: title + fav · id · status · facts | actions
+ * Sticky document header for Purchase create/edit/view.
+ * Uses the same CRM sticky record header chrome as Leads / Opportunities
+ * (`crm-sticky-record-header`) — do not restyle for Purchase-only themes.
  */
 export function PurchaseDocumentRecordHeader({
   title,
@@ -42,19 +43,13 @@ export function PurchaseDocumentRecordHeader({
   const fav = isFavorite(favoritePath)
 
   return (
-    <header
-      className={cn('crm-sticky-record-header', className)}
-      aria-label="Document header"
-    >
+    <header className={cn('crm-sticky-record-header', className)} aria-label="Document header">
       <div className="crm-sticky-record-header__identity">
         <div className="crm-sticky-record-header__title-row">
           <h1 className="crm-sticky-record-header__title">{title}</h1>
           <button
             type="button"
-            className={cn(
-              'crm-sticky-record-header__fav',
-              fav && 'crm-sticky-record-header__fav--on',
-            )}
+            className={cn('crm-sticky-record-header__fav', fav && 'crm-sticky-record-header__fav--on')}
             onClick={() => toggleFavorite({ path: favoritePath, label: title })}
             aria-label={fav ? 'Remove from favorites' : 'Add to favorites'}
             title={fav ? 'Remove from favorites' : 'Add to favorites'}
@@ -63,9 +58,7 @@ export function PurchaseDocumentRecordHeader({
           </button>
         </div>
         <div className="crm-sticky-record-header__meta">
-          {idChip ? (
-            <span className="crm-sticky-record-header__id">{idChip}</span>
-          ) : null}
+          {idChip ? <span className="crm-sticky-record-header__id">{idChip}</span> : null}
           <StatusBadge label={status} status={statusKey ?? status} />
           {facts.map((fact) => (
             <span key={fact.label} className="crm-sticky-record-header__owner">

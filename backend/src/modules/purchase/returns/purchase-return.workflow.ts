@@ -12,8 +12,12 @@ export function validateReturnLines(lines: Array<{ returnQuantity: unknown }>) {
 export function returnAllowedActions(status: PurchaseReturnStatus, deletedAt?: Date | null) {
   const active = !deletedAt
   return {
-    canEdit: active && status === 'DRAFT', canSubmit: active && status === 'DRAFT',
-    canComplete: active && ['SUBMITTED', 'APPROVED', 'SHIPPED'].includes(status),
+    canEdit: active && status === 'DRAFT',
+    canSubmit: active && status === 'DRAFT',
+    canApprove: active && status === 'SUBMITTED',
+    canShip: active && status === 'APPROVED',
+    canComplete: active && ['APPROVED', 'SHIPPED'].includes(status),
     canCancel: active && ['DRAFT', 'SUBMITTED', 'APPROVED'].includes(status),
+    canRaiseApAdjustment: active && status === 'COMPLETED',
   }
 }

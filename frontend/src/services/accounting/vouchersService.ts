@@ -6,6 +6,7 @@
  * (tenant isolation + accounting.voucher.* permissions). UI gating alone is not security.
  */
 
+import { accountingDemoOrEmpty, isAccountingDemoDataEnabled } from '@/utils/accounting/accountingDemoData'
 import {
   seedAccountingVouchers,
   VOUCHER_COST_CENTRES,
@@ -40,7 +41,7 @@ export class VouchersServiceError extends Error {
 
 const delay = (ms = 100) => new Promise((r) => setTimeout(r, ms))
 
-let vouchersStore: AccountingVoucher[] = seedAccountingVouchers()
+let vouchersStore: AccountingVoucher[] = accountingDemoOrEmpty(seedAccountingVouchers)
 
 function currentUser(): string {
   try {
@@ -634,12 +635,12 @@ export async function addVoucherAttachmentMeta(
 
 export async function getPartyOptions() {
   await delay(40)
-  return clone(VOUCHER_PARTY_OPTIONS)
+  return isAccountingDemoDataEnabled() ? clone(VOUCHER_PARTY_OPTIONS) : []
 }
 
 export async function getCostCentreOptions() {
   await delay(40)
-  return clone(VOUCHER_COST_CENTRES)
+  return isAccountingDemoDataEnabled() ? clone(VOUCHER_COST_CENTRES) : []
 }
 
 export async function validateVoucherImport(fileName: string, csvText: string): Promise<VoucherImportPreview> {
@@ -781,7 +782,7 @@ export function getVoucherImportTemplateCsv(): string {
 }
 
 export function resetVouchersDemo(): void {
-  vouchersStore = seedAccountingVouchers()
+  vouchersStore = accountingDemoOrEmpty(seedAccountingVouchers)
 }
 
 export { DEFAULT_VOUCHER_FILTER }

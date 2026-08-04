@@ -82,6 +82,9 @@ export async function createTenantUser(opts: {
 }
 
 export async function cleanupPurchaseTenant(tenantId: string) {
+  await prisma.vendorAdjustmentSourceLink.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.vendorAdjustmentLine.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.vendorAdjustment.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.vendorInvoiceSourceLink.deleteMany({ where: { tenantId } })
   await prisma.vendorInvoiceLine.deleteMany({ where: { tenantId } })
   await prisma.vendorInvoice.deleteMany({ where: { tenantId } })
@@ -277,6 +280,9 @@ export async function createSentPo(
     itemCode?: string
     itemId?: string
     itemName?: string
+    /** ISO date (YYYY-MM-DD) used for OTD KPI samples. */
+    expectedDeliveryDate?: string
+    orderDate?: string
   },
 ) {
   const poBase = `/api/v1/t/${opts.slug}/purchase/orders`
@@ -286,8 +292,9 @@ export async function createSentPo(
     .set(auth)
     .send({
       vendorId: opts.vendorId,
-      orderDate: '2026-07-21',
+      orderDate: opts.orderDate ?? '2026-07-21',
       deliveryWarehouseId: opts.warehouseId,
+      ...(opts.expectedDeliveryDate ? { expectedDeliveryDate: opts.expectedDeliveryDate } : {}),
       lines: [
         {
           itemId: opts.itemId,
@@ -332,6 +339,7 @@ export async function createSubmittedGrn(
     binId: string
     receivedQuantity?: number
     inspectionRequired?: boolean
+    receiptDate?: string
   },
 ) {
   const grnBase = `/api/v1/t/${opts.slug}/purchase/grns`
@@ -341,7 +349,7 @@ export async function createSubmittedGrn(
     .set(auth)
     .send({
       purchaseOrderId: opts.poId,
-      receiptDate: '2026-07-21',
+      receiptDate: opts.receiptDate ?? '2026-07-21',
       warehouseId: opts.warehouseId,
       storageLocationId: opts.locationId,
       vendorChallanNumber: `CH-${Date.now()}`,

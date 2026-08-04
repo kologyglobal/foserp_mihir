@@ -1965,10 +1965,8 @@ export const useCrmStore = create<CrmState>()(
         const contact = doc.contactId ? get().getContact(doc.contactId) : undefined
         const product = salesQuo ? masters.getProduct(salesQuo.productId) : undefined
 
-        if (!doc.opportunityId || !opportunity) {
-          return { ok: false, error: 'Link this quotation to an opportunity before creating a sales order' }
-        }
-        if (opportunity.stage === 'lost' || opportunity.status === 'lost') {
+        // Opportunity is optional. When loaded and Lost/Cancelled, block.
+        if (opportunity && (opportunity.stage === 'lost' || opportunity.status === 'lost')) {
           return { ok: false, error: 'Cannot convert quotation — opportunity is Lost or Cancelled' }
         }
         if (customer && customer.isActive === false) {
@@ -1980,7 +1978,7 @@ export const useCrmStore = create<CrmState>()(
           latestDocument: latestDoc,
           salesQuotation: salesQuo,
           customer,
-          customerId: salesQuo?.customerId ?? opportunity.customerId,
+          customerId: salesQuo?.customerId ?? opportunity?.customerId,
           contactName: contact?.name,
           opportunityName: opportunity?.opportunityName,
           productName: product?.productName,
@@ -2058,7 +2056,9 @@ export const useCrmStore = create<CrmState>()(
         if (!result.ok) return result
 
         const soNo = result.salesOrderNo ?? 'SO'
-        const alreadyWon = opportunity.stage === 'won' || opportunity.status === 'won'
+        const alreadyWon = Boolean(
+          opportunity && (opportunity.stage === 'won' || opportunity.status === 'won'),
+        )
         const today = new Date().toISOString().slice(0, 10)
         set((s) => ({
           quotationDocuments: s.quotationDocuments.map((d) => {
@@ -2082,22 +2082,24 @@ export const useCrmStore = create<CrmState>()(
             }
             return d
           }),
-          opportunities: s.opportunities.map((o) =>
-            o.id === opportunity.id
-              ? mergeAudit(o, {
-                  salesOrderId: result.salesOrderId ?? null,
-                  stage: 'won',
-                  status: 'won',
-                  probability: 100,
-                  value: summary.grandTotal,
-                  // Preserve original close date when already Won.
-                  expectedCloseDate: alreadyWon
-                    ? o.expectedCloseDate
-                    : (o.expectedCloseDate || today),
-                  ...stampModified(o),
-                })
-              : o,
-          ),
+          opportunities: opportunity
+            ? s.opportunities.map((o) =>
+                o.id === opportunity.id
+                  ? mergeAudit(o, {
+                      salesOrderId: result.salesOrderId ?? null,
+                      stage: 'won',
+                      status: 'won',
+                      probability: 100,
+                      value: summary.grandTotal,
+                      // Preserve original close date when already Won.
+                      expectedCloseDate: alreadyWon
+                        ? o.expectedCloseDate
+                        : (o.expectedCloseDate || today),
+                      ...stampModified(o),
+                    })
+                  : o,
+              )
+            : s.opportunities,
         }))
         logActivity(get, set, {
           type: alreadyWon ? 'note' : 'sales_order_created',

@@ -68,18 +68,20 @@ export function buildBlankSalesOrderNewUrl(options?: BuildSalesOrderNewUrlOption
 
 /** Create form stays on `/sales/orders/new`; `fromCrm=1` preserves CRM chrome after save. */
 export function buildSalesOrderNewUrl(
-  opportunityId: string,
+  opportunityId?: string | null,
   quotationDocumentId?: string | null,
   options?: BuildSalesOrderNewUrlOptions,
 ): string {
-  const params = new URLSearchParams({ opportunityId })
+  const params = new URLSearchParams()
+  if (opportunityId) params.set('opportunityId', opportunityId)
   if (quotationDocumentId) params.set('quotationDocumentId', quotationDocumentId)
   if (options?.fromCrm) params.set(FROM_CRM_QUERY, '1')
-  return `${SALES_ORDERS_NEW_PATH}?${params.toString()}`
+  const qs = params.toString()
+  return qs ? `${SALES_ORDERS_NEW_PATH}?${qs}` : SALES_ORDERS_NEW_PATH
 }
 
 export function resolveSalesOrderNewPath(
-  opportunityId: string,
+  opportunityId?: string | null,
   quotationDocumentId?: string | null,
   fromCrm = false,
 ): string {

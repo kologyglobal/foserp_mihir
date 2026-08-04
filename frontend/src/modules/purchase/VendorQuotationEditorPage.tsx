@@ -894,6 +894,7 @@ export function VendorQuotationEditorPage() {
         collapsible
         defaultOpen
         dense
+        columns={6}
         collapsedSummary={quotationPeek || undefined}
       >
         <ErpFormSpan span={3}>
@@ -971,6 +972,7 @@ export function VendorQuotationEditorPage() {
         collapsible
         defaultOpen
         dense
+        columns={6}
         collapsedSummary={vendorPeek || undefined}
       >
         <ErpFieldRow label="Vendor" required>
@@ -1049,6 +1051,7 @@ export function VendorQuotationEditorPage() {
         collapsible
         defaultOpen={false}
         dense
+        columns={6}
         collapsedSummary={commercialPeek || undefined}
       >
         <ErpFieldRow label="Payment Terms">

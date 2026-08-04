@@ -1,5 +1,6 @@
 import type { Request } from 'express'
 import { prisma } from '../../../config/prisma.js'
+import { resolveUserNames } from '../../../shared/index.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { mapPurchaseRequisitionToDto } from './purchase-requisition.mapper.js'
 import { findPurchaseRequisitionById } from './purchase-requisition.repository.js'
@@ -14,6 +15,15 @@ const PRIORITY_MAP = {
 } as const
 
 const prInclude = { lines: { orderBy: { lineNumber: 'asc' as const } } } as const
+
+async function toShortageDto(tenantId: string, pr: NonNullable<Awaited<ReturnType<typeof findPurchaseRequisitionById>>>) {
+  const userNames = await resolveUserNames(
+    [pr.requestedById, pr.createdById, pr.updatedById],
+    tenantId,
+    prisma,
+  )
+  return withProductionShortageShape(mapPurchaseRequisitionToDto(pr, userNames))
+}
 
 /** Prefer production / stores for WO shortage; fall back to purchase / any dept. */
 const SHORTAGE_DEPARTMENT_CODES = ['production', 'stores', 'purchase', 'procurement'] as const
@@ -85,7 +95,7 @@ export async function createFromProductionShortage(
       },
       include: prInclude,
     })
-    if (existing) return withProductionShortageShape(mapPurchaseRequisitionToDto(existing))
+    if (existing) return toShortageDto(tenantId, existing)
   }
 
   const itemIds = [...new Set(input.lines.map((line) => line.itemId))]
@@ -179,7 +189,7 @@ export async function createFromProductionShortage(
   }
 
   const loaded = await findPurchaseRequisitionById(tenantId, created.id)
-  return withProductionShortageShape(mapPurchaseRequisitionToDto(loaded!))
+  return toShortageDto(tenantId, loaded!)
 }
 
 function withProductionShortageShape<T extends { lines: Array<{ requiredQuantity: number }> }>(dto: T) {

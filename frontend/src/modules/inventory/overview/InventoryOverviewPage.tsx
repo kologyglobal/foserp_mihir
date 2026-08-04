@@ -162,6 +162,9 @@ export function InventoryOverviewPage() {
               { label: 'Adjust Stock', icon: SlidersHorizontal, href: '/inventory/movements/adjustments' },
               { label: 'Stock Count', icon: ClipboardList, href: '/inventory/stock-count' },
               { label: 'Today’s Work', icon: Package, href: '/inventory/store-workbench' },
+              { label: 'Consolidated Stock', icon: Package, href: '/inventory/stock' },
+              { label: 'Warehouse Ops', icon: Package, href: '/inventory/ops/warehouses' },
+              { label: 'Ops Analytics', icon: Package, href: '/inventory/ops/analytics' },
             ].map((action) => (
               <button
                 key={action.label}
@@ -278,7 +281,11 @@ export function InventoryOverviewPage() {
           <p className="mt-4 text-xs text-erp-muted">
             <Package className="mr-1 inline h-3.5 w-3.5" aria-hidden />
             Demo mode — KPIs computed from stock ledger and master data.{' '}
-            <Link to="/inventory/stock" className="text-erp-primary underline">View stock availability</Link>
+            <Link to="/inventory/stock" className="text-erp-primary underline">View consolidated stock</Link>
+            {' · '}
+            <Link to="/inventory/ops/warehouses" className="text-erp-primary underline">Warehouse ops</Link>
+            {' · '}
+            <Link to="/inventory/ops/analytics" className="text-erp-primary underline">Ops analytics</Link>
           </p>
         </>
       ) : null}

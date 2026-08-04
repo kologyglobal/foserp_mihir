@@ -154,17 +154,16 @@ function assertConvertible(quotation: CrmQuotation, doc: CrmQuotationDocument, l
   }
 }
 
+/** When linked, opportunity must not be Lost/Archived. Opportunity is optional for convert. */
 async function assertOpportunityConvertible(
   tenantId: string,
   opportunityId: string | null | undefined,
-): Promise<CrmOpportunity> {
-  if (!opportunityId) {
-    throw new ValidationError('Link this quotation to an opportunity before creating a sales order')
-  }
+): Promise<CrmOpportunity | null> {
+  if (!opportunityId) return null
   const opportunity = await prisma.crmOpportunity.findFirst({
     where: { id: opportunityId, tenantId, deletedAt: null },
   })
-  if (!opportunity) throw new ValidationError('Opportunity not found')
+  if (!opportunity) throw new ValidationError('Linked opportunity not found')
   if (opportunity.status === 'LOST') {
     throw new InvalidStateError('Cannot convert quotation — opportunity is Lost')
   }
@@ -277,7 +276,7 @@ export async function convertQuotationToSalesOrder(
   const totalQty = lines.reduce((s, l) => s + l.qty, 0)
   const expectedDeliveryDate = parseDate(input.expectedDeliveryDate) ?? validityDate
   const warrantyTerms = sectionContent(doc.sections, 'warranty') || null
-  const opportunityId = opportunity.id
+  const opportunityId = opportunity?.id ?? null
 
   const { nextCode } = await import('../../../services/codeSeries.service.js')
 
@@ -424,103 +423,106 @@ export async function convertQuotationToSalesOrder(
         },
       })
 
-      const winReason = `Quotation ${quotation.quotationCode} converted to ${salesOrderNo}`
-      const alreadyWon = opportunity.status === 'WON'
-      const wonStage = await findWonStage(tenantId, opportunity.pipelineId)
+      // Opportunity win/link is optional — only when the quotation is already linked.
+      if (opportunity && opportunityId) {
+        const winReason = `Quotation ${quotation.quotationCode} converted to ${salesOrderNo}`
+        const alreadyWon = opportunity.status === 'WON'
+        const wonStage = await findWonStage(tenantId, opportunity.pipelineId)
 
-      if (!alreadyWon) {
-        if (!wonStage) {
-          throw new InvalidStateError('No won stage configured in pipeline')
+        if (!alreadyWon) {
+          if (!wonStage) {
+            throw new InvalidStateError('No won stage configured in pipeline')
+          }
+          await tx.crmOpportunity.update({
+            where: { id: opportunityId, tenantId },
+            data: {
+              status: 'WON',
+              stageId: wonStage.id,
+              probability: 100,
+              amount: summary.grandTotal,
+              // Use expectedCloseDate as close date (schema has no actualCloseDate).
+              expectedCloseDate: opportunity.expectedCloseDate ?? todayDateOnly(),
+              winReason,
+              updatedBy: userId,
+              lastActivityAt: now,
+            },
+          })
+          await tx.crmOpportunityStatusHistory.create({
+            data: {
+              tenantId,
+              opportunityId,
+              fromStatus: opportunity.status,
+              toStatus: 'WON',
+              changedBy: userId,
+              reason: winReason,
+            },
+          })
+          await tx.crmOpportunityStageHistory.create({
+            data: {
+              tenantId,
+              opportunityId,
+              fromStageId: opportunity.stageId,
+              toStageId: wonStage.id,
+              changedBy: userId,
+              reason: winReason,
+            },
+          })
+          const fromStage = opportunity.stageId
+            ? await tx.crmPipelineStage.findFirst({
+                where: { id: opportunity.stageId, tenantId },
+                select: { name: true },
+              })
+            : null
+          await tx.crmActivity.create({
+            data: {
+              tenantId,
+              activityType: 'STAGE_CHANGE',
+              subject: `Deal won: ${fromStage?.name ?? '—'} → ${wonStage.name}`,
+              description: winReason,
+              companyId: opportunity.companyId,
+              contactId: opportunity.contactId,
+              leadId: opportunity.leadId,
+              opportunityId,
+              assignedTo: userId,
+              scheduledAt: now,
+              completedAt: now,
+              status: 'COMPLETED',
+              outcome: 'Won via quotation conversion',
+              createdBy: userId,
+              updatedBy: userId,
+            },
+          })
+        } else {
+          // Already Won: link SO value, preserve original close date, no duplicate Won activity.
+          await tx.crmOpportunity.update({
+            where: { id: opportunityId, tenantId },
+            data: {
+              amount: summary.grandTotal,
+              probability: 100,
+              updatedBy: userId,
+              lastActivityAt: now,
+            },
+          })
+          await tx.crmActivity.create({
+            data: {
+              tenantId,
+              activityType: 'NOTE',
+              subject: `Sales order ${salesOrderNo} linked`,
+              description: `Quotation ${quotation.quotationCode} converted to ${salesOrderNo} (opportunity was already Won).`,
+              companyId: opportunity.companyId,
+              contactId: opportunity.contactId,
+              leadId: opportunity.leadId,
+              opportunityId,
+              assignedTo: userId,
+              scheduledAt: now,
+              completedAt: now,
+              status: 'COMPLETED',
+              outcome: 'SO linked from quotation',
+              createdBy: userId,
+              updatedBy: userId,
+            },
+          })
         }
-        await tx.crmOpportunity.update({
-          where: { id: opportunityId, tenantId },
-          data: {
-            status: 'WON',
-            stageId: wonStage.id,
-            probability: 100,
-            amount: summary.grandTotal,
-            // Use expectedCloseDate as close date (schema has no actualCloseDate).
-            expectedCloseDate: opportunity.expectedCloseDate ?? todayDateOnly(),
-            winReason,
-            updatedBy: userId,
-            lastActivityAt: now,
-          },
-        })
-        await tx.crmOpportunityStatusHistory.create({
-          data: {
-            tenantId,
-            opportunityId,
-            fromStatus: opportunity.status,
-            toStatus: 'WON',
-            changedBy: userId,
-            reason: winReason,
-          },
-        })
-        await tx.crmOpportunityStageHistory.create({
-          data: {
-            tenantId,
-            opportunityId,
-            fromStageId: opportunity.stageId,
-            toStageId: wonStage.id,
-            changedBy: userId,
-            reason: winReason,
-          },
-        })
-        const fromStage = opportunity.stageId
-          ? await tx.crmPipelineStage.findFirst({
-              where: { id: opportunity.stageId, tenantId },
-              select: { name: true },
-            })
-          : null
-        await tx.crmActivity.create({
-          data: {
-            tenantId,
-            activityType: 'STAGE_CHANGE',
-            subject: `Deal won: ${fromStage?.name ?? '—'} → ${wonStage.name}`,
-            description: winReason,
-            companyId: opportunity.companyId,
-            contactId: opportunity.contactId,
-            leadId: opportunity.leadId,
-            opportunityId,
-            assignedTo: userId,
-            scheduledAt: now,
-            completedAt: now,
-            status: 'COMPLETED',
-            outcome: 'Won via quotation conversion',
-            createdBy: userId,
-            updatedBy: userId,
-          },
-        })
-      } else {
-        // Already Won: link SO value, preserve original close date, no duplicate Won activity.
-        await tx.crmOpportunity.update({
-          where: { id: opportunityId, tenantId },
-          data: {
-            amount: summary.grandTotal,
-            probability: 100,
-            updatedBy: userId,
-            lastActivityAt: now,
-          },
-        })
-        await tx.crmActivity.create({
-          data: {
-            tenantId,
-            activityType: 'NOTE',
-            subject: `Sales order ${salesOrderNo} linked`,
-            description: `Quotation ${quotation.quotationCode} converted to ${salesOrderNo} (opportunity was already Won).`,
-            companyId: opportunity.companyId,
-            contactId: opportunity.contactId,
-            leadId: opportunity.leadId,
-            opportunityId,
-            assignedTo: userId,
-            scheduledAt: now,
-            completedAt: now,
-            status: 'COMPLETED',
-            outcome: 'SO linked from quotation',
-            createdBy: userId,
-            updatedBy: userId,
-          },
-        })
       }
 
       const updated = await tx.crmQuotation.findUniqueOrThrow({

@@ -6,6 +6,7 @@
  * (tenant isolation + accounting.reports.* permissions). UI gating alone is not security.
  */
 
+import { accountingDemoOrEmpty, accountingDemoOrFactory, isAccountingDemoDataEnabled } from '@/utils/accounting/accountingDemoData'
 import {
   FINANCIAL_REPORTS_COMPANY_NAME,
   FINANCIAL_REPORTS_PERIOD_LABEL,
@@ -66,21 +67,93 @@ export class FinancialReportsServiceError extends Error {
   }
 }
 
-const delay = () => new Promise((r) => setTimeout(r, 60 + Math.floor(Math.random() * 80)))
+const delay = () =>
+  new Promise((r) => setTimeout(r, isAccountingDemoDataEnabled() ? 60 + Math.floor(Math.random() * 80) : 0))
 
-let dashboardStore = seedFinancialReportsDashboard()
-let trialBalanceStore = seedTrialBalanceRows()
-let profitLossStore = seedProfitLossStatement()
-let balanceSheetStore = seedBalanceSheetStatement()
-let cashFlowStore = seedCashFlowStatement()
-let scheduleStore = seedAccountScheduleDefinitions()
-let manufacturingStore = seedManufacturingProfitability()
-let budgetStore = seedBudgetVsActualSeries()
-let costCentreStore = seedCostCentreProfitability()
-let departmentStore = seedDepartmentPerformance()
-let projectStore = seedProjectProfitability()
-let setupStore = seedFinancialReportSetup()
-let misStore = seedFinancialMisSnapshot()
+function emptyFinancialDashboard(): ReturnType<typeof seedFinancialReportsDashboard> {
+  return {
+    kpis: {
+      revenue: 0,
+      grossProfit: 0,
+      ebitda: 0,
+      netProfit: 0,
+      totalAssets: 0,
+      totalLiabilities: 0,
+      workingCapital: 0,
+      cashAndBank: 0,
+      receivables: 0,
+      payables: 0,
+      inventoryValue: 0,
+      currentRatio: 0,
+    },
+    monthlyTrend: [],
+    expenseByCategory: [],
+    budgetVsActual: [],
+    receivablesVsPayables: [],
+    plantProfitability: [],
+    productCategoryProfitability: [],
+    alerts: [],
+  }
+}
+
+function emptyProfitLoss(): ReturnType<typeof seedProfitLossStatement> {
+  return {
+    companyName: '',
+    periodLabel: '',
+    sections: [],
+    netProfit: 0,
+  }
+}
+
+function emptyBalanceSheet(): ReturnType<typeof seedBalanceSheetStatement> {
+  return {
+    companyName: '',
+    periodLabel: '',
+    asOfDate: new Date().toISOString().slice(0, 10),
+    sections: [],
+    totalAssets: 0,
+    totalLiabilitiesAndEquity: 0,
+    isBalanced: true,
+  }
+}
+
+function emptyCashFlow(): ReturnType<typeof seedCashFlowStatement> {
+  return {
+    companyName: '',
+    periodLabel: '',
+    openingCash: 0,
+    closingCash: 0,
+    netChangeInCash: 0,
+    sections: [],
+  }
+}
+
+function emptyMis(): ReturnType<typeof seedFinancialMisSnapshot> {
+  return {
+    view: 'executive_summary',
+    periodLabel: '',
+    generatedAt: new Date().toISOString(),
+    headline: 'No report data — live financial statements require GL reporting APIs.',
+    kpis: [],
+    charts: [],
+    highlights: [],
+    risks: [],
+  }
+}
+
+let dashboardStore = accountingDemoOrFactory(seedFinancialReportsDashboard, emptyFinancialDashboard)
+let trialBalanceStore = accountingDemoOrEmpty(seedTrialBalanceRows)
+let profitLossStore = accountingDemoOrFactory(seedProfitLossStatement, emptyProfitLoss)
+let balanceSheetStore = accountingDemoOrFactory(seedBalanceSheetStatement, emptyBalanceSheet)
+let cashFlowStore = accountingDemoOrFactory(seedCashFlowStatement, emptyCashFlow)
+let scheduleStore = accountingDemoOrEmpty(seedAccountScheduleDefinitions)
+let manufacturingStore = accountingDemoOrEmpty(seedManufacturingProfitability)
+let budgetStore = accountingDemoOrEmpty(seedBudgetVsActualSeries)
+let costCentreStore = accountingDemoOrEmpty(seedCostCentreProfitability)
+let departmentStore = accountingDemoOrEmpty(seedDepartmentPerformance)
+let projectStore = accountingDemoOrEmpty(seedProjectProfitability)
+let setupStore = accountingDemoOrFactory(seedFinancialReportSetup, seedFinancialReportSetup)
+let misStore = accountingDemoOrFactory(seedFinancialMisSnapshot, emptyMis)
 
 function clone<T>(value: T): T {
   return structuredClone(value)
@@ -359,24 +432,32 @@ function buildComparativeStatements(filter: FinancialReportFilter): ComparativeS
 }
 
 export function resetFinancialReportsDemo(): void {
-  dashboardStore = seedFinancialReportsDashboard()
-  trialBalanceStore = seedTrialBalanceRows()
-  profitLossStore = seedProfitLossStatement()
-  balanceSheetStore = seedBalanceSheetStatement()
-  cashFlowStore = seedCashFlowStatement()
-  scheduleStore = seedAccountScheduleDefinitions()
-  manufacturingStore = seedManufacturingProfitability()
-  budgetStore = seedBudgetVsActualSeries()
-  costCentreStore = seedCostCentreProfitability()
-  departmentStore = seedDepartmentPerformance()
-  projectStore = seedProjectProfitability()
-  setupStore = seedFinancialReportSetup()
-  misStore = seedFinancialMisSnapshot()
+  dashboardStore = accountingDemoOrFactory(seedFinancialReportsDashboard, emptyFinancialDashboard)
+  trialBalanceStore = accountingDemoOrEmpty(seedTrialBalanceRows)
+  profitLossStore = accountingDemoOrFactory(seedProfitLossStatement, emptyProfitLoss)
+  balanceSheetStore = accountingDemoOrFactory(seedBalanceSheetStatement, emptyBalanceSheet)
+  cashFlowStore = accountingDemoOrFactory(seedCashFlowStatement, emptyCashFlow)
+  scheduleStore = accountingDemoOrEmpty(seedAccountScheduleDefinitions)
+  manufacturingStore = accountingDemoOrEmpty(seedManufacturingProfitability)
+  budgetStore = accountingDemoOrEmpty(seedBudgetVsActualSeries)
+  costCentreStore = accountingDemoOrEmpty(seedCostCentreProfitability)
+  departmentStore = accountingDemoOrEmpty(seedDepartmentPerformance)
+  projectStore = accountingDemoOrEmpty(seedProjectProfitability)
+  setupStore = accountingDemoOrFactory(seedFinancialReportSetup, seedFinancialReportSetup)
+  misStore = accountingDemoOrFactory(seedFinancialMisSnapshot, emptyMis)
 }
 
 export async function getFinancialReportLookups(): Promise<FinancialReportLookups> {
   await delay()
-  const dims = seedCoaDimensionLookups()
+  const dims = isAccountingDemoDataEnabled()
+    ? seedCoaDimensionLookups()
+    : {
+        plants: [],
+        locations: [],
+        departments: [],
+        costCentres: [],
+        projects: [],
+      }
   const fy = getIndianFinancialYear()
   const prevFy = getIndianFinancialYear(new Date(`${fy.startYear - 1}-07-01`))
   return {
@@ -389,14 +470,16 @@ export async function getFinancialReportLookups(): Promise<FinancialReportLookup
     departments: dims.departments,
     costCentres: dims.costCentres,
     projects: dims.projects,
-    accountGroups: [
-      { code: '1100', name: 'Current Assets' },
-      { code: '1140', name: 'Inventory' },
-      { code: '2100', name: 'Current Liabilities' },
-      { code: '4000', name: 'Income' },
-      { code: '5000', name: 'Cost of Goods Sold' },
-      { code: '6000', name: 'Operating Expenses' },
-    ],
+    accountGroups: isAccountingDemoDataEnabled()
+      ? [
+          { code: '1100', name: 'Current Assets' },
+          { code: '1140', name: 'Inventory' },
+          { code: '2100', name: 'Current Liabilities' },
+          { code: '4000', name: 'Income' },
+          { code: '5000', name: 'Cost of Goods Sold' },
+          { code: '6000', name: 'Operating Expenses' },
+        ]
+      : [],
   }
 }
 

@@ -14,12 +14,21 @@ function genLineId(prefix = 'pil'): string {
 
 function mapSoLineToPiLine(line: SalesOrderLine, items: Item[]): ProformaInvoiceLine {
   const item = line.itemId ? items.find((i) => i.id === line.itemId) : undefined
+  const lineExtra = line as SalesOrderLine & {
+    itemCodeSnapshot?: string | null
+    itemNameSnapshot?: string | null
+  }
   return {
     id: genLineId(),
     lineNo: line.lineNo,
     itemId: line.itemId ?? item?.id ?? '',
-    itemCode: item?.itemCode ?? '',
-    description: line.description || line.productOrItem || item?.itemName || '',
+    itemCode: item?.itemCode ?? lineExtra.itemCodeSnapshot ?? '',
+    description:
+      line.description ||
+      line.productOrItem ||
+      lineExtra.itemNameSnapshot ||
+      item?.itemName ||
+      '',
     hsnCode: item?.hsnCode ?? '',
     qty: line.qty,
     uom: line.uom || 'Nos',

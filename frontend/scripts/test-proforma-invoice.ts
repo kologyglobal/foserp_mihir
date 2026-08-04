@@ -44,6 +44,10 @@ check('Store module loads', Boolean(useProformaInvoiceStore.getState().createDir
 check('Build lines from SO', buildProformaLinesFromSalesOrder(so, useMasterStore.getState().products).length >= 1)
 check('Prefill URL', buildProformaNewUrl(so.id).includes(`salesOrderId=${so.id}`))
 check('Prefill resolver', Boolean(resolveSalesOrderProformaPrefill(so.id)?.salesOrderNo))
+check('Prefill includes remarks field', typeof resolveSalesOrderProformaPrefill(so.id)?.remarks === 'string')
+const { ensureSalesOrderProformaPrefill } = await import('../src/utils/proformaInvoicePrefill')
+const ensureResult = await ensureSalesOrderProformaPrefill(so.id)
+check('Ensure prefill maps SO lines', ensureResult.ok && (ensureResult.ok ? ensureResult.data.lines.length >= 1 : false))
 
 const direct = useProformaInvoiceStore.getState().createDirect({
   customerId: customer.id,

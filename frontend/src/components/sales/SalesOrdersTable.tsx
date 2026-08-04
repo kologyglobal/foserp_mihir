@@ -8,6 +8,7 @@ import { useWorkOrderStore } from '../../store/workOrderStore'
 import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
+import { resolveCatalogProductDisplay } from '../../utils/catalogProductLabel'
 import type { SalesOrder } from '../../types/mrp'
 import { resolveSalesOrderValue } from './SalesOrder360Sections'
 import { getSalesOrderFulfillmentLabel, isSalesOrderOverdue } from '../../utils/salesDashboardMetrics'
@@ -79,6 +80,7 @@ export function SalesOrdersTable({
   const densityClass = useDensityClass()
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
+  const items = useMasterStore((s) => s.items)
   const workOrders = useWorkOrderStore((s) => s.workOrders)
   const proformaInvoices = useProformaInvoiceStore((s) => s.proformaInvoices)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
@@ -146,11 +148,11 @@ export function SalesOrdersTable({
         header: 'Product',
         meta: { columnLabel: 'Product' },
         cell: ({ row }) => {
-          const p = products.find((p) => p.id === row.original.productId)
+          const display = resolveCatalogProductDisplay(row.original, { items, products })
           return (
             <EnterpriseRecordCell
-              primary={p?.productName ?? row.original.productId}
-              subtitle={p?.productFamily}
+              primary={display.code || display.label}
+              subtitle={display.code ? display.name || undefined : undefined}
             />
           )
         },
@@ -313,7 +315,7 @@ export function SalesOrdersTable({
         },
       },
     ],
-    [customers, products, workOrders, proformaInvoices, crmMode, onView, onEdit, onPreview, onDelete, onPrint, onConvert, onDuplicate, onCreateProforma],
+    [customers, products, items, workOrders, proformaInvoices, crmMode, onView, onEdit, onPreview, onDelete, onPrint, onConvert, onDuplicate, onCreateProforma],
   )
 
   const resolvedEmptyMessage = emptyMessage ?? (hasActiveFilters ? 'No sales orders match current filters.' : 'No sales orders found.')

@@ -191,6 +191,27 @@ export function mapPurchaseOrderToDto(
         purchasePlanningRowId: line.purchasePlanningRowId,
         requisitionNumber: (line as { requisitionNumber?: string | null }).requisitionNumber ?? null,
         remarks: line.remarks,
+        prSources: (
+          (line as {
+            prSources?: Array<{
+              id: string
+              purchaseRequisitionId: string
+              purchaseRequisitionLineId: string
+              purchasePlanningRowId: string | null
+              requisitionNumber: string
+              planningNumber: string | null
+              quantity: unknown
+            }>
+          }).prSources ?? []
+        ).map((s) => ({
+          id: s.id,
+          purchaseRequisitionId: s.purchaseRequisitionId,
+          purchaseRequisitionLineId: s.purchaseRequisitionLineId,
+          purchasePlanningRowId: s.purchasePlanningRowId,
+          requisitionNumber: s.requisitionNumber,
+          planningNumber: s.planningNumber,
+          quantity: num(s.quantity),
+        })),
       }
     }),
   }

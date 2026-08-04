@@ -19,6 +19,7 @@ import {
   seedReceivableCustomers,
   seedReceivableInvoices,
 } from '../../data/accounting/receivablesSeed'
+import { accountingDemoOrEmpty, isAccountingDemoDataEnabled } from '@/utils/accounting/accountingDemoData'
 import type {
   AllocationStatus,
   AutoAllocationMethod,
@@ -87,19 +88,22 @@ export class ReceivablesServiceError extends Error {
   }
 }
 
-const COMPANY_NAME = 'Vasant Trailers Pvt Ltd'
-const delay = () => new Promise((r) => setTimeout(r, 60 + Math.floor(Math.random() * 80)))
+const COMPANY_NAME = isAccountingDemoDataEnabled() ? 'Vasant Trailers Pvt Ltd' : 'Company'
+const delay = () =>
+  new Promise((r) => setTimeout(r, isAccountingDemoDataEnabled() ? 60 + Math.floor(Math.random() * 80) : 0))
 
-let customersStore = seedReceivableCustomers()
-let invoicesStore = seedReceivableInvoices()
-let receiptsStore = seedCustomerReceipts()
-let activitiesStore = seedCollectionActivities()
-let promisesStore = seedPaymentPromises()
-let disputesStore = seedCustomerDisputes()
-let creditNotesStore = seedCreditNotes()
-let remindersStore = seedPaymentReminders()
-let auditStore = seedReceivableAudit()
-let savedViewsStore: ReceivableSavedView[] = [...SEED_RECEIVABLE_SAVED_VIEWS]
+let customersStore = accountingDemoOrEmpty(seedReceivableCustomers)
+let invoicesStore = accountingDemoOrEmpty(seedReceivableInvoices)
+let receiptsStore = accountingDemoOrEmpty(seedCustomerReceipts)
+let activitiesStore = accountingDemoOrEmpty(seedCollectionActivities)
+let promisesStore = accountingDemoOrEmpty(seedPaymentPromises)
+let disputesStore = accountingDemoOrEmpty(seedCustomerDisputes)
+let creditNotesStore = accountingDemoOrEmpty(seedCreditNotes)
+let remindersStore = accountingDemoOrEmpty(seedPaymentReminders)
+let auditStore = accountingDemoOrEmpty(seedReceivableAudit)
+let savedViewsStore: ReceivableSavedView[] = isAccountingDemoDataEnabled()
+  ? [...SEED_RECEIVABLE_SAVED_VIEWS]
+  : []
 
 function pushAudit(entityType: string, entityId: string, action: string, details: string) {
   const user = getSessionUser()

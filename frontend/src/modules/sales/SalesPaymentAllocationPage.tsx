@@ -149,7 +149,26 @@ export function SalesPaymentAllocationPage() {
               i.customerId === customerId
               && i.status !== 'draft'
               && i.status !== 'cancelled'
-              && i.balanceDue > 0.009,
+              && i.balanceDue > 0.009
+              && !i.salesInvoiceId
+              && i.accountingStatus !== 'pending_review'
+              && i.accountingStatus !== 'converted',
+          )
+        : [],
+    [customerId, invoices],
+  )
+
+  const accountingManagedInvoices = useMemo(
+    () =>
+      customerId
+        ? invoices.filter(
+            (i) =>
+              i.customerId === customerId
+              && i.status !== 'draft'
+              && i.status !== 'cancelled'
+              && (Boolean(i.salesInvoiceId)
+                || i.accountingStatus === 'pending_review'
+                || i.accountingStatus === 'converted'),
           )
         : [],
     [customerId, invoices],
@@ -598,6 +617,20 @@ export function SalesPaymentAllocationPage() {
           }
         >
           <div className="col-span-full space-y-3">
+            {customerId && accountingManagedInvoices.length > 0 ? (
+              <div className="rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-950">
+                {accountingManagedInvoices.length} invoice
+                {accountingManagedInvoices.length === 1 ? ' is' : 's are'} managed by Accounting Money In and
+                cannot receive CRM allocations.{' '}
+                <button
+                  type="button"
+                  className="font-semibold underline"
+                  onClick={() => navigate('/accounting/money-in/receipts')}
+                >
+                  Open Money In Allocation
+                </button>
+              </div>
+            ) : null}
             {customerId && openInvoices.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2">
                 <ErpButton

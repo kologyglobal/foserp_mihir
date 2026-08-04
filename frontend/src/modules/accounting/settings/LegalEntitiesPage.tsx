@@ -18,6 +18,9 @@ import { useFinancePermissions } from '@/utils/permissions/finance'
 import { notify } from '@/store/toastStore'
 import { FinanceSettingsShell } from './FinanceSettingsShell'
 import { FinanceSettingsTable } from './financeSettingsShared'
+import { listGstStateSelectOptions } from '@/utils/gstStateCode'
+
+const GST_STATE_OPTIONS = listGstStateSelectOptions()
 
 const ENTITY_TYPES: LegalEntityType[] = [
   'PRIVATE_LIMITED',
@@ -95,6 +98,10 @@ export function LegalEntitiesPage() {
   }
 
   const save = async () => {
+    if (!form.stateCode.trim()) {
+      notify.error('State code is required for GST supply determination on invoices.')
+      return
+    }
     try {
       if (editing) {
         await updateLegalEntity(editing.id, form)
@@ -141,7 +148,7 @@ export function LegalEntitiesPage() {
         <p className="text-[13px] text-erp-muted">You do not have permission to view legal entities.</p>
       ) : null}
       {!loading && perms.canView ? (
-        <FinanceSettingsTable headers={['Code', 'Name', 'GSTIN', 'FY Start', 'Default', 'Status', 'Actions']}>
+        <FinanceSettingsTable headers={['Code', 'Name', 'GSTIN', 'State', 'FY Start', 'Default', 'Status', 'Actions']}>
           {rows.map((row) => (
             <tr key={row.id} className="hover:bg-erp-surface-alt/60">
               <td className="px-3 py-2 font-mono text-[11px]">{row.code}</td>
@@ -150,6 +157,7 @@ export function LegalEntitiesPage() {
                 <div className="text-[11px] text-erp-muted">{row.legalName}</div>
               </td>
               <td className="px-3 py-2">{row.gstin ?? '—'}</td>
+              <td className="px-3 py-2 font-mono text-[11px]">{row.stateCode ?? '—'}</td>
               <td className="px-3 py-2">Month {row.fiscalYearStartMonth}</td>
               <td className="px-3 py-2">{row.isDefault ? 'Yes' : 'No'}</td>
               <td className="px-3 py-2">{row.isActive ? 'Active' : 'Inactive'}</td>
@@ -219,17 +227,37 @@ export function LegalEntitiesPage() {
               ))}
             </Select>
           </FormField>
+          <FormField label="GSTIN">
+            <Input
+              value={form.gstin}
+              onChange={(e) => {
+                const gstin = e.target.value.toUpperCase()
+                setForm((f) => {
+                  const next = { ...f, gstin }
+                  if (gstin.length >= 2 && !f.stateCode.trim()) {
+                    const code = gstin.slice(0, 2)
+                    if (/^\d{2}$/.test(code)) next.stateCode = code
+                  }
+                  return next
+                })
+              }}
+            />
+          </FormField>
+          <FormField label="State code" required hint="GST state of the legal entity (required for tax supply type)">
+            <Select value={form.stateCode} onChange={(e) => setForm((f) => ({ ...f, stateCode: e.target.value }))}>
+              <option value="">— Select —</option>
+              {GST_STATE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </Select>
+          </FormField>
           <details className="rounded border border-erp-border p-2">
             <summary className="cursor-pointer text-[12px] font-semibold text-erp-text">Advanced</summary>
             <div className="mt-3 space-y-3">
               <FormField label="PAN">
                 <Input value={form.pan} onChange={(e) => setForm((f) => ({ ...f, pan: e.target.value.toUpperCase() }))} />
-              </FormField>
-              <FormField label="GSTIN">
-                <Input value={form.gstin} onChange={(e) => setForm((f) => ({ ...f, gstin: e.target.value.toUpperCase() }))} />
-              </FormField>
-              <FormField label="State code">
-                <Input value={form.stateCode} onChange={(e) => setForm((f) => ({ ...f, stateCode: e.target.value }))} />
               </FormField>
               <FormField label="FY start month (1–12)">
                 <Input

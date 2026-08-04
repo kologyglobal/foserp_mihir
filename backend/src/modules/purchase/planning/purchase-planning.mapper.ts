@@ -10,7 +10,7 @@ function enumToApi(value: string): string {
   return value.toLowerCase()
 }
 
-export function mapPlanningRowToDto(row: PurchasePlanningRow) {
+export function mapPlanningRowToDto(row: PurchasePlanningRow, userNames?: Map<string, string>) {
   return {
     id: row.id,
     planningNumber: row.planningNumber,
@@ -20,6 +20,7 @@ export function mapPlanningRowToDto(row: PurchasePlanningRow) {
     purchaseRequisitionNumber: row.purchaseRequisitionNumberSnapshot,
     departmentId: row.departmentId,
     requestedById: row.requestedById,
+    requestedByName: (row.requestedById && userNames?.get(row.requestedById)?.trim()) || null,
     itemId: row.itemId,
     itemCode: row.itemCodeSnapshot,
     itemName: row.itemNameSnapshot,

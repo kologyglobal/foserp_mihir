@@ -7,12 +7,14 @@ import customerCreditNoteRoutes from './credit-notes/customer-credit-note.routes
 import creditNoteAllocationRoutes from './credit-notes/allocations/customer-credit-note-allocation.routes.js'
 import arDisputeRoutes from './disputes/ar-dispute.routes.js'
 import recurringInvoiceRoutes from './recurring-invoices/recurring-invoice.routes.js'
+import crmReceiptMigrationRoutes from './source/crm-receipt-migration.routes.js'
 
 const router = Router({ mergeParams: true })
 
 router.use('/', reportingRoutes)
 router.use('/', allocationRoutes)
 router.use('/', creditNoteAllocationRoutes)
+router.use('/', crmReceiptMigrationRoutes)
 router.use('/invoices', salesInvoiceRoutes)
 router.use('/receipts', customerReceiptRoutes)
 router.use('/credit-notes', customerCreditNoteRoutes)

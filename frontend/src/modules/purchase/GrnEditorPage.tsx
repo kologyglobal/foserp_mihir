@@ -962,6 +962,7 @@ export function GrnEditorPage() {
         collapsible
         defaultOpen
         dense
+        columns={6}
       >
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Document</p>
@@ -1038,6 +1039,7 @@ export function GrnEditorPage() {
         collapsible
         defaultOpen
         dense
+        columns={6}
       >
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Location</p>

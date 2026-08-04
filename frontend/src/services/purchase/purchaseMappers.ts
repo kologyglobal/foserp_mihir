@@ -250,14 +250,19 @@ function resolveRequesterDisplayName(
   requestedById: string | null | undefined,
   requestedByName?: string | null,
 ): string {
-  const fromApi = (requestedByName ?? '').trim()
-  if (fromApi) return fromApi
+  const named = (requestedByName ?? '').trim()
+  if (named) return named
   const id = (requestedById ?? '').trim()
   if (!id) return ''
+  // Avoid showing raw UUIDs when the session matches but names were omitted from the API.
   const session = getStoredSession()
   if (session?.user?.id === id) {
     const name = `${session.user.firstName ?? ''} ${session.user.lastName ?? ''}`.trim()
     return name || session.user.email || id
+  }
+  // Never prefer UUID as a "name" in registers — blank is clearer than a technical id.
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    return '—'
   }
   return id
 }
@@ -1290,6 +1295,29 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     rfqLineId: null,
     vendorQuotationLineId: null,
     remarks: line.remarks ?? '',
+    prSources: Array.isArray((line as { prSources?: unknown }).prSources)
+      ? (
+          (line as {
+            prSources: Array<{
+              id: string
+              purchaseRequisitionId: string
+              purchaseRequisitionLineId: string
+              purchasePlanningRowId: string | null
+              requisitionNumber: string
+              planningNumber: string | null
+              quantity: number
+            }>
+          }).prSources
+        ).map((s) => ({
+          id: s.id,
+          purchaseRequisitionId: s.purchaseRequisitionId,
+          purchaseRequisitionLineId: s.purchaseRequisitionLineId,
+          purchasePlanningRowId: s.purchasePlanningRowId,
+          requisitionNumber: s.requisitionNumber,
+          planningNumber: s.planningNumber,
+          quantity: Number(s.quantity) || 0,
+        }))
+      : undefined,
   }
 }
 
@@ -2102,8 +2130,9 @@ function mapApiReturnStatus(status: string): PurchaseReturnDomainStatus {
     case 'SUBMITTED':
       return 'pending_approval'
     case 'APPROVED':
-    case 'SHIPPED':
       return 'approved'
+    case 'SHIPPED':
+      return 'shipped'
     case 'COMPLETED':
       return 'posted'
     case 'CLOSED':
@@ -2179,13 +2208,18 @@ export function mapApiPurchaseReturnToDomain(api: ApiPurchaseReturn): PurchaseRe
     qualityInspectionId: api.qualityInspectionId,
     qualityInspectionNumber: api.qualityInspectionNumber || null,
     returnReason,
+    returnType: api.returnType || 'CREDIT',
+    accountingStatus: api.accountingStatus || 'NONE',
+    vendorAdjustmentId: api.vendorAdjustmentId ?? null,
+    vendorAdjustmentHref: api.vendorAdjustmentHref ?? null,
+    replacementGoodsReceiptId: api.replacementGoodsReceiptId ?? null,
     transportDetails: '',
-    debitNoteRequired: false,
-    replacementRequired: false,
+    debitNoteRequired: (api.returnType || 'CREDIT') !== 'REPLACEMENT',
+    replacementRequired: (api.returnType || '') === 'REPLACEMENT',
     linkedReplacementPoId: null,
     linkedReplacementPoNumber: null,
-    linkedDebitNoteId: null,
-    linkedDebitNoteNumber: null,
+    linkedDebitNoteId: api.vendorAdjustmentId ?? null,
+    linkedDebitNoteNumber: api.vendorAdjustmentDraftRef ?? null,
     postedAt: api.completedAt,
     lines: (api.lines ?? []).map((l) => {
       const qty = Number(l.returnQuantity) || 0
@@ -2273,6 +2307,12 @@ export function mapApiPurchaseReturnToListRow(api: ApiPurchaseReturn): PurchaseR
 export function mapDomainPurchaseReturnInputToApiPayload(
   input: PurchaseReturnInput,
 ): Record<string, unknown> {
+  const returnType =
+    input.returnType ||
+    (input.replacementRequired ? 'REPLACEMENT' : undefined)
+  const reasonText =
+    (input.remarks && String(input.remarks).trim()) ||
+    String(input.returnReason || 'Return')
   return {
     vendorId: input.vendorId,
     returnDate: input.documentDate ?? undefined,
@@ -2280,7 +2320,8 @@ export function mapDomainPurchaseReturnInputToApiPayload(
     goodsReceiptId: uuidOrNull(input.goodsReceiptId ?? null),
     qualityInspectionId: uuidOrNull(input.qualityInspectionId ?? null),
     warehouseId: uuidOrNull(input.warehouseId ?? null),
-    reason: input.returnReason,
+    returnType,
+    reason: reasonText,
     remarks: input.remarks || null,
     lines: input.lines.map((line: PurchaseReturnLineInput) => ({
       goodsReceiptLineId: uuidOrNull(line.goodsReceiptLineId ?? null),

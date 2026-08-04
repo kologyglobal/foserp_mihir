@@ -412,29 +412,135 @@ export async function getQualityWorkspaceSummary() {
   return apiRequest<QualityWorkspaceSummary>(tenantPath('/quality/workspace/summary'))
 }
 
-export interface IncomingQualityQueueItem {
-  kind: 'GRN' | 'PURCHASE_QI'
+export interface IncomingQualityWorkItem {
   id: string
-  number: string
-  status: string
+  kind: 'GRN_LINE' | 'PURCHASE_QI_LINE'
+  goodsReceiptId: string
+  goodsReceiptNumber: string
+  goodsReceiptLineId: string | null
+  purchaseOrderId: string | null
+  purchaseOrderNumber: string | null
+  vendorId: string | null
   vendorName: string | null
-  warehouseId?: string | null
-  receivedDate?: string | null
-  grnId?: string | null
-  grnNumber?: string | null
-  href: string
+  warehouseId: string | null
+  itemId: string | null
+  itemCode: string
+  itemName: string
+  receivedQuantity: number
+  qcHoldQuantity: number
+  qualityInspectionId: string | null
+  qualityInspectionNumber: string | null
+  inspectionStatus: string
+  result: string | null
+  priority: string
+  inspectorId: string | null
+  inspectorName: string | null
+  assignedAt: string | null
+  startedAt: string | null
+  completedAt: string | null
+  receivedDate: string | null
+  ageingDays: number
+  ageingBand: '0-1' | '2-3' | '4-7' | '8+'
+  hrefGrn: string
+  hrefQi: string | null
+  hrefCreateQi: string
+  allowedActions: string[]
 }
 
 export interface IncomingQualityReadiness {
   ready: boolean
   code: string
   message: string
-  items?: IncomingQualityQueueItem[]
+  /** Enhanced work queue (line-level). */
+  items?: IncomingQualityWorkItem[]
+  summary?: {
+    total: number
+    openQi: number
+    grnAwaitingQi: number
+    ageingHot: number
+    qcHoldQty: number
+  }
   counts?: { grnPending: number; purchaseQiPending: number; total: number }
+  page?: number
+  limit?: number
+  total?: number
 }
 
-export async function getIncomingQualityQueue() {
-  return apiRequest<IncomingQualityReadiness>(tenantPath('/quality/incoming/queue'))
+export interface IncomingStockStatusPanel {
+  received: number
+  qcHold: number
+  accepted: number
+  rejected: number
+  deviationHold: number
+  released: number
+  goodsReceiptId: string | null
+  goodsReceiptNumber: string | null
+  qualityInspectionId: string | null
+  qualityInspectionNumber: string | null
+  warehouseId: string | null
+  movementRefs: Array<{
+    referenceType: string
+    referenceNo: string | null
+    quantity: number
+    stockStatus: string
+    createdAt: string | null
+  }>
+}
+
+export interface IncomingQualityReports {
+  generatedAt: string
+  ageing: { '0-1': number; '2-3': number; '4-7': number; '8+': number }
+  qcHoldStock: number
+  vendorRejectionRate: Array<{ key: string; inspected: number; rejected: number; ratePct: number }>
+  itemRejectionRate: Array<{ key: string; inspected: number; rejected: number; ratePct: number }>
+  avgTurnaroundHours: number | null
+  turnaroundSampleSize: number
+  ncrBySupplier: Array<{ supplierId: string; count: number }>
+  purchaseReturnsFromRejection: { count: number; quantity: number }
+  openInspectionCount: number
+  completedSampleCount: number
+  grnQcPendingCount: number
+}
+
+export async function getIncomingQualityQueue(params?: Record<string, string | number | boolean | undefined>) {
+  return apiRequest<IncomingQualityReadiness>(
+    tenantPath(`/quality/incoming/queue${buildQuery(params)}`),
+  )
+}
+
+export async function getIncomingQualityReports() {
+  return apiRequest<IncomingQualityReports>(tenantPath('/quality/incoming/reports'))
+}
+
+export async function assignIncomingInspector(payload: {
+  qualityInspectionId: string
+  inspectedById: string
+  inspectedByName?: string
+  priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL'
+}) {
+  return apiRequest<unknown>(tenantPath('/quality/incoming/assign'), {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function startIncomingInspection(qualityInspectionId: string) {
+  return apiRequest<unknown>(tenantPath('/quality/incoming/start'), {
+    method: 'POST',
+    body: JSON.stringify({ qualityInspectionId }),
+  })
+}
+
+export async function getIncomingStockStatusGrn(goodsReceiptId: string) {
+  return apiRequest<IncomingStockStatusPanel>(
+    tenantPath(`/quality/incoming/stock-status/grn/${goodsReceiptId}`),
+  )
+}
+
+export async function getIncomingStockStatusQi(qualityInspectionId: string) {
+  return apiRequest<IncomingStockStatusPanel>(
+    tenantPath(`/quality/incoming/stock-status/qi/${qualityInspectionId}`),
+  )
 }
 
 export async function listQualityCertificates(params?: { page?: number; limit?: number; inspectionId?: string }) {

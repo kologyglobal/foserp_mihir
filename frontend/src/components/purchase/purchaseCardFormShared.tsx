@@ -33,6 +33,7 @@ export function purchaseStatusTone(status: string): 'success' | 'warning' | 'cri
   ) {
     return 'success'
   }
+  if (status === 'shipped') return 'info'
   if (status === 'cancelled' || status === 'rejected') return 'critical'
   if (
     status === 'converted' ||

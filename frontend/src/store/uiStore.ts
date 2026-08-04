@@ -93,6 +93,10 @@ interface UIState {
   notificationSnoozedUntil: Record<string, string>
   markNotificationRead: (id: string) => void
   snoozeNotification: (id: string, untilIso: string) => void
+  copilotOpen: boolean
+  openCopilot: () => void
+  closeCopilot: () => void
+  toggleCopilot: () => void
 }
 
 export const useUIStore = create<UIState>()(
@@ -172,6 +176,10 @@ export const useUIStore = create<UIState>()(
         set((s) => ({
           notificationSnoozedUntil: { ...s.notificationSnoozedUntil, [id]: untilIso },
         })),
+      copilotOpen: false,
+      openCopilot: () => set({ copilotOpen: true }),
+      closeCopilot: () => set({ copilotOpen: false }),
+      toggleCopilot: () => set((s) => ({ copilotOpen: !s.copilotOpen })),
     }),
     {
       name: 'vasant-erp-ui',

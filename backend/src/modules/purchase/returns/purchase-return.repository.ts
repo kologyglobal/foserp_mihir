@@ -13,9 +13,11 @@ export async function findPurchaseReturns(tenantId: string, query: ListPurchaseR
   const where: Prisma.PurchaseReturnWhereInput = {
     ...tenantActiveFilter(tenantId),
     ...(query.status ? { status: query.status as PurchaseReturnStatus } : {}),
+    ...(query.returnType ? { returnType: query.returnType } : {}),
     ...(query.vendorId ? { vendorId: query.vendorId } : {}),
     ...(query.purchaseOrderId ? { purchaseOrderId: query.purchaseOrderId } : {}),
     ...(query.goodsReceiptId ? { goodsReceiptId: query.goodsReceiptId } : {}),
+    ...(query.qualityInspectionId ? { qualityInspectionId: query.qualityInspectionId } : {}),
     ...(query.search ? { returnNumber: { contains: query.search } } : {}),
   }
   const [items, total] = await Promise.all([

@@ -323,8 +323,8 @@ export function groupPlanningRowsByVendor<T extends { selectedVendorId: string |
 /**
  * Derive PR conversion status from planning rows after PO creation.
  * - all rows PO_CREATED / COMPLETED → CONVERTED_TO_PO
- * - some converted → PARTIALLY_CONVERTED
- * - none → leave unchanged (caller keeps APPROVED)
+ * - any PARTIALLY_ORDERED, or mix of fully converted + still-open → PARTIALLY_CONVERTED
+ * - none ordered → leave unchanged (caller keeps APPROVED)
  */
 export function derivePrConversionStatus(
   planningStatuses: Array<'PO_CREATED' | 'COMPLETED' | 'PARTIALLY_ORDERED' | string>,

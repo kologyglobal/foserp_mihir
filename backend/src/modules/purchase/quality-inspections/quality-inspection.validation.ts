@@ -24,6 +24,8 @@ export const qualityInspectionLineSchema = z.object({
 export const qualityInspectionParameterSchema = z.object({
   id: z.string().uuid().optional(),
   parameter: z.string().trim().min(1).max(200),
+  parameterCode: z.string().trim().max(64).optional().nullable(),
+  sourceParameterId: z.string().uuid().optional().nullable(),
   specification: z.string().trim().max(500).optional().default(''),
   minValue: z.coerce.number().nullable().optional(),
   maxValue: z.coerce.number().nullable().optional(),
@@ -42,6 +44,8 @@ export const createQualityInspectionSchema = z.object({
   inspectedById: z.string().trim().max(36).optional().nullable(),
   inspectedByName: z.string().trim().max(200).optional().nullable(),
   inspectionPlan: z.string().trim().max(300).optional().nullable(),
+  inspectionPlanId: z.string().uuid().optional().nullable(),
+  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).optional(),
   remarks: z.string().trim().max(5000).optional().nullable(),
   deviationRemarks: z.string().trim().max(5000).optional().nullable(),
   lines: z.array(qualityInspectionLineSchema).min(1).optional(),
@@ -53,13 +57,40 @@ export const updateQualityInspectionSchema = z.object({
   inspectedById: z.string().trim().max(36).optional().nullable(),
   inspectedByName: z.string().trim().max(200).optional().nullable(),
   inspectionPlan: z.string().trim().max(300).optional().nullable(),
+  inspectionPlanId: z.string().uuid().optional().nullable(),
+  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).optional(),
   remarks: z.string().trim().max(5000).optional().nullable(),
   deviationRemarks: z.string().trim().max(5000).optional().nullable(),
   lines: z.array(qualityInspectionLineSchema).min(1).optional(),
   parameters: z.array(qualityInspectionParameterSchema).max(100).optional(),
 })
+export const assignQualityInspectorSchema = z.object({
+  inspectedById: z.string().trim().min(1).max(36),
+  inspectedByName: z.string().trim().max(200).optional(),
+  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).optional(),
+})
+export const createNcrFromQiSchema = z.object({
+  title: z.string().trim().max(200).optional(),
+  description: z.string().trim().max(5000).optional(),
+  severity: z.enum(['CRITICAL', 'MAJOR', 'MINOR']).optional(),
+  itemId: z.string().uuid().optional(),
+})
 export const completeQualityInspectionSchema = z.object({
   outcome: z.enum(['AUTO', 'ACCEPT', 'REJECT']).default('AUTO'),
+  /** ACCEPT | PARTIAL | REJECT | DEVIATION_ACCEPT | QUARANTINE | REWORK | RETURN_TO_VENDOR | REPLACEMENT_REQUIRED */
+  decisionCode: z
+    .enum([
+      'ACCEPT',
+      'PARTIAL',
+      'REJECT',
+      'DEVIATION_ACCEPT',
+      'QUARANTINE',
+      'REWORK',
+      'RETURN_TO_VENDOR',
+      'REPLACEMENT_REQUIRED',
+    ])
+    .optional(),
+  decisionReason: z.string().trim().min(1).max(2000).optional(),
   remarks: z.string().trim().max(2000).optional(),
   deviationRemarks: z.string().trim().max(5000).optional(),
 }).default({ outcome: 'AUTO' })

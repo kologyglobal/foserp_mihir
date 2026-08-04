@@ -196,7 +196,7 @@ export function VendorQuotationDetailPage() {
         subtitle="Quote header and commercial snapshot"
         icon={ClipboardList}
         accent="blue"
-        columns={2}
+        columns={6}
         collapsible
         defaultOpen
       >

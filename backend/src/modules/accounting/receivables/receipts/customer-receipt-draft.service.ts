@@ -88,6 +88,7 @@ async function assertBranch(tenantId: string, legalEntityId: string, branchId?: 
 
 function assertSourceTypeSupported(sourceType: string): void {
   if (sourceType === 'BANK_IMPORT') throw new CustomerReceiptSourceNotSupportedError()
+  // DIRECT and CRM_PAYMENT_RECEIPT are supported for drafts.
 }
 
 function assertPaymentMethodReady(

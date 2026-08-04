@@ -1,5 +1,8 @@
 import type { InventoryStockMovement, Prisma } from '@prisma/client'
-import { postStockMovement } from '../../inventory/shared/stock-posting.service.js'
+import {
+  InventoryPostingService,
+  postStockMovement,
+} from '../../inventory/shared/stock-posting.service.js'
 
 type QtyLine = {
   id: string
@@ -204,7 +207,7 @@ export async function reverseGrnQcHold(input: {
   return movements
 }
 
-/** Issue stock for completed purchase return lines. Idempotent per line. */
+/** Issue stock for completed purchase return lines from REJECTED status. Idempotent per line. */
 export async function postPurchaseReturnStockIssue(input: {
   tenantId: string
   returnId: string
@@ -212,29 +215,81 @@ export async function postPurchaseReturnStockIssue(input: {
   warehouseId: string
   lines: QtyLine[]
   actorId: string
+  /** ship intermediate = STATUS transfer only; complete = full issue */
+  phase?: 'SHIP' | 'COMPLETE'
   tx?: Prisma.TransactionClient
 }): Promise<InventoryStockMovement[]> {
   const movements: InventoryStockMovement[] = []
+  const phase = input.phase ?? 'COMPLETE'
   for (const line of input.lines) {
     if (!line.itemId) continue
     const quantity = qty(line.returnQuantity)
     if (quantity <= 0) continue
-    const movement = await postStockMovement(
-      {
-        tenantId: input.tenantId,
-        itemId: line.itemId,
-        warehouseId: input.warehouseId,
-        movementType: 'ISSUE',
-        referenceType: 'ISS',
-        quantity,
-        referenceNo: input.returnNumber,
-        remarks: `Purchase return ${input.returnNumber}`,
-        idempotencyKey: `prt-out:${input.returnId}:${line.id}`,
-        createdBy: input.actorId,
-      },
-      input.tx,
-    )
-    movements.push(movement)
+
+    if (phase === 'SHIP') {
+      // Operational RETURN_IN_TRANSIT: move REJECTED → BLOCKED (still on books until vendor confirms).
+      try {
+        const movement = await InventoryPostingService.transferStatus(
+          {
+            tenantId: input.tenantId,
+            itemId: line.itemId,
+            warehouseId: input.warehouseId,
+            fromStockStatus: 'REJECTED',
+            stockStatus: 'BLOCKED',
+            quantity,
+            referenceType: 'QUALITY_HOLD',
+            referenceNo: input.returnNumber,
+            remarks: `Purchase return in transit ${input.returnNumber}`,
+            idempotencyKey: `prt-transit:${input.returnId}:${line.id}`,
+            createdBy: input.actorId,
+          },
+          input.tx,
+        )
+        if (movement) movements.push(movement)
+      } catch {
+        // Already in transit or no reject balance — complete path will still attempt issue.
+      }
+      continue
+    }
+
+    // RETURNED_TO_VENDOR: issue out rejected (or blocked-in-transit) stock
+    let movement: InventoryStockMovement | null = null
+    try {
+      movement = await postStockMovement(
+        {
+          tenantId: input.tenantId,
+          itemId: line.itemId,
+          warehouseId: input.warehouseId,
+          movementType: 'ISSUE',
+          referenceType: 'ISS',
+          quantity,
+          stockStatus: 'BLOCKED',
+          referenceNo: input.returnNumber,
+          remarks: `Purchase return to vendor ${input.returnNumber}`,
+          idempotencyKey: `prt-out:${input.returnId}:${line.id}`,
+          createdBy: input.actorId,
+        },
+        input.tx,
+      )
+    } catch {
+      movement = await postStockMovement(
+        {
+          tenantId: input.tenantId,
+          itemId: line.itemId,
+          warehouseId: input.warehouseId,
+          movementType: 'ISSUE',
+          referenceType: 'ISS',
+          quantity,
+          stockStatus: 'REJECTED',
+          referenceNo: input.returnNumber,
+          remarks: `Purchase return to vendor ${input.returnNumber}`,
+          idempotencyKey: `prt-out-rej:${input.returnId}:${line.id}`,
+          createdBy: input.actorId,
+        },
+        input.tx,
+      )
+    }
+    if (movement) movements.push(movement)
   }
   return movements
 }

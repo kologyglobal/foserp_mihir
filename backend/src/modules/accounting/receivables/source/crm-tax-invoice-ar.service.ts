@@ -2,20 +2,9 @@
  * CRM Tax Invoice → Money In AR bridge.
  * Prefill + convert handoff; payment sync from AR open items back to CrmTaxInvoice.
  */
-import { Prisma } from '@prisma/client'
 import { prisma } from '../../../../config/prisma.js'
 import { NotFoundError, ValidationError } from '../../../../utils/errors.js'
 import { createAuditLog } from '../../../../services/audit.service.js'
-import {
-  computePaymentStatus,
-  invoiceStatusFromPayment,
-} from '../../../crm/commercial/commercial.types.js'
-
-function dec(v: Prisma.Decimal | number | string): number {
-  if (typeof v === 'number') return v
-  if (typeof v === 'string') return Number(v)
-  return v.toNumber()
-}
 
 function dateOnly(d: Date | string): string {
   if (typeof d === 'string') return d.slice(0, 10)
@@ -76,86 +65,13 @@ export type InvoicePrefillFromCrmTaxInvoice = {
 }
 
 export async function listCrmPendingTaxInvoices(
-  tenantId: string,
+  _tenantId: string,
   query?: { companyId?: string; search?: string; page?: number; limit?: number },
 ): Promise<{ items: CrmPendingTaxInvoiceRow[]; total: number; page: number; limit: number }> {
+  // Unified model: no convert queue — CRM creates SalesInvoice directly.
   const page = query?.page ?? 1
   const limit = Math.min(query?.limit ?? 50, 100)
-  const search = query?.search?.trim()
-
-  const where: Prisma.CrmTaxInvoiceWhereInput = {
-    tenantId,
-    deletedAt: null,
-    accountingStatus: { in: ['pending_review', 'converted'] },
-    status: { notIn: ['draft', 'cancelled'] },
-    ...(query?.companyId ? { companyId: query.companyId } : {}),
-    ...(search
-      ? {
-          OR: [
-            { invoiceNo: { contains: search } },
-            { customerNameSnapshot: { contains: search } },
-            { salesOrderNo: { contains: search } },
-            { createdByNameSnapshot: { contains: search } },
-          ],
-        }
-      : {}),
-  }
-
-  const [total, rows] = await Promise.all([
-    prisma.crmTaxInvoice.count({ where }),
-    prisma.crmTaxInvoice.findMany({
-      where,
-      orderBy: [{ accountingSubmittedAt: 'desc' }, { invoiceDate: 'desc' }],
-      skip: (page - 1) * limit,
-      take: limit,
-      select: {
-        id: true,
-        invoiceNo: true,
-        invoiceDate: true,
-        dueDate: true,
-        companyId: true,
-        customerNameSnapshot: true,
-        grandTotal: true,
-        balanceDue: true,
-        paymentStatus: true,
-        status: true,
-        accountingStatus: true,
-        createdBy: true,
-        createdByNameSnapshot: true,
-        salesOrderId: true,
-        salesOrderNo: true,
-        salesInvoiceId: true,
-        salesInvoiceNumber: true,
-        accountingSubmittedAt: true,
-      },
-    }),
-  ])
-
-  return {
-    total,
-    page,
-    limit,
-    items: rows.map((r) => ({
-      id: r.id,
-      invoiceNo: r.invoiceNo,
-      invoiceDate: dateOnly(r.invoiceDate),
-      dueDate: dateOnly(r.dueDate),
-      customerId: r.companyId,
-      customerName: r.customerNameSnapshot,
-      grandTotal: r.grandTotal.toFixed(2),
-      balanceDue: r.balanceDue.toFixed(2),
-      paymentStatus: r.paymentStatus,
-      status: r.status,
-      accountingStatus: r.accountingStatus,
-      createdBy: r.createdBy,
-      createdByName: r.createdByNameSnapshot,
-      salesOrderId: r.salesOrderId,
-      salesOrderNo: r.salesOrderNo,
-      salesInvoiceId: r.salesInvoiceId,
-      salesInvoiceNumber: r.salesInvoiceNumber,
-      accountingSubmittedAt: r.accountingSubmittedAt?.toISOString() ?? null,
-    })),
-  }
+  return { items: [], total: 0, page, limit }
 }
 
 export async function buildPrefillFromCrmTaxInvoice(
@@ -271,85 +187,18 @@ export async function linkCrmTaxInvoiceToSalesInvoice(args: {
 
 /**
  * Sync CRM tax invoice payment fields from AR open-item settlement.
- * Call after receipt allocation (and reverse).
+ * @deprecated Unified invoice: payment lives on SalesInvoice / open items only. No-op.
  */
 export async function syncCrmTaxInvoicePaymentFromSalesInvoice(
-  tenantId: string,
-  salesInvoiceId: string,
-  userId?: string | null,
+  _tenantId: string,
+  _salesInvoiceId: string,
+  _userId?: string | null,
 ): Promise<void> {
-  const si = await prisma.salesInvoice.findFirst({
-    where: { id: salesInvoiceId, tenantId },
-    select: {
-      id: true,
-      sourceType: true,
-      sourceDocumentId: true,
-      totalAmount: true,
-      status: true,
-      invoiceNumber: true,
-    },
-  })
-  if (!si || si.sourceType !== 'CRM_TAX_INVOICE' || !si.sourceDocumentId) return
-
-  const openItem = await prisma.receivableOpenItem.findFirst({
-    where: {
-      tenantId,
-      documentType: 'SALES_INVOICE',
-      documentId: salesInvoiceId,
-      side: 'DEBIT',
-    },
-    select: {
-      originalAmount: true,
-      openAmount: true,
-      allocatedAmount: true,
-      status: true,
-    },
-  })
-
-  const grandTotal = dec(si.totalAmount)
-  const amountPaid = openItem
-    ? Math.max(0, dec(openItem.originalAmount) - dec(openItem.openAmount))
-    : si.status === 'POSTED'
-      ? 0
-      : 0
-  const balanceDue = Math.max(0, Math.round((grandTotal - amountPaid) * 100) / 100)
-  const paymentStatus = computePaymentStatus(grandTotal, amountPaid)
-
-  const crm = await prisma.crmTaxInvoice.findFirst({
-    where: { id: si.sourceDocumentId, tenantId, deletedAt: null },
-  })
-  if (!crm) return
-
-  const nextStatus = invoiceStatusFromPayment(paymentStatus, crm.status)
-
-  await prisma.crmTaxInvoice.updateMany({
-    where: { id: crm.id, tenantId, deletedAt: null },
-    data: {
-      amountPaid: new Prisma.Decimal(amountPaid.toFixed(2)),
-      balanceDue: new Prisma.Decimal(balanceDue.toFixed(2)),
-      paymentStatus,
-      status: nextStatus,
-      salesInvoiceNumber: si.invoiceNumber ?? crm.salesInvoiceNumber,
-      updatedBy: userId ?? undefined,
-    },
-  })
-
-  await createAuditLog({
-    tenantId,
-    userId: userId ?? null,
-    module: 'crm',
-    entity: 'crmTaxInvoice',
-    entityId: crm.id,
-    action: 'AR_PAYMENT_SYNC',
-    newValues: {
-      salesInvoiceId,
-      amountPaid,
-      balanceDue,
-      paymentStatus,
-      status: nextStatus,
-    },
-  })
+  return
 }
+
+/** Alias for syncCrmTaxInvoicePaymentFromSalesInvoice — centralized naming. */
+export const syncAccountingPaymentStateToCrmTaxInvoice = syncCrmTaxInvoicePaymentFromSalesInvoice
 
 /** Sync all CRM-linked invoices touched by an allocation batch. */
 export async function syncCrmTaxInvoicesForAllocationBatch(

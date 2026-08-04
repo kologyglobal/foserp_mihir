@@ -74,10 +74,10 @@ export const LEAD_STAGE_REQUIREMENTS: Record<string, readonly string[]> = {
   closed: [],
 }
 
-/** Qualified: dates/priority only — scope text deferred to Requirement Discussion. */
+/** Qualified: priority only — close date deferred to later commercial stages. */
 export const OPPORTUNITY_STAGE_REQUIREMENTS: Record<string, readonly string[]> = {
   new_lead: ['opportunityName', 'customerId', 'ownerId'],
-  qualified: ['expectedCloseDate', 'priority'],
+  qualified: ['priority'],
   requirement_discussion: ['productRequirement', 'contactId', 'value', 'expectedCloseDate'],
   technical_review: ['productRequirement', 'lines'],
   quotation_prepared: ['lines', 'value'],

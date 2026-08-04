@@ -188,6 +188,7 @@ interface CrmCommercialState {
 
   receiveProformaPayment: (input: ReceiveProformaPaymentInput) => { ok: boolean; error?: string; id?: string }
   createInvoice: (input: CreateCrmInvoiceInput) => { ok: boolean; error?: string; id?: string }
+  updateInvoice: (id: string, input: CreateCrmInvoiceInput) => { ok: boolean; error?: string; id?: string }
   createInvoiceFromSalesOrder: (
     salesOrderId: string,
     lineQtys?: Record<string, number>,
@@ -474,6 +475,76 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
         return { ok: true, id: record.id }
       },
 
+      updateInvoice: (id, input) => {
+        const perm = assertCommercial('crm.commercial.invoice.create')
+        if (!perm.ok) return perm
+        const existing = get().getInvoice(id)
+        if (!existing) return { ok: false, error: 'Invoice not found.' }
+        if (existing.status !== 'draft') return { ok: false, error: 'Only draft invoices can be edited.' }
+        if (!input.lines.length) return { ok: false, error: 'At least one line is required.' }
+        for (const line of input.lines) {
+          if (line.qty <= 0) return { ok: false, error: 'Line quantity must be greater than zero.' }
+          if (line.maxQty != null && line.qty > line.maxQty + 0.0001) {
+            return { ok: false, error: `Qty for ${line.itemCode} exceeds remaining ${line.maxQty}.` }
+          }
+        }
+
+        const customer = useMasterStore.getState().getCustomer(input.customerId)
+        if (!customer) return { ok: false, error: 'Customer not found.' }
+
+        const lines = normalizeLines(input.lines)
+        const gst = buildGst(lines, customer.state)
+        const ts = nowIso()
+        const invoiceDate = (input.invoiceDate ?? existing.invoiceDate).slice(0, 10)
+        const dueDate = (input.dueDate ?? existing.dueDate).slice(0, 10)
+
+        set((s) => ({
+          invoices: s.invoices.map((inv) =>
+            inv.id !== id
+              ? inv
+              : {
+                  ...inv,
+                  invoiceDate,
+                  dueDate,
+                  customerId: customer.id,
+                  customerName: customer.customerName,
+                  customerGstin: customer.gstin,
+                  customerState: customer.state,
+                  customerAddress: formatCustomerAddress(customer),
+                  placeOfSupply: customer.state,
+                  billingAddress: input.billingAddress ?? inv.billingAddress,
+                  shippingAddress: input.shippingAddress ?? inv.shippingAddress,
+                  deliveryTerms: input.deliveryTerms ?? inv.deliveryTerms,
+                  paymentTerms: input.paymentTerms ?? inv.paymentTerms,
+                  customerPoNumber:
+                    input.customerPoNumber !== undefined ? input.customerPoNumber : inv.customerPoNumber,
+                  salesOrderId: input.salesOrderId !== undefined ? input.salesOrderId : inv.salesOrderId,
+                  salesOrderNo: inv.salesOrderNo,
+                  quotationId: input.quotationId !== undefined ? input.quotationId : inv.quotationId,
+                  quotationNo: input.quotationNo !== undefined ? input.quotationNo : inv.quotationNo,
+                  proformaInvoiceId:
+                    input.proformaInvoiceId !== undefined ? input.proformaInvoiceId : inv.proformaInvoiceId,
+                  proformaNo: inv.proformaNo,
+                  remarks: input.remarks ?? inv.remarks,
+                  source: input.source ?? inv.source,
+                  lines,
+                  gst,
+                  balanceDue: Math.max(0, gst.grandTotal - inv.amountPaid),
+                  updatedAt: ts,
+                },
+          ),
+          auditLog: pushAudit(s.auditLog, {
+            action: 'invoice_updated',
+            entityType: 'invoice',
+            entityId: id,
+            customerId: customer.id,
+            summary: `Draft invoice ${existing.invoiceNo} updated`,
+            details: { invoiceNo: existing.invoiceNo, total: gst.grandTotal },
+          }),
+        }))
+        return { ok: true, id }
+      },
+
       createInvoiceFromSalesOrder: (salesOrderId, lineQtys) => {
         const so = useMrpStore.getState().getSalesOrder(salesOrderId)
         if (!so) return { ok: false, error: 'Sales order not found.' }
@@ -669,6 +740,17 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
           }
           if (inv.status === 'draft' || inv.status === 'cancelled') {
             return { ok: false, error: `Invoice ${inv.invoiceNo} is not open for allocation.` }
+          }
+          if (
+            inv.salesInvoiceId ||
+            inv.accountingStatus === 'pending_review' ||
+            inv.accountingStatus === 'converted'
+          ) {
+            return {
+              ok: false,
+              error:
+                'This invoice is managed by Accounting Money In. Record and allocate the payment through Money In.',
+            }
           }
           const alreadyQueued = invoicePatches.get(inv.id) ?? 0
           if (row.amount > inv.balanceDue - alreadyQueued + 0.009) {

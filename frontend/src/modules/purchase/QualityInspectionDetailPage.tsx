@@ -22,7 +22,6 @@ import { ErpButton } from '@/components/erp/ErpButton'
 import {
   acceptQualityInspection,
   cancelQualityInspection,
-  createPurchaseReturnFromGrn,
   getQualityInspectionById,
   holdQualityInspection,
   postGRN,
@@ -304,19 +303,10 @@ export function QualityInspectionDetailPage() {
               id: 'return',
               label: 'Create Purchase Return',
               icon: RotateCcw,
-              onClick: async () => {
-                setSaving(true)
-                try {
-                  const ret = await createPurchaseReturnFromGrn(qi.goodsReceiptId)
-                  notify.success(`Return ${ret.documentNumber} created`)
-                  navigate(`/purchase/returns/${ret.id}`)
-                } catch (err) {
-                  notify.error(err instanceof PurchaseServiceError ? err.message : 'Return failed')
-                } finally {
-                  setSaving(false)
-                }
+              onClick: () => {
+                navigate(`/purchase/returns/new?qiId=${qi.id}`)
               },
-              hidden: !perms.canCreateReturn,
+              hidden: !perms.canCreateReturn || qi.rejectedQty <= 0,
               disabled: saving,
             },
           ]}

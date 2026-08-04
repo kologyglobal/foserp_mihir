@@ -70,6 +70,30 @@ export interface CrmCommercialLine {
   maxQty?: number | null
 }
 
+export type CrmPaymentReceiptAccountingMigrationStatus =
+  | 'UNREVIEWED'
+  | 'NON_ACCOUNTING'
+  | 'READY_TO_MIGRATE'
+  | 'DRAFT_CREATED'
+  | 'MIGRATED'
+  | 'DUPLICATE'
+  | 'REJECTED'
+  | 'FAILED'
+
+export const CRM_RECEIPT_MIGRATION_STATUS_LABELS: Record<
+  CrmPaymentReceiptAccountingMigrationStatus,
+  string
+> = {
+  UNREVIEWED: 'Commercial Receipt',
+  NON_ACCOUNTING: 'Non-Accounting',
+  READY_TO_MIGRATE: 'Ready to Migrate',
+  DRAFT_CREATED: 'Accounting Draft Created',
+  MIGRATED: 'Posted in Money In',
+  DUPLICATE: 'Duplicate',
+  REJECTED: 'Rejected',
+  FAILED: 'Migration Failed',
+}
+
 export interface CrmPaymentReceipt {
   id: string
   receiptNo: string
@@ -86,6 +110,11 @@ export interface CrmPaymentReceipt {
   unallocatedAmount: number
   remarks: string
   attachmentName: string | null
+  accountingReceiptId?: string | null
+  accountingMigrationStatus?: CrmPaymentReceiptAccountingMigrationStatus
+  accountingMigrationError?: string | null
+  accountingMigratedAt?: string | null
+  commercialOnly?: boolean
   createdAt: string
   updatedAt: string
   createdBy: string
@@ -126,6 +155,8 @@ export interface CrmTaxInvoice {
   salesInvoiceNumber?: string | null
   accountingSubmittedAt?: string | null
   accountingConvertedAt?: string | null
+  /** AR-synced last payment date (read-only mirror). */
+  lastPaymentDate?: string | null
   createdByName?: string
   postedAt: string | null
   cancelledAt: string | null
@@ -154,6 +185,7 @@ export interface CrmPaymentAllocation {
 export type CrmCommercialAuditAction =
   | 'receipt_created'
   | 'invoice_created'
+  | 'invoice_updated'
   | 'invoice_posted'
   | 'invoice_cancelled'
   | 'allocation_created'

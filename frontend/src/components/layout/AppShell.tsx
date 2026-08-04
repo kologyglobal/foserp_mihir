@@ -9,6 +9,8 @@ import { GlobalSearch } from '../design-system/GlobalSearch'
 import { NotificationPanel } from '../design-system/NotificationPanel'
 import { RecordDetailPanel } from '../design-system/RecordDetailPanel'
 import { RightDrawer } from '../design-system/RightDrawer'
+import { KnowledgeCopilotPanel } from '../knowledge/KnowledgeCopilotPanel'
+import { KnowledgeCopilotFab } from '../knowledge/KnowledgeCopilotFab'
 import { CrmQuickCreateHost } from '../crm/quick-create/CrmQuickCreateHost'
 import { AppErrorBoundary } from '../system/AppErrorBoundary'
 import { ApiHydrationErrorScreen } from '../system/ApiHydrationErrorScreen'
@@ -133,6 +135,8 @@ export function AppShell() {
       <NotificationPanel />
       <RecordDetailPanel />
       <RightDrawer />
+      <KnowledgeCopilotPanel />
+      <KnowledgeCopilotFab />
       <CrmQuickCreateHost />
       {!isApiMode() && (
         <div

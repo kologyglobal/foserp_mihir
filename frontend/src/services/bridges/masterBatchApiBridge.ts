@@ -105,7 +105,8 @@ function removeVendor(id: string): void {
 }
 
 export async function syncBatchMastersFromApi(): Promise<void> {
-  const [categories, hsn, receivingTolerances, gstGroups, gstRates, items, vendors] = await Promise.all([
+  // Fail-soft: one missing master permission (e.g. receiving_tolerance) must not block items/CRM hydrate.
+  const results = await Promise.allSettled([
     api.fetchItemCategories(),
     api.fetchHsnCodes(),
     api.fetchReceivingTolerances(),
@@ -115,14 +116,19 @@ export async function syncBatchMastersFromApi(): Promise<void> {
     api.fetchVendors(),
   ])
 
+  const value = <T>(r: PromiseSettledResult<T[]>, fallback: T[] = []): T[] =>
+    r.status === 'fulfilled' ? r.value : fallback
+
+  const [categories, hsn, receivingTolerances, gstGroups, gstRates, items, vendors] = results
+
   useMasterStore.setState({
-    categories: categories.map(api.mapCategoryDto),
-    hsnMasters: hsn.map(api.mapHsnDto),
-    receivingTolerances: receivingTolerances.map(api.mapReceivingToleranceDto),
-    gstGroups: gstGroups.map(api.mapGstGroupDto),
-    gstRates: gstRates.map(api.mapGstRateDto),
-    items: items.map(api.mapItemDto),
-    vendors: vendors.map(api.mapVendorDto),
+    categories: value(categories).map(api.mapCategoryDto),
+    hsnMasters: value(hsn).map(api.mapHsnDto),
+    receivingTolerances: value(receivingTolerances).map(api.mapReceivingToleranceDto),
+    gstGroups: value(gstGroups).map(api.mapGstGroupDto),
+    gstRates: value(gstRates).map(api.mapGstRateDto),
+    items: value(items).map(api.mapItemDto),
+    vendors: value(vendors).map(api.mapVendorDto),
   })
 }
 

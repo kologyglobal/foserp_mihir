@@ -54,6 +54,8 @@ const APP_MOUNTS: AppMount[] = [
   { prefix: '/t/{tenantSlug}/modules', importHint: 'module.routes' },
   { prefix: '/t/{tenantSlug}/roles', importHint: 'role.routes' },
   { prefix: '/t/{tenantSlug}/crm', importHint: 'crm.routes' },
+  { prefix: '/t/{tenantSlug}/mobile/device-tokens', importHint: 'device-token.routes' },
+  { prefix: '/t/{tenantSlug}/notifications', importHint: 'notification.routes' },
   { prefix: '/t/{tenantSlug}/masters/items', importHint: 'item.routes', routerBindings: ['router'] },
   { prefix: '/t/{tenantSlug}/masters/vendors', importHint: 'vendor.routes', routerBindings: ['router'] },
   { prefix: '/t/{tenantSlug}/masters/imports', importHint: 'import.routes' },
@@ -68,6 +70,7 @@ const APP_MOUNTS: AppMount[] = [
   { prefix: '/t/{tenantSlug}/organisation', importHint: 'organisation.routes' },
   { prefix: '/t/{tenantSlug}/manufacturing', importHint: 'manufacturing.routes' },
   { prefix: '/t/{tenantSlug}/maintenance', importHint: 'maintenance.routes' },
+  { prefix: '/t/{tenantSlug}/kb', importHint: 'knowledge.routes' },
   { prefix: '/t/{tenantSlug}/hrms', importHint: 'hrms.routes' },
   { prefix: '/t/{tenantSlug}/purchase', importHint: 'purchase.routes' },
   { prefix: '/t/{tenantSlug}/quality', importHint: 'quality.routes' },
@@ -195,8 +198,17 @@ function tagFor(openApiPath: string): string {
       .split('-')
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ')
-  if (!sub || sub.startsWith('{')) return title(domain)
-  return `${title(domain)} — ${title(sub)}`
+  // Prefer readable product names over raw URL segments.
+  const domainLabel =
+    domain === 'kb'
+      ? 'Knowledge Base'
+      : domain === 'hrms'
+        ? 'HRMS'
+        : domain === 'crm'
+          ? 'CRM'
+          : title(domain)
+  if (!sub || sub.startsWith('{')) return domainLabel
+  return `${domainLabel} — ${title(sub)}`
 }
 
 function summaryFor(method: HttpMethod, openApiPath: string): string {

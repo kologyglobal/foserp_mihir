@@ -183,6 +183,18 @@ export interface SalesInvoiceDto {
   projectRef?: string | null
   projectNameSnapshot?: string | null
   sourceLinks?: SalesInvoiceSourceLinkDto[]
+  /** Commercial / unify fields (CRM + Accounting single invoice). */
+  quotationId?: string | null
+  quotationNo?: string | null
+  proformaInvoiceId?: string | null
+  proformaNo?: string | null
+  salesOrderId?: string | null
+  salesOrderNo?: string | null
+  deliveryTerms?: string | null
+  paymentTerms?: string | null
+  legacyCrmTaxInvoiceId?: string | null
+  legacyCrmInvoiceNo?: string | null
+  createdChannel?: 'CRM' | 'ACCOUNTING' | 'DISPATCH' | 'RECURRING'
 }
 
 export interface SalesInvoiceSourceLinkDto {
@@ -390,6 +402,8 @@ export interface CreateSalesInvoiceInput {
   dueDate?: string | null
   paymentTermsDays?: number | null
   placeOfSupply?: string | null
+  /** GST company/legal-entity state override for supply determination */
+  legalEntityStateCode?: string | null
   supplyType?: SalesInvoiceSupplyType
   taxTreatment: SalesInvoiceTaxTreatment
   currencyCode?: string
@@ -938,7 +952,7 @@ export interface CreditNoteAllocationHistoryRow {
 
 export type CustomerReceiptStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
 export type CustomerReceiptPaymentMethod = 'BANK_TRANSFER' | 'CASH' | 'CHEQUE' | 'UPI' | 'CARD' | 'OTHER'
-export type CustomerReceiptSourceType = 'DIRECT' | 'BANK_IMPORT'
+export type CustomerReceiptSourceType = 'DIRECT' | 'BANK_IMPORT' | 'CRM_PAYMENT_RECEIPT'
 export type CustomerTdsMode = 'NONE' | 'AMOUNT' | 'PERCENTAGE'
 export type CustomerReceiptDeductionType = 'BANK_CHARGE' | 'OTHER_DEDUCTION'
 

@@ -203,18 +203,34 @@ export function CrmQuotationListPage() {
     }
     return [...map.values()].map((document) => {
       const q = getQuotation(document.quotationId)
-      const opp = document.opportunityId ? opportunities.find((o) => o.id === document.opportunityId) : null
+      const opp = document.opportunityId
+        ? opportunities.find((o) => o.id === document.opportunityId)
+        : q?.opportunityId
+          ? opportunities.find((o) => o.id === q.opportunityId)
+          : null
       const cust = q ? customers.find((c) => c.id === q.customerId) : null
       return {
         document,
         quotationNo: q?.quotationNo ?? document.quotationId,
-        customerName: cust?.customerName ?? 'Customer',
+        customerName: q?.customerName?.trim() || cust?.customerName || 'Customer',
+        customerId: q?.customerId ?? cust?.id ?? null,
         opportunityName: opp?.opportunityName,
+        opportunityId: document.opportunityId ?? q?.opportunityId ?? null,
+        opportunityNo: q?.opportunityNo ?? opp?.opportunityNo ?? null,
+        opportunityStage: opp?.stage ?? null,
         customerApproval: q?.customerApproval,
         revisionCount: revCounts.get(document.quotationId) ?? 1,
         quotationDate: document.createdAt?.slice(0, 10) ?? q?.createdAt?.slice(0, 10) ?? '',
         expiryDate: q?.validityDate?.slice(0, 10) ?? '',
         ownerName: document.salesOwnerName ?? opp?.ownerName ?? '—',
+        currencyCode: q?.currencyCode ?? 'INR',
+        taxAmount: q?.pricing?.gstAmount ?? null,
+        subtotalAmount: q?.pricing?.subtotal ?? null,
+        qty: q?.qty ?? null,
+        paymentTerms: q?.paymentTerms || null,
+        deliveryTime: q?.deliveryTime || null,
+        salesOrderNo: document.salesOrderNo ?? q?.salesOrderNo ?? null,
+        lastModified: document.modifiedAt ?? document.createdAt ?? null,
       }
     })
   }, [quotationDocuments, getQuotation, opportunities, customers])
@@ -397,18 +413,51 @@ export function CrmQuotationListPage() {
   function exportSelectedQuotations(selected: QuotationListItem[]) {
     exportRowsToCsv(
       'quotations-selected',
-      ['Quotation', 'Customer', 'Quotation Date', 'Expiry', 'Amount', 'Status', 'Owner', 'Revision'],
+      [
+        'Quotation',
+        'Revision',
+        'Customer',
+        'Opportunity',
+        'Opp Stage',
+        'Quotation Date',
+        'Valid Until',
+        'Lines',
+        'Qty',
+        'Subtotal',
+        'Tax',
+        'Amount',
+        'Currency',
+        'Status',
+        'Customer Approval',
+        'Owner',
+        'Payment Terms',
+        'Delivery Time',
+        'Sales Order',
+        'Last Modified',
+      ],
       selected.map((item) => [
         item.quotationNo,
+        item.document.revisionNo,
         item.customerName,
+        item.opportunityName ?? item.opportunityNo ?? '',
+        item.opportunityStage ?? '',
         item.quotationDate,
         item.expiryDate,
+        item.document.priceLines?.length ?? 0,
+        item.qty ?? '',
+        item.subtotalAmount ?? '',
+        item.taxAmount ?? '',
         item.document.totalAmount,
+        item.currencyCode ?? 'INR',
         item.document.status === 'sent' && item.customerApproval === 'approved'
           ? 'Customer Approved'
           : quotationStatusLabel(item.document.status),
+        item.customerApproval ?? '',
         item.ownerName,
-        item.document.revisionNo,
+        item.paymentTerms ?? '',
+        item.deliveryTime ?? '',
+        item.salesOrderNo ?? item.document.salesOrderNo ?? '',
+        item.lastModified ?? item.document.modifiedAt ?? '',
       ]),
     )
   }

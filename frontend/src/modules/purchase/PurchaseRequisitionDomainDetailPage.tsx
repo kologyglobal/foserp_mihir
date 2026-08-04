@@ -440,7 +440,13 @@ export function PurchaseRequisitionDomainDetailPage({
           }}
         />
 
-        <ErpCardSection title="General" subtitle="Identity, requester, and process path" defaultOpen>
+        <ErpCardSection
+          title="General"
+          subtitle="Identity, requester, and process path"
+          dense
+          columns={6}
+          defaultOpen
+        >
           <ErpViewField label="PR Number" value={pr.documentNumber} />
           <ErpViewField label="Revision" value={String(pr.revisionNo ?? 0)} />
           <ErpViewField label="Requisition Date" value={formatDate(pr.documentDate)} />

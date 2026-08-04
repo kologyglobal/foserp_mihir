@@ -10,17 +10,58 @@ import type {
 } from '@prisma/client'
 import { SERVER_DEFAULT_SETUP, type PurchaseSettingsWithRelations } from './purchase-setup.repository.js'
 
-const NOTIFICATIONS_ON_HOLD = {
-  status: 'ON_HOLD' as const,
-  message:
-    'Purchase notifications are not implemented yet. This tab is visible for planning only and is not saved.',
-  prPendingApproval: { inApp: false, email: false },
-  rfqResponseDue: { inApp: false, email: false },
-  poDeliveryApproaching: { inApp: false, email: false },
-  poOverdue: { inApp: false, email: false },
-  grnPendingInspection: { inApp: false, email: false },
-  invoiceMismatch: { inApp: false, email: false },
-  invoicePendingApproval: { inApp: false, email: false },
+export type PurchaseNotificationChannelFlags = { inApp: boolean; email: boolean }
+
+export type PurchaseNotificationPreferences = {
+  prPendingApproval: PurchaseNotificationChannelFlags
+  rfqResponseDue: PurchaseNotificationChannelFlags
+  poDeliveryApproaching: PurchaseNotificationChannelFlags
+  poOverdue: PurchaseNotificationChannelFlags
+  grnPendingInspection: PurchaseNotificationChannelFlags
+  invoiceMismatch: PurchaseNotificationChannelFlags
+  invoicePendingApproval: PurchaseNotificationChannelFlags
+}
+
+export const PURCHASE_NOTIFICATION_EVENT_KEYS = [
+  'prPendingApproval',
+  'rfqResponseDue',
+  'poDeliveryApproaching',
+  'poOverdue',
+  'grnPendingInspection',
+  'invoiceMismatch',
+  'invoicePendingApproval',
+] as const satisfies readonly (keyof PurchaseNotificationPreferences)[]
+
+/** Default when setup is empty or preferences JSON is null. */
+export const DEFAULT_PURCHASE_NOTIFICATIONS: PurchaseNotificationPreferences = {
+  prPendingApproval: { inApp: true, email: true },
+  rfqResponseDue: { inApp: true, email: true },
+  poDeliveryApproaching: { inApp: true, email: false },
+  poOverdue: { inApp: true, email: true },
+  grnPendingInspection: { inApp: true, email: false },
+  invoiceMismatch: { inApp: true, email: true },
+  invoicePendingApproval: { inApp: true, email: true },
+}
+
+function isChannelFlags(value: unknown): value is PurchaseNotificationChannelFlags {
+  if (!value || typeof value !== 'object') return false
+  const o = value as Record<string, unknown>
+  return typeof o.inApp === 'boolean' && typeof o.email === 'boolean'
+}
+
+/** Merge stored JSON with defaults — unknown keys ignored. */
+export function normalizeNotificationPreferences(
+  raw: unknown,
+): PurchaseNotificationPreferences {
+  const base = structuredClone(DEFAULT_PURCHASE_NOTIFICATIONS)
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base
+  const src = raw as Record<string, unknown>
+  for (const key of PURCHASE_NOTIFICATION_EVENT_KEYS) {
+    if (isChannelFlags(src[key])) {
+      base[key] = { inApp: src[key].inApp, email: src[key].email }
+    }
+  }
+  return base
 }
 
 export const NUMBER_SERIES_ENTITY_MAP = {
@@ -188,6 +229,9 @@ export function mapPurchaseSettingsToDto(
         requirePoWarehouse: d.requirePoWarehouse,
         requireExpectedDeliveryDate: d.requireExpectedDeliveryDate,
         requirePaymentTerms: d.requirePaymentTerms,
+        planningConsolidationEnabled: Boolean(
+          (d as { planningConsolidationEnabled?: boolean }).planningConsolidationEnabled,
+        ),
       },
       requisition: {
         skipRfq: !d.defaultRfqRequired,
@@ -268,7 +312,7 @@ export function mapPurchaseSettingsToDto(
         paperSize: paperToApi(d.printPaperSize),
         orientation: orientationToApi(d.printOrientation),
       },
-      notifications: NOTIFICATIONS_ON_HOLD,
+      notifications: structuredClone(DEFAULT_PURCHASE_NOTIFICATIONS),
       createdById: null,
       updatedById: null,
       createdAt: null,
@@ -316,6 +360,9 @@ export function mapPurchaseSettingsToDto(
       requirePoWarehouse: row.requirePoWarehouse,
       requireExpectedDeliveryDate: row.requireExpectedDeliveryDate,
       requirePaymentTerms: row.requirePaymentTerms,
+      planningConsolidationEnabled: Boolean(
+        (row as { planningConsolidationEnabled?: boolean }).planningConsolidationEnabled,
+      ),
     },
     requisition: {
       skipRfq: !row.defaultRfqRequired,
@@ -398,7 +445,9 @@ export function mapPurchaseSettingsToDto(
       paperSize: paperToApi(row.printPaperSize),
       orientation: orientationToApi(row.printOrientation),
     },
-    notifications: NOTIFICATIONS_ON_HOLD,
+    notifications: normalizeNotificationPreferences(
+      (row as { notificationPreferences?: unknown }).notificationPreferences,
+    ),
     createdById: row.createdById,
     updatedById: row.updatedById,
     createdAt: row.createdAt.toISOString(),
