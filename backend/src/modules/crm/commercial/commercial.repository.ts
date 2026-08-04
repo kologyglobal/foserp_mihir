@@ -280,6 +280,36 @@ export async function updateInvoice(
   return findInvoiceById(tenantId, id)
 }
 
+export async function updateInvoiceWithLines(
+  tenantId: string,
+  id: string,
+  userId: string,
+  invoice: Prisma.CrmTaxInvoiceUncheckedUpdateInput,
+  lines?: Array<Omit<Prisma.CrmTaxInvoiceLineUncheckedCreateInput, 'tenantId' | 'invoiceId'>>,
+) {
+  return prisma.$transaction(async (tx) => {
+    await tx.crmTaxInvoice.updateMany({
+      where: { id, tenantId, deletedAt: null },
+      data: { ...invoice, updatedBy: userId },
+    })
+    if (lines) {
+      await tx.crmTaxInvoiceLine.updateMany({
+        where: { invoiceId: id, tenantId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      })
+      if (lines.length) {
+        await tx.crmTaxInvoiceLine.createMany({
+          data: lines.map((l) => ({ ...l, tenantId, invoiceId: id })),
+        })
+      }
+    }
+    return tx.crmTaxInvoice.findFirstOrThrow({
+      where: { id },
+      include: { lines: { where: { deletedAt: null }, orderBy: { lineNo: 'asc' } } },
+    })
+  })
+}
+
 export async function findAllocations(tenantId: string, query: ListAllocationsQuery) {
   const page = query.page ?? 1
   const limit = query.limit ?? 50

@@ -31,7 +31,7 @@ function Badge({
   )
 }
 
-const ASSET_CFG: Record<AssetStatus, string> = {
+const ASSET_CFG: Record<string, string> = {
   Draft: 'bg-slate-50 text-slate-700 ring-slate-200',
   'Under Construction': 'bg-amber-50 text-amber-800 ring-amber-200',
   'Pending Capitalization': 'bg-orange-50 text-orange-800 ring-orange-200',
@@ -43,6 +43,7 @@ const ASSET_CFG: Record<AssetStatus, string> = {
   Disposed: 'bg-slate-50 text-slate-600 ring-slate-200',
   'Written Off': 'bg-rose-50 text-rose-800 ring-rose-200',
   Sold: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  Cancelled: 'bg-slate-50 text-slate-600 ring-slate-200',
 }
 
 const DEP_CFG: Record<DepreciationRunStatus, string> = {
@@ -75,11 +76,11 @@ const VER_CFG: Record<VerificationStatus, string> = {
   Cancelled: 'bg-slate-50 text-slate-600 ring-slate-200',
 }
 
-export function AssetStatusBadge({ status }: { status: AssetStatus }) {
+export function AssetStatusBadge({ status }: { status: AssetStatus | string }) {
   return (
     <Badge
       label={status}
-      className={ASSET_CFG[status]}
+      className={ASSET_CFG[status] ?? 'bg-slate-50 text-slate-700 ring-slate-200'}
       icon={status === 'Held for Disposal' ? AlertTriangle : status === 'Active' ? CheckCircle2 : undefined}
     />
   )

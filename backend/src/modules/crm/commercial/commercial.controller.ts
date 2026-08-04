@@ -141,10 +141,21 @@ export const createInvoice = asyncHandler(async (req: Request, res: Response) =>
   sendCreated(res, 'Invoice created', data)
 })
 
+export const updateInvoice = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const { userId } = getContext(req)
+  const data = await service.updateInvoice(tenantId, getRouteParam(req, 'id'), userId, req.body, auditFromRequest(req))
+  sendSuccess(res, 'Invoice updated', data)
+})
+
 export const postInvoice = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const { userId } = getContext(req)
-  const data = await service.postInvoice(tenantId, getRouteParam(req, 'id'), userId, auditFromRequest(req))
+  const canGlPost = Boolean(req.context?.permissions?.includes('finance.ar.invoice.post'))
+  const data = await service.postInvoice(tenantId, getRouteParam(req, 'id'), userId, auditFromRequest(req), {
+    canGlPost,
+    req,
+  })
   sendSuccess(res, 'Invoice posted', data)
 })
 

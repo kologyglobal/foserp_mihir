@@ -1,8 +1,8 @@
 /**
  * AUTO-GENERATED — do not edit by hand.
  * Run: npx tsx scripts/generate-swagger-paths.ts
- * Generated: 2026-07-31T07:55:52.855Z
- * Stubs added: 1093 (skipped already documented: 570; scanned ops: 1663)
+ * Generated: 2026-08-03T17:50:22.479Z
+ * Stubs added: 1155 (skipped already documented: 570; scanned ops: 1725)
  */
 
 export const generatedSwaggerTags = [
@@ -99,23 +99,23 @@ export const generatedSwaggerTags = [
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Crm — Commercial",
+    "name": "CRM — Commercial",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Crm — Companies",
+    "name": "CRM — Companies",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Crm — Integrations",
+    "name": "CRM — Integrations",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Crm — Quotations",
+    "name": "CRM — Quotations",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Crm — Sales Orders",
+    "name": "CRM — Sales Orders",
     "description": "Auto-generated from Express routes"
   },
   {
@@ -239,51 +239,51 @@ export const generatedSwaggerTags = [
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Attendance",
+    "name": "HRMS — Attendance",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Designations",
+    "name": "HRMS — Designations",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Employees",
+    "name": "HRMS — Employees",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Exits",
+    "name": "HRMS — Exits",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Fnf",
+    "name": "HRMS — Fnf",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Holidays",
+    "name": "HRMS — Holidays",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Leave",
+    "name": "HRMS — Leave",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Overtime",
+    "name": "HRMS — Overtime",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Payroll",
+    "name": "HRMS — Payroll",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Roster",
+    "name": "HRMS — Roster",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Salary",
+    "name": "HRMS — Salary",
     "description": "Auto-generated from Express routes"
   },
   {
-    "name": "Hrms — Shifts",
+    "name": "HRMS — Shifts",
     "description": "Auto-generated from Express routes"
   },
   {
@@ -332,6 +332,62 @@ export const generatedSwaggerTags = [
   },
   {
     "name": "Inventory — Transfers",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Activity",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Admin",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Analytics",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Categories",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Chat",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Copilot",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Documents",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Feedback",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Insights",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Search",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Sessions",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Sources",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Status",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Knowledge Base — Tags",
     "description": "Auto-generated from Express routes"
   },
   {
@@ -455,11 +511,39 @@ export const generatedSwaggerTags = [
     "description": "Auto-generated from Express routes"
   },
   {
+    "name": "Mobile — Device Tokens",
+    "description": "Auto-generated from Express routes"
+  },
+  {
     "name": "Modules",
     "description": "Auto-generated from Express routes"
   },
   {
     "name": "Modules — Administrators",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Notifications",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Notifications — Preferences",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Notifications — Read All",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Notifications — Settings",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Notifications — Summary",
+    "description": "Auto-generated from Express routes"
+  },
+  {
+    "name": "Notifications — Unread Count",
     "description": "Auto-generated from Express routes"
   },
   {
@@ -982,6 +1066,80 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
         "Accounting — Accounts"
       ],
       "summary": "Create / action apply-template",
+      "description": "Auto-generated stub from `modules/accounting/accounts/account.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/accounting/accounts/import": {
+    "post": {
+      "tags": [
+        "Accounting — Accounts"
+      ],
+      "summary": "Create / action import",
+      "description": "Auto-generated stub from `modules/accounting/accounts/account.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/accounting/accounts/import/template": {
+    "get": {
+      "tags": [
+        "Accounting — Accounts"
+      ],
+      "summary": "List / get template",
       "description": "Auto-generated stub from `modules/accounting/accounts/account.routes.ts`. Enrich in `swagger.ts` when needed.",
       "parameters": [
         {
@@ -11743,6 +11901,89 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
       }
     }
   },
+  "/t/{tenantSlug}/accounting/receivables/crm-receipt-migration": {
+    "get": {
+      "tags": [
+        "Accounting — Receivables"
+      ],
+      "summary": "List / get crm-receipt-migration",
+      "description": "Auto-generated stub from `modules/accounting/receivables/source/crm-receipt-migration.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/accounting/receivables/crm-receipt-migration/{id}": {
+    "get": {
+      "tags": [
+        "Accounting — Receivables"
+      ],
+      "summary": "Get id",
+      "description": "Auto-generated stub from `modules/accounting/receivables/source/crm-receipt-migration.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
   "/t/{tenantSlug}/accounting/receivables/disputes": {
     "get": {
       "tags": [
@@ -12120,6 +12361,262 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
           "schema": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/accounting/receivables/recurring-schedules": {
+    "get": {
+      "tags": [
+        "Accounting — Receivables"
+      ],
+      "summary": "List / get recurring-schedules",
+      "description": "Auto-generated stub from `modules/accounting/receivables/recurring-invoices/recurring-invoice.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    },
+    "post": {
+      "tags": [
+        "Accounting — Receivables"
+      ],
+      "summary": "Create / action recurring-schedules",
+      "description": "Auto-generated stub from `modules/accounting/receivables/recurring-invoices/recurring-invoice.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/accounting/receivables/recurring-schedules/{id}": {
+    "get": {
+      "tags": [
+        "Accounting — Receivables"
+      ],
+      "summary": "Get id",
+      "description": "Auto-generated stub from `modules/accounting/receivables/recurring-invoices/recurring-invoice.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/accounting/receivables/recurring-schedules/{id}/cancel": {
+    "post": {
+      "tags": [
+        "Accounting — Receivables"
+      ],
+      "summary": "Create / action cancel",
+      "description": "Auto-generated stub from `modules/accounting/receivables/recurring-invoices/recurring-invoice.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/accounting/receivables/recurring-schedules/{id}/executions/{executionId}/approve": {
+    "post": {
+      "tags": [
+        "Accounting — Receivables"
+      ],
+      "summary": "Create / action approve",
+      "description": "Auto-generated stub from `modules/accounting/receivables/recurring-invoices/recurring-invoice.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "executionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/accounting/receivables/recurring-schedules/upcoming": {
+    "get": {
+      "tags": [
+        "Accounting — Receivables"
+      ],
+      "summary": "List / get upcoming",
+      "description": "Auto-generated stub from `modules/accounting/receivables/recurring-invoices/recurring-invoice.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
           }
         }
       ],
@@ -15794,7 +16291,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/allocations": {
     "get": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "List / get allocations",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -15829,7 +16326,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Create / action allocations",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -15866,7 +16363,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/allocations/{id}/reverse": {
     "post": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Create / action reverse",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -15912,7 +16409,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/invoices": {
     "get": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "List / get invoices",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -15947,7 +16444,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Create / action invoices",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -15984,10 +16481,54 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/invoices/{id}": {
     "get": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Get id",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    },
+    "patch": {
+      "tags": [
+        "CRM — Commercial"
+      ],
+      "summary": "Update id",
+      "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed. Only draft invoices can be edited.",
       "parameters": [
         {
           "name": "tenantSlug",
@@ -16030,7 +16571,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/invoices/{id}/cancel": {
     "post": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Create / action cancel",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16076,7 +16617,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/invoices/{id}/post": {
     "post": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Create / action post",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16122,7 +16663,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/proformas": {
     "get": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "List / get proformas",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16157,7 +16698,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Create / action proformas",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16194,7 +16735,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/proformas/{id}": {
     "get": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Get id",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16238,7 +16779,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Update id",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16284,7 +16825,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/proformas/{id}/cancel": {
     "post": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Create / action cancel",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16330,7 +16871,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/proformas/{id}/issue": {
     "post": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Create / action issue",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16376,7 +16917,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/receipts": {
     "get": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "List / get receipts",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16411,7 +16952,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Create / action receipts",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16448,9 +16989,239 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/receipts/{id}": {
     "get": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "Get id",
+      "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/crm/commercial/receipts/{id}/accounting-duplicate-check": {
+    "get": {
+      "tags": [
+        "CRM — Commercial"
+      ],
+      "summary": "List / get accounting-duplicate-check",
+      "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/crm/commercial/receipts/{id}/accounting-status": {
+    "get": {
+      "tags": [
+        "CRM — Commercial"
+      ],
+      "summary": "List / get accounting-status",
+      "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/crm/commercial/receipts/{id}/create-accounting-draft": {
+    "post": {
+      "tags": [
+        "CRM — Commercial"
+      ],
+      "summary": "Create / action create-accounting-draft",
+      "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/crm/commercial/receipts/{id}/mark-non-accounting": {
+    "post": {
+      "tags": [
+        "CRM — Commercial"
+      ],
+      "summary": "Create / action mark-non-accounting",
+      "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/crm/commercial/receipts/{id}/retry-accounting-draft": {
+    "post": {
+      "tags": [
+        "CRM — Commercial"
+      ],
+      "summary": "Create / action retry-accounting-draft",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
       "parameters": [
         {
@@ -16494,7 +17265,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/commercial/sync": {
     "get": {
       "tags": [
-        "Crm — Commercial"
+        "CRM — Commercial"
       ],
       "summary": "List / get sync",
       "description": "Auto-generated stub from `modules/crm/commercial/commercial.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16531,7 +17302,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/companies/{id}/commercial-position": {
     "get": {
       "tags": [
-        "Crm — Companies"
+        "CRM — Companies"
       ],
       "summary": "List / get commercial-position",
       "description": "Auto-generated stub from `modules/crm/companies/company.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16577,7 +17348,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/alerts": {
     "get": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "List / get alerts",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16614,7 +17385,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/alerts/{id}/read": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action read",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16660,7 +17431,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/alerts/mark-all-read": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action mark-all-read",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16697,7 +17468,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/dashboard": {
     "get": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "List / get dashboard",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16734,7 +17505,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/enquiries": {
     "get": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "List / get enquiries",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16771,7 +17542,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/enquiries/{id}": {
     "get": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Get id",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16817,7 +17588,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/enquiries/{id}/assign": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action assign",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16863,7 +17634,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/enquiries/{id}/create-lead": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action create-lead",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16909,7 +17680,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/enquiries/{id}/ignore": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action ignore",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -16955,7 +17726,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/enquiries/{id}/link-lead": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action link-lead",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17001,7 +17772,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/enquiries/{id}/retry": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action retry",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17047,7 +17818,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/enquiries/bulk-assign": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action bulk-assign",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17084,7 +17855,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/enquiries/bulk-create-leads": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action bulk-create-leads",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17121,7 +17892,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/enquiries/bulk-ignore": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action bulk-ignore",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17158,7 +17929,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/product-mappings": {
     "get": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "List / get product-mappings",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17193,7 +17964,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action product-mappings",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17230,7 +18001,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/product-mappings/{id}": {
     "put": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Update id",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17276,7 +18047,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/product-mappings/suggest": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action suggest",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17313,7 +18084,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/push-webhook/disable": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action disable",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17350,7 +18121,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/push-webhook/enable": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action enable",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17387,7 +18158,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/push-webhook/rotate": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action rotate",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17424,7 +18195,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/settings": {
     "get": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "List / get settings",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17459,7 +18230,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "put": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Update settings",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17496,7 +18267,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/sync": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action sync",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17533,7 +18304,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/sync-runs": {
     "get": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "List / get sync-runs",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17570,7 +18341,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/integrations/indiamart/test-connection": {
     "post": {
       "tags": [
-        "Crm — Integrations"
+        "CRM — Integrations"
       ],
       "summary": "Create / action test-connection",
       "description": "Auto-generated stub from `modules/crm/integrations/indiamart/indiamart.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17607,7 +18378,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/quotations/{id}/documents/{docId}/customer-approve": {
     "post": {
       "tags": [
-        "Crm — Quotations"
+        "CRM — Quotations"
       ],
       "summary": "Create / action customer-approve",
       "description": "Auto-generated stub from `modules/crm/quotations/quotation.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17662,7 +18433,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/quotations/{id}/documents/{docId}/customer-reject": {
     "post": {
       "tags": [
-        "Crm — Quotations"
+        "CRM — Quotations"
       ],
       "summary": "Create / action customer-reject",
       "description": "Auto-generated stub from `modules/crm/quotations/quotation.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17717,7 +18488,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/sales-orders/{id}/commercial-position": {
     "get": {
       "tags": [
-        "Crm — Sales Orders"
+        "CRM — Sales Orders"
       ],
       "summary": "List / get commercial-position",
       "description": "Auto-generated stub from `modules/crm/sales-orders/sales-order.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17763,7 +18534,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/sales-orders/{id}/fulfilment": {
     "get": {
       "tags": [
-        "Crm — Sales Orders"
+        "CRM — Sales Orders"
       ],
       "summary": "List / get fulfilment",
       "description": "Auto-generated stub from `modules/crm/sales-orders/sales-order.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -17809,7 +18580,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/crm/sales-orders/{id}/fulfilment/lines/{lineId}/cancelled-qty": {
     "post": {
       "tags": [
-        "Crm — Sales Orders"
+        "CRM — Sales Orders"
       ],
       "summary": "Create / action cancelled-qty",
       "description": "Auto-generated stub from `modules/crm/sales-orders/sales-order.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24073,7 +24844,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/attendance/days/finalize": {
     "post": {
       "tags": [
-        "Hrms — Attendance"
+        "HRMS — Attendance"
       ],
       "summary": "Create / action finalize",
       "description": "Auto-generated stub from `modules/hrms/attendance/attendance.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24110,7 +24881,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/designations": {
     "get": {
       "tags": [
-        "Hrms — Designations"
+        "HRMS — Designations"
       ],
       "summary": "List / get designations",
       "description": "Auto-generated stub from `modules/hrms/designations/designation.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24145,7 +24916,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Hrms — Designations"
+        "HRMS — Designations"
       ],
       "summary": "Create / action designations",
       "description": "Auto-generated stub from `modules/hrms/designations/designation.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24182,7 +24953,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/designations/{designationId}": {
     "get": {
       "tags": [
-        "Hrms — Designations"
+        "HRMS — Designations"
       ],
       "summary": "Get designationId",
       "description": "Auto-generated stub from `modules/hrms/designations/designation.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24226,7 +24997,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Designations"
+        "HRMS — Designations"
       ],
       "summary": "Update designationId",
       "description": "Auto-generated stub from `modules/hrms/designations/designation.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24272,7 +25043,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/employees": {
     "get": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "List / get employees",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24307,7 +25078,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "Create / action employees",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24344,7 +25115,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/employees/{employeeId}": {
     "get": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "Get employeeId",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24388,7 +25159,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "Update employeeId",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24434,7 +25205,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/employees/{employeeId}/bank": {
     "get": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "List / get bank",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24478,7 +25249,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "Create / action bank",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24524,7 +25295,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/employees/{employeeId}/bank/{bankId}": {
     "patch": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "Update bankId",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24579,7 +25350,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/employees/{employeeId}/documents": {
     "get": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "List / get documents",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24623,7 +25394,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "Create / action documents",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24669,7 +25440,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/employees/{employeeId}/documents/{documentId}": {
     "delete": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "Delete documentId",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24724,7 +25495,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/employees/{employeeId}/history": {
     "get": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "List / get history",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24770,7 +25541,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/employees/{employeeId}/statutory": {
     "get": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "List / get statutory",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24814,7 +25585,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "put": {
       "tags": [
-        "Hrms — Employees"
+        "HRMS — Employees"
       ],
       "summary": "Update statutory",
       "description": "Auto-generated stub from `modules/hrms/employees/employee.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24860,7 +25631,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits": {
     "get": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "List / get exits",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24895,7 +25666,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Create / action exits",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24932,7 +25703,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}": {
     "get": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Get exitId",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -24976,7 +25747,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Update exitId",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25022,7 +25793,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}/approve": {
     "post": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Create / action approve",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25068,7 +25839,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}/assets": {
     "get": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "List / get assets",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25112,7 +25883,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Create / action assets",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25158,7 +25929,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}/assets/{assetLineId}": {
     "delete": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Delete assetLineId",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25211,7 +25982,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Update assetLineId",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25266,7 +26037,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}/assets/{assetLineId}/status": {
     "post": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Create / action status",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25321,7 +26092,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}/cancel": {
     "post": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Create / action cancel",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25367,7 +26138,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}/clearance": {
     "get": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "List / get clearance",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25413,7 +26184,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}/clearance/{lineId}/clear": {
     "post": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Create / action clear",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25468,7 +26239,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}/clearance/{lineId}/waive": {
     "post": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Create / action waive",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25523,7 +26294,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}/clearance/seed": {
     "post": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Create / action seed",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25569,7 +26340,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/{exitId}/submit": {
     "post": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "Create / action submit",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25615,7 +26386,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/exits/mine": {
     "get": {
       "tags": [
-        "Hrms — Exits"
+        "HRMS — Exits"
       ],
       "summary": "List / get mine",
       "description": "Auto-generated stub from `modules/hrms/exit/exit.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25652,7 +26423,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/fnf": {
     "get": {
       "tags": [
-        "Hrms — Fnf"
+        "HRMS — Fnf"
       ],
       "summary": "List / get fnf",
       "description": "Auto-generated stub from `modules/hrms/exit/fnf.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25689,7 +26460,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/fnf/{exitId}": {
     "get": {
       "tags": [
-        "Hrms — Fnf"
+        "HRMS — Fnf"
       ],
       "summary": "Get exitId",
       "description": "Auto-generated stub from `modules/hrms/exit/fnf.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25735,7 +26506,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/fnf/{exitId}/approve": {
     "post": {
       "tags": [
-        "Hrms — Fnf"
+        "HRMS — Fnf"
       ],
       "summary": "Create / action approve",
       "description": "Auto-generated stub from `modules/hrms/exit/fnf.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25781,7 +26552,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/fnf/{exitId}/calculate": {
     "post": {
       "tags": [
-        "Hrms — Fnf"
+        "HRMS — Fnf"
       ],
       "summary": "Create / action calculate",
       "description": "Auto-generated stub from `modules/hrms/exit/fnf.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25827,7 +26598,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/fnf/{exitId}/pay": {
     "post": {
       "tags": [
-        "Hrms — Fnf"
+        "HRMS — Fnf"
       ],
       "summary": "Create / action pay",
       "description": "Auto-generated stub from `modules/hrms/exit/fnf.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25873,7 +26644,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/fnf/{exitId}/post": {
     "post": {
       "tags": [
-        "Hrms — Fnf"
+        "HRMS — Fnf"
       ],
       "summary": "Create / action post",
       "description": "Auto-generated stub from `modules/hrms/exit/fnf.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25919,7 +26690,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/fnf/{exitId}/review": {
     "post": {
       "tags": [
-        "Hrms — Fnf"
+        "HRMS — Fnf"
       ],
       "summary": "Create / action review",
       "description": "Auto-generated stub from `modules/hrms/exit/fnf.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -25965,7 +26736,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/holidays": {
     "get": {
       "tags": [
-        "Hrms — Holidays"
+        "HRMS — Holidays"
       ],
       "summary": "List / get holidays",
       "description": "Auto-generated stub from `modules/hrms/holidays/holiday.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26000,7 +26771,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Hrms — Holidays"
+        "HRMS — Holidays"
       ],
       "summary": "Create / action holidays",
       "description": "Auto-generated stub from `modules/hrms/holidays/holiday.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26037,7 +26808,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/holidays/{calendarId}": {
     "get": {
       "tags": [
-        "Hrms — Holidays"
+        "HRMS — Holidays"
       ],
       "summary": "Get calendarId",
       "description": "Auto-generated stub from `modules/hrms/holidays/holiday.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26081,7 +26852,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Holidays"
+        "HRMS — Holidays"
       ],
       "summary": "Update calendarId",
       "description": "Auto-generated stub from `modules/hrms/holidays/holiday.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26127,7 +26898,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/holidays/{calendarId}/days": {
     "post": {
       "tags": [
-        "Hrms — Holidays"
+        "HRMS — Holidays"
       ],
       "summary": "Create / action days",
       "description": "Auto-generated stub from `modules/hrms/holidays/holiday.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26173,7 +26944,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/holidays/{calendarId}/days/{dayId}": {
     "delete": {
       "tags": [
-        "Hrms — Holidays"
+        "HRMS — Holidays"
       ],
       "summary": "Delete dayId",
       "description": "Auto-generated stub from `modules/hrms/holidays/holiday.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26226,7 +26997,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Holidays"
+        "HRMS — Holidays"
       ],
       "summary": "Update dayId",
       "description": "Auto-generated stub from `modules/hrms/holidays/holiday.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26281,7 +27052,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/holidays/resolve": {
     "get": {
       "tags": [
-        "Hrms — Holidays"
+        "HRMS — Holidays"
       ],
       "summary": "List / get resolve",
       "description": "Auto-generated stub from `modules/hrms/holidays/holiday.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26318,7 +27089,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/leave/policies/{policyId}": {
     "patch": {
       "tags": [
-        "Hrms — Leave"
+        "HRMS — Leave"
       ],
       "summary": "Update policyId",
       "description": "Auto-generated stub from `modules/hrms/leave/leave.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26364,7 +27135,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/leave/requests/{requestId}": {
     "get": {
       "tags": [
-        "Hrms — Leave"
+        "HRMS — Leave"
       ],
       "summary": "Get requestId",
       "description": "Auto-generated stub from `modules/hrms/leave/leave.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26408,7 +27179,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Leave"
+        "HRMS — Leave"
       ],
       "summary": "Update requestId",
       "description": "Auto-generated stub from `modules/hrms/leave/leave.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26454,7 +27225,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/leave/types/{leaveTypeId}": {
     "patch": {
       "tags": [
-        "Hrms — Leave"
+        "HRMS — Leave"
       ],
       "summary": "Update leaveTypeId",
       "description": "Auto-generated stub from `modules/hrms/leave/leave.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26500,7 +27271,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/overtime/{otId}": {
     "get": {
       "tags": [
-        "Hrms — Overtime"
+        "HRMS — Overtime"
       ],
       "summary": "Get otId",
       "description": "Auto-generated stub from `modules/hrms/overtime/overtime.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26546,7 +27317,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/overtime/{otId}/cancel": {
     "post": {
       "tags": [
-        "Hrms — Overtime"
+        "HRMS — Overtime"
       ],
       "summary": "Create / action cancel",
       "description": "Auto-generated stub from `modules/hrms/overtime/overtime.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26592,7 +27363,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/overtime/{otId}/reject": {
     "post": {
       "tags": [
-        "Hrms — Overtime"
+        "HRMS — Overtime"
       ],
       "summary": "Create / action reject",
       "description": "Auto-generated stub from `modules/hrms/overtime/overtime.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26638,7 +27409,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/overtime/bulk-reject": {
     "post": {
       "tags": [
-        "Hrms — Overtime"
+        "HRMS — Overtime"
       ],
       "summary": "Create / action bulk-reject",
       "description": "Auto-generated stub from `modules/hrms/overtime/overtime.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26675,7 +27446,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/overtime/policies": {
     "get": {
       "tags": [
-        "Hrms — Overtime"
+        "HRMS — Overtime"
       ],
       "summary": "List / get policies",
       "description": "Auto-generated stub from `modules/hrms/overtime/overtime.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26710,7 +27481,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Hrms — Overtime"
+        "HRMS — Overtime"
       ],
       "summary": "Create / action policies",
       "description": "Auto-generated stub from `modules/hrms/overtime/overtime.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26747,7 +27518,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/overtime/policies/{policyId}": {
     "patch": {
       "tags": [
-        "Hrms — Overtime"
+        "HRMS — Overtime"
       ],
       "summary": "Update policyId",
       "description": "Auto-generated stub from `modules/hrms/overtime/overtime.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26793,7 +27564,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/overtime/regenerate": {
     "post": {
       "tags": [
-        "Hrms — Overtime"
+        "HRMS — Overtime"
       ],
       "summary": "Create / action regenerate",
       "description": "Auto-generated stub from `modules/hrms/overtime/overtime.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26830,7 +27601,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/payroll/periods/{periodId}": {
     "get": {
       "tags": [
-        "Hrms — Payroll"
+        "HRMS — Payroll"
       ],
       "summary": "Get periodId",
       "description": "Auto-generated stub from `modules/hrms/payroll/payroll.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26876,7 +27647,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/roster/assignments": {
     "post": {
       "tags": [
-        "Hrms — Roster"
+        "HRMS — Roster"
       ],
       "summary": "Create / action assignments",
       "description": "Auto-generated stub from `modules/hrms/roster/roster.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26913,7 +27684,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/roster/assignments/bulk": {
     "post": {
       "tags": [
-        "Hrms — Roster"
+        "HRMS — Roster"
       ],
       "summary": "Create / action bulk",
       "description": "Auto-generated stub from `modules/hrms/roster/roster.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26950,7 +27721,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/roster/assignments/clear": {
     "post": {
       "tags": [
-        "Hrms — Roster"
+        "HRMS — Roster"
       ],
       "summary": "Create / action clear",
       "description": "Auto-generated stub from `modules/hrms/roster/roster.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -26987,7 +27758,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/roster/assignments/copy": {
     "post": {
       "tags": [
-        "Hrms — Roster"
+        "HRMS — Roster"
       ],
       "summary": "Create / action copy",
       "description": "Auto-generated stub from `modules/hrms/roster/roster.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27024,7 +27795,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/roster/effective-shift": {
     "get": {
       "tags": [
-        "Hrms — Roster"
+        "HRMS — Roster"
       ],
       "summary": "List / get effective-shift",
       "description": "Auto-generated stub from `modules/hrms/roster/roster.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27061,7 +27832,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/roster/grid": {
     "get": {
       "tags": [
-        "Hrms — Roster"
+        "HRMS — Roster"
       ],
       "summary": "List / get grid",
       "description": "Auto-generated stub from `modules/hrms/roster/roster.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27098,7 +27869,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/salary/assignments/{assignmentId}/revise": {
     "post": {
       "tags": [
-        "Hrms — Salary"
+        "HRMS — Salary"
       ],
       "summary": "Create / action revise",
       "description": "Auto-generated stub from `modules/hrms/salary/salary.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27144,7 +27915,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/salary/components/{componentId}": {
     "get": {
       "tags": [
-        "Hrms — Salary"
+        "HRMS — Salary"
       ],
       "summary": "Get componentId",
       "description": "Auto-generated stub from `modules/hrms/salary/salary.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27188,7 +27959,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Salary"
+        "HRMS — Salary"
       ],
       "summary": "Update componentId",
       "description": "Auto-generated stub from `modules/hrms/salary/salary.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27234,7 +28005,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/salary/structures/{structureId}": {
     "get": {
       "tags": [
-        "Hrms — Salary"
+        "HRMS — Salary"
       ],
       "summary": "Get structureId",
       "description": "Auto-generated stub from `modules/hrms/salary/salary.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27278,7 +28049,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Salary"
+        "HRMS — Salary"
       ],
       "summary": "Update structureId",
       "description": "Auto-generated stub from `modules/hrms/salary/salary.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27324,7 +28095,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/salary/versions/{versionId}": {
     "get": {
       "tags": [
-        "Hrms — Salary"
+        "HRMS — Salary"
       ],
       "summary": "Get versionId",
       "description": "Auto-generated stub from `modules/hrms/salary/salary.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27368,7 +28139,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Salary"
+        "HRMS — Salary"
       ],
       "summary": "Update versionId",
       "description": "Auto-generated stub from `modules/hrms/salary/salary.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27414,7 +28185,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/shifts": {
     "get": {
       "tags": [
-        "Hrms — Shifts"
+        "HRMS — Shifts"
       ],
       "summary": "List / get shifts",
       "description": "Auto-generated stub from `modules/hrms/shifts/shift.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27449,7 +28220,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "post": {
       "tags": [
-        "Hrms — Shifts"
+        "HRMS — Shifts"
       ],
       "summary": "Create / action shifts",
       "description": "Auto-generated stub from `modules/hrms/shifts/shift.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27486,7 +28257,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
   "/t/{tenantSlug}/hrms/shifts/{shiftId}": {
     "get": {
       "tags": [
-        "Hrms — Shifts"
+        "HRMS — Shifts"
       ],
       "summary": "Get shiftId",
       "description": "Auto-generated stub from `modules/hrms/shifts/shift.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -27530,7 +28301,7 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
     },
     "patch": {
       "tags": [
-        "Hrms — Shifts"
+        "HRMS — Shifts"
       ],
       "summary": "Update shiftId",
       "description": "Auto-generated stub from `modules/hrms/shifts/shift.routes.ts`. Enrich in `swagger.ts` when needed.",
@@ -30067,6 +30838,1295 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
           "schema": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/activity": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Activity"
+      ],
+      "summary": "List / get activity",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/admin/settings": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Admin"
+      ],
+      "summary": "List / get settings",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/analytics": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Analytics"
+      ],
+      "summary": "List / get analytics",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/categories": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Categories"
+      ],
+      "summary": "List / get categories",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/chat/stop": {
+    "post": {
+      "tags": [
+        "Knowledge Base — Chat"
+      ],
+      "summary": "Create / action stop",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/chat/suggestions": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Chat"
+      ],
+      "summary": "List / get suggestions",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/copilot/complete": {
+    "post": {
+      "tags": [
+        "Knowledge Base — Copilot"
+      ],
+      "summary": "Create / action complete",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/copilot/stop": {
+    "post": {
+      "tags": [
+        "Knowledge Base — Copilot"
+      ],
+      "summary": "Create / action stop",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/documents": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Documents"
+      ],
+      "summary": "List / get documents",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    },
+    "post": {
+      "tags": [
+        "Knowledge Base — Documents"
+      ],
+      "summary": "Create / action documents",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/documents/{id}": {
+    "delete": {
+      "tags": [
+        "Knowledge Base — Documents"
+      ],
+      "summary": "Delete id",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    },
+    "get": {
+      "tags": [
+        "Knowledge Base — Documents"
+      ],
+      "summary": "Get id",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    },
+    "patch": {
+      "tags": [
+        "Knowledge Base — Documents"
+      ],
+      "summary": "Update id",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/documents/{id}/file": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Documents"
+      ],
+      "summary": "List / get file",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/documents/{id}/reindex": {
+    "post": {
+      "tags": [
+        "Knowledge Base — Documents"
+      ],
+      "summary": "Create / action reindex",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/documents/{id}/status": {
+    "post": {
+      "tags": [
+        "Knowledge Base — Documents"
+      ],
+      "summary": "Create / action status",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/documents/{id}/versions": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Documents"
+      ],
+      "summary": "List / get versions",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/feedback": {
+    "post": {
+      "tags": [
+        "Knowledge Base — Feedback"
+      ],
+      "summary": "Create / action feedback",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/insights/summary": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Insights"
+      ],
+      "summary": "List / get summary",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/search": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Search"
+      ],
+      "summary": "List / get search",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/search/hybrid": {
+    "post": {
+      "tags": [
+        "Knowledge Base — Search"
+      ],
+      "summary": "Create / action hybrid",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/search/semantic": {
+    "post": {
+      "tags": [
+        "Knowledge Base — Search"
+      ],
+      "summary": "Create / action semantic",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/sessions": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Sessions"
+      ],
+      "summary": "List / get sessions",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    },
+    "post": {
+      "tags": [
+        "Knowledge Base — Sessions"
+      ],
+      "summary": "Create / action sessions",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/sessions/{id}": {
+    "delete": {
+      "tags": [
+        "Knowledge Base — Sessions"
+      ],
+      "summary": "Delete id",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    },
+    "get": {
+      "tags": [
+        "Knowledge Base — Sessions"
+      ],
+      "summary": "Get id",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/sessions/{id}/messages": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Sessions"
+      ],
+      "summary": "List / get messages",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    },
+    "post": {
+      "tags": [
+        "Knowledge Base — Sessions"
+      ],
+      "summary": "Create / action messages",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/sessions/{id}/messages/{messageId}/regenerate": {
+    "post": {
+      "tags": [
+        "Knowledge Base — Sessions"
+      ],
+      "summary": "Create / action regenerate",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "messageId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/sources": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Sources"
+      ],
+      "summary": "List / get sources",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/status": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Status"
+      ],
+      "summary": "List / get status",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/kb/tags": {
+    "get": {
+      "tags": [
+        "Knowledge Base — Tags"
+      ],
+      "summary": "List / get tags",
+      "description": "Auto-generated stub from `modules/knowledge/knowledge.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
           }
         }
       ],
@@ -39033,6 +41093,115 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
       }
     }
   },
+  "/t/{tenantSlug}/mobile/device-tokens": {
+    "delete": {
+      "tags": [
+        "Mobile — Device Tokens"
+      ],
+      "summary": "Delete device-tokens",
+      "description": "Auto-generated stub from `modules/mobile/device-tokens/device-token.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    },
+    "post": {
+      "tags": [
+        "Mobile — Device Tokens"
+      ],
+      "summary": "Create / action device-tokens",
+      "description": "Auto-generated stub from `modules/mobile/device-tokens/device-token.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/mobile/device-tokens/revoke": {
+    "post": {
+      "tags": [
+        "Mobile — Device Tokens"
+      ],
+      "summary": "Create / action revoke",
+      "description": "Auto-generated stub from `modules/mobile/device-tokens/device-token.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
   "/t/{tenantSlug}/modules": {
     "get": {
       "tags": [
@@ -39210,6 +41379,447 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
       ],
       "summary": "List / get administrators",
       "description": "Auto-generated stub from `modules/modules/module.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/notifications": {
+    "get": {
+      "tags": [
+        "Notifications"
+      ],
+      "summary": "List / get notifications",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/notifications/{id}/dismiss": {
+    "patch": {
+      "tags": [
+        "Notifications"
+      ],
+      "summary": "Update dismiss",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/notifications/{id}/read": {
+    "patch": {
+      "tags": [
+        "Notifications"
+      ],
+      "summary": "Update read",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/notifications/{id}/resolve": {
+    "patch": {
+      "tags": [
+        "Notifications"
+      ],
+      "summary": "Update resolve",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/notifications/{id}/snooze": {
+    "patch": {
+      "tags": [
+        "Notifications"
+      ],
+      "summary": "Update snooze",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/notifications/preferences": {
+    "get": {
+      "tags": [
+        "Notifications — Preferences"
+      ],
+      "summary": "List / get preferences",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    },
+    "put": {
+      "tags": [
+        "Notifications — Preferences"
+      ],
+      "summary": "Update preferences",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/notifications/read-all": {
+    "patch": {
+      "tags": [
+        "Notifications — Read All"
+      ],
+      "summary": "Update read-all",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/notifications/settings": {
+    "get": {
+      "tags": [
+        "Notifications — Settings"
+      ],
+      "summary": "List / get settings",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/notifications/summary": {
+    "get": {
+      "tags": [
+        "Notifications — Summary"
+      ],
+      "summary": "List / get summary",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/notifications/unread-count": {
+    "get": {
+      "tags": [
+        "Notifications — Unread Count"
+      ],
+      "summary": "List / get unread-count",
+      "description": "Auto-generated stub from `modules/notifications/notification.routes.ts`. Enrich in `swagger.ts` when needed.",
       "parameters": [
         {
           "name": "tenantSlug",
@@ -40774,6 +43384,43 @@ export const generatedSwaggerPaths: Record<string, Record<string, unknown>> = {
           "schema": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Success"
+        },
+        "400": {
+          "description": "Validation error"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      }
+    }
+  },
+  "/t/{tenantSlug}/purchase/grns/evaluate-lines": {
+    "post": {
+      "tags": [
+        "Purchase — Grns"
+      ],
+      "summary": "Create / action evaluate-lines",
+      "description": "Auto-generated stub from `modules/purchase/grn/goods-receipt.routes.ts`. Enrich in `swagger.ts` when needed.",
+      "parameters": [
+        {
+          "name": "tenantSlug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "example": "vasant-trailers"
           }
         }
       ],

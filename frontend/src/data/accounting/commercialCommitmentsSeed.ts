@@ -1,7 +1,8 @@
-import type { CommercialCommitment } from '@/types/commercialCommitments'
+import { isApiMode } from '@/config/apiConfig'
 import { summarizeCommercialCommitments } from '@/types/commercialCommitments'
+import type { CommercialCommitment } from '@/types/commercialCommitments'
 
-/** Mock commercial commitments — not posted to AR / GL. */
+/** Mock commercial commitments — not posted to AR / GL. Used only when VITE_USE_API=false. */
 export const COMMERCIAL_COMMITMENTS_SEED: CommercialCommitment[] = [
   {
     id: 'cc-so-star-confirmed',
@@ -174,14 +175,17 @@ const delay = (ms = 120) => new Promise((r) => setTimeout(r, ms))
 
 export async function listCommercialCommitments(): Promise<CommercialCommitment[]> {
   await delay()
+  if (isApiMode()) return []
   return COMMERCIAL_COMMITMENTS_SEED.map((r) => ({ ...r }))
 }
 
 export async function getCommercialCommitmentSummary() {
   await delay()
+  if (isApiMode()) return summarizeCommercialCommitments([])
   return summarizeCommercialCommitments(COMMERCIAL_COMMITMENTS_SEED)
 }
 
 export function getCommercialCommitmentById(id: string): CommercialCommitment | undefined {
+  if (isApiMode()) return undefined
   return COMMERCIAL_COMMITMENTS_SEED.find((r) => r.id === id)
 }

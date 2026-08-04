@@ -203,61 +203,6 @@ export default function FollowUpsScreen() {
       />
 
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filters}
-      >
-        {BUCKETS.map((b) => {
-          const selected = view === b.key
-          const count = counts[b.key]
-          return (
-            <Pressable
-              key={b.key}
-              onPress={() => setView(b.key)}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              accessibilityLabel={`${b.label}, ${count}`}
-              style={({ pressed }) => [
-                styles.filter,
-                selected
-                  ? {
-                      backgroundColor: colors.surface,
-                      borderColor: b.accent,
-                    }
-                  : {
-                      backgroundColor: b.muteBg,
-                      borderColor: 'transparent',
-                    },
-                pressed && styles.filterPressed,
-              ]}
-            >
-              <Ionicons name={b.icon} size={15} color={b.accent} />
-              <Text style={[styles.filterLabel, { color: selected ? b.accent : b.muteFg }]}>
-                {b.label}
-              </Text>
-              <View
-                style={[
-                  styles.filterBadge,
-                  {
-                    backgroundColor: selected ? b.accent : colors.surface,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterBadgeText,
-                    { color: selected ? colors.textInverse : b.muteFg },
-                  ]}
-                >
-                  {count}
-                </Text>
-              </View>
-            </Pressable>
-          )
-        })}
-      </ScrollView>
-
-      <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -267,7 +212,6 @@ export default function FollowUpsScreen() {
           />
         }
       >
-        {/* Summary strip — 4 tinted stat mini-cards */}
         <View style={styles.statsRow}>
           {BUCKETS.map((b) => {
             const selected = view === b.key
@@ -275,6 +219,9 @@ export default function FollowUpsScreen() {
               <Pressable
                 key={`stat-${b.key}`}
                 onPress={() => setView(b.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${b.label}, ${counts[b.key]}`}
                 style={({ pressed }) => [
                   styles.statCard,
                   selected && {
@@ -285,7 +232,7 @@ export default function FollowUpsScreen() {
                 ]}
               >
                 <Text style={[styles.statValue, { color: b.accent }]}>{counts[b.key]}</Text>
-                <Text style={styles.statLabel}>{b.label}</Text>
+                <Text style={[styles.statLabel, selected && { color: b.accent }]}>{b.label}</Text>
               </Pressable>
             )
           })}
@@ -433,7 +380,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md + 2,
     height: 40,
-    borderRadius: radius.full,
+    borderRadius: radius.md,
     ...shadows.soft,
   },
   addBtnPressed: {
@@ -445,39 +392,9 @@ const styles = StyleSheet.create({
     color: colors.textInverse,
     fontSize: 14,
   },
-  filters: {
-    paddingHorizontal: layout.screenPadding,
-    paddingBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  filter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingLeft: spacing.md,
-    paddingRight: spacing.sm + 2,
-    paddingVertical: spacing.sm + 1,
-    borderRadius: radius.full,
-    borderWidth: 1.5,
-    minHeight: 38,
-  },
-  filterPressed: { opacity: 0.9, transform: [{ scale: motion.pressScaleSoft }] },
-  filterLabel: { ...typography.captionStrong, fontSize: 13 },
-  filterBadge: {
-    minWidth: 22,
-    height: 22,
-    paddingHorizontal: 6,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterBadgeText: {
-    ...typography.micro,
-    fontSize: 11,
-    fontWeight: '700',
-  },
   scroll: {
     paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.hero,
   },
   sectionHead: {
@@ -508,11 +425,11 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xs,
     alignItems: 'center',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.border,
     ...shadows.soft,
   },
@@ -532,7 +449,7 @@ const styles = StyleSheet.create({
     marginTop: -spacing.sm,
     marginBottom: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.md,
     ...shadows.soft,
@@ -541,7 +458,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     padding: spacing.lg,
     minHeight: 88,
     textAlignVertical: 'top',

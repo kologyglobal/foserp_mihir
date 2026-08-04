@@ -1,4 +1,21 @@
+## 2026-08-04 — Unify CRM Tax Invoice + Money In Sales Invoice
+
+### Shipped
+- Canonical invoice = `SalesInvoice` (`sales_invoices`). CRM commercial invoice APIs create/update/post via `crm-unified-sales-invoice.service.ts`.
+- Schema: commercial + `legacyCrmTaxInvoiceId` / `createdChannel` on SI. Migration `20260804020000_unify_sales_invoice_commercial`.
+- CRM-only backfill script: `scripts/migrate-crm-tax-invoices-to-sales-invoices.ts`.
+- CRM “Post” → Mark Ready; GL post if `finance.ar.invoice.post`.
+- Convert queue `/crm-pending` retired (redirect). Payment sync CRM←AR is no-op.
+- Doc: `docs/accounting/UNIFIED_SALES_INVOICE.md`.
+
+### Conditions
+- `prisma migrate deploy` + generate; run CRM-only migrate script for tenants with unconverted CRM TIs.
+- Demo mode store may still hold legacy CRM invoice shapes until FE demo rewrite; API mode is SoT.
+
+---
+
 ## 2026-08-03 — CRM SO/quotation customer-first, Customer 360, document titles
+
 
 ### Shipped
 - Sales order / quotation create: customer first, then filtered open opportunities / unconverted quotations.

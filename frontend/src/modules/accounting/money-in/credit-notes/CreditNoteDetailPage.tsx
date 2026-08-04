@@ -443,7 +443,16 @@ export function CreditNoteDetailPage() {
         </div>
       )}
 
-      <ValidationDrawer open={showValidate} onClose={() => setShowValidate(false)} report={report} />
+      <ValidationDrawer
+        open={showValidate}
+        onClose={() => setShowValidate(false)}
+        report={report}
+        allocateHref={
+          id && mergeAllowedAction(perms.canAllocate, actions?.allocate)
+            ? `/accounting/money-in/credit-notes/${id}/allocate`
+            : null
+        }
+      />
 
       {showPost && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true">

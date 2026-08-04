@@ -1,28 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import {
-  Banknote,
-  Building2,
-  ClipboardList,
-  FileSearch,
-  FileText,
-  Percent,
-  Plus,
-  Trash2,
-} from 'lucide-react'
+import { ChevronDown, Plus, Trash2, UserPlus } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
-import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '@/components/erp/card-form'
 import { ErpSegmentedControl } from '@/components/erp/ErpSegmentedControl'
 import { ErpSmartSelect, type ErpSmartSelectOption } from '@/components/erp/ErpSmartSelect'
 import { VendorMasterSelect } from '@/components/masters/VendorMasterSelect'
 import { Input, Select } from '@/components/forms/Inputs'
+import { FormField } from '@/components/forms/FormField'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { Badge } from '@/components/ui/Badge'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { isApiMode } from '@/config/apiConfig'
-import { listAccounts, resolveLegalEntityId } from '@/services/bridges/financeApiBridge'
+import {
+  ensureLegalEntity,
+  listAccounts,
+  resolveLegalEntityId,
+  updateLegalEntity,
+} from '@/services/bridges/financeApiBridge'
 import {
   createVendorInvoiceDraft,
   getVendorInvoice,
@@ -38,17 +35,32 @@ import { useActiveVendors } from '@/hooks/useMasterLists'
 import { useMasterStore } from '@/store/masterStore'
 import { useTenantProfileStore } from '@/store/tenantProfileStore'
 import { notify } from '@/store/toastStore'
-import { PartyMasterCard } from '@/modules/accounting/shared/invoices'
+import {
+  partyMasterCreateRoute,
+  partyMasterRoute,
+} from '@/modules/accounting/shared/invoices'
 import type {
   CreateVendorInvoiceInput,
   VendorInvoiceLineType,
   VendorInvoiceSourceLinkInput,
   VendorInvoiceType,
 } from '@/types/moneyOut'
+import type { LegalEntity } from '@/types/financeSetup'
 import { useMoneyOutPermissions } from '@/utils/permissions/moneyOut'
+import { canQuickCreateEntity } from '@/utils/quickCreatePermissions'
+import {
+  formatPlaceOfSupplyLabel,
+  listGstStateSelectOptions,
+  resolveGstStateCode,
+  validateStateCode,
+} from '@/utils/gstStateCode'
+import { gstStateCodeFromGstin } from '@/utils/customerUtils'
+import { cn } from '@/utils/cn'
 import { VendorInvoiceTotalsPanel } from '../components/VendorInvoiceTotalsPanel'
 import { addDaysIso, todayIsoDate } from '../moneyOutUi'
 import { MoneyOutWorkspaceShell } from '../MoneyOutWorkspaceShell'
+
+const GST_STATE_OPTIONS = listGstStateSelectOptions()
 
 const lineSchema = z.object({
   lineType: z.enum(['ITEM', 'SERVICE', 'EXPENSE', 'ASSET', 'FREIGHT', 'OTHER_CHARGE']),
@@ -89,6 +101,10 @@ const formSchema = z.object({
   tdsSectionCode: z.string().optional(),
   tdsRate: z.string().optional(),
   supplyType: z.enum(['INTRA_STATE', 'INTER_STATE']),
+  placeOfSupply: z
+    .string()
+    .min(1, 'Place of supply is required')
+    .refine((v) => Boolean(validateStateCode(v)), 'Select a valid GST state code'),
   freightAmount: z.string().optional(),
   otherChargeAmount: z.string().optional(),
   paymentTermsDays: z.string().optional(),
@@ -152,6 +168,54 @@ const INVOICE_TYPE_BADGE_COLOR: Record<VendorInvoiceType, 'blue' | 'green' | 'or
 /** VI create source mode (Wave 3) — Direct entry, or sourced from a real PO / GRN. */
 type VendorInvoiceCreateSource = 'DIRECT' | 'PURCHASE_ORDER' | 'GOODS_RECEIPT'
 
+/** Zoho-flat document card — dense header + tight body (mirrors Money In invoice create). */
+function FormSection({
+  title,
+  subtitle,
+  actions,
+  children,
+  className,
+}: {
+  title: string
+  subtitle?: string
+  actions?: React.ReactNode
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <section
+      className={cn(
+        'sales-invoice-zoho-form__section mi-create-section rounded-md border border-erp-border bg-white',
+        className,
+      )}
+    >
+      <header className="sales-invoice-zoho-form__section-header mi-create-section__header flex flex-wrap items-center justify-between gap-2 border-b border-erp-border">
+        <div>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-erp-text">{title}</h3>
+          {subtitle ? <p className="text-[11px] text-erp-muted">{subtitle}</p> : null}
+        </div>
+        {actions}
+      </header>
+      <div className="mi-create-section__body">{children}</div>
+    </section>
+  )
+}
+
+function vendorInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+}
+
+const LINE_GRID_QUICK =
+  'md:grid-cols-[minmax(0,2.6fr)_minmax(0,0.75fr)_minmax(0,1fr)_minmax(0,0.75fr)_minmax(0,2fr)_minmax(0,0.4fr)]'
+const LINE_GRID_FULL =
+  'md:grid-cols-[minmax(0,0.95fr)_minmax(0,2.2fr)_minmax(0,0.7fr)_minmax(0,0.95fr)_minmax(0,0.7fr)_minmax(0,0.85fr)_minmax(0,1.6fr)_minmax(0,0.4fr)]'
+
 export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
@@ -193,6 +257,8 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [sourcesLoading, setSourcesLoading] = useState(false)
   /** Existing source links loaded on edit — resent unchanged (never re-fabricated). */
   const [existingSourceLinks, setExistingSourceLinks] = useState<VendorInvoiceSourceLinkInput[]>([])
+  const [legalEntity, setLegalEntity] = useState<LegalEntity | null>(null)
+  const [companyStateCode, setCompanyStateCode] = useState('')
   const items = useMasterStore((s) => s.items)
 
   const form = useForm<FormValues>({
@@ -214,6 +280,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       tdsSectionCode: '',
       tdsRate: '0',
       supplyType: 'INTRA_STATE',
+      placeOfSupply: '',
       freightAmount: '0',
       otherChargeAmount: '0',
       paymentTermsDays: '',
@@ -224,6 +291,38 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' })
   const watched = form.watch()
   const isDirty = form.formState.isDirty
+
+  useEffect(() => {
+    let cancelled = false
+    void ensureLegalEntity()
+      .then((le) => {
+        if (cancelled) return
+        setLegalEntity(le)
+        const code =
+          validateStateCode(le.stateCode) ||
+          (le.gstin ? validateStateCode(gstStateCodeFromGstin(le.gstin)) : null) ||
+          ''
+        setCompanyStateCode(code)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLegalEntity(null)
+          setCompanyStateCode('')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const le = validateStateCode(companyStateCode)
+    const pos = validateStateCode(watched.placeOfSupply)
+    if (le && pos) {
+      const next = le === pos ? 'INTRA_STATE' : 'INTER_STATE'
+      if (next !== watched.supplyType) form.setValue('supplyType', next, { shouldDirty: true })
+    }
+  }, [companyStateCode, watched.placeOfSupply, watched.supplyType, form])
   // Services-only tenants never receive freight — hide it for the Expense path only
   // (Goods/Service/Asset invoices still show freight regardless of tenant packaging).
   const hideFreightField = watched.invoiceType === 'EXPENSE' && isServicesTenant
@@ -265,6 +364,27 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     () => vendors.find((v) => v.id === watched.vendorId),
     [vendors, watched.vendorId],
   )
+
+  const resolveVendorPlaceOfSupply = useCallback(
+    (vendorId: string): string | null => {
+      const v = vendors.find((x) => x.id === vendorId)
+      if (!v) return null
+      return (
+        (v.gstin ? validateStateCode(gstStateCodeFromGstin(v.gstin)) : null) ||
+        resolveGstStateCode(v.state) ||
+        null
+      )
+    },
+    [vendors],
+  )
+
+  useEffect(() => {
+    if (!watched.vendorId || mode !== 'create') return
+    const pos = resolveVendorPlaceOfSupply(watched.vendorId)
+    if (!pos) return
+    // Prefill (or refresh after vendor change) when master has a state.
+    form.setValue('placeOfSupply', pos, { shouldDirty: true, shouldValidate: true })
+  }, [watched.vendorId, mode, resolveVendorPlaceOfSupply, form])
 
   // Invoice-eligible PO / GRN candidates from the accounting lookup endpoints
   // (server-side eligibility whitelist + tenant scope — no frontend status filter).
@@ -422,6 +542,17 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
           sourceDocumentDateSnapshot: s.sourceDocumentDateSnapshot ?? null,
         })),
       )
+      const loadedCompanyState =
+        validateStateCode(inv.companyStateCodeSnapshot) ||
+        resolveGstStateCode(inv.companyStateCodeSnapshot) ||
+        ''
+      if (loadedCompanyState) setCompanyStateCode(loadedCompanyState)
+      const loadedPos =
+        validateStateCode(inv.placeOfSupplyStateCode) ||
+        resolveGstStateCode(inv.placeOfSupplyStateCode) ||
+        validateStateCode(inv.vendorStateCodeSnapshot) ||
+        resolveGstStateCode(inv.vendorStateCodeSnapshot) ||
+        ''
       form.reset({
         vendorId: inv.vendorId,
         invoiceType: inv.invoiceType,
@@ -438,7 +569,15 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
         tdsRecognitionMode: inv.tdsRecognitionMode,
         tdsSectionCode: inv.tdsSectionCode ?? '',
         tdsRate: inv.tdsRate,
-        supplyType: 'INTRA_STATE',
+        supplyType: (() => {
+          const company = validateStateCode(inv.companyStateCodeSnapshot)
+          const pos =
+            validateStateCode(inv.placeOfSupplyStateCode) ||
+            validateStateCode(inv.vendorStateCodeSnapshot)
+          if (company && pos) return company === pos ? 'INTRA_STATE' : 'INTER_STATE'
+          return 'INTRA_STATE'
+        })(),
+        placeOfSupply: loadedPos,
         freightAmount: inv.freightAmount,
         otherChargeAmount: inv.otherChargeAmount,
         paymentTermsDays: '',
@@ -503,6 +642,11 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
 
     const linkedItem = (itemId?: string) => (itemId ? items.find((i) => i.id === itemId) : undefined)
+    const placeOfSupply =
+      validateStateCode(values.placeOfSupply) ||
+      resolveVendorPlaceOfSupply(values.vendorId)
+    const vendorStateCode = resolveVendorPlaceOfSupply(values.vendorId)
+    const companyState = validateStateCode(companyStateCode)
 
     return {
       legalEntityId: resolveLegalEntityId(),
@@ -523,6 +667,9 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       tdsSectionCode: values.tdsSectionCode || null,
       tdsRate: values.tdsRate || '0',
       supplyType: values.supplyType,
+      placeOfSupply: placeOfSupply || null,
+      companyStateCode: companyState || null,
+      vendorStateCode: vendorStateCode || null,
       freightAmount: values.freightAmount || '0',
       otherChargeAmount: values.otherChargeAmount || '0',
       paymentTermsDays: values.paymentTermsDays ? Number(values.paymentTermsDays) : null,
@@ -551,6 +698,32 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const onSave = form.handleSubmit(async (values) => {
     setSaving(true)
     try {
+      const leState = validateStateCode(companyStateCode)
+      if (!leState) {
+        notify.error(
+          'Company state code is required. Select company state under Charges & Tax (or Accounting → Setup → Legal Entities).',
+        )
+        setSaving(false)
+        return
+      }
+      if (!validateStateCode(values.placeOfSupply) && !resolveVendorPlaceOfSupply(values.vendorId)) {
+        notify.error('Place of supply is required to determine CGST/SGST vs IGST.')
+        setSaving(false)
+        return
+      }
+      if (legalEntity && validateStateCode(legalEntity.stateCode) !== leState) {
+        try {
+          const updatedLe = await updateLegalEntity(legalEntity.id, {
+            stateCode: leState,
+            gstin: legalEntity.gstin ?? undefined,
+          })
+          setLegalEntity(updatedLe)
+          setCompanyStateCode(validateStateCode(updatedLe.stateCode) || leState)
+        } catch {
+          // Vendor invoice payload includes companyStateCode even if LE master update fails.
+        }
+      }
+
       if (mode === 'create') {
         const created = await createVendorInvoiceDraft(buildPayload(values))
         form.reset(values)
@@ -620,461 +793,661 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const invoiceTypeLabel = INVOICE_TYPE_LABELS[watched.invoiceType] ?? watched.invoiceType
   const invoiceTypeBadgeColor = INVOICE_TYPE_BADGE_COLOR[watched.invoiceType] ?? 'gray'
   const lineCount = fields.length
+  const vendorLocked = mode === 'create' && createSource !== 'DIRECT' && Boolean(selectedPoId || selectedGrnId)
+  const canQuickCreateVendor = canQuickCreateEntity('vendor')
+  const vendorDisplayName = selectedVendor?.vendorName || 'Vendor'
+  const lineGrid = quickMode ? LINE_GRID_QUICK : LINE_GRID_FULL
+  const selectedPo = purchaseOrders.find((p) => p.id === selectedPoId)
+  const selectedGrn = goodsReceipts.find((g) => g.id === selectedGrnId)
 
   return (
     <MoneyOutWorkspaceShell title={mode === 'create' ? 'New Vendor Invoice' : 'Edit Vendor Invoice'}>
-      <div className="enterprise-workspace--dynamics-form vendor-invoice-zoho-form">
-        <div className="vendor-invoice-zoho-form__header">
-          <div className="vendor-invoice-zoho-form__header-title">
-            <h2>{mode === 'create' ? 'New Vendor Invoice' : 'Edit Vendor Invoice'}</h2>
+      {mode === 'create' && (
+        <div className="mi-create-toolbar mb-2">
+          <div className="mi-create-toolbar__group">
+            <span className="mi-create-toolbar__label">Source</span>
+            <ErpSegmentedControl<VendorInvoiceCreateSource>
+              variant="pills"
+              name="Vendor invoice source"
+              value={createSource}
+              onChange={(next) => {
+                if (next === 'DIRECT') {
+                  setCreateSource('DIRECT')
+                  setSelectedPoId('')
+                  setSelectedGrnId('')
+                } else if (next === 'PURCHASE_ORDER') {
+                  setCreateSource('PURCHASE_ORDER')
+                  setSelectedGrnId('')
+                } else {
+                  setCreateSource('GOODS_RECEIPT')
+                  setSelectedPoId('')
+                }
+              }}
+              options={[
+                { value: 'DIRECT', label: 'Direct' },
+                { value: 'PURCHASE_ORDER', label: 'From PO' },
+                { value: 'GOODS_RECEIPT', label: 'From GRN' },
+              ]}
+            />
+          </div>
+          <div className="mi-create-toolbar__group">
+            <span className="mi-create-toolbar__label">Entry mode</span>
+            <ErpSegmentedControl<'quick' | 'full'>
+              variant="pills"
+              name="Vendor invoice entry mode"
+              value={quickMode ? 'quick' : 'full'}
+              onChange={(next) => setQuickMode(next === 'quick')}
+              options={[
+                { value: 'quick', label: 'Quick expense' },
+                { value: 'full', label: 'Full invoice' },
+              ]}
+            />
+          </div>
+        </div>
+      )}
+
+      {draftReference ? (
+        <p className="mi-create-banner mi-create-banner--info mb-2">
+          Editing draft <strong>{draftReference}</strong>
+          <span className="ml-2 inline-flex align-middle">
             <Badge color={invoiceTypeBadgeColor} dot>
               {invoiceTypeLabel}
             </Badge>
-          </div>
-          {draftReference && (
-            <p className="vendor-invoice-zoho-form__header-meta">
-              Draft reference: <span>{draftReference}</span>
-            </p>
-          )}
-        </div>
+          </span>
+        </p>
+      ) : null}
 
-        {mode === 'create' && (
-          <div className="vendor-invoice-zoho-form__toolbar">
-            <div className="vendor-invoice-zoho-form__toolbar-group">
-              <span className="vendor-invoice-zoho-form__toolbar-label">Source</span>
-              <ErpSegmentedControl<VendorInvoiceCreateSource>
-                variant="pills"
-                name="Vendor invoice source"
-                value={createSource}
-                onChange={(next) => {
-                  if (next === 'DIRECT') {
-                    setCreateSource('DIRECT')
-                    setSelectedPoId('')
-                    setSelectedGrnId('')
-                  } else if (next === 'PURCHASE_ORDER') {
-                    setCreateSource('PURCHASE_ORDER')
-                    setSelectedGrnId('')
-                  } else {
-                    setCreateSource('GOODS_RECEIPT')
-                    setSelectedPoId('')
-                  }
-                }}
-                options={[
-                  { value: 'DIRECT', label: 'Direct' },
-                  { value: 'PURCHASE_ORDER', label: 'From Purchase Order' },
-                  { value: 'GOODS_RECEIPT', label: 'From GRN' },
-                ]}
-              />
-            </div>
-            <div className="vendor-invoice-zoho-form__toolbar-group">
-              <span className="vendor-invoice-zoho-form__toolbar-label">Entry mode</span>
-              <ErpSegmentedControl<'quick' | 'full'>
-                variant="pills"
-                name="Vendor invoice entry mode"
-                value={quickMode ? 'quick' : 'full'}
-                onChange={(next) => setQuickMode(next === 'quick')}
-                options={[
-                  { value: 'quick', label: 'Quick expense' },
-                  { value: 'full', label: 'Full invoice' },
-                ]}
-              />
-            </div>
-          </div>
-        )}
-
-        {mode === 'create' && createSource !== 'DIRECT' && (
-          <div className="vendor-invoice-zoho-form__source-picker">
-            <ErpFieldRow
-              label={createSource === 'PURCHASE_ORDER' ? 'Purchase order' : 'Goods receipt (GRN)'}
-              horizontal={false}
-              hint="Picking a document locks the vendor and records a real source link for Purchase matching."
-            >
-              <ErpSmartSelect
-                options={createSource === 'PURCHASE_ORDER' ? poOptions : grnOptions}
-                value={createSource === 'PURCHASE_ORDER' ? selectedPoId : selectedGrnId}
-                onChange={createSource === 'PURCHASE_ORDER' ? onPickPurchaseOrder : onPickGoodsReceipt}
-                placeholder={createSource === 'PURCHASE_ORDER' ? 'Select purchase order…' : 'Select GRN…'}
-                emptyMessage={
-                  sourcesLoading
-                    ? 'Loading…'
-                    : createSource === 'PURCHASE_ORDER'
-                      ? 'No invoiceable purchase orders found'
-                      : 'No invoiceable goods receipts found'
-                }
-                allowEmpty
-              />
-            </ErpFieldRow>
-          </div>
-        )}
-
-        <form onSubmit={onSave} className="vendor-invoice-zoho-form__body">
-          <ErpCardSection
-            title="Vendor"
-            subtitle="Bill-from vendor for this invoice — quick-create is available if the vendor isn't found."
-            icon={Building2}
-            accent="blue"
-            columns={2}
-          >
-            <ErpFieldRow
-              label="Vendor"
-              required
-              horizontal={false}
-              colSpan={2}
-              fieldError={form.formState.errors.vendorId?.message}
-              hint={
-                mode === 'create' && createSource !== 'DIRECT' && (selectedPoId || selectedGrnId)
-                  ? 'Vendor comes from the selected source document.'
-                  : undefined
-              }
-            >
-              <VendorMasterSelect
-                value={watched.vendorId}
-                onChange={(vendorId) => form.setValue('vendorId', vendorId, { shouldDirty: true, shouldValidate: true })}
-                disabled={mode === 'create' && createSource !== 'DIRECT' && Boolean(selectedPoId || selectedGrnId)}
-                source="accounting"
-                allowEmpty
-              />
-            </ErpFieldRow>
-            <div className="erp-field-row--wide">
-              <PartyMasterCard variant="purchase" partyId={watched.vendorId} showQuickCreate />
-            </div>
-          </ErpCardSection>
-
-          <ErpCardSection
-            title="Invoice Details"
-            subtitle="Supplier reference, invoice type, and key dates."
-            icon={FileText}
-            accent="teal"
-            columns={2}
-          >
-            <ErpFieldRow
-              label="Supplier invoice number"
-              required
-              horizontal={false}
-              fieldError={form.formState.errors.supplierInvoiceNumber?.message}
-            >
-              <Input {...form.register('supplierInvoiceNumber')} autoComplete="off" />
-            </ErpFieldRow>
-            <ErpFieldRow label="Invoice type" horizontal={false}>
-              <Select {...form.register('invoiceType')}>
-                <option value="EXPENSE">Expense</option>
-                <option value="SERVICE">Service</option>
-                <option value="GOODS">Goods</option>
-                <option value="ASSET">Asset</option>
-                <option value="MIXED">Mixed</option>
-              </Select>
-            </ErpFieldRow>
-            <ErpFieldRow label="Supplier invoice date" required horizontal={false}>
-              <Input type="date" {...form.register('supplierInvoiceDate')} />
-            </ErpFieldRow>
-            <ErpFieldRow label="Document date" required horizontal={false}>
-              <Input type="date" {...form.register('documentDate')} />
-            </ErpFieldRow>
-            <ErpFieldRow label="Proposed posting date" horizontal={false}>
-              <Input type="date" {...form.register('postingDate')} />
-            </ErpFieldRow>
-            <ErpFieldRow label="Due date" horizontal={false}>
-              <Input type="date" {...form.register('dueDate')} />
-            </ErpFieldRow>
-            {!quickMode && (
-              <>
-                <ErpFieldRow label="Currency" horizontal={false}>
-                  <Input {...form.register('currencyCode')} />
-                </ErpFieldRow>
-                <ErpFieldRow label="Exchange rate" horizontal={false}>
-                  <Input {...form.register('exchangeRate')} />
-                </ErpFieldRow>
-              </>
-            )}
-          </ErpCardSection>
-
-          <ErpCardSection
-            title="Invoice Lines"
-            subtitle="Raw line inputs are sent to the server — taxable, GST, TDS and payable totals are calculated there."
-            icon={ClipboardList}
-            accent="violet"
-            columns={1}
-          >
-            <div className="vendor-invoice-lines__toolbar">
-              <p className="vendor-invoice-lines__count">
-                {lineCount} line{lineCount === 1 ? '' : 's'}
-              </p>
-              {!quickMode && (
-                <ErpButton
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  icon={Plus}
-                  onClick={() => append(emptyLine(watched.invoiceType))}
+      <form onSubmit={onSave} className="sales-invoice-zoho-form mi-create-form vendor-invoice-zoho-form">
+        <FormSection
+          title="Vendor & Invoice Details"
+          subtitle="Party, supplier reference, type, and key dates."
+          actions={
+            mode === 'create' ? (
+              <Badge color={invoiceTypeBadgeColor} dot>
+                {invoiceTypeLabel}
+              </Badge>
+            ) : undefined
+          }
+        >
+          <div className="mi-create-commercial__body">
+            {mode === 'create' && createSource !== 'DIRECT' && (
+              <div className="mi-create-source-row">
+                <FormField
+                  label={createSource === 'PURCHASE_ORDER' ? 'Purchase order' : 'Goods receipt (GRN)'}
+                  hint="Locks vendor and records a real Purchase source link."
                 >
-                  Add line
-                </ErpButton>
-              )}
+                  <ErpSmartSelect
+                    options={createSource === 'PURCHASE_ORDER' ? poOptions : grnOptions}
+                    value={createSource === 'PURCHASE_ORDER' ? selectedPoId : selectedGrnId}
+                    onChange={createSource === 'PURCHASE_ORDER' ? onPickPurchaseOrder : onPickGoodsReceipt}
+                    placeholder={
+                      createSource === 'PURCHASE_ORDER' ? 'Select purchase order…' : 'Select GRN…'
+                    }
+                    emptyMessage={
+                      sourcesLoading
+                        ? 'Loading…'
+                        : createSource === 'PURCHASE_ORDER'
+                          ? 'No invoiceable purchase orders found'
+                          : 'No invoiceable goods receipts found'
+                    }
+                    allowEmpty
+                  />
+                </FormField>
+                {createSource === 'PURCHASE_ORDER' && selectedPo ? (
+                  <>
+                    <FormField label="PO status">
+                      <div className="erp-input flex min-h-[34px] items-center bg-erp-surface-alt/70 text-erp-text">
+                        {String(selectedPo.status).replace(/_/g, ' ')}
+                      </div>
+                    </FormField>
+                    <FormField label="Currency">
+                      <div className="erp-input flex min-h-[34px] items-center bg-erp-surface-alt/70 text-erp-text">
+                        {selectedPo.currencyCode || '—'}
+                      </div>
+                    </FormField>
+                  </>
+                ) : null}
+                {createSource === 'GOODS_RECEIPT' && selectedGrn ? (
+                  <>
+                    <FormField label="GRN date">
+                      <div className="erp-input flex min-h-[34px] items-center bg-erp-surface-alt/70 text-erp-text">
+                        {selectedGrn.receiptDate || '—'}
+                      </div>
+                    </FormField>
+                    <FormField label="PO">
+                      <div className="erp-input flex min-h-[34px] items-center bg-erp-surface-alt/70 text-erp-text">
+                        {selectedGrn.purchaseOrderNumber || '—'}
+                      </div>
+                    </FormField>
+                  </>
+                ) : null}
+              </div>
+            )}
+
+            {createSource !== 'DIRECT' && (selectedPoId || selectedGrnId) ? (
+              <div className="mi-create-source-chips">
+                {selectedPo ? (
+                  <span className="mi-create-source-chip">
+                    <span className="mi-create-source-chip__label">PO</span>
+                    {selectedPo.orderNumber}
+                  </span>
+                ) : null}
+                {selectedGrn ? (
+                  <span className="mi-create-source-chip">
+                    <span className="mi-create-source-chip__label">GRN</span>
+                    {selectedGrn.grnNumber}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="mi-create-customer-row">
+              <FormField label="Vendor" required error={form.formState.errors.vendorId?.message}>
+                <VendorMasterSelect
+                  value={watched.vendorId}
+                  onChange={(vendorId) =>
+                    form.setValue('vendorId', vendorId, { shouldDirty: true, shouldValidate: true })
+                  }
+                  disabled={vendorLocked}
+                  source="accounting"
+                  allowEmpty
+                />
+                {vendorLocked ? (
+                  <p className="mt-0.5 text-[11px] text-erp-muted">Vendor locked from source document.</p>
+                ) : null}
+              </FormField>
+              {mode === 'create' && !vendorLocked && canQuickCreateVendor ? (
+                <Link
+                  to={partyMasterCreateRoute('purchase')}
+                  className="inline-flex h-[34px] items-center gap-1 self-end rounded-md border border-erp-border bg-white px-2.5 text-[12px] font-semibold text-erp-primary hover:bg-erp-surface-alt"
+                >
+                  <UserPlus className="h-3.5 w-3.5" aria-hidden />
+                  New
+                </Link>
+              ) : null}
             </div>
 
-            {/* Mobile card layout */}
-            <div className="space-y-2 md:hidden">
-              {fields.map((field, index) => (
-                <div key={field.id} className="rounded border border-erp-border p-3">
-                  <ErpFieldRow label="Description" horizontal={false}>
-                    <Input {...form.register(`lines.${index}.description`)} />
-                  </ErpFieldRow>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <ErpFieldRow label="Qty" horizontal={false}>
-                      <Input {...form.register(`lines.${index}.quantity`)} />
-                    </ErpFieldRow>
-                    <ErpFieldRow label="Rate" horizontal={false}>
-                      <Input {...form.register(`lines.${index}.unitPrice`)} />
-                    </ErpFieldRow>
+            {watched.vendorId && selectedVendor ? (
+              <aside className="mi-create-party" aria-label="Selected vendor">
+                <div className="mi-create-party__avatar" aria-hidden>
+                  {vendorInitials(vendorDisplayName)}
+                </div>
+                <div className="mi-create-party__main">
+                  <div className="mi-create-party__title-row">
+                    <h3 className="mi-create-party__name">
+                      {selectedVendor.vendorCode ? `${selectedVendor.vendorCode} — ` : ''}
+                      {vendorDisplayName}
+                    </h3>
+                    <Link
+                      to={partyMasterRoute('purchase', watched.vendorId)}
+                      className="mi-create-party__360"
+                    >
+                      Vendor 360
+                    </Link>
                   </div>
-                  <ErpFieldRow label="GST %" horizontal={false}>
-                    <Input {...form.register(`lines.${index}.gstRate`)} />
-                  </ErpFieldRow>
-                  <ErpFieldRow label="Expense / debit account" horizontal={false}>
+                  <div className="mi-create-party__chips">
+                    <span className="mi-create-party__chip">
+                      <span className="mi-create-party__chip-label">GSTIN</span>
+                      {selectedVendor.gstin || '—'}
+                    </span>
+                    <span className="mi-create-party__chip">
+                      <span className="mi-create-party__chip-label">Place of supply</span>
+                      {watched.placeOfSupply
+                        ? formatPlaceOfSupplyLabel(watched.placeOfSupply)
+                        : '—'}
+                    </span>
+                    {selectedVendor.paymentTermsDays != null ? (
+                      <span className="mi-create-party__chip">
+                        <span className="mi-create-party__chip-label">Terms</span>
+                        {selectedVendor.paymentTermsDays} days
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </aside>
+            ) : null}
+
+            <div className="mi-create-commercial__grid">
+              <FormField
+                label="Supplier invoice no."
+                required
+                error={form.formState.errors.supplierInvoiceNumber?.message}
+              >
+                <Input {...form.register('supplierInvoiceNumber')} autoComplete="off" />
+              </FormField>
+              <FormField label="Invoice type">
+                <Select {...form.register('invoiceType')}>
+                  <option value="EXPENSE">Expense</option>
+                  <option value="SERVICE">Service</option>
+                  <option value="GOODS">Goods</option>
+                  <option value="ASSET">Asset</option>
+                  <option value="MIXED">Mixed</option>
+                </Select>
+              </FormField>
+              <FormField label="Supplier inv. date" required>
+                <Input type="date" {...form.register('supplierInvoiceDate')} />
+              </FormField>
+              <FormField label="Document date" required>
+                <Input type="date" {...form.register('documentDate')} />
+              </FormField>
+              <FormField label="Posting date">
+                <Input type="date" {...form.register('postingDate')} />
+              </FormField>
+              <FormField label="Due date">
+                <Input type="date" {...form.register('dueDate')} />
+              </FormField>
+              {!quickMode ? (
+                <>
+                  <FormField label="Currency">
+                    <Input {...form.register('currencyCode')} />
+                  </FormField>
+                  <FormField label="Exchange rate">
+                    <Input {...form.register('exchangeRate')} />
+                  </FormField>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </FormSection>
+
+        <FormSection
+          title="Invoice Lines"
+          subtitle="Qty × rate preview on client; GST, TDS and payable totals calculated by the server on save."
+          actions={
+            <span className="text-[11px] font-semibold tabular-nums text-erp-muted">
+              {lineCount} line{lineCount === 1 ? '' : 's'}
+            </span>
+          }
+        >
+          {/* Column headers (md+) */}
+          <div
+            className={cn(
+              'sales-invoice-zoho-form__lines-head mb-1 hidden gap-2 border-b border-erp-border px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-erp-muted md:grid',
+              lineGrid,
+            )}
+          >
+            {!quickMode ? <span>Type</span> : null}
+            <span>Description *</span>
+            <span className="text-right">Qty</span>
+            <span className="text-right">Rate (₹)</span>
+            <span className="text-right">GST %</span>
+            {!quickMode ? <span>HSN/SAC</span> : null}
+            <span>Account</span>
+            <span />
+          </div>
+
+          {/* Mobile cards */}
+          <div className="space-y-2 md:hidden">
+            {fields.map((field, index) => (
+              <div key={field.id} className="rounded border border-erp-border bg-erp-surface-alt/30 p-2.5">
+                <FormField label="Description">
+                  <Input {...form.register(`lines.${index}.description`)} />
+                </FormField>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <FormField label="Qty">
+                    <Input
+                      inputMode="decimal"
+                      className="text-right tabular-nums"
+                      {...form.register(`lines.${index}.quantity`)}
+                    />
+                  </FormField>
+                  <FormField label="Rate">
+                    <Input
+                      inputMode="decimal"
+                      className="text-right tabular-nums"
+                      {...form.register(`lines.${index}.unitPrice`)}
+                    />
+                  </FormField>
+                  <FormField label="GST %">
+                    <Input
+                      inputMode="decimal"
+                      className="text-right tabular-nums"
+                      {...form.register(`lines.${index}.gstRate`)}
+                    />
+                  </FormField>
+                  <FormField label="Account">
                     <Select {...form.register(`lines.${index}.debitAccountId`)}>
-                      <option value="">Server mapping / default</option>
+                      <option value="">{SELECT_PLACEHOLDER}</option>
                       {expenseAccounts.map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.code} — {a.name}
                         </option>
                       ))}
                     </Select>
-                  </ErpFieldRow>
-                  {fields.length > 1 && (
-                    <ErpButton
+                  </FormField>
+                </div>
+                {fields.length > 1 ? (
+                  <button
+                    type="button"
+                    className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-erp-muted hover:text-rose-600"
+                    onClick={() => remove(index)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop dense rows */}
+          <div className="hidden md:block">
+            {fields.map((field, index) => (
+              <div
+                key={field.id}
+                className={cn(
+                  'sales-invoice-zoho-form__line-row grid items-start gap-2 rounded border border-erp-border bg-erp-surface-alt/30 p-2 md:rounded-none md:border-0 md:border-b md:bg-transparent md:px-1 md:py-2',
+                  lineGrid,
+                )}
+              >
+                {!quickMode ? (
+                  <Select
+                    {...form.register(`lines.${index}.lineType`)}
+                    aria-label={`Line ${index + 1} type`}
+                  >
+                    <option value="ITEM">Item</option>
+                    <option value="SERVICE">Service</option>
+                    <option value="EXPENSE">Expense</option>
+                    <option value="ASSET">Asset</option>
+                    <option value="FREIGHT">Freight</option>
+                    <option value="OTHER_CHARGE">Other charge</option>
+                  </Select>
+                ) : null}
+                <div className="min-w-0 space-y-1">
+                  {!quickMode && watched.lines?.[index]?.lineType === 'ITEM' ? (
+                    <ErpSmartSelect
+                      options={itemOptions}
+                      value={watched.lines?.[index]?.itemId ?? ''}
+                      onChange={(itemId) => onPickLineItem(index, itemId)}
+                      placeholder="Item master (optional)…"
+                      allowEmpty
+                    />
+                  ) : null}
+                  <Input
+                    placeholder="Description"
+                    {...form.register(`lines.${index}.description`)}
+                  />
+                </div>
+                <Input
+                  placeholder="0"
+                  inputMode="decimal"
+                  className="text-right tabular-nums"
+                  aria-label={`Line ${index + 1} quantity`}
+                  {...form.register(`lines.${index}.quantity`)}
+                />
+                <Input
+                  placeholder="0.00"
+                  inputMode="decimal"
+                  className="text-right tabular-nums"
+                  aria-label={`Line ${index + 1} rate`}
+                  {...form.register(`lines.${index}.unitPrice`)}
+                />
+                <Input
+                  placeholder="0"
+                  inputMode="decimal"
+                  className="text-right tabular-nums"
+                  aria-label={`Line ${index + 1} GST %`}
+                  {...form.register(`lines.${index}.gstRate`)}
+                />
+                {!quickMode ? (
+                  <Input
+                    placeholder="HSN/SAC"
+                    aria-label={`Line ${index + 1} HSN/SAC`}
+                    {...form.register(`lines.${index}.hsnSacCode`)}
+                  />
+                ) : null}
+                <Select
+                  {...form.register(`lines.${index}.debitAccountId`)}
+                  aria-label={`Line ${index + 1} account`}
+                >
+                  <option value="">{SELECT_PLACEHOLDER}</option>
+                  {expenseAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.code} — {a.name}
+                    </option>
+                  ))}
+                </Select>
+                <div className="flex min-h-[34px] items-center justify-end">
+                  {!quickMode && fields.length > 1 ? (
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="sm"
-                      icon={Trash2}
-                      className="mt-2"
+                      className="rounded p-1.5 text-erp-muted transition-colors hover:bg-rose-50 hover:text-rose-600"
+                      title="Remove line"
+                      aria-label={`Remove line ${index + 1}`}
                       onClick={() => remove(index)}
                     >
-                      Remove
-                    </ErpButton>
-                  )}
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  ) : null}
                 </div>
-              ))}
-            </div>
-
-            {/* Desktop grid */}
-            <div className="hidden space-y-2 md:block">
-              {fields.map((field, index) => (
-                <div key={field.id} className="vendor-invoice-line-row grid gap-2 rounded border border-erp-border p-2 lg:grid-cols-12">
-                  {!quickMode && (
-                    <div className="lg:col-span-2">
-                      <Select {...form.register(`lines.${index}.lineType`)} aria-label={`Line ${index + 1} type`}>
-                        <option value="ITEM">Item</option>
-                        <option value="SERVICE">Service</option>
-                        <option value="EXPENSE">Expense</option>
-                        <option value="ASSET">Asset</option>
-                        <option value="FREIGHT">Freight</option>
-                        <option value="OTHER_CHARGE">Other charge</option>
-                      </Select>
-                    </div>
-                  )}
-                  <div className={quickMode ? 'lg:col-span-4' : 'lg:col-span-3'}>
-                    {!quickMode && watched.lines?.[index]?.lineType === 'ITEM' && (
-                      <div className="mb-1">
-                        <ErpSmartSelect
-                          options={itemOptions}
-                          value={watched.lines?.[index]?.itemId ?? ''}
-                          onChange={(itemId) => onPickLineItem(index, itemId)}
-                          placeholder="Item master (optional)…"
-                          allowEmpty
-                        />
-                      </div>
-                    )}
-                    <Input placeholder="Description" {...form.register(`lines.${index}.description`)} />
-                  </div>
-                  <div className="lg:col-span-1">
-                    <Input placeholder="Qty" {...form.register(`lines.${index}.quantity`)} />
-                  </div>
-                  <div className="lg:col-span-2">
-                    <Input placeholder="Rate" {...form.register(`lines.${index}.unitPrice`)} />
-                  </div>
-                  <div className="lg:col-span-1">
-                    <Input placeholder="GST %" {...form.register(`lines.${index}.gstRate`)} />
-                  </div>
-                  {!quickMode && (
-                    <div className="lg:col-span-1">
-                      <Input placeholder="HSN/SAC" {...form.register(`lines.${index}.hsnSacCode`)} />
-                    </div>
-                  )}
-                  <div className={quickMode ? 'lg:col-span-4' : 'lg:col-span-2'}>
-                    <Select {...form.register(`lines.${index}.debitAccountId`)} aria-label={`Line ${index + 1} account`}>
-                      <option value="">Account (optional)</option>
-                      {expenseAccounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.code} — {a.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  {!quickMode && fields.length > 1 && (
-                    <div className="flex items-center lg:col-span-1">
-                      <ErpButton type="button" variant="ghost" size="sm" icon={Trash2} onClick={() => remove(index)} aria-label={`Remove line ${index + 1}`} />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </ErpCardSection>
-
-          <ErpCardSection
-            title="Charges & Tax"
-            subtitle="Tax treatment, ITC, TDS, freight and other charges."
-            icon={Percent}
-            accent="amber"
-            collapsible
-            open={advancedOpen}
-            onOpenChange={setAdvancedOpen}
-            columns={2}
-          >
-            <ErpFieldRow label="Tax treatment" horizontal={false}>
-              <Select {...form.register('taxTreatment')}>
-                <option value="REGULAR">Regular</option>
-                <option value="REVERSE_CHARGE">Reverse charge</option>
-                <option value="NON_GST">Non-GST</option>
-                <option value="EXEMPT">Exempt</option>
-                <option value="NIL_RATED">Nil rated</option>
-                <option value="IMPORT_GOODS">Import goods</option>
-                <option value="IMPORT_SERVICE">Import service</option>
-                <option value="SEZ">SEZ</option>
-              </Select>
-            </ErpFieldRow>
-            <ErpFieldRow label="Supply type" horizontal={false}>
-              <Select {...form.register('supplyType')}>
-                <option value="INTRA_STATE">Intra-state</option>
-                <option value="INTER_STATE">Inter-state</option>
-              </Select>
-            </ErpFieldRow>
-            <ErpFieldRow label="ITC eligibility" horizontal={false}>
-              <Select {...form.register('itcEligibility')}>
-                <option value="PENDING_REVIEW">Pending review</option>
-                <option value="ELIGIBLE">Eligible</option>
-                <option value="PARTIALLY_ELIGIBLE">Partially eligible</option>
-                <option value="INELIGIBLE">Ineligible</option>
-              </Select>
-            </ErpFieldRow>
-            {watched.itcEligibility === 'PARTIALLY_ELIGIBLE' && (
-              <ErpFieldRow label="Eligible ITC %" horizontal={false}>
-                <Input {...form.register('itcEligiblePercent')} />
-              </ErpFieldRow>
-            )}
-            <ErpFieldRow label="TDS recognition" horizontal={false}>
-              <Select {...form.register('tdsRecognitionMode')}>
-                <option value="NOT_APPLICABLE">Not applicable</option>
-                <option value="AT_INVOICE">At invoice</option>
-                <option value="AT_PAYMENT">At payment</option>
-              </Select>
-            </ErpFieldRow>
-            <ErpFieldRow label="TDS section" horizontal={false}>
-              <Input {...form.register('tdsSectionCode')} placeholder="e.g. 194C" />
-            </ErpFieldRow>
-            <ErpFieldRow label="TDS rate %" horizontal={false}>
-              <Input {...form.register('tdsRate')} />
-            </ErpFieldRow>
-            {!hideFreightField && (
-              <ErpFieldRow label="Freight amount" horizontal={false}>
-                <Input {...form.register('freightAmount')} />
-              </ErpFieldRow>
-            )}
-            <ErpFieldRow label="Other charges" horizontal={false}>
-              <Input {...form.register('otherChargeAmount')} />
-            </ErpFieldRow>
-            {watched.tdsRecognitionMode === 'AT_INVOICE' && (
-              <p className="erp-field-row--wide text-[11px] text-erp-muted">
-                TDS liability is recognised when the vendor invoice is posted.
-              </p>
-            )}
-            {watched.tdsRecognitionMode === 'AT_PAYMENT' && (
-              <p className="erp-field-row--wide text-[11px] text-erp-muted">
-                TDS is handled during vendor payment. The invoice posts the full vendor liability.
-              </p>
-            )}
-          </ErpCardSection>
-
-          <ErpCardSection
-            title="Notes & References"
-            subtitle="Purchase source links and posting notes."
-            icon={FileSearch}
-            accent="slate"
-            optional
-            collapsible
-            defaultOpen={mode === 'edit' && existingSourceLinks.length > 0}
-            columns={1}
-          >
-            <div className="erp-field-row--wide">
-              <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Purchase references</h4>
-              {mode === 'edit' && existingSourceLinks.length > 0 ? (
-                <ul className="space-y-1 text-[11px] text-erp-muted">
-                  {existingSourceLinks.map((s, i) => (
-                    <li key={`${s.sourceType}-${i}`}>
-                      {s.sourceType.replace(/_/g, ' ')} — {s.sourceDocumentNumberSnapshot ?? s.sourceDocumentId}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-[11px] text-erp-muted">
-                  {mode === 'create'
-                    ? 'Source documents are linked from the “From Purchase Order” / “From GRN” create modes above.'
-                    : 'This invoice was entered directly without a Purchase reference.'}
-                </p>
-              )}
-              <p className="mt-2 text-[11px] text-erp-muted">
-                Direct invoices require no Purchase link. ITC classification controls accounting treatment — it does
-                not file GST returns.
-              </p>
-            </div>
-          </ErpCardSection>
-
-          <ErpCardSection
-            title="Totals"
-            subtitle="Server-calculated taxable, GST, TDS and vendor payable amounts."
-            icon={Banknote}
-            accent="green"
-            columns={1}
-          >
-            {serverTotals ? (
-              <VendorInvoiceTotalsPanel
-                taxable={serverTotals.taxable}
-                cgst={serverTotals.cgst}
-                sgst={serverTotals.sgst}
-                igst={serverTotals.igst}
-                cess={serverTotals.cess}
-                nonRecoverable={serverTotals.nonRecoverable}
-                freight={serverTotals.freight}
-                other={serverTotals.other}
-                roundOff={serverTotals.roundOff}
-                grandTotal={serverTotals.grandTotal}
-                tds={serverTotals.tds}
-                vendorPayable={serverTotals.vendorPayable}
-              />
-            ) : (
-              <p className="text-[12px] text-erp-muted">
-                Totals appear here after the first save — taxable value, GST, TDS and rounding are calculated by the
-                server.
-              </p>
-            )}
-          </ErpCardSection>
-
-          <div className="vendor-invoice-zoho-form__sticky-footer">
-            <ErpStickySaveBar
-              sticky
-              onSave={onSave}
-              onCancel={() => navigate(-1)}
-              submitLabel="Save Draft"
-              isSubmitting={saving}
-              hint={
-                <span className="text-[12px] text-erp-muted">
-                  {lineCount} line{lineCount === 1 ? '' : 's'} ·{' '}
-                  {mode === 'create' ? 'Saving opens the invoice detail page.' : 'Saving recalculates totals from the server.'}
-                </span>
-              }
-            />
+              </div>
+            ))}
           </div>
-        </form>
-      </div>
+
+          {!quickMode ? (
+            <button
+              type="button"
+              className="sales-invoice-zoho-form__add-line mt-2 inline-flex items-center gap-1"
+              onClick={() => append(emptyLine(watched.invoiceType))}
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden />
+              Add another line
+            </button>
+          ) : null}
+        </FormSection>
+
+        <div className="sales-invoice-zoho-form__footer-grid grid gap-2.5 lg:grid-cols-[1.4fr_1fr]">
+          <div className="space-y-2.5">
+            <section className="sales-invoice-zoho-form__section mi-create-section rounded-md border border-erp-border bg-white">
+              <button
+                type="button"
+                className="mi-create-section__header flex w-full flex-wrap items-center justify-between gap-2 border-b border-erp-border text-left"
+                onClick={() => setAdvancedOpen((v) => !v)}
+                aria-expanded={advancedOpen}
+              >
+                <div>
+                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-erp-text">
+                    Charges &amp; Tax
+                  </h3>
+                  <p className="text-[11px] text-erp-muted">
+                    Tax treatment, place of supply, ITC, TDS, freight and other charges.
+                  </p>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 shrink-0 text-erp-muted transition-transform',
+                    advancedOpen && 'rotate-180',
+                  )}
+                  aria-hidden
+                />
+              </button>
+              {advancedOpen ? (
+                <div className="mi-create-section__body">
+                  <div className="mi-create-commercial__grid">
+                    <FormField label="Tax treatment">
+                      <Select {...form.register('taxTreatment')}>
+                        <option value="REGULAR">Regular</option>
+                        <option value="REVERSE_CHARGE">Reverse charge</option>
+                        <option value="NON_GST">Non-GST</option>
+                        <option value="EXEMPT">Exempt</option>
+                        <option value="NIL_RATED">Nil rated</option>
+                        <option value="IMPORT_GOODS">Import goods</option>
+                        <option value="IMPORT_SERVICE">Import service</option>
+                        <option value="SEZ">SEZ</option>
+                      </Select>
+                    </FormField>
+                    <FormField
+                      label="Company state"
+                      required
+                      error={!validateStateCode(companyStateCode) ? 'Required for supply type' : undefined}
+                      hint={
+                        legalEntity
+                          ? `Legal entity: ${legalEntity.displayName}`
+                          : 'From Accounting → Setup → Legal Entities'
+                      }
+                    >
+                      <Select
+                        value={companyStateCode}
+                        onChange={(e) => setCompanyStateCode(e.target.value)}
+                      >
+                        <option value="">{SELECT_PLACEHOLDER}</option>
+                        {GST_STATE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                    <FormField
+                      label="Place of supply"
+                      required
+                      error={form.formState.errors.placeOfSupply?.message}
+                      hint={
+                        selectedVendor
+                          ? 'Suggested from vendor state / GSTIN when available'
+                          : 'Vendor state when registered — or enter manually'
+                      }
+                    >
+                      <Select {...form.register('placeOfSupply')}>
+                        <option value="">{SELECT_PLACEHOLDER}</option>
+                        {GST_STATE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                    <FormField
+                      label="Supply type"
+                      hint="Auto from company state vs place of supply"
+                    >
+                      <Select {...form.register('supplyType')}>
+                        <option value="INTRA_STATE">Intra-state (CGST + SGST)</option>
+                        <option value="INTER_STATE">Inter-state (IGST)</option>
+                      </Select>
+                    </FormField>
+                    <FormField label="ITC eligibility">
+                      <Select {...form.register('itcEligibility')}>
+                        <option value="PENDING_REVIEW">Pending review</option>
+                        <option value="ELIGIBLE">Eligible</option>
+                        <option value="PARTIALLY_ELIGIBLE">Partially eligible</option>
+                        <option value="INELIGIBLE">Ineligible</option>
+                      </Select>
+                    </FormField>
+                    {watched.itcEligibility === 'PARTIALLY_ELIGIBLE' ? (
+                      <FormField label="Eligible ITC %">
+                        <Input {...form.register('itcEligiblePercent')} />
+                      </FormField>
+                    ) : null}
+                    <FormField label="TDS recognition">
+                      <Select {...form.register('tdsRecognitionMode')}>
+                        <option value="NOT_APPLICABLE">Not applicable</option>
+                        <option value="AT_INVOICE">At invoice</option>
+                        <option value="AT_PAYMENT">At payment</option>
+                      </Select>
+                    </FormField>
+                    <FormField label="TDS section">
+                      <Input {...form.register('tdsSectionCode')} placeholder="e.g. 194C" />
+                    </FormField>
+                    <FormField label="TDS rate %">
+                      <Input {...form.register('tdsRate')} />
+                    </FormField>
+                    {!hideFreightField ? (
+                      <FormField label="Freight amount">
+                        <Input {...form.register('freightAmount')} />
+                      </FormField>
+                    ) : null}
+                    <FormField label="Other charges">
+                      <Input {...form.register('otherChargeAmount')} />
+                    </FormField>
+                  </div>
+                  {watched.tdsRecognitionMode === 'AT_INVOICE' ? (
+                    <p className="mt-2 text-[11px] text-erp-muted">
+                      TDS liability is recognised when the vendor invoice is posted.
+                    </p>
+                  ) : null}
+                  {watched.tdsRecognitionMode === 'AT_PAYMENT' ? (
+                    <p className="mt-2 text-[11px] text-erp-muted">
+                      TDS is handled during vendor payment. The invoice posts the full vendor liability.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+
+            <details className="rounded-md border border-erp-border bg-white px-3 py-2">
+              <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
+                Purchase references
+              </summary>
+              <div className="mt-2 text-[11px] text-erp-muted">
+                {mode === 'edit' && existingSourceLinks.length > 0 ? (
+                  <ul className="space-y-1">
+                    {existingSourceLinks.map((s, i) => (
+                      <li key={`${s.sourceType}-${i}`}>
+                        {s.sourceType.replace(/_/g, ' ')} —{' '}
+                        {s.sourceDocumentNumberSnapshot ?? s.sourceDocumentId}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>
+                    {mode === 'create'
+                      ? 'Source documents are linked from From PO / From GRN create modes above.'
+                      : 'This invoice was entered directly without a Purchase reference.'}
+                  </p>
+                )}
+                <p className="mt-1.5">
+                  Direct invoices require no Purchase link. ITC classification controls accounting treatment — it does
+                  not file GST returns.
+                </p>
+              </div>
+            </details>
+          </div>
+
+          <div className="space-y-2">
+            <div className="mi-create-totals">
+              {serverTotals ? (
+                <VendorInvoiceTotalsPanel
+                  taxable={serverTotals.taxable}
+                  cgst={serverTotals.cgst}
+                  sgst={serverTotals.sgst}
+                  igst={serverTotals.igst}
+                  cess={serverTotals.cess}
+                  nonRecoverable={serverTotals.nonRecoverable}
+                  freight={serverTotals.freight}
+                  other={serverTotals.other}
+                  roundOff={serverTotals.roundOff}
+                  grandTotal={serverTotals.grandTotal}
+                  tds={serverTotals.tds}
+                  vendorPayable={serverTotals.vendorPayable}
+                />
+              ) : (
+                <div className="rounded-md border border-erp-border bg-white px-3 py-3 text-[12px] text-erp-muted">
+                  Totals appear after the first save — taxable, GST, TDS and rounding are calculated by the server.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="sales-invoice-zoho-form__sticky-footer vendor-invoice-zoho-form__sticky-footer flex flex-wrap items-center justify-between gap-2 rounded-md border border-erp-border">
+          <span className="text-[12px] text-erp-muted">
+            {lineCount} line{lineCount === 1 ? '' : 's'}
+            {' · '}
+            {mode === 'create'
+              ? 'Saving opens the invoice detail page.'
+              : 'Saving recalculates totals from the server.'}
+          </span>
+          <div className="flex items-center gap-2">
+            <ErpButton type="button" variant="secondary" onClick={() => navigate(-1)}>
+              Cancel
+            </ErpButton>
+            <ErpButton type="submit" variant="primary" disabled={saving}>
+              {saving ? 'Saving…' : 'Save Draft'}
+            </ErpButton>
+          </div>
+        </div>
+      </form>
     </MoneyOutWorkspaceShell>
   )
 }

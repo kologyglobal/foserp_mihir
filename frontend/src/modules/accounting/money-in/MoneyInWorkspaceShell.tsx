@@ -2,7 +2,9 @@ import { useEffect, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { DynamicsTabs } from '@/components/dynamics/DynamicsTabs'
+import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import { FinanceLegalEntitySwitcher } from '@/modules/accounting/settings/FinanceLegalEntitySwitcher'
+import { cn } from '@/utils/cn'
 import { shouldNavigate } from '@/utils/safeState'
 import { MONEY_IN_WORKSPACE_TABS } from './moneyInUi'
 
@@ -12,12 +14,17 @@ export function MoneyInWorkspaceShell({
   children,
   actions,
   commandBar,
+  kpiStrip,
+  contentClassName,
 }: {
   title: string
   description?: string
   children: ReactNode
   actions?: ReactNode
   commandBar?: ReactNode
+  kpiStrip?: EnterpriseKpiItem[]
+  /** Override the default bordered content panel (e.g. flush register tables). */
+  contentClassName?: string
 }) {
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
@@ -66,6 +73,7 @@ export function MoneyInWorkspaceShell({
       autoBreadcrumbs={false}
       favoritePath={`${pathname}${search}`}
       commandBar={commandBar}
+      kpiStrip={kpiStrip}
       actions={
         <>
           <FinanceLegalEntitySwitcher />
@@ -74,7 +82,7 @@ export function MoneyInWorkspaceShell({
       }
       mergeHeaderWithWorkspace
     >
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <DynamicsTabs
           items={MONEY_IN_WORKSPACE_TABS.map((t) => ({
             ...t,
@@ -85,10 +93,9 @@ export function MoneyInWorkspaceShell({
             if (shouldNavigate(pathname, path)) navigate(path)
           }}
         />
-        <div className="min-w-0 rounded border border-erp-border bg-white p-3">{children}</div>
-        <p className="text-[11px] text-erp-muted px-1">
-          Receipts · Credit Notes · Corrections (reversals) — available in API mode
-        </p>
+        <div className={cn('min-w-0 rounded border border-erp-border bg-white p-3', contentClassName)}>
+          {children}
+        </div>
       </div>
     </OperationalPageShell>
   )

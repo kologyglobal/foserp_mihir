@@ -6,27 +6,67 @@ import {
   AppHeader,
   EmptyState,
   ErrorState,
-  PrimaryButton,
-  SecondaryButton,
   SkeletonCard,
   StatusChip,
 } from '@/components'
 import { useQuotations, useInvalidateCrm } from '@/features/crm/hooks'
 import { convertQuotationToSalesOrder } from '@/api/crmApi'
-import { quotationAmount } from '@/features/crm/commercialMap'
-import { formatDate, formatMoney, statusTone } from '@/features/crm/utils'
-import { colors, layout, motion, spacing, typography } from '@/theme'
+import {
+  quotationAmount,
+  quotationDisplayCode,
+  quotationDisplayCustomer,
+  quotationDisplayOwner,
+  quotationDisplayProduct,
+} from '@/features/crm/commercialMap'
+import { formatDate, formatMoney, statusTone, titleCaseLabel } from '@/features/crm/utils'
+import { colors, layout, motion, radius, spacing, typography } from '@/theme'
 import { getUserFriendlyMessage } from '@/api/errors'
 import { usePermissions } from '@/auth/permissions'
+
+type ActionIconProps = {
+  name: keyof typeof Ionicons.glyphMap
+  label: string
+  onPress: () => void
+  primary?: boolean
+  disabled?: boolean
+}
+
+function ActionIcon({ name, label, onPress, primary, disabled }: ActionIconProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={disabled}
+      hitSlop={6}
+      onPress={(e) => {
+        e.stopPropagation?.()
+        onPress()
+      }}
+      style={({ pressed }) => [
+        styles.actionIcon,
+        primary && styles.actionIconPrimary,
+        disabled && styles.actionIconDisabled,
+        pressed && !disabled && styles.actionIconPressed,
+      ]}
+    >
+      <Ionicons
+        name={name}
+        size={18}
+        color={primary ? colors.textInverse : colors.primary}
+      />
+    </Pressable>
+  )
+}
 
 export default function QuotationsListScreen() {
   const { data, isLoading, error, refetch } = useQuotations()
   const router = useRouter()
   const invalidate = useInvalidateCrm()
   const { can } = usePermissions()
+  const canConvert = can('crm.quotation.convert') || can('tenant.manage')
 
   const onConvert = async (id: string) => {
-    if (!can('crm.quotation.convert') && !can('tenant.manage')) {
+    if (!canConvert) {
       Alert.alert('Permission denied', 'You cannot convert quotations.')
       return
     }
@@ -48,7 +88,7 @@ export default function QuotationsListScreen() {
 
   const onShare = async (code: string) => {
     await Share.share({
-      message: `Quotation ${code} (open FOS ERP web for PDF export)`,
+      message: `Quotation ${code}`,
     })
   }
 
@@ -64,40 +104,88 @@ export default function QuotationsListScreen() {
         ) : null}
         {error ? <ErrorState error={error} onRetry={() => void refetch()} /> : null}
         {(data ?? []).map((q) => {
-          const code = q.quotationCode || q.quotationNo || q.id
+          const code = quotationDisplayCode(q)
+          const customer = quotationDisplayCustomer(q)
+          const product = quotationDisplayProduct(q)
+          const owner = quotationDisplayOwner(q)
           const amount = quotationAmount(q)
           const expiry = q.validUntil || q.expiryDate || q.validityDate
-          const customer = q.customerName || q.companyName || '—'
+          const status = titleCaseLabel(q.status || '—')
+          const alreadyConverted = Boolean(q.salesOrderId)
+          const metaBits = [
+            expiry ? `Valid ${formatDate(expiry)}` : null,
+            owner,
+            product ? `Item: ${product}` : null,
+          ].filter(Boolean)
+
           return (
-            <AppCard key={q.id} style={styles.card}>
+            <AppCard key={q.id} style={styles.card} padded={false}>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${code}, ${customer}, ${formatMoney(amount)}`}
                 onPress={() => router.push(`/(app)/crm/quotations/${q.id}`)}
-                style={({ pressed }) => pressed && styles.pressed}
+                style={({ pressed }) => [styles.cardBody, pressed && styles.pressed]}
               >
-                <View style={styles.head}>
-                  <View style={styles.headCopy}>
-                    <Text style={styles.title}>{code}</Text>
-                    <Text style={styles.meta}>{customer}</Text>
-                  </View>
-                  <StatusChip label={q.status || '—'} tone={statusTone(q.status)} compact />
+                <View style={styles.iconBadge}>
+                  <Ionicons name="document-text-outline" size={20} color={colors.primary} />
                 </View>
-                <Text style={styles.amount}>{formatMoney(amount)}</Text>
-                <Text style={styles.metaMuted}>
-                  Valid until {formatDate(expiry)}
-                  {q.salesOwnerName ? ` · ${q.salesOwnerName}` : ''}
-                </Text>
+
+                <View style={styles.main}>
+                  <View style={styles.topRow}>
+                    <Text style={styles.title} numberOfLines={1}>
+                      {code}
+                    </Text>
+                    <StatusChip label={status} tone={statusTone(q.status)} compact />
+                  </View>
+                  <Text style={styles.customer} numberOfLines={1}>
+                    {customer}
+                  </Text>
+                  {product ? (
+                    <Text style={styles.product} numberOfLines={1}>
+                      {product}
+                    </Text>
+                  ) : null}
+                  <View style={styles.amountRow}>
+                    <Text style={styles.amount}>{formatMoney(amount)}</Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  </View>
+                  {metaBits.length ? (
+                    <Text style={styles.meta} numberOfLines={2}>
+                      {metaBits.join(' · ')}
+                    </Text>
+                  ) : null}
+                </View>
               </Pressable>
+
               <View style={styles.actions}>
-                <SecondaryButton
-                  title="View"
+                <ActionIcon
+                  name="eye-outline"
+                  label="View quotation"
                   onPress={() => router.push(`/(app)/crm/quotations/${q.id}`)}
-                  style={styles.btn}
                 />
-                <SecondaryButton title="Share" onPress={() => void onShare(String(code))} style={styles.btn} />
-                <PrimaryButton title="To SO" onPress={() => void onConvert(q.id)} style={styles.btn} />
-              </View>
-              <View style={styles.chevronHint}>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                <ActionIcon
+                  name="document-outline"
+                  label="View PDF"
+                  onPress={() => router.push(`/(app)/crm/pdf/quotation/${q.id}`)}
+                />
+                <ActionIcon
+                  name="share-outline"
+                  label="Share quotation"
+                  onPress={() => void onShare(code === 'Quotation' ? 'document' : code)}
+                />
+                <ActionIcon
+                  name={alreadyConverted ? 'cart-outline' : 'swap-horizontal-outline'}
+                  label={alreadyConverted ? 'Open sales order' : 'Convert to sales order'}
+                  primary={!alreadyConverted && canConvert}
+                  disabled={!alreadyConverted && !canConvert}
+                  onPress={() => {
+                    if (alreadyConverted && q.salesOrderId) {
+                      router.push(`/(app)/crm/sales-orders/${q.salesOrderId}`)
+                      return
+                    }
+                    void onConvert(q.id)
+                  }}
+                />
               </View>
             </AppCard>
           )
@@ -117,21 +205,78 @@ export default function QuotationsListScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: layout.screenPadding, paddingBottom: spacing.hero },
-  card: { marginBottom: spacing.md, position: 'relative' },
+  card: {
+    marginBottom: spacing.md,
+    overflow: 'hidden',
+  },
+  cardBody: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    padding: spacing.lg,
+    paddingBottom: spacing.md,
+  },
   pressed: { opacity: 0.94, transform: [{ scale: motion.pressScaleSoft }] },
-  head: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  headCopy: { flex: 1, minWidth: 0, paddingRight: spacing.md },
-  title: { ...typography.subtitle, fontSize: 17 },
-  meta: { ...typography.caption, marginTop: 3 },
-  metaMuted: { ...typography.caption, color: colors.textMuted, marginTop: spacing.sm },
+  iconBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primaryMuted ?? colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  main: { flex: 1, minWidth: 0 },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  title: { ...typography.subtitle, fontSize: 16, flex: 1, minWidth: 0 },
+  customer: { ...typography.bodyStrong, marginTop: 3, fontSize: 14 },
+  product: { ...typography.caption, marginTop: 2, color: colors.textMuted },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+  },
   amount: {
     ...typography.metric,
-    fontSize: 24,
-    marginTop: spacing.lg,
+    fontSize: 20,
     color: colors.primary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-  btn: { flex: 1, minHeight: 48, paddingVertical: spacing.sm },
-  chevronHint: { position: 'absolute', top: spacing.xl, right: spacing.xl },
+  meta: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    paddingTop: spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  actionIconPrimary: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  actionIconPressed: { opacity: 0.85, transform: [{ scale: motion.pressScale }] },
+  actionIconDisabled: { opacity: 0.4 },
 })

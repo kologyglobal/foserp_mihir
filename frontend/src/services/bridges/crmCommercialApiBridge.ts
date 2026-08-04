@@ -211,42 +211,61 @@ export async function apiReceiveProformaPayment(
   }
 }
 
+function invoiceWriteBody(
+  input: CreateCrmInvoiceInput & { customerState?: string; salesOrderNo?: string | null; proformaNo?: string | null },
+) {
+  return {
+    companyId: input.customerId,
+    invoiceDate: input.invoiceDate,
+    dueDate: input.dueDate,
+    source: input.source,
+    salesOrderId: input.salesOrderId,
+    salesOrderNo: input.salesOrderNo,
+    quotationId: input.quotationId,
+    quotationNo: input.quotationNo,
+    proformaInvoiceId: input.proformaInvoiceId,
+    proformaNo: input.proformaNo,
+    paymentTerms: input.paymentTerms,
+    deliveryTerms: input.deliveryTerms,
+    customerPoNumber: input.customerPoNumber,
+    billingAddress: input.billingAddress,
+    shippingAddress: input.shippingAddress,
+    remarks: input.remarks,
+    customerState: input.customerState,
+    lines: input.lines.map((l) => ({
+      itemId: l.itemId,
+      itemCode: l.itemCode,
+      description: l.description,
+      hsnCode: l.hsnCode,
+      qty: l.qty,
+      uom: l.uom,
+      unitPrice: l.unitPrice,
+      discountPct: l.discountPct,
+      taxPct: l.taxPct,
+      sourceLineId: l.sourceLineId,
+      maxQty: l.maxQty,
+    })),
+  }
+}
+
 export async function apiCreateInvoice(
   input: CreateCrmInvoiceInput & { customerState?: string; salesOrderNo?: string | null; proformaNo?: string | null },
 ): Promise<{ ok: boolean; error?: string; id?: string }> {
   try {
-    const res = await api.createCommercialInvoice({
-      companyId: input.customerId,
-      invoiceDate: input.invoiceDate,
-      dueDate: input.dueDate,
-      source: input.source,
-      salesOrderId: input.salesOrderId,
-      salesOrderNo: input.salesOrderNo,
-      quotationId: input.quotationId,
-      quotationNo: input.quotationNo,
-      proformaInvoiceId: input.proformaInvoiceId,
-      proformaNo: input.proformaNo,
-      paymentTerms: input.paymentTerms,
-      deliveryTerms: input.deliveryTerms,
-      customerPoNumber: input.customerPoNumber,
-      billingAddress: input.billingAddress,
-      shippingAddress: input.shippingAddress,
-      remarks: input.remarks,
-      customerState: input.customerState,
-      lines: input.lines.map((l) => ({
-        itemId: l.itemId,
-        itemCode: l.itemCode,
-        description: l.description,
-        hsnCode: l.hsnCode,
-        qty: l.qty,
-        uom: l.uom,
-        unitPrice: l.unitPrice,
-        discountPct: l.discountPct,
-        taxPct: l.taxPct,
-        sourceLineId: l.sourceLineId,
-        maxQty: l.maxQty,
-      })),
-    })
+    const res = await api.createCommercialInvoice(invoiceWriteBody(input))
+    upsertInvoice(res.data)
+    return { ok: true, id: res.data.id }
+  } catch (err) {
+    return { ok: false, error: formatApiError(err) }
+  }
+}
+
+export async function apiUpdateInvoice(
+  id: string,
+  input: CreateCrmInvoiceInput & { customerState?: string; salesOrderNo?: string | null; proformaNo?: string | null },
+): Promise<{ ok: boolean; error?: string; id?: string }> {
+  try {
+    const res = await api.updateCommercialInvoice(id, invoiceWriteBody(input))
     upsertInvoice(res.data)
     return { ok: true, id: res.data.id }
   } catch (err) {
@@ -259,6 +278,16 @@ export async function apiPostInvoice(id: string): Promise<{ ok: boolean; error?:
     const res = await api.postCommercialInvoice(id)
     upsertInvoice(res.data)
     return { ok: true }
+  } catch (err) {
+    return { ok: false, error: formatApiError(err) }
+  }
+}
+
+export async function apiGetInvoice(id: string): Promise<{ ok: boolean; data?: CrmTaxInvoice; error?: string }> {
+  try {
+    const res = await api.fetchCommercialInvoice(id)
+    upsertInvoice(res.data)
+    return { ok: true, data: res.data }
   } catch (err) {
     return { ok: false, error: formatApiError(err) }
   }

@@ -1,19 +1,10 @@
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/prisma.js'
 import { createAuditLog } from '../../../services/audit.service.js'
 import { NotFoundError, ValidationError } from '../../../utils/errors.js'
 import {
   assertCrmTaxInvoiceAllowsCommercialAllocation,
 } from '../../accounting/receivables/source/crm-payment-receipt-ar.service.js'
 import * as repo from './commercial.repository.js'
-import {
-  computePaymentStatus,
-  invoiceStatusFromPayment,
-  mapAllocationDto,
-  mapInvoiceDto,
-  mapProformaDto,
-  mapReceiptDto,
-} from './commercial.types.js'
 import type {
   AllocatePaymentsInput,
   CreateInvoiceInput,
@@ -23,8 +14,16 @@ import type {
   ListInvoicesQuery,
   ListProformasQuery,
   ListReceiptsQuery,
+  UpdateInvoiceInput,
   UpdateProformaInput,
 } from './commercial.validation.js'
+import {
+  computePaymentStatus,
+  invoiceStatusFromPayment,
+  mapAllocationDto,
+  mapProformaDto,
+  mapReceiptDto,
+} from './commercial.types.js'
 import { resolveGstStateCode } from '../../accounting/receivables/validation/state-code.validator.js'
 import { resolveEffectivePurchaseDefaults } from '../../purchase/shared/purchase-defaults.js'
 
@@ -54,16 +53,6 @@ function resolveCustomerPlaceOfSupplyCode(
 
 function parseDate(dateStr: string): Date {
   return new Date(`${dateStr.slice(0, 10)}T00:00:00.000Z`)
-}
-
-async function resolveUserDisplayName(tenantId: string, userId: string): Promise<string | null> {
-  const user = await prisma.user.findFirst({
-    where: { id: userId, tenantId },
-    select: { firstName: true, lastName: true, email: true },
-  })
-  if (!user) return null
-  const name = `${user.firstName} ${user.lastName}`.trim()
-  return name || user.email || null
 }
 
 function addDays(dateStr: string, days: number): string {
@@ -496,14 +485,17 @@ export async function cancelProforma(
 }
 
 export async function listInvoices(tenantId: string, query: ListInvoicesQuery) {
-  const result = await repo.findInvoices(tenantId, query)
-  return { ...result, items: result.items.map(mapInvoiceDto) }
+  const { listUnifiedInvoices } = await import(
+    '../../accounting/receivables/source/crm-unified-sales-invoice.service.js'
+  )
+  return listUnifiedInvoices(tenantId, query)
 }
 
 export async function getInvoice(tenantId: string, id: string) {
-  const row = await repo.findInvoiceById(tenantId, id)
-  if (!row) throw new NotFoundError('Tax invoice not found')
-  return mapInvoiceDto(row)
+  const { getUnifiedInvoice } = await import(
+    '../../accounting/receivables/source/crm-unified-sales-invoice.service.js'
+  )
+  return getUnifiedInvoice(tenantId, id)
 }
 
 export async function createInvoice(
@@ -512,77 +504,23 @@ export async function createInvoice(
   input: CreateInvoiceInput,
   audit?: { ipAddress?: string | null; userAgent?: string | null },
 ) {
-  const company = await repo.findCompany(tenantId, input.companyId)
-  if (!company) throw new NotFoundError('Customer not found')
-
-  const computedLines = input.lines.map((l, idx) => computeLine(l, idx + 1))
-  const customerState = input.customerState ?? company.state ?? ''
-  const companyStateCode = await resolveTenantBillingStateCode(tenantId)
-  const placeOfSupplyCode = resolveCustomerPlaceOfSupplyCode(customerState, company.gstin, null)
-  const gst = buildGst(companyStateCode, placeOfSupplyCode, computedLines)
-  const invoiceDate = (input.invoiceDate ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
-  const dueDate = (input.dueDate ?? addDays(invoiceDate, company.creditDays || 30)).slice(0, 10)
-  const invoiceNo = await repo.nextDocumentNo(tenantId, 'INV-', 'invoice')
-
-  const address = [company.addressLine1, company.city, company.state, company.pincode].filter(Boolean).join(', ')
-  const createdByNameSnapshot = await resolveUserDisplayName(tenantId, userId)
-
-  const row = await repo.createInvoiceWithLines(
-    tenantId,
-    userId,
-    {
-      invoiceNo,
-      invoiceDate: parseDate(invoiceDate),
-      dueDate: parseDate(dueDate),
-      status: 'draft',
-      paymentStatus: 'unpaid',
-      accountingStatus: 'none',
-      createdByNameSnapshot,
-      source: input.source ?? 'direct',
-      companyId: company.id,
-      customerNameSnapshot: company.name,
-      customerGstin: company.gstin,
-      customerState,
-      customerAddress: address,
-      placeOfSupply: placeOfSupplyCode ?? customerState,
-      billingAddress: input.billingAddress ?? address,
-      shippingAddress: input.shippingAddress ?? address,
-      deliveryTerms: input.deliveryTerms ?? null,
-      paymentTerms: input.paymentTerms ?? null,
-      customerPoNumber: input.customerPoNumber ?? null,
-      salesOrderId: input.salesOrderId ?? null,
-      salesOrderNo: input.salesOrderNo ?? null,
-      quotationId: input.quotationId ?? null,
-      quotationNo: input.quotationNo ?? null,
-      proformaInvoiceId: input.proformaInvoiceId ?? null,
-      proformaNo: input.proformaNo ?? null,
-      remarks: input.remarks ?? null,
-      taxableAmount: new Prisma.Decimal(gst.taxableAmount),
-      cgstAmount: new Prisma.Decimal(gst.cgstAmount),
-      sgstAmount: new Prisma.Decimal(gst.sgstAmount),
-      igstAmount: new Prisma.Decimal(gst.igstAmount),
-      totalTaxAmount: new Prisma.Decimal(gst.totalTaxAmount),
-      grandTotal: new Prisma.Decimal(gst.grandTotal),
-      amountPaid: new Prisma.Decimal(0),
-      balanceDue: new Prisma.Decimal(gst.grandTotal),
-      gstScheme: gst.gstScheme,
-    },
-    computedLines.map(({ taxableNumber: _t, gstNumber: _g, taxPctNumber: _p, ...line }) => line),
+  const { createUnifiedInvoice } = await import(
+    '../../accounting/receivables/source/crm-unified-sales-invoice.service.js'
   )
+  return createUnifiedInvoice(tenantId, userId, input, audit)
+}
 
-  await createAuditLog({
-    tenantId,
-    userId,
-    module: 'crm',
-    entity: 'crmTaxInvoice',
-    entityId: row.id,
-    action: 'CREATE',
-    newValues: { invoiceNo: row.invoiceNo, grandTotal: gst.grandTotal, source: input.source },
-    ipAddress: audit?.ipAddress,
-    userAgent: audit?.userAgent,
-  })
-
-  return mapInvoiceDto(row)
+export async function updateInvoice(
+  tenantId: string,
+  id: string,
+  userId: string,
+  input: UpdateInvoiceInput,
+  audit?: { ipAddress?: string | null; userAgent?: string | null },
+) {
+  const { updateUnifiedInvoice } = await import(
+    '../../accounting/receivables/source/crm-unified-sales-invoice.service.js'
+  )
+  return updateUnifiedInvoice(tenantId, id, userId, input, audit)
 }
 
 export async function postInvoice(
@@ -590,37 +528,16 @@ export async function postInvoice(
   id: string,
   userId: string,
   audit?: { ipAddress?: string | null; userAgent?: string | null },
+  opts?: { canGlPost?: boolean; req?: import('express').Request },
 ) {
-  const row = await repo.findInvoiceById(tenantId, id)
-  if (!row) throw new NotFoundError('Tax invoice not found')
-  if (row.status !== 'draft') throw new ValidationError('Only draft invoices can be posted')
-
-  const createdByNameSnapshot =
-    row.createdByNameSnapshot ?? (await resolveUserDisplayName(tenantId, row.createdBy ?? userId))
-
-  const updated = await repo.updateInvoice(tenantId, id, userId, {
-    status: 'posted',
-    postedAt: new Date(),
-    accountingStatus: 'pending_review',
-    accountingSubmittedAt: new Date(),
-    createdByNameSnapshot,
+  const { postUnifiedInvoice } = await import(
+    '../../accounting/receivables/source/crm-unified-sales-invoice.service.js'
+  )
+  return postUnifiedInvoice(tenantId, id, userId, {
+    ...audit,
+    canGlPost: opts?.canGlPost,
+    req: opts?.req,
   })
-  await createAuditLog({
-    tenantId,
-    userId,
-    module: 'crm',
-    entity: 'crmTaxInvoice',
-    entityId: id,
-    action: 'POST',
-    newValues: {
-      invoiceNo: row.invoiceNo,
-      accountingStatus: 'pending_review',
-      createdByName: createdByNameSnapshot,
-    },
-    ipAddress: audit?.ipAddress,
-    userAgent: audit?.userAgent,
-  })
-  return mapInvoiceDto(updated!)
 }
 
 export async function cancelDraftInvoice(
@@ -629,27 +546,10 @@ export async function cancelDraftInvoice(
   userId: string,
   audit?: { ipAddress?: string | null; userAgent?: string | null },
 ) {
-  const row = await repo.findInvoiceById(tenantId, id)
-  if (!row) throw new NotFoundError('Tax invoice not found')
-  if (row.status !== 'draft') throw new ValidationError('Only draft invoices can be cancelled')
-
-  const updated = await repo.updateInvoice(tenantId, id, userId, {
-    status: 'cancelled',
-    cancelledAt: new Date(),
-    balanceDue: new Prisma.Decimal(0),
-  })
-  await createAuditLog({
-    tenantId,
-    userId,
-    module: 'crm',
-    entity: 'crmTaxInvoice',
-    entityId: id,
-    action: 'CANCEL',
-    newValues: { invoiceNo: row.invoiceNo },
-    ipAddress: audit?.ipAddress,
-    userAgent: audit?.userAgent,
-  })
-  return mapInvoiceDto(updated!)
+  const { cancelUnifiedInvoice } = await import(
+    '../../accounting/receivables/source/crm-unified-sales-invoice.service.js'
+  )
+  return cancelUnifiedInvoice(tenantId, id, userId, audit)
 }
 
 export async function listAllocations(tenantId: string, query: ListAllocationsQuery) {
@@ -689,6 +589,15 @@ export async function allocatePayments(
   const queued = new Map<string, number>()
 
   for (const row of input.allocations) {
+    const { findUnifiedInvoiceById } = await import(
+      '../../accounting/receivables/source/crm-unified-sales-invoice.service.js'
+    )
+    const unified = await findUnifiedInvoiceById(tenantId, row.invoiceId)
+    if (unified) {
+      throw new ValidationError(
+        'This invoice is the unified Accounting Sales Invoice. Allocate payments in Money In (Receipts → Allocate), not CRM commercial allocation.',
+      )
+    }
     const inv = await repo.findInvoiceById(tenantId, row.invoiceId)
     if (!inv) throw new NotFoundError('Tax invoice not found')
     if (inv.companyId !== receipt.companyId) {
@@ -833,9 +742,12 @@ export async function reverseAllocation(
 }
 
 export async function syncBundle(tenantId: string, companyId?: string) {
+  const { listUnifiedInvoices } = await import(
+    '../../accounting/receivables/source/crm-unified-sales-invoice.service.js'
+  )
   const [receipts, invoices, allocations, proformas] = await Promise.all([
     repo.findReceipts(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
-    repo.findInvoices(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
+    listUnifiedInvoices(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
     repo.findAllocations(tenantId, {
       page: 1,
       limit: 500,
@@ -847,7 +759,7 @@ export async function syncBundle(tenantId: string, companyId?: string) {
   ])
   return {
     receipts: receipts.items.map(mapReceiptDto),
-    invoices: invoices.items.map(mapInvoiceDto),
+    invoices: invoices.items,
     allocations: allocations.items.map(mapAllocationDto),
     proformas: proformas.items.map(mapProformaDto),
   }

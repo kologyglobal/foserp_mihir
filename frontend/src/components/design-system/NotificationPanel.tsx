@@ -3,10 +3,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Bell,
+  Check,
   CheckCircle2,
   Clock,
+  ExternalLink,
   PackageX,
   Settings,
+  Timer,
   Truck,
   X,
 } from 'lucide-react'
@@ -18,6 +21,13 @@ import { formatRelativeTime } from '../../utils/dates/format'
 import { useApiMode } from '@/hooks/useApiMode'
 import { useAppNotifications } from '@/hooks/useAppNotifications'
 import type { AppNotification } from '@/services/api/notificationsApi'
+import {
+  categoryShort,
+  getNotificationContext,
+  priorityBadgeClass,
+  priorityLabel,
+  priorityTone,
+} from '@/modules/notifications/notificationPresentation'
 
 const GROUPS = [
   { id: 'all', label: 'All' },
@@ -35,47 +45,78 @@ const SUMMARY_GROUPS = [
   { key: 'delay' as const, label: 'Delayed Delivery', icon: Truck, softClass: 'erp-status-soft-danger', labelClass: 'erp-status-label-danger' },
 ]
 
-function priorityTone(p: string): 'red' | 'amber' | 'green' | 'grey' {
-  if (p === 'CRITICAL') return 'red'
-  if (p === 'HIGH') return 'amber'
-  if (p === 'POSITIVE') return 'green'
-  return 'grey'
-}
-
-function metaStr(m: Record<string, unknown> | null | undefined, key: string): string | null {
-  if (!m) return null
-  const v = m[key]
-  return typeof v === 'string' && v.trim() ? v.trim() : null
-}
-
-function NotificationDetail({ n }: { n: AppNotification }) {
-  const meta = n.metadata
-  const contact = metaStr(meta, 'contactName')
-  const company = metaStr(meta, 'companyName')
-  const dueTime = metaStr(meta, 'dueTime')
-  const notes = metaStr(meta, 'notesSnippet')
-  const recordCode = metaStr(meta, 'recordCode') ?? n.entityCode
-  const recordName = n.entityName ?? company
-
-  const chips = [
-    recordCode && recordName && recordName !== recordCode
-      ? `${recordCode} · ${recordName}`
-      : recordCode || recordName,
-    contact && contact !== recordName ? `Contact: ${contact}` : null,
-    dueTime ? `Time: ${dueTime}` : null,
-  ].filter(Boolean) as string[]
-
-  // Message already includes rich context; avoid duplicating the full chips block when empty.
+function MetaChip({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-w-0">
-      <p className="text-[12px] leading-snug text-erp-muted">{n.message}</p>
-      {notes && !n.message.includes(notes) ? (
-        <p className="mt-0.5 line-clamp-2 text-[11px] italic text-erp-muted">{notes}</p>
+    <span className="inline-flex max-w-full items-center truncate rounded-md bg-erp-surface-alt px-2 py-0.5 text-[11px] font-medium text-erp-text ring-1 ring-inset ring-erp-border/70">
+      {children}
+    </span>
+  )
+}
+
+function ApiNotificationBody({ n }: { n: AppNotification }) {
+  const ctx = getNotificationContext(n)
+  const chips: { key: string; label: string }[] = []
+
+  if (ctx.recordCode) {
+    chips.push({
+      key: 'record',
+      label: ctx.recordKind ? `${ctx.recordKind} ${ctx.recordCode}` : ctx.recordCode,
+    })
+  }
+  if (ctx.contact) chips.push({ key: 'contact', label: ctx.contact })
+  if (ctx.dueTime && !ctx.shortSummary?.includes(ctx.dueTime)) {
+    chips.push({ key: 'time', label: ctx.dueTime })
+  }
+
+  return (
+    <div className="min-w-0 space-y-1.5">
+      {ctx.company ? (
+        <p className="truncate text-[12.5px] font-medium leading-snug text-erp-text">{ctx.company}</p>
       ) : null}
-      {chips.length > 0 && !n.message.includes(String(chips[0])) ? (
-        <p className="mt-1 text-[11px] font-medium text-erp-text">{chips.join(' · ')}</p>
+
+      {ctx.shortSummary ? (
+        <p className="text-[12px] leading-snug text-erp-muted">{ctx.shortSummary}</p>
+      ) : null}
+
+      {ctx.bodyMessage ? (
+        <p className="text-[12px] leading-relaxed text-erp-muted">{ctx.bodyMessage}</p>
+      ) : null}
+
+      {chips.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5 pt-0.5">
+          {chips.map((c) => (
+            <MetaChip key={c.key}>{c.label}</MetaChip>
+          ))}
+        </div>
+      ) : null}
+
+      {ctx.notes ? (
+        <p className="line-clamp-2 border-l-2 border-erp-border pl-2 text-[11.5px] leading-snug text-erp-muted">
+          {ctx.notes}
+        </p>
       ) : null}
     </div>
+  )
+}
+
+function ActionGhostBtn({
+  onClick,
+  children,
+  icon: Icon,
+}: {
+  onClick: () => void
+  children: React.ReactNode
+  icon?: typeof Check
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-erp-muted transition-colors hover:bg-erp-surface-alt hover:text-erp-text"
+    >
+      {Icon ? <Icon className="h-3 w-3 opacity-70" /> : null}
+      {children}
+    </button>
   )
 }
 
@@ -104,138 +145,222 @@ function ApiNotificationPanel({ onClose }: { onClose: () => void }) {
   const list =
     section === 'critical' ? grouped.critical : section === 'today' ? grouped.today : grouped.earlier
 
+  const tabs = [
+    { id: 'critical' as const, label: 'Critical', count: counts.critical },
+    { id: 'today' as const, label: 'Today', count: grouped.today.length },
+    { id: 'earlier' as const, label: 'Earlier', count: grouped.earlier.length },
+  ]
+
   return (
     <>
       <div className="erp-detail-scrim fixed inset-0 z-40 bg-black/20" onClick={onClose} />
-      <aside className="erp-detail-panel fixed right-0 top-0 z-50 flex h-screen w-full max-w-md flex-col border-l border-erp-border bg-erp-surface shadow-erp-lg">
-        <div className="flex items-center justify-between border-b border-erp-border bg-gradient-to-r from-erp-surface-alt/80 to-erp-surface px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Bell className="h-4 w-4 text-erp-primary" />
-            <h2 className="text-[15px] font-semibold">Notifications</h2>
-            <span className="rounded-full bg-erp-primary-soft px-2 py-0.5 text-[11px] font-semibold text-erp-primary">
-              {counts.unread > 99 ? '99+' : counts.unread}
+      <aside
+        className="erp-detail-panel fixed right-0 top-0 z-50 flex h-screen w-full max-w-[400px] flex-col border-l border-erp-border bg-erp-surface shadow-erp-lg"
+        role="dialog"
+        aria-label="Notifications"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 border-b border-erp-border px-4 py-3.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-erp-primary-soft text-erp-primary">
+              <Bell className="h-4 w-4" />
             </span>
+            <div className="min-w-0">
+              <h2 className="text-[15px] font-semibold leading-tight text-erp-text">Notifications</h2>
+              <p className="text-[11px] text-erp-muted">
+                {counts.unread === 0
+                  ? 'You are all caught up'
+                  : `${counts.unread > 99 ? '99+' : counts.unread} unread`}
+              </p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} className="rounded p-1 hover:bg-erp-surface-alt">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-erp-muted transition-colors hover:bg-erp-surface-alt hover:text-erp-text"
+            aria-label="Close notifications"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 border-b border-erp-border p-3">
-          {(
-            [
-              { id: 'critical' as const, label: 'Critical', count: counts.critical },
-              { id: 'today' as const, label: 'Today', count: grouped.today.length },
-              { id: 'earlier' as const, label: 'Earlier', count: grouped.earlier.length },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setSection(tab.id)}
-              className={cn(
-                'rounded-lg border px-2 py-2 text-center transition-colors',
-                section === tab.id
-                  ? 'border-erp-primary bg-erp-primary-soft text-erp-primary'
-                  : 'border-erp-border bg-erp-surface-alt text-erp-muted',
-              )}
-            >
-              <p className="text-[10px] font-bold uppercase tracking-wide">{tab.label}</p>
-              <p className="text-[16px] font-bold tabular-nums">{tab.count}</p>
-            </button>
-          ))}
+        {/* Segmented filter */}
+        <div className="border-b border-erp-border px-3 py-2.5">
+          <div className="flex rounded-lg bg-erp-surface-alt p-0.5" role="tablist">
+            {tabs.map((tab) => {
+              const active = section === tab.id
+              const danger = tab.id === 'critical' && tab.count > 0
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setSection(tab.id)}
+                  className={cn(
+                    'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-semibold transition-all',
+                    active
+                      ? 'bg-erp-surface text-erp-text shadow-sm ring-1 ring-erp-border/80'
+                      : 'text-erp-muted hover:text-erp-text',
+                  )}
+                >
+                  <span>{tab.label}</span>
+                  <span
+                    className={cn(
+                      'min-w-[1.25rem] rounded-full px-1.5 py-px text-center text-[10px] font-bold tabular-nums',
+                      active && danger
+                        ? 'bg-erp-danger-soft text-erp-danger-fg'
+                        : active
+                          ? 'bg-erp-primary-soft text-erp-primary'
+                          : 'bg-erp-surface text-erp-muted',
+                    )}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
-        <ul className="flex-1 overflow-y-auto divide-y divide-erp-border">
+        {/* List */}
+        <ul className="flex-1 overflow-y-auto overscroll-contain">
           {loading && (
-            <li className="px-4 py-8 text-center text-[13px] text-erp-muted">Loading…</li>
+            <li className="px-4 py-10 text-center text-[13px] text-erp-muted">Loading…</li>
           )}
           {error && !loading && (
-            <li className="px-4 py-8 text-center text-[13px] text-erp-danger-fg">
+            <li className="px-4 py-10 text-center text-[13px] text-erp-danger-fg">
               {error}
-              <button type="button" className="mt-2 block w-full text-erp-primary underline" onClick={() => void refresh()}>
+              <button
+                type="button"
+                className="mt-2 block w-full text-[12px] font-semibold text-erp-primary underline"
+                onClick={() => void refresh()}
+              >
                 Retry
               </button>
             </li>
           )}
           {!loading && !error && list.length === 0 && (
-            <li className="px-4 py-12 text-center text-[13px] text-erp-muted">
-              All clear — nothing needs attention
+            <li className="flex flex-col items-center px-6 py-14 text-center">
+              <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-erp-success-soft text-erp-success-fg">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+              <p className="text-[13px] font-semibold text-erp-text">All clear</p>
+              <p className="mt-1 text-[12px] text-erp-muted">Nothing needs attention right now.</p>
             </li>
           )}
-          {list.slice(0, 10).map((n) => (
-            <li key={n.id}>
-              <div className="flex gap-3 px-4 py-3 hover:bg-erp-surface-alt">
-                <TrafficLight status={priorityTone(n.priority)} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-[13px] font-semibold text-erp-text">{n.title}</p>
-                    <span className="shrink-0 text-[10px] font-bold uppercase text-erp-muted">
-                      {n.priority}
-                    </span>
+          {list.slice(0, 12).map((n) => {
+            const unread = n.status === 'UNREAD'
+            return (
+              <li key={n.id} className="border-b border-erp-border/80 last:border-b-0">
+                <article
+                  className={cn(
+                    'relative px-4 py-3.5 transition-colors',
+                    unread ? 'bg-erp-primary-soft/25' : 'bg-erp-surface',
+                    'hover:bg-erp-surface-alt/80',
+                  )}
+                >
+                  {unread ? (
+                    <span
+                      className="absolute inset-y-3 left-0 w-0.5 rounded-r bg-erp-primary"
+                      aria-hidden
+                    />
+                  ) : null}
+
+                  <div className="flex gap-3">
+                    <div className="pt-1.5">
+                      <TrafficLight status={priorityTone(n.priority)} />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      {/* Title row */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <h3
+                              className={cn(
+                                'truncate text-[13px] leading-snug text-erp-text',
+                                unread ? 'font-semibold' : 'font-medium',
+                              )}
+                            >
+                              {n.title}
+                            </h3>
+                          </div>
+                          <p className="mt-0.5 text-[10.5px] font-medium uppercase tracking-wide text-erp-muted">
+                            {categoryShort(n.category)}
+                          </p>
+                        </div>
+                        {n.priority !== 'NORMAL' && n.priority !== 'LOW' ? (
+                          <span
+                            className={cn(
+                              'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset',
+                              priorityBadgeClass(n.priority),
+                            )}
+                          >
+                            {priorityLabel(n.priority)}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-2">
+                        <ApiNotificationBody n={n} />
+                      </div>
+
+                      <p className="mt-2 flex items-center gap-1 text-[11px] text-erp-muted">
+                        <Clock className="h-3 w-3 shrink-0 opacity-70" />
+                        <span>{formatRelativeTime(n.createdAt)}</span>
+                      </p>
+
+                      {/* Actions */}
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1 border-t border-erp-border/60 pt-2">
+                        {n.actionUrl ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-7 items-center gap-1 rounded-md bg-erp-primary px-2.5 text-[11px] font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+                            onClick={() => {
+                              void markRead(n.id)
+                              onClose()
+                              navigate(n.actionUrl!)
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 opacity-90" />
+                            {n.primaryAction === 'REVIEW' ? 'Review' : 'Open'}
+                          </button>
+                        ) : null}
+                        {unread ? (
+                          <ActionGhostBtn icon={Check} onClick={() => void markRead(n.id)}>
+                            Read
+                          </ActionGhostBtn>
+                        ) : null}
+                        <ActionGhostBtn icon={Timer} onClick={() => void snooze(n.id, 60)}>
+                          Snooze
+                        </ActionGhostBtn>
+                        <ActionGhostBtn icon={CheckCircle2} onClick={() => void resolve(n.id)}>
+                          Done
+                        </ActionGhostBtn>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-0.5">
-                    <NotificationDetail n={n} />
-                  </div>
-                  <p className="mt-1 flex items-center gap-1 text-[10px] text-erp-muted">
-                    <Clock className="h-3 w-3" />
-                    {formatRelativeTime(n.createdAt)}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {n.actionUrl && (
-                      <button
-                        type="button"
-                        className="rounded-md bg-erp-primary px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90"
-                        onClick={() => {
-                          void markRead(n.id)
-                          onClose()
-                          navigate(n.actionUrl!)
-                        }}
-                      >
-                        {n.primaryAction === 'REVIEW' ? 'Review' : 'Open'}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void markRead(n.id)}
-                      className="text-[11px] font-medium text-erp-muted hover:text-erp-text"
-                    >
-                      Mark read
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void snooze(n.id, 60)}
-                      className="text-[11px] font-medium text-erp-muted hover:text-erp-text"
-                    >
-                      Snooze 1h
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void resolve(n.id)}
-                      className="text-[11px] font-medium text-erp-muted hover:text-erp-text"
-                    >
-                      Resolve
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </li>
-          ))}
+                </article>
+              </li>
+            )
+          })}
         </ul>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-erp-border px-4 py-3">
+        {/* Footer */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-erp-border bg-erp-surface-alt/40 px-4 py-3">
           <button
             type="button"
             className="text-[12px] font-semibold text-erp-primary hover:underline"
             onClick={() => void markAllRead()}
           >
-            Mark all as read
+            Mark all read
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
             <Link
               to="/notifications/settings"
               onClick={onClose}
-              className="inline-flex items-center gap-1 text-[12px] font-medium text-erp-muted hover:text-erp-text"
+              className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-erp-muted transition-colors hover:bg-erp-surface hover:text-erp-text"
             >
               <Settings className="h-3.5 w-3.5" />
               Settings
@@ -243,7 +368,7 @@ function ApiNotificationPanel({ onClose }: { onClose: () => void }) {
             <Link
               to="/notifications"
               onClick={onClose}
-              className="text-[12px] font-semibold text-erp-primary hover:underline"
+              className="inline-flex h-8 items-center rounded-md bg-erp-surface px-2.5 text-[12px] font-semibold text-erp-primary shadow-sm ring-1 ring-erp-border transition-colors hover:bg-erp-primary-soft"
             >
               View all
             </Link>
@@ -290,16 +415,27 @@ function DemoNotificationPanel({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div className="erp-detail-scrim fixed inset-0 z-40 bg-black/20" onClick={onClose} />
-      <aside className="erp-detail-panel fixed right-0 top-0 z-50 flex h-screen w-full max-w-md flex-col border-l border-erp-border bg-erp-surface shadow-erp-lg">
-        <div className="flex items-center justify-between border-b border-erp-border bg-gradient-to-r from-erp-surface-alt/80 to-erp-surface px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Bell className="h-4 w-4 text-erp-primary" />
-            <h2 className="text-[15px] font-semibold">Notification Center</h2>
-            <span className="rounded-full bg-erp-primary-soft px-2 py-0.5 text-[11px] font-semibold text-erp-primary">
-              {notifications.length}
+      <aside className="erp-detail-panel fixed right-0 top-0 z-50 flex h-screen w-full max-w-[400px] flex-col border-l border-erp-border bg-erp-surface shadow-erp-lg">
+        <div className="flex items-center justify-between gap-3 border-b border-erp-border px-4 py-3.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-erp-primary-soft text-erp-primary">
+              <Bell className="h-4 w-4" />
             </span>
+            <div className="min-w-0">
+              <h2 className="text-[15px] font-semibold leading-tight text-erp-text">Notifications</h2>
+              <p className="text-[11px] text-erp-muted">
+                {notifications.length === 0
+                  ? 'You are all caught up'
+                  : `${notifications.length} open`}
+              </p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} className="rounded p-1 hover:bg-erp-surface-alt">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-erp-muted transition-colors hover:bg-erp-surface-alt hover:text-erp-text"
+            aria-label="Close notifications"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -312,7 +448,9 @@ function DemoNotificationPanel({ onClose }: { onClose: () => void }) {
               onClick={() => setActiveGroup(g.id)}
               className={cn(
                 'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors',
-                activeGroup === g.id ? 'bg-erp-primary text-white' : 'bg-erp-surface-alt text-erp-muted hover:text-erp-text',
+                activeGroup === g.id
+                  ? 'bg-erp-primary text-white'
+                  : 'bg-erp-surface-alt text-erp-muted hover:text-erp-text',
               )}
             >
               {g.label}
@@ -345,22 +483,30 @@ function DemoNotificationPanel({ onClose }: { onClose: () => void }) {
           })}
         </div>
 
-        <ul className="flex-1 overflow-y-auto divide-y divide-erp-border">
+        <ul className="flex-1 overflow-y-auto divide-y divide-erp-border/80">
           {notifications.length === 0 && (
-            <li className="px-4 py-12 text-center text-[13px] text-erp-muted">All clear — nothing needs attention</li>
+            <li className="flex flex-col items-center px-6 py-14 text-center">
+              <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-erp-success-soft text-erp-success-fg">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+              <p className="text-[13px] font-semibold text-erp-text">All clear</p>
+              <p className="mt-1 text-[12px] text-erp-muted">Nothing needs attention right now.</p>
+            </li>
           )}
           {notifications.map((n) => (
             <li key={n.id}>
-              <div className="flex gap-3 px-4 py-3 hover:bg-erp-surface-alt">
-                <TrafficLight status={n.severity} />
+              <div className="flex gap-3 px-4 py-3.5 hover:bg-erp-surface-alt/80">
+                <div className="pt-1.5">
+                  <TrafficLight status={n.severity} />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-erp-text">{n.title}</p>
-                  <p className="text-[12px] text-erp-muted">{n.description}</p>
-                  <p className="mt-1 flex items-center gap-1 text-[10px] text-erp-muted">
-                    <Clock className="h-3 w-3" />
+                  <p className="text-[13px] font-semibold leading-snug text-erp-text">{n.title}</p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-erp-muted">{n.description}</p>
+                  <p className="mt-2 flex items-center gap-1 text-[11px] text-erp-muted">
+                    <Clock className="h-3 w-3 opacity-70" />
                     {formatRelativeTime(n.createdAt)}
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1 border-t border-erp-border/60 pt-2">
                     {n.href && (
                       <Link
                         to={n.href}
@@ -368,17 +514,18 @@ function DemoNotificationPanel({ onClose }: { onClose: () => void }) {
                           markRead(n.id)
                           onClose()
                         }}
-                        className="rounded-md bg-erp-primary px-2 py-1 text-[11px] font-semibold text-white"
+                        className="inline-flex h-7 items-center gap-1 rounded-md bg-erp-primary px-2.5 text-[11px] font-semibold text-white"
                       >
+                        <ExternalLink className="h-3 w-3 opacity-90" />
                         {n.actionLabel ?? 'Open'}
                       </Link>
                     )}
-                    <button type="button" onClick={() => markRead(n.id)} className="text-[11px] font-medium text-erp-muted">
-                      Mark read
-                    </button>
-                    <button type="button" onClick={() => snoozeOne(n.id)} className="text-[11px] font-medium text-erp-muted">
-                      Snooze 1h
-                    </button>
+                    <ActionGhostBtn icon={Check} onClick={() => markRead(n.id)}>
+                      Read
+                    </ActionGhostBtn>
+                    <ActionGhostBtn icon={Timer} onClick={() => snoozeOne(n.id)}>
+                      Snooze
+                    </ActionGhostBtn>
                   </div>
                 </div>
               </div>

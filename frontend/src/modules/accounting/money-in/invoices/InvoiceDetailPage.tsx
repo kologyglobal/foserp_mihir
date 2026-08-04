@@ -1,10 +1,24 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Download, Pencil, Printer } from 'lucide-react'
+import {
+  CheckCircle2,
+  ClipboardCheck,
+  Download,
+  FileText,
+  Pencil,
+  Printer,
+  RefreshCw,
+  Send,
+  Undo2,
+  XCircle,
+} from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpStatusChip } from '@/components/erp/ErpStatusChip'
 import { Textarea } from '@/components/forms/Inputs'
+import { PageBackLink } from '@/components/ui/PageBackLink'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { entity360CustomerPath } from '@/config/entity360Routes'
 import {
   cancelSalesInvoice,
   getSalesInvoice,
@@ -15,69 +29,53 @@ import {
 } from '@/services/bridges/receivablesApiBridge'
 import type { SalesInvoiceDto, SalesInvoiceValidationPreview } from '@/types/moneyIn'
 import { formatCurrency } from '@/utils/formatters/currency'
+import { formatDate } from '@/utils/dates/format'
+import { downloadSalesInvoicePdf, printSalesInvoiceDocument, salesInvoicePdfFileName } from '@/utils/salesInvoiceExport'
 import { mergeAllowedAction, useMoneyInPermissions } from '@/utils/permissions/moneyIn'
 import { notify } from '@/store/toastStore'
+import { cn } from '@/utils/cn'
 import {
   MasterRefreshModal,
-  PartyMasterCard,
-  SourceDocumentCard,
   sourceTypeLabel,
 } from '@/modules/accounting/shared/invoices'
-import { invoiceDisplayNumber, moneyInStatusTone, MONEY_IN_STATUS_LABELS, parseDecimal, resolveSettlementStatus, SETTLEMENT_STATUS_LABELS, settlementStatusTone, summarizeReceiptValidationToast } from '../moneyInUi'
+import {
+  invoiceDisplayNumber,
+  moneyInStatusTone,
+  MONEY_IN_STATUS_LABELS,
+  parseDecimal,
+  resolveSettlementStatus,
+  SETTLEMENT_STATUS_LABELS,
+  settlementStatusTone,
+  summarizeReceiptValidationToast,
+} from '../moneyInUi'
 import { PostConfirmModal } from '../components/PostConfirmModal'
-import { TotalsPanel } from '../components/TotalsPanel'
 import { ValidationDrawer } from '../components/ValidationDrawer'
 import { MoneyInWorkspaceShell } from '../MoneyInWorkspaceShell'
+import { SalesInvoiceDocument } from './SalesInvoiceDocument'
 
-/** Bordered card with a titled header band — document view chrome. */
-function DetailSection({
-  title,
-  subtitle,
-  children,
-  className,
-}: {
-  title: string
-  subtitle?: string
-  children: React.ReactNode
-  className?: string
-}) {
+function SideMeta({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section className={`rounded-md border border-erp-border bg-white ${className ?? ''}`}>
-      <header className="border-b border-erp-border bg-erp-surface-alt/60 px-4 py-2">
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-erp-text">{title}</h3>
-        {subtitle && <p className="text-[11px] text-erp-muted">{subtitle}</p>}
-      </header>
-      <div className="p-4">{children}</div>
-    </section>
-  )
-}
-
-function InfoField({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return (
-    <div>
-      <dt className="text-[11px] font-medium uppercase tracking-wide text-erp-muted">{label}</dt>
-      <dd className={`mt-0.5 text-[13px] text-erp-text ${mono ? 'tabular-nums' : ''}`}>{value ?? '—'}</dd>
+    <div className="mi-receipt-detail-meta">
+      <dt className="mi-receipt-detail-meta__label">{label}</dt>
+      <dd className="mi-receipt-detail-meta__value">{children}</dd>
     </div>
   )
 }
 
-/** Best-effort renderer for the persisted address snapshot JSON. */
-function snapshotAddressLines(snapshot: Record<string, unknown> | null): string[] {
-  if (!snapshot) return []
-  const pick = (...keys: string[]) =>
-    keys
-      .map((k) => snapshot[k])
-      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
-  const line1 = pick('addressLine1', 'address1', 'line1', 'address')
-  const line2 = pick('addressLine2', 'address2', 'line2')
-  const cityState = pick('city', 'state')
-  const pinCountry = pick('pincode', 'postalCode', 'country')
-  return [line1.join(', '), line2.join(', '), [...cityState, ...pinCountry].join(', ')].filter(Boolean)
-}
-
-function lineTaxAmount(l: { cgstAmount: string; sgstAmount: string; igstAmount: string; cessAmount: string }) {
+function SideCard({
+  title,
+  children,
+  className,
+}: {
+  title?: string
+  children: ReactNode
+  className?: string
+}) {
   return (
-    parseDecimal(l.cgstAmount) + parseDecimal(l.sgstAmount) + parseDecimal(l.igstAmount) + parseDecimal(l.cessAmount)
+    <section className={cn('mi-receipt-detail-side-card', className)}>
+      {title ? <h3 className="mi-receipt-detail-side-card__title">{title}</h3> : null}
+      {children}
+    </section>
   )
 }
 
@@ -89,6 +87,7 @@ export function InvoiceDetailPage() {
   const [report, setReport] = useState<SalesInvoiceValidationPreview | null>(null)
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [showValidate, setShowValidate] = useState(false)
   const [showPost, setShowPost] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
@@ -119,9 +118,8 @@ export function InvoiceDetailPage() {
       const r = await validateSalesInvoice(id)
       setReport(r)
       setShowValidate(true)
-      if (r.valid) {
-        notify.success('Validation passed')
-      } else {
+      if (r.valid) notify.success('Validation passed')
+      else {
         const toast = summarizeReceiptValidationToast(r)
         if (toast) notify.error(toast)
       }
@@ -134,8 +132,7 @@ export function InvoiceDetailPage() {
     if (!id) return
     setActing(true)
     try {
-      const updated = await markSalesInvoiceReady(id)
-      setInvoice(updated)
+      setInvoice(await markSalesInvoiceReady(id))
       notify.success('Marked ready to post')
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Mark ready failed')
@@ -167,8 +164,7 @@ export function InvoiceDetailPage() {
     }
     setActing(true)
     try {
-      const updated = await cancelSalesInvoice(id, cancelReason.trim())
-      setInvoice(updated)
+      setInvoice(await cancelSalesInvoice(id, cancelReason.trim()))
       setShowCancel(false)
       notify.success('Invoice cancelled')
     } catch (e) {
@@ -198,6 +194,20 @@ export function InvoiceDetailPage() {
     }
   }
 
+  const handlePdf = async () => {
+    if (!invoice) return
+    setExporting(true)
+    try {
+      const result = await downloadSalesInvoicePdf(invoice)
+      if (!result.ok) notify.error(result.error || 'PDF export failed')
+      else notify.success('PDF downloaded')
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'PDF export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (!perms.canViewInvoice) {
     return (
       <MoneyInWorkspaceShell title="Invoice">
@@ -205,8 +215,6 @@ export function InvoiceDetailPage() {
       </MoneyInWorkspaceShell>
     )
   }
-
-  const settlement = invoice ? resolveSettlementStatus(invoice) : null
 
   if (loading || !invoice) {
     return (
@@ -217,6 +225,29 @@ export function InvoiceDetailPage() {
   }
 
   const actions = invoice.allowedActions
+  const invNo = invoiceDisplayNumber(invoice)
+  const settlement = resolveSettlementStatus(invoice)
+  const canEdit = mergeAllowedAction(perms.canEditInvoice, actions?.edit)
+  const canValidate = mergeAllowedAction(perms.canViewInvoice, actions?.validate)
+  const canMarkReady = mergeAllowedAction(perms.canEditInvoice, actions?.markReady)
+  const canPost = mergeAllowedAction(perms.canPostInvoice, actions?.post)
+  const canCancel = mergeAllowedAction(perms.canCancelInvoice, actions?.cancel)
+  const canReverse = mergeAllowedAction(perms.canReverseInvoice, actions?.reverse)
+  const hasAccountingLink =
+    (invoice.status === 'POSTED' || invoice.status === 'REVERSED') && Boolean(invoice.accountingVoucherId)
+  const outstanding = parseDecimal(invoice.outstandingAmount)
+  const amountDue =
+    invoice.status === 'POSTED' || invoice.status === 'REVERSED'
+      ? outstanding
+      : parseDecimal(invoice.totalAmount)
+
+  const sourceSnap = invoice.sourceDocumentSnapshot as {
+    salesOrderNo?: string
+    documentNumber?: string
+    invoiceNo?: string
+  } | null
+  const sourceDocNo = sourceSnap?.salesOrderNo ?? sourceSnap?.documentNumber ?? sourceSnap?.invoiceNo ?? null
+
   const statusBanner =
     invoice.status === 'POSTED'
       ? actions?.reverse === false && perms.canReverseInvoice
@@ -230,273 +261,263 @@ export function InvoiceDetailPage() {
             ? 'Cancelled — read-only.'
             : null
 
-  return (
-    <MoneyInWorkspaceShell
-      title={invoiceDisplayNumber(invoice)}
-      actions={
-        <div className="flex flex-wrap gap-2">
-          <ErpButton
-            variant="secondary"
-            icon={Printer}
-            onClick={() => navigate(`/accounting/money-in/invoices/${id}/print`)}
-          >
-            Print
-          </ErpButton>
-          <ErpButton
-            variant="secondary"
-            icon={Download}
-            onClick={() => navigate(`/accounting/money-in/invoices/${id}/print`)}
-          >
-            Download PDF
-          </ErpButton>
-          {mergeAllowedAction(perms.canEditInvoice, actions?.edit) && (
-            <ErpButton variant="secondary" icon={Pencil} onClick={() => navigate(`/accounting/money-in/invoices/${id}/edit`)}>
-              Edit
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canViewInvoice, actions?.validate) && (
-            <ErpButton variant="secondary" onClick={() => void runValidate()}>
-              Validate
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canEditInvoice, actions?.markReady) && (
-            <ErpButton variant="secondary" onClick={() => void runMarkReady()} disabled={acting}>
-              Mark Ready
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canPostInvoice, actions?.post) && (
-            <ErpButton variant="primary" onClick={() => setShowPost(true)} disabled={acting}>
-              Post
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canCancelInvoice, actions?.cancel) && (
-            <ErpButton variant="ghost" onClick={() => setShowCancel(true)}>
-              Cancel
-            </ErpButton>
-          )}
-          {mergeAllowedAction(perms.canReverseInvoice, actions?.reverse) && (
-            <ErpButton variant="ghost" onClick={() => setShowReverse(true)} disabled={acting}>
-              Reverse Document
-            </ErpButton>
-          )}
-          {(invoice.status === 'POSTED' || invoice.status === 'REVERSED') && invoice.accountingVoucherId && (
-            <Link to={`/accounting/ledger-entries/voucher/${invoice.accountingVoucherId}`}>
-              <ErpButton variant="secondary">View Accounting</ErpButton>
-            </Link>
-          )}
-        </div>
+  const primaryAction = canPost
+    ? {
+        id: 'post',
+        label: 'Post',
+        icon: Send,
+        onClick: () => setShowPost(true),
+        disabled: acting,
       }
-    >
-      {statusBanner && (
-        <div className="mb-3 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-900">{statusBanner}</div>
-      )}
+    : {
+        id: 'pdf',
+        label: 'Export PDF',
+        icon: Download,
+        onClick: () => void handlePdf(),
+        disabled: exporting,
+      }
 
-      {/* ── Document masthead ────────────────────────────────────────────── */}
-      <div className="mb-3 rounded-md border border-erp-border bg-white px-4 py-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-[18px] font-semibold tracking-tight text-erp-text">
-                {invoice.invoiceNumber ?? invoice.draftReference ?? 'Invoice'}
-              </h2>
-              <ErpStatusChip label={MONEY_IN_STATUS_LABELS[invoice.status]} tone={moneyInStatusTone(invoice.status)} />
-              {settlement && (
-                <ErpStatusChip label={SETTLEMENT_STATUS_LABELS[settlement]} tone={settlementStatusTone(settlement)} />
-              )}
+  return (
+    <MoneyInWorkspaceShell title={invNo} contentClassName="border-0 bg-transparent p-0 shadow-none">
+      <div className="mi-receipt-detail-page mi-si-detail-page">
+        <PageBackLink to="/accounting/money-in/invoices" label="Back to Invoices" className="no-print" />
+
+        {statusBanner ? (
+          <div className="mi-receipt-detail-banner no-print" role="status">
+            {statusBanner}
+          </div>
+        ) : null}
+
+        {invoice.createdChannel === 'CRM' || invoice.sourceType === 'CRM_TAX_INVOICE' ? (
+          <div className="mi-receipt-detail-source no-print">
+            <div className="mi-receipt-detail-source__title">Unified sales invoice</div>
+            <div className="mi-receipt-detail-source__body">
+              {invoice.legacyCrmInvoiceNo
+                ? `Legacy commercial ref ${invoice.legacyCrmInvoiceNo} · same document as CRM / Sales`
+                : 'Created from CRM commercial workflow — one Accounting sales invoice'}
+              {invoice.legacyCrmTaxInvoiceId ? (
+                <>
+                  {' · '}
+                  <Link
+                    className="mi-receipt-detail-source__link"
+                    to={`/sales/invoices/${invoice.id}`}
+                  >
+                    Open Sales view
+                  </Link>
+                </>
+              ) : null}
             </div>
-            <p className="mt-0.5 text-[13px] text-erp-muted">
+          </div>
+        ) : null}
+
+        <header className="mi-receipt-detail-toolbar no-print">
+          <div className="mi-receipt-detail-toolbar__identity">
+            <div className="mi-receipt-detail-toolbar__title-row">
+              <h1 className="mi-receipt-detail-toolbar__title">{invNo}</h1>
+              <ErpStatusChip label={MONEY_IN_STATUS_LABELS[invoice.status]} tone={moneyInStatusTone(invoice.status)} />
+              {settlement ? (
+                <ErpStatusChip label={SETTLEMENT_STATUS_LABELS[settlement]} tone={settlementStatusTone(settlement)} />
+              ) : null}
+            </div>
+            <p className="mi-receipt-detail-toolbar__subtitle">
               {invoice.customerNameSnapshot}
-              {invoice.customerCodeSnapshot ? ` · ${invoice.customerCodeSnapshot}` : ''} ·{' '}
+              <span aria-hidden> · </span>
               {sourceTypeLabel(invoice.sourceType)}
+              <span aria-hidden> · </span>
+              {formatDate(invoice.invoiceDate)}
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-erp-muted">Invoice total</p>
-            <p className="text-[20px] font-semibold tabular-nums text-erp-text">
-              {formatCurrency(parseDecimal(invoice.totalAmount))}
-            </p>
-            {(invoice.status === 'POSTED' || invoice.status === 'REVERSED') && (
-              <p className="text-[11px] tabular-nums text-erp-muted">
-                Outstanding {formatCurrency(parseDecimal(invoice.outstandingAmount))} · Paid{' '}
-                {formatCurrency(parseDecimal(invoice.amountPaid))}
-              </p>
-            )}
-          </div>
-        </div>
-        <dl className="mt-3 grid gap-x-6 gap-y-3 border-t border-erp-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
-          <InfoField label="Invoice date" value={invoice.invoiceDate} mono />
-          <InfoField label="Posting date" value={invoice.postingDate ?? '—'} mono />
-          <InfoField label="Due date" value={invoice.dueDate ?? '—'} mono />
-          <InfoField
-            label="Payment terms"
-            value={invoice.paymentTermsDays != null ? `${invoice.paymentTermsDays} days` : '—'}
-          />
-          <InfoField label="Customer PO" value={invoice.customerPoNumber ?? '—'} />
-          <InfoField label="Project ref" value={invoice.projectRef ?? '—'} />
-          <InfoField label="Project name" value={invoice.projectNameSnapshot ?? '—'} />
-          <InfoField label="Supply type" value={invoice.supplyType.replace(/_/g, ' ')} />
-          <InfoField label="Tax treatment" value={invoice.taxTreatment.replace(/_/g, ' ')} />
-          <InfoField
-            label="Place of supply"
-            value={invoice.placeOfSupply ? `State code ${invoice.placeOfSupply}` : '—'}
-          />
-          <InfoField label="Currency" value={`${invoice.currencyCode} @ ${invoice.exchangeRate}`} mono />
-          <InfoField label="Reference no." value={invoice.referenceNumber ?? '—'} />
-          <InfoField label="Source document" value={sourceTypeLabel(invoice.sourceType)} />
-          <InfoField
-            label="Posted at"
-            value={invoice.postedAt ? new Date(invoice.postedAt).toLocaleString() : 'Not posted'}
-          />
-        </dl>
-      </div>
 
-      {/* ── Bill To + Source / Accounting ────────────────────────────────── */}
-      <div className="mb-3 grid gap-3 lg:grid-cols-2">
-        <DetailSection title="Bill To" subtitle="Customer snapshot captured on the document.">
-          <p className="text-[14px] font-semibold text-erp-text">{invoice.customerNameSnapshot}</p>
-          {snapshotAddressLines(invoice.customerBillingAddressSnapshot).map((line) => (
-            <p key={line} className="text-[12px] text-erp-muted">
-              {line}
-            </p>
-          ))}
-          <dl className="mt-2 grid gap-x-4 gap-y-2 sm:grid-cols-2">
-            <InfoField label="Customer code" value={invoice.customerCodeSnapshot ?? '—'} />
-            <InfoField label="State code" value={invoice.customerStateCodeSnapshot ?? '—'} mono />
-            <InfoField label="GSTIN" value={invoice.customerGstinSnapshot ?? '—'} mono />
-            <InfoField label="PAN" value={invoice.customerPanSnapshot ?? '—'} mono />
-          </dl>
-          <PartyMasterCard
-            variant="crm"
-            partyId={invoice.customerId}
-            snapshot={{
-              name: invoice.customerNameSnapshot,
-              code: invoice.customerCodeSnapshot,
-              gstin: invoice.customerGstinSnapshot,
-              pan: invoice.customerPanSnapshot,
-            }}
-            onRefreshFromMaster={
-              invoice.status === 'DRAFT' && mergeAllowedAction(perms.canEditInvoice, actions?.edit)
-                ? () => setShowMasterRefresh(true)
-                : undefined
-            }
-          />
-        </DetailSection>
-
-        <DetailSection title="Source & Accounting" subtitle="Origin document, GL voucher, and receivable status.">
-          <SourceDocumentCard
-            sources={[
+          <ErpCommandBar
+            sticky={false}
+            className="mi-receipt-detail-toolbar__actions"
+            maxHeaderActions={4}
+            primaryAction={primaryAction}
+            secondaryActions={[
+              ...(canEdit
+                ? [
+                    {
+                      id: 'edit',
+                      label: 'Edit',
+                      icon: Pencil,
+                      pin: true,
+                      onClick: () => navigate(`/accounting/money-in/invoices/${id}/edit`),
+                    },
+                  ]
+                : []),
               {
-                sourceType: invoice.sourceType,
-                sourceDocumentId: invoice.sourceDocumentId,
-                documentNumber:
-                  (invoice.sourceDocumentSnapshot as { salesOrderNo?: string; documentNumber?: string } | null)
-                    ?.salesOrderNo ??
-                  (invoice.sourceDocumentSnapshot as { documentNumber?: string } | null)?.documentNumber ??
-                  null,
+                id: 'print',
+                label: 'Print',
+                icon: Printer,
+                pin: true,
+                onClick: () => printSalesInvoiceDocument({ fileName: salesInvoicePdfFileName(invoice) }),
               },
+              ...(primaryAction.id !== 'pdf'
+                ? [
+                    {
+                      id: 'pdf-secondary',
+                      label: 'PDF',
+                      icon: Download,
+                      pin: true,
+                      onClick: () => void handlePdf(),
+                      disabled: exporting,
+                    },
+                  ]
+                : []),
+              ...(canValidate
+                ? [
+                    {
+                      id: 'validate',
+                      label: 'Validate',
+                      icon: ClipboardCheck,
+                      onClick: () => void runValidate(),
+                    },
+                  ]
+                : []),
+              ...(canMarkReady
+                ? [
+                    {
+                      id: 'mark-ready',
+                      label: 'Mark Ready',
+                      icon: CheckCircle2,
+                      onClick: () => void runMarkReady(),
+                      disabled: acting,
+                    },
+                  ]
+                : []),
+              ...(hasAccountingLink
+                ? [
+                    {
+                      id: 'accounting',
+                      label: 'View Accounting',
+                      icon: FileText,
+                      onClick: () =>
+                        navigate(`/accounting/ledger-entries/voucher/${invoice.accountingVoucherId}`),
+                    },
+                  ]
+                : []),
+              ...(canEdit && invoice.status === 'DRAFT'
+                ? [
+                    {
+                      id: 'refresh-master',
+                      label: 'Refresh customer',
+                      icon: RefreshCw,
+                      onClick: () => setShowMasterRefresh(true),
+                    },
+                  ]
+                : []),
             ]}
-            emptyText="Direct invoice — no sales order reference."
+            destructiveActions={[
+              ...(canCancel
+                ? [
+                    {
+                      id: 'cancel',
+                      label: 'Cancel',
+                      icon: XCircle,
+                      onClick: () => setShowCancel(true),
+                    },
+                  ]
+                : []),
+              ...(canReverse
+                ? [
+                    {
+                      id: 'reverse',
+                      label: 'Reverse',
+                      icon: Undo2,
+                      onClick: () => setShowReverse(true),
+                      disabled: acting,
+                    },
+                  ]
+                : []),
+            ]}
           />
-          {invoice.status === 'POSTED' || invoice.status === 'REVERSED' ? (
-            <dl className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2">
-              <InfoField
-                label="Accounting voucher"
-                value={
-                  invoice.accountingVoucherId ? (
-                    <Link
-                      to={`/accounting/ledger-entries/voucher/${invoice.accountingVoucherId}`}
-                      className="text-erp-accent hover:underline"
-                    >
-                      View accounting voucher
+        </header>
+
+        <div className="mi-receipt-detail-layout">
+          <main className="mi-receipt-detail-main">
+            <div className="ti-preview-canvas">
+              <div className="ti-preview-canvas__sheet">
+                <SalesInvoiceDocument invoice={invoice} />
+              </div>
+            </div>
+          </main>
+
+          <aside className="mi-receipt-detail-rail no-print">
+            <SideCard className="mi-receipt-detail-amount-card">
+              <p className="mi-receipt-detail-amount-card__label">
+                {invoice.status === 'POSTED' || invoice.status === 'REVERSED' ? 'Amount Due' : 'Invoice Total'}
+              </p>
+              <p className="mi-receipt-detail-amount-card__amount">{formatCurrency(amountDue)}</p>
+              {(invoice.status === 'POSTED' || invoice.status === 'REVERSED') && (
+                <p className="mi-receipt-detail-amount-card__meta">
+                  Paid {formatCurrency(parseDecimal(invoice.amountPaid))}
+                  {parseDecimal(invoice.amountAdjusted) > 0
+                    ? ` · Adjusted ${formatCurrency(parseDecimal(invoice.amountAdjusted))}`
+                    : ''}
+                </p>
+              )}
+            </SideCard>
+
+            <SideCard title="Customer">
+              <Link className="mi-receipt-detail-customer-link" to={entity360CustomerPath(invoice.customerId)}>
+                {invoice.customerNameSnapshot}
+              </Link>
+              {invoice.customerCodeSnapshot ? (
+                <p className="mi-receipt-detail-muted">{invoice.customerCodeSnapshot}</p>
+              ) : null}
+              {invoice.customerGstinSnapshot ? (
+                <p className="mi-receipt-detail-muted">GSTIN {invoice.customerGstinSnapshot}</p>
+              ) : null}
+            </SideCard>
+
+            <SideCard title="Invoice details">
+              <dl className="mi-receipt-detail-meta-list">
+                <SideMeta label="Invoice date">{formatDate(invoice.invoiceDate)}</SideMeta>
+                <SideMeta label="Posting date">{invoice.postingDate ? formatDate(invoice.postingDate) : '—'}</SideMeta>
+                <SideMeta label="Due date">{invoice.dueDate ? formatDate(invoice.dueDate) : '—'}</SideMeta>
+                <SideMeta label="Payment terms">
+                  {invoice.paymentTermsDays != null ? `${invoice.paymentTermsDays} days` : invoice.paymentTerms ?? '—'}
+                </SideMeta>
+                <SideMeta label="Customer PO">{invoice.customerPoNumber ?? '—'}</SideMeta>
+                <SideMeta label="Currency">
+                  {invoice.currencyCode} @ {invoice.exchangeRate}
+                </SideMeta>
+                <SideMeta label="Place of supply">{invoice.placeOfSupply ?? '—'}</SideMeta>
+              </dl>
+            </SideCard>
+
+            <SideCard title="Source & links">
+              <dl className="mi-receipt-detail-meta-list">
+                <SideMeta label="Source">{sourceTypeLabel(invoice.sourceType)}</SideMeta>
+                {sourceDocNo ? <SideMeta label="Source no.">{sourceDocNo}</SideMeta> : null}
+                {invoice.salesOrderNo ? (
+                  <SideMeta label="Sales order">
+                    {invoice.salesOrderId ? (
+                      <Link to={`/sales/orders/${invoice.salesOrderId}`}>{invoice.salesOrderNo}</Link>
+                    ) : (
+                      invoice.salesOrderNo
+                    )}
+                  </SideMeta>
+                ) : null}
+                {invoice.proformaNo ? <SideMeta label="Proforma">{invoice.proformaNo}</SideMeta> : null}
+                {invoice.quotationNo ? <SideMeta label="Quotation">{invoice.quotationNo}</SideMeta> : null}
+                {hasAccountingLink ? (
+                  <SideMeta label="Accounting">
+                    <Link to={`/accounting/ledger-entries/voucher/${invoice.accountingVoucherId}`}>
+                      View voucher
                     </Link>
-                  ) : (
-                    '—'
-                  )
-                }
-              />
-              <InfoField label="Posted at" value={invoice.postedAt ? new Date(invoice.postedAt).toLocaleString() : '—'} />
-              <InfoField label="Outstanding" value={formatCurrency(parseDecimal(invoice.outstandingAmount))} mono />
-              <InfoField label="Amount paid" value={formatCurrency(parseDecimal(invoice.amountPaid))} mono />
-              <InfoField label="Amount adjusted" value={formatCurrency(parseDecimal(invoice.amountAdjusted))} mono />
-              <InfoField label="Open item" value={invoice.receivableOpenItemId ? 'Linked' : '—'} />
-            </dl>
-          ) : (
-            <p className="mt-3 text-[12px] text-erp-muted">
-              Revenue and receivable accounts resolve from default posting mappings on the server. Post the invoice to
-              create the voucher and open item.
-            </p>
-          )}
-          {invoice.status === 'REVERSED' && invoice.reversalReason && (
-            <p className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[12px] text-amber-900">
-              Reversal reason: {invoice.reversalReason}
-              {invoice.reversalVoucherId ? ' · Reversal voucher linked' : ''}
-            </p>
-          )}
-        </DetailSection>
-      </div>
+                  </SideMeta>
+                ) : null}
+              </dl>
+            </SideCard>
 
-      {/* ── Lines ────────────────────────────────────────────────────────── */}
-      <DetailSection
-        title="Invoice Lines"
-        subtitle="Posted invoices always render the snapshot captured at posting time."
-        className="mb-3"
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-[12px]">
-            <thead>
-              <tr className="border-b border-erp-border bg-erp-surface-alt/60 text-[11px] uppercase tracking-wide text-erp-muted">
-                <th className="px-2 py-2">#</th>
-                <th className="px-2 py-2">Item</th>
-                <th className="px-2 py-2">Description</th>
-                <th className="px-2 py-2">HSN</th>
-                <th className="px-2 py-2 text-right">Qty</th>
-                <th className="px-2 py-2 text-right">Rate</th>
-                <th className="px-2 py-2 text-right">Taxable</th>
-                <th className="px-2 py-2 text-right">Tax</th>
-                <th className="px-2 py-2 text-right">Line total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(invoice.lines ?? []).map((l) => (
-                <tr key={l.id} className="border-b border-erp-border/60 hover:bg-erp-surface-alt/40">
-                  <td className="px-2 py-2 text-erp-muted">{l.lineNumber}</td>
-                  <td className="px-2 py-2">{l.itemCodeSnapshot ?? '—'}</td>
-                  <td className="px-2 py-2">{l.description ?? l.itemNameSnapshot}</td>
-                  <td className="px-2 py-2 tabular-nums">{l.hsnCodeSnapshot ?? '—'}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">
-                    {l.quantity}
-                    {l.uomSnapshot ? ` ${l.uomSnapshot}` : ''}
-                  </td>
-                  <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(parseDecimal(l.unitRate))}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(parseDecimal(l.taxableAmount))}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(lineTaxAmount(l))}</td>
-                  <td className="px-2 py-2 text-right font-medium tabular-nums">
-                    {formatCurrency(parseDecimal(l.lineTotal))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            {invoice.reversalReason ? (
+              <SideCard title="Reversal">
+                <p className="mi-receipt-detail-muted">{invoice.reversalReason}</p>
+              </SideCard>
+            ) : null}
+          </aside>
         </div>
-      </DetailSection>
-
-      {/* ── Narration + Totals ───────────────────────────────────────────── */}
-      <div className="grid gap-3 lg:grid-cols-2">
-        <DetailSection title="Narration">
-          <p className="text-[13px] text-erp-text">{invoice.narration ?? '—'}</p>
-        </DetailSection>
-        <TotalsPanel
-          subtotal={invoice.subtotalAmount}
-          discount={invoice.discountAmount}
-          taxable={invoice.taxableAmount}
-          cgst={invoice.cgstAmount}
-          sgst={invoice.sgstAmount}
-          igst={invoice.igstAmount}
-          freight={invoice.freightAmount}
-          other={invoice.otherChargesAmount}
-          roundOff={invoice.roundOffAmount}
-          total={invoice.totalAmount}
-        />
       </div>
 
       <MasterRefreshModal
@@ -517,7 +538,7 @@ export function InvoiceDetailPage() {
       <ValidationDrawer open={showValidate} onClose={() => setShowValidate(false)} report={report} />
       <PostConfirmModal
         open={showPost}
-        invoiceLabel={invoiceDisplayNumber(invoice)}
+        invoiceLabel={invNo}
         totalAmount={invoice.totalAmount}
         posting={acting}
         onConfirm={() => void runPost()}
@@ -525,10 +546,16 @@ export function InvoiceDetailPage() {
       />
 
       {showCancel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 no-print">
           <div className="w-full max-w-md rounded border border-erp-border bg-white p-4">
             <h3 className="text-[14px] font-semibold">Cancel invoice</h3>
-            <Textarea className="mt-2" rows={3} placeholder="Reason" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+            <Textarea
+              className="mt-2"
+              rows={3}
+              placeholder="Reason"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
             <div className="mt-3 flex justify-end gap-2">
               <ErpButton variant="secondary" onClick={() => setShowCancel(false)}>
                 Close
@@ -542,7 +569,7 @@ export function InvoiceDetailPage() {
       )}
 
       {showReverse && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 no-print">
           <div className="w-full max-w-md rounded border border-erp-border bg-white p-4">
             <h3 className="text-[14px] font-semibold">Reverse sales invoice</h3>
             <p className="mt-1 text-[12px] text-erp-muted">

@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity,
+  AlertTriangle,
   Bell,
   Calendar,
+  CalendarClock,
   CheckCircle2,
   Clock,
   FileText,
@@ -13,6 +15,8 @@ import {
   MessageCircle,
   Phone,
   Plus,
+  User,
+  Users,
   Video,
 } from 'lucide-react'
 import { useCrmStore } from '../../store/crmStore'
@@ -41,7 +45,8 @@ import type { LucideIcon } from 'lucide-react'
 
 export type CrmEngagementScope = 'lead' | 'pipeline' | 'quotation'
 
-type FollowUpView = 'today' | 'overdue' | 'upcoming' | 'completed' | 'mine' | 'team'
+type FollowUpStatusView = 'today' | 'overdue' | 'upcoming' | 'completed'
+type FollowUpOwnerScope = 'all' | 'mine'
 
 const FOLLOW_UP_ICONS: Record<string, LucideIcon> = {
   call: Phone,
@@ -53,6 +58,18 @@ const FOLLOW_UP_ICONS: Record<string, LucideIcon> = {
   quotation_follow_up: FileText,
   payment_follow_up: FileText,
   technical_discussion: FileText,
+}
+
+const FOLLOW_UP_ICON_TONE: Record<string, string> = {
+  call: 'crm-engage-row__icon--call',
+  email: 'crm-engage-row__icon--email',
+  whatsapp: 'crm-engage-row__icon--whatsapp',
+  meeting: 'crm-engage-row__icon--meeting',
+  site_visit: 'crm-engage-row__icon--visit',
+  demo: 'crm-engage-row__icon--demo',
+  quotation_follow_up: 'crm-engage-row__icon--quote',
+  payment_follow_up: 'crm-engage-row__icon--payment',
+  technical_discussion: 'crm-engage-row__icon--tech',
 }
 
 function todayStr() {
@@ -138,30 +155,51 @@ function FollowUpRow({
   onOpenNotes?: () => void
 }) {
   const Icon = FOLLOW_UP_ICONS[followUp.followUpType as FollowUpType] ?? Bell
+  const iconTone = FOLLOW_UP_ICON_TONE[followUp.followUpType] ?? ''
   const open = followUp.status === 'pending' || followUp.status === 'overdue'
   const overdue = followUp.status === 'overdue'
+  const typeLabel = formatTypeLabel(followUp.followUpType)
+  const showOpportunity =
+    Boolean(opportunityName) && opportunityName!.toLowerCase() !== customerName.toLowerCase()
 
   return (
     <article className={`crm-engage-row${overdue ? ' crm-engage-row--overdue' : ''}`}>
-      <div className={`crm-engage-row__icon${overdue ? ' crm-engage-row__icon--danger' : ''}`} aria-hidden>
-        <Icon className="h-4 w-4" />
+      <div
+        className={`crm-engage-row__icon${overdue ? ' crm-engage-row__icon--danger' : iconTone ? ` ${iconTone}` : ''}`}
+        aria-hidden
+        title={typeLabel}
+      >
+        <Icon className="h-4 w-4" strokeWidth={2} />
       </div>
 
       <div className="crm-engage-row__main">
         <div className="crm-engage-row__title-line">
+          <span className="crm-engage-row__type-badge">
+            <Icon className="h-3 w-3" aria-hidden />
+            {typeLabel}
+          </span>
           <button type="button" className="crm-engage-row__title" onClick={onOpenCustomer}>
             {customerName}
           </button>
-          {contactName ? <span className="crm-engage-row__sub">{contactName}</span> : null}
         </div>
         <div className="crm-engage-row__meta-line">
-          <span className="crm-engage-row__type">{formatTypeLabel(followUp.followUpType)}</span>
-          {opportunityName ? (
+          {contactName ? (
+            <span className="crm-engage-row__contact">
+              <User className="h-3 w-3" aria-hidden />
+              {contactName}
+            </span>
+          ) : null}
+          {showOpportunity ? (
             <button type="button" className="crm-engage-row__link" onClick={onOpenOpportunity}>
               {opportunityName}
             </button>
           ) : null}
-          <span className="crm-engage-row__assignee">{followUp.assignedToName}</span>
+          {followUp.assignedToName ? (
+            <span className="crm-engage-row__assignee" title="Assigned to">
+              <Users className="h-3 w-3" aria-hidden />
+              {followUp.assignedToName}
+            </span>
+          ) : null}
         </div>
         {followUp.notes ? <p className="crm-engage-row__notes">{followUp.notes}</p> : null}
       </div>
@@ -211,7 +249,8 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
   const rescheduleFollowUp = useCrmStore((s) => s.rescheduleFollowUp)
   const snoozeFollowUp = useCrmStore((s) => s.snoozeFollowUp)
   const canCreateFollowUp = canCrmPermission('crm.follow_up.create')
-  const [view, setView] = useState<FollowUpView>('today')
+  const [statusView, setStatusView] = useState<FollowUpStatusView>('today')
+  const [ownerScope, setOwnerScope] = useState<FollowUpOwnerScope>('all')
   const [newFollowUpOpen, setNewFollowUpOpen] = useState(false)
   const [rescheduleTarget, setRescheduleTarget] = useState<RescheduleFollowUpTarget | null>(null)
   const [notesDetail, setNotesDetail] = useState<{
@@ -244,12 +283,17 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
   const filtered = useMemo(() => {
     return scopedFollowUps
       .filter((f) => {
-        if (view === 'today') return f.status === 'pending' && f.dueDate.slice(0, 10) === today
-        if (view === 'overdue') return f.status === 'overdue'
-        if (view === 'upcoming') return f.status === 'pending' && f.dueDate.slice(0, 10) > today
-        if (view === 'completed') return f.status === 'completed'
-        if (view === 'mine') return f.assignedTo === user?.id && f.status !== 'completed'
-        if (view === 'team') return f.status !== 'completed' && f.status !== 'cancelled'
+        if (statusView === 'today') {
+          if (!(f.status === 'pending' && f.dueDate.slice(0, 10) === today)) return false
+        } else if (statusView === 'overdue') {
+          if (f.status !== 'overdue') return false
+        } else if (statusView === 'upcoming') {
+          if (!(f.status === 'pending' && f.dueDate.slice(0, 10) > today)) return false
+        } else if (statusView === 'completed') {
+          if (f.status !== 'completed') return false
+        }
+
+        if (ownerScope === 'mine') return f.assignedTo === user?.id
         return true
       })
       .sort((a, b) => {
@@ -257,7 +301,7 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
         if (b.status === 'overdue' && a.status !== 'overdue') return 1
         return `${a.dueDate}${a.dueTime}`.localeCompare(`${b.dueDate}${b.dueTime}`)
       })
-  }, [scopedFollowUps, view, today, user?.id])
+  }, [scopedFollowUps, statusView, ownerScope, today, user?.id])
 
   const counts = useMemo(
     () => ({
@@ -269,13 +313,16 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
     [scopedFollowUps, today],
   )
 
-  const views: { id: FollowUpView; label: string; count?: number }[] = [
-    { id: 'today', label: 'Today', count: counts.today },
-    { id: 'overdue', label: 'Overdue', count: counts.overdue },
-    { id: 'upcoming', label: 'Upcoming', count: counts.upcoming },
-    { id: 'completed', label: 'Completed', count: counts.completed },
-    { id: 'mine', label: 'Mine' },
-    { id: 'team', label: 'Team' },
+  const statusViews: { id: FollowUpStatusView; label: string; count: number; icon: LucideIcon; tone: string }[] = [
+    { id: 'today', label: 'Due today', count: counts.today, icon: CalendarClock, tone: '' },
+    { id: 'overdue', label: 'Overdue', count: counts.overdue, icon: AlertTriangle, tone: 'crm-engage-stat--danger' },
+    { id: 'upcoming', label: 'Upcoming', count: counts.upcoming, icon: Calendar, tone: '' },
+    { id: 'completed', label: 'Completed', count: counts.completed, icon: CheckCircle2, tone: 'crm-engage-stat--success' },
+  ]
+
+  const ownerViews: { id: FollowUpOwnerScope; label: string; icon: LucideIcon }[] = [
+    { id: 'all', label: 'Everyone', icon: Users },
+    { id: 'mine', label: 'Mine', icon: User },
   ]
 
   const scopeHint =
@@ -285,15 +332,21 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
         ? 'Commercial follow-ups on quotations and quote revision cycles'
         : 'Scheduled touchpoints linked to opportunities'
 
+  const emptyIcon =
+    statusView === 'overdue' ? AlertTriangle : statusView === 'completed' || statusView === 'today' ? CheckCircle2 : Bell
+  const EmptyIcon = emptyIcon
+
   return (
     <div className="crm-engage">
       <header className="crm-engage__header">
-        <div className="crm-engage__header-text">
-          <h2 className="crm-engage__title">
-            <Bell className="h-4 w-4" aria-hidden />
-            Follow-ups
-          </h2>
-          <p className="crm-engage__subtitle">{scopeHint}</p>
+        <div className="crm-engage__header-brand">
+          <div className="crm-engage__icon-plate" aria-hidden>
+            <Bell className="h-5 w-5" strokeWidth={2} />
+          </div>
+          <div className="crm-engage__header-text">
+            <h2 className="crm-engage__title">Follow-ups</h2>
+            <p className="crm-engage__subtitle">{scopeHint}</p>
+          </div>
         </div>
         {canCreateFollowUp ? (
           <ErpButton type="button" size="sm" variant="primary" icon={Plus} onClick={() => setNewFollowUpOpen(true)}>
@@ -303,41 +356,44 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
       </header>
 
       <div className="crm-engage__stats" role="group" aria-label="Follow-up summary">
-        {(
-          [
-            { id: 'today' as const, label: 'Due today', value: counts.today, tone: '' },
-            { id: 'overdue' as const, label: 'Overdue', value: counts.overdue, tone: 'crm-engage-stat--danger' },
-            { id: 'upcoming' as const, label: 'Upcoming', value: counts.upcoming, tone: '' },
-            { id: 'completed' as const, label: 'Completed', value: counts.completed, tone: 'crm-engage-stat--success' },
-          ] as const
-        ).map((stat) => (
-          <button
-            key={stat.id}
-            type="button"
-            className={`crm-engage-stat${stat.tone ? ` ${stat.tone}` : ''}${view === stat.id ? ' crm-engage-stat--active' : ''}`}
-            onClick={() => setView(stat.id)}
-          >
-            <span className="crm-engage-stat__label">{stat.label}</span>
-            <span className="crm-engage-stat__value">{stat.value}</span>
-          </button>
-        ))}
+        {statusViews.map((stat) => {
+          const StatIcon = stat.icon
+          return (
+            <button
+              key={stat.id}
+              type="button"
+              className={`crm-engage-stat${stat.tone ? ` ${stat.tone}` : ''}${statusView === stat.id ? ' crm-engage-stat--active' : ''}`}
+              onClick={() => setStatusView(stat.id)}
+              aria-pressed={statusView === stat.id}
+            >
+              <span className="crm-engage-stat__top">
+                <span className="crm-engage-stat__label">{stat.label}</span>
+                <StatIcon className="crm-engage-stat__icon" aria-hidden />
+              </span>
+              <span className="crm-engage-stat__value">{stat.count}</span>
+            </button>
+          )
+        })}
       </div>
 
       <div className="crm-engage__toolbar">
-        <div className="crm-engage-tabs" role="tablist" aria-label="Follow-up views">
-          {views.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              role="tab"
-              aria-selected={view === v.id}
-              className={`crm-engage-tab${view === v.id ? ' crm-engage-tab--active' : ''}`}
-              onClick={() => setView(v.id)}
-            >
-              {v.label}
-              {v.count !== undefined ? <span className="crm-engage-tab__count">{v.count}</span> : null}
-            </button>
-          ))}
+        <div className="crm-engage-tabs" role="tablist" aria-label="Owner filter">
+          {ownerViews.map((v) => {
+            const TabIcon = v.icon
+            return (
+              <button
+                key={v.id}
+                type="button"
+                role="tab"
+                aria-selected={ownerScope === v.id}
+                className={`crm-engage-tab${ownerScope === v.id ? ' crm-engage-tab--active' : ''}`}
+                onClick={() => setOwnerScope(v.id)}
+              >
+                <TabIcon className="crm-engage-tab__icon" aria-hidden />
+                {v.label}
+              </button>
+            )
+          })}
         </div>
         <p className="crm-engage__result-count">
           {filtered.length} item{filtered.length === 1 ? '' : 's'}
@@ -346,14 +402,24 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
 
       {filtered.length === 0 ? (
         <div className="crm-engage-empty">
-          <CheckCircle2 className="h-8 w-8 text-erp-success" aria-hidden />
+          <div className="crm-engage-empty__icon" aria-hidden>
+            <EmptyIcon className="h-7 w-7" strokeWidth={1.75} />
+          </div>
           <p className="crm-engage-empty__title">
-            {view === 'overdue' ? 'No overdue follow-ups' : view === 'today' ? 'Nothing due today' : 'No follow-ups in this view'}
+            {statusView === 'overdue'
+              ? 'No overdue follow-ups'
+              : statusView === 'today'
+                ? 'Nothing due today'
+                : statusView === 'upcoming'
+                  ? 'No upcoming follow-ups'
+                  : 'No completed follow-ups'}
           </p>
           <p className="crm-engage-empty__desc">
-            {view === 'today'
-              ? 'You are clear for today — a good time to prospect or advance open deals.'
-              : 'Try another view or schedule a new follow-up.'}
+            {ownerScope === 'mine'
+              ? 'None of your assigned follow-ups match this status — try Everyone or another status card.'
+              : statusView === 'today'
+                ? 'You are clear for today — a good time to prospect or advance open deals.'
+                : 'Try another status card or schedule a new follow-up.'}
           </p>
           {canCreateFollowUp ? (
             <ErpButton type="button" size="sm" variant="secondary" icon={Plus} onClick={() => setNewFollowUpOpen(true)}>
@@ -511,12 +577,14 @@ export function CrmActivitiesPanel({ scope }: { scope: CrmEngagementScope }) {
   return (
     <div className="crm-engage">
       <header className="crm-engage__header">
-        <div className="crm-engage__header-text">
-          <h2 className="crm-engage__title">
-            <Activity className="h-4 w-4" aria-hidden />
-            Activities
-          </h2>
-          <p className="crm-engage__subtitle">{scopeHint}</p>
+        <div className="crm-engage__header-brand">
+          <div className="crm-engage__icon-plate crm-engage__icon-plate--activity" aria-hidden>
+            <Activity className="h-5 w-5" strokeWidth={2} />
+          </div>
+          <div className="crm-engage__header-text">
+            <h2 className="crm-engage__title">Activities</h2>
+            <p className="crm-engage__subtitle">{scopeHint}</p>
+          </div>
         </div>
         <div className="crm-engage__header-actions">
           <div className="crm-engage-view-toggle" role="group" aria-label="Activity layout">

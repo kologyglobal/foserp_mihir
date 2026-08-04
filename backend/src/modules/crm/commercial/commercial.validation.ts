@@ -78,6 +78,11 @@ export const createInvoiceSchema = z.object({
   lines: z.array(invoiceLineSchema).min(1),
 })
 
+export const updateInvoiceSchema = createInvoiceSchema.partial().extend({
+  companyId: z.string().uuid().optional(),
+  lines: z.array(invoiceLineSchema).min(1).optional(),
+})
+
 export const listProformasQuerySchema = paginationSchema.extend({
   companyId: z.string().uuid().optional(),
   salesOrderId: z.string().uuid().optional(),
@@ -138,6 +143,7 @@ export const markNonAccountingBodySchema = z.object({
 
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>
+export type UpdateInvoiceInput = z.infer<typeof updateInvoiceSchema>
 export type CreateProformaInput = z.infer<typeof createProformaSchema>
 export type UpdateProformaInput = z.infer<typeof updateProformaSchema>
 export type AllocatePaymentsInput = z.infer<typeof allocatePaymentsSchema>

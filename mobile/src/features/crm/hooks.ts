@@ -169,8 +169,8 @@ export function useQuotations(): UseQueryResult<CrmQuotation[], Error> {
   return useQuery({
     queryKey: crmKeys.quotations(),
     queryFn: async () => {
-      const rows = (await crm.listQuotations({ page: '1', limit: '50' })).data ?? []
-      return enrichQuotations(rows)
+      const res = await crm.listQuotations({ page: '1', limit: '50' })
+      return enrichQuotations(res.data)
     },
   })
 }
@@ -187,8 +187,8 @@ export function useSalesOrders(): UseQueryResult<CrmSalesOrder[], Error> {
   return useQuery({
     queryKey: crmKeys.salesOrders(),
     queryFn: async () => {
-      const rows = (await crm.listSalesOrders({ page: '1', limit: '50' })).data ?? []
-      return enrichSalesOrders(rows)
+      const res = await crm.listSalesOrders({ page: '1', limit: '50' })
+      return enrichSalesOrders(res.data)
     },
   })
 }

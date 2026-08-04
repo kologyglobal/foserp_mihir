@@ -199,11 +199,42 @@ export interface CrmQuotation {
   salesOwnerName?: string | null
   salesOrderId?: string | null
   salesOrderNo?: string | null
+  terms?: string | null
+  paymentTerms?: string | null
+  deliveryTerms?: string | null
+  deliveryTime?: string | null
+  opportunityNo?: string | null
+  customerApproval?: string | null
+  locked?: boolean
+  revisionNo?: number
   documents?: Array<{
     id: string
     status?: string
     revisionNo?: number
     totalAmount?: number
+    freightAmount?: number
+    installationAmount?: number
+    customCharges?: number
+    orderDiscountAmount?: number
+    commercialNotes?: string | null
+    technicalNotes?: string | null
+    salesOrderId?: string | null
+    salesOrderNo?: string | null
+    priceLines?: Array<{
+      id?: string
+      productOrItem?: string
+      description?: string
+      itemNameSnapshot?: string | null
+      itemCodeSnapshot?: string | null
+      qty?: number
+      uom?: string
+      unitPrice?: number
+      discountPct?: number
+      taxPct?: number
+      lineTotal?: number
+      isOptional?: boolean
+      [key: string]: unknown
+    }>
     [key: string]: unknown
   }>
   [key: string]: unknown

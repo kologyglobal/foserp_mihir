@@ -102,6 +102,8 @@ const salesInvoiceDraftFieldsSchema = z.object({
   paymentTermsDays: z.number().int().min(0).nullable().optional(),
   placeOfSupply: z.string().max(8).nullable().optional(),
   placeOfSupplyStateCode: z.string().max(8).nullable().optional(),
+  /** Optional override for GST supply calc when LE master state is missing/outdated. */
+  legalEntityStateCode: z.string().max(8).nullable().optional(),
   supplyType: salesInvoiceSupplyTypeSchema.optional(),
   taxTreatment: salesInvoiceTaxTreatmentSchema,
   currencyCode: z.string().max(8).default('INR'),
@@ -139,6 +141,8 @@ export interface NormalizedSalesInvoiceBody {
   dueDate?: string | null
   paymentTermsDays?: number | null
   placeOfSupply: string | null
+  /** Optional override when legal entity master state is missing; not persisted on the invoice row. */
+  legalEntityStateCode?: string | null
   supplyType?: z.infer<typeof salesInvoiceSupplyTypeSchema>
   taxTreatment: z.infer<typeof salesInvoiceTaxTreatmentSchema>
   currencyCode: string

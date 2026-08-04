@@ -2346,6 +2346,8 @@ model CrmProformaInvoiceLine {
   @@map("crm_proforma_invoice_lines")
 }
 
+/// @deprecated Dual-ledger commercial tax invoice. Canonical invoice is SalesInvoice (sales_invoices).
+/// Kept for historical rows / migration redirect via SalesInvoice.legacyCrmTaxInvoiceId. Do not create new rows.
 model CrmTaxInvoice {
   id                    String                        @id @default(uuid())
   tenantId              String
@@ -5095,7 +5097,16 @@ enum SalesInvoiceSourceType {
   SALES_ORDER
   OUTBOUND_DISPATCH
   PROFORMA_INVOICE
+  /// Historical provenance only — new invoices must not use this (unified SI create).
   CRM_TAX_INVOICE
+}
+
+/// Which UI/channel created the canonical SalesInvoice (badge / filter only).
+enum SalesInvoiceCreatedChannel {
+  CRM
+  ACCOUNTING
+  DISPATCH
+  RECURRING
 }
 
 enum SalesInvoiceSupplyType {
@@ -5235,6 +5246,21 @@ model SalesInvoice {
   reversedBy        String?
   reversalReason    String?   @db.VarChar(500)
 
+  /// Commercial metadata (unified CRM + Accounting invoice).
+  quotationId         String?
+  quotationNo         String?                     @db.VarChar(64)
+  proformaInvoiceId   String?
+  proformaNo          String?                     @db.VarChar(64)
+  salesOrderId        String?
+  salesOrderNo        String?                     @db.VarChar(64)
+  deliveryTerms       String?                     @db.VarChar(500)
+  paymentTerms        String?                     @db.VarChar(500)
+  /// Legacy CRM tax invoice UUID for redirects / migration map (not a second ledger).
+  legacyCrmTaxInvoiceId String?                   @unique
+  legacyCrmInvoiceNo    String?                   @db.VarChar(64)
+  createdChannel        SalesInvoiceCreatedChannel @default(ACCOUNTING)
+  commercialMetadata    Json?
+
   createdBy String?
   updatedBy String?
   createdAt DateTime @default(now())
@@ -5269,6 +5295,9 @@ model SalesInvoice {
   @@index([sourceType, sourceDocumentId], map: "sales_inv_src_doc_idx")
   @@index([financialYearId])
   @@index([createdBy])
+  @@index([tenantId, createdChannel])
+  @@index([tenantId, salesOrderId])
+  @@index([tenantId, legacyCrmInvoiceNo])
   @@map("sales_invoices")
 }
 

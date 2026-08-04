@@ -73,11 +73,16 @@ async function main() {
   check('mergeAllowedAction helper', permSrc.includes('mergeAllowedAction'))
   check('useMoneyInPermissions hook', permSrc.includes('useMoneyInPermissions'))
 
-  // Workspace tabs
-  check('Eight workspace tabs', MONEY_IN_WORKSPACE_TABS.length === 8)
+  // Workspace tabs (CRM Tax Invoices convert queue removed after unified SI)
+  check('Workspace tab count', MONEY_IN_WORKSPACE_TABS.length === 11)
   check('Overview tab path', MONEY_IN_WORKSPACE_TABS[0].path === '/accounting/money-in')
+  check('Invoices tab present', MONEY_IN_WORKSPACE_TABS.some((t) => t.path === '/accounting/money-in/invoices'))
   check('Receipts tab present', MONEY_IN_WORKSPACE_TABS.some((t) => t.path === '/accounting/money-in/receipts'))
   check('Credit Notes tab present', MONEY_IN_WORKSPACE_TABS.some((t) => t.path === '/accounting/money-in/credit-notes'))
+  check(
+    'CRM Tax Invoices tab removed',
+    !MONEY_IN_WORKSPACE_TABS.some((t) => t.path === '/accounting/money-in/crm-pending'),
+  )
   check(
     'Receipts tab ordered after Invoices, before Credit Notes',
     MONEY_IN_WORKSPACE_TABS.findIndex((t) => t.path === '/accounting/money-in/invoices') <

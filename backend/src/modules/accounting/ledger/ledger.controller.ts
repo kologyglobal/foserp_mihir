@@ -54,8 +54,8 @@ export const getVoucher = asyncHandler(async (req: Request, res: Response) => {
 export const getVoucherLedger = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const id = getRouteParam(req, 'id')
-  const items = await postingReadService.getVoucherLedger(tenantId, id)
-  return sendSuccess(res, 'voucher ledger fetched', items)
+  const ledger = await postingReadService.getVoucherLedger(tenantId, id)
+  return sendSuccess(res, 'voucher ledger fetched', ledger)
 })
 
 export const listPostingRules = asyncHandler(async (req: Request, res: Response) => {

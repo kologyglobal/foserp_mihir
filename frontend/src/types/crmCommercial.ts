@@ -185,6 +185,7 @@ export interface CrmPaymentAllocation {
 export type CrmCommercialAuditAction =
   | 'receipt_created'
   | 'invoice_created'
+  | 'invoice_updated'
   | 'invoice_posted'
   | 'invoice_cancelled'
   | 'allocation_created'

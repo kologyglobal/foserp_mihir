@@ -1,5 +1,5 @@
 import { isApiMode } from '../config/apiConfig'
-import type { CrmCommercialLine, CrmCommercialSource } from '../types/crmCommercial'
+import type { CrmCommercialLine, CrmCommercialSource, CrmTaxInvoice } from '../types/crmCommercial'
 import type { GstBreakdown } from '../types/invoice'
 import { DEFAULT_GST_RATE } from '../types/invoice'
 import { DEFAULT_PURCHASE_SETUP } from '../data/purchase/purchaseSetupSeed'
@@ -155,6 +155,70 @@ export function resolveTaxInvoiceFromSalesOrder(
       proformaNo: null,
       lines,
       gst: buildGst(lines, customerState),
+    },
+  }
+}
+
+/**
+ * Prefill the create/edit form from an existing draft tax invoice.
+ * For SO-sourced drafts, maxQty is recomputed so this invoice's own qty remains editable.
+ */
+export function prefillFromExistingTaxInvoice(invoice: CrmTaxInvoice): TaxInvoicePrefillResult {
+  if (invoice.status !== 'draft') {
+    return { ok: false, error: 'Only draft invoices can be edited.' }
+  }
+
+  let lines = invoice.lines.map((line, idx) => withTotals({ ...line }, idx + 1))
+
+  if (invoice.source === 'sales_order' && invoice.salesOrderId) {
+    const so = useMrpStore.getState().getSalesOrder(invoice.salesOrderId)
+    if (so) {
+      const master = useMasterStore.getState()
+      const baseLines = buildProformaLinesFromSalesOrder(so, master.items)
+      const others = useCrmCommercialStore
+        .getState()
+        .getInvoicesBySalesOrder(invoice.salesOrderId)
+        .filter((inv) => inv.id !== invoice.id && inv.status !== 'cancelled')
+      const invoicedQtyBySource = new Map<string, number>()
+      for (const inv of others) {
+        for (const line of inv.lines) {
+          const key = line.sourceLineId ?? line.itemCode
+          invoicedQtyBySource.set(key, (invoicedQtyBySource.get(key) ?? 0) + line.qty)
+        }
+      }
+      lines = lines.map((line, idx) => {
+        const sourceKey = line.sourceLineId ?? line.itemCode
+        const base = baseLines.find((b) => b.id === line.sourceLineId || b.itemCode === line.itemCode)
+        const already = invoicedQtyBySource.get(sourceKey) ?? invoicedQtyBySource.get(line.itemCode) ?? 0
+        const maxQty = base ? Math.max(line.qty, base.qty - already) : (line.maxQty ?? line.qty)
+        return withTotals({ ...line, maxQty }, idx + 1)
+      })
+    }
+  }
+
+  return {
+    ok: true,
+    data: {
+      source: invoice.source,
+      customerId: invoice.customerId,
+      customerName: invoice.customerName,
+      customerGstin: invoice.customerGstin,
+      customerState: invoice.customerState,
+      customerAddress: invoice.customerAddress,
+      billingAddress: invoice.billingAddress,
+      shippingAddress: invoice.shippingAddress,
+      paymentTerms: invoice.paymentTerms,
+      deliveryTerms: invoice.deliveryTerms,
+      customerPoNumber: invoice.customerPoNumber,
+      remarks: invoice.remarks,
+      salesOrderId: invoice.salesOrderId,
+      salesOrderNo: invoice.salesOrderNo,
+      quotationId: invoice.quotationId,
+      quotationNo: invoice.quotationNo,
+      proformaInvoiceId: invoice.proformaInvoiceId,
+      proformaNo: invoice.proformaNo,
+      lines,
+      gst: invoice.gst.taxableAmount != null ? buildGst(lines, invoice.customerState) : invoice.gst,
     },
   }
 }

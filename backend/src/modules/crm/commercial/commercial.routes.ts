@@ -14,6 +14,7 @@ import {
   listInvoicesQuerySchema,
   listProformasQuerySchema,
   listReceiptsQuerySchema,
+  updateInvoiceSchema,
   updateProformaSchema,
 } from './commercial.validation.js'
 
@@ -68,6 +69,7 @@ router.post(
 router.get('/invoices', requirePermission('crm.commercial.invoice.view'), validateQuery(listInvoicesQuerySchema), controller.listInvoices)
 router.post('/invoices', requirePermission('crm.commercial.invoice.create'), validateBody(createInvoiceSchema), controller.createInvoice)
 router.get('/invoices/:id', requirePermission('crm.commercial.invoice.view'), validateParams(uuidParamSchema), controller.getInvoice)
+router.patch('/invoices/:id', requirePermission('crm.commercial.invoice.create'), validateParams(uuidParamSchema), validateBody(updateInvoiceSchema), controller.updateInvoice)
 router.post('/invoices/:id/post', requirePermission('crm.commercial.invoice.post'), validateParams(uuidParamSchema), controller.postInvoice)
 router.post('/invoices/:id/cancel', requirePermission('crm.commercial.invoice.cancel'), validateParams(uuidParamSchema), controller.cancelInvoice)
 

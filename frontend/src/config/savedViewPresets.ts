@@ -74,6 +74,85 @@ export const TAX_INVOICE_REGISTER_PRESETS: Record<string, Record<string, string>
   'From Proforma': { search: '', status: '', source: 'proforma', paymentStatus: '', sortBy: 'invoiceDate' },
 }
 
+/** Money In (AR) sales invoice register — Accounting `/accounting/money-in/invoices`. */
+export const MONEY_IN_INVOICE_REGISTER_PRESETS: Record<string, Record<string, string>> = {
+  'My View': {
+    search: '',
+    status: '',
+    settlement: '',
+    source: '',
+    dateFrom: '',
+    dateTo: '',
+    dueFrom: '',
+    dueTo: '',
+    sortBy: 'invoiceDate',
+  },
+  Draft: {
+    search: '',
+    status: 'draft',
+    settlement: '',
+    source: '',
+    dateFrom: '',
+    dateTo: '',
+    dueFrom: '',
+    dueTo: '',
+    sortBy: 'invoiceDate',
+  },
+  'Ready to Post': {
+    search: '',
+    status: 'ready',
+    settlement: '',
+    source: '',
+    dateFrom: '',
+    dateTo: '',
+    dueFrom: '',
+    dueTo: '',
+    sortBy: 'invoiceDate',
+  },
+  'Open Balance': {
+    search: '',
+    status: 'open',
+    settlement: '',
+    source: '',
+    dateFrom: '',
+    dateTo: '',
+    dueFrom: '',
+    dueTo: '',
+    sortBy: 'dueDate',
+  },
+  Overdue: {
+    search: '',
+    status: 'overdue',
+    settlement: '',
+    source: '',
+    dateFrom: '',
+    dateTo: '',
+    dueFrom: '',
+    dueTo: '',
+    sortBy: 'dueDate',
+  },
+  Paid: {
+    search: '',
+    status: 'paid',
+    settlement: '',
+    source: '',
+    dateFrom: '',
+    dateTo: '',
+    dueFrom: '',
+    dueTo: '',
+    sortBy: 'invoiceDate',
+  },
+}
+
+/** Money In (AR) credit note register — Accounting `/accounting/money-in/credit-notes`. */
+export const MONEY_IN_CREDIT_NOTE_REGISTER_PRESETS: Record<string, Record<string, string>> = {
+  'My View': { search: '', status: '', sortBy: 'creditNoteDate' },
+  Draft: { search: '', status: 'DRAFT', sortBy: 'creditNoteDate' },
+  'Pending Approval': { search: '', status: 'PENDING_APPROVAL', sortBy: 'creditNoteDate' },
+  'Ready to Post': { search: '', status: 'READY_TO_POST', sortBy: 'creditNoteDate' },
+  Posted: { search: '', status: 'POSTED', sortBy: 'creditNoteDate' },
+}
+
 export const WORK_ORDER_REGISTER_PRESETS: Record<string, Record<string, string>> = {
   'My View': { search: '', view: '', productItemId: '' },
   Draft: { search: '', view: 'DRAFT', productItemId: '' },

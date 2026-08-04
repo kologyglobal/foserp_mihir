@@ -181,10 +181,11 @@ export async function createVendorInvoiceDraft(req: Request, tenantId: string, i
     input.sourceMode,
   )
 
+  const companyStateForCalc = input.companyStateCode ?? legalEntity.stateCode
   const calcInput = buildCalculationInputFromRequest(
     input.legalEntityId,
     input,
-    legalEntity.stateCode,
+    companyStateForCalc,
     vendor.stateCode ?? vendor.state,
   )
   const result = await calculateVendorInvoice(calcInput, { tenantId, legalEntityId: input.legalEntityId, userId: req.context?.userId })
@@ -200,7 +201,7 @@ export async function createVendorInvoiceDraft(req: Request, tenantId: string, i
     },
     vendor,
     legalEntity.gstin,
-    legalEntity.stateCode,
+    companyStateForCalc,
     financialYear.id,
     draftReference,
     approvalRequired,
@@ -245,10 +246,11 @@ export async function updateVendorInvoiceDraft(
     input.sourceMode,
   )
 
+  const companyStateForCalc = input.companyStateCode ?? legalEntity.stateCode
   const calcInput = buildCalculationInputFromRequest(
     existing.legalEntityId,
     input,
-    legalEntity.stateCode,
+    companyStateForCalc,
     vendor.stateCode ?? vendor.state,
   )
   const result = await calculateVendorInvoice(calcInput, { tenantId, legalEntityId: existing.legalEntityId, userId: req.context?.userId })
@@ -264,7 +266,7 @@ export async function updateVendorInvoiceDraft(
     },
     vendor,
     legalEntity.gstin,
-    legalEntity.stateCode,
+    companyStateForCalc,
     financialYear.id,
     existing.draftReference,
     approvalRequired,

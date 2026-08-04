@@ -9,6 +9,7 @@ import * as repo from '../sales-invoices/sales-invoice.repository.js'
 import {
   buildCalculationInputFromStoredInvoice,
   parseCalculationContext,
+  resolveCalculationContext,
 } from '../sales-invoices/sales-invoice-validation.service.js'
 import { SalesInvoiceNotFoundError, SalesInvoiceNotReadyError } from '../sales-invoices/sales-invoice.errors.js'
 import {
@@ -77,7 +78,10 @@ export async function validateSalesInvoiceForPosting(
   }
 
   const calc = preview.calculation
-  if (amountsDrift(invoice, calc)) {
+  // Trust document amounts when context was reconstructed (migrated CRM rows may
+  // differ slightly from the AR pure calc engine; posting GL uses stored amounts).
+  const hadStoredContext = Boolean(parseCalculationContext(invoice.calculationContext))
+  if (hadStoredContext && amountsDrift(invoice, calc)) {
     throw new SalesInvoiceChangedAfterReadyError()
   }
 
@@ -117,7 +121,7 @@ export async function validateSalesInvoiceForPosting(
   }
 
   const resolvedPeriod = await resolvePostingPeriod(tenantId, invoice.legalEntityId, postingDate)
-  const calculationContext = parseCalculationContext(invoice.calculationContext)
+  const calculationContext = resolveCalculationContext(invoice)
 
   const postingRequest = buildSalesInvoicePostingRequest({
     invoice,

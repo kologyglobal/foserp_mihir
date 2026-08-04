@@ -69,6 +69,8 @@ const PDF_KEEP_TOGETHER_SELECTOR = [
   '.po-print-party',
   '.so-print-totals',
   '.pi-print-totals',
+  '.mi-si-print-doc__footer-grid',
+  '.mi-si-print-doc__totals',
   '.so-print-signatures',
   '.pi-print-signatures',
   '.so-print-doc__footer',
@@ -189,6 +191,7 @@ export async function downloadElementAsPdf(
       // (live viewport) are what keeps the export identical to the preview.
       onclone: (clonedDoc: Document) => {
         const cloned =
+          clonedDoc.querySelector('.mi-si-print-doc') ??
           clonedDoc.querySelector('.so-print-doc') ??
           clonedDoc.querySelector('.rcpt-print-doc') ??
           clonedDoc.querySelector('.pi-print-doc') ??
@@ -197,6 +200,7 @@ export async function downloadElementAsPdf(
           clonedDoc.querySelector('.po-print-doc')
         if (cloned instanceof HTMLElement) {
           applyExactColorAdjust(cloned)
+          cloned.style.overflow = 'visible'
         }
       },
     })

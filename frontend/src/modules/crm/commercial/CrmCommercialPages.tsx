@@ -8,19 +8,17 @@ import {
   ClipboardList,
   Download,
   FileText,
-  MapPin,
   PenLine,
   Plus,
   Printer,
-  Receipt,
   Send,
-  ShoppingBag,
   Trash2,
   XCircle,
   ArrowLeftRight,
 } from 'lucide-react'
 import { OperationalPageShell } from '../../../components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '../../../components/erp/ErpCommandBar'
+import { ErpButton } from '../../../components/erp/ErpButton'
 import { ErpCardSection, ErpFieldGroup, ErpFieldRow } from '../../../components/erp/card-form'
 import { FormActionBar } from '../../../components/erp/FormActionBar'
 import { ErpSegmentedControl } from '../../../components/erp/ErpSegmentedControl'
@@ -51,17 +49,15 @@ import { downloadPaymentReceiptPdf } from '../../../utils/paymentReceiptExport'
 import { notify } from '../../../store/toastStore'
 import { isApiMode } from '../../../config/apiConfig'
 import {
-  apiCancelDraftInvoice,
   apiCreateInvoice,
-  apiPostInvoice,
+  apiGetInvoice,
   apiReceiveProformaPayment,
+  apiUpdateInvoice,
 } from '../../../services/bridges/crmCommercialApiBridge'
 import type { CrmPaymentMode } from '../../../types/crmCommercial'
 import {
   CRM_PAYMENT_MODE_LABELS,
   CRM_TAX_INVOICE_STATUS_LABELS,
-  CRM_INVOICE_PAYMENT_STATUS_LABELS,
-  CRM_TAX_INVOICE_ACCOUNTING_STATUS_LABELS,
   CRM_RECEIPT_MIGRATION_STATUS_LABELS,
 } from '../../../types/crmCommercial'
 import { computeProformaLineTotals } from '../../../utils/proformaInvoiceLines'
@@ -70,6 +66,7 @@ import {
   blankTaxInvoiceLine,
   ensureTaxInvoiceFromProforma,
   ensureTaxInvoiceFromSalesOrder,
+  prefillFromExistingTaxInvoice,
   resolveTaxInvoiceFromCustomer,
   type TaxInvoicePrefill,
 } from '../../../utils/taxInvoicePrefill'
@@ -87,286 +84,7 @@ export function CrmInvoiceListPage() {
   return <SalesTaxInvoiceListPage />
 }
 
-export function CrmInvoiceDetailPage() {
-  const { id } = useParams()
-  const navigate = useNavigate()
-  const invoice = useCrmCommercialStore((s) => (id ? s.invoices.find((i) => i.id === id) : undefined))
-  const postInvoice = useCrmCommercialStore((s) => s.postInvoice)
-  const cancelDraftInvoice = useCrmCommercialStore((s) => s.cancelDraftInvoice)
-  const allAllocations = useCrmCommercialStore((s) => s.allocations)
-  const allocations = useMemo(
-    () => (id ? allAllocations.filter((a) => a.invoiceId === id && !a.reversedAt) : []),
-    [allAllocations, id],
-  )
-  const [toast, setToast] = useState<string | null>(null)
-
-  if (!invoice) {
-    return (
-      <OperationalPageShell title="Invoice not found" breadcrumbs={[{ label: 'Sales', to: '/sales' }, { label: 'Not found' }]}>
-        <Link to="/sales/invoices" className="text-sm font-semibold text-erp-primary">Back to invoices</Link>
-      </OperationalPageShell>
-    )
-  }
-
-  function act(label: string, fn: () => { ok: boolean; error?: string } | Promise<{ ok: boolean; error?: string }>) {
-    void Promise.resolve(fn()).then((r) => {
-      setToast(r.ok ? label : (r.error ?? 'Action failed'))
-    })
-  }
-
-  return (
-    <>
-      <Toast message={toast} />
-      <OperationalPageShell
-        variant="dynamics"
-        badge="Sales"
-        title={invoice.invoiceNo}
-        description={`${invoice.customerName} · ${CRM_TAX_INVOICE_STATUS_LABELS[invoice.status]}`}
-        breadcrumbs={[
-          { label: 'Sales', to: '/sales' },
-          { label: 'Tax Invoices', to: '/sales/invoices' },
-          { label: invoice.invoiceNo },
-        ]}
-        favoritePath={`/sales/invoices/${invoice.id}`}
-        commandBar={(
-          <ErpCommandBar
-            sticky={false}
-            primaryAction={
-              invoice.status === 'draft' && canCrmPermission('crm.commercial.invoice.post')
-                ? {
-                    id: 'post',
-                    label: 'Post Invoice',
-                    icon: Send,
-                    onClick: () =>
-                      act('Invoice posted', () =>
-                        isApiMode() ? apiPostInvoice(invoice.id) : postInvoice(invoice.id),
-                      ),
-                  }
-                : invoice.balanceDue > 0 &&
-                    invoice.status !== 'cancelled' &&
-                    invoice.status !== 'draft' &&
-                    !invoice.salesInvoiceId &&
-                    invoice.accountingStatus !== 'pending_review' &&
-                    invoice.accountingStatus !== 'converted'
-                  ? {
-                      id: 'alloc',
-                      label: 'Allocate Payment',
-                      icon: ArrowLeftRight,
-                      onClick: () => navigate(`/sales/payment-allocation?customerId=${invoice.customerId}&invoiceId=${invoice.id}`),
-                    }
-                  : invoice.salesInvoiceId
-                    ? {
-                        id: 'money-in-pay',
-                        label: 'Record Payment in Money In',
-                        icon: Banknote,
-                        onClick: () =>
-                          navigate(
-                            `/accounting/money-in/receipts/new?customerId=${invoice.customerId}&salesInvoiceId=${invoice.salesInvoiceId}`,
-                          ),
-                      }
-                    : undefined
-            }
-            secondaryActions={[
-              ...(invoice.status === 'draft' && canCrmPermission('crm.commercial.invoice.cancel')
-                ? [{
-                    id: 'cancel',
-                    label: 'Cancel Draft',
-                    icon: XCircle,
-                    onClick: () =>
-                      act('Draft cancelled', () =>
-                        isApiMode() ? apiCancelDraftInvoice(invoice.id) : cancelDraftInvoice(invoice.id),
-                      ),
-                  }]
-                : []),
-              ...(invoice.salesInvoiceId
-                ? [
-                    {
-                      id: 'open-si',
-                      label: 'Open in Money In',
-                      icon: FileText,
-                      onClick: () => navigate(`/accounting/money-in/invoices/${invoice.salesInvoiceId}`),
-                    },
-                  ]
-                : invoice.accountingStatus === 'pending_review'
-                  ? [
-                      {
-                        id: 'crm-pending',
-                        label: 'Accounting Queue',
-                        icon: ClipboardList,
-                        onClick: () => navigate('/accounting/money-in/crm-pending'),
-                      },
-                    ]
-                  : []),
-              { id: 'customer', label: 'Customer 360', icon: FileText, onClick: () => navigate(salesCustomer360Path(invoice.customerId)) },
-            ]}
-          />
-        )}
-        insights={[
-          { label: 'Status', value: CRM_TAX_INVOICE_STATUS_LABELS[invoice.status], accent: invoice.status === 'paid' ? 'green' : 'amber' },
-          { label: 'Total', value: formatCurrency(invoice.gst.grandTotal), accent: 'blue' },
-          { label: 'Paid', value: formatCurrency(invoice.amountPaid), accent: 'green' },
-          { label: 'Balance', value: formatCurrency(invoice.balanceDue), accent: 'amber' },
-        ]}
-      >
-        <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
-          <div className="space-y-4">
-            {(invoice.accountingStatus && invoice.accountingStatus !== 'none') || invoice.salesInvoiceId ? (
-              <ErpCardSection title="Accounting (Money In)">
-                <div className="col-span-2 space-y-2 text-[13px]">
-                  <p className="rounded border border-erp-border bg-erp-surface-muted/40 px-3 py-2 text-erp-muted">
-                    Payment status is controlled by Accounting after conversion. CRM values below are read-only mirrors.
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <div className="text-erp-muted">Accounting status</div>
-                      <div className="font-medium">
-                        {CRM_TAX_INVOICE_ACCOUNTING_STATUS_LABELS[invoice.accountingStatus ?? 'none']}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-erp-muted">Accounting invoice</div>
-                      <div className="font-medium">
-                        {invoice.salesInvoiceId ? (
-                          <TableLink to={`/accounting/money-in/invoices/${invoice.salesInvoiceId}`}>
-                            {invoice.salesInvoiceNumber || invoice.salesInvoiceId}
-                          </TableLink>
-                        ) : (
-                          '—'
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-erp-muted">Amount paid</div>
-                      <div className="font-medium">{formatCurrency(invoice.amountPaid)}</div>
-                    </div>
-                    <div>
-                      <div className="text-erp-muted">Balance due</div>
-                      <div className="font-medium">{formatCurrency(invoice.balanceDue)}</div>
-                    </div>
-                    <div>
-                      <div className="text-erp-muted">Payment status</div>
-                      <div className="font-medium">
-                        {CRM_INVOICE_PAYMENT_STATUS_LABELS[invoice.paymentStatus]}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-erp-muted">Last payment date</div>
-                      <div className="font-medium">
-                        {invoice.lastPaymentDate ? formatDate(invoice.lastPaymentDate) : '—'}
-                      </div>
-                    </div>
-                  </div>
-                  {invoice.salesInvoiceId ? (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <button
-                        type="button"
-                        className="rounded border border-erp-border px-3 py-1.5 text-[12px] font-semibold hover:border-erp-accent"
-                        onClick={() => navigate(`/accounting/money-in/invoices/${invoice.salesInvoiceId}`)}
-                      >
-                        Open in Money In
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-erp-border px-3 py-1.5 text-[12px] font-semibold hover:border-erp-accent"
-                        onClick={() =>
-                          navigate(`/accounting/money-in/receipts/new?customerId=${invoice.customerId}`)
-                        }
-                      >
-                        Record Payment in Money In
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-erp-border px-3 py-1.5 text-[12px] font-semibold hover:border-erp-accent"
-                        onClick={() =>
-                          navigate(`/accounting/money-in/invoices/${invoice.salesInvoiceId}`)
-                        }
-                      >
-                        View Accounting Allocations
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </ErpCardSection>
-            ) : null}
-            <ErpCardSection title="Invoice lines">
-              <div className="col-span-2 overflow-x-auto">
-                <table className="w-full text-left text-[13px]">
-                  <thead>
-                    <tr className="border-b border-erp-border text-erp-muted">
-                      <th className="py-2 pr-3">Item</th>
-                      <th className="py-2 pr-3">Qty</th>
-                      <th className="py-2 pr-3">Rate</th>
-                      <th className="py-2 pr-3">Tax %</th>
-                      <th className="py-2">Line total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoice.lines.map((line) => (
-                      <tr key={line.id} className="border-b border-erp-border/60">
-                        <td className="py-2 pr-3">
-                          <div className="font-medium">{line.itemCode}</div>
-                          <div className="text-[12px] text-erp-muted">{line.description}</div>
-                        </td>
-                        <td className="py-2 pr-3">{line.qty} {line.uom}</td>
-                        <td className="py-2 pr-3">{formatCurrency(line.unitPrice)}</td>
-                        <td className="py-2 pr-3">{line.taxPct}%</td>
-                        <td className="py-2">{formatCurrency(line.lineTotal)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </ErpCardSection>
-            <ErpCardSection title="Allocation history">
-              <div className="col-span-2 space-y-2">
-                {allocations.length === 0 ? (
-                  <p className="text-[13px] text-erp-muted">No allocations yet.</p>
-                ) : (
-                  allocations.map((a) => (
-                    <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-erp-border px-3 py-2 text-[13px]">
-                      <span>
-                        {formatDate(a.allocationDate)} · {a.receiptNo}
-                        {a.reversedAt ? <span className="ml-2 text-erp-danger">(Reversed)</span> : null}
-                      </span>
-                      <span className="font-semibold">{formatCurrency(a.amount)}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </ErpCardSection>
-          </div>
-          <aside className="erp-doc-facts min-w-0 space-y-4">
-            <ErpCardSection title="References">
-              <ErpFieldRow label="Customer" readOnly>
-                <TableLink to={salesCustomer360Path(invoice.customerId)}>{invoice.customerName}</TableLink>
-              </ErpFieldRow>
-              {invoice.salesOrderId ? (
-                <ErpFieldRow label="Sales Order" readOnly>
-                  <TableLink to={`/crm/sales-orders/${invoice.salesOrderId}`}>{invoice.salesOrderNo}</TableLink>
-                </ErpFieldRow>
-              ) : null}
-              {invoice.quotationId ? (
-                <ErpFieldRow label="Quotation" readOnly>
-                  <TableLink to={`/crm/quotations/${invoice.quotationId}`}>{invoice.quotationNo ?? invoice.quotationId}</TableLink>
-                </ErpFieldRow>
-              ) : null}
-              {invoice.proformaInvoiceId ? (
-                <ErpFieldRow label="Proforma" readOnly>
-                  <TableLink to={`/sales/proforma-invoices/${invoice.proformaInvoiceId}`}>{invoice.proformaNo}</TableLink>
-                </ErpFieldRow>
-              ) : null}
-              <ErpFieldRow label="Payment status" readOnly>
-                {CRM_INVOICE_PAYMENT_STATUS_LABELS[invoice.paymentStatus]}
-              </ErpFieldRow>
-              <ErpFieldRow label="Delivery" readOnly>{invoice.deliveryTerms || '—'}</ErpFieldRow>
-              <ErpFieldRow label="Payment terms" readOnly>{invoice.paymentTerms || '—'}</ErpFieldRow>
-            </ErpCardSection>
-          </aside>
-        </div>
-      </OperationalPageShell>
-    </>
-  )
-}
+export { CrmInvoiceDetailPage, CrmInvoicePrintPage } from './CrmTaxInvoiceDetailPage'
 
 function recomputePrefill(prefill: TaxInvoicePrefill, lines: CrmCommercialLine[]): TaxInvoicePrefill {
   const withNos = lines.map((line, idx) => ({ ...line, lineNo: idx + 1 }))
@@ -408,20 +126,29 @@ function patchPrefillLine(
   return recomputePrefill(prefill, lines)
 }
 
-export function CrmInvoiceCreatePage() {
+export function CrmInvoiceEditPage() {
+  return <CrmInvoiceCreatePage mode="edit" />
+}
+
+export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
   const navigate = useNavigate()
+  const { id: editId } = useParams()
   const [params] = useSearchParams()
-  const salesOrderId = params.get('salesOrderId')
-  const proformaId = params.get('proformaId')
-  const customerIdParam = params.get('customerId')
+  const isEdit = mode === 'edit'
+  const salesOrderId = isEdit ? null : params.get('salesOrderId')
+  const proformaId = isEdit ? null : params.get('proformaId')
+  const customerIdParam = isEdit ? null : params.get('customerId')
 
   const createInvoice = useCrmCommercialStore((s) => s.createInvoice)
+  const updateInvoice = useCrmCommercialStore((s) => s.updateInvoice)
+  const getInvoice = useCrmCommercialStore((s) => s.getInvoice)
   const salesOrders = useMrpStore((s) => s.salesOrders)
   const proformas = useProformaInvoiceStore((s) => s.proformaInvoices)
   const customers = useMasterStore((s) => s.customers)
   const getCustomer = useMasterStore((s) => s.getCustomer)
   const getItem = useMasterStore((s) => s.getItem)
   const sellableItems = useSellableItems()
+  const canMutate = canCrmPermission('crm.commercial.invoice.create')
 
   const [sourceType, setSourceType] = useState<InvoiceCreateSource>(
     salesOrderId ? 'sales_order' : proformaId ? 'proforma' : 'direct',
@@ -429,11 +156,17 @@ export function CrmInvoiceCreatePage() {
   const [selectedSo, setSelectedSo] = useState(salesOrderId ?? '')
   const [selectedPi, setSelectedPi] = useState(proformaId ?? '')
   const [selectedCustomer, setSelectedCustomer] = useState(customerIdParam ?? '')
+  const [invoiceMeta, setInvoiceMeta] = useState<{
+    id: string
+    invoiceNo: string
+    invoiceDate: string
+    dueDate: string
+  } | null>(null)
   const [prefill, setPrefill] = useState<TaxInvoicePrefill | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [prefillLoading, setPrefillLoading] = useState(
-    Boolean(salesOrderId || proformaId || customerIdParam),
+    Boolean(isEdit || salesOrderId || proformaId || customerIdParam),
   )
 
   const isDirect = sourceType === 'direct' || prefill?.source === 'direct'
@@ -490,28 +223,32 @@ export function CrmInvoiceCreatePage() {
         : [],
     [prefill],
   )
-  const canCreate = Boolean(
-    prefill &&
+  const canSave = Boolean(
+    canMutate &&
+      prefill &&
       activeLines.length > 0 &&
       activeLines.every((l) => l.itemId || l.itemCode) &&
       !creating &&
-      !prefillLoading,
+      !prefillLoading &&
+      (!isEdit || invoiceMeta),
   )
 
   const sourceDone = Boolean(
-    (sourceType === 'sales_order' && selectedSo && prefill) ||
-      (sourceType === 'proforma' && selectedPi && prefill) ||
-      (sourceType === 'direct' && selectedCustomer && prefill),
+    isEdit
+      ? Boolean(prefill)
+      : (sourceType === 'sales_order' && selectedSo && prefill) ||
+          (sourceType === 'proforma' && selectedPi && prefill) ||
+          (sourceType === 'direct' && selectedCustomer && prefill),
   )
   const linesDone = activeLines.length > 0
   const completionItems = useMemo(
     () => [
-      { id: 'source', label: 'Source document', done: sourceDone },
+      { id: 'source', label: isEdit ? 'Invoice' : 'Source document', done: sourceDone },
       { id: 'customer', label: 'Customer & Commercial', done: Boolean(prefill) },
       { id: 'lines', label: 'Invoice lines', done: linesDone },
-      { id: 'totals', label: 'Tax & Totals', done: canCreate },
+      { id: 'totals', label: 'Tax & Totals', done: canSave },
     ],
-    [sourceDone, prefill, linesDone, canCreate],
+    [sourceDone, prefill, linesDone, canSave, isEdit],
   )
   const completionPercent = Math.round(
     (completionItems.filter((i) => i.done).length / completionItems.length) * 100,
@@ -596,6 +333,7 @@ export function CrmInvoiceCreatePage() {
   }
 
   function switchSourceType(next: InvoiceCreateSource) {
+    if (isEdit) return
     setSourceType(next)
     clearLoaded()
     setError(null)
@@ -603,6 +341,62 @@ export function CrmInvoiceCreatePage() {
     if (next !== 'sales_order') setSelectedSo('')
     if (next !== 'proforma') setSelectedPi('')
     if (next !== 'direct') setSelectedCustomer('')
+  }
+
+  function applyExistingInvoice(invoice: NonNullable<ReturnType<typeof getInvoice>>) {
+    const result = prefillFromExistingTaxInvoice(invoice)
+    if (!result.ok) {
+      setError(result.error)
+      notify.error(result.error)
+      setPrefill(null)
+      setInvoiceMeta(null)
+      return false
+    }
+    const src: InvoiceCreateSource =
+      invoice.source === 'sales_order' || invoice.source === 'proforma' ? invoice.source : 'direct'
+    setSourceType(src)
+    setSelectedSo(invoice.salesOrderId ?? '')
+    setSelectedPi(invoice.proformaInvoiceId ?? '')
+    setSelectedCustomer(invoice.customerId)
+    setInvoiceMeta({
+      id: invoice.id,
+      invoiceNo: invoice.invoiceNo,
+      invoiceDate: invoice.invoiceDate.slice(0, 10),
+      dueDate: invoice.dueDate.slice(0, 10),
+    })
+    setPrefill(result.data)
+    setError(null)
+    return true
+  }
+
+  async function loadExistingInvoice(id: string) {
+    setPrefillLoading(true)
+    setError(null)
+    try {
+      let invoice = getInvoice(id)
+      if (!invoice && isApiMode()) {
+        const res = await apiGetInvoice(id)
+        if (!res.ok || !res.data) {
+          setError(res.error ?? 'Invoice not found')
+          notify.error(res.error ?? 'Invoice not found')
+          return
+        }
+        invoice = res.data
+      }
+      if (!invoice) {
+        setError('Invoice not found')
+        notify.error('Invoice not found')
+        return
+      }
+      if (invoice.status !== 'draft') {
+        notify.error('Only draft invoices can be edited')
+        navigate(`/sales/invoices/${invoice.id}`, { replace: true })
+        return
+      }
+      applyExistingInvoice(invoice)
+    } finally {
+      setPrefillLoading(false)
+    }
   }
 
   function addDirectLine() {
@@ -638,13 +432,22 @@ export function CrmInvoiceCreatePage() {
   }
 
   useEffect(() => {
+    if (isEdit) {
+      if (!editId) {
+        setPrefillLoading(false)
+        setError('Invoice not found')
+        return
+      }
+      void loadExistingInvoice(editId)
+      return
+    }
     if (salesOrderId) void loadFromSalesOrder(salesOrderId)
     else if (proformaId) void loadFromProforma(proformaId)
     else if (customerIdParam) loadFromCustomer(customerIdParam)
     else setPrefillLoading(false)
-    // Initial deep-link preload only.
+    // Initial deep-link / edit preload only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isEdit, editId])
 
   async function persistDraft(
     localCreate: () => { ok: boolean; error?: string; id?: string },
@@ -674,46 +477,84 @@ export function CrmInvoiceCreatePage() {
       shippingAddress: draft.shippingAddress,
       remarks: draft.remarks,
       customerState: draft.customerState,
+      invoiceDate: draft.invoiceDate,
+      dueDate: draft.dueDate,
       lines: draft.lines,
+    })
+  }
+
+  async function persistUpdate(
+    localUpdate: () => { ok: boolean; error?: string; id?: string },
+  ): Promise<{ ok: boolean; error?: string; id?: string }> {
+    if (!isApiMode()) return localUpdate()
+    if (!prefill || !invoiceMeta) return { ok: false, error: 'Invoice is not loaded' }
+    return apiUpdateInvoice(invoiceMeta.id, {
+      customerId: prefill.customerId,
+      source: prefill.source,
+      salesOrderId: prefill.salesOrderId,
+      salesOrderNo: prefill.salesOrderNo,
+      proformaInvoiceId: prefill.proformaInvoiceId,
+      proformaNo: prefill.proformaNo,
+      quotationId: prefill.quotationId,
+      quotationNo: prefill.quotationNo,
+      paymentTerms: prefill.paymentTerms,
+      deliveryTerms: prefill.deliveryTerms,
+      customerPoNumber: prefill.customerPoNumber,
+      billingAddress: prefill.billingAddress,
+      shippingAddress: prefill.shippingAddress,
+      remarks: prefill.remarks,
+      customerState: prefill.customerState,
+      invoiceDate: invoiceMeta.invoiceDate,
+      dueDate: invoiceMeta.dueDate,
+      lines: activeLines,
     })
   }
 
   async function handleCreate() {
     setError(null)
+    if (!canMutate) {
+      setError('You do not have permission to edit tax invoices.')
+      return
+    }
     if (!prefill || activeLines.length === 0) {
       setError(
-        isDirect
-          ? 'Select a customer and add at least one product line before saving.'
-          : 'Select a source document to load the invoice first.',
+        isEdit
+          ? 'Add at least one product line before saving.'
+          : isDirect
+            ? 'Select a customer and add at least one product line before saving.'
+            : 'Select a source document to load the invoice first.',
       )
       return
     }
 
     setCreating(true)
-    const result = await persistDraft(() =>
-      createInvoice({
-        customerId: prefill.customerId,
-        source: prefill.source,
-        salesOrderId: prefill.salesOrderId,
-        proformaInvoiceId: prefill.proformaInvoiceId,
-        quotationId: prefill.quotationId,
-        quotationNo: prefill.quotationNo,
-        paymentTerms: prefill.paymentTerms,
-        deliveryTerms: prefill.deliveryTerms,
-        customerPoNumber: prefill.customerPoNumber,
-        billingAddress: prefill.billingAddress,
-        shippingAddress: prefill.shippingAddress,
-        remarks: prefill.remarks,
-        lines: activeLines,
-      }),
-    )
+    const payload = {
+      customerId: prefill.customerId,
+      source: prefill.source,
+      salesOrderId: prefill.salesOrderId,
+      proformaInvoiceId: prefill.proformaInvoiceId,
+      quotationId: prefill.quotationId,
+      quotationNo: prefill.quotationNo,
+      paymentTerms: prefill.paymentTerms,
+      deliveryTerms: prefill.deliveryTerms,
+      customerPoNumber: prefill.customerPoNumber,
+      billingAddress: prefill.billingAddress,
+      shippingAddress: prefill.shippingAddress,
+      remarks: prefill.remarks,
+      invoiceDate: invoiceMeta?.invoiceDate,
+      dueDate: invoiceMeta?.dueDate,
+      lines: activeLines,
+    }
+    const result = isEdit && invoiceMeta
+      ? await persistUpdate(() => updateInvoice(invoiceMeta.id, payload))
+      : await persistDraft(() => createInvoice(payload))
 
     setCreating(false)
     if (!result.ok || !result.id) {
-      setError(result.error ?? 'Could not create invoice')
+      setError(result.error ?? (isEdit ? 'Could not update invoice' : 'Could not create invoice'))
       return
     }
-    notify.success('Draft invoice created')
+    notify.success(isEdit ? 'Draft invoice updated' : 'Draft invoice created')
     navigate(`/sales/invoices/${result.id}`)
   }
 
@@ -731,19 +572,31 @@ export function CrmInvoiceCreatePage() {
         {
           id: 'ready',
           label: 'Readiness',
-          value: canCreate ? 'Ready to create draft' : sourceDone ? 'Review lines & totals' : 'Select a source',
-          tone: canCreate ? ('success' as const) : ('warning' as const),
+          value: canSave
+            ? isEdit
+              ? 'Ready to save draft'
+              : 'Ready to create draft'
+            : sourceDone
+              ? 'Review lines & totals'
+              : isEdit
+                ? 'Loading invoice…'
+                : 'Select a source',
+          tone: canSave ? ('success' as const) : ('warning' as const),
         },
         {
           id: 'next',
           label: 'Suggested Next',
           value: !sourceDone
-            ? 'Choose SO, proforma, or direct customer'
+            ? isEdit
+              ? 'Open a draft invoice to edit'
+              : 'Choose SO, proforma, or direct customer'
             : !linesDone
               ? isDirect
                 ? 'Add product lines with qty > 0'
                 : 'Set at least one line qty > 0'
-              : 'Create draft invoice',
+              : isEdit
+                ? 'Save draft invoice'
+                : 'Create draft invoice',
           tone: 'info' as const,
         },
       ]}
@@ -755,7 +608,11 @@ export function CrmInvoiceCreatePage() {
           { label: 'Customer', value: prefill?.customerName ?? '—' },
           {
             label: 'Document',
-            value: prefill?.salesOrderNo ?? prefill?.proformaNo ?? (isDirect && prefill ? 'Direct' : '—'),
+            value:
+              invoiceMeta?.invoiceNo ??
+              prefill?.salesOrderNo ??
+              prefill?.proformaNo ??
+              (isDirect && prefill ? 'Direct' : '—'),
           },
           { label: 'Active lines', value: String(activeLines.length) },
           {
@@ -771,32 +628,52 @@ export function CrmInvoiceCreatePage() {
         actions={[
           {
             id: 'create',
-            label: creating ? 'Creating…' : 'Create Draft Invoice',
-            icon: canCreate ? ChevronRight : Plus,
+            label: creating
+              ? isEdit
+                ? 'Saving…'
+                : 'Creating…'
+              : isEdit
+                ? 'Save Draft Invoice'
+                : 'Create Draft Invoice',
+            icon: canSave ? ChevronRight : Plus,
             primary: true,
             onClick: () => void handleCreate(),
-            disabled: !canCreate,
+            disabled: !canSave,
           },
           {
             id: 'list',
-            label: 'Tax Invoice Register',
+            label: isEdit && invoiceMeta ? 'Back to invoice' : 'Tax Invoice Register',
             icon: ClipboardList,
-            onClick: () => navigate('/sales/invoices'),
+            onClick: () =>
+              navigate(isEdit && invoiceMeta ? `/sales/invoices/${invoiceMeta.id}` : '/sales/invoices'),
           },
         ]}
       />
       <p className="mt-3 rounded-lg border border-erp-border bg-erp-surface-alt/60 p-3 text-[12px] text-erp-muted">
-        Direct invoices need only a customer and product lines. From SO/proforma, partial quantities stay available for another invoice. Drafts can be cancelled before posting.
+        {isEdit
+          ? 'Only draft invoices can be edited. Posted invoices are view-only — cancel or create a credit note if corrections are needed after posting.'
+          : 'Direct invoices need only a customer and product lines. From SO/proforma, partial quantities stay available for another invoice. Drafts can be cancelled before posting.'}
       </p>
     </EnterpriseBusinessFactBox>
   )
 
+  if (isEdit && !canMutate) {
+    return (
+      <OperationalPageShell title="Edit Tax Invoice">
+        <p className="text-sm text-erp-muted">You do not have permission to edit tax invoices.</p>
+        <ErpButton type="button" variant="ghost" onClick={() => navigate('/sales/invoices')}>
+          Back to register
+        </ErpButton>
+      </OperationalPageShell>
+    )
+  }
+
   return (
     <SalesCardFormShell
-      title="Create Tax Invoice"
+      title={isEdit ? 'Edit Tax Invoice' : 'Create Tax Invoice'}
       badge="Sales"
       className={`${ENTERPRISE_FORM_CLASS} crm-lead-form-page crm-lead-form-page--zoho crm-sales-invoice-form-page--zoho enterprise-workspace--crm-smart-overview`}
-      recordNo="New"
+      recordNo={invoiceMeta?.invoiceNo ?? 'New'}
       recordTitle={prefill?.customerName ?? 'Tax Invoice'}
       status="Draft"
       statusTone="info"
@@ -807,10 +684,14 @@ export function CrmInvoiceCreatePage() {
             ? 'From Proforma'
             : 'Direct'
       }
-      createdDate={formatDate(new Date().toISOString().slice(0, 10))}
+      createdDate={formatDate(invoiceMeta?.invoiceDate ?? new Date().toISOString().slice(0, 10))}
       company={prefill?.customerName}
-      favoritePath="/sales/invoices/new"
-      breadcrumbs={salesChildBreadcrumbs('Tax Invoices', '/sales/invoices', 'New Invoice')}
+      favoritePath={isEdit && invoiceMeta ? `/sales/invoices/${invoiceMeta.id}/edit` : '/sales/invoices/new'}
+      breadcrumbs={salesChildBreadcrumbs(
+        'Tax Invoices',
+        '/sales/invoices',
+        isEdit ? invoiceMeta?.invoiceNo ?? 'Edit' : 'New Invoice',
+      )}
       validationErrors={error ? [error] : undefined}
       factBox={factBox}
       suppressFactBoxRecord
@@ -827,24 +708,38 @@ export function CrmInvoiceCreatePage() {
         <FormActionBar
           sticky
           busy={creating || prefillLoading}
-          disabled={!canCreate || prefillLoading}
+          disabled={!canSave || prefillLoading}
           disabledReason={
             prefillLoading
-              ? 'Loading source document…'
-              : !sourceDone
-                ? (isDirect ? 'Select a customer' : 'Select a source document')
-                : !linesDone
-                  ? 'Add at least one product line'
-                  : undefined
+              ? isEdit
+                ? 'Loading invoice…'
+                : 'Loading source document…'
+              : !canMutate
+                ? 'You do not have permission to edit tax invoices'
+                : !sourceDone
+                  ? isEdit
+                    ? 'Invoice not loaded'
+                    : isDirect
+                      ? 'Select a customer'
+                      : 'Select a source document'
+                  : !linesDone
+                    ? 'Add at least one product line'
+                    : undefined
           }
           dirty={Boolean(selectedSo || selectedPi || selectedCustomer || prefill)}
-          saveLabel="Create Draft Invoice"
-          onCancel={() => navigate('/sales/invoices')}
+          saveLabel={isEdit ? 'Save Draft Invoice' : 'Create Draft Invoice'}
+          onCancel={() =>
+            navigate(isEdit && invoiceMeta ? `/sales/invoices/${invoiceMeta.id}` : '/sales/invoices')
+          }
           onSave={() => void handleCreate()}
           hint={(
             <span className="text-[12px] text-erp-muted">
               {completionPercent}% complete
-              {prefill ? ` · ${formatCurrency(prefill.gst.grandTotal)} grand total` : ' · Select a source to continue'}
+              {prefill
+                ? ` · ${formatCurrency(prefill.gst.grandTotal)} grand total`
+                : isEdit
+                  ? ' · Loading draft…'
+                  : ' · Select a source to continue'}
             </span>
           )}
         />
@@ -853,7 +748,7 @@ export function CrmInvoiceCreatePage() {
       <div className="erp-form-body crm-lead-form-body crm-sales-invoice-create-body">
         <div className="crm-lead-zoho-layout">
           <nav className="crm-lead-zoho-rail" aria-label="Tax invoice form sections">
-            <p className="crm-lead-zoho-rail__eyebrow">Create Tax Invoice</p>
+            <p className="crm-lead-zoho-rail__eyebrow">{isEdit ? 'Edit Tax Invoice' : 'Create Tax Invoice'}</p>
             <p className="crm-lead-zoho-rail__title">Sections</p>
             <ul className="crm-lead-zoho-rail__list">
               {completionItems.map((item) => (
@@ -889,129 +784,144 @@ export function CrmInvoiceCreatePage() {
           role="status"
           aria-live="polite"
         >
-          Loading source document details…
+          {isEdit ? 'Loading draft invoice…' : 'Loading source document details…'}
         </div>
       ) : null}
       <div id="ti-section-source" className="crm-lead-quick-entry crm-lead-zoho-block">
       <ErpFieldGroup label="Tax Invoice Information" columns={4} className="crm-lead-zoho-section">
-        <ErpFieldRow label="Create from" colSpan={3} horizontal={false}>
-          <ErpSegmentedControl<InvoiceCreateSource>
-            name="Tax invoice create source"
-            value={sourceType}
-            onChange={switchSourceType}
-            options={[
-              {
-                value: 'sales_order',
-                label: 'Sales Order',
-                description: 'Pull remaining qty and terms from a confirmed SO.',
-                icon: ShoppingBag,
-              },
-              {
-                value: 'proforma',
-                label: 'Proforma',
-                description: 'Convert an issued proforma into a tax invoice.',
-                icon: Receipt,
-              },
-              {
-                value: 'direct',
-                label: 'Direct',
-                description: 'Pick a customer and enter product lines — no SO or proforma needed.',
-                icon: Building2,
-              },
-            ]}
-          />
-        </ErpFieldRow>
+        {isEdit ? (
+          <>
+            <ErpFieldRow label="Invoice No." colSpan={2} horizontal={false} readOnly>
+              {invoiceMeta?.invoiceNo ?? '—'}
+            </ErpFieldRow>
+            <ErpFieldRow label="Source" colSpan={2} horizontal={false} readOnly>
+              {sourceType === 'sales_order'
+                ? 'Sales Order'
+                : sourceType === 'proforma'
+                  ? 'Proforma'
+                  : 'Direct'}
+            </ErpFieldRow>
+            {prefill?.salesOrderNo ? (
+              <ErpFieldRow label="Sales Order" colSpan={2} horizontal={false} readOnly>
+                <TableLink to={`/sales/orders/${prefill.salesOrderId}`}>{prefill.salesOrderNo}</TableLink>
+              </ErpFieldRow>
+            ) : null}
+            {prefill?.proformaNo ? (
+              <ErpFieldRow label="Proforma" colSpan={2} horizontal={false} readOnly>
+                <TableLink to={`/sales/proforma-invoices/${prefill.proformaInvoiceId}`}>
+                  {prefill.proformaNo}
+                </TableLink>
+              </ErpFieldRow>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <ErpFieldRow label="Create from" colSpan={2} horizontal={false}>
+              <ErpSegmentedControl<InvoiceCreateSource>
+                variant="pills"
+                name="Tax invoice create source"
+                value={sourceType}
+                onChange={switchSourceType}
+                options={[
+                  { value: 'direct', label: 'Direct' },
+                  { value: 'sales_order', label: 'Sales Order' },
+                  { value: 'proforma', label: 'Proforma' },
+                ]}
+              />
+            </ErpFieldRow>
 
-        {sourceType === 'sales_order' ? (
-          <ErpFieldRow
-            label="Sales Order"
-            required
-            colSpan={3}
-            horizontal={false}
-            hint="Confirmed sales orders only — open drafts are excluded"
-          >
-            <ErpSmartSelect
-              options={soOptions}
-              value={selectedSo}
-              onChange={(v) => {
-                const id = v ?? ''
-                setSelectedSo(id)
-                void loadFromSalesOrder(id, { announceSuccess: true })
-              }}
-              placeholder={prefillLoading ? 'Loading sales order…' : 'Search sales order no, customer…'}
-              appearance="dropdown"
-              emptyMessage="No confirmed sales orders available."
-              disabled={prefillLoading}
-              resolveOrphanLabel={(id) =>
-                prefill?.salesOrderId === id
-                  ? prefill.salesOrderNo ?? undefined
-                  : salesOrders.find((s) => s.id === id)?.salesOrderNo
-              }
-            />
-          </ErpFieldRow>
-        ) : null}
+            {sourceType === 'sales_order' ? (
+              <ErpFieldRow
+                label="Sales Order"
+                required
+                colSpan={3}
+                horizontal={false}
+                hint="Confirmed sales orders only — open drafts are excluded"
+              >
+                <ErpSmartSelect
+                  options={soOptions}
+                  value={selectedSo}
+                  onChange={(v) => {
+                    const id = v ?? ''
+                    setSelectedSo(id)
+                    void loadFromSalesOrder(id, { announceSuccess: true })
+                  }}
+                  placeholder={prefillLoading ? 'Loading sales order…' : 'Search sales order no, customer…'}
+                  appearance="dropdown"
+                  emptyMessage="No confirmed sales orders available."
+                  disabled={prefillLoading}
+                  resolveOrphanLabel={(id) =>
+                    prefill?.salesOrderId === id
+                      ? prefill.salesOrderNo ?? undefined
+                      : salesOrders.find((s) => s.id === id)?.salesOrderNo
+                  }
+                />
+              </ErpFieldRow>
+            ) : null}
 
-        {sourceType === 'proforma' ? (
-          <ErpFieldRow
-            label="Proforma Invoice"
-            required
-            colSpan={3}
-            horizontal={false}
-            hint="Issued proformas only"
-          >
-            <ErpSmartSelect
-              options={piOptions}
-              value={selectedPi}
-              onChange={(v) => {
-                const id = v ?? ''
-                setSelectedPi(id)
-                void loadFromProforma(id, { announceSuccess: true })
-              }}
-              placeholder={prefillLoading ? 'Loading proforma…' : 'Search proforma no, customer…'}
-              appearance="dropdown"
-              emptyMessage="No issued proformas available."
-              disabled={prefillLoading}
-              resolveOrphanLabel={(id) =>
-                prefill?.proformaInvoiceId === id
-                  ? prefill.proformaNo ?? undefined
-                  : proformas.find((p) => p.id === id)?.proformaNo
-              }
-            />
-          </ErpFieldRow>
-        ) : null}
+            {sourceType === 'proforma' ? (
+              <ErpFieldRow
+                label="Proforma Invoice"
+                required
+                colSpan={3}
+                horizontal={false}
+                hint="Issued proformas only"
+              >
+                <ErpSmartSelect
+                  options={piOptions}
+                  value={selectedPi}
+                  onChange={(v) => {
+                    const id = v ?? ''
+                    setSelectedPi(id)
+                    void loadFromProforma(id, { announceSuccess: true })
+                  }}
+                  placeholder={prefillLoading ? 'Loading proforma…' : 'Search proforma no, customer…'}
+                  appearance="dropdown"
+                  emptyMessage="No issued proformas available."
+                  disabled={prefillLoading}
+                  resolveOrphanLabel={(id) =>
+                    prefill?.proformaInvoiceId === id
+                      ? prefill.proformaNo ?? undefined
+                      : proformas.find((p) => p.id === id)?.proformaNo
+                  }
+                />
+              </ErpFieldRow>
+            ) : null}
 
-        {sourceType === 'direct' ? (
-          <ErpFieldRow
-            label="Customer"
-            required
-            colSpan={3}
-            horizontal={false}
-            hint="Loads bill-to details from the customer master. Add product lines below."
-          >
-            <ErpSmartSelect
-              options={customerOptions}
-              value={selectedCustomer}
-              onChange={(v) => {
-                const id = v ?? ''
-                setSelectedCustomer(id)
-                loadFromCustomer(id)
-              }}
-              placeholder="Search customers…"
-              appearance="dropdown"
-            />
-          </ErpFieldRow>
-        ) : null}
+            {sourceType === 'direct' ? (
+              <ErpFieldRow
+                label="Customer"
+                required
+                colSpan={3}
+                horizontal={false}
+                hint="Loads bill-to details from the customer master. Add product lines below."
+              >
+                <ErpSmartSelect
+                  options={customerOptions}
+                  value={selectedCustomer}
+                  onChange={(v) => {
+                    const id = v ?? ''
+                    setSelectedCustomer(id)
+                    loadFromCustomer(id)
+                  }}
+                  placeholder="Search customers…"
+                  appearance="dropdown"
+                />
+              </ErpFieldRow>
+            ) : null}
 
-        {!prefill && !error && !prefillLoading ? (
-          <div className="col-span-full">
-            <p className="pi-create-mode-hint">
-              <PenLine className="h-4 w-4 shrink-0" aria-hidden />
-              {sourceType === 'direct'
-                ? 'Select a customer to start a direct tax invoice, then add product lines.'
-                : 'Select a source above to auto-load customer, taxes, addresses, and invoice lines.'}
-            </p>
-          </div>
-        ) : null}
+            {!prefill && !error && !prefillLoading ? (
+              <div className="col-span-full">
+                <p className="pi-create-mode-hint">
+                  <PenLine className="h-4 w-4 shrink-0" aria-hidden />
+                  {sourceType === 'direct'
+                    ? 'Select a customer to start a direct tax invoice, then add product lines.'
+                    : 'Select a source above to auto-load customer, taxes, addresses, and invoice lines.'}
+                </p>
+              </div>
+            ) : null}
+          </>
+        )}
       </ErpFieldGroup>
       </div>
 
@@ -1022,127 +932,137 @@ export function CrmInvoiceCreatePage() {
             title="Customer & commercial"
             subtitle={
               isDirect
-                ? 'Bill-to account from customer master. Edit commercial terms as needed.'
-                : 'Bill-to account and commercial terms inherited from the source document.'
+                ? 'Bill-to party, commercial terms, and addresses.'
+                : 'Inherited from the source document — adjust terms if needed.'
             }
             icon={Building2}
             accent="teal"
             collapsible
             defaultOpen
-            columns={4}
+            columns={1}
+            className="ti-create-commercial"
           >
-            <aside className="so-customer-card col-span-full" aria-label="Selected customer">
-              <div className="so-customer-card__header">
-                <div className="so-customer-card__avatar" aria-hidden>
+            <div className="ti-create-commercial__body col-span-full">
+              <aside className="ti-create-party" aria-label="Selected customer">
+                <div className="ti-create-party__avatar" aria-hidden>
                   {prefill.customerName
                     .split(/\s+/)
+                    .filter(Boolean)
                     .slice(0, 2)
                     .map((w) => w[0])
                     .join('')
                     .toUpperCase()}
                 </div>
-                <div className="so-customer-card__identity">
-                  <div className="so-customer-card__title-row">
-                    <h3 className="so-customer-card__name">{prefill.customerName}</h3>
+                <div className="ti-create-party__main">
+                  <div className="ti-create-party__title-row">
+                    <h3 className="ti-create-party__name">{prefill.customerName}</h3>
                     <TableLink
                       to={salesCustomer360Path(prefill.customerId)}
-                      className="so-customer-card__360"
+                      className="ti-create-party__360"
                     >
                       Customer 360
                     </TableLink>
                   </div>
-                  <dl className="so-customer-card__facts">
-                    <div className="so-customer-card__fact">
-                      <dt>GSTIN</dt>
-                      <dd>{prefill.customerGstin || '—'}</dd>
+                  <div className="ti-create-party__chips">
+                    <span className="ti-create-party__chip">
+                      <span className="ti-create-party__chip-label">GSTIN</span>
+                      {prefill.customerGstin || '—'}
+                    </span>
+                    <span className="ti-create-party__chip">
+                      <span className="ti-create-party__chip-label">Place of supply</span>
+                      {prefill.customerState || '—'}
+                    </span>
+                    {prefill.salesOrderNo ? (
+                      <span className="ti-create-party__chip">
+                        <span className="ti-create-party__chip-label">SO</span>
+                        <TableLink to={`/sales/orders/${prefill.salesOrderId}`}>
+                          {prefill.salesOrderNo}
+                        </TableLink>
+                      </span>
+                    ) : null}
+                    {prefill.proformaNo ? (
+                      <span className="ti-create-party__chip">
+                        <span className="ti-create-party__chip-label">PI</span>
+                        <TableLink to={`/sales/proforma-invoices/${prefill.proformaInvoiceId}`}>
+                          {prefill.proformaNo}
+                        </TableLink>
+                      </span>
+                    ) : null}
+                    {prefill.quotationNo ? (
+                      <span className="ti-create-party__chip">
+                        <span className="ti-create-party__chip-label">Quote</span>
+                        {prefill.quotationNo}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </aside>
+
+              <div className="ti-create-commercial__grid">
+                {isDirect ? (
+                  <>
+                    <label className="ti-create-field">
+                      <span className="ti-create-field__label">Payment terms</span>
+                      <CommercialTermSelect
+                        termType="payment"
+                        value={prefill.paymentTerms}
+                        onChange={(v) => setPrefill({ ...prefill, paymentTerms: v })}
+                        placeholder="Select payment terms"
+                      />
+                    </label>
+                    <label className="ti-create-field">
+                      <span className="ti-create-field__label">Delivery terms</span>
+                      <CommercialTermSelect
+                        termType="delivery"
+                        value={prefill.deliveryTerms}
+                        onChange={(v) => setPrefill({ ...prefill, deliveryTerms: v })}
+                        placeholder="Select delivery terms"
+                      />
+                    </label>
+                    <label className="ti-create-field">
+                      <span className="ti-create-field__label">Customer PO</span>
+                      <Input
+                        value={prefill.customerPoNumber ?? ''}
+                        onChange={(e) =>
+                          setPrefill({ ...prefill, customerPoNumber: e.target.value || null })
+                        }
+                        placeholder="Optional PO reference"
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <div className="ti-create-field ti-create-field--readonly">
+                      <span className="ti-create-field__label">Payment terms</span>
+                      <span className="ti-create-field__value">{prefill.paymentTerms || '—'}</span>
                     </div>
-                    <div className="so-customer-card__fact">
-                      <dt>Place of supply</dt>
-                      <dd>{prefill.customerState || '—'}</dd>
+                    <div className="ti-create-field ti-create-field--readonly">
+                      <span className="ti-create-field__label">Delivery terms</span>
+                      <span className="ti-create-field__value">{prefill.deliveryTerms || '—'}</span>
                     </div>
-                    <div className="so-customer-card__fact">
-                      <dt>Customer PO</dt>
-                      <dd>
-                        {isDirect ? (
-                          <Input
-                            value={prefill.customerPoNumber ?? ''}
-                            onChange={(e) =>
-                              setPrefill({ ...prefill, customerPoNumber: e.target.value || null })
-                            }
-                            placeholder="Optional PO reference"
-                          />
-                        ) : (
-                          prefill.customerPoNumber || '—'
-                        )}
-                      </dd>
+                    <div className="ti-create-field ti-create-field--readonly">
+                      <span className="ti-create-field__label">Customer PO</span>
+                      <span className="ti-create-field__value">{prefill.customerPoNumber || '—'}</span>
                     </div>
-                  </dl>
+                  </>
+                )}
+              </div>
+
+              <div className="ti-create-addresses">
+                <div className="ti-create-address">
+                  <p className="ti-create-address__label">Bill to</p>
+                  <p className="ti-create-address__body">
+                    {prefill.billingAddress || prefill.customerAddress || '—'}
+                  </p>
+                </div>
+                <div className="ti-create-address">
+                  <p className="ti-create-address__label">Ship to</p>
+                  <p className="ti-create-address__body">
+                    {prefill.shippingAddress || prefill.customerAddress || '—'}
+                  </p>
                 </div>
               </div>
-            </aside>
-
-            {isDirect ? (
-              <>
-                <ErpFieldRow label="Payment terms" horizontal={false}>
-                  <CommercialTermSelect
-                    termType="payment"
-                    value={prefill.paymentTerms}
-                    onChange={(v) => setPrefill({ ...prefill, paymentTerms: v })}
-                    placeholder="Select payment terms"
-                  />
-                </ErpFieldRow>
-                <ErpFieldRow label="Delivery terms" horizontal={false}>
-                  <CommercialTermSelect
-                    termType="delivery"
-                    value={prefill.deliveryTerms}
-                    onChange={(v) => setPrefill({ ...prefill, deliveryTerms: v })}
-                    placeholder="Select delivery terms"
-                  />
-                </ErpFieldRow>
-              </>
-            ) : (
-              <>
-                <ErpFieldRow label="Payment terms" readOnly>{prefill.paymentTerms || '—'}</ErpFieldRow>
-                <ErpFieldRow label="Delivery terms" readOnly>{prefill.deliveryTerms || '—'}</ErpFieldRow>
-              </>
-            )}
-            {prefill.salesOrderNo ? (
-              <ErpFieldRow label="Sales Order" readOnly>
-                <TableLink to={`/sales/orders/${prefill.salesOrderId}`}>{prefill.salesOrderNo}</TableLink>
-              </ErpFieldRow>
-            ) : null}
-            {prefill.proformaNo ? (
-              <ErpFieldRow label="Proforma" readOnly>
-                <TableLink to={`/sales/proforma-invoices/${prefill.proformaInvoiceId}`}>{prefill.proformaNo}</TableLink>
-              </ErpFieldRow>
-            ) : null}
-            {prefill.quotationNo ? (
-              <ErpFieldRow label="Quotation Number (Reference)" readOnly>
-                {prefill.quotationNo}
-              </ErpFieldRow>
-            ) : null}
-          </ErpCardSection>
-          </div>
-
-          <div id="ti-section-addresses">
-          <ErpCardSection
-            title="Addresses"
-            subtitle="Billing and shipping addresses from the source document."
-            icon={MapPin}
-            accent="slate"
-            collapsible
-            defaultOpen
-          >
-            <ErpFieldRow label="Billing" readOnly colSpan={2} horizontal={false}>
-              <p className="rounded-lg border border-erp-border bg-erp-surface-alt/40 px-3 py-2.5 text-[13px] text-erp-text whitespace-pre-wrap">
-                {prefill.billingAddress || prefill.customerAddress || '—'}
-              </p>
-            </ErpFieldRow>
-            <ErpFieldRow label="Shipping" readOnly colSpan={2} horizontal={false}>
-              <p className="rounded-lg border border-erp-border bg-erp-surface-alt/40 px-3 py-2.5 text-[13px] text-erp-text whitespace-pre-wrap">
-                {prefill.shippingAddress || '—'}
-              </p>
-            </ErpFieldRow>
+            </div>
           </ErpCardSection>
           </div>
 
@@ -1483,45 +1403,136 @@ export function ProformaReceivePaymentPage() {
         { label: 'Balance', value: formatCurrency(summary.balanceAmount), accent: 'amber' },
       ]}
     >
-      <ErpCardSection title="Payment receipt">
-        <ErpFieldRow label="Receipt Number" readOnly>Auto-generated on save</ErpFieldRow>
-        <ErpFieldRow label="Receipt Date" required>
-          <Input type="date" value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} />
-        </ErpFieldRow>
-        <ErpFieldRow label="Customer" readOnly>{proforma.customerName}</ErpFieldRow>
-        <ErpFieldRow label="Proforma Reference" readOnly>{proforma.proformaNo}</ErpFieldRow>
-        <ErpFieldRow label="Payment Mode" required>
-          <Select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as CrmPaymentMode | '')}>
-            <option value="">{SELECT_PLACEHOLDER}</option>
-            {(Object.keys(CRM_PAYMENT_MODE_LABELS) as CrmPaymentMode[]).map((m) => (
-              <option key={m} value={m}>{CRM_PAYMENT_MODE_LABELS[m]}</option>
-            ))}
-          </Select>
-        </ErpFieldRow>
-        <ErpFieldRow label="Transaction Reference">
-          <Input value={transactionRef} onChange={(e) => setTransactionRef(e.target.value)} placeholder="UTR / Cheque / UPI ref" />
-        </ErpFieldRow>
-        <ErpFieldRow label="Amount Received" required>
-          <Input
-            type="number"
-            min={0}
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder={String(summary.balanceAmount)}
-          />
-        </ErpFieldRow>
-        <ErpFieldRow label="Remarks">
-          <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} />
-        </ErpFieldRow>
-        <ErpFieldRow label="Attachment (optional)">
-          <Input
-            type="file"
-            onChange={(e) => setAttachmentName(e.target.files?.[0]?.name ?? null)}
-          />
-          {attachmentName ? <span className="text-[12px] text-erp-muted">{attachmentName}</span> : null}
-        </ErpFieldRow>
-        {error ? <p className="col-span-2 text-[13px] text-erp-danger">{error}</p> : null}
+      <ErpCardSection
+        title="Payment receipt"
+        subtitle="Record the customer remittance against this proforma."
+        columns={1}
+        className="pi-receive-section"
+      >
+        <div className="pi-receive col-span-full">
+          <aside className="pi-receive-context" aria-label="Payment context">
+            <div className="pi-receive-context__avatar" aria-hidden>
+              {proforma.customerName
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((w) => w[0])
+                .join('')
+                .toUpperCase()}
+            </div>
+            <div className="pi-receive-context__main">
+              <div className="pi-receive-context__title-row">
+                <h3 className="pi-receive-context__name">{proforma.customerName}</h3>
+                <TableLink
+                  to={salesCustomer360Path(proforma.customerId)}
+                  className="pi-receive-context__360"
+                >
+                  Customer 360
+                </TableLink>
+              </div>
+              <div className="pi-receive-context__chips">
+                <span className="pi-receive-chip">
+                  <span className="pi-receive-chip__label">Proforma</span>
+                  <TableLink to={`/sales/proforma-invoices/${proforma.id}`}>
+                    {proforma.proformaNo}
+                  </TableLink>
+                </span>
+                {proforma.salesOrderNo ? (
+                  <span className="pi-receive-chip">
+                    <span className="pi-receive-chip__label">SO</span>
+                    {proforma.salesOrderId ? (
+                      <TableLink to={`/sales/orders/${proforma.salesOrderId}`}>
+                        {proforma.salesOrderNo}
+                      </TableLink>
+                    ) : (
+                      proforma.salesOrderNo
+                    )}
+                  </span>
+                ) : null}
+                <span className="pi-receive-chip pi-receive-chip--balance">
+                  <span className="pi-receive-chip__label">Balance</span>
+                  {formatCurrency(summary.balanceAmount)}
+                </span>
+              </div>
+            </div>
+          </aside>
+
+          <section className="pi-receive-group" aria-labelledby="pi-receive-identity">
+            <h4 id="pi-receive-identity" className="pi-receive-group__title">Receipt identity</h4>
+            <div className="pi-receive-grid">
+              <div className="pi-receive-field pi-receive-field--readonly">
+                <span className="pi-receive-field__label">Receipt number</span>
+                <span className="pi-receive-field__value">Auto-generated on save</span>
+              </div>
+              <label className="pi-receive-field">
+                <span className="pi-receive-field__label">
+                  Receipt date <span className="pi-receive-field__req" aria-hidden>*</span>
+                </span>
+                <Input type="date" value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} />
+              </label>
+            </div>
+          </section>
+
+          <section className="pi-receive-group" aria-labelledby="pi-receive-payment">
+            <h4 id="pi-receive-payment" className="pi-receive-group__title">Payment</h4>
+            <div className="pi-receive-grid">
+              <label className="pi-receive-field">
+                <span className="pi-receive-field__label">
+                  Payment mode <span className="pi-receive-field__req" aria-hidden>*</span>
+                </span>
+                <Select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as CrmPaymentMode | '')}>
+                  <option value="">{SELECT_PLACEHOLDER}</option>
+                  {(Object.keys(CRM_PAYMENT_MODE_LABELS) as CrmPaymentMode[]).map((m) => (
+                    <option key={m} value={m}>{CRM_PAYMENT_MODE_LABELS[m]}</option>
+                  ))}
+                </Select>
+              </label>
+              <label className="pi-receive-field">
+                <span className="pi-receive-field__label">
+                  Amount received <span className="pi-receive-field__req" aria-hidden>*</span>
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder={String(summary.balanceAmount)}
+                />
+              </label>
+              <label className="pi-receive-field pi-receive-field--wide">
+                <span className="pi-receive-field__label">Transaction reference</span>
+                <Input
+                  value={transactionRef}
+                  onChange={(e) => setTransactionRef(e.target.value)}
+                  placeholder="UTR / Cheque / UPI ref"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="pi-receive-group" aria-labelledby="pi-receive-notes">
+            <h4 id="pi-receive-notes" className="pi-receive-group__title">Notes &amp; attachment</h4>
+            <div className="pi-receive-grid">
+              <label className="pi-receive-field pi-receive-field--wide">
+                <span className="pi-receive-field__label">Remarks</span>
+                <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} />
+              </label>
+              <label className="pi-receive-field pi-receive-field--wide">
+                <span className="pi-receive-field__label">Attachment (optional)</span>
+                <Input
+                  type="file"
+                  onChange={(e) => setAttachmentName(e.target.files?.[0]?.name ?? null)}
+                />
+                {attachmentName ? (
+                  <span className="pi-receive-field__hint">{attachmentName}</span>
+                ) : null}
+              </label>
+            </div>
+          </section>
+
+          {error ? <p className="pi-receive-error" role="alert">{error}</p> : null}
+        </div>
       </ErpCardSection>
     </OperationalPageShell>
   )

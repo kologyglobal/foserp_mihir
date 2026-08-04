@@ -85,9 +85,20 @@ export async function fetchCommercialInvoices(params?: Record<string, string | u
   return apiRequest<CrmTaxInvoice[]>(`${tenantPath('/crm/commercial/invoices')}${buildQuery(params)}`)
 }
 
+export async function fetchCommercialInvoice(id: string) {
+  return apiRequest<CrmTaxInvoice>(tenantPath(`/crm/commercial/invoices/${id}`))
+}
+
 export async function createCommercialInvoice(body: Record<string, unknown>) {
   return apiRequest<CrmTaxInvoice>(tenantPath('/crm/commercial/invoices'), {
     method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updateCommercialInvoice(id: string, body: Record<string, unknown>) {
+  return apiRequest<CrmTaxInvoice>(tenantPath(`/crm/commercial/invoices/${id}`), {
+    method: 'PATCH',
     body: JSON.stringify(body),
   })
 }

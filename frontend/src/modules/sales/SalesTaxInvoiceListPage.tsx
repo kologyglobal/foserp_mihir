@@ -9,6 +9,7 @@ import {
   Download,
   Eye,
   FileText,
+  Pencil,
   Plus,
   Save,
   ShoppingCart,
@@ -182,6 +183,7 @@ export function SalesTaxInvoiceListPage() {
   const getCustomer = useMasterStore((s) => s.getCustomer)
   const densityClass = useDensityClass()
   const canCreate = canCrmPermission('crm.commercial.invoice.create')
+  const canEdit = canCreate
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -558,6 +560,14 @@ export function SalesTaxInvoiceListPage() {
                 icon: Eye,
                 onClick: () => navigate(`/sales/invoices/${row.original.id}`),
               },
+              ...(canEdit && row.original.status === 'draft'
+                ? [{
+                    id: 'edit',
+                    label: 'Edit',
+                    icon: Pencil,
+                    onClick: () => navigate(`/sales/invoices/${row.original.id}/edit`),
+                  }]
+                : []),
               ...(isOpenBalance(row.original)
                 ? [{
                     id: 'alloc',
@@ -572,7 +582,7 @@ export function SalesTaxInvoiceListPage() {
         ),
       },
     ],
-    [getCustomer, navigate],
+    [canEdit, getCustomer, navigate],
   )
 
   return (

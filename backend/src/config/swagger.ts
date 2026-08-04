@@ -2,7 +2,7 @@
  * OpenAPI 3.0 spec for Swagger UI at `/api/docs` (development).
  * Hand-written paths below are authoritative; missing routes are filled from
  * `swagger.generated-paths.ts` (run `npm run swagger:generate`).
- * Last aligned: 2026-07-31 — OpenAPI 1.6.0 + maintenance V1.1/V2 + HRMS + full stub regen.
+ * Last aligned: 2026-08-03 — OpenAPI 1.7.0 + KB / notifications / mobile device-tokens mounts + full stub regen.
  */
 
 import { generatedSwaggerPaths, generatedSwaggerTags } from './swagger.generated-paths.js'
@@ -276,23 +276,23 @@ export const swaggerSpecDraft = {
   openapi: '3.0.3',
   info: {
     title: 'FOS ERP API',
-    version: '1.6.0',
+    version: '1.7.0',
     description: [
-      'Multi-tenant ERP backend — Auth, RBAC, CRM, masters, lookups, imports/exports, finance, manufacturing, maintenance, HRMS, purchase, inventory (incl. valuation costing), quality, dispatch, gate, executive, and ops reports.',
+      'Multi-tenant ERP backend — Auth, RBAC, CRM, masters, lookups, imports/exports, finance, manufacturing, maintenance, knowledge base (KB), HRMS, purchase, inventory (incl. valuation costing), quality, dispatch, gate, notifications, mobile device tokens, executive, and ops reports.',
       '',
       '**Tenant routes:** prefer `/api/v1/t/{tenantSlug}/…` (frontend default). Equivalent UUID form: `/api/v1/tenants/{tenantId}/…`.',
       '',
       '**Auth:** `Authorization: Bearer <accessToken>`. Never send `tenantId` in request bodies.',
       '',
-      '**Shipped (API):** Auth, users/roles/security/modules, CRM (+ quotations/templates/sales orders/commercial), masters, finance (journals, AR/AP, bank & cash, period close),',
-      'manufacturing (setup → WO → materials → job work → corrections → plans → costing flag-gated), maintenance (breakdown + machine health + preventive), HRMS (employees → payroll → statutory → loans),',
+      '**Shipped (API):** Auth, users/roles/security/modules, CRM (+ quotations/templates/sales orders/commercial), notifications + mobile device-tokens, masters, finance (journals, AR/AP, bank & cash, period close),',
+      'manufacturing (setup → WO → materials → job work → corrections → plans → costing flag-gated), maintenance (breakdown + machine health + preventive), knowledge base (`/kb` documents, search, chat, copilot), HRMS (employees → payroll → statutory → loans → exit/F&F),',
       'inventory + inventory costing (FIFO/average/standard/specific), purchase (PR→PO→GRN→invoice),',
       'quality inspections/plans, dispatch fulfilment/pick/pack/challan, gate, executive dashboard, ops reports / exceptions.',
       '',
       '**Docs note:** Paths with description “Auto-generated stub…” were produced from Express route modules.',
       'Hand-written entries in this file override stubs for the same method+path. Regenerate stubs with `npm run swagger:generate`.',
       '',
-      '**Aligned:** 2026-07-31 — OpenAPI 1.6.0 refreshes stubs for all mounted modules (incl. maintenance + HRMS) and expands hand-written Maintenance / Money In CRM bridge paths.',
+      '**Aligned:** 2026-08-03 — OpenAPI 1.7.0 adds KB / notifications / mobile mounts to the path generator and regenerates stubs for all mounted Express routers.',
     ].join('\n'),
   },
   servers: [{ url: '/api/v1', description: 'API v1' }],
@@ -352,6 +352,9 @@ export const swaggerSpecDraft = {
     { name: 'Purchase Requisitions' },
     { name: 'Maintenance' },
     { name: 'HRMS' },
+    { name: 'Knowledge Base' },
+    { name: 'Notifications' },
+    { name: 'Mobile Device Tokens' },
   ],
   components: {
     securitySchemes: {

@@ -147,6 +147,17 @@ export interface SalesInvoiceDto {
   } | null
   metaWarnings?: Array<{ code: string; message: string }>
   receivableOpenItemId?: string | null
+  quotationId?: string | null
+  quotationNo?: string | null
+  proformaInvoiceId?: string | null
+  proformaNo?: string | null
+  salesOrderId?: string | null
+  salesOrderNo?: string | null
+  deliveryTerms?: string | null
+  paymentTerms?: string | null
+  legacyCrmTaxInvoiceId?: string | null
+  legacyCrmInvoiceNo?: string | null
+  createdChannel?: 'CRM' | 'ACCOUNTING' | 'DISPATCH' | 'RECURRING'
 }
 
 export interface SalesInvoiceListItemDto extends Omit<SalesInvoiceDto, 'lines' | 'validationSummary'> {}

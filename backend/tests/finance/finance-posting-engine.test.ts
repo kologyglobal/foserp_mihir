@@ -533,7 +533,10 @@ describe.skipIf(!dbAvailable)('Finance posting engine (Phase 2B)', () => {
       .get(`/api/v1/t/${fx.slug}/accounting/vouchers/${posted.voucherId}/ledger`)
       .set('Authorization', `Bearer ${fx.token}`)
     expect(glRes.status).toBe(200)
-    expect(glRes.body.data).toHaveLength(2)
+    expect(glRes.body.data.voucher.id).toBe(posted.voucherId)
+    expect(glRes.body.data.entries).toHaveLength(2)
+    expect(glRes.body.data.entries[0].account?.code).toBeTruthy()
+    expect(glRes.body.data.entries[0].debitAmount).toBeDefined()
 
     const eventRes = await request(app)
       .get(`/api/v1/t/${fx.slug}/accounting/posting-events/${posted.postingEventId}`)

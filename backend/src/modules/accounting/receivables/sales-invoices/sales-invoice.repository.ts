@@ -183,12 +183,27 @@ export async function createSalesInvoiceDraft(
   options?: {
     sourceDocumentSnapshot?: unknown
     sourceLinks?: CreateSalesInvoiceSourceLinkInput[]
+    commercial?: {
+      quotationId?: string | null
+      quotationNo?: string | null
+      proformaInvoiceId?: string | null
+      proformaNo?: string | null
+      salesOrderId?: string | null
+      salesOrderNo?: string | null
+      deliveryTerms?: string | null
+      paymentTerms?: string | null
+      legacyCrmTaxInvoiceId?: string | null
+      legacyCrmInvoiceNo?: string | null
+      createdChannel?: 'CRM' | 'ACCOUNTING' | 'DISPATCH' | 'RECURRING'
+      commercialMetadata?: Prisma.InputJsonValue | null
+    }
   },
 ): Promise<SalesInvoiceWithLines> {
   await getLegalEntityOrThrow(tenantId, input.legalEntityId)
   const { financialYear } = await resolvePeriodByDate(tenantId, input.legalEntityId, input.postingDate)
   const draftReference = await generateUniqueDraftReference(input.legalEntityId)
   const context = buildCalculationContextFromRequest(input)
+  const commercial = options?.commercial
 
   const outboundLineIds = (options?.sourceLinks ?? [])
     .filter((l) => l.sourceType === 'OUTBOUND_DISPATCH' && l.sourceLineId)
@@ -237,6 +252,18 @@ export async function createSalesInvoiceDraft(
         postingEventId: null,
         createdBy: createdBy ?? null,
         updatedBy: createdBy ?? null,
+        quotationId: commercial?.quotationId ?? null,
+        quotationNo: commercial?.quotationNo ?? null,
+        proformaInvoiceId: commercial?.proformaInvoiceId ?? null,
+        proformaNo: commercial?.proformaNo ?? null,
+        salesOrderId: commercial?.salesOrderId ?? null,
+        salesOrderNo: commercial?.salesOrderNo ?? null,
+        deliveryTerms: commercial?.deliveryTerms ?? null,
+        paymentTerms: commercial?.paymentTerms ?? null,
+        legacyCrmTaxInvoiceId: commercial?.legacyCrmTaxInvoiceId ?? null,
+        legacyCrmInvoiceNo: commercial?.legacyCrmInvoiceNo ?? null,
+        createdChannel: commercial?.createdChannel ?? 'ACCOUNTING',
+        commercialMetadata: commercial?.commercialMetadata ?? undefined,
         ...headerAmountsFromCalc(calc),
       },
     })
@@ -570,6 +597,17 @@ export function mapInvoiceRecord(invoice: SalesInvoice, lines?: SalesInvoiceLine
     reversedAt: invoice.reversedAt?.toISOString() ?? null,
     reversedBy: invoice.reversedBy,
     reversalReason: invoice.reversalReason,
+    quotationId: invoice.quotationId ?? null,
+    quotationNo: invoice.quotationNo ?? null,
+    proformaInvoiceId: invoice.proformaInvoiceId ?? null,
+    proformaNo: invoice.proformaNo ?? null,
+    salesOrderId: invoice.salesOrderId ?? null,
+    salesOrderNo: invoice.salesOrderNo ?? null,
+    deliveryTerms: invoice.deliveryTerms ?? null,
+    paymentTerms: invoice.paymentTerms ?? null,
+    legacyCrmTaxInvoiceId: invoice.legacyCrmTaxInvoiceId ?? null,
+    legacyCrmInvoiceNo: invoice.legacyCrmInvoiceNo ?? null,
+    createdChannel: invoice.createdChannel ?? 'ACCOUNTING',
     createdBy: invoice.createdBy,
     updatedBy: invoice.updatedBy,
     createdAt: invoice.createdAt.toISOString(),
