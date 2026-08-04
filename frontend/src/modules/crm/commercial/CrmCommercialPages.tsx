@@ -11,9 +11,7 @@ import {
   PenLine,
   Plus,
   Printer,
-  Send,
   Trash2,
-  XCircle,
   ArrowLeftRight,
 } from 'lucide-react'
 import { OperationalPageShell } from '../../../components/design-system/OperationalPageShell'
@@ -26,7 +24,6 @@ import { ErpSmartSelect } from '../../../components/erp/ErpSmartSelect'
 import { Select, Input, Textarea } from '../../../components/forms/Inputs'
 import { CommercialTermSelect } from '../../../components/masters/GeographySelects'
 import { TableLink } from '../../../components/ui/AppLink'
-import { Toast } from '../../../components/ui/Toast'
 import { SELECT_PLACEHOLDER } from '../../../components/forms/selectStandards'
 import { useSellableItems } from '../../../hooks/useMasterLists'
 import { canUseItemInSales } from '../../../utils/opportunityItemOptions'
@@ -57,7 +54,6 @@ import {
 import type { CrmPaymentMode } from '../../../types/crmCommercial'
 import {
   CRM_PAYMENT_MODE_LABELS,
-  CRM_TAX_INVOICE_STATUS_LABELS,
   CRM_RECEIPT_MIGRATION_STATUS_LABELS,
 } from '../../../types/crmCommercial'
 import { computeProformaLineTotals } from '../../../utils/proformaInvoiceLines'

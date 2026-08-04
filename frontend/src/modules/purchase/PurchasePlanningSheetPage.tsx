@@ -1276,16 +1276,6 @@ export function PurchasePlanningSheetPage() {
                     type="button"
                     size="sm"
                     variant="secondary"
-                    icon={UserCheck}
-                    disabled={!canEdit}
-                    onClick={() => setBulkBuyerOpen(true)}
-                  >
-                    Assign buyer
-                  </ErpButton>
-                  <ErpButton
-                    type="button"
-                    size="sm"
-                    variant="secondary"
                     icon={Users}
                     disabled={!canEdit}
                     onClick={() => setBulkVendorOpen(true)}

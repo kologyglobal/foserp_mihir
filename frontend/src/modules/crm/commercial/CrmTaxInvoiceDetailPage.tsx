@@ -122,7 +122,7 @@ export function CrmInvoiceDetailPage() {
     }
   }, [id, invoice])
 
-  if (loading) return <LoadingState label="Loading tax invoice…" />
+  if (loading) return <LoadingState variant="form" rows={6} />
 
   if (!invoice) {
     return (
@@ -449,7 +449,7 @@ export function CrmInvoicePrintPage() {
     }
   }, [id, invoice])
 
-  if (loading || !invoice) return <LoadingState label="Loading tax invoice…" />
+  if (loading || !invoice) return <LoadingState variant="form" rows={6} />
 
   return (
     <div className="pi-print-page erp-page">

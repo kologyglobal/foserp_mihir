@@ -38,6 +38,7 @@ export interface ApiPurchaseSetupGeneral {
   requirePoWarehouse: boolean
   requireExpectedDeliveryDate: boolean
   requirePaymentTerms: boolean
+  planningConsolidationEnabled?: boolean
 }
 
 export interface ApiPurchaseSetupRequisition {

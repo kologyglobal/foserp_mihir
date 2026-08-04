@@ -2390,6 +2390,7 @@ function mapApiSetupToDomain(api: setupApi.ApiPurchaseSetup): PurchaseSetup {
       requirePoWarehouse: g.requirePoWarehouse,
       requireExpectedDeliveryDate: g.requireExpectedDeliveryDate,
       requirePaymentTerms: g.requirePaymentTerms,
+      planningConsolidationEnabled: g.planningConsolidationEnabled !== false,
     },
     requisition: {
       skipRfq: api.requisition.skipRfq,
@@ -2530,6 +2531,7 @@ function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseS
       requirePoWarehouse: setup.general.requirePoWarehouse,
       requireExpectedDeliveryDate: setup.general.requireExpectedDeliveryDate,
       requirePaymentTerms: setup.general.requirePaymentTerms,
+      planningConsolidationEnabled: setup.general.planningConsolidationEnabled,
     },
     requisition: {
       skipRfq: setup.requisition.skipRfq,
