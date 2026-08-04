@@ -204,6 +204,7 @@ model Tenant {
   masterGstRates                         MasterGstRate[]
   masterReceivingTolerances              MasterReceivingTolerance[]
   masterItems                            MasterItem[]
+  masterItemUomConversions               MasterItemUomConversion[]
   masterVendors                          MasterVendor[]
   legalEntities                          LegalEntity[]
   branches                               Branch[]
@@ -509,6 +510,9 @@ model Tenant {
   purchaseOrders                      PurchaseOrder[]
   purchaseOrderLines                  PurchaseOrderLine[]
   purchaseOrderRevisions              PurchaseOrderRevision[]
+  purchaseRequisitionRevisions        PurchaseRequisitionRevision[]
+  purchaseRequisitionArchived         PurchaseRequisitionArchived[]
+  purchaseRequisitionLineArchived     PurchaseRequisitionLineArchived[]
   purchaseOrdersArchived              PurchaseOrderArchived[]
   purchaseOrderLinesArchived          PurchaseOrderLineArchived[]
   goodsReceipts                       GoodsReceipt[]
@@ -2629,6 +2633,7 @@ model MasterUom {
   itemsPurchaseUom         MasterItem[]              @relation("ItemPurchaseUom")
   itemsSalesUom            MasterItem[]              @relation("ItemSalesUom")
   itemsWeightUom           MasterItem[]              @relation("ItemWeightUom")
+  itemUomConversions       MasterItemUomConversion[]
   purchaseRequisitionLines PurchaseRequisitionLine[]
   purchasePlanningRows     PurchasePlanningRow[]
   requestForQuotationLines RequestForQuotationLine[]
@@ -3086,6 +3091,7 @@ model MasterItem {
   gstGroup                 MasterGstGroup?           @relation(fields: [gstGroupId], references: [id])
   receivingTolerance       MasterReceivingTolerance? @relation(fields: [receivingToleranceId], references: [id])
   weightUom                MasterUom?                @relation("ItemWeightUom", fields: [weightUomId], references: [id])
+  uomConversions           MasterItemUomConversion[]
   purchaseRequisitionLines PurchaseRequisitionLine[]
   purchasePlanningRows     PurchasePlanningRow[]
   requestForQuotationLines RequestForQuotationLine[]
@@ -3144,6 +3150,30 @@ model MasterItem {
   @@index([tenantId, receivingToleranceId])
   @@index([tenantId, weightUomId])
   @@map("master_items")
+}
+
+/// Alternate UOM mappings for an item (purchase, future sales packs). Base UOM qty = transactionQty / conversionFactor.
+model MasterItemUomConversion {
+  id                String   @id @default(uuid())
+  tenantId          String
+  itemId            String
+  uomId             String
+  /// Units of `uomId` per 1 base UOM unit (e.g. 3 MTR = 1 NOS → factor 3).
+  conversionFactor  Decimal  @default(1) @db.Decimal(18, 4)
+  isPurchaseAllowed Boolean  @default(true)
+  isDefaultPurchase Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id])
+  item   MasterItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  uom    MasterUom  @relation(fields: [uomId], references: [id])
+
+  @@unique([tenantId, itemId, uomId])
+  @@index([tenantId])
+  @@index([tenantId, itemId])
+  @@index([tenantId, uomId])
+  @@map("master_item_uom_conversions")
 }
 
 model MasterVendor {
@@ -6269,6 +6299,7 @@ enum PurchaseRequisitionStatus {
 
 enum PurchaseRequisitionLineStatus {
   OPEN
+  PARTIALLY_CONVERTED
   CANCELLED
   CONVERTED
   CLOSED
@@ -6409,6 +6440,7 @@ model PurchaseRequisition {
   purchasePurpose      String?                   @db.Text
   rfqRequired          Boolean                   @default(true)
   status               PurchaseRequisitionStatus @default(DRAFT)
+  revisionNo           Int                       @default(0)
   /// Originating module — e.g. MAINTENANCE (spare shortage from ticket).
   sourceType           String?                   @db.VarChar(40)
   /// Originating document id (MaintenanceTicket.id when sourceType=MAINTENANCE).
@@ -6434,6 +6466,8 @@ model PurchaseRequisition {
   purchaseOrders      PurchaseOrder[]
   approvals           PurchaseApproval[]        @relation("PurchaseApprovalPr")
   productionMaterials ProductionOrderMaterial[]
+  revisions             PurchaseRequisitionRevision[]
+  archivedHeaders       PurchaseRequisitionArchived[]
 
   @@unique([tenantId, requisitionNumber])
   @@index([tenantId])
@@ -6457,6 +6491,8 @@ model PurchaseRequisitionLine {
   itemNameSnapshot            String                        @default("") @db.VarChar(300)
   description                 String?                       @db.Text
   requiredQuantity            Decimal                       @default(0) @db.Decimal(18, 4)
+  /// Cumulative quantity converted to PO(s) for this line.
+  orderedQuantity             Decimal                       @default(0) @db.Decimal(18, 4)
   uomId                       String?
   estimatedRate               Decimal                       @default(0) @db.Decimal(18, 2)
   estimatedAmount             Decimal                       @default(0) @db.Decimal(18, 2)
@@ -6479,7 +6515,7 @@ model PurchaseRequisitionLine {
   warehouse           MasterWarehouse?          @relation(fields: [warehouseId], references: [id])
   preferredVendor     MasterVendor?             @relation("PrLinePreferredVendor", fields: [preferredVendorId], references: [id])
   purchaseOrder       PurchaseOrder?            @relation(fields: [purchaseOrderId], references: [id])
-  planningRow         PurchasePlanningRow?
+  planningRows        PurchasePlanningRow[]
   rfqLines            RequestForQuotationLine[]
   purchaseOrderLines  PurchaseOrderLine[]
 
@@ -6493,13 +6529,97 @@ model PurchaseRequisitionLine {
   @@map("purchase_requisition_lines")
 }
 
+model PurchaseRequisitionRevision {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  purchaseRequisitionId String
+  revisionNo            Int
+  reason                String   @db.Text
+  statusBefore          String   @db.VarChar(40)
+  statusAfter           String   @db.VarChar(40)
+  revisedById           String?  @db.VarChar(36)
+  revisedAt             DateTime @default(now())
+  headerSnapshot        Json
+  linesSnapshot         Json
+  changes               Json     @default("[]")
+  createdAt             DateTime @default(now())
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id])
+  purchaseRequisition PurchaseRequisition @relation(fields: [purchaseRequisitionId], references: [id])
+
+  @@unique([tenantId, purchaseRequisitionId, revisionNo], map: "pr_req_rev_tenant_pr_rev_key")
+  @@index([tenantId], map: "pr_req_rev_tenant_idx")
+  @@index([tenantId, purchaseRequisitionId], map: "pr_req_rev_tenant_pr_idx")
+  @@map("purchase_requisition_revisions")
+}
+
+model PurchaseRequisitionArchived {
+  id                    String                    @id @default(uuid())
+  tenantId              String
+  purchaseRequisitionId String
+  revisionNo            Int
+  requisitionNumber     String                    @db.VarChar(64)
+  requisitionDate       DateTime                  @db.Date
+  departmentId          String?                   @db.VarChar(36)
+  requestedById         String?                   @db.VarChar(36)
+  warehouseId           String?
+  requiredDate          DateTime?                 @db.Date
+  priority              PurchasePriority          @default(NORMAL)
+  purchasePurpose       String?                   @db.Text
+  rfqRequired           Boolean                   @default(true)
+  status                PurchaseRequisitionStatus @default(DRAFT)
+  remarks               String?                   @db.Text
+  archivedById          String?                   @db.VarChar(36)
+  archivedAt            DateTime                  @default(now())
+  reason                String                    @db.Text
+
+  tenant              Tenant                        @relation(fields: [tenantId], references: [id])
+  purchaseRequisition PurchaseRequisition           @relation(fields: [purchaseRequisitionId], references: [id])
+  lines               PurchaseRequisitionLineArchived[]
+
+  @@unique([tenantId, purchaseRequisitionId, revisionNo], map: "pr_req_arch_tenant_pr_rev_key")
+  @@index([tenantId], map: "pr_req_arch_tenant_idx")
+  @@index([tenantId, purchaseRequisitionId], map: "pr_req_arch_tenant_pr_idx")
+  @@map("purchase_requisition_archived")
+}
+
+model PurchaseRequisitionLineArchived {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  archivedHeaderId      String
+  purchaseRequisitionId String
+  sourceLineId          String?
+  revisionNo            Int
+  lineNumber            Int
+  itemId                String?
+  itemCodeSnapshot      String   @default("") @db.VarChar(64)
+  itemNameSnapshot      String   @default("") @db.VarChar(300)
+  description           String?  @db.Text
+  requiredQuantity      Decimal  @default(0) @db.Decimal(18, 4)
+  uomId                 String?
+  estimatedRate         Decimal  @default(0) @db.Decimal(18, 2)
+  estimatedAmount       Decimal  @default(0) @db.Decimal(18, 2)
+  preferredVendorId     String?
+  requiredDate          DateTime? @db.Date
+  remarks               String?  @db.Text
+  archivedAt            DateTime @default(now())
+
+  tenant         Tenant                      @relation(fields: [tenantId], references: [id])
+  archivedHeader PurchaseRequisitionArchived @relation(fields: [archivedHeaderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "pr_req_line_arch_tenant_idx")
+  @@index([tenantId, purchaseRequisitionId], map: "pr_req_line_arch_tenant_pr_idx")
+  @@index([tenantId, archivedHeaderId], map: "pr_req_line_arch_hdr_idx")
+  @@map("purchase_requisition_line_archived")
+}
+
 model PurchasePlanningRow {
   id                                String                       @id @default(uuid())
   tenantId                          String
   planningNumber                    String                       @db.VarChar(64)
   planningDate                      DateTime                     @db.Date
   purchaseRequisitionId             String
-  purchaseRequisitionLineId         String                       @unique
+  purchaseRequisitionLineId         String
   purchaseRequisitionNumberSnapshot String                       @db.VarChar(64)
   departmentId                      String?                      @db.VarChar(36)
   requestedById                     String?                      @db.VarChar(36)
@@ -6512,6 +6632,10 @@ model PurchasePlanningRow {
   currentStockQuantity              Decimal                      @default(0) @db.Decimal(18, 4)
   openPurchaseOrderQuantity         Decimal                      @default(0) @db.Decimal(18, 4)
   netPurchaseQuantity               Decimal                      @default(0) @db.Decimal(18, 4)
+  /// Vendor allocation qty for this planning slice (≤ net / remaining on PR line).
+  allocatedQuantity                 Decimal                      @default(0) @db.Decimal(18, 4)
+  /// Qty already on PO from this planning row.
+  orderedQuantity                   Decimal                      @default(0) @db.Decimal(18, 4)
   preferredVendorId                 String?
   selectedVendorId                  String?
   lastPurchaseVendorId              String?
@@ -6546,7 +6670,6 @@ model PurchasePlanningRow {
   purchaseOrder           PurchaseOrder?          @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderLines      PurchaseOrderLine[]
 
-  @@unique([tenantId, purchaseRequisitionLineId])
   @@unique([tenantId, planningNumber])
   @@index([tenantId])
   @@index([tenantId, status])
@@ -7406,8 +7529,18 @@ model PurchaseSettings {
   overReceiptTolerancePct        Decimal                     @default(0) @db.Decimal(5, 2)
   /// When true, revising a released PO returns it to PENDING_APPROVAL.
   requireApprovalOnPoRevision    Boolean                     @default(true)
+  /// When true, revising an approved PR returns it to pending approval.
+  requireApprovalOnPrRevision    Boolean                     @default(true)
   /// When true, new POs must be submitted for approval before release.
   requireApprovalOnPo            Boolean                     @default(true)
+  /// When true, PO must be released before GRN. When false, draft POs may receive goods.
+  requirePoReleaseWorkflow       Boolean                     @default(true)
+  /// Allow PO order date earlier than today.
+  allowBackdatedPo               Boolean                     @default(false)
+  /// Max calendar days in the past when allowBackdatedPo is true (0 = today only).
+  backdatedPoDaysLimit           Int                         @default(0)
+  /// Backdated PO must go through approval even when requireApprovalOnPo is off.
+  requireApprovalForBackdatedPo  Boolean                     @default(true)
   allowShortClose                Boolean                     @default(true)
   requireVendorChallan           Boolean                     @default(false)
   requireVehicleNumber           Boolean                     @default(false)
@@ -7731,6 +7864,12 @@ model PurchaseInvoiceLine {
   description         String?  @db.Text
   quantity            Decimal  @default(0) @db.Decimal(18, 4)
   uomCodeSnapshot     String   @default("") @db.VarChar(32)
+  /// Vendor / purchase UOM quantity at invoice time.
+  uomQuantitySnapshot Decimal? @db.Decimal(18, 4)
+  /// Vendor units per 1 stock unit at invoice time.
+  uomConversionFactorSnapshot Decimal? @db.Decimal(18, 4)
+  /// Vendor / purchase UOM code at invoice time.
+  purchaseUomCodeSnapshot String? @db.VarChar(32)
   rate                Decimal  @default(0) @db.Decimal(18, 2)
   amount              Decimal  @default(0) @db.Decimal(18, 2)
   taxRatePct          Decimal  @default(0) @db.Decimal(5, 2)

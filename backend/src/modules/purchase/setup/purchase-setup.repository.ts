@@ -13,6 +13,16 @@ import type {
 } from '@prisma/client'
 import { prisma } from '../../../config/prisma.js'
 
+/** Drop scalar keys missing from the generated client (schema ahead of `prisma generate`). */
+function sanitizePurchaseSettingsWrite<T extends Record<string, unknown>>(data: T): T {
+  const allowed = Prisma.PurchaseSettingsScalarFieldEnum as Record<string, string>
+  const out = { ...data }
+  for (const key of Object.keys(out)) {
+    if (!(key in allowed)) delete out[key]
+  }
+  return out
+}
+
 export type PurchaseSettingsRow = PurchaseSettings
 export type PurchasePlantSettingsRow = PurchasePlantSettings
 
@@ -65,6 +75,11 @@ export const SERVER_DEFAULT_SETUP = {
   overReceiptTolerancePct: 0,
   requireApprovalOnPoRevision: true,
   requireApprovalOnPo: true,
+  requirePoReleaseWorkflow: true,
+  requireApprovalOnPrRevision: true,
+  allowBackdatedPo: false,
+  backdatedPoDaysLimit: 0,
+  requireApprovalForBackdatedPo: true,
   allowShortClose: true,
   requireVendorChallan: false,
   requireVehicleNumber: false,
@@ -141,13 +156,13 @@ export async function createPurchaseSettings(
   tx: Prisma.TransactionClient = prisma,
 ) {
   return tx.purchaseSettings.create({
-    data: {
+    data: sanitizePurchaseSettingsWrite({
       ...data,
       tenantId,
       createdById: actorId,
       updatedById: actorId,
       version: 1,
-    },
+    }),
     include: settingsInclude,
   }) as Promise<PurchaseSettingsWithRelations>
 }
@@ -161,11 +176,11 @@ export async function updatePurchaseSettings(
 ) {
   const result = await tx.purchaseSettings.updateMany({
     where: { tenantId, version: expectedVersion },
-    data: {
+    data: sanitizePurchaseSettingsWrite({
       ...data,
       updatedById: actorId,
       version: { increment: 1 },
-    },
+    }),
   })
   if (result.count === 0) return null
   return tx.purchaseSettings.findUnique({

@@ -1,48 +1,69 @@
+/**
+ * Allowed PO/GRN units from Item Master UOM conversion mappings.
+ * Inventory and FIFO always use base UOM quantity.
+ */
 import { useMasterStore } from '@/store/masterStore'
+import type { ItemUomConversion } from '@/types/master'
 
 export type PurchaseLineUomOption = {
   id: string
   code: string
-  /** Vendor units per 1 primary unit when this option is selected. */
+  /** Vendor units per 1 primary/base unit when this option is selected. */
   factor: number
 }
 
-/**
- * Allowed PO/GRN units from Item Master:
- * - purchase UOM (default vendor unit) + base UOM when they differ
- * - single option when purchase is unset or equals base
- */
-export function getPurchaseLineUomOptions(itemId: string | null | undefined): PurchaseLineUomOption[] {
-  if (!itemId) return []
-  const master = useMasterStore.getState().items.find((i) => i.id === itemId)
-  if (!master?.baseUomId) return []
-  const uoms = useMasterStore.getState().uoms
-  const codeOf = (id: string) => {
-    const u = uoms.find((row) => row.id === id)
-    return (u?.uomCode || u?.uomName || '').trim()
+function codeOf(uomId: string, uoms: ReturnType<typeof useMasterStore.getState>['uoms']) {
+  const u = uoms.find((row) => row.id === uomId)
+  return (u?.uomCode || u?.uomName || '').trim()
+}
+
+function optionsFromConversions(
+  item: {
+    baseUomId: string
+    purchaseUomId?: string | null
+    uomConversionFactor?: number
+    purchaseQtyPerUom?: number
+    uomConversions?: ItemUomConversion[]
+  },
+  uoms: ReturnType<typeof useMasterStore.getState>['uoms'],
+): PurchaseLineUomOption[] {
+  const purchaseRows = (item.uomConversions ?? []).filter((c) => c.isPurchaseAllowed)
+  if (purchaseRows.length > 0) {
+    return purchaseRows.map((row) => ({
+      id: row.uomId,
+      code: row.uomCode || codeOf(row.uomId, uoms),
+      factor: row.uomId === item.baseUomId ? 1 : Number(row.conversionFactor) || 1,
+    }))
   }
 
-  const purchaseId = master.purchaseUomId || master.baseUomId
-  const purchaseCode = codeOf(purchaseId)
+  const purchaseId = item.purchaseUomId || item.baseUomId
+  const purchaseCode = codeOf(purchaseId, uoms)
   if (!purchaseCode) return []
 
-  const sameUom = !master.purchaseUomId || master.purchaseUomId === master.baseUomId
+  const sameUom = !item.purchaseUomId || item.purchaseUomId === item.baseUomId
   const purchaseFactor = sameUom
     ? 1
-    : Number(master.uomConversionFactor ?? master.purchaseQtyPerUom ?? 1) || 1
+    : Number(item.uomConversionFactor ?? item.purchaseQtyPerUom ?? 1) || 1
 
   const options: PurchaseLineUomOption[] = [
     { id: purchaseId, code: purchaseCode, factor: purchaseFactor },
   ]
 
   if (!sameUom) {
-    const baseCode = codeOf(master.baseUomId)
+    const baseCode = codeOf(item.baseUomId, uoms)
     if (baseCode) {
-      options.push({ id: master.baseUomId, code: baseCode, factor: 1 })
+      options.push({ id: item.baseUomId, code: baseCode, factor: 1 })
     }
   }
 
   return options
+}
+
+export function getPurchaseLineUomOptions(itemId: string | null | undefined): PurchaseLineUomOption[] {
+  if (!itemId) return []
+  const master = useMasterStore.getState().items.find((i) => i.id === itemId)
+  if (!master?.baseUomId) return []
+  return optionsFromConversions(master, useMasterStore.getState().uoms)
 }
 
 export function resolveUomCode(uomId: string | null | undefined, fallback = ''): string {
@@ -63,12 +84,14 @@ export function getPurchaseLineBaseUomCode(itemId: string | null | undefined): s
 export function purchaseLineHasDualUom(line: {
   itemId?: string | null
   uomConversionFactor?: number | null
+  uomId?: string | null
 }): boolean {
   const factor = Number(line.uomConversionFactor ?? 1)
   if (factor !== 1) return true
   if (!line.itemId) return false
   const master = useMasterStore.getState().items.find((i) => i.id === line.itemId)
   if (!master) return false
+  if (line.uomId && line.uomId !== master.baseUomId) return true
   return Boolean(master.purchaseUomId && master.purchaseUomId !== master.baseUomId)
 }
 

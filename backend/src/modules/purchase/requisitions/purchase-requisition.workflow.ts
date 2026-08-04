@@ -339,3 +339,31 @@ export function normalizeLineInputs(lines: PurchaseRequisitionLineInput[]): Arra
     }
   })
 }
+
+export const PR_REVISABLE_STATUSES: PurchaseRequisitionStatus[] = ['APPROVED', 'PARTIALLY_CONVERTED']
+
+export function assertRevisable(
+  pr: Pick<PurchaseRequisition, 'status' | 'deletedAt'>,
+  lines: Array<Pick<PurchaseRequisitionLine, 'status' | 'orderedQuantity'>>,
+): void {
+  if (pr.deletedAt) {
+    throw new PurchaseRequisitionNotEditableError(
+      purchaseMessage(PURCHASE_ERROR_CODE.PR_NOT_FOUND),
+      PURCHASE_ERROR_CODE.PR_NOT_FOUND,
+    )
+  }
+  if (!PR_REVISABLE_STATUSES.includes(pr.status)) {
+    throw new PurchaseRequisitionNotEditableError(
+      purchaseMessage(PURCHASE_ERROR_CODE.PR_REVISION_NOT_ALLOWED),
+      PURCHASE_ERROR_CODE.PR_REVISION_NOT_ALLOWED,
+    )
+  }
+  for (const line of lines) {
+    if (line.status === 'CONVERTED' || (Number(line.orderedQuantity) || 0) > 0) {
+      throw new PurchaseRequisitionNotEditableError(
+        purchaseMessage(PURCHASE_ERROR_CODE.PR_REVISION_LINE_CONVERTED),
+        PURCHASE_ERROR_CODE.PR_REVISION_LINE_CONVERTED,
+      )
+    }
+  }
+}

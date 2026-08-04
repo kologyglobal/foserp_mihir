@@ -11,6 +11,8 @@ import { formatStatus } from '@/components/ui/Badge'
 import { notify } from '@/store/toastStore'
 import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
 import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
+import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
+import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
 
 function factorOf(l: GoodsReceiptNote['lines'][number]) {
   return Number(l.uomConversionFactor ?? 1) > 0 ? Number(l.uomConversionFactor ?? 1) : 1
@@ -32,45 +34,6 @@ function stockUomOf(l: GoodsReceiptNote['lines'][number]) {
   // Same UOM when factor is 1 and no base found
   if (factorOf(l) === 1) return purchaseUomOf(l)
   return 'NOS'
-}
-
-/** Stacked dual qty for print/PDF — e.g. "8 MTR" over "2.33 NOS". */
-function DualQtyCell({
-  purchaseQty,
-  purchaseUom,
-  stockQty,
-  stockUom,
-}: {
-  purchaseQty: number
-  purchaseUom: string
-  stockQty: number
-  stockUom: string
-}) {
-  const showDual =
-    purchaseUom !== stockUom || Math.abs(purchaseQty - stockQty) > 1e-6
-
-  if (!showDual) {
-    return (
-      <td className="num">
-        <span className="po-print-qty-line">
-          {formatNumber(stockQty)} {stockUom}
-        </span>
-      </td>
-    )
-  }
-
-  return (
-    <td className="num">
-      <div className="po-print-dual-qty">
-        <span className="po-print-qty-line">
-          {formatNumber(purchaseQty)} {purchaseUom}
-        </span>
-        <span className="po-print-qty-line po-print-qty-line--stock">
-          {formatNumber(stockQty)} {stockUom}
-        </span>
-      </div>
-    </td>
-  )
 }
 
 export function GrnPrintPage() {
@@ -195,6 +158,22 @@ export function GrnPrintPage() {
                 Number(l.receivedUomQty) || Number(l.receivedQty) * factor
               const stockOrdered = Number(l.orderedQty) || 0
               const stockReceived = Number(l.receivedQty) || 0
+              const orderedDual = resolveDualQtyForPrint({
+                stockQty: stockOrdered,
+                stockUom,
+                purchaseQty: purchaseOrdered,
+                purchaseUom,
+                uomConversionFactor: factor,
+                itemId: l.itemId,
+              })
+              const receivedDual = resolveDualQtyForPrint({
+                stockQty: stockReceived,
+                stockUom,
+                purchaseQty: purchaseReceived,
+                purchaseUom,
+                uomConversionFactor: factor,
+                itemId: l.itemId,
+              })
               return (
                 <tr key={l.id}>
                   <td className="num">{l.lineNo}</td>
@@ -202,18 +181,8 @@ export function GrnPrintPage() {
                     <span className="mono">{l.itemCode}</span>
                     <span className="block">{l.itemName}</span>
                   </td>
-                  <DualQtyCell
-                    purchaseQty={purchaseOrdered}
-                    purchaseUom={purchaseUom}
-                    stockQty={stockOrdered}
-                    stockUom={stockUom}
-                  />
-                  <DualQtyCell
-                    purchaseQty={purchaseReceived}
-                    purchaseUom={purchaseUom}
-                    stockQty={stockReceived}
-                    stockUom={stockUom}
-                  />
+                  <PurchasePrintDualQtyCell {...orderedDual} />
+                  <PurchasePrintDualQtyCell {...receivedDual} />
                   <td className="num">{formatNumber(l.tolerancePercentage ?? 0)}</td>
                   <td>{formatStatus(l.toleranceStatus ?? 'EXACT')}</td>
                   <td className="num">{formatCurrency(l.rate)}</td>

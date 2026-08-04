@@ -26,6 +26,7 @@ import { PurchaseOrderDocumentPage } from './PurchaseDocumentPages'
 import { PurchaseRequisitionDomainDetailPage } from './PurchaseRequisitionDomainDetailPage'
 
 export { PurchaseRequisitionListPage } from './PurchaseRequisitionListPage'
+export { PurchaseRequisitionRevisePage } from './PurchaseRequisitionRevisePage'
 export { RfqListPage } from './RfqListPage'
 export { RfqDetailPage } from './RfqDetailPage'
 

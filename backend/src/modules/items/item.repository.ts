@@ -4,7 +4,55 @@ import { tenantActiveFilter } from '../../shared/index.js'
 import { getPagination } from '../../utils/pagination.js'
 import { ConflictError, NotFoundError, ValidationError } from '../../utils/errors.js'
 import { applySalesFieldDefaults } from './item-sales-defaults.js'
+import {
+  legacyFieldsToConversionInputs,
+  mapConversionRow,
+  syncItemUomConversions,
+  type ItemUomConversionInput,
+} from './item-uom-conversion.service.js'
 import type { ItemLookupQuery, ListItemsQuery } from './item.validation.js'
+import { assertRawMaterialItemName } from './item-naming.rules.js'
+
+const itemConversionInclude = {
+  uomConversions: {
+    include: { uom: { select: { id: true, code: true, name: true } } },
+    orderBy: [{ isDefaultPurchase: 'desc' as const }, { uom: { code: 'asc' as const } }],
+  },
+} as const
+
+function stripUomConversions(input: Record<string, unknown>): {
+  data: Record<string, unknown>
+  uomConversions?: ItemUomConversionInput[]
+  hasUomConversions: boolean
+} {
+  const data = { ...input }
+  const hasUomConversions = Object.prototype.hasOwnProperty.call(data, 'uomConversions')
+  const raw = data.uomConversions
+  delete data.uomConversions
+  if (!hasUomConversions || !Array.isArray(raw)) {
+    return { data, hasUomConversions: false }
+  }
+  return {
+    data,
+    hasUomConversions: true,
+    uomConversions: raw.map((row) => ({
+      uomId: String((row as { uomId?: string }).uomId ?? ''),
+      conversionFactor: Number((row as { conversionFactor?: unknown }).conversionFactor ?? 1),
+      isPurchaseAllowed: (row as { isPurchaseAllowed?: boolean }).isPurchaseAllowed,
+      isDefaultPurchase: (row as { isDefaultPurchase?: boolean }).isDefaultPurchase,
+    })),
+  }
+}
+
+function attachUomConversions<T extends { uomConversions?: Array<Parameters<typeof mapConversionRow>[0]> }>(
+  item: T,
+) {
+  const { uomConversions, ...rest } = item
+  return {
+    ...rest,
+    uomConversions: (uomConversions ?? []).map(mapConversionRow),
+  }
+}
 
 function normalizeNullableIds(input: Record<string, unknown>): Record<string, unknown> {
   const data = { ...input }
@@ -146,11 +194,12 @@ export async function listItems(tenantId: string, query: ListItemsQuery) {
       skip,
       take,
       orderBy: { [sortField]: query.sortOrder },
+      include: itemConversionInclude,
     }),
     prisma.masterItem.count({ where }),
   ])
 
-  return { items, total, page: query.page, limit: query.limit }
+  return { items: items.map(attachUomConversions), total, page: query.page, limit: query.limit }
 }
 
 export async function listItemLookups(tenantId: string, query: ItemLookupQuery) {
@@ -192,9 +241,10 @@ export async function listItemLookups(tenantId: string, query: ItemLookupQuery) 
 export async function getItem(tenantId: string, id: string) {
   const item = await prisma.masterItem.findFirst({
     where: { id, ...tenantActiveFilter(tenantId) },
+    include: itemConversionInclude,
   })
   if (!item) throw new NotFoundError('Item not found')
-  return item
+  return attachUomConversions(item)
 }
 
 async function applyCategoryStockDefaults(
@@ -270,18 +320,47 @@ export async function createItem(
   input: Record<string, unknown>,
 ) {
   let data = normalizeNullableIds(input)
+  const { data: itemData, uomConversions, hasUomConversions } = stripUomConversions(data)
+  data = itemData
   await assertTenantFk(tenantId, data)
   data = await syncReceivingToleranceLegacyPct(tenantId, data)
   data = await applyCategoryStockDefaults(tenantId, data, { isCreate: true })
   data = applySalesFieldDefaults(data, { isCreate: true })
+  const baseUomId = String(data.baseUomId ?? '')
+  if (!baseUomId) throw new ValidationError('baseUomId is required')
+
+  assertRawMaterialItemName(
+    String(data.name ?? ''),
+    String(data.itemType ?? ''),
+    data.productType != null ? String(data.productType) : undefined,
+  )
+
   try {
-    return await prisma.masterItem.create({
-      data: {
+    return await prisma.$transaction(async (tx) => {
+      const record = await tx.masterItem.create({
+        data: {
+          tenantId,
+          ...(data as Omit<Prisma.MasterItemUncheckedCreateInput, 'tenantId' | 'createdBy' | 'updatedBy'>),
+          createdBy: userId,
+          updatedBy: userId,
+        },
+      })
+      const seedConversions =
+        hasUomConversions
+          ? uomConversions
+          : legacyFieldsToConversionInputs(
+              baseUomId,
+              (data.purchaseUomId as string | null | undefined) ?? record.purchaseUomId,
+              Number(data.uomConversionFactor ?? data.purchaseQtyPerUom ?? record.uomConversionFactor ?? 1),
+            )
+      const conversions = await syncItemUomConversions(
         tenantId,
-        ...(data as Omit<Prisma.MasterItemUncheckedCreateInput, 'tenantId' | 'createdBy' | 'updatedBy'>),
-        createdBy: userId,
-        updatedBy: userId,
-      },
+        record.id,
+        baseUomId,
+        seedConversions,
+        tx,
+      )
+      return { ...record, uomConversions: conversions }
     })
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -297,19 +376,45 @@ export async function updateItem(
   userId: string,
   input: Record<string, unknown>,
 ) {
-  await getItem(tenantId, id)
+  const existing = await getItem(tenantId, id)
   let data = normalizeNullableIds(input)
+  const { data: itemData, uomConversions, hasUomConversions } = stripUomConversions(data)
+  data = itemData
   await assertTenantFk(tenantId, data)
   data = await syncReceivingToleranceLegacyPct(tenantId, data)
   data = await applyCategoryStockDefaults(tenantId, data, { isCreate: false })
   data = applySalesFieldDefaults(data, { isCreate: false })
+  const baseUomId =
+    data.baseUomId != null
+      ? String(data.baseUomId)
+      : (await prisma.masterItem.findFirst({ where: { id, tenantId }, select: { baseUomId: true } }))?.baseUomId
+  if (!baseUomId) throw new ValidationError('baseUomId is required')
+
+  assertRawMaterialItemName(
+    String(data.name ?? existing.name),
+    String(data.itemType ?? existing.itemType),
+    data.productType != null ? String(data.productType) : existing.productType,
+  )
+
   try {
-    return await prisma.masterItem.update({
-      where: { id, tenantId },
-      data: {
-        ...(data as Prisma.MasterItemUncheckedUpdateInput),
-        updatedBy: userId,
-      },
+    return await prisma.$transaction(async (tx) => {
+      const record = await tx.masterItem.update({
+        where: { id, tenantId },
+        data: {
+          ...(data as Prisma.MasterItemUncheckedUpdateInput),
+          updatedBy: userId,
+        },
+      })
+      const conversions = hasUomConversions
+        ? await syncItemUomConversions(tenantId, id, baseUomId, uomConversions, tx)
+        : (
+            await tx.masterItemUomConversion.findMany({
+              where: { tenantId, itemId: id },
+              include: { uom: { select: { id: true, code: true, name: true } } },
+              orderBy: [{ isDefaultPurchase: 'desc' }, { uom: { code: 'asc' } }],
+            })
+          ).map(mapConversionRow)
+      return { ...record, uomConversions: conversions }
     })
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {

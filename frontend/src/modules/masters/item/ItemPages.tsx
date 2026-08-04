@@ -48,9 +48,19 @@ import { SUB_ASSEMBLY_RULE_LABELS } from '../../../types/bom'
 import { EnterpriseMasterWorkspace, MasterStickyFooter } from '../shared/EnterpriseMasterShell'
 import { MasterCodeField } from '../../../components/masters/MasterCodeField'
 import { MasterItemImageField } from '../../../components/masters/MasterItemImageField'
-import { ItemPurchaseMultiUnitFields } from '../../../components/masters/ItemPurchaseMultiUnitFields'
+import {
+  ItemUomConversionEditor,
+  itemToUomConversionRows,
+  type ItemUomConversionRow,
+} from '../../../components/masters/ItemUomConversionEditor'
 import type { MasterCodeSeriesHandle } from '../../../hooks/useMasterCodeSeries'
 import { handleInvalidSubmit, rhfErrorsToFieldMap, fieldErrorsToMessages } from '../../../utils/formValidation'
+// HELD: MS_GRADE_SECTION validation paused — restore with superRefine block below.
+// import {
+//   isRawMaterialProductType,
+//   isValidRawMaterialItemName,
+//   RAW_MATERIAL_ITEM_NAME_MESSAGE,
+// } from '../../../utils/itemNamingRules'
 
 const FULFILMENT_OPTIONS: { value: ItemSalesFulfilmentMethod; label: string }[] = [
   { value: 'STOCK', label: 'Stock' },
@@ -135,7 +145,7 @@ function resolveItemTaxFields(
 const schema = z.object({
   productType: z.enum(['boi', 'raw_material', 'sub_assembly', 'assembly_product', 'finish_product', 'scrap', 'service']),
   itemCode: z.string().min(1).max(30),
-  itemName: z.string().min(1),
+  itemName: z.string().min(1).max(300),
   itemName2: z.string().optional(),
   itemDescription: z.string().default(''),
   categoryId: z.string().min(1),
@@ -192,6 +202,10 @@ const schema = z.object({
   if (!data.hsnId) {
     ctx.addIssue({ code: 'custom', message: 'HSN code is required', path: ['hsnId'] })
   }
+  // HELD (2026-08-04): MS_GRADE_SECTION item name check paused until master data is normalized.
+  // if (isRawMaterialProductType(data.productType) && !isValidRawMaterialItemName(data.itemName)) {
+  //   ctx.addIssue({ code: 'custom', message: RAW_MATERIAL_ITEM_NAME_MESSAGE, path: ['itemName'] })
+  // }
 })
 
 type FormData = z.infer<typeof schema>
@@ -449,6 +463,15 @@ export function ItemFormPage() {
   const [sectionForceOpen, setSectionForceOpen] = useState<Record<string, number>>({})
   const formRootRef = useRef<HTMLDivElement>(null)
   const codeSeriesRef = useRef<MasterCodeSeriesHandle | null>(null)
+  const [uomConversionRows, setUomConversionRows] = useState<ItemUomConversionRow[]>([])
+
+  useEffect(() => {
+    if (!existing) {
+      setUomConversionRows([])
+      return
+    }
+    setUomConversionRows(itemToUomConversionRows(existing))
+  }, [existing?.id, existing?.updatedAt, existing?.uomConversions?.length])
 
   useEffect(() => {
     if (hash === '#attachments' || hash === '#item-section-attachments') {
@@ -516,25 +539,8 @@ export function ItemFormPage() {
   const hsnId = watch('hsnId') ?? ''
   const gstGroupId = watch('gstGroupId') ?? ''
   const baseUomId = watch('baseUomId')
-  const purchaseUomId = watch('purchaseUomId') ?? ''
-  const uomConversionFactor = watch('uomConversionFactor') ?? 1
 
   const baseUomCode = uoms.find((u) => u.id === baseUomId)?.uomCode ?? '—'
-  const purchaseUomCode = uoms.find((u) => u.id === (purchaseUomId || baseUomId))?.uomCode ?? baseUomCode
-
-  function onPurchaseUomChange(uomId: string) {
-    setValue('purchaseUomId', uomId || null, { shouldValidate: true })
-    if (!uomId || uomId === baseUomId) {
-      setValue('uomConversionFactor', 1, { shouldValidate: true })
-      setValue('purchaseQtyPerUom', 1, { shouldValidate: true })
-    }
-  }
-
-  function onConversionFactorChange(value: number) {
-    const next = Number.isFinite(value) && value > 0 ? value : 1
-    setValue('uomConversionFactor', next, { shouldValidate: true })
-    setValue('purchaseQtyPerUom', next, { shouldValidate: true })
-  }
 
   const categoryOptions = useMemo(
     () => leafCategories.map((c) => ({ value: c.id, label: `${c.categoryCode} — ${c.categoryName}`, searchText: c.categoryName.toLowerCase() })),
@@ -600,6 +606,15 @@ export function ItemFormPage() {
         return
       }
       setSaveError(null)
+      const defaultPurchase =
+        uomConversionRows.find((r) => r.isDefaultPurchase && r.isPurchaseAllowed !== false) ??
+        uomConversionRows.find((r) => r.isPurchaseAllowed !== false) ??
+        uomConversionRows.find((r) => r.uomId === data.baseUomId)
+      const legacyPurchaseUomId = defaultPurchase?.uomId || data.baseUomId
+      const legacyFactor =
+        legacyPurchaseUomId === data.baseUomId
+          ? 1
+          : Number(defaultPurchase?.conversionFactor ?? data.uomConversionFactor ?? 1) || 1
       const payload = {
         ...data,
         codeSeriesMode: 'auto' as const,
@@ -609,7 +624,23 @@ export function ItemFormPage() {
           : null,
         hsnId: data.hsnId || null,
         gstGroupId: data.gstGroupId || null,
-        purchaseUomId: data.purchaseUomId || data.baseUomId,
+        purchaseUomId: legacyPurchaseUomId,
+        uomConversionFactor: legacyFactor,
+        purchaseQtyPerUom: legacyFactor,
+        uomConversions: uomConversionRows
+          .filter((r) => r.uomId)
+          .map((r) => {
+            const uom = uoms.find((u) => u.id === r.uomId)
+            return {
+              id: r.id ?? '',
+              uomId: r.uomId,
+              uomCode: r.uomCode ?? uom?.uomCode ?? '',
+              uomName: uom?.uomName ?? uom?.uomCode ?? '',
+              conversionFactor: r.uomId === data.baseUomId ? 1 : Number(r.conversionFactor) || 1,
+              isPurchaseAllowed: r.isPurchaseAllowed !== false,
+              isDefaultPurchase: Boolean(r.isDefaultPurchase),
+            }
+          }),
         qualityTestGroupCode: data.qualityTestGroupCode || null,
         productionBomId: data.productionBomId || null,
         routingNo: data.routingNo || null,
@@ -739,7 +770,16 @@ export function ItemFormPage() {
               ))}
             </Select>
           </FormField>
-          <FormField label="Item Name" required error={errors.itemName?.message}>
+          <FormField
+            label="Item Name"
+            required
+            error={errors.itemName?.message}
+            hint={
+              productType === 'raw_material'
+                ? 'Format: MS_GRADE_SECTION (e.g. MS_IS2062_100x50)'
+                : undefined
+            }
+          >
             <Input {...register('itemName')} />
           </FormField>
           <FormField label="Item Name 2">
@@ -797,14 +837,12 @@ export function ItemFormPage() {
           <FormField label="Purchasable" className="md:col-span-3">
             <Checkbox {...register('isPurchasable')} label="Allow purchase on PO, GRN, and vendor documents" />
           </FormField>
-          <ItemPurchaseMultiUnitFields
+          <ItemUomConversionEditor
+            baseUomId={baseUomId}
             baseUomCode={baseUomCode}
-            purchaseUomId={purchaseUomId || baseUomId}
-            purchaseUomCode={purchaseUomCode}
-            uomConversionFactor={uomConversionFactor}
-            onPurchaseUomChange={onPurchaseUomChange}
-            onConversionFactorChange={onConversionFactorChange}
-            conversionError={errors.uomConversionFactor?.message ?? errors.purchaseQtyPerUom?.message}
+            rows={uomConversionRows}
+            onChange={setUomConversionRows}
+            uomCodeOf={(uomId) => uoms.find((u) => u.id === uomId)?.uomCode ?? '—'}
           />
           <FormField label="Standard Rate">
             <Input type="number" step="0.01" {...register('standardRate')} />

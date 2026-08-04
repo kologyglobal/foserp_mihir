@@ -62,7 +62,7 @@ export function mapPurchaseCategoryToEngineeringProductType(
     case 'consumable':
     case 'packing_material':
     case 'maintenance':
-      return 'scrap'
+      return 'raw_material'
     case 'job_work':
       return 'service'
     default:

@@ -43,6 +43,24 @@ import {
   parseDateInput,
 } from './purchase-requisition.workflow.js'
 
+async function requestedByNameMap(
+  tenantId: string,
+  requestedByIds: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const ids = [...new Set(requestedByIds.filter((id): id is string => Boolean(id?.trim())))]
+  if (ids.length === 0) return new Map()
+  const users = await prisma.user.findMany({
+    where: { tenantId, id: { in: ids }, deletedAt: null },
+    select: { id: true, firstName: true, lastName: true, email: true },
+  })
+  const map = new Map<string, string>()
+  for (const user of users) {
+    const name = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email
+    if (name) map.set(user.id, name)
+  }
+  return map
+}
+
 async function loadOrThrow(tenantId: string, id: string) {
   const pr = await repo.findPurchaseRequisitionById(tenantId, id)
   if (!pr) throw new PurchaseRequisitionNotFoundError()
@@ -96,8 +114,13 @@ async function assertApprovalAssignedToActor(
 
 export async function listPurchaseRequisitions(tenantId: string, query: ListPurchaseRequisitionsQuery) {
   const result = await repo.findPurchaseRequisitions(tenantId, query)
+  const nameById = await requestedByNameMap(tenantId, result.items.map((pr) => pr.requestedById))
   return {
-    items: result.items.map(mapPurchaseRequisitionToDto),
+    items: result.items.map((pr) =>
+      mapPurchaseRequisitionToDto(pr, {
+        requestedByName: pr.requestedById ? nameById.get(pr.requestedById) ?? null : null,
+      }),
+    ),
     total: result.total,
     page: result.page,
     limit: result.limit,
@@ -106,7 +129,10 @@ export async function listPurchaseRequisitions(tenantId: string, query: ListPurc
 
 export async function getPurchaseRequisition(tenantId: string, id: string) {
   const pr = await loadOrThrow(tenantId, id)
-  return mapPurchaseRequisitionToDto(pr)
+  const nameById = await requestedByNameMap(tenantId, [pr.requestedById])
+  return mapPurchaseRequisitionToDto(pr, {
+    requestedByName: pr.requestedById ? nameById.get(pr.requestedById) ?? null : null,
+  })
 }
 
 export async function previewNextPurchaseRequisitionNumber(tenantId: string) {

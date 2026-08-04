@@ -5,6 +5,11 @@ import type { ListPurchaseRequisitionsQuery } from './purchase-requisition.valid
 
 const lineOrder = { lineNumber: 'asc' as const }
 
+const linesWithItemInclude = {
+  orderBy: lineOrder,
+  include: { item: { select: { productType: true } } },
+} as const
+
 export async function findPurchaseRequisitions(tenantId: string, query: ListPurchaseRequisitionsQuery) {
   const { getPagination } = await import('../../../utils/pagination.js')
   const { skip, take } = getPagination(query)
@@ -31,7 +36,7 @@ export async function findPurchaseRequisitions(tenantId: string, query: ListPurc
       skip,
       take,
       orderBy: { createdAt: query.sortOrder },
-      include: { lines: { orderBy: lineOrder } },
+      include: { lines: linesWithItemInclude },
     }),
     prisma.purchaseRequisition.count({ where }),
   ])
@@ -42,7 +47,7 @@ export async function findPurchaseRequisitions(tenantId: string, query: ListPurc
 export async function findPurchaseRequisitionById(tenantId: string, id: string) {
   return prisma.purchaseRequisition.findFirst({
     where: { id, ...tenantActiveFilter(tenantId) },
-    include: { lines: { orderBy: lineOrder } },
+    include: { lines: linesWithItemInclude },
   })
 }
 
@@ -52,7 +57,7 @@ export async function createPurchaseRequisition(
 ) {
   return tx.purchaseRequisition.create({
     data,
-    include: { lines: { orderBy: lineOrder } },
+    include: { lines: linesWithItemInclude },
   })
 }
 
@@ -116,7 +121,7 @@ export async function updatePurchaseRequisition(
   return tx.purchaseRequisition.update({
     where: { id },
     data,
-    include: { lines: { orderBy: lineOrder } },
+    include: { lines: linesWithItemInclude },
   })
 }
 

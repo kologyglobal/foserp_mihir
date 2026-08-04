@@ -13,7 +13,9 @@ import { cn } from '@/utils/cn'
 import type { PrEditorLine } from '@/utils/purchaseRequisitionValidation'
 import {
   mapEngineeringProductTypeToPurchaseCategory,
+  normalizeEngineeringProductType,
 } from '@/utils/purchaseProductType'
+import { filterPurchaseCatalogByProductType } from '@/utils/purchaseCatalogFilter'
 import {
   ENGINEERING_PRODUCT_TYPES,
   ENGINEERING_PRODUCT_TYPE_LABELS,
@@ -121,12 +123,20 @@ export function PurchaseRequisitionLinesTable({
 
   const patch = (key: string, next: Partial<PrEditorLine>) => onPatchLine?.(key, next)
 
-  const catalogForLine = (productType: EngineeringProductType | '') => {
-    // Prefer items matching the selected Item Master product type; still show the rest.
-    if (!productType) return catalogItems
-    const matched = catalogItems.filter((item) => item.productType === productType)
-    const rest = catalogItems.filter((item) => item.productType !== productType)
-    return matched.length ? [...matched, ...rest] : catalogItems
+  const catalogForLine = (
+    productType: EngineeringProductType | '' | null | undefined,
+    selectedItemId?: string,
+  ) => {
+    if (!productType) {
+      if (!selectedItemId) return []
+      const selected = catalogItems.find((i) => i.id === selectedItemId)
+      return selected ? [selected] : []
+    }
+    const filtered = filterPurchaseCatalogByProductType(catalogItems, productType)
+    if (!selectedItemId) return filtered
+    if (filtered.some((i) => i.id === selectedItemId)) return filtered
+    const selected = catalogItems.find((i) => i.id === selectedItemId)
+    return selected ? [selected, ...filtered] : filtered
   }
 
   const setRowProductType = (line: PrEditorLine, productType: EngineeringProductType | '') => {
@@ -152,7 +162,11 @@ export function PurchaseRequisitionLinesTable({
       return
     }
     const matched = line.itemId
-      ? catalogItems.find((i) => i.id === line.itemId && i.productType === productType)
+      ? catalogItems.find(
+          (i) =>
+            i.id === line.itemId &&
+            normalizeEngineeringProductType(i.productType) === productType,
+        )
       : undefined
     if (matched) {
       patch(line.key, { productType, category })
@@ -279,7 +293,7 @@ export function PurchaseRequisitionLinesTable({
                 const miss = missingMandatory(line)
                 const qtyError = showErrors && lineErrors?.[`${line.key}:quantity`]
                 const typeError = showErrors && lineErrors?.[`${line.key}:productType`]
-                const rowCatalog = catalogForLine(line.productType)
+                const rowCatalog = catalogForLine(line.productType, line.itemId)
                 const lineLocked = Boolean(line.purchaseOrderId)
                 const rowEditable = canEdit && !lineLocked
                 return (
@@ -333,6 +347,11 @@ export function PurchaseRequisitionLinesTable({
                           catalogItems={rowCatalog}
                           labelMode="code"
                           allowManual={false}
+                          emptyCatalogHint={
+                            line.productType
+                              ? 'No Item Master rows for this product type'
+                              : 'Select product type first'
+                          }
                           onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
                           onClearCatalog={() =>
                             patch(line.key, { itemId: '', itemCode: '', itemName: '' })

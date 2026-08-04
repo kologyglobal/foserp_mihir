@@ -11,6 +11,7 @@ import {
   PurchaseOrderWorkflowError,
 } from './purchase-order.errors.js'
 import type { PurchaseOrderLineInput } from './purchase-order.validation.js'
+import { requiresBackdatedPoApproval, type PoBackdatePolicy } from './purchase-order-backdate.js'
 
 export type PoWithLines = PurchaseOrder & { lines: PurchaseOrderLine[] }
 
@@ -31,6 +32,12 @@ export const PO_RECEIVABLE_STATUSES: PurchaseOrderStatus[] = [
   'SENT_TO_VENDOR',
   'PARTIALLY_RECEIVED',
 ]
+
+/** Resolve receivable PO statuses based on release workflow policy. */
+export function resolvePoReceivableStatuses(requirePoReleaseWorkflow = true): PurchaseOrderStatus[] {
+  if (requirePoReleaseWorkflow) return PO_RECEIVABLE_STATUSES
+  return ['DRAFT', ...PO_RECEIVABLE_STATUSES]
+}
 
 function workflowError(code: string): PurchaseOrderWorkflowError {
   return new PurchaseOrderWorkflowError(purchaseMessage(code), code)
@@ -326,7 +333,11 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
 /** Backend-provided action eligibility so the frontend never guesses. */
 export function allowedActions(
   po: PoWithLines,
-  opts: { requireApprovalOnPo?: boolean } = {},
+  opts: {
+    requireApprovalOnPo?: boolean
+    requirePoReleaseWorkflow?: boolean
+    backdatePolicy?: PoBackdatePolicy
+  } = {},
 ): {
   canEdit: boolean
   canSubmit: boolean
@@ -344,17 +355,23 @@ export function allowedActions(
   const editable = !po.deletedAt && PO_EDITABLE_STATUSES.includes(po.status)
   const pending = !po.deletedAt && po.status === 'PENDING_APPROVAL'
   const requireApproval = opts.requireApprovalOnPo !== false
+  const requireRelease = opts.requirePoReleaseWorkflow !== false
+  const backdatePolicy = opts.backdatePolicy ?? {}
+  const backdateNeedsApproval = requiresBackdatedPoApproval(po.orderDate, backdatePolicy)
+  const receivableStatuses = resolvePoReceivableStatuses(requireRelease)
   return {
     canEdit: editable,
-    canSubmit: editable && requireApproval,
+    canSubmit: editable && (requireApproval || backdateNeedsApproval),
     canApprove: pending,
     canReject: pending,
     canSendBack: pending,
     canSendToVendor:
+      requireRelease &&
       !po.deletedAt &&
       (requireApproval
         ? po.status === 'APPROVED'
-        : PO_EDITABLE_STATUSES.includes(po.status)),
+        : PO_EDITABLE_STATUSES.includes(po.status)) &&
+      !(backdateNeedsApproval && PO_EDITABLE_STATUSES.includes(po.status)),
     canCancel: pending || (!po.deletedAt && po.status === 'DRAFT'),
     canClose:
       !po.deletedAt &&
@@ -366,7 +383,7 @@ export function allowedActions(
       (po.status === 'REJECTED' ||
         po.status === 'CLOSED' ||
         (po.status === 'CANCELLED' && received === 0)),
-    canReceive: !po.deletedAt && PO_RECEIVABLE_STATUSES.includes(po.status),
+    canReceive: !po.deletedAt && receivableStatuses.includes(po.status),
     canRevise: !po.deletedAt && PO_REVISABLE_STATUSES.includes(po.status) && received === 0,
   }
 }

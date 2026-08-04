@@ -259,6 +259,8 @@ export interface Item extends MasterRecordAudit {
   purchaseQtyPerUom?: number
   /** Vendor units per 1 primary/base unit (e.g. 3 m = 1 NOS). */
   uomConversionFactor?: number
+  /** Alternate UOM mappings (purchase allowed units + conversion factors). */
+  uomConversions?: ItemUomConversion[]
   /** ±% band for GRN receiving vs open qty (legacy dual-read). */
   receivingTolerancePercentage?: number
   receivingToleranceId?: string | null
@@ -285,6 +287,16 @@ export interface Item extends MasterRecordAudit {
   imageUrl?: string | null
   createdAt: string
   updatedAt: string
+}
+
+export type ItemUomConversion = {
+  id: string
+  uomId: string
+  uomCode: string
+  uomName: string
+  conversionFactor: number
+  isPurchaseAllowed: boolean
+  isDefaultPurchase: boolean
 }
 
 export type ItemSalesFulfilmentMethod =

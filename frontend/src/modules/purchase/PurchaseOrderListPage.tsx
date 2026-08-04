@@ -178,8 +178,8 @@ export function PurchaseOrderListPage() {
     () => [...new Set(rows.map((r) => r.locationName).filter(Boolean))].sort(),
     [rows],
   )
-  const buyerNames = useMemo(
-    () => [...new Set(rows.map((r) => r.buyerName).filter(Boolean))].sort(),
+  const createdByNames = useMemo(
+    () => [...new Set(rows.map((r) => r.createdByName).filter(Boolean))].sort(),
     [rows],
   )
 
@@ -188,9 +188,9 @@ export function PurchaseOrderListPage() {
       buildPoFilterFields({
         vendorOptions: vendorNames,
         locationOptions: locationNames,
-        buyerOptions: buyerNames,
+        buyerOptions: createdByNames,
       }),
-    [vendorNames, locationNames, buyerNames],
+    [vendorNames, locationNames, createdByNames],
   )
 
   const filterDrawer = useCrmFilterDrawer({
@@ -210,7 +210,7 @@ export function PurchaseOrderListPage() {
           r.documentNumber.toLowerCase().includes(q) ||
           r.vendorName.toLowerCase().includes(q) ||
           r.vendorGstin.toLowerCase().includes(q) ||
-          r.buyerName.toLowerCase().includes(q) ||
+          r.createdByName.toLowerCase().includes(q) ||
           r.locationName.toLowerCase().includes(q) ||
           r.statusLabel.toLowerCase().includes(q),
       )
@@ -229,7 +229,7 @@ export function PurchaseOrderListPage() {
     }
     if (filters.vendorName) list = list.filter((r) => r.vendorName === filters.vendorName)
     if (filters.locationName) list = list.filter((r) => r.locationName === filters.locationName)
-    if (filters.buyerName) list = list.filter((r) => r.buyerName === filters.buyerName)
+    if (filters.buyerName) list = list.filter((r) => r.createdByName === filters.buyerName)
     if (filters.invoiceStatus) {
       list = list.filter((r) => r.invoiceStatus === filters.invoiceStatus)
     }
@@ -297,6 +297,8 @@ export function PurchaseOrderListPage() {
           `${po.documentNumber} sent for approval`,
         ),
       onPrint: (po: PurchaseOrderListRow) => navigate(`/purchase/orders/${po.id}/print`),
+      onCreateGrn: (po: PurchaseOrderListRow) =>
+        navigate(`/purchase/grn/new?poId=${po.id}`),
       onReopen: (po: PurchaseOrderListRow) =>
         void runAction(po.id, () => reopenPurchaseOrder(po.id), `${po.documentNumber} reopened`),
       onCancel: (po: PurchaseOrderListRow) => {
@@ -340,7 +342,7 @@ export function PurchaseOrderListPage() {
         'Vendor',
         'Vendor GST Number',
         'Location',
-        'Buyer',
+        'Created By',
         'Currency',
         'Expected Delivery',
         'Basic Amount',
@@ -356,7 +358,7 @@ export function PurchaseOrderListPage() {
         r.vendorName,
         r.vendorGstin,
         r.locationName,
-        r.buyerName,
+        r.createdByName,
         r.currency,
         r.expectedDeliveryDate,
         r.basicAmount,
@@ -493,7 +495,7 @@ export function PurchaseOrderListPage() {
                 registerFilter={{
                   search: filters.search,
                   onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
-                  searchPlaceholder: 'Search PO number, vendor, GST, buyer…',
+                  searchPlaceholder: 'Search PO number, vendor, GST, creator…',
                   activeFilterCount: filterDrawer.activeCount,
                   onOpenFilters: filterDrawer.openDrawer,
                   chips: filterDrawer.chips,

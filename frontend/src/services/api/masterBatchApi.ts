@@ -84,6 +84,15 @@ export interface ItemDto {
   purchaseUomId?: string | null
   purchaseQtyPerUom: number | string
   uomConversionFactor?: number | string
+  uomConversions?: Array<{
+    id: string
+    uomId: string
+    uomCode: string
+    uomName: string
+    conversionFactor: number | string
+    isPurchaseAllowed: boolean
+    isDefaultPurchase: boolean
+  }>
   receivingTolerancePercentage?: number | string
   receivingToleranceId?: string | null
   receiptEntryMode?: string
@@ -308,6 +317,15 @@ export function mapItemDto(row: ItemDto): Item {
     purchaseUomId: row.purchaseUomId ?? null,
     purchaseQtyPerUom: num(row.uomConversionFactor ?? row.purchaseQtyPerUom),
     uomConversionFactor: num(row.uomConversionFactor ?? row.purchaseQtyPerUom),
+    uomConversions: (row.uomConversions ?? []).map((c) => ({
+      id: c.id,
+      uomId: c.uomId,
+      uomCode: c.uomCode,
+      uomName: c.uomName,
+      conversionFactor: num(c.conversionFactor),
+      isPurchaseAllowed: c.isPurchaseAllowed,
+      isDefaultPurchase: c.isDefaultPurchase,
+    })),
     receivingTolerancePercentage: num(row.receivingTolerancePercentage),
     receivingToleranceId: row.receivingToleranceId ?? null,
     receiptEntryMode: (row.receiptEntryMode ?? 'UNIT_ONLY') as Item['receiptEntryMode'],

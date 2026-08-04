@@ -33,6 +33,7 @@ import type {
   PurchaseRequisition,
   PurchaseRequisitionInput,
   PurchaseRequisitionListRow,
+  PurchaseRequisitionRevisionSnapshot,
   PurchaseSetup,
   QuotationComparison,
   QuotationComparisonInput,
@@ -461,6 +462,20 @@ export async function updatePurchasePlanningSheetRow(
   }
 }
 
+export async function splitPurchasePlanningRowByVendor(
+  id: string,
+  splits: Array<{ vendorId: string; allocatedQuantity: number }>,
+): Promise<PurchasePlanningSheetRow[]> {
+  if (!isApiMode()) return demo.splitPurchasePlanningRowByVendor(id, splits)
+  try {
+    await ensureMasterVendorsForMapping()
+    const res = await planningApi.splitPlanningRowApi(id, { splits })
+    return res.data.map(mapApiPlanningRowToDomain)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
 export async function assignPurchasePlanningBuyer(
   id: string,
   buyerId: string,
@@ -647,13 +662,24 @@ export async function recalculatePurchasePlanningRows(
 
 export async function createPurchaseOrdersFromPlanningSelection(
   planningRowIds: string[],
-  options?: { seriesPrefix?: string },
+  options?: {
+    seriesPrefix?: string
+    orderDate?: string
+    deliveryWarehouseId?: string
+    deliveryAddress?: string
+    remarks?: string
+    orderQuantities?: Record<string, number>
+  },
 ): Promise<PurchaseOrder[]> {
   if (!isApiMode()) return demo.createPurchaseOrdersFromPlanningSelection(planningRowIds, options)
-  // No optimistic PO creation — server groups and numbers.
   try {
     const res = await poApi.createPurchaseOrdersFromPlanningApi({
       rowIds: planningRowIds,
+      orderDate: options?.orderDate,
+      deliveryWarehouseId: options?.deliveryWarehouseId,
+      deliveryAddress: options?.deliveryAddress,
+      remarks: options?.remarks,
+      orderQuantities: options?.orderQuantities,
     })
     // Re-fetch full DTOs so detail page has vendor + lines.
     const orders = await Promise.all(
@@ -1683,6 +1709,51 @@ export async function sendBackPurchaseDocument(
   }
 }
 
+export async function revisePurchaseRequisition(
+  id: string,
+  input: {
+    reason: string
+    requiredDate?: string | null
+    purchasePurpose?: string | null
+    remarks?: string | null
+    lines?: Array<{ id: string; requiredQuantity?: number; estimatedRate?: number }>
+  },
+): Promise<PurchaseRequisition> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'PR revision is API mode only in this build.')
+  }
+  try {
+    const res = await prApi.revisePurchaseRequisitionApi(id, input)
+    return mapApiRequisitionToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getPurchaseRequisitionRevisions(
+  id: string,
+): Promise<PurchaseRequisitionRevisionSnapshot[]> {
+  if (!isApiMode()) return []
+  try {
+    const res = await prApi.listPurchaseRequisitionRevisionsApi(id)
+    return (res.data ?? []).map((r) => {
+      const row = r as Record<string, unknown>
+      return {
+        id: String(row.id ?? ''),
+        revisionNo: Number(row.revisionNo ?? 0),
+        reason: String(row.reason ?? ''),
+        revisedAt: String(row.revisedAt ?? row.createdAt ?? ''),
+        revisedById: row.revisedById != null ? String(row.revisedById) : null,
+        headerSnapshot: row.headerSnapshot,
+        linesSnapshot: row.linesSnapshot,
+        changes: row.changes,
+      }
+    })
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
 export async function delegatePurchaseApproval(
   approvalId: string,
   toUserId: string,
@@ -1736,6 +1807,7 @@ export async function getPurchaseOrderSeriesOptions(): Promise<PurchaseOrderSeri
 export {
   canCreatePoFromPlanningRow,
   canSelectPlanningRowForPo,
+  planningOrderableQuantity,
 } from './purchaseService'
 
 /**
@@ -2279,6 +2351,11 @@ function mapApiSetupToDomain(api: setupApi.ApiPurchaseSetup): PurchaseSetup {
       overReceiptTolerancePct: Number(g.overReceiptTolerancePct ?? 0),
       requireApprovalOnPoRevision: g.requireApprovalOnPoRevision ?? true,
       requireApprovalOnPo: g.requireApprovalOnPo ?? true,
+      requirePoReleaseWorkflow: g.requirePoReleaseWorkflow !== false,
+      requireApprovalOnPrRevision: g.requireApprovalOnPrRevision ?? true,
+      allowBackdatedPo: g.allowBackdatedPo ?? false,
+      backdatedPoDaysLimit: Number(g.backdatedPoDaysLimit ?? 0),
+      requireApprovalForBackdatedPo: g.requireApprovalForBackdatedPo !== false,
       allowShortClose: g.allowShortClose,
       requirePoWarehouse: g.requirePoWarehouse,
       requireExpectedDeliveryDate: g.requireExpectedDeliveryDate,
@@ -2400,6 +2477,11 @@ function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseS
       overReceiptTolerancePct: setup.general.overReceiptTolerancePct,
       requireApprovalOnPoRevision: setup.general.requireApprovalOnPoRevision,
       requireApprovalOnPo: setup.general.requireApprovalOnPo,
+      requirePoReleaseWorkflow: setup.general.requirePoReleaseWorkflow,
+      requireApprovalOnPrRevision: setup.general.requireApprovalOnPrRevision,
+      allowBackdatedPo: setup.general.allowBackdatedPo,
+      backdatedPoDaysLimit: setup.general.backdatedPoDaysLimit,
+      requireApprovalForBackdatedPo: setup.general.requireApprovalForBackdatedPo,
       allowShortClose: setup.general.allowShortClose,
       requirePoWarehouse: setup.general.requirePoWarehouse,
       requireExpectedDeliveryDate: setup.general.requireExpectedDeliveryDate,

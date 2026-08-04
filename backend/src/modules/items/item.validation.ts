@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { paginationSchema } from '../../utils/pagination.js'
+// HELD: MS_GRADE_SECTION validation paused — restore when re-enabling validateItemNameFormat.
+// import { assertRawMaterialItemName, isRawMaterialItem } from './item-naming.rules.js'
 
 export const listItemsQuerySchema = paginationSchema.extend({
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
@@ -116,7 +118,37 @@ const itemBaseSchema = z.object({
   drawingNo: z.string().trim().max(64).nullable().optional(),
   subAssemblyRule: z.enum(['phantom', 'manufactured', 'purchased', 'subcontracted']).nullable().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+  uomConversions: z
+    .array(
+      z.object({
+        uomId: z.string().uuid(),
+        conversionFactor: z.coerce.number().positive(),
+        isPurchaseAllowed: z.boolean().optional(),
+        isDefaultPurchase: z.boolean().optional(),
+      }),
+    )
+    .optional(),
 })
+
+function validateItemNameFormat(
+  data: { name?: string; itemType?: string; productType?: string },
+  ctx: z.RefinementCtx,
+  namePath: 'name' = 'name',
+): void {
+  // HELD (2026-08-04): MS_GRADE_SECTION Zod check paused — see item-naming.rules assertRawMaterialItemName.
+  return
+  // if (!data.name?.trim()) return
+  // if (!isRawMaterialItem(data.itemType, data.productType)) return
+  // try {
+  //   assertRawMaterialItemName(data.name, data.itemType, data.productType)
+  // } catch (err) {
+  //   ctx.addIssue({
+  //     code: 'custom',
+  //     message: err instanceof Error ? err.message : 'Invalid raw material item name',
+  //     path: [namePath],
+  //   })
+  // }
+}
 
 function validateItemRules(data: z.infer<typeof itemBaseSchema>, ctx: z.RefinementCtx): void {
   if (data.itemType === 'sub_assembly' && !data.subAssemblyRule) {
@@ -130,6 +162,7 @@ function validateItemRules(data: z.infer<typeof itemBaseSchema>, ctx: z.Refineme
       path: ['uomConversionFactor'],
     })
   }
+  validateItemNameFormat(data, ctx)
 }
 
 export const createItemSchema = itemBaseSchema.superRefine(validateItemRules)
@@ -137,6 +170,7 @@ export const updateItemSchema = itemBaseSchema.partial().superRefine((data, ctx)
   if (data.itemType === 'sub_assembly' && data.subAssemblyRule === null) {
     ctx.addIssue({ code: 'custom', message: 'Sub-assembly rule required', path: ['subAssemblyRule'] })
   }
+  validateItemNameFormat(data, ctx)
 })
 
 export type ListItemsQuery = z.infer<typeof listItemsQuerySchema>

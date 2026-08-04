@@ -4,12 +4,14 @@ import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
 import { PurchaseDocumentLetterhead } from '@/components/purchase/PurchaseDocumentLetterhead'
 import { getPurchaseInvoiceById } from '@/services/purchase'
 import type { PurchaseInvoice } from '@/types/purchaseDomain'
-import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
+import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { formatStatus } from '@/components/ui/Badge'
 import { notify } from '@/store/toastStore'
 import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
 import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
+import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
+import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
 
 export function PurchaseInvoicePrintPage() {
   const { id } = useParams()
@@ -97,15 +99,24 @@ export function PurchaseInvoicePrintPage() {
               <th>#</th>
               <th>Item</th>
               <th>HSN</th>
-              <th>Qty</th>
-              <th>Rate</th>
+              <th className="num">Qty</th>
+              <th className="num">Rate</th>
               <th>Taxable</th>
               <th>GST%</th>
               <th>Total</th>
             </tr>
           </thead>
           <tbody>
-            {inv.lines.map((l) => (
+            {inv.lines.map((l) => {
+              const dual = resolveDualQtyForPrint({
+                stockQty: l.quantity,
+                stockUom: l.uom,
+                purchaseQty: l.uomQuantity,
+                purchaseUom: l.purchaseUom,
+                uomConversionFactor: l.uomConversionFactor,
+                itemId: l.itemId,
+              })
+              return (
               <tr key={l.id}>
                 <td>{l.lineNo}</td>
                 <td>
@@ -114,15 +125,14 @@ export function PurchaseInvoicePrintPage() {
                   <span className="text-muted">{l.description || l.itemName}</span>
                 </td>
                 <td>{l.hsnCode || l.sacCode || '—'}</td>
-                <td>
-                  {formatNumber(l.quantity)} {l.uom}
-                </td>
+                <PurchasePrintDualQtyCell {...dual} />
                 <td>{formatCurrency(l.rate)}</td>
                 <td>{formatCurrency(l.taxableAmount)}</td>
                 <td>{l.gstRatePct}%</td>
                 <td>{formatCurrency(l.lineTotal)}</td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
 

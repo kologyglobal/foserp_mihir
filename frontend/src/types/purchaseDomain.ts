@@ -44,6 +44,7 @@ export type PurchaseRequisitionStatus =
   | 'draft'
   | 'pending_approval'
   | 'approved'
+  | 'partially_converted'
   | 'rejected'
   | 'converted_to_rfq'
   | 'converted_to_po'
@@ -54,6 +55,7 @@ export const PURCHASE_REQUISITION_STATUSES: readonly PurchaseRequisitionStatus[]
   'draft',
   'pending_approval',
   'approved',
+  'partially_converted',
   'rejected',
   'converted_to_rfq',
   'converted_to_po',
@@ -65,6 +67,7 @@ export const PURCHASE_REQUISITION_STATUS_LABELS: Record<PurchaseRequisitionStatu
   draft: 'Draft',
   pending_approval: 'Pending Approval',
   approved: 'Approved',
+  partially_converted: 'Partially Converted',
   rejected: 'Rejected',
   converted_to_rfq: 'Converted to RFQ',
   converted_to_po: 'Converted to PO',
@@ -777,6 +780,16 @@ export interface PurchaseSetupGeneral {
   requireApprovalOnPoRevision: boolean
   /** When true, new POs must be submitted for approval before release. */
   requireApprovalOnPo: boolean
+  /** When true, PO must be released before GRN. When false, draft POs may receive goods. */
+  requirePoReleaseWorkflow: boolean
+  /** When true, revising an approved PR returns it to pending approval. */
+  requireApprovalOnPrRevision: boolean
+  /** Allow PO order date earlier than today. */
+  allowBackdatedPo: boolean
+  /** Max days in the past when allowBackdatedPo is enabled. */
+  backdatedPoDaysLimit: number
+  /** Backdated PO must go through approval even when requireApprovalOnPo is off. */
+  requireApprovalForBackdatedPo: boolean
   allowShortClose: boolean
   requirePoWarehouse: boolean
   requireExpectedDeliveryDate: boolean
@@ -1279,12 +1292,18 @@ export interface PurchaseRequisitionLine {
   itemName: string
   specification: string
   category: PurchaseItemCategory
+  /** Engineering product type from Item Master (API / hydrated lines). */
+  productType?: EngineeringProductType | '' | null
   /** Master UOM UUID — required by purchase APIs when line has an item/qty. */
   uomId?: string | null
   uom: string
   hsnCode: string
   sacCode: string | null
   quantity: number
+  /** Cumulative qty on PO(s). */
+  orderedQuantity?: number
+  /** Required − ordered. */
+  remainingQuantity?: number
   estimatedRate: number
   amount: number
   currentStock: number
@@ -1324,9 +1343,21 @@ export interface PurchaseRequisitionLine {
   attachmentNote: string
 }
 
+export interface PurchaseRequisitionRevisionSnapshot {
+  id: string
+  revisionNo: number
+  reason: string
+  revisedAt: IsoDateTime
+  revisedById: string | null
+  headerSnapshot?: unknown
+  linesSnapshot?: unknown
+  changes?: unknown
+}
+
 export interface PurchaseRequisition extends PurchaseMoneyTotals, PurchaseAuditFields {
   id: string
   documentNumber: string
+  revisionNo: number
   documentDate: IsoDate
   status: PurchaseRequisitionStatus
   location: PurchaseLocationRef
@@ -1451,6 +1482,12 @@ export interface PurchasePlanningSheetRow {
   openPoQuantity: number
   /** Required Qty − Current Stock − Open PO Qty (floored at 0). */
   netPurchaseQuantity: number
+  /** Vendor allocation qty for this planning slice. */
+  allocatedQuantity: number
+  /** Qty already on PO from this row. */
+  orderedQuantity: number
+  /** allocated − ordered. */
+  remainingQuantity: number
   preferredVendorId: string | null
   preferredVendorName: string | null
   preferredVendorCode: string | null
@@ -1997,7 +2034,7 @@ export interface PurchaseOrderListRow {
   vendorName: string
   vendorGstin: string
   locationName: string
-  buyerName: string
+  createdByName: string
   currency: IndianCurrencyCode
   expectedDeliveryDate: IsoDate
   basicAmount: number
@@ -2237,6 +2274,10 @@ export interface PurchaseInvoiceLine {
   hsnCode: string
   sacCode: string | null
   quantity: number
+  /** Vendor / purchase UOM qty snapshot (when dual UOM). */
+  uomQuantity?: number | null
+  uomConversionFactor?: number | null
+  purchaseUom?: string | null
   rate: number
   discountAmount: number
   taxableAmount: number

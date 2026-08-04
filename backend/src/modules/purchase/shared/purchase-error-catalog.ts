@@ -52,6 +52,9 @@ export const PURCHASE_ERROR_CODE = {
   PPS_CANCELLED: 'PPS_CANCELLED',
   PPS_RFQ_REQUIRED: 'PPS_RFQ_REQUIRED',
   PPS_NOT_SELECTED: 'PPS_NOT_SELECTED',
+  PPS_SPLIT_INVALID: 'PPS_SPLIT_INVALID',
+  PPS_SPLIT_SUM_EXCEEDS: 'PPS_SPLIT_SUM_EXCEEDS',
+  PPS_SPLIT_NOT_ALLOWED: 'PPS_SPLIT_NOT_ALLOWED',
 
   // PO creation
   PO_NO_ELIGIBLE_ROWS: 'PO_NO_ELIGIBLE_ROWS',
@@ -117,6 +120,14 @@ export const PURCHASE_ERROR_CODE = {
   PO_REVISION_NO_CHANGES: 'PO_REVISION_NO_CHANGES',
   PO_REVISION_QTY_BELOW_RECEIVED: 'PO_REVISION_QTY_BELOW_RECEIVED',
   PO_REVISION_LINE_NOT_FOUND: 'PO_REVISION_LINE_NOT_FOUND',
+  PR_REVISION_REASON_REQUIRED: 'PR_REVISION_REASON_REQUIRED',
+  PR_REVISION_NO_CHANGES: 'PR_REVISION_NO_CHANGES',
+  PR_REVISION_NOT_ALLOWED: 'PR_REVISION_NOT_ALLOWED',
+  PR_REVISION_LINE_CONVERTED: 'PR_REVISION_LINE_CONVERTED',
+
+  PO_BACKDATE_NOT_ALLOWED: 'PO_BACKDATE_NOT_ALLOWED',
+  PO_BACKDATE_EXCEEDS_LIMIT: 'PO_BACKDATE_EXCEEDS_LIMIT',
+  PO_BACKDATE_APPROVAL_REQUIRED: 'PO_BACKDATE_APPROVAL_REQUIRED',
 
   // Shared
   TENANT_MISMATCH: 'TENANT_MISMATCH',
@@ -179,6 +190,9 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   [PURCHASE_ERROR_CODE.PPS_CANCELLED]: 'Cancelled rows cannot be converted.',
   [PURCHASE_ERROR_CODE.PPS_RFQ_REQUIRED]: 'RFQ-required PR items cannot be processed from Planning.',
   [PURCHASE_ERROR_CODE.PPS_NOT_SELECTED]: 'Select at least one planning row that is ready for PO (vendor, quantity, rate, date).',
+  [PURCHASE_ERROR_CODE.PPS_SPLIT_INVALID]: 'Each split needs a unique vendor and a quantity greater than zero.',
+  [PURCHASE_ERROR_CODE.PPS_SPLIT_SUM_EXCEEDS]: 'Split quantities must equal the row allocated quantity.',
+  [PURCHASE_ERROR_CODE.PPS_SPLIT_NOT_ALLOWED]: 'Cannot split a planning row after PO quantities have been ordered.',
 
   [PURCHASE_ERROR_CODE.PO_NO_ELIGIBLE_ROWS]: 'Select at least one eligible Planning row.',
   [PURCHASE_ERROR_CODE.PO_TENANT_MISMATCH]: 'All rows must belong to the current tenant.',
@@ -237,6 +251,12 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
     'Warehouse must belong to the selected plant.',
   [PURCHASE_ERROR_CODE.SETUP_PAYMENT_TERM_INVALID]: 'Payment term is invalid or inactive.',
   [PURCHASE_ERROR_CODE.PO_WAREHOUSE_REQUIRED]: 'Delivery warehouse is required.',
+  [PURCHASE_ERROR_CODE.PO_BACKDATE_NOT_ALLOWED]:
+    'Backdated purchase orders are not allowed. Enable in Purchase Setup or use today\'s date.',
+  [PURCHASE_ERROR_CODE.PO_BACKDATE_EXCEEDS_LIMIT]:
+    'PO order date is earlier than the allowed backdate limit in Purchase Setup.',
+  [PURCHASE_ERROR_CODE.PO_BACKDATE_APPROVAL_REQUIRED]:
+    'Backdated purchase orders must be submitted and approved before release.',
   [PURCHASE_ERROR_CODE.PO_EXPECTED_DELIVERY_REQUIRED]: 'Expected delivery date is required.',
   [PURCHASE_ERROR_CODE.PO_PAYMENT_TERMS_REQUIRED]: 'Payment terms are required.',
   [PURCHASE_ERROR_CODE.PO_NOT_REVISABLE]:
@@ -246,6 +266,10 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   [PURCHASE_ERROR_CODE.PO_REVISION_QTY_BELOW_RECEIVED]:
     'Revised quantity cannot be less than quantity already received.',
   [PURCHASE_ERROR_CODE.PO_REVISION_LINE_NOT_FOUND]: 'One or more revision lines were not found on this PO.',
+  [PURCHASE_ERROR_CODE.PR_REVISION_REASON_REQUIRED]: 'Revision reason is required.',
+  [PURCHASE_ERROR_CODE.PR_REVISION_NO_CHANGES]: 'No changes detected for this revision.',
+  [PURCHASE_ERROR_CODE.PR_REVISION_NOT_ALLOWED]: 'This purchase requisition cannot be revised in its current status.',
+  [PURCHASE_ERROR_CODE.PR_REVISION_LINE_CONVERTED]: 'Cannot revise — one or more lines have PO quantities ordered.',
 
   [PURCHASE_ERROR_CODE.TENANT_MISMATCH]: 'Tenant access denied.',
   [PURCHASE_ERROR_CODE.FORBIDDEN]: 'You do not have permission for this action.',

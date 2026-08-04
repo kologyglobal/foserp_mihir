@@ -23,6 +23,7 @@ import {
   toUomQuantity,
   UomConversionError,
 } from '../shared/uom-conversion.js'
+import { assertGrnLineMatchesPoUom } from '../shared/item-uom-resolution.js'
 import {
   nextPurchaseDocumentNumber,
   previewPurchaseDocumentNumber,
@@ -30,7 +31,7 @@ import {
 import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
 import {
   deriveReceiptStatus,
-  PO_RECEIVABLE_STATUSES,
+  resolvePoReceivableStatuses,
 } from '../orders/purchase-order.workflow.js'
 import {
   GoodsReceiptNotFoundError,
@@ -77,7 +78,11 @@ async function loadReceivablePo(tenantId: string, purchaseOrderId: string) {
       PURCHASE_ERROR_CODE.PO_NOT_FOUND,
     )
   }
-  if (!PO_RECEIVABLE_STATUSES.includes(po.status)) {
+  const settings = await resolveEffectivePurchaseDefaults(tenantId)
+  const receivable = resolvePoReceivableStatuses(
+    (settings as { requirePoReleaseWorkflow?: boolean }).requirePoReleaseWorkflow !== false,
+  )
+  if (!receivable.includes(po.status)) {
     throw new GoodsReceiptWorkflowError(
       purchaseMessage(PURCHASE_ERROR_CODE.GRN_PO_NOT_RECEIVABLE),
       PURCHASE_ERROR_CODE.GRN_PO_NOT_RECEIVABLE,
@@ -309,6 +314,10 @@ async function buildLineCreates(
       )
       return fromPo > 0 ? fromPo : 1
     })()
+    assertGrnLineMatchesPoUom({
+      poConversionFactor: factor,
+      clientFactor: (input as { uomConversionFactor?: unknown }).uomConversionFactor,
+    })
 
     let receivedUom: number
     let received: number

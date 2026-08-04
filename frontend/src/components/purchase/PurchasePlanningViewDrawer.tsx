@@ -108,8 +108,7 @@ export function PurchasePlanningViewDrawer({ open, row, onClose, onEdit }: Props
           />
         </Section>
 
-        <Section title="Buyer and Priority">
-          <ErpViewField label="Buyer" value={row.buyerName || '—'} />
+        <Section title="Priority">
           <ErpViewField
             label="Priority"
             value={PURCHASE_PLANNING_PRIORITY_LABELS[row.priority] ?? row.priority}
