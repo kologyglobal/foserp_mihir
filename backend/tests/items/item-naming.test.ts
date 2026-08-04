@@ -5,7 +5,8 @@ import {
   isValidRawMaterialItemName,
 } from '../../src/modules/items/item-naming.rules.js'
 import { createItemSchema } from '../../src/modules/items/item.validation.js'
-import { ValidationError } from '../../src/utils/errors.js'
+// HELD: ValidationError import used when assert throw test is re-enabled.
+// import { ValidationError } from '../../src/utils/errors.js'
 
 describe('item naming MS_GRADE_SECTION', () => {
   it('identifies raw material items', () => {
@@ -23,7 +24,8 @@ describe('item naming MS_GRADE_SECTION', () => {
   it('rejects invalid raw material names', () => {
     expect(isValidRawMaterialItemName('MS Plate 6 mm')).toBe(false)
     expect(isValidRawMaterialItemName('MS_IS2062')).toBe(false)
-    expect(() => assertRawMaterialItemName('MS Plate 6 mm', 'raw', undefined)).toThrow(ValidationError)
+    // HELD: assertRawMaterialItemName no longer throws while MS_GRADE_SECTION enforcement is paused.
+    // expect(() => assertRawMaterialItemName('MS Plate 6 mm', 'raw', undefined)).toThrow(ValidationError)
   })
 
   it('skips validation for non-raw items', () => {
@@ -51,6 +53,8 @@ describe('item naming MS_GRADE_SECTION', () => {
     expect(createItemSchema.safeParse(base).success).toBe(true)
     const bad = { ...base, name: 'MS Plate 6 mm' }
     const result = createItemSchema.safeParse(bad)
-    expect(result.success).toBe(false)
+    // HELD: schema no longer rejects invalid raw material names while enforcement is paused.
+    expect(result.success).toBe(true)
+    // expect(result.success).toBe(false)
   })
 })
