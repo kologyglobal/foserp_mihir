@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, Fragment } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { type ColumnDef, type RowSelectionState } from '@tanstack/react-table'
 import {
   Ban,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   Download,
   Eye,
+  Layers,
+  ListTree,
+  MapPin,
+  Package,
   PauseCircle,
   Pencil,
   RefreshCw,
@@ -13,6 +19,7 @@ import {
   Users,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
 import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
@@ -29,6 +36,10 @@ import {
 } from '@/design-system/enterprise'
 import { Select } from '@/components/forms/Inputs'
 import { useCrmFilterDrawer } from '@/hooks/useCrmFilterDrawer'
+import {
+  PurchasePlanningSummaryCards,
+  type PlanningSummaryFilterKey,
+} from '@/components/purchase/PurchasePlanningSummaryCards'
 import { PurchasePlanningViewDrawer } from '@/components/purchase/PurchasePlanningViewDrawer'
 import { PurchasePlanningEditDrawer } from '@/components/purchase/PurchasePlanningEditDrawer'
 import {
@@ -40,9 +51,11 @@ import {
   bulkUpdatePurchasePlanningStatus,
   canSelectPlanningRowForPo,
   cancelPurchasePlanningRow,
+  createPurchaseOrdersFromConsolidation,
   createPurchaseOrdersFromPlanningSelection,
   getPurchaseOrderSeriesOptions,
   getPurchasePlanningSheet,
+  getPurchaseSetup,
   getPurchaseWarehouses,
   getVendors,
   holdPurchasePlanningRow,
@@ -56,9 +69,15 @@ import {
   PURCHASE_PLANNING_PRIORITIES,
   PURCHASE_PLANNING_PURCHASE_TYPES,
   PURCHASE_PLANNING_STATUSES,
+  type PlanningSheetSummary,
   type PurchasePlanningSheetInput,
   type PurchaseOrderSeriesOption,
 } from '@/services/purchase'
+import { PurchasePlanningAllocateModal } from '@/components/purchase/PurchasePlanningAllocateModal'
+import {
+  consolidatePlanningRows,
+  type FeConsolidatedGroup,
+} from '@/utils/purchase/purchasePlanningConsolidation'
 import { usePurchasePermissions } from '@/utils/permissions'
 import type {
   PurchasePlanningPurchaseType,
@@ -114,6 +133,35 @@ function isOverdue(row: PurchasePlanningSheetRow) {
 
 function isSelectionDisabled(row: PurchasePlanningSheetRow) {
   return HIDDEN_FROM_PENDING_VIEW.includes(row.status)
+}
+
+function summarizePlanningRows(rows: PurchasePlanningSheetRow[]): PlanningSheetSummary {
+  const today = todayIso()
+  return {
+    totalPendingPlanning: rows.filter((r) => r.status === 'draft').length,
+    criticalItems: rows.filter((r) => r.priority === 'critical').length,
+    overdueItems: rows.filter(
+      (r) =>
+        Boolean(r.requiredByDate) &&
+        r.requiredByDate < today &&
+        !['completed', 'cancelled', 'po_created'].includes(r.status),
+    ).length,
+    vendorSelectionPending: rows.filter(
+      (r) => !r.preferredVendorId && ['draft', 'pending_review'].includes(r.status),
+    ).length,
+    poPending: rows.filter((r) => r.status === 'po_pending').length,
+    poCreated: rows.filter((r) => r.status === 'po_created').length,
+    totalEstimatedPurchaseValue: rows
+      .filter((r) => !['cancelled', 'completed'].includes(r.status))
+      .reduce((s, r) => s + (r.estimatedAmount || 0), 0),
+  }
+}
+
+function priorityTone(priority: string): 'danger' | 'warning' | 'info' | 'neutral' {
+  if (priority === 'critical') return 'danger'
+  if (priority === 'high') return 'warning'
+  if (priority === 'medium' || priority === 'normal') return 'info'
+  return 'neutral'
 }
 
 /** Human-readable gaps preventing Create PO for one row (mirrors canSelectPlanningRowForPo). */
@@ -229,6 +277,9 @@ function Truncate({ text, className }: { text: string; className?: string }) {
   )
 }
 
+/** Product demand = consolidated Item+UOM+Location; document = one PPS row per PR line. */
+type PlanningViewMode = 'product' | 'document'
+
 export function PurchasePlanningSheetPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -260,16 +311,32 @@ export function PurchasePlanningSheetPage() {
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false)
   const [bulkVendorId, setBulkVendorId] = useState('')
   const [bulkStatus, setBulkStatus] = useState('po_pending')
+  /**
+   * Product-centric demand is the default page view (groups Item + UOM + location).
+   * Setup flag tracks tenant preference/messaging; on-page toggle switches to document lines.
+   */
+  const [viewMode, setViewMode] = useState<PlanningViewMode>('product')
+  const [setupPrefersProduct, setSetupPrefersProduct] = useState(true)
+  const consolidationEnabled = viewMode === 'product'
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Record<string, boolean>>({})
+  const [allocateGroup, setAllocateGroup] = useState<FeConsolidatedGroup | null>(null)
+  const [allocating, setAllocating] = useState(false)
+  const [summaryFilterKey, setSummaryFilterKey] = useState<PlanningSummaryFilterKey | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [sheet, v, wh] = await Promise.all([
+      const [sheet, v, wh, setup] = await Promise.all([
         getPurchasePlanningSheet(),
         getVendors(),
         getPurchaseWarehouses(),
+        getPurchaseSetup().catch(() => null),
       ])
+      // Product-centric is the product goal (page defaults to product; toggle is sticky across reloads).
+      // Explicit false in setup only updates the banner/hint about tenant default — not the active grid mode.
+      const setupFlag = setup?.general?.planningConsolidationEnabled
+      setSetupPrefersProduct(setupFlag !== false)
       const enriched = sheet.map((r) => {
         if (r.preferredVendorName || !r.preferredVendorId) return r
         const match = v.find((x) => x.id === r.preferredVendorId)
@@ -434,6 +501,61 @@ export function PurchasePlanningSheetPage() {
   })
 
   const filtered = useMemo(() => sortRows(filterRows(rows, filters), sortBy), [rows, filters, sortBy])
+
+  const summary = useMemo(() => summarizePlanningRows(rows), [rows])
+
+  const consolidatedGroups = useMemo(() => {
+    if (!consolidationEnabled) return []
+    return consolidatePlanningRows(
+      filtered.map((r) => ({
+        id: r.id,
+        itemId: r.itemId || null,
+        itemCode: r.itemCode,
+        itemName: r.itemName,
+        itemDescription: r.specification || r.itemName,
+        uomId: r.uom || null,
+        deliveryLocationId: r.deliveryLocationId ?? null,
+        requiredQuantity: r.requiredQuantity,
+        netPurchaseQuantity: r.netPurchaseQuantity,
+        requiredDate: r.requiredByDate || null,
+        purchaseRequisitionId: r.purchaseRequisitionId,
+        purchaseRequisitionNumber: r.purchaseRequisitionNumber,
+        purchaseRequisitionLineId: r.purchaseRequisitionLineId,
+        preferredVendorId: r.preferredVendorId,
+        selectedVendorId: r.preferredVendorId,
+        preferredVendorName: r.preferredVendorName,
+        expectedRate: r.expectedRate,
+        negotiatedRate: r.negotiatedRate,
+        status: r.status,
+        planningNumber: r.planningNumber,
+      })),
+    )
+  }, [consolidationEnabled, filtered])
+
+  const onCreateFromConsolidation = async (
+    allocations: Array<{ vendorId: string; quantity: number; rate: number }>,
+  ) => {
+    if (!allocateGroup) return
+    setAllocating(true)
+    try {
+      const orders = await createPurchaseOrdersFromConsolidation({
+        planningRowIds: allocateGroup.planningRowIds,
+        allocations,
+      })
+      notify.success(
+        orders.length === 1
+          ? `Created ${orders[0].documentNumber}`
+          : `Created ${orders.length} purchase orders`,
+      )
+      setAllocateGroup(null)
+      await load()
+      if (orders[0]?.id) navigate(`/purchase/orders/${orders[0].id}`)
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Failed to create PO from allocation')
+    } finally {
+      setAllocating(false)
+    }
+  }
 
   const selectedRows = useMemo(
     () => filtered.filter((r) => rowSelection[r.id]),
@@ -764,6 +886,34 @@ export function PurchasePlanningSheetPage() {
         cell: ({ row }) => formatDate(row.original.planningDate),
       },
       {
+        id: 'status',
+        accessorKey: 'status',
+        header: 'Status',
+        meta: { columnLabel: 'Status' },
+        cell: ({ row }) => (
+          <StatusDot
+            label={PURCHASE_PLANNING_STATUS_LABELS[row.original.status] ?? row.original.status}
+            tone={statusToneFromLabel(row.original.status)}
+          />
+        ),
+      },
+      {
+        id: 'priority',
+        accessorKey: 'priority',
+        header: 'Priority',
+        meta: { columnLabel: 'Priority' },
+        cell: ({ row }) => (
+          <StatusDot
+            label={
+              PURCHASE_PLANNING_PRIORITY_LABELS[
+                row.original.priority as keyof typeof PURCHASE_PLANNING_PRIORITY_LABELS
+              ] ?? row.original.priority
+            }
+            tone={priorityTone(row.original.priority)}
+          />
+        ),
+      },
+      {
         id: 'prNumber',
         header: 'PR Number',
         meta: { columnLabel: 'PR Number' },
@@ -929,7 +1079,7 @@ export function PurchasePlanningSheetPage() {
     <>
       <OperationalPageShell
         title="Purchase Planning Sheet"
-        description="Plan approved direct-purchase requirements, assign vendors, and create Purchase Orders."
+        description="Review demand, assign vendors, and create purchase orders from approved requisitions."
         badge="Purchase"
         variant="dynamics"
         breadcrumbs={purchaseBreadcrumbs('Purchase Planning Sheet')}
@@ -1014,71 +1164,462 @@ export function PurchasePlanningSheetPage() {
             }
           />
         ) : (
-          <div className="min-w-0 space-y-3">
-            <EnterpriseRegisterTableShell className="min-w-0">
-              <ErpDataGrid
-                data={filtered}
-                columns={columns}
-                getRowId={(r) => r.id}
-                showCompactSearch={false}
-                enableColumnSorting
-                stickyFirstColumn
-                selectable
-                getRowCanSelect={(r) => !isSelectionDisabled(r)}
-                rowSelection={rowSelection}
-                onRowSelectionChange={(updater) => {
-                  setRowSelection((prev) => {
-                    const next = typeof updater === 'function' ? updater(prev) : updater
-                    const cleaned: RowSelectionState = {}
-                    for (const [id, on] of Object.entries(next)) {
-                      if (!on) continue
-                      const row = rows.find((r) => r.id === id) ?? filtered.find((r) => r.id === id)
-                      if (!row || isSelectionDisabled(row)) continue
-                      cleaned[id] = true
+          <div className="purchase-planning-register min-w-0 space-y-3">
+            <PurchasePlanningSummaryCards
+              summary={summary}
+              activeKey={summaryFilterKey}
+              onSelect={(key, patch) => {
+                setSummaryFilterKey(key)
+                setFilters((f) => ({ ...f, ...patch }))
+              }}
+            />
+
+            <div className="purchase-planning-register__toolbar">
+              <div
+                className="purchase-planning-register__view-switch erp-segmented-pills"
+                role="tablist"
+                aria-label="Planning view"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={consolidationEnabled}
+                  className={cn(
+                    'erp-segmented-pills__btn',
+                    consolidationEnabled && 'erp-segmented-pills__btn--active',
+                  )}
+                  onClick={() => setViewMode('product')}
+                >
+                  <Layers className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                  Product demand
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={!consolidationEnabled}
+                  className={cn(
+                    'erp-segmented-pills__btn',
+                    !consolidationEnabled && 'erp-segmented-pills__btn--active',
+                  )}
+                  onClick={() => setViewMode('document')}
+                >
+                  <ListTree className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                  Document lines
+                </button>
+              </div>
+
+              <div className="purchase-planning-register__meta">
+                {consolidationEnabled ? (
+                  <>
+                    <span className="purchase-planning-register__count">
+                      {consolidatedGroups.length} item group
+                      {consolidatedGroups.length === 1 ? '' : 's'}
+                    </span>
+                    <span className="purchase-planning-register__sep" aria-hidden>
+                      ·
+                    </span>
+                    <span>
+                      {filtered.length} PR line{filtered.length === 1 ? '' : 's'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="purchase-planning-register__count">
+                      {filtered.length} of {rows.length} line
+                      {rows.length === 1 ? '' : 's'}
+                    </span>
+                    {selectedRows.length > 0 ? (
+                      <>
+                        <span className="purchase-planning-register__sep" aria-hidden>
+                          ·
+                        </span>
+                        <span className="purchase-planning-register__selected">
+                          {selectedRows.length} selected
+                          {selectedReadyCount < selectedRows.length
+                            ? ` (${selectedReadyCount} ready for PO)`
+                            : ''}
+                        </span>
+                      </>
+                    ) : null}
+                  </>
+                )}
+              </div>
+
+              {!setupPrefersProduct && consolidationEnabled ? (
+                <p className="purchase-planning-register__hint">
+                  Tenant default is document lines — change in{' '}
+                  <TableLink to="/purchase/setup">Purchase Setup</TableLink>.
+                </p>
+              ) : (
+                <p className="purchase-planning-register__hint">
+                  {consolidationEnabled
+                    ? 'Same item + UOM + location from multiple PRs appears as one row. Expand for PR source lines.'
+                    : 'One row per PR / planning line. Select rows to create POs or run bulk actions.'}
+                </p>
+              )}
+            </div>
+
+            {!consolidationEnabled && selectedRows.length > 0 ? (
+              <div className="purchase-planning-register__selection-bar" role="status">
+                <div className="purchase-planning-register__selection-text">
+                  <strong>{selectedRows.length}</strong> row
+                  {selectedRows.length === 1 ? '' : 's'} selected
+                  {selectedReadyCount > 0 ? (
+                    <span className="text-erp-muted">
+                      {' '}
+                      · {selectedReadyCount} ready for PO
+                    </span>
+                  ) : null}
+                </div>
+                <ErpButtonGroup className="shrink-0">
+                  <ErpButton
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    icon={UserCheck}
+                    disabled={!canEdit}
+                    onClick={() => setBulkBuyerOpen(true)}
+                  >
+                    Assign buyer
+                  </ErpButton>
+                  <ErpButton
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    icon={Users}
+                    disabled={!canEdit}
+                    onClick={() => setBulkVendorOpen(true)}
+                  >
+                    Select vendor
+                  </ErpButton>
+                  <ErpButton
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    icon={ShoppingCart}
+                    disabled={
+                      creatingPo ||
+                      !allSelectedEligible ||
+                      !perms.canCreatePoFromPlanning
                     }
-                    return cleaned
-                  })
-                }}
-                pageSizeOptions={[25, 50, 100]}
-                showToolbarView
-                showToolbarExport={false}
-                emptyMessage={
-                  rows.length === 0
-                    ? 'No planning rows yet. Approved PRs with RFQ Required = No create one row per item automatically.'
-                    : 'No pending planning rows match filters. Converted (PO Created) / completed / cancelled rows are hidden by default — use Status filter to view them.'
-                }
-                registerBar={
+                    onClick={() => void openCreatePoDialog()}
+                  >
+                    Create PO
+                  </ErpButton>
+                  <ErpButton
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setRowSelection({})}
+                  >
+                    Clear
+                  </ErpButton>
+                </ErpButtonGroup>
+              </div>
+            ) : null}
+
+            {consolidationEnabled ? (
+              <EnterpriseRegisterTableShell className="min-w-0 purchase-planning-register__grid">
+                <div className="border-b border-erp-border bg-erp-surface-alt px-3 py-2">
                   <CrmListFilterBar
                     search={String(filters.search ?? '')}
                     onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
-                    searchPlaceholder="Search planning no, PR, item, vendor…"
+                    searchPlaceholder="Search item, PR, vendor…"
                     activeFilterCount={filterDrawer.activeCount}
                     onOpenFilters={filterDrawer.openDrawer}
                     chips={filterDrawer.chips}
                     onRemoveChip={filterDrawer.removeChip}
                     onClearAll={() => {
                       setFilters(DEFAULT_FILTERS)
+                      setSummaryFilterKey(null)
                     }}
-                    className="crm-list-filter-bar--embedded"
+                    className="crm-list-filter-bar--embedded !border-0 !bg-transparent !p-0"
                     showCommandPaletteHint={false}
-                    sort={
-                      <CrmListSortSelect
-                        value={sortBy}
-                        onChange={(v) => setSortBy(v as SortKey)}
-                        aria-label="Sort planning sheet"
-                        options={[
-                          { value: 'planningDate', label: 'Planning date' },
-                          { value: 'requiredByDate', label: 'Required by' },
-                          { value: 'priority', label: 'Priority' },
-                          { value: 'status', label: 'Status' },
-                          { value: 'planningNumber', label: 'Planning no.' },
-                        ]}
-                      />
-                    }
                   />
-                }
-              />
-            </EnterpriseRegisterTableShell>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="purchase-planning-demand-table min-w-full text-left">
+                    <thead>
+                      <tr>
+                        <th className="w-10" scope="col">
+                          <span className="sr-only">Expand</span>
+                        </th>
+                        <th scope="col">Item</th>
+                        <th scope="col">Location / UOM</th>
+                        <th scope="col" className="text-right">
+                          Net qty
+                        </th>
+                        <th scope="col" className="text-right">
+                          PRs
+                        </th>
+                        <th scope="col">Earliest required</th>
+                        <th scope="col">Suggested vendors</th>
+                        <th scope="col" className="text-right">
+                          Action
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {consolidatedGroups.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="purchase-planning-demand-table__empty">
+                            <div className="flex flex-col items-center gap-2 py-10 text-center">
+                              <Package className="h-8 w-8 text-erp-muted opacity-50" aria-hidden />
+                              <p className="text-[13px] font-medium text-erp-text">
+                                No demand groups for current filters
+                              </p>
+                              <p className="max-w-sm text-[12px] text-erp-muted">
+                                Adjust filters or switch to Document lines. Converted and cancelled rows are
+                                hidden unless Status is set.
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        consolidatedGroups.map((g) => {
+                          const open = Boolean(expandedGroupKeys[g.groupKey])
+                          const qty = g.totalNetQty || g.totalRequiredQty
+                          const overdueEarliest =
+                            Boolean(g.earliestRequiredDate) && g.earliestRequiredDate! < todayIso()
+                          return (
+                            <Fragment key={g.groupKey}>
+                              <tr
+                                className={cn(
+                                  'purchase-planning-demand-table__row',
+                                  open && 'purchase-planning-demand-table__row--open',
+                                )}
+                              >
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="purchase-planning-demand-table__expand"
+                                    aria-expanded={open}
+                                    aria-label={open ? 'Collapse PR lines' : 'Expand PR lines'}
+                                    onClick={() =>
+                                      setExpandedGroupKeys((prev) => ({
+                                        ...prev,
+                                        [g.groupKey]: !prev[g.groupKey],
+                                      }))
+                                    }
+                                  >
+                                    {open ? (
+                                      <ChevronDown className="h-4 w-4" aria-hidden />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" aria-hidden />
+                                    )}
+                                  </button>
+                                </td>
+                                <td>
+                                  <div className="purchase-planning-demand-table__item">
+                                    <span className="purchase-planning-demand-table__code">
+                                      {g.itemCode || '—'}
+                                    </span>
+                                    <span className="purchase-planning-demand-table__name">
+                                      {g.itemName}
+                                    </span>
+                                    {g.description && g.description !== g.itemName ? (
+                                      <span className="purchase-planning-demand-table__desc">
+                                        {g.description}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </td>
+                                <td>
+                                  <div className="purchase-planning-demand-table__loc">
+                                    <span className="inline-flex items-center gap-1 text-erp-muted">
+                                      <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+                                      {g.deliveryLocationId
+                                        ? warehouses.find((w) => w.id === g.deliveryLocationId)?.name ||
+                                          g.deliveryLocationId
+                                        : 'Any location'}
+                                    </span>
+                                    <span className="font-medium text-erp-text">
+                                      {g.uomId || '—'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="text-right">
+                                  <span className="purchase-planning-demand-table__qty tabular-nums">
+                                    {qty}
+                                  </span>
+                                </td>
+                                <td className="text-right">
+                                  <span className="purchase-planning-demand-table__pr-count tabular-nums">
+                                    {g.prCount}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span
+                                    className={cn(
+                                      'tabular-nums',
+                                      overdueEarliest && 'font-semibold text-red-700',
+                                    )}
+                                  >
+                                    {g.earliestRequiredDate
+                                      ? formatDate(g.earliestRequiredDate)
+                                      : '—'}
+                                  </span>
+                                </td>
+                                <td>
+                                  {g.suggestedVendors.length ? (
+                                    <div className="purchase-planning-demand-table__vendors">
+                                      {g.suggestedVendors.slice(0, 2).map((v) => (
+                                        <span
+                                          key={v.id || v.name}
+                                          className="purchase-planning-demand-table__vendor-chip"
+                                        >
+                                          {v.name}
+                                        </span>
+                                      ))}
+                                      {g.suggestedVendors.length > 2 ? (
+                                        <span className="text-[11px] text-erp-muted">
+                                          +{g.suggestedVendors.length - 2}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  ) : (
+                                    <span className="text-erp-muted">—</span>
+                                  )}
+                                </td>
+                                <td className="text-right">
+                                  <ErpButton
+                                    type="button"
+                                    size="sm"
+                                    variant="primary"
+                                    icon={ShoppingCart}
+                                    disabled={
+                                      !perms.canCreatePoFromPlanning || qty <= 0
+                                    }
+                                    onClick={() => setAllocateGroup(g)}
+                                  >
+                                    Allocate / Create PO
+                                  </ErpButton>
+                                </td>
+                              </tr>
+                              {open ? (
+                                <tr className="purchase-planning-demand-table__detail">
+                                  <td colSpan={8}>
+                                    <div className="purchase-planning-demand-table__detail-inner">
+                                      <div className="purchase-planning-demand-table__detail-head">
+                                        Contributing PR lines
+                                        <span className="text-erp-muted font-normal normal-case">
+                                          {' '}
+                                          · total {qty}
+                                        </span>
+                                      </div>
+                                      <table className="purchase-planning-demand-table__nested">
+                                        <thead>
+                                          <tr>
+                                            <th>PR</th>
+                                            <th>Planning #</th>
+                                            <th className="text-right">Qty</th>
+                                            <th className="text-right">Rate</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {g.members.map((m) => (
+                                            <tr key={m.planningRowId}>
+                                              <td>
+                                                <TableLink
+                                                  to={`/purchase/requisitions/${m.purchaseRequisitionId}`}
+                                                >
+                                                  {m.purchaseRequisitionNumber}
+                                                </TableLink>
+                                              </td>
+                                              <td className="font-mono text-[12px]">
+                                                {m.planningNumber || '—'}
+                                              </td>
+                                              <td className="text-right tabular-nums">
+                                                {m.netPurchaseQuantity || m.requiredQuantity}
+                                              </td>
+                                              <td className="text-right tabular-nums">
+                                                {m.expectedRate != null && m.expectedRate > 0
+                                                  ? formatCurrency(m.expectedRate)
+                                                  : '—'}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ) : null}
+                            </Fragment>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </EnterpriseRegisterTableShell>
+            ) : (
+              <EnterpriseRegisterTableShell className="min-w-0 purchase-planning-register__grid">
+                <ErpDataGrid
+                  data={filtered}
+                  columns={columns}
+                  getRowId={(r) => r.id}
+                  showCompactSearch={false}
+                  enableColumnSorting
+                  stickyFirstColumn
+                  selectable
+                  getRowCanSelect={(r) => !isSelectionDisabled(r)}
+                  rowSelection={rowSelection}
+                  onRowSelectionChange={(updater) => {
+                    setRowSelection((prev) => {
+                      const next = typeof updater === 'function' ? updater(prev) : updater
+                      const cleaned: RowSelectionState = {}
+                      for (const [id, on] of Object.entries(next)) {
+                        if (!on) continue
+                        const row = rows.find((r) => r.id === id) ?? filtered.find((r) => r.id === id)
+                        if (!row || isSelectionDisabled(row)) continue
+                        cleaned[id] = true
+                      }
+                      return cleaned
+                    })
+                  }}
+                  pageSizeOptions={[25, 50, 100]}
+                  showToolbarView
+                  showToolbarExport={false}
+                  emptyMessage={
+                    rows.length === 0
+                      ? 'No planning rows yet. Approved PRs with RFQ Required = No create one row per item automatically.'
+                      : 'No pending planning rows match filters. Converted (PO Created) / completed / cancelled rows are hidden by default — use Status filter to view them.'
+                  }
+                  registerBar={
+                    <CrmListFilterBar
+                      search={String(filters.search ?? '')}
+                      onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
+                      searchPlaceholder="Search planning no, PR, item, vendor…"
+                      activeFilterCount={filterDrawer.activeCount}
+                      onOpenFilters={filterDrawer.openDrawer}
+                      chips={filterDrawer.chips}
+                      onRemoveChip={filterDrawer.removeChip}
+                      onClearAll={() => {
+                        setFilters(DEFAULT_FILTERS)
+                        setSummaryFilterKey(null)
+                      }}
+                      className="crm-list-filter-bar--embedded"
+                      showCommandPaletteHint={false}
+                      sort={
+                        <CrmListSortSelect
+                          value={sortBy}
+                          onChange={(v) => setSortBy(v as SortKey)}
+                          aria-label="Sort planning sheet"
+                          options={[
+                            { value: 'planningDate', label: 'Planning date' },
+                            { value: 'requiredByDate', label: 'Required by' },
+                            { value: 'priority', label: 'Priority' },
+                            { value: 'status', label: 'Status' },
+                            { value: 'planningNumber', label: 'Planning no.' },
+                          ]}
+                        />
+                      }
+                    />
+                  }
+                />
+              </EnterpriseRegisterTableShell>
+            )}
           </div>
         )}
       </OperationalPageShell>
@@ -1130,6 +1671,15 @@ export function PurchasePlanningSheetPage() {
           setPoModalRows([])
         }}
         onConfirm={(form) => void confirmCreatePo(form)}
+      />
+
+      <PurchasePlanningAllocateModal
+        open={Boolean(allocateGroup)}
+        group={allocateGroup}
+        vendors={vendors}
+        busy={allocating}
+        onClose={() => setAllocateGroup(null)}
+        onConfirm={(alloc) => void onCreateFromConsolidation(alloc)}
       />
 
       <Modal

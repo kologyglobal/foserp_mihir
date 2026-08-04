@@ -61,6 +61,10 @@ import type {
   PurchaseReturnListRow,
   PurchaseReturnOrigin,
   PurchaseReturnReason,
+  ReturnWizardPrefill,
+  SupplierQualityDashboardWidgets,
+  ItemSupplierQualityHistory,
+  VendorQualityScorecard,
 } from '../../types/purchaseDomain'
 import { INVOICE_MATCHING_RESULT_STATUS_LABELS } from '../../types/purchaseDomain'
 import { ApiError } from '../api/apiErrors'
@@ -77,6 +81,7 @@ import * as grnApi from './goodsReceiptApi'
 import * as invoiceApi from './purchaseInvoiceApi'
 import * as qiApi from './qualityInspectionApi'
 import * as returnApi from './purchaseReturnApi'
+import * as supplierQualityApi from './supplierQualityApi'
 import * as setupApi from '../api/purchaseSetupApi'
 import {
   aggregateGrniReportToDashboardRows,
@@ -695,6 +700,31 @@ export async function createPurchaseOrdersFromPlanningSelection(
     return orders
   } catch (err) {
     throwIfMissing(err, 'Create PO from Planning')
+  }
+}
+
+export async function createPurchaseOrdersFromConsolidation(payload: {
+  planningRowIds: string[]
+  allocations: Array<{ vendorId: string; quantity: number; rate: number }>
+}): Promise<PurchaseOrder[]> {
+  if (!isApiMode()) {
+    return demo.createPurchaseOrdersFromConsolidation(payload)
+  }
+  try {
+    const res = await planningApi.createPurchaseOrdersFromConsolidationApi(payload)
+    const orders = await Promise.all(
+      res.data.orders.map(async (o) => {
+        try {
+          const full = await poApi.getPurchaseOrderApi(o.id)
+          return mapApiPurchaseOrderToDomain(full.data)
+        } catch {
+          return mapApiPurchaseOrderToDomain(o)
+        }
+      }),
+    )
+    return orders
+  } catch (err) {
+    throwIfMissing(err, 'Create PO from consolidation')
   }
 }
 
@@ -2449,13 +2479,27 @@ function mapApiSetupToDomain(api: setupApi.ApiPurchaseSetup): PurchaseSetup {
       paperSize: api.print.paperSize,
       orientation: api.print.orientation,
     },
-    notifications: { ...api.notifications },
+    notifications: {
+      prPendingApproval: { ...(api.notifications?.prPendingApproval ?? { inApp: true, email: true }) },
+      rfqResponseDue: { ...(api.notifications?.rfqResponseDue ?? { inApp: true, email: true }) },
+      poDeliveryApproaching: {
+        ...(api.notifications?.poDeliveryApproaching ?? { inApp: true, email: false }),
+      },
+      poOverdue: { ...(api.notifications?.poOverdue ?? { inApp: true, email: true }) },
+      grnPendingInspection: {
+        ...(api.notifications?.grnPendingInspection ?? { inApp: true, email: false }),
+      },
+      invoiceMismatch: { ...(api.notifications?.invoiceMismatch ?? { inApp: true, email: true }) },
+      invoicePendingApproval: {
+        ...(api.notifications?.invoicePendingApproval ?? { inApp: true, email: true }),
+      },
+    },
     updatedAt: api.updatedAt ?? '',
     updatedBy: api.updatedById ?? 'System',
   }
 }
 
-/** Full nested PUT payload — round-trips every editable field. Notifications are omitted (read-only ON_HOLD). */
+/** Full nested PUT payload — round-trips every editable field. */
 function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseSetupInput {
   return {
     version: setup.version || undefined,
@@ -2551,6 +2595,15 @@ function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseS
       paperSize: 'A4',
       orientation: 'portrait',
     },
+    notifications: {
+      prPendingApproval: { ...setup.notifications.prPendingApproval },
+      rfqResponseDue: { ...setup.notifications.rfqResponseDue },
+      poDeliveryApproaching: { ...setup.notifications.poDeliveryApproaching },
+      poOverdue: { ...setup.notifications.poOverdue },
+      grnPendingInspection: { ...setup.notifications.grnPendingInspection },
+      invoiceMismatch: { ...setup.notifications.invoiceMismatch },
+      invoicePendingApproval: { ...setup.notifications.invoicePendingApproval },
+    },
   }
 }
 
@@ -2591,8 +2644,37 @@ export async function updatePurchaseSetup(
       receiving: { ...current.receiving, ...(patch.receiving ?? {}) },
       quality: { ...current.quality, ...(patch.quality ?? {}) },
       print: { ...current.print, ...(patch.print ?? {}) },
-      // Local-only merge — notifications are stripped from the API payload below.
-      notifications: { ...current.notifications, ...(patch.notifications ?? {}) },
+      // notifications merge is sent to API via mapDomainSetupToApiPayload
+      notifications: {
+        prPendingApproval: {
+          ...current.notifications.prPendingApproval,
+          ...(patch.notifications?.prPendingApproval ?? {}),
+        },
+        rfqResponseDue: {
+          ...current.notifications.rfqResponseDue,
+          ...(patch.notifications?.rfqResponseDue ?? {}),
+        },
+        poDeliveryApproaching: {
+          ...current.notifications.poDeliveryApproaching,
+          ...(patch.notifications?.poDeliveryApproaching ?? {}),
+        },
+        poOverdue: {
+          ...current.notifications.poOverdue,
+          ...(patch.notifications?.poOverdue ?? {}),
+        },
+        grnPendingInspection: {
+          ...current.notifications.grnPendingInspection,
+          ...(patch.notifications?.grnPendingInspection ?? {}),
+        },
+        invoiceMismatch: {
+          ...current.notifications.invoiceMismatch,
+          ...(patch.notifications?.invoiceMismatch ?? {}),
+        },
+        invoicePendingApproval: {
+          ...current.notifications.invoicePendingApproval,
+          ...(patch.notifications?.invoicePendingApproval ?? {}),
+        },
+      },
     }
     const res = await setupApi.putPurchaseSetupApi(mapDomainSetupToApiPayload(merged))
     return mapApiSetupToDomain(res.data)
@@ -3276,6 +3358,263 @@ export async function requestDeviationApproval(
 
 /* ─── Purchase Returns ─── */
 
+function mapWizardPrefillFromApi(api: returnApi.ApiReturnWizardPrefill): ReturnWizardPrefill {
+  const linesSrc = api.linesPrefill?.length
+    ? api.linesPrefill
+    : (api.lines ?? [])
+        .filter((l) => Number(l.remainingReturnableQuantity) > 0)
+        .map((l) => ({
+          goodsReceiptLineId: l.goodsReceiptLineId,
+          purchaseOrderLineId: l.purchaseOrderLineId,
+          itemId: l.itemId,
+          itemCode: l.itemCode,
+          itemName: l.itemName,
+          returnQuantity: l.remainingReturnableQuantity,
+          rate: l.rate,
+          batchNumber: l.batchNumber,
+          serialNumber: l.serialNumber,
+          remainingReturnableQuantity: l.remainingReturnableQuantity,
+        }))
+  return {
+    vendorId: api.vendorId || '',
+    purchaseOrderId: api.purchaseOrderId,
+    goodsReceiptId: api.goodsReceiptId,
+    qualityInspectionId: api.qualityInspectionId,
+    qualityInspectionNumber: api.qualityInspectionNumber,
+    warehouseId: api.warehouseId,
+    suggestedReturnType: api.suggestedReturnType || 'CREDIT',
+    replacementRequired: api.suggestedReturnType === 'REPLACEMENT',
+    reason: api.reason || 'Rejected on quality inspection',
+    totalRejected: Number(api.totalRejected) || 0,
+    totalReturned: Number(api.totalReturned) || 0,
+    totalRemaining: Number(api.totalRemaining) || 0,
+    lines: linesSrc.map((l) => ({
+      goodsReceiptLineId: l.goodsReceiptLineId,
+      purchaseOrderLineId: l.purchaseOrderLineId,
+      itemId: l.itemId || '',
+      itemCode: l.itemCode || '',
+      itemName: l.itemName || '',
+      returnQty: Number(l.returnQuantity) || Number(l.remainingReturnableQuantity) || 0,
+      unitCost: Number(l.rate) || 0,
+      batchLotNo: l.batchNumber || '',
+      serialNumber: l.serialNumber || '',
+      availableReturnQty:
+        Number(l.remainingReturnableQuantity) || Number(l.returnQuantity) || 0,
+    })),
+  }
+}
+
+/** Demo fallback: build wizard-style prefill without posting a return document. */
+async function buildDemoReturnWizardPrefill(params: {
+  qualityInspectionId?: string
+  goodsReceiptId?: string
+}): Promise<ReturnWizardPrefill> {
+  if (params.qualityInspectionId) {
+    const qi = await demo.getQualityInspectionById(params.qualityInspectionId)
+    if (!qi) throw new PurchaseServiceError('QI_NOT_FOUND', 'Quality inspection not found')
+    if (qi.rejectedQty <= 0) {
+      throw new PurchaseServiceError('RETURN_NO_QTY', 'Quality inspection has no rejected quantity')
+    }
+    const grn = qi.goodsReceiptId ? await demo.getGRNById(qi.goodsReceiptId) : null
+    const grnLine = grn?.lines.find((l) => l.id === qi.goodsReceiptLineId)
+    return {
+      vendorId: qi.vendor.id,
+      purchaseOrderId: qi.purchaseOrderId,
+      goodsReceiptId: qi.goodsReceiptId,
+      qualityInspectionId: qi.id,
+      qualityInspectionNumber: qi.documentNumber,
+      warehouseId: grn?.warehouseId ?? qi.location.id,
+      suggestedReturnType: 'CREDIT',
+      replacementRequired: false,
+      reason: qi.remarks || `Rejected on ${qi.documentNumber}`,
+      totalRejected: qi.rejectedQty,
+      totalReturned: 0,
+      totalRemaining: qi.rejectedQty,
+      lines: [
+        {
+          goodsReceiptLineId: qi.goodsReceiptLineId,
+          purchaseOrderLineId: null,
+          itemId: qi.itemId,
+          itemCode: qi.itemCode || '',
+          itemName: qi.itemName,
+          returnQty: qi.rejectedQty,
+          unitCost: grnLine?.rate ?? 0,
+          batchLotNo: qi.batchLotNo || '',
+          serialNumber: grnLine?.serialNumber || '',
+          availableReturnQty: qi.rejectedQty,
+        },
+      ],
+    }
+  }
+  if (params.goodsReceiptId) {
+    const grn = await demo.getGRNById(params.goodsReceiptId)
+    if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', 'GRN not found')
+    const lines = grn.lines
+      .filter((l) => (l.rejectedQty || 0) > 0 || (l.damagedQty || 0) > 0 || (l.excessQty || 0) > 0)
+      .map((l) => {
+        const qty = Math.max(l.rejectedQty || 0, l.damagedQty || 0, l.excessQty || 0)
+        return {
+          goodsReceiptLineId: l.id,
+          purchaseOrderLineId: l.purchaseOrderLineId ?? null,
+          itemId: l.itemId,
+          itemCode: l.itemCode,
+          itemName: l.itemName,
+          returnQty: qty,
+          unitCost: l.rate,
+          batchLotNo: l.batchNumber || '',
+          serialNumber: l.serialNumber || '',
+          availableReturnQty: qty,
+        }
+      })
+    if (!lines.length) {
+      throw new PurchaseServiceError('RETURN_NO_QTY', 'No returnable quantity on this GRN')
+    }
+    return {
+      vendorId: grn.vendor.id,
+      purchaseOrderId: grn.purchaseOrderId,
+      goodsReceiptId: grn.id,
+      qualityInspectionId: null,
+      qualityInspectionNumber: null,
+      warehouseId: grn.warehouseId,
+      suggestedReturnType: 'CREDIT',
+      replacementRequired: false,
+      reason: `Rejected on ${grn.documentNumber}`,
+      totalRejected: lines.reduce((s, l) => s + l.returnQty, 0),
+      totalReturned: 0,
+      totalRemaining: lines.reduce((s, l) => s + l.returnQty, 0),
+      lines,
+    }
+  }
+  throw new PurchaseServiceError('RETURN_PREFILL_ARGS', 'Provide qualityInspectionId or goodsReceiptId')
+}
+
+/**
+ * Prefill purchase return create wizard from QI and/or GRN
+ * (does not create a document — forms stay on /returns/new until save).
+ */
+export async function getReturnWizardPrefill(params: {
+  qualityInspectionId?: string
+  goodsReceiptId?: string
+}): Promise<ReturnWizardPrefill> {
+  if (!params.qualityInspectionId && !params.goodsReceiptId) {
+    throw new PurchaseServiceError(
+      'RETURN_PREFILL_ARGS',
+      'Provide qualityInspectionId or goodsReceiptId for return wizard prefill',
+    )
+  }
+  if (!isApiMode()) return buildDemoReturnWizardPrefill(params)
+  try {
+    const res = await returnApi.getReturnWizardPrefillApi({
+      qualityInspectionId: params.qualityInspectionId,
+      goodsReceiptId: params.goodsReceiptId,
+    })
+    const mapped = mapWizardPrefillFromApi(res.data)
+    if (!mapped.vendorId) {
+      throw new PurchaseServiceError('RETURN_NO_VENDOR', 'Cannot prefill — no vendor on QI/GRN')
+    }
+    if (!mapped.lines.length) {
+      throw new PurchaseServiceError(
+        'RETURN_NO_QTY',
+        'No remaining returnable quantity for purchase return',
+      )
+    }
+    return mapped
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getSupplierQualityDashboardWidgets(): Promise<SupplierQualityDashboardWidgets> {
+  const empty: SupplierQualityDashboardWidgets = {
+    pendingReturns: 0,
+    rejectedStockQty: 0,
+    rejectedStockValue: 0,
+    replacementPending: 0,
+    vendorAdjustmentsPending: 0,
+    topRejectedVendors: [],
+    mostRejectedItems: [],
+  }
+  if (!isApiMode()) return empty
+  try {
+    const res = await supplierQualityApi.getSupplierQualityDashboardWidgetsApi()
+    const d = res.data
+    const rejectedQty = Number(d.rejectedStockQty) || 0
+    const masters = useMasterStore.getState()
+    return {
+      pendingReturns: Number(d.pendingReturns) || 0,
+      rejectedStockQty: rejectedQty,
+      // Value pricing not returned by API yet — surface qty under the reject-stock KPI.
+      rejectedStockValue: rejectedQty,
+      replacementPending: Number(d.replacementPending) || 0,
+      vendorAdjustmentsPending: Number(d.vendorAdjustmentsPending) || 0,
+      topRejectedVendors: (d.topRejectedVendors ?? []).map((r) => {
+        const v = masters.getVendor(r.vendorId)
+        return {
+          vendorId: r.vendorId,
+          vendorName: r.vendorName || v?.vendorName,
+          vendorCode: r.vendorCode || v?.vendorCode,
+          rejectedQty: Number(r.rejectedQty) || 0,
+          acceptedQty: Number(r.acceptedQty) || 0,
+          inspectionCount: Number(r.inspectionCount) || 0,
+          rejectRatePct: Number(r.rejectRatePct) || 0,
+        }
+      }),
+      mostRejectedItems: (d.mostRejectedItems ?? []).map((r) => {
+        const item = masters.getItem(r.itemKey)
+        return {
+          itemKey: r.itemKey,
+          itemCode: r.itemCode || item?.itemCode || undefined,
+          itemName: r.itemName || item?.itemName || undefined,
+          rejectedQty: Number(r.rejectedQty) || 0,
+          acceptedQty: Number(r.acceptedQty) || 0,
+          rejectRatePct: Number(r.rejectRatePct) || 0,
+        }
+      }),
+    }
+  } catch (err) {
+    if (isBackendMissingError(err)) return empty
+    throwApi(err)
+  }
+}
+
+export async function getVendorQualityScorecard(
+  vendorId: string,
+): Promise<VendorQualityScorecard | null> {
+  if (!isApiMode()) return null
+  try {
+    const res = await supplierQualityApi.getVendorQualityScorecardApi(vendorId)
+    return res.data
+  } catch (err) {
+    if (isBackendMissingError(err)) return null
+    const { code } = formatPurchaseApiError(err)
+    if (code === 'NOT_FOUND' || code === 'HTTP_404') return null
+    throwApi(err)
+  }
+}
+
+export async function getItemSupplierQualityHistory(
+  itemId: string,
+): Promise<ItemSupplierQualityHistory> {
+  if (!isApiMode()) return { itemId, timeline: [] }
+  try {
+    const res = await supplierQualityApi.getItemSupplierQualityHistoryApi(itemId)
+    return {
+      itemId: res.data.itemId,
+      timeline: (res.data.timeline ?? []).map((e) => ({
+        at: e.at,
+        type: e.type,
+        number: e.number,
+        status: e.status,
+        href: e.href,
+        detail: e.detail,
+      })),
+    }
+  } catch (err) {
+    if (isBackendMissingError(err)) return { itemId, timeline: [] }
+    throwApi(err)
+  }
+}
+
 export async function getPurchaseReturns(): Promise<PurchaseReturn[]> {
   if (!isApiMode()) return demo.getPurchaseReturns()
   try {
@@ -3344,8 +3683,6 @@ export async function createPurchaseReturnFromGrn(
   options?: { origin?: PurchaseReturnOrigin; returnReason?: PurchaseReturnReason },
 ): Promise<PurchaseReturn> {
   if (!isApiMode()) return demo.createPurchaseReturnFromGrn(grnId, options)
-  const grn = await getGRNById(grnId)
-  if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${grnId}`)
   const origin = options?.origin ?? 'grn_rejected_quantity'
   const returnReason =
     options?.returnReason
@@ -3358,6 +3695,48 @@ export async function createPurchaseReturnFromGrn(
           : origin === 'wrong_material'
             ? 'wrong_item'
             : 'quality_rejection')
+
+  // Quality / rejected qty: use live remaining-returnable wizard (QI-aware).
+  if (origin === 'quality_rejection' || origin === 'grn_rejected_quantity') {
+    try {
+      const prefill = await getReturnWizardPrefill({ goodsReceiptId: grnId })
+      if (prefill.lines.length) {
+        return createPurchaseReturn({
+          vendorId: prefill.vendorId,
+          origin,
+          goodsReceiptId: prefill.goodsReceiptId,
+          purchaseOrderId: prefill.purchaseOrderId,
+          qualityInspectionId: prefill.qualityInspectionId,
+          returnReason,
+          returnType: prefill.suggestedReturnType,
+          warehouseId: prefill.warehouseId ?? undefined,
+          replacementRequired: prefill.replacementRequired,
+          debitNoteRequired: true,
+          remarks: prefill.reason,
+          lines: prefill.lines.map((l) => ({
+            itemId: l.itemId,
+            itemCode: l.itemCode,
+            itemName: l.itemName,
+            returnQty: l.returnQty,
+            unitCost: l.unitCost,
+            goodsReceiptLineId: l.goodsReceiptLineId,
+            purchaseOrderLineId: l.purchaseOrderLineId,
+            description: l.itemName,
+            batchLotNo: l.batchLotNo,
+            serialNumber: l.serialNumber,
+            availableReturnQty: l.availableReturnQty,
+            reason: returnReason,
+            remarks: prefill.reason,
+          })),
+        })
+      }
+    } catch {
+      // Fall through to GRN line mapping.
+    }
+  }
+
+  const grn = await getGRNById(grnId)
+  if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${grnId}`)
   const lines = grn.lines
     .map((l) => {
       const qty =
@@ -3372,6 +3751,8 @@ export async function createPurchaseReturnFromGrn(
         unitCost: l.rate,
         goodsReceiptLineId: l.id,
         description: l.description || l.itemName,
+        batchLotNo: l.batchNumber || '',
+        serialNumber: l.serialNumber || '',
         reason: returnReason,
       }
     })
@@ -3395,35 +3776,33 @@ export async function createPurchaseReturnFromQualityInspection(
   qualityInspectionId: string,
 ): Promise<PurchaseReturn> {
   if (!isApiMode()) return demo.createPurchaseReturnFromQualityInspection(qualityInspectionId)
-  let api
-  try {
-    api = (await qiApi.getQualityInspectionApi(qualityInspectionId)).data
-  } catch (err) {
-    throwApi(err)
-  }
-  const rejectedLines = api.lines.filter((l) => Number(l.rejectedQuantity) > 0)
-  if (!rejectedLines.length) {
-    throw new PurchaseServiceError('RETURN_NO_QTY', 'Quality inspection has no rejected quantity')
-  }
-  if (!api.vendorId) {
-    throw new PurchaseServiceError('RETURN_NO_VENDOR', 'Quality inspection has no vendor linked')
-  }
+  const prefill = await getReturnWizardPrefill({ qualityInspectionId })
   return createPurchaseReturn({
-    vendorId: api.vendorId,
+    vendorId: prefill.vendorId,
     origin: 'quality_rejection',
-    goodsReceiptId: api.goodsReceiptId,
-    purchaseOrderId: api.purchaseOrderId,
-    qualityInspectionId: api.id,
+    goodsReceiptId: prefill.goodsReceiptId,
+    purchaseOrderId: prefill.purchaseOrderId,
+    qualityInspectionId: prefill.qualityInspectionId,
     returnReason: 'quality_rejection',
-    warehouseId: api.warehouseId ?? undefined,
-    remarks: `Created from ${api.documentNumber || api.inspectionNumber}`,
-    lines: rejectedLines.map((l) => ({
-      itemId: l.itemId || '',
-      returnQty: Number(l.rejectedQuantity) || 0,
+    returnType: prefill.suggestedReturnType,
+    warehouseId: prefill.warehouseId ?? undefined,
+    replacementRequired: prefill.replacementRequired,
+    debitNoteRequired: true,
+    remarks: prefill.reason,
+    lines: prefill.lines.map((l) => ({
+      itemId: l.itemId,
+      itemCode: l.itemCode,
+      itemName: l.itemName,
+      returnQty: l.returnQty,
+      unitCost: l.unitCost,
       goodsReceiptLineId: l.goodsReceiptLineId,
-      description: l.itemNameSnapshot || '',
+      purchaseOrderLineId: l.purchaseOrderLineId,
+      description: l.itemName,
+      batchLotNo: l.batchLotNo,
+      serialNumber: l.serialNumber,
+      availableReturnQty: l.availableReturnQty,
       reason: 'quality_rejection',
-      remarks: l.remarks || 'QC rejection',
+      remarks: prefill.reason,
     })),
   })
 }
@@ -3484,10 +3863,44 @@ export async function approvePurchaseReturn(id: string, remarks = ''): Promise<P
   }
 }
 
+/** API: APPROVED → SHIPPED (REJECTED → BLOCKED transit via inventory engine). */
+export async function shipPurchaseReturn(id: string, remarks = ''): Promise<PurchaseReturn> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError(
+      'RETURN_SHIP_DEMO',
+      'Ship return is available in API mode only',
+    )
+  }
+  try {
+    const res = await returnApi.shipPurchaseReturnApi(id, remarks ? { remarks } : {})
+    return mapApiPurchaseReturnToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
 export async function postPurchaseReturn(id: string): Promise<PurchaseReturn> {
   if (!isApiMode()) return demo.postPurchaseReturn(id)
   try {
     const res = await returnApi.completePurchaseReturnApi(id, {})
+    return mapApiPurchaseReturnToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function linkReplacementGrnToReturn(
+  id: string,
+  goodsReceiptId: string,
+): Promise<PurchaseReturn> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError(
+      'RETURN_REPLACEMENT_DEMO',
+      'Link replacement GRN is available in API mode only',
+    )
+  }
+  try {
+    const res = await returnApi.linkReplacementGrnApi(id, { goodsReceiptId })
     return mapApiPurchaseReturnToDomain(res.data)
   } catch (err) {
     throwApi(err)

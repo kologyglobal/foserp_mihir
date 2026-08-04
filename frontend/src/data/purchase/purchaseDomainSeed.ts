@@ -23,6 +23,7 @@ import type {
   Vendor,
   VendorQuotation,
 } from '../../types/purchaseDomain'
+import { mapPurchaseCategoryToEngineeringProductType } from '../../utils/purchaseProductType'
 
 const NOW = '2026-07-10T09:30:00.000Z'
 const ACTOR = {
@@ -354,6 +355,8 @@ function item(
     itemCode: code,
     itemName: name,
     category,
+    // Align with PR/PO Product Type filter (engineering enum).
+    productType: mapPurchaseCategoryToEngineeringProductType(category) || null,
     description: name,
     uom,
     hsnCode: hsn,

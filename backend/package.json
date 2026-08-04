@@ -25,6 +25,7 @@
     "test:purchase-invoice-live": "vitest run tests/purchase-invoice-lifecycle.test.ts tests/purchase-invoice-lifecycle-live.test.ts --hookTimeout=120000",
     "test:purchase-qi-live": "vitest run tests/purchase-qi-lifecycle.test.ts --hookTimeout=120000",
     "test:purchase-return-live": "vitest run tests/purchase-return-lifecycle.test.ts --hookTimeout=120000",
+    "test:supplier-quality-closure-live": "vitest run tests/supplier-quality-closure-live.test.ts --hookTimeout=180000",
     "test:purchase-coverage-live": "vitest run tests/purchase-module-coverage.test.ts --hookTimeout=120000",
     "test:purchase-multi-unit-uom-live": "tsx scripts/test-purchase-multi-unit-uom-flow.ts",
     "test:grn-tolerance": "vitest run tests/purchase/grn-tolerance.test.ts",

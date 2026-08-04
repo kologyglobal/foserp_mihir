@@ -385,6 +385,7 @@ export function VendorQuotationDetailPage() {
         collapsible
         defaultOpen
         dense
+        columns={6}
       >
         <ErpViewField label="Quotation Date" value={formatDate(quote.documentDate)} />
         <ErpViewField label="Valid Until" value={formatDate(quote.validTill)} />
@@ -411,6 +412,7 @@ export function VendorQuotationDetailPage() {
         collapsible
         defaultOpen={false}
         dense
+        columns={6}
         collapsedSummary={commercialPeek || undefined}
       >
         <ErpViewField label="Payment Terms" value={quote.paymentTerms} />

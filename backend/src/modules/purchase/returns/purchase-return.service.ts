@@ -15,6 +15,7 @@ import { mapPurchaseReturn, type PurchaseReturnEnrichment } from './purchase-ret
 import * as repo from './purchase-return.repository.js'
 import type { CreatePurchaseReturnInput, ListPurchaseReturnsQuery, PurchaseReturnLineInput, UpdatePurchaseReturnInput } from './purchase-return.validation.js'
 import { assertReturnStatus, returnDate, returnMoney, returnQty, validateReturnLines } from './purchase-return.workflow.js'
+import { computeRemainingReturnable } from './returnable-quantity.service.js'
 
 type ReturnRow = NonNullable<Awaited<ReturnType<typeof repo.findPurchaseReturnById>>>
 
@@ -128,7 +129,11 @@ async function resolveReturnRefs(tenantId: string, input: Pick<CreatePurchaseRet
   }
   return { po: resolvedPo, grn, qi, warehouseId }
 }
-function buildReturnLines(inputs: PurchaseReturnLineInput[], refs: Awaited<ReturnType<typeof resolveReturnRefs>>) {
+function buildReturnLines(
+  inputs: PurchaseReturnLineInput[],
+  refs: Awaited<ReturnType<typeof resolveReturnRefs>>,
+  remainingByKey?: Map<string, number>,
+) {
   validateReturnLines(inputs)
   const poLines = new Map((refs.po?.lines ?? []).map((line) => [line.id, line]))
   const grnLines = new Map((refs.grn?.lines ?? []).map((line) => [line.id, line]))
@@ -140,18 +145,20 @@ function buildReturnLines(inputs: PurchaseReturnLineInput[], refs: Awaited<Retur
     if (input.goodsReceiptLineId && !grnLine) throw new PurchaseReturnValidationError(`Invalid GRN line ${index + 1}.`)
     if (poLine && grnLine && grnLine.purchaseOrderLineId !== poLine.id) throw new PurchaseReturnValidationError(`PO/GRN mismatch on line ${index + 1}.`)
     const quantity = returnQty(input.returnQuantity)
-    const available = refs.qi
-      ? returnQty(qiLines.get(grnLine?.id ?? null)?.rejectedQuantity)
-      : grnLine
-        ? returnQty(grnLine.acceptedQuantity) + returnQty(grnLine.rejectedQuantity)
-        : poLine
-          ? returnQty(poLine.receivedQuantity) - returnQty(poLine.returnedQuantity)
-          : quantity
+    const key = grnLine?.id ?? poLine?.id ?? `idx-${index}`
+    let available = remainingByKey?.get(key)
+    if (available === undefined) {
+      available = refs.qi
+        ? returnQty(qiLines.get(grnLine?.id ?? null)?.rejectedQuantity)
+        : grnLine
+          ? returnQty(grnLine.acceptedQuantity) + returnQty(grnLine.rejectedQuantity)
+          : poLine
+            ? returnQty(poLine.receivedQuantity) - returnQty(poLine.returnedQuantity)
+            : quantity
+    }
     if (quantity > available + 1e-9) {
       throw new PurchaseReturnValidationError(
-        refs.qi
-          ? `Return quantity exceeds rejected quantity on quality inspection for line ${index + 1} (available ${available}).`
-          : `Return quantity exceeds available received/rejected quantity on line ${index + 1} (available ${available}).`,
+        `Return quantity exceeds remaining returnable quantity on line ${index + 1} (available ${available}).`,
       )
     }
     const rate = input.rate ?? returnQty(grnLine?.rate ?? poLine?.rate)
@@ -176,15 +183,47 @@ export async function getPurchaseReturn(tenantId: string, id: string) {
   return toReturnDto(tenantId, await loadOrThrow(tenantId, id))
 }
 export async function createPurchaseReturn(tenantId: string, actorId: string, input: CreatePurchaseReturnInput) {
+  if (!input.reason?.trim()) throw new PurchaseReturnValidationError('Return reason is required.')
   const refs = await resolveReturnRefs(tenantId, input)
-  const lines = buildReturnLines(input.lines, refs)
+  if (refs.grn?.status === 'CANCELLED') {
+    throw new PurchaseReturnValidationError('Cannot create a return for a cancelled goods receipt.')
+  }
+  const returnable = await computeRemainingReturnable(tenantId, {
+    qualityInspectionId: input.qualityInspectionId,
+    goodsReceiptId: input.goodsReceiptId,
+  })
+  if (returnable.closedForReturn) {
+    throw new PurchaseReturnValidationError('Goods receipt is closed for returns.')
+  }
+  const remainingByKey = new Map(
+    returnable.lines
+      .filter((l) => l.goodsReceiptLineId || l.purchaseOrderLineId)
+      .map((l) => [l.goodsReceiptLineId ?? l.purchaseOrderLineId!, l.remainingReturnableQuantity]),
+  )
+  // Without QI/GRN remaining map, fall through to classic caps
+  const lines = buildReturnLines(
+    input.lines,
+    refs,
+    remainingByKey.size ? remainingByKey : undefined,
+  )
+  if (lines.every((l) => l.returnQuantity <= 0)) {
+    throw new PurchaseReturnValidationError('No remaining returnable quantity.')
+  }
   const returnNumber = await nextCode(tenantId, 'PURCHASE_RETURN')
+  const returnType = input.returnType ?? 'CREDIT'
   const row = await prisma.$transaction(async (tx) => {
     const created = await tx.purchaseReturn.create({ data: {
       tenantId, returnNumber, returnDate: returnDate(input.returnDate) ?? new Date(), vendorId: input.vendorId,
       purchaseOrderId: refs.po?.id ?? input.purchaseOrderId ?? null, goodsReceiptId: refs.grn?.id ?? input.goodsReceiptId ?? null,
       qualityInspectionId: refs.qi?.id ?? input.qualityInspectionId ?? null, warehouseId: refs.warehouseId,
-      status: 'DRAFT', reason: input.reason?.trim() || null, remarks: input.remarks?.trim() || null,
+      status: 'DRAFT',
+      returnType,
+      decisionCode: input.decisionCode?.trim() || refs.qi?.decisionCode || null,
+      ncrId: input.ncrId ?? null,
+      replacedReturnId: input.replacedReturnId ?? null,
+      accountingStatus: 'NONE',
+      reason: input.reason.trim(),
+      remarks: input.remarks?.trim() || null,
       createdById: actorId, updatedById: actorId, lines: { create: lines.map((line) => ({ ...line, tenantId })) },
     }, include: repo.includePurchaseReturn })
     await repo.addReturnHistory(tenantId, created.id, created.returnNumber, 'RETURN_CREATED', null, 'DRAFT', actorId, undefined, tx)
@@ -235,10 +274,73 @@ export async function approvePurchaseReturn(tenantId: string, id: string, actorI
   return toReturnDto(tenantId, await loadOrThrow(tenantId, id))
 }
 
+/** SHIPPED = RETURN_IN_TRANSIT (stock BLOCKED from REJECTED). */
+export async function shipPurchaseReturn(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
+  const existing = await loadOrThrow(tenantId, id)
+  assertReturnStatus(existing.status, ['APPROVED'], 'shipped')
+  const warehouseId = existing.warehouseId
+  if (!warehouseId) throw new PurchaseReturnValidationError('Warehouse is required to ship a purchase return.')
+  await prisma.$transaction(async (tx) => {
+    await postPurchaseReturnStockIssue({
+      tenantId,
+      returnId: existing.id,
+      returnNumber: existing.returnNumber,
+      warehouseId,
+      lines: existing.lines,
+      actorId,
+      phase: 'SHIP',
+      tx,
+    })
+    await repo.updatePurchaseReturn(
+      tenantId,
+      id,
+      {
+        status: 'SHIPPED',
+        shippedAt: new Date(),
+        updatedById: actorId,
+        remarks: body.remarks?.trim() || existing.remarks,
+      },
+      tx,
+    )
+    await repo.addReturnHistory(
+      tenantId,
+      id,
+      existing.returnNumber,
+      'RETURN_SHIPPED',
+      existing.status,
+      'SHIPPED',
+      actorId,
+      body.remarks,
+      tx,
+    )
+  })
+  return toReturnDto(tenantId, await loadOrThrow(tenantId, id))
+}
+
 export async function completePurchaseReturn(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
   const existing = await loadOrThrow(tenantId, id); assertReturnStatus(existing.status, ['APPROVED', 'SHIPPED'], 'completed')
   const warehouseId = existing.warehouseId
   if (!warehouseId) throw new PurchaseReturnValidationError('Warehouse is required to complete a purchase return.')
+  // Re-validate remaining returnable against concurrent returns
+  if (existing.qualityInspectionId || existing.goodsReceiptId) {
+    const returnable = await computeRemainingReturnable(tenantId, {
+      qualityInspectionId: existing.qualityInspectionId,
+      goodsReceiptId: existing.goodsReceiptId,
+      excludeReturnId: existing.id,
+    })
+    for (const line of existing.lines) {
+      const key = line.goodsReceiptLineId ?? line.purchaseOrderLineId
+      if (!key) continue
+      const match = returnable.lines.find(
+        (r) => r.goodsReceiptLineId === line.goodsReceiptLineId || r.purchaseOrderLineId === line.purchaseOrderLineId,
+      )
+      if (match && returnQty(line.returnQuantity) > match.remainingReturnableQuantity + 1e-9) {
+        throw new PurchaseReturnValidationError(
+          `Line exceeds remaining returnable quantity (available ${match.remainingReturnableQuantity}).`,
+        )
+      }
+    }
+  }
   const returnMovements = await prisma.$transaction(async (tx) => {
     for (const line of existing.lines.filter((item) => item.purchaseOrderLineId)) await tx.purchaseOrderLine.updateMany({
       where: { id: line.purchaseOrderLineId!, tenantId }, data: { returnedQuantity: { increment: returnQty(line.returnQuantity) } },
@@ -250,13 +352,18 @@ export async function completePurchaseReturn(tenantId: string, id: string, actor
       warehouseId,
       lines: existing.lines,
       actorId,
+      phase: 'COMPLETE',
       tx,
     })
-    await repo.updatePurchaseReturn(tenantId, id, { status: 'COMPLETED', completedAt: new Date(), updatedById: actorId, remarks: body.remarks?.trim() || existing.remarks }, tx)
+    await repo.updatePurchaseReturn(tenantId, id, {
+      status: 'COMPLETED',
+      completedAt: new Date(),
+      updatedById: actorId,
+      remarks: body.remarks?.trim() || existing.remarks,
+    }, tx)
     await repo.addReturnHistory(tenantId, id, existing.returnNumber, 'RETURN_COMPLETED', existing.status, 'COMPLETED', actorId, body.remarks, tx)
     return movements
   })
-  // Return issues post with generic ISS reference — pass the explicit event type.
   await tryRecordInventoryAccountingEventsForMovements(null, tenantId, returnMovements, {
     eventType: 'PURCHASE_RETURN',
     sourceDocumentType: 'PURCHASE_RETURN',
@@ -264,17 +371,26 @@ export async function completePurchaseReturn(tenantId: string, id: string, actor
     narration: `Purchase return ${existing.returnNumber}`,
     userId: actorId,
   })
-  // FIN-CLOSE-1 — raise the AP debit note for the invoiced portion. Best-effort: the
-  // stock issue is already committed, so a finance-setup gap must not fail the return.
-  // Re-runnable from the Purchase Return detail page.
-  try {
-    await handoffPurchaseReturnToVendorAdjustmentDraft(tenantId, id, actorId)
-  } catch (error) {
-    logger.error('Purchase return AP adjustment handoff failed', {
-      tenantId,
-      purchaseReturnId: id,
-      error: error instanceof Error ? error.message : String(error),
-    })
+  // AP handoff: CREDIT (and repairs that reverse AP) create Vendor Debit draft. REPLACEMENT does not post GL here.
+  if (existing.returnType === 'CREDIT' || existing.returnType === 'REPAIR' || existing.returnType === 'SCRAP_VENDOR') {
+    try {
+      const handoff = await handoffPurchaseReturnToVendorAdjustmentDraft(tenantId, id, actorId)
+      const accountingStatus = handoff.skipped
+        ? 'NONE'
+        : handoff.status === 'POSTED'
+          ? 'POSTED'
+          : 'DRAFT'
+      await repo.updatePurchaseReturn(tenantId, id, {
+        accountingStatus,
+        updatedById: actorId,
+      })
+    } catch (error) {
+      logger.error('Purchase return AP adjustment handoff failed', {
+        tenantId,
+        purchaseReturnId: id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
   return toReturnDto(tenantId, await loadOrThrow(tenantId, id))
 }
@@ -284,7 +400,192 @@ export async function getPurchaseReturnApAdjustmentPreview(tenantId: string, id:
 }
 
 export async function createPurchaseReturnApAdjustment(tenantId: string, id: string, actorId: string) {
-  return handoffPurchaseReturnToVendorAdjustmentDraft(tenantId, id, actorId)
+  const result = await handoffPurchaseReturnToVendorAdjustmentDraft(tenantId, id, actorId)
+  if (!result.skipped) {
+    await repo.updatePurchaseReturn(tenantId, id, {
+      accountingStatus: result.status === 'POSTED' ? 'POSTED' : 'DRAFT',
+      updatedById: actorId,
+    })
+  }
+  return result
+}
+
+export async function getReturnWizardPrefill(
+  tenantId: string,
+  query: { qualityInspectionId?: string; goodsReceiptId?: string },
+) {
+  const returnable = await computeRemainingReturnable(tenantId, query)
+  if (!returnable.vendorId) throw new PurchaseReturnValidationError('Cannot prefill — no vendor resolved from QI/GRN.')
+  const qi = returnable.qualityInspectionId
+    ? await prisma.purchaseQualityInspection.findFirst({
+        where: { id: returnable.qualityInspectionId, tenantId, deletedAt: null },
+        select: {
+          inspectionNumber: true,
+          decisionCode: true,
+          decisionReason: true,
+          remarks: true,
+          result: true,
+        },
+      })
+    : null
+  return {
+    ...returnable,
+    suggestedReturnType:
+      qi?.decisionCode === 'REPLACEMENT_REQUIRED' ? 'REPLACEMENT' : 'CREDIT',
+    reason: qi?.decisionReason || qi?.remarks || 'Rejected on quality inspection',
+    qualityInspectionNumber: qi?.inspectionNumber ?? null,
+    linesPrefill: returnable.lines
+      .filter((l) => l.remainingReturnableQuantity > 0)
+      .map((l) => ({
+        goodsReceiptLineId: l.goodsReceiptLineId,
+        purchaseOrderLineId: l.purchaseOrderLineId,
+        itemId: l.itemId,
+        itemCode: l.itemCode,
+        itemName: l.itemName,
+        returnQuantity: l.remainingReturnableQuantity,
+        rate: l.rate,
+        batchNumber: l.batchNumber,
+        serialNumber: l.serialNumber,
+        remainingReturnableQuantity: l.remainingReturnableQuantity,
+      })),
+  }
+}
+
+/** Link a replacement GRN to a completed REPLACEMENT return. */
+export async function linkReplacementGoodsReceipt(
+  tenantId: string,
+  returnId: string,
+  actorId: string,
+  goodsReceiptId: string,
+) {
+  const existing = await loadOrThrow(tenantId, returnId)
+  if (existing.returnType !== 'REPLACEMENT') {
+    throw new PurchaseReturnValidationError('Only REPLACEMENT returns can link a replacement GRN.')
+  }
+  if (existing.status !== 'COMPLETED') {
+    throw new PurchaseReturnValidationError('Return must be completed before linking replacement receipt.')
+  }
+  const grn = await prisma.goodsReceipt.findFirst({
+    where: { id: goodsReceiptId, tenantId, deletedAt: null, vendorId: existing.vendorId },
+  })
+  if (!grn) throw new PurchaseReturnValidationError('Replacement goods receipt not found for this vendor.')
+  await repo.updatePurchaseReturn(tenantId, returnId, {
+    replacementGoodsReceiptId: grn.id,
+    updatedById: actorId,
+  })
+  await repo.addReturnHistory(
+    tenantId,
+    returnId,
+    existing.returnNumber,
+    'RETURN_REPLACEMENT_LINKED',
+    existing.status,
+    existing.status,
+    actorId,
+    `Replacement GRN ${grn.grnNumber}`,
+    prisma,
+  )
+  return toReturnDto(tenantId, await loadOrThrow(tenantId, returnId))
+}
+
+/**
+ * Traceability chain for return / QI / GRN document family.
+ */
+export async function getSupplierQualityTrace(tenantId: string, args: {
+  purchaseReturnId?: string
+  qualityInspectionId?: string
+  goodsReceiptId?: string
+}) {
+  let ret = args.purchaseReturnId
+    ? await repo.findPurchaseReturnById(tenantId, args.purchaseReturnId)
+    : null
+  const qiId = args.qualityInspectionId ?? ret?.qualityInspectionId
+  const grnId = args.goodsReceiptId ?? ret?.goodsReceiptId
+  const qi = qiId
+    ? await prisma.purchaseQualityInspection.findFirst({ where: { id: qiId, tenantId, deletedAt: null } })
+    : null
+  const grn = grnId
+    ? await prisma.goodsReceipt.findFirst({ where: { id: grnId, tenantId, deletedAt: null } })
+    : null
+  if (!ret && qi) {
+    ret = await prisma.purchaseReturn.findFirst({
+      where: { tenantId, deletedAt: null, qualityInspectionId: qi.id },
+      orderBy: { createdAt: 'desc' },
+      include: { lines: true },
+    })
+  }
+  const po = grn?.purchaseOrderId
+    ? await prisma.purchaseOrder.findFirst({
+        where: { id: grn.purchaseOrderId, tenantId, deletedAt: null },
+        select: { id: true, orderNumber: true, purchaseRequisitionId: true },
+      })
+    : null
+  const adj = ret?.vendorAdjustmentId
+    ? await prisma.vendorAdjustment.findFirst({
+        where: { id: ret.vendorAdjustmentId, tenantId },
+        select: { id: true, draftReference: true, status: true, vendorAdjustmentNumber: true },
+      })
+    : null
+  const replacementGrn = ret?.replacementGoodsReceiptId
+    ? await prisma.goodsReceipt.findFirst({
+        where: { id: ret.replacementGoodsReceiptId, tenantId, deletedAt: null },
+        select: { id: true, grnNumber: true, status: true },
+      })
+    : null
+  const replacementQi = replacementGrn
+    ? await prisma.purchaseQualityInspection.findFirst({
+        where: { tenantId, deletedAt: null, goodsReceiptId: replacementGrn.id },
+        select: { id: true, inspectionNumber: true, status: true },
+      })
+    : null
+  const ncr = ret?.ncrId
+    ? await prisma.qualityNcr.findFirst({
+        where: { id: ret.ncrId, tenantId },
+        select: { id: true, ncrNumber: true, status: true },
+      })
+    : null
+
+  return {
+    chain: [
+      po?.purchaseRequisitionId ? { type: 'PR', id: po.purchaseRequisitionId, number: null } : null,
+      po ? { type: 'PO', id: po.id, number: po.orderNumber } : null,
+      grn ? { type: 'GRN', id: grn.id, number: grn.grnNumber, status: grn.status } : null,
+      qi
+        ? {
+            type: 'PURCHASE_QI',
+            id: qi.id,
+            number: qi.inspectionNumber,
+            status: qi.status,
+            decision: qi.decisionCode,
+            result: qi.result,
+          }
+        : null,
+      ret
+        ? {
+            type: 'PURCHASE_RETURN',
+            id: ret.id,
+            number: ret.returnNumber,
+            status: ret.status,
+            returnType: ret.returnType,
+            accountingStatus: ret.accountingStatus,
+          }
+        : null,
+      adj
+        ? {
+            type: 'VENDOR_ADJUSTMENT',
+            id: adj.id,
+            number: adj.vendorAdjustmentNumber || adj.draftReference,
+            status: adj.status,
+          }
+        : null,
+      replacementGrn
+        ? { type: 'REPLACEMENT_GRN', id: replacementGrn.id, number: replacementGrn.grnNumber, status: replacementGrn.status }
+        : null,
+      replacementQi
+        ? { type: 'REPLACEMENT_QI', id: replacementQi.id, number: replacementQi.inspectionNumber, status: replacementQi.status }
+        : null,
+      ncr ? { type: 'NCR', id: ncr.id, number: ncr.ncrNumber, status: ncr.status } : null,
+    ].filter(Boolean),
+  }
 }
 export async function cancelPurchaseReturn(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
   const existing = await loadOrThrow(tenantId, id); assertReturnStatus(existing.status, ['DRAFT', 'SUBMITTED', 'APPROVED'], 'cancelled')

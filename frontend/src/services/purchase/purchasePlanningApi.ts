@@ -70,6 +70,20 @@ export async function recalculatePlanningApi(payload: ApiRecalculatePlanningPayl
   })
 }
 
+export async function createPurchaseOrdersFromConsolidationApi(payload: {
+  planningRowIds: string[]
+  allocations: Array<{ vendorId: string; quantity: number; rate: number }>
+}) {
+  return apiRequest<{
+    orders: import('./purchaseApiTypes').ApiPurchaseOrder[]
+    orderCount: number
+    vendorCount: number
+  }>(`${base()}/create-po-consolidated`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function splitPlanningRowApi(
   id: string,
   payload: { splits: Array<{ vendorId: string; allocatedQuantity: number }> },

@@ -120,10 +120,10 @@ const STORES: RoleExperienceDefinition = {
   kpiIds: ['grnPending', 'openReservations', 'negativeStock', 'pendingIssues', 'slowMoving', 'qcIncoming'],
   shortcuts: [
     { label: 'Store Home', path: '/inventory', icon: Warehouse },
-    { label: 'Today’s Work', path: '/inventory/store-workbench', icon: Package },
-    { label: 'Receive Stock', path: '/inventory/movements/receipts', icon: PackageCheck },
-    { label: 'Issue Stock', path: '/inventory/movements/issues', icon: Package },
-    { label: 'Stock', path: '/inventory/stock', icon: ClipboardList },
+    { label: 'Receive', path: '/inventory/store/receive', icon: PackageCheck },
+    { label: 'Issue', path: '/inventory/store/issue', icon: Package },
+    { label: 'Item Stock 360', path: '/inventory/stock', icon: ClipboardList },
+    { label: 'Today’s Work (MFG)', path: '/inventory/store-workbench', icon: Package },
     { label: 'Purchase GRN', path: '/purchase/grn', icon: Box },
   ],
 }

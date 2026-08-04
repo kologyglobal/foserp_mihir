@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../../config/prisma.js'
+import { resolveUserNames } from '../../../shared/index.js'
 import { nextCode, previewNextCode } from '../../../services/codeSeries.service.js'
 import { syncPurchasePlanningRowsFromApprovedPr } from '../planning/purchase-planning-sync.service.js'
 import {
@@ -43,28 +44,30 @@ import {
   parseDateInput,
 } from './purchase-requisition.workflow.js'
 
-async function requestedByNameMap(
-  tenantId: string,
-  requestedByIds: Array<string | null | undefined>,
-): Promise<Map<string, string>> {
-  const ids = [...new Set(requestedByIds.filter((id): id is string => Boolean(id?.trim())))]
-  if (ids.length === 0) return new Map()
-  const users = await prisma.user.findMany({
-    where: { tenantId, id: { in: ids }, deletedAt: null },
-    select: { id: true, firstName: true, lastName: true, email: true },
-  })
-  const map = new Map<string, string>()
-  for (const user of users) {
-    const name = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email
-    if (name) map.set(user.id, name)
-  }
-  return map
-}
-
 async function loadOrThrow(tenantId: string, id: string) {
   const pr = await repo.findPurchaseRequisitionById(tenantId, id)
   if (!pr) throw new PurchaseRequisitionNotFoundError()
   return pr
+}
+
+type PrWithLines = NonNullable<Awaited<ReturnType<typeof repo.findPurchaseRequisitionById>>>
+
+async function mapPrToDto(tenantId: string, pr: PrWithLines) {
+  const userNames = await resolveUserNames(
+    [pr.requestedById, pr.createdById, pr.updatedById],
+    tenantId,
+    prisma,
+  )
+  return mapPurchaseRequisitionToDto(pr, userNames)
+}
+
+async function mapPrListToDto(tenantId: string, items: PrWithLines[]) {
+  const userNames = await resolveUserNames(
+    items.flatMap((pr) => [pr.requestedById, pr.createdById, pr.updatedById]),
+    tenantId,
+    prisma,
+  )
+  return items.map((pr) => mapPurchaseRequisitionToDto(pr, userNames))
 }
 
 async function assertApprovalAssignedToActor(
@@ -114,13 +117,8 @@ async function assertApprovalAssignedToActor(
 
 export async function listPurchaseRequisitions(tenantId: string, query: ListPurchaseRequisitionsQuery) {
   const result = await repo.findPurchaseRequisitions(tenantId, query)
-  const nameById = await requestedByNameMap(tenantId, result.items.map((pr) => pr.requestedById))
   return {
-    items: result.items.map((pr) =>
-      mapPurchaseRequisitionToDto(pr, {
-        requestedByName: pr.requestedById ? nameById.get(pr.requestedById) ?? null : null,
-      }),
-    ),
+    items: await mapPrListToDto(tenantId, result.items),
     total: result.total,
     page: result.page,
     limit: result.limit,
@@ -129,10 +127,7 @@ export async function listPurchaseRequisitions(tenantId: string, query: ListPurc
 
 export async function getPurchaseRequisition(tenantId: string, id: string) {
   const pr = await loadOrThrow(tenantId, id)
-  const nameById = await requestedByNameMap(tenantId, [pr.requestedById])
-  return mapPurchaseRequisitionToDto(pr, {
-    requestedByName: pr.requestedById ? nameById.get(pr.requestedById) ?? null : null,
-  })
+  return mapPrToDto(tenantId, pr)
 }
 
 export async function previewNextPurchaseRequisitionNumber(tenantId: string) {
@@ -265,7 +260,7 @@ export async function createPurchaseRequisition(
     },
   })
 
-  return mapPurchaseRequisitionToDto(created)
+  return mapPrToDto(tenantId, created)
 }
 
 export async function updatePurchaseRequisition(
@@ -408,7 +403,7 @@ export async function updatePurchaseRequisition(
     },
   })
 
-  return mapPurchaseRequisitionToDto(updated)
+  return mapPrToDto(tenantId, updated)
 }
 
 export async function submitPurchaseRequisition(
@@ -487,7 +482,7 @@ export async function submitPurchaseRequisition(
     newValue: { status: updated.status },
   })
 
-  return mapPurchaseRequisitionToDto(updated)
+  return mapPrToDto(tenantId, updated)
 }
 
 export async function approvePurchaseRequisition(
@@ -620,7 +615,7 @@ export async function approvePurchaseRequisition(
 
   // Reload with lines after planning sync side-effects
   const fresh = await loadOrThrow(tenantId, id)
-  return mapPurchaseRequisitionToDto(fresh)
+  return mapPrToDto(tenantId, fresh)
 }
 
 export async function rejectPurchaseRequisition(
@@ -677,7 +672,7 @@ export async function rejectPurchaseRequisition(
     newValue: { status: updated.status, rejectionReason: reason },
   })
 
-  return mapPurchaseRequisitionToDto(updated)
+  return mapPrToDto(tenantId, updated)
 }
 
 export async function sendBackPurchaseRequisition(
@@ -736,7 +731,7 @@ export async function sendBackPurchaseRequisition(
     newValue: { status: updated.status, sendBackReason: reason },
   })
 
-  return mapPurchaseRequisitionToDto(updated)
+  return mapPrToDto(tenantId, updated)
 }
 
 export async function cancelPurchaseRequisition(
@@ -790,7 +785,7 @@ export async function cancelPurchaseRequisition(
     newValue: { status: updated.status },
   })
 
-  return mapPurchaseRequisitionToDto(updated)
+  return mapPrToDto(tenantId, updated)
 }
 
 export async function reopenPurchaseRequisition(
@@ -850,5 +845,5 @@ export async function reopenPurchaseRequisition(
     newValue: { status: updated.status },
   })
 
-  return mapPurchaseRequisitionToDto(updated)
+  return mapPrToDto(tenantId, updated)
 }

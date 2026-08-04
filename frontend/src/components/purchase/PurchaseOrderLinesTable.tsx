@@ -11,10 +11,9 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { CommandBarOverflowMenu } from '@/components/ui/CommandBar'
 import { MQ_BELOW_LG, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/utils/cn'
-import { filterPurchaseCatalogByProductType } from '@/utils/purchaseCatalogFilter'
+import { filterPurchaseCatalogByProductType, resolveCatalogItemProductType } from '@/utils/purchaseCatalogFilter'
 import {
   mapEngineeringProductTypeToPurchaseCategory,
-  normalizeEngineeringProductType,
 } from '@/utils/purchaseProductType'
 import { getPurchaseLineUomOptions } from '@/utils/purchaseLineUom'
 import { PurchaseLineQtyCell } from '@/components/purchase/PurchaseLineQtyCell'
@@ -204,8 +203,7 @@ export function PurchaseOrderLinesTable({
     const matched = line.itemId
       ? catalogItems.find(
           (i) =>
-            i.id === line.itemId &&
-            normalizeEngineeringProductType(i.productType) === productType,
+            i.id === line.itemId && resolveCatalogItemProductType(i) === productType,
         )
       : undefined
     if (matched) {

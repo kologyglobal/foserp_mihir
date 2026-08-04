@@ -351,7 +351,7 @@ export function RfqDetailPage() {
             subtitle="Identity, buyer, and locations"
             collapsible
             defaultOpen
-            columns={4}
+            columns={6}
           >
             <ErpViewField label="RFQ Number" value={rfq.documentNumber} />
             <ErpViewField label="RFQ Date" value={formatDate(rfq.documentDate)} />
@@ -403,7 +403,7 @@ export function RfqDetailPage() {
             subtitle="Terms and communication"
             collapsible
             defaultOpen
-            columns={4}
+            columns={6}
           >
             <ErpViewField label="Payment Terms" value={rfq.paymentTerms} />
             <ErpViewField label="Delivery Terms" value={rfq.deliveryTerms} />

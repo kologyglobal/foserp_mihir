@@ -646,7 +646,7 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
       subtitle="Header, requester, and scheduling"
       icon={ClipboardList}
       accent="blue"
-      columns={2}
+      columns={6}
       collapsible
       defaultOpen
     >
@@ -683,6 +683,7 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
       subtitle="Header, requester, and scheduling"
       icon={ClipboardList}
       accent="blue"
+      columns={6}
       collapsible
       defaultOpen
     >
@@ -770,7 +771,7 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
       subtitle="Scheduling and demand references"
       icon={ClipboardList}
       accent="amber"
-      columns={2}
+      columns={6}
       collapsible
       defaultOpen
     >
@@ -806,7 +807,7 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
 
   const commercialSection = (
     <div id={purchaseSectionId('commercial')} className="space-y-4">
-      <ErpCardSection title="Commercial terms" subtitle="Payment, incoterms, and currency" icon={ShoppingCart} accent="violet" columns={2} collapsible defaultOpen>
+      <ErpCardSection title="Commercial terms" subtitle="Payment, incoterms, and currency" icon={ShoppingCart} accent="violet" columns={6} collapsible defaultOpen>
         {isView ? (
           <>
             <ErpViewField label="Payment Terms" value="Net 30" />
@@ -886,7 +887,7 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
       subtitle="Workflow status and sign-off"
       icon={CheckCircle}
       accent="green"
-      columns={2}
+      columns={5}
       collapsible
       defaultOpen
     >

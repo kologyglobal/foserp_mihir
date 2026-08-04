@@ -13004,15 +13004,17 @@ a.crm-companies-table__name:hover {
   }
 }
 
-/* When factbox is open, keep field grids to max 2 columns */
+/* When factbox is open, keep field grids narrower beside Smart Context */
 .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-3,
 .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3,
 .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-4,
-.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4 {
+.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4,
+.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-5,
+.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-6 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-/* Wide detail layouts: keep dense 4-col / 3-col grids usable beside Smart Context */
+/* Wide detail layouts: keep dense multi-col grids usable beside Smart Context */
 @media (min-width: 1280px) {
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-3,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3 {
@@ -13020,7 +13022,9 @@ a.crm-companies-table__name:hover {
   }
 
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-4,
-  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4 {
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-5,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-6 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
@@ -13030,7 +13034,9 @@ a.crm-companies-table__name:hover {
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-quick-entry .erp-card-section__grid--cols-3,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-quick-entry .erp-form-grid--cols-3,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-quick-entry .erp-card-section__grid--cols-4,
-  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-quick-entry .erp-form-grid--cols-4 {
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-quick-entry .erp-form-grid--cols-4,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-quick-entry .erp-card-section__grid--cols-5,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-quick-entry .erp-card-section__grid--cols-6 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
@@ -13040,6 +13046,14 @@ a.crm-companies-table__name:hover {
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-5 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-6 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 767px) {
@@ -13047,6 +13061,8 @@ a.crm-companies-table__name:hover {
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-4,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-5,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-6,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-2 {
     grid-template-columns: 1fr;
   }
@@ -16835,7 +16851,9 @@ a.crm-companies-table__name:hover {
   /* Dense defaults to 2 cols — never override an explicit cols-1 */
   .erp-card-section__grid--dense:not(.erp-card-section__grid--cols-1):not(
       .erp-card-section__grid--cols-3
-    ):not(.erp-card-section__grid--cols-4),
+    ):not(.erp-card-section__grid--cols-4):not(.erp-card-section__grid--cols-5):not(
+      .erp-card-section__grid--cols-6
+    ),
   .erp-card-section__grid--cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -16851,6 +16869,14 @@ a.crm-companies-table__name:hover {
   .erp-card-section__grid--cols-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+
+  .erp-card-section__grid--cols-5 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .erp-card-section__grid--cols-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 768px) and (max-width: 1279px) {
@@ -16860,6 +16886,11 @@ a.crm-companies-table__name:hover {
 
   .erp-card-section__grid--cols-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-card-section__grid--cols-5,
+  .erp-card-section__grid--cols-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   /* Keep Quick Entry at 3 columns on typical laptop widths */
@@ -16873,6 +16904,28 @@ a.crm-companies-table__name:hover {
   .erp-card-section__grid--cols-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+
+  .erp-card-section__grid--cols-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .erp-card-section__grid--cols-6 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1400px) {
+  .erp-card-section__grid--cols-6 {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.erp-field-row--span-2 {
+  grid-column: span 2;
+}
+
+.erp-field-row--span-3 {
+  grid-column: span 3;
 }
 
 .erp-field-row {
@@ -23747,3 +23800,280 @@ a.crm-companies-table__name:hover {
   }
 }
 
+
+/* -- Purchase Planning Sheet (Zoho-style register) -- */
+.purchase-planning-register__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border, #e1e4e8);
+  border-radius: 8px;
+  background: var(--erp-surface, #fff);
+}
+
+.purchase-planning-register__view-switch {
+  flex-shrink: 0;
+}
+
+.purchase-planning-register__view-switch .erp-segmented-pills__btn {
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.purchase-planning-register__meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--erp-muted, #605e5c);
+}
+
+.purchase-planning-register__count {
+  font-weight: 600;
+  color: var(--erp-text, #1f2933);
+}
+
+.purchase-planning-register__sep {
+  opacity: 0.55;
+}
+
+.purchase-planning-register__selected {
+  font-weight: 600;
+  color: var(--erp-primary, #0078d4);
+}
+
+.purchase-planning-register__hint {
+  margin: 0;
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--erp-muted, #605e5c);
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .purchase-planning-register__hint {
+    flex-basis: 100%;
+    text-align: left;
+  }
+}
+
+.purchase-planning-register__selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--erp-primary, #0078d4) 28%, var(--erp-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 6%, #fff);
+}
+
+.purchase-planning-register__selection-text {
+  font-size: 13px;
+  color: var(--erp-text, #1f2933);
+}
+
+.purchase-planning-demand-table {
+  font-size: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.purchase-planning-demand-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 9px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--erp-muted, #605e5c);
+  background: #f8f9fa;
+  border-bottom: 1px solid var(--erp-border, #e1e4e8);
+  white-space: nowrap;
+}
+
+.purchase-planning-demand-table tbody td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--erp-border, #e1e4e8);
+  color: var(--erp-text, #1f2933);
+}
+
+.purchase-planning-demand-table__row {
+  transition: background 0.12s ease;
+}
+
+.purchase-planning-demand-table__row:hover {
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 4%, #fff);
+}
+
+.purchase-planning-demand-table__row--open {
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 5%, #fff);
+}
+
+.purchase-planning-demand-table__expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--erp-border, #e1e4e8);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--erp-muted, #605e5c);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+
+.purchase-planning-demand-table__expand:hover {
+  border-color: var(--erp-primary, #0078d4);
+  color: var(--erp-primary, #0078d4);
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 6%, #fff);
+}
+
+.purchase-planning-demand-table__item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 160px;
+}
+
+.purchase-planning-demand-table__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--erp-primary, #0078d4);
+  letter-spacing: 0.01em;
+}
+
+.purchase-planning-demand-table__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--erp-text, #1f2933);
+  line-height: 1.3;
+}
+
+.purchase-planning-demand-table__desc {
+  font-size: 11px;
+  color: var(--erp-muted, #605e5c);
+  line-height: 1.35;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.purchase-planning-demand-table__loc {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  min-width: 100px;
+}
+
+.purchase-planning-demand-table__qty {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--erp-text, #1f2933);
+}
+
+.purchase-planning-demand-table__pr-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f3f2f1;
+  font-weight: 600;
+  color: var(--erp-text, #1f2933);
+}
+
+.purchase-planning-demand-table__vendors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+}
+
+.purchase-planning-demand-table__vendor-chip {
+  display: inline-flex;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--erp-border, #e1e4e8);
+  background: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--erp-text, #1f2933);
+}
+
+.purchase-planning-demand-table__empty {
+  border-bottom: none;
+}
+
+.purchase-planning-demand-table__detail td {
+  padding: 0;
+  background: #fafbfc;
+  border-bottom: 1px solid var(--erp-border, #e1e4e8);
+}
+
+.purchase-planning-demand-table__detail-inner {
+  margin: 0 12px 12px 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border, #e1e4e8);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.purchase-planning-demand-table__detail-head {
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--erp-muted, #605e5c);
+}
+
+.purchase-planning-demand-table__nested {
+  width: 100%;
+  max-width: 640px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.purchase-planning-demand-table__nested th {
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--erp-muted, #605e5c);
+  border-bottom: 1px solid var(--erp-border, #e1e4e8);
+  background: transparent;
+}
+
+.purchase-planning-demand-table__nested td {
+  padding: 7px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--erp-border, #e1e4e8) 70%, transparent);
+}
+
+.purchase-planning-demand-table__nested tr:last-child td {
+  border-bottom: none;
+}

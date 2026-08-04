@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-31** (HRMS UI/UX redesign — Zoho People–inspired FE). Prior **2026-07-31**: Phase 11 Exit & F&F; Phase 10 Loans; Phase 9 Payslip/Accounting/Payment; Phase 8 Statutory; Phase 7 Payroll. Prior **2026-07-30**: HRMS Phase 6 Salary Structures; Phase 5 Overtime; Leave + attendance; Phase 2 Shift/Roster; Phase 1 Employee. Prior **2026-07-29**: FIN-CLOSE-1 stop; MFG Fuel Tank READY.
+Last verified against codebase: **2026-08-04** (Store & Inventory Operations FE hub — dashboard/hubs/Item 360 over existing ledger and engines; no duplicate stock tables). Prior **2026-07-31** (HRMS UI/UX redesign — Zoho People–inspired FE). Prior **2026-07-31**: Phase 11 Exit & F&F; Phase 10 Loans; Phase 9 Payslip/Accounting/Payment; Phase 8 Statutory; Phase 7 Payroll. Prior **2026-07-30**: HRMS Phase 6 Salary Structures; Phase 5 Overtime; Leave + attendance; Phase 2 Shift/Roster; Phase 1 Employee. Prior **2026-07-29**: FIN-CLOSE-1 stop; MFG Fuel Tank READY.
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** see [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -396,7 +396,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | Tests | ✅ | Lifecycle suites + matrix role unit; QI/return stock movement asserts with seeded `itemId` |
 | Demo mode | ✅ | Full RFQ→VQ→comparison→award→PO + Planning→PO paths; Setup via `purchaseService` |
 | API mode | ✅ | Facade wired for QI/Invoice/Return; stub actions hidden |
-| Remaining gap | ITC / vendor-outstanding placeholders; formal GR/IR clearing GL (qty GRNI report shipped) |
+| Remaining gap | ITC / vendor-outstanding placeholders; formal GR/IR clearing GL (qty GRNI report shipped); **supplier quality FE wizard polish** (API: returnable qty, ship, scorecards, reports READY WITH CONDITIONS 2026-08-04) |
 
 ### Quality (manufacturing QC + Purchase incoming QI)
 

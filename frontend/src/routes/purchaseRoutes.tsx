@@ -66,6 +66,9 @@ import {
 import { PurchaseApprovalsPage } from '../modules/purchase/PurchaseApprovalsPage'
 import { PurchaseSetupPage } from '../modules/purchase/PurchaseSetupPage'
 import { PurchasePlanningSheetPage } from '../modules/purchase/PurchasePlanningSheetPage'
+import { ReceiptSummaryRegisterPage } from '../modules/purchase/ops/ReceiptSummaryRegisterPage'
+import { PurchaseItemSummaryPage } from '../modules/purchase/ops/PurchaseItemSummaryPage'
+import { VendorOpsSummaryPage } from '../modules/purchase/ops/VendorOpsSummaryPage'
 
 export const purchaseRouteChildren = [
   { index: true, element: <PurchaseModuleDashboard /> },
@@ -117,6 +120,9 @@ export const purchaseRouteChildren = [
   { path: 'returns/:id/print', element: <PurchaseReturnPrintPage /> },
   { path: 'returns/:id', element: <PurchaseReturnDetailPage /> },
   { path: 'vendor-performance', element: <VendorPerformancePage /> },
+  { path: 'ops/receipts', element: <ReceiptSummaryRegisterPage /> },
+  { path: 'ops/item-summary', element: <PurchaseItemSummaryPage /> },
+  { path: 'ops/vendors', element: <VendorOpsSummaryPage /> },
   { path: 'reports', element: <PurchaseReportsHubPage /> },
   { path: 'reports/:reportId', element: <PurchaseReportRunnerPage /> },
   { path: 'masters', element: <PurchaseMastersHubPage /> },

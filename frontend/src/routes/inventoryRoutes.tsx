@@ -2,10 +2,26 @@ import type { ReactElement } from 'react'
 import type { RouteObject } from 'react-router-dom'
 import { Navigate, useParams } from 'react-router-dom'
 import { InventoryOverviewPage } from '@/modules/inventory/overview/InventoryOverviewPage'
+import { StoreDashboardPage } from '@/modules/inventory/store/StoreDashboardPage'
+import {
+  MaterialReceiptHubPage,
+  MaterialIssueHubPage,
+  StockTransferHubPage,
+  PickingHubPage,
+  StockCountHubPage,
+  BarcodeHubPage,
+} from '@/modules/inventory/store/StoreOperationHubs'
+import { PutAwayWorkbenchPage } from '@/modules/inventory/store/PutAwayWorkbenchPage'
+import { InventoryTimelinePage } from '@/modules/inventory/store/InventoryTimelinePage'
+import { StoreReservationsPage } from '@/modules/inventory/store/StoreReservationsPage'
 import { InventoryItemsListPage } from '@/modules/inventory/items/InventoryItemsListPage'
 import { InventoryItemFormPage } from '@/modules/inventory/items/InventoryItemFormPage'
 import { InventoryItemDetailPage } from '@/modules/inventory/items/InventoryItemDetailPage'
-import { StockAvailabilityPage } from '@/modules/inventory/stock/StockAvailabilityPage'
+import { ConsolidatedStockPage } from '@/modules/inventory/ops/ConsolidatedStockPage'
+import { ItemStock360Page } from '@/modules/inventory/ops/ItemStock360Page'
+import { WarehouseOpsDashboardPage } from '@/modules/inventory/ops/WarehouseOpsDashboardPage'
+import { InventoryOpsAnalyticsPage } from '@/modules/inventory/ops/InventoryOpsAnalyticsPage'
+import { OpsSearchPage } from '@/modules/inventory/ops/OpsSearchPage'
 import { InventoryPlanningPage } from '@/modules/inventory/planning/InventoryPlanningPage'
 import { InventoryReportsHubPage } from '@/modules/inventory/reports/InventoryReportsHubPage'
 import { InventoryReportRunnerPage } from '@/modules/inventory/reports/InventoryReportRunnerPage'
@@ -45,11 +61,9 @@ import {
   StockAdjustmentPage,
 } from '@/modules/inventory/InventoryTxnPages'
 import { StockLedgerPage } from '@/modules/inventory/StockLedgerPage'
-import { InventoryStockDetailPage } from '@/modules/inventory/stock/InventoryStockDetailPage'
 import { ReservationsPage } from '@/modules/inventory/ReservationsPage'
 import { ScanToReceivePage, ScanToIssuePage, ScanToTransferPage } from '@/modules/barcode'
 import {
-  ApiStockBalancesPage,
   ApiStockLedgerPage,
   ApiItemLedgerRedirect,
   ApiReservationsPage,
@@ -90,7 +104,18 @@ function MastersItemEditRedirect() {
 }
 
 const demoInventoryRouteChildren: RouteObject[] = [
-  { path: 'inventory', element: <InventoryOverviewPage /> },
+  { path: 'inventory', element: <StoreDashboardPage /> },
+  { path: 'inventory/overview', element: <InventoryOverviewPage /> },
+  { path: 'inventory/store', element: <StoreDashboardPage /> },
+  { path: 'inventory/store/receive', element: <MaterialReceiptHubPage /> },
+  { path: 'inventory/store/issue', element: <MaterialIssueHubPage /> },
+  { path: 'inventory/store/transfer', element: <StockTransferHubPage /> },
+  { path: 'inventory/store/put-away', element: <PutAwayWorkbenchPage /> },
+  { path: 'inventory/store/picking', element: <PickingHubPage /> },
+  { path: 'inventory/store/count', element: <StockCountHubPage /> },
+  { path: 'inventory/store/scan', element: <BarcodeHubPage /> },
+  { path: 'inventory/store/timeline', element: <InventoryTimelinePage /> },
+  { path: 'inventory/store/reservations', element: <StoreReservationsPage /> },
   { path: 'inventory/items', element: <InventoryItemsListPage /> },
   { path: 'inventory/items/new', element: <InventoryItemFormPage /> },
   { path: 'inventory/items/:itemId/edit', element: <InventoryItemFormPage /> },
@@ -99,8 +124,11 @@ const demoInventoryRouteChildren: RouteObject[] = [
   { path: 'inventory/items/:id/ledger', element: <ItemLedgerPage /> },
   { path: 'inventory/items/:itemId', element: <InventoryItemDetailPage /> },
   { path: 'inventory/items/:id', element: <InventoryItemDetailPage /> },
-  { path: 'inventory/stock', element: <StockAvailabilityPage /> },
-  { path: 'inventory/stock/:itemId', element: <InventoryStockDetailPage /> },
+  { path: 'inventory/stock', element: <ConsolidatedStockPage /> },
+  { path: 'inventory/stock/:itemId', element: <ItemStock360Page /> },
+  { path: 'inventory/ops/warehouses', element: <WarehouseOpsDashboardPage /> },
+  { path: 'inventory/ops/analytics', element: <InventoryOpsAnalyticsPage /> },
+  { path: 'inventory/ops/search', element: <OpsSearchPage /> },
 
   { path: 'inventory/movements/receipts', element: <ReceiptsRegisterPage /> },
   { path: 'inventory/movements/receipts/new', element: <QuickReceiptPage /> },
@@ -185,7 +213,18 @@ const inventoryApiModeGate = (
 
 /** Routes with a live Inventory 3A backend — rendered instead of the gate in API mode. */
 const apiInventoryRouteOverrides: Record<string, ReactElement> = {
-  inventory: <InventoryOverviewPage />,
+  inventory: <StoreDashboardPage />,
+  'inventory/overview': <InventoryOverviewPage />,
+  'inventory/store': <StoreDashboardPage />,
+  'inventory/store/receive': <MaterialReceiptHubPage />,
+  'inventory/store/issue': <MaterialIssueHubPage />,
+  'inventory/store/transfer': <StockTransferHubPage />,
+  'inventory/store/put-away': <PutAwayWorkbenchPage />,
+  'inventory/store/picking': <PickingHubPage />,
+  'inventory/store/count': <StockCountHubPage />,
+  'inventory/store/scan': <BarcodeHubPage />,
+  'inventory/store/timeline': <InventoryTimelinePage />,
+  'inventory/store/reservations': <StoreReservationsPage />,
   'inventory/store-workbench': <StoreWorkbenchPage />,
   'inventory/items': <InventoryItemsListPage />,
   'inventory/items/new': <Navigate to="/masters/items/new" replace />,
@@ -222,8 +261,11 @@ const apiInventoryRouteOverrides: Record<string, ReactElement> = {
   'inventory/scan/receive': <ApiScanToReceivePage />,
   'inventory/scan/issue': <ApiScanToIssuePage />,
   'inventory/scan/transfer': <ApiScanToTransferPage />,
-  'inventory/stock': <ApiStockBalancesPage />,
-  'inventory/stock/:itemId': <ApiItemLedgerRedirect />,
+  'inventory/stock': <ConsolidatedStockPage />,
+  'inventory/stock/:itemId': <ItemStock360Page />,
+  'inventory/ops/warehouses': <WarehouseOpsDashboardPage />,
+  'inventory/ops/analytics': <InventoryOpsAnalyticsPage />,
+  'inventory/ops/search': <OpsSearchPage />,
   'inventory/movements': <ApiStockLedgerPage />,
   'inventory/ledger': <ApiStockLedgerPage />,
   'inventory/items/:itemId/ledger': <ApiItemLedgerRedirect />,

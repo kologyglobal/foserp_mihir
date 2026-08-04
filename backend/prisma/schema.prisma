@@ -509,6 +509,7 @@ model Tenant {
   vendorComparisonLines               VendorComparisonLine[]
   purchaseOrders                      PurchaseOrder[]
   purchaseOrderLines                  PurchaseOrderLine[]
+  purchaseOrderLinePrSources          PurchaseOrderLinePrSource[]
   purchaseOrderRevisions              PurchaseOrderRevision[]
   purchaseRequisitionRevisions        PurchaseRequisitionRevision[]
   purchaseRequisitionArchived         PurchaseRequisitionArchived[]
@@ -6468,6 +6469,7 @@ model PurchaseRequisition {
   productionMaterials ProductionOrderMaterial[]
   revisions             PurchaseRequisitionRevision[]
   archivedHeaders       PurchaseRequisitionArchived[]
+  poLinePrSources       PurchaseOrderLinePrSource[]
 
   @@unique([tenantId, requisitionNumber])
   @@index([tenantId])
@@ -6518,6 +6520,7 @@ model PurchaseRequisitionLine {
   planningRows        PurchasePlanningRow[]
   rfqLines            RequestForQuotationLine[]
   purchaseOrderLines  PurchaseOrderLine[]
+  poLinePrSources     PurchaseOrderLinePrSource[]
 
   @@unique([tenantId, purchaseRequisitionId, lineNumber])
   @@index([tenantId])
@@ -6669,6 +6672,7 @@ model PurchasePlanningRow {
   lastPurchaseVendor      MasterVendor?           @relation("PlanningLastPurchaseVendor", fields: [lastPurchaseVendorId], references: [id])
   purchaseOrder           PurchaseOrder?          @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderLines      PurchaseOrderLine[]
+  poLinePrSources         PurchaseOrderLinePrSource[]
 
   @@unique([tenantId, planningNumber])
   @@index([tenantId])
@@ -7046,6 +7050,8 @@ model PurchaseOrderLine {
   hsn                     MasterHsnCode?           @relation(fields: [hsnId], references: [id])
   bin                     MasterBin?               @relation(fields: [binId], references: [id])
   goodsReceiptLines       GoodsReceiptLine[]
+  /// Traceability for consolidated PO lines (Item demand from multiple PRs).
+  prSources               PurchaseOrderLinePrSource[]
 
   @@unique([tenantId, purchaseOrderId, lineNumber])
   @@index([tenantId])
@@ -7057,6 +7063,34 @@ model PurchaseOrderLine {
   @@index([tenantId, hsnId])
   @@index([tenantId, binId])
   @@map("purchase_order_lines")
+}
+
+/// Links a (possibly consolidated) PO line back to originating PR line / planning qty slices.
+/// When planning consolidation is used, one PO line may have many sources; PO line quantity =
+/// sum of source quantities for that vendor allocation.
+model PurchaseOrderLinePrSource {
+  id                        String   @id @default(uuid())
+  tenantId                  String
+  purchaseOrderLineId       String
+  purchaseRequisitionId     String
+  purchaseRequisitionLineId String
+  purchasePlanningRowId     String?
+  requisitionNumber         String   @default("") @db.VarChar(64)
+  planningNumber            String?  @db.VarChar(64)
+  quantity                  Decimal  @default(0) @db.Decimal(18, 4)
+  createdAt                 DateTime @default(now())
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  purchaseOrderLine       PurchaseOrderLine        @relation(fields: [purchaseOrderLineId], references: [id], onDelete: Cascade)
+  purchaseRequisition     PurchaseRequisition      @relation(fields: [purchaseRequisitionId], references: [id])
+  purchaseRequisitionLine PurchaseRequisitionLine  @relation(fields: [purchaseRequisitionLineId], references: [id])
+  purchasePlanningRow     PurchasePlanningRow?     @relation(fields: [purchasePlanningRowId], references: [id])
+  @@index([tenantId], map: "pol_pr_src_tenant_idx")
+  @@index([tenantId, purchaseOrderLineId], map: "pol_pr_src_tenant_pol_idx")
+  @@index([tenantId, purchaseRequisitionId], map: "pol_pr_src_tenant_pr_idx")
+  @@index([tenantId, purchaseRequisitionLineId], map: "pol_pr_src_tenant_prl_idx")
+  @@index([tenantId, purchasePlanningRowId], map: "pol_pr_src_tenant_plan_idx")
+  @@map("purchase_order_line_pr_sources")
 }
 
 /// Immutable snapshot of a PO amendment (Rev N). Live PO stays the current document.
@@ -7525,6 +7559,9 @@ model PurchaseSettings {
   requirePoWarehouse             Boolean                     @default(false)
   requireExpectedDeliveryDate    Boolean                     @default(false)
   requirePaymentTerms            Boolean                     @default(false)
+  /// When true, Planning Sheet prefers consolidated demand (item+UOM+location) with multi-vendor allocation.
+  /// Document-level PPS rows and PR audit links are preserved; buyers can still switch to document lines on the sheet.
+  planningConsolidationEnabled   Boolean                     @default(true)
   allowOverReceipt               Boolean                     @default(false)
   overReceiptTolerancePct        Decimal                     @default(0) @db.Decimal(5, 2)
   /// When true, revising a released PO returns it to PENDING_APPROVAL.
@@ -7579,6 +7616,8 @@ model PurchaseSettings {
   printDefaultCopies             Int                         @default(1)
   printPaperSize                 PurchasePrintPaperSize      @default(A4)
   printOrientation               PurchasePrintOrientation    @default(PORTRAIT)
+  /// In-app / email toggles per purchase event key (JSON object). Null → server defaults.
+  notificationPreferences        Json?
   selfApprovalPolicy             SelfApprovalPolicy          @default(PERMISSION_ONLY)
   version                        Int                         @default(1)
   createdById                    String?                     @db.VarChar(36)
@@ -7710,26 +7749,40 @@ model PurchasePlantSettings {
 }
 
 model PurchaseQualityInspection {
-  id               String                  @id @default(uuid())
-  tenantId         String
-  inspectionNumber String                  @db.VarChar(64)
-  inspectionDate   DateTime                @db.Date
-  goodsReceiptId   String?
-  purchaseOrderId  String?
-  vendorId         String?
-  status           QualityInspectionStatus @default(DRAFT)
-  warehouseId      String?
-  inspectionPlan   String?                 @db.VarChar(300)
-  remarks          String?                 @db.Text
-  deviationRemarks String?                 @db.Text
-  inspectedById    String?                 @db.VarChar(36)
-  inspectedByName  String?                 @db.VarChar(200)
-  completedAt      DateTime?
-  createdById      String?                 @db.VarChar(36)
-  updatedById      String?                 @db.VarChar(36)
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  deletedAt        DateTime?
+  id                         String                  @id @default(uuid())
+  tenantId                   String
+  inspectionNumber           String                  @db.VarChar(64)
+  inspectionDate             DateTime                @db.Date
+  goodsReceiptId             String?
+  purchaseOrderId            String?
+  vendorId                   String?
+  status                     QualityInspectionStatus @default(DRAFT)
+  /// Disposition/result after completion: ACCEPT | PARTIAL | REJECT | HOLD
+  result                     String?                 @db.VarChar(32)
+  /// Fine-grained decision: ACCEPT | PARTIAL | REJECT | DEVIATION_ACCEPT | QUARANTINE | REWORK | RETURN_TO_VENDOR | REPLACEMENT_REQUIRED
+  decisionCode               String?                 @db.VarChar(40)
+  decisionReason             String?                 @db.Text
+  priority                   String                  @default("NORMAL") @db.VarChar(16)
+  warehouseId                String?
+  /// Shared master plan reference (snapshot parameters on create — do not live-edit)
+  inspectionPlanId           String?
+  inspectionPlanRevisionId   String?
+  planCodeSnapshot           String?                 @db.VarChar(64)
+  planRevisionSnapshot       String?                 @db.VarChar(32)
+  /// Free-text plan label (legacy + display)
+  inspectionPlan             String?                 @db.VarChar(300)
+  remarks                    String?                 @db.Text
+  deviationRemarks           String?                 @db.Text
+  inspectedById              String?                 @db.VarChar(36)
+  inspectedByName            String?                 @db.VarChar(200)
+  assignedAt                 DateTime?
+  startedAt                  DateTime?
+  completedAt                DateTime?
+  createdById                String?                 @db.VarChar(36)
+  updatedById                String?                 @db.VarChar(36)
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
+  deletedAt                  DateTime?
 
   tenant     Tenant                               @relation(fields: [tenantId], references: [id])
   lines      PurchaseQualityInspectionLine[]
@@ -7741,6 +7794,8 @@ model PurchaseQualityInspection {
   @@index([tenantId, deletedAt])
   @@index([tenantId, goodsReceiptId])
   @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, inspectedById])
+  @@index([tenantId, inspectionPlanId])
   @@map("purchase_quality_inspections")
 }
 
@@ -7771,12 +7826,15 @@ model PurchaseQualityInspectionLine {
   @@map("purchase_quality_inspection_lines")
 }
 
-/// Free-form incoming QI parameter checklist (not linked to manufacturing QualityParameter masters).
+/// Incoming QI parameter checklist — free-form or snapshotted from shared QualityParameter masters.
 model PurchaseQualityInspectionParameter {
   id                  String   @id @default(uuid())
   tenantId            String
   qualityInspectionId String
   lineNumber          Int
+  /// Source master parameter when snapped from inspection plan (never live-linked)
+  sourceParameterId   String?
+  parameterCode       String?  @db.VarChar(64)
   parameterName       String   @db.VarChar(200)
   specification       String   @default("") @db.VarChar(500)
   minValue            Decimal? @db.Decimal(18, 4)
@@ -7898,14 +7956,25 @@ model PurchaseReturn {
   goodsReceiptId           String?
   qualityInspectionId      String?
   status                   PurchaseReturnStatus @default(DRAFT)
+  /// CREDIT | REPLACEMENT | REPAIR | INSPECTION | SCRAP_VENDOR
+  returnType               String               @default("CREDIT") @db.VarChar(32)
+  /// QI/decision reference code snapshot
+  decisionCode             String?              @db.VarChar(40)
   warehouseId              String?
   reason                   String?              @db.Text
   remarks                  String?              @db.Text
-  /// FIN-CLOSE-1 — soft link to the Accounting VendorAdjustment (debit note) raised for
-  /// the invoiced portion of this return. Null when no posted invoice exists (no AP effect).
+  /// FIN-CLOSE-1 — soft link to the Accounting VendorAdjustment (debit note)
   vendorAdjustmentId       String?              @db.VarChar(36)
   vendorAdjustmentDraftRef String?              @db.VarChar(64)
+  /// NONE | DRAFT | POSTED | ADJUSTED | CANCELLED
+  accountingStatus          String               @default("NONE") @db.VarChar(24)
+  /// Optional NCR opened with this rejection cycle
+  ncrId                    String?              @db.VarChar(36)
+  /// Replacement flow: GRN that settled replacement, original return id
+  replacementGoodsReceiptId String?             @db.VarChar(36)
+  replacedReturnId         String?              @db.VarChar(36)
   submittedAt              DateTime?
+  shippedAt                DateTime?
   completedAt              DateTime?
   cancelledAt              DateTime?
   createdById              String?              @db.VarChar(36)
@@ -7924,6 +7993,10 @@ model PurchaseReturn {
   @@index([tenantId, vendorId])
   @@index([tenantId, purchaseOrderId])
   @@index([tenantId, goodsReceiptId])
+  @@index([tenantId, returnType])
+  @@index([tenantId, qualityInspectionId])
+  @@index([tenantId, replacedReturnId])
+  @@index([tenantId, accountingStatus])
   @@map("purchase_returns")
 }
 
@@ -14862,6 +14935,7 @@ model QualityNcr {
   title               String                 @db.VarChar(200)
   description         String?                @db.Text
   productionOrderId   String?
+  /// Manufacturing quality inspection id when source is mfg QC
   inspectionId        String?
   itemId              String?
   reportedByUserId    String?
@@ -14878,6 +14952,10 @@ model QualityNcr {
   targetDate          DateTime?
   jobWorkOrderId      String?
   supplierId          String?
+  /// PURCHASE_QI | MFG_INSPECTION | MANUAL | …
+  sourceType          String?                @db.VarChar(64)
+  sourceId            String?
+  goodsReceiptId      String?
   effectivenessReview String?                @db.Text
   dispositionNotes    String?                @db.Text
   createdBy           String?
@@ -14895,6 +14973,9 @@ model QualityNcr {
   @@index([tenantId, status])
   @@index([tenantId, productionOrderId])
   @@index([tenantId, jobWorkOrderId])
+  @@index([tenantId, sourceType, sourceId])
+  @@index([tenantId, goodsReceiptId])
+  @@index([tenantId, supplierId])
   @@map("quality_ncrs")
 }
 

@@ -131,6 +131,7 @@ export interface ApiPurchaseRequisition {
   requisitionDate: string
   departmentId: string | null
   requestedById: string | null
+  /** Resolved display name for requestedById (API). */
   requestedByName?: string | null
   warehouseId: string | null
   requiredDate: string | null
@@ -144,6 +145,7 @@ export interface ApiPurchaseRequisition {
   rejectionReason: string | null
   remarks: string | null
   createdById: string | null
+  createdByName?: string | null
   updatedById: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -472,6 +474,15 @@ export interface ApiPurchaseOrderLine {
   receivedQtyBase?: number
   receivedUomQty?: number
   invoicedUomQty?: number
+  prSources?: Array<{
+    id: string
+    purchaseRequisitionId: string
+    purchaseRequisitionLineId: string
+    purchasePlanningRowId: string | null
+    requisitionNumber: string
+    planningNumber: string | null
+    quantity: number
+  }>
 }
 
 export interface ApiPurchaseOrder {
@@ -953,12 +964,28 @@ export interface ApiPurchaseReturn {
   status: ApiPurchaseReturnStatus
   reason: string | null
   remarks: string | null
+  returnType?: string
+  accountingStatus?: string
+  vendorAdjustmentId?: string | null
+  vendorAdjustmentDraftRef?: string | null
+  vendorAdjustmentHref?: string | null
+  replacementGoodsReceiptId?: string | null
+  decisionCode?: string | null
   submittedAt: string | null
+  shippedAt?: string | null
   completedAt: string | null
   cancelledAt: string | null
   createdAt: string | null
   updatedAt: string | null
-  allowedActions: { canEdit: boolean; canSubmit: boolean; canComplete: boolean; canCancel: boolean }
+  allowedActions: {
+    canEdit: boolean
+    canSubmit: boolean
+    canApprove?: boolean
+    canShip?: boolean
+    canComplete: boolean
+    canCancel: boolean
+    canRaiseApAdjustment?: boolean
+  }
   totalAmount: number
   totalQuantity: number
   lines: ApiPurchaseReturnLine[]

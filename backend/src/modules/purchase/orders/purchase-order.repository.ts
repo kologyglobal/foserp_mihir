@@ -9,6 +9,18 @@ const includeOrderBase = {
     include: {
       uom: { select: { id: true, code: true, name: true } },
       bin: { select: { id: true, code: true, name: true } },
+      prSources: {
+        orderBy: { createdAt: 'asc' as const },
+        select: {
+          id: true,
+          purchaseRequisitionId: true,
+          purchaseRequisitionLineId: true,
+          purchasePlanningRowId: true,
+          requisitionNumber: true,
+          planningNumber: true,
+          quantity: true,
+        },
+      },
     },
   },
   vendor: {

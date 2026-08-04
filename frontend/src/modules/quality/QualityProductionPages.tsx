@@ -1,15 +1,12 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { SectionCard } from '../../components/ui/SectionCard'
 import { Button } from '../../components/ui/Button'
 import { TableLink } from '../../components/ui/AppLink'
-import { Badge, formatStatus, statusColor } from '../../components/ui/Badge'
-import { useIncomingPendingInspections, useQualityProductionReports } from '../../hooks/useStableStoreData'
+import { useQualityProductionReports } from '../../hooks/useStableStoreData'
 import { useQualityStore } from '../../store/qualityStore'
 import { useMasterStore } from '../../store/masterStore'
 import { isApiMode } from '@/config/apiConfig'
-import { getIncomingQualityQueue, type IncomingQualityReadiness } from '@/services/api/qualityApi'
 import {
   getFinalQcChecklistReport,
   getPaintingDefectReport,
@@ -156,120 +153,5 @@ export function QualityReportsPage() {
   )
 }
 
-export function IncomingQcQueuePage() {
-  const inspections = useIncomingPendingInspections()
-  const [apiReadiness, setApiReadiness] = useState<IncomingQualityReadiness | null>(null)
-  const [apiError, setApiError] = useState<string | null>(null)
+export { IncomingQcQueuePage } from './QualityIncomingCommandCenter'
 
-  useEffect(() => {
-    if (!isApiMode()) return
-    let cancelled = false
-    void getIncomingQualityQueue()
-      .then((res) => {
-        if (!cancelled) setApiReadiness(res.data ?? null)
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setApiError(err instanceof Error ? err.message : 'Failed to load incoming QC queue')
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  if (isApiMode()) {
-    const items = apiReadiness?.items ?? []
-    const counts = apiReadiness?.counts
-    return (
-      <div className="erp-page">
-        <PageHeader
-          title="Incoming QC Queue"
-          description="Purchase GRN material inspections — live from GRN QC_PENDING and purchase quality inspections."
-          breadcrumbs={[{ label: 'Quality', to: '/quality' }, { label: 'Incoming QC' }]}
-          actions={(
-            <div className="flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => { void getIncomingQualityQueue().then((res) => setApiReadiness(res.data ?? null)) }}>
-                Refresh
-              </Button>
-              <Button size="sm" onClick={() => { window.location.href = '/purchase/quality-inspections' }}>
-                Open Purchase QI
-              </Button>
-            </div>
-          )}
-        />
-        <SectionCard>
-          {apiError ? (
-            <p className="text-sm text-red-600" role="alert">{apiError}</p>
-          ) : (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-950">
-                <p className="font-semibold">Incoming QC ready</p>
-                <p className="mt-1">{apiReadiness?.message}</p>
-                <p className="mt-2 font-mono text-[11px] text-emerald-800">{apiReadiness?.code ?? '…'}</p>
-                {counts ? (
-                  <p className="mt-2 text-[12px]">
-                    {counts.grnPending} GRN pending · {counts.purchaseQiPending} open QI · {counts.total} total
-                  </p>
-                ) : null}
-              </div>
-              {items.length === 0 ? (
-                <p className="text-[13px] text-erp-muted">No pending incoming GRN QC right now.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="erp-table w-full min-w-[720px] text-[13px]">
-                    <thead>
-                      <tr>
-                        <th>Type</th>
-                        <th>Number</th>
-                        <th>Vendor</th>
-                        <th>Status</th>
-                        <th>Linked GRN</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((row) => (
-                        <tr key={`${row.kind}:${row.id}`}>
-                          <td>{row.kind === 'GRN' ? 'GRN' : 'Purchase QI'}</td>
-                          <td className="font-mono">{row.number}</td>
-                          <td>{row.vendorName ?? '—'}</td>
-                          <td>{row.status}</td>
-                          <td className="font-mono">{row.kind === 'PURCHASE_QI' ? (row.grnNumber ?? '—') : '—'}</td>
-                          <td className="text-right">
-                            <TableLink to={row.href}>Open →</TableLink>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </SectionCard>
-      </div>
-    )
-  }
-
-  return (
-    <div className="erp-page">
-      <PageHeader title="Incoming QC Queue" description="GRN-triggered material inspections (demo)" breadcrumbs={[{ label: 'Quality', to: '/quality' }, { label: 'Incoming QC' }]} />
-      <SectionCard noPadding>
-        <table className="erp-table">
-          <thead><tr><th>Inspection</th><th>GRN</th><th>Item</th><th>Created</th></tr></thead>
-          <tbody>
-            {inspections.map((i) => (
-              <tr key={i.id}>
-                <td><TableLink to={`/quality/inspections/${i.id}`}>{i.inspectionNo}</TableLink></td>
-                <td>{i.grnNo}</td>
-                <td>{i.itemCode}</td>
-                <td>{i.createdAt.slice(0, 10)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </SectionCard>
-    </div>
-  )
-}

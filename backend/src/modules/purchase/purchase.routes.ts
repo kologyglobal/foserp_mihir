@@ -21,6 +21,7 @@ import setupRoutes from './setup/purchase-setup.routes.js'
 import * as grnController from './grn/goods-receipt.controller.js'
 import timelineRoutes from './timeline/purchase-timeline.routes.js'
 import reportRoutes from './reports/purchase-report.routes.js'
+import supplierQualityRoutes from './supplier-quality/supplier-quality.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -51,6 +52,7 @@ router.use('/grns', grnRoutes)
 router.use('/invoices', invoiceRoutes)
 router.use('/quality-inspections', qualityInspectionRoutes)
 router.use('/returns', returnRoutes)
+router.use('/supplier-quality', supplierQualityRoutes)
 router.use('/timeline', timelineRoutes)
 router.use('/reports', reportRoutes)
 

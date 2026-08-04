@@ -418,6 +418,25 @@ export function PurchaseSetupPage() {
     setSetup((prev) => (prev ? { ...prev, print: { ...prev.print, [key]: value } } : prev))
   }
 
+  const patchNotification = (
+    key: PurchaseNotificationEventKey,
+    channel: 'inApp' | 'email',
+    value: boolean,
+  ) => {
+    touch()
+    setSetup((prev) =>
+      prev
+        ? {
+            ...prev,
+            notifications: {
+              ...prev.notifications,
+              [key]: { ...prev.notifications[key], [channel]: value },
+            },
+          }
+        : prev,
+    )
+  }
+
   const patchTier = (id: string, patch: Partial<PurchaseApprovalMatrixTier>) => {
     touch()
     setSetup((prev) =>
@@ -699,6 +718,15 @@ export function PurchaseSetupPage() {
                   checked={setup.general.allowDirectPo}
                   onChange={(e) => patchGeneral('allowDirectPo', e.target.checked)}
                 />
+                <Checkbox
+                  label="Planning consolidation (product demand view — default on)"
+                  checked={Boolean(setup.general.planningConsolidationEnabled)}
+                  onChange={(e) => patchGeneral('planningConsolidationEnabled', e.target.checked)}
+                />
+                <p className="col-span-full -mt-2 text-[11px] text-erp-muted">
+                  Tenant preference for planning: Product demand groups Item + UOM + Location (never merges PR
+                  documents). The Planning Sheet starts in Product demand and has an on-page Document lines toggle.
+                </p>
                 <Checkbox
                   label="Require PR before PO"
                   checked={setup.general.requirePrBeforePo}
@@ -1668,12 +1696,8 @@ export function PurchaseSetupPage() {
           {tab === 'notifications' && (
             <SectionCard
               title="Notifications"
-              description="In-app and email toggles per event — visible for planning only."
+              description="Choose which purchase events send in-app alerts (and email when delivery is enabled for the tenant)."
             >
-              <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-                {setup.notifications.message ||
-                  'Purchase notifications are on hold — this tab is read-only and is not saved.'}
-              </p>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[28rem] text-left text-[13px]">
                   <thead>
@@ -1693,17 +1717,17 @@ export function PurchaseSetupPage() {
                         <td className="py-3 pr-3">
                           <Checkbox
                             checked={setup.notifications[key].inApp}
-                            disabled
-                            readOnly
-                            aria-label={`${label} in-app (on hold)`}
+                            disabled={!canEdit}
+                            onChange={(e) => patchNotification(key, 'inApp', e.target.checked)}
+                            aria-label={`${label} in-app`}
                           />
                         </td>
                         <td className="py-3">
                           <Checkbox
                             checked={setup.notifications[key].email}
-                            disabled
-                            readOnly
-                            aria-label={`${label} email (on hold)`}
+                            disabled={!canEdit}
+                            onChange={(e) => patchNotification(key, 'email', e.target.checked)}
+                            aria-label={`${label} email`}
                           />
                         </td>
                       </tr>

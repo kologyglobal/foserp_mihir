@@ -30,14 +30,13 @@ import {
 } from '@/modules/purchase/purchaseFastTabSummaries'
 import {
   createPurchaseReturn,
-  createPurchaseReturnFromGrn,
-  createPurchaseReturnFromQualityInspection,
   getGRNs,
   getPurchaseInvoices,
   getPurchaseItems,
   getPurchaseOrders,
   getPurchaseReturnById,
   getQualityInspections,
+  getReturnWizardPrefill,
   getVendors,
   getPurchaseWarehouses,
   previewNextPurchaseReturnNumber,
@@ -56,6 +55,7 @@ import type {
   PurchaseReturnOrigin,
   PurchaseReturnReason,
   QualityInspection,
+  ReturnWizardPrefill,
   Vendor,
 } from '@/types/purchaseDomain'
 import { formatCurrency } from '@/utils/formatters/currency'
@@ -63,6 +63,7 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -136,16 +137,22 @@ export function PurchaseReturnEditorPage() {
   const [documentDate, setDocumentDate] = useState(today())
   const [vendorId, setVendorId] = useState('')
   const [purchaseOrderId, setPurchaseOrderId] = useState('')
-  const [goodsReceiptId, setGoodsReceiptId] = useState(searchParams.get('grnId') ?? '')
+  const [goodsReceiptId, setGoodsReceiptId] = useState(
+    searchParams.get('grnId') ?? searchParams.get('goodsReceiptId') ?? '',
+  )
   const [purchaseInvoiceId, setPurchaseInvoiceId] = useState('')
-  const [qualityInspectionId, setQualityInspectionId] = useState(searchParams.get('qiId') ?? '')
+  const [qualityInspectionId, setQualityInspectionId] = useState(
+    searchParams.get('qiId') ?? searchParams.get('qualityInspectionId') ?? '',
+  )
   const [returnReason, setReturnReason] = useState<PurchaseReturnReason>('quality_rejection')
+  const [returnType, setReturnType] = useState<string>('CREDIT')
   const [warehouseId, setWarehouseId] = useState('')
   const [transportDetails, setTransportDetails] = useState('')
   const [debitNoteRequired, setDebitNoteRequired] = useState(true)
   const [replacementRequired, setReplacementRequired] = useState(false)
   const [remarks, setRemarks] = useState('')
   const [lines, setLines] = useState<EditorLine[]>([emptyLine()])
+  const [prefillBanner, setPrefillBanner] = useState<string | null>(null)
 
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [items, setItems] = useState<PurchaseItem[]>([])
@@ -308,6 +315,7 @@ export function PurchaseReturnEditorPage() {
     purchaseInvoiceId: purchaseInvoiceId || null,
     qualityInspectionId: qualityInspectionId || null,
     returnReason,
+    returnType,
     warehouseId,
     warehouseName: locations.find((l) => l.id === warehouseId)?.name ?? '',
     transportDetails,
@@ -333,6 +341,55 @@ export function PurchaseReturnEditorPage() {
         remarks: l.remarks,
       })),
   })
+
+  const applyWizardPrefill = useCallback(
+    (prefill: ReturnWizardPrefill, itemCatalog: PurchaseItem[]) => {
+      setVendorId(prefill.vendorId)
+      setPurchaseOrderId(prefill.purchaseOrderId ?? '')
+      setGoodsReceiptId(prefill.goodsReceiptId ?? '')
+      setQualityInspectionId(prefill.qualityInspectionId ?? '')
+      if (prefill.warehouseId) setWarehouseId(prefill.warehouseId)
+      setReturnType(prefill.suggestedReturnType || 'CREDIT')
+      setReplacementRequired(prefill.replacementRequired)
+      setOrigin(prefill.qualityInspectionId ? 'quality_rejection' : 'grn_rejected_quantity')
+      setReturnReason('quality_rejection')
+      setRemarks(prefill.reason)
+      setDebitNoteRequired(prefill.suggestedReturnType !== 'REPLACEMENT')
+      setLines(
+        prefill.lines.length
+          ? prefill.lines.map((l) => {
+              const item = itemCatalog.find((i) => i.id === l.itemId)
+              return emptyLine({
+                itemId: l.itemId,
+                itemCode: l.itemCode || item?.itemCode || '',
+                description: l.itemName || item?.itemName || '',
+                batchLotNo: l.batchLotNo,
+                serialNumber: l.serialNumber,
+                receivedQty: l.availableReturnQty,
+                availableReturnQty: l.availableReturnQty,
+                returnQty: l.returnQty,
+                uom: item?.uom || 'NOS',
+                unitCost: l.unitCost || item?.standardRate || 0,
+                gstRatePct: item?.gstRatePct ?? 18,
+                reason: 'quality_rejection',
+                goodsReceiptLineId: l.goodsReceiptLineId,
+                remarks: prefill.reason,
+              })
+            })
+          : [emptyLine()],
+      )
+      const src =
+        prefill.qualityInspectionNumber ||
+        prefill.qualityInspectionId ||
+        prefill.goodsReceiptId ||
+        'source'
+      setPrefillBanner(
+        `Prefilled from ${src} · remaining returnable ${prefill.totalRemaining} (rejected ${prefill.totalRejected}, already returned ${prefill.totalReturned})`,
+      )
+      markDirty()
+    },
+    [markDirty],
+  )
 
   const hydrate = useCallback(
     (doc: PurchaseReturn) => {
@@ -420,29 +477,24 @@ export function PurchaseReturnEditorPage() {
           if (!cancelled) setLoading(false)
         }
       } else {
-        const qiId = searchParams.get('qiId')
-        const grnId = searchParams.get('grnId')
-        if (qiId) {
+        const qiId =
+          searchParams.get('qiId') || searchParams.get('qualityInspectionId') || ''
+        const grnId =
+          searchParams.get('grnId') || searchParams.get('goodsReceiptId') || ''
+        if (qiId || grnId) {
           setLoading(true)
           try {
-            const created = await createPurchaseReturnFromQualityInspection(qiId)
-            hydrate(created)
-            navigate(`/purchase/returns/${created.id}/edit`, { replace: true })
-          } catch (err) {
-            notify.error(purchaseUserMessage(err, 'Failed to create from QI'))
-          } finally {
-            if (!cancelled) setLoading(false)
-          }
-        } else if (grnId) {
-          setLoading(true)
-          try {
-            const created = await createPurchaseReturnFromGrn(grnId, {
-              origin: (searchParams.get('origin') as PurchaseReturnOrigin) || 'grn_rejected_quantity',
+            const prefill = await getReturnWizardPrefill({
+              qualityInspectionId: qiId || undefined,
+              goodsReceiptId: grnId || undefined,
             })
-            hydrate(created)
-            navigate(`/purchase/returns/${created.id}/edit`, { replace: true })
+            if (cancelled) return
+            applyWizardPrefill(prefill, i)
+            const nextNumber = await previewNextPurchaseReturnNumber().catch(() => null)
+            if (!cancelled && nextNumber) setDocumentNumber(nextNumber)
+            notify.info('Return form prefilled from inspection / receipt')
           } catch (err) {
-            notify.error(purchaseUserMessage(err, 'Failed to create from GRN'))
+            notify.error(purchaseUserMessage(err, 'Failed to prefill return from QI/GRN'))
           } finally {
             if (!cancelled) setLoading(false)
           }
@@ -455,16 +507,18 @@ export function PurchaseReturnEditorPage() {
     return () => {
       cancelled = true
     }
-  }, [hydrate, id, isNew, navigate, searchParams])
+  }, [applyWizardPrefill, hydrate, id, isNew, navigate, searchParams])
 
   const applyOriginPreset = async (mode: PurchaseReturnOrigin) => {
     setOrigin(mode)
     markDirty()
     if (mode === 'quality_rejection' && qualityInspectionId) {
       try {
-        const created = await createPurchaseReturnFromQualityInspection(qualityInspectionId)
-        hydrate(created)
-        navigate(`/purchase/returns/${created.id}/edit`, { replace: true })
+        const prefill = await getReturnWizardPrefill({
+          qualityInspectionId,
+          goodsReceiptId: goodsReceiptId || undefined,
+        })
+        applyWizardPrefill(prefill, items)
       } catch (err) {
         notify.error(purchaseUserMessage(err, 'Could not load QI lines'))
       }
@@ -472,9 +526,9 @@ export function PurchaseReturnEditorPage() {
     }
     if (goodsReceiptId) {
       try {
-        const created = await createPurchaseReturnFromGrn(goodsReceiptId, { origin: mode })
-        hydrate(created)
-        navigate(`/purchase/returns/${created.id}/edit`, { replace: true })
+        const prefill = await getReturnWizardPrefill({ goodsReceiptId })
+        applyWizardPrefill(prefill, items)
+        setOrigin(mode)
       } catch (err) {
         notify.error(purchaseUserMessage(err, 'Could not load GRN lines'))
       }
@@ -577,10 +631,15 @@ export function PurchaseReturnEditorPage() {
       }
       onSaveShortcut={() => void saveDraft()}
     >
+      {prefillBanner ? (
+        <div className="mb-3 rounded-md border border-erp-primary/30 bg-erp-primary-soft px-3 py-2 text-[12px] text-erp-text">
+          {prefillBanner}
+        </div>
+      ) : null}
       {showOriginPicker ? (
         <ErpCardSection
           title="Origin"
-          subtitle="Choose return origin and optionally load lines from GRN or quality inspection"
+          subtitle="Choose return origin and load remaining returnable lines from GRN or quality inspection"
           icon={ClipboardList}
           accent="slate"
           collapsible
@@ -589,7 +648,7 @@ export function PurchaseReturnEditorPage() {
           columns={1}
         >
           <p className="mb-2 text-[12px] text-erp-muted">
-            Selecting an origin with a source GRN or QI loads draft lines, then opens the editor.
+            Load lines via wizard prefill (remaining returnable qty). Review header and lines, then save draft.
           </p>
           <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Purchase return origin">
             {(Object.entries(PURCHASE_RETURN_ORIGIN_LABELS) as [PurchaseReturnOrigin, string][]).map(
@@ -622,7 +681,7 @@ export function PurchaseReturnEditorPage() {
               className="max-w-md"
               aria-label="Source GRN"
             >
-              <option value="">Source GRN…</option>
+              <option value="">{SELECT_PLACEHOLDER}</option>
               {grns.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.documentNumber} · {g.vendor.name}
@@ -638,7 +697,7 @@ export function PurchaseReturnEditorPage() {
               className="max-w-md"
               aria-label="Source quality inspection"
             >
-              <option value="">Source Quality Inspection…</option>
+              <option value="">{SELECT_PLACEHOLDER}</option>
               {inspections
                 .filter((q) => q.rejectedQty > 0)
                 .map((q) => (
@@ -679,6 +738,7 @@ export function PurchaseReturnEditorPage() {
         collapsible
         defaultOpen
         dense
+        columns={6}
       >
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Document</p>
@@ -722,7 +782,7 @@ export function PurchaseReturnEditorPage() {
             }}
             disabled={!editable}
           >
-            <option value="">Select vendor…</option>
+            <option value="">{SELECT_PLACEHOLDER}</option>
             {vendors.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.vendorName}
@@ -746,6 +806,24 @@ export function PurchaseReturnEditorPage() {
             ))}
           </Select>
         </ErpFieldRow>
+        <ErpFieldRow label="Return type">
+          <Select
+            value={returnType}
+            onChange={(e) => {
+              const next = e.target.value
+              setReturnType(next)
+              setReplacementRequired(next === 'REPLACEMENT')
+              markDirty()
+            }}
+            disabled={!editable}
+          >
+            <option value="CREDIT">Credit</option>
+            <option value="REPLACEMENT">Replacement</option>
+            <option value="REPAIR">Repair</option>
+            <option value="INSPECTION">Inspection</option>
+            <option value="SCRAP_VENDOR">Scrap (vendor)</option>
+          </Select>
+        </ErpFieldRow>
         <ErpFieldRow label="Warehouse">
           <Select
             value={warehouseId}
@@ -755,6 +833,7 @@ export function PurchaseReturnEditorPage() {
             }}
             disabled={!editable}
           >
+            <option value="">{SELECT_PLACEHOLDER}</option>
             {locations.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
@@ -775,7 +854,7 @@ export function PurchaseReturnEditorPage() {
             }}
             disabled={!editable}
           >
-            <option value="">—</option>
+            <option value="">{SELECT_PLACEHOLDER}</option>
             {vendorOrders.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.documentNumber}
@@ -792,7 +871,7 @@ export function PurchaseReturnEditorPage() {
             }}
             disabled={!editable}
           >
-            <option value="">—</option>
+            <option value="">{SELECT_PLACEHOLDER}</option>
             {vendorGrns.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.documentNumber}
@@ -809,7 +888,7 @@ export function PurchaseReturnEditorPage() {
             }}
             disabled={!editable}
           >
-            <option value="">—</option>
+            <option value="">{SELECT_PLACEHOLDER}</option>
             {vendorInvoices.map((inv) => (
               <option key={inv.id} value={inv.id}>
                 {inv.documentNumber}
@@ -826,7 +905,7 @@ export function PurchaseReturnEditorPage() {
             }}
             disabled={!editable}
           >
-            <option value="">—</option>
+            <option value="">{SELECT_PLACEHOLDER}</option>
             {inspections.map((q) => (
               <option key={q.id} value={q.id}>
                 {q.documentNumber}
@@ -945,7 +1024,7 @@ export function PurchaseReturnEditorPage() {
                         onChange={(e) => applyItem(l.key, e.target.value)}
                         disabled={!editable}
                       >
-                        <option value="">Item…</option>
+                        <option value="">{SELECT_PLACEHOLDER}</option>
                         {items.map((it) => (
                           <option key={it.id} value={it.id}>
                             {it.itemCode} — {it.itemName}

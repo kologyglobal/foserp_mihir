@@ -1,5 +1,6 @@
 import type { Prisma, PurchasePlanningRow, PurchasePlanningStatus } from '@prisma/client'
 import { prisma } from '../../../config/prisma.js'
+import { resolveUserNames } from '../../../shared/index.js'
 import {
   PURCHASE_AUDIT_ACTION,
   PURCHASE_AUDIT_ENTITY,
@@ -36,6 +37,20 @@ async function loadOrThrow(tenantId: string, id: string) {
   return row
 }
 
+async function mapRowsToDto(tenantId: string, rows: PurchasePlanningRow[]) {
+  const userNames = await resolveUserNames(
+    rows.flatMap((r) => [r.requestedById, r.createdById, r.buyerId]),
+    tenantId,
+    prisma,
+  )
+  return rows.map((row) => mapPlanningRowToDto(row, userNames))
+}
+
+async function mapRowToDto(tenantId: string, row: PurchasePlanningRow) {
+  const [dto] = await mapRowsToDto(tenantId, [row])
+  return dto
+}
+
 function requireRows(ids: string[]): void {
   if (!ids.length) throw new PlanningNoSelectionError()
 }
@@ -63,7 +78,7 @@ function commercialSnapshot(row: PurchasePlanningRow) {
 export async function listPlanningSheet(tenantId: string, query: ListPlanningSheetQuery) {
   const result = await repo.findPlanningRows(tenantId, query)
   return {
-    items: result.items.map(mapPlanningRowToDto),
+    items: await mapRowsToDto(tenantId, result.items),
     total: result.total,
     page: result.page,
     limit: result.limit,
@@ -76,7 +91,7 @@ export async function getPlanningSheetSummary(tenantId: string): Promise<Plannin
 
 export async function getPlanningRow(tenantId: string, id: string) {
   const row = await loadOrThrow(tenantId, id)
-  return mapPlanningRowToDto(row)
+  return mapRowToDto(tenantId, row)
 }
 
 export async function updatePlanningRow(
@@ -224,7 +239,7 @@ export async function updatePlanningRow(
     newValue: commercialSnapshot(updated),
   })
 
-  return mapPlanningRowToDto(updated)
+  return mapRowToDto(tenantId, updated)
 }
 
 async function assertAllFound(requestedIds: string[], rows: PurchasePlanningRow[]) {
@@ -295,7 +310,7 @@ export async function bulkAssignBuyer(
   }
 
   const refreshed = await repo.findPlanningRowsByIds(tenantId, input.rowIds)
-  return refreshed.map(mapPlanningRowToDto)
+  return mapRowsToDto(tenantId, refreshed)
 }
 
 export async function bulkSelectVendor(
@@ -369,7 +384,7 @@ export async function bulkSelectVendor(
   }
 
   const refreshed = await repo.findPlanningRowsByIds(tenantId, input.rowIds)
-  return refreshed.map(mapPlanningRowToDto)
+  return mapRowsToDto(tenantId, refreshed)
 }
 
 export async function bulkUpdateStatus(
@@ -431,7 +446,7 @@ export async function bulkUpdateStatus(
   }
 
   const refreshed = await repo.findPlanningRowsByIds(tenantId, input.rowIds)
-  return refreshed.map(mapPlanningRowToDto)
+  return mapRowsToDto(tenantId, refreshed)
 }
 
 export async function recalculatePlanningRows(
@@ -457,7 +472,14 @@ export async function recalculatePlanningRows(
   const updated = await prisma.$transaction(async (tx) => {
     const results: Array<{ previous: PurchasePlanningRow; next: PurchasePlanningRow }> = []
     for (const row of rows) {
-      if (row.deletedAt || row.status === 'CANCELLED' || row.status === 'COMPLETED') {
+      // Preserve residual net after partial raise — do not wipe PARTIALLY_ORDERED / fully converted qty.
+      if (
+        row.deletedAt ||
+        row.status === 'CANCELLED' ||
+        row.status === 'COMPLETED' ||
+        row.status === 'PO_CREATED' ||
+        row.status === 'PARTIALLY_ORDERED'
+      ) {
         continue
       }
       const currentStockQuantity = row.itemId ? (stockMap.get(row.itemId) ?? 0) : 0
@@ -511,5 +533,5 @@ export async function recalculatePlanningRows(
   const refreshed = refreshedIds.length
     ? await repo.findPlanningRowsByIds(tenantId, refreshedIds)
     : []
-  return refreshed.map(mapPlanningRowToDto)
+  return mapRowsToDto(tenantId, refreshed)
 }

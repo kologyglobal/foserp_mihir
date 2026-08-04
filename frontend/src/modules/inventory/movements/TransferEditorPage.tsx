@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Save, Send, Truck, XCircle } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
@@ -41,6 +41,7 @@ export function TransferEditorPage() {
   const { id } = useParams()
   const isNew = !id
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const perms = useInventoryPermissions()
   const warehouses = useActiveWarehouses()
   const items = useStockableItems()
@@ -49,17 +50,27 @@ export function TransferEditorPage() {
   const [saving, setSaving] = useState(false)
   const [doc, setDoc] = useState<InventoryTransfer | null>(null)
   const [transferType, setTransferType] = useState<TransferType>('warehouse_to_warehouse')
-  const [fromWarehouseId, setFromWarehouseId] = useState(warehouses[0]?.id ?? '')
-  const [toWarehouseId, setToWarehouseId] = useState(warehouses[1]?.id ?? warehouses[0]?.id ?? '')
+  const [fromWarehouseId, setFromWarehouseId] = useState(
+    () => searchParams.get('fromWarehouseId') || warehouses[0]?.id || '',
+  )
+  const [toWarehouseId, setToWarehouseId] = useState(
+    () => searchParams.get('toWarehouseId') || warehouses[1]?.id || warehouses[0]?.id || '',
+  )
   const [transferDate, setTransferDate] = useState(today())
   const [expectedReceiptDate, setExpectedReceiptDate] = useState('')
   const [vehicleNo, setVehicleNo] = useState('')
   const [transporter, setTransporter] = useState('')
-  const [reference, setReference] = useState('')
-  const [remarks, setRemarks] = useState('')
+  const [reference, setReference] = useState(() => {
+    const grn = searchParams.get('grnId')
+    return grn ? `Put-away GRN ${grn}` : ''
+  })
+  const [remarks, setRemarks] = useState(() => searchParams.get('remarks') ?? '')
   const [lines, setLines] = useState<EditorLine[]>([])
-  const [selectedItemId, setSelectedItemId] = useState('')
-  const [transferQty, setTransferQty] = useState(1)
+  const [selectedItemId, setSelectedItemId] = useState(() => searchParams.get('itemId') ?? '')
+  const [transferQty, setTransferQty] = useState(() => {
+    const q = Number(searchParams.get('quantity'))
+    return Number.isFinite(q) && q > 0 ? q : 1
+  })
   const [availableQty, setAvailableQty] = useState(0)
   const [unitCost, setUnitCost] = useState(0)
   const [lineBatchNo, setLineBatchNo] = useState<string | null>(null)

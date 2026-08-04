@@ -34,6 +34,7 @@ import {
   PURCHASE_RETURN_DOMAIN_STATUS_LABELS,
   PURCHASE_RETURN_ORIGIN_LABELS,
   PURCHASE_RETURN_REASON_LABELS,
+  shipPurchaseReturn,
   submitPurchaseReturn,
 } from '@/services/purchase'
 import type { ApprovalHistory, PurchaseReturn } from '@/types/purchaseDomain'
@@ -109,7 +110,8 @@ export function PurchaseReturnDetailPage() {
   const canEdit = doc.status === 'draft' || doc.status === 'pending_approval'
   const canSubmit = doc.status === 'draft'
   const canApprove = doc.status === 'pending_approval'
-  const canPost = doc.status === 'approved'
+  const canShip = isApiMode() && doc.status === 'approved'
+  const canPost = doc.status === 'approved' || doc.status === 'shipped'
   const canDebit =
     !isApiMode()
     && (doc.status === 'approved' || doc.status === 'posted')
@@ -118,7 +120,25 @@ export function PurchaseReturnDetailPage() {
     !isApiMode()
     && (doc.status === 'approved' || doc.status === 'posted')
     && !doc.linkedReplacementPoId
-  const canCancel = !['posted', 'closed', 'cancelled'].includes(doc.status)
+  const canCancel = !['posted', 'closed', 'cancelled', 'shipped'].includes(doc.status)
+  const accountingStatus = (doc.accountingStatus || 'NONE').toUpperCase()
+  const accountingLabel =
+    accountingStatus === 'NONE'
+      ? 'None'
+      : accountingStatus === 'DRAFT'
+        ? 'Draft'
+        : accountingStatus === 'POSTED'
+          ? 'Posted'
+          : accountingStatus === 'ADJUSTED'
+            ? 'Adjusted'
+            : accountingStatus === 'CANCELLED'
+              ? 'Cancelled'
+              : accountingStatus
+  const moneyOutHref =
+    doc.vendorAdjustmentHref ||
+    (doc.vendorAdjustmentId
+      ? `/accounting/money-out/vendor-adjustments/${doc.vendorAdjustmentId}`
+      : null)
 
   const documentFactBox = (
     <PurchaseDocumentFactBox
@@ -210,13 +230,27 @@ export function PurchaseReturnDetailPage() {
                 disabled: busy,
               },
               {
-                id: 'post',
-                label: isApiMode() ? 'Complete Return' : 'Post Return',
+                id: 'ship',
+                label: 'Ship to Vendor',
                 icon: Truck,
                 onClick: () =>
                   void runAction(
+                    () => shipPurchaseReturn(doc.id),
+                    'Return shipped — stock marked in transit',
+                  ),
+                hidden: !perms.canPostReturn || !canShip,
+                disabled: busy,
+              },
+              {
+                id: 'post',
+                label: isApiMode() ? 'Complete Return' : 'Post Return',
+                icon: CheckCircle2,
+                onClick: () =>
+                  void runAction(
                     () => postPurchaseReturn(doc.id),
-                    isApiMode() ? 'Return completed — stock issued' : 'Return posted',
+                    isApiMode()
+                      ? 'Return completed — stock issued to vendor'
+                      : 'Return posted',
                   ),
                 hidden: !perms.canPostReturn || !canPost,
                 disabled: busy,
@@ -228,6 +262,20 @@ export function PurchaseReturnDetailPage() {
                 onClick: () =>
                   void runAction(() => createDebitNoteFromReturn(doc.id), 'Debit note created'),
                 hidden: !perms.canCreateReturn || !canDebit,
+                disabled: busy,
+              },
+              {
+                id: 'money-out',
+                label: 'Open in Money Out',
+                icon: FileText,
+                onClick: () => {
+                  if (moneyOutHref) navigate(moneyOutHref)
+                  else navigate('/accounting/money-out/vendor-adjustments')
+                },
+                hidden:
+                  !isApiMode() ||
+                  doc.status !== 'posted' ||
+                  (accountingStatus === 'NONE' && !moneyOutHref),
                 disabled: busy,
               },
               {
@@ -267,11 +315,18 @@ export function PurchaseReturnDetailPage() {
         }
         footer={null}
       >
-        {isApiMode() && doc.status === 'posted' ? (
+        {isApiMode() && doc.status === 'posted' && accountingStatus === 'NONE' ? (
           <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
-            <strong>ACCOUNTING_ADJUSTMENT_PENDING.</strong> Stock issue is posted via Inventory Costing.
-            Vendor debit note / AP reduction is not auto-created from Purchase Return in API mode — open Money
-            Out vendor adjustments when a posted Vendor Invoice exists.
+            <strong>Accounting:</strong> stock issue complete. No vendor adjustment draft yet — usually
+            requires a posted purchase invoice covering returned lines. Purchase does not post GL.
+          </div>
+        ) : null}
+        {isApiMode() && doc.status === 'posted' && accountingStatus === 'DRAFT' && moneyOutHref ? (
+          <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-950">
+            <strong>Vendor adjustment draft</strong> created in Money Out (AP owns liability).{' '}
+            <Link to={moneyOutHref} className="font-semibold text-erp-primary underline">
+              Open in Money Out →
+            </Link>
           </div>
         ) : null}
         <ErpCardSection title="Header" collapsible defaultOpen>
@@ -279,10 +334,12 @@ export function PurchaseReturnDetailPage() {
             <ErpViewField label="Return Date" value={formatDate(doc.documentDate)} />
             <ErpViewField label="Vendor" value={`${doc.vendor.name} (${doc.vendor.gstin})`} />
             <ErpViewField label="Origin" value={PURCHASE_RETURN_ORIGIN_LABELS[doc.origin]} />
+            <ErpViewField label="Return type" value={doc.returnType || 'CREDIT'} />
             <ErpViewField
               label="Return Reason"
               value={PURCHASE_RETURN_REASON_LABELS[doc.returnReason]}
             />
+            <ErpViewField label="Accounting status" value={accountingLabel} />
             <ErpViewField
               label="PO Number"
               value={
@@ -340,15 +397,49 @@ export function PurchaseReturnDetailPage() {
               }
             />
             <ErpViewField
-              label="Debit / Credit Note"
-              value={doc.linkedDebitNoteNumber || '—'}
+              label="Vendor adjustment"
+              value={
+                moneyOutHref ? (
+                  <Link to={moneyOutHref} className="text-erp-primary">
+                    {doc.linkedDebitNoteNumber || 'Open in Money Out'}
+                  </Link>
+                ) : (
+                  doc.linkedDebitNoteNumber || '—'
+                )
+              }
             />
             <ErpViewField
               label="Quality Inspection"
-              value={doc.qualityInspectionNumber || '—'}
+              value={
+                doc.qualityInspectionId ? (
+                  <Link
+                    to={`/purchase/quality-inspections/${doc.qualityInspectionId}`}
+                    className="text-erp-primary"
+                  >
+                    {doc.qualityInspectionNumber || 'View QI'}
+                  </Link>
+                ) : (
+                  doc.qualityInspectionNumber || '—'
+                )
+              }
             />
             <ErpViewField
-              label="Posted At"
+              label="Replacement GRN"
+              value={
+                doc.replacementGoodsReceiptId ? (
+                  <Link
+                    to={`/purchase/grn/${doc.replacementGoodsReceiptId}`}
+                    className="text-erp-primary"
+                  >
+                    View GRN
+                  </Link>
+                ) : (
+                  '—'
+                )
+              }
+            />
+            <ErpViewField
+              label="Completed At"
               value={doc.postedAt ? formatDate(doc.postedAt.slice(0, 10)) : '—'}
             />
             <ErpViewField label="Total Amount" value={formatCurrency(doc.totalAmount)} />

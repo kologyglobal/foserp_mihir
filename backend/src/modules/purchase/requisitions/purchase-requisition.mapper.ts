@@ -60,8 +60,12 @@ export function formatPurchaseRequisitionUserName(user: {
 
 export function mapPurchaseRequisitionToDto(
   pr: PurchaseRequisition & { lines?: PurchaseRequisitionLine[] },
-  ctx?: { requestedByName?: string | null },
+  userNames?: Map<string, string>,
 ) {
+  const requestedByName =
+    (pr.requestedById && userNames?.get(pr.requestedById)?.trim()) || null
+  const createdByName =
+    (pr.createdById && userNames?.get(pr.createdById)?.trim()) || null
   return {
     id: pr.id,
     requisitionNumber: pr.requisitionNumber,
@@ -69,7 +73,7 @@ export function mapPurchaseRequisitionToDto(
     requisitionDate: toDateOnly(pr.requisitionDate),
     departmentId: pr.departmentId,
     requestedById: pr.requestedById,
-    requestedByName: ctx?.requestedByName ?? null,
+    requestedByName,
     warehouseId: pr.warehouseId,
     requiredDate: pr.requiredDate ? toDateOnly(pr.requiredDate) : null,
     priority: priorityToApi(pr.priority),
@@ -85,6 +89,7 @@ export function mapPurchaseRequisitionToDto(
     rejectionReason: pr.rejectionReason,
     remarks: pr.remarks,
     createdById: pr.createdById,
+    createdByName,
     updatedById: pr.updatedById,
     createdAt: toIso(pr.createdAt),
     updatedAt: toIso(pr.updatedAt),

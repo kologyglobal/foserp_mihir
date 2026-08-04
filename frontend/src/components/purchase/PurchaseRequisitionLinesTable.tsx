@@ -12,10 +12,10 @@ import { useBinCodeOptions } from '@/hooks/usePurchaseMasters'
 import { cn } from '@/utils/cn'
 import type { PrEditorLine } from '@/utils/purchaseRequisitionValidation'
 import {
-  mapEngineeringProductTypeToPurchaseCategory,
-  normalizeEngineeringProductType,
-} from '@/utils/purchaseProductType'
-import { filterPurchaseCatalogByProductType } from '@/utils/purchaseCatalogFilter'
+  filterPurchaseCatalogByProductType,
+  resolveCatalogItemProductType,
+} from '@/utils/purchaseCatalogFilter'
+import { mapEngineeringProductTypeToPurchaseCategory } from '@/utils/purchaseProductType'
 import {
   ENGINEERING_PRODUCT_TYPES,
   ENGINEERING_PRODUCT_TYPE_LABELS,
@@ -132,9 +132,11 @@ export function PurchaseRequisitionLinesTable({
       const selected = catalogItems.find((i) => i.id === selectedItemId)
       return selected ? [selected] : []
     }
+    // Strict filter by row Product Type (matches PO / Item Master engineering types).
     const filtered = filterPurchaseCatalogByProductType(catalogItems, productType)
     if (!selectedItemId) return filtered
     if (filtered.some((i) => i.id === selectedItemId)) return filtered
+    // Keep currently selected item visible if type mismatched (legacy rows) — cleared on type change.
     const selected = catalogItems.find((i) => i.id === selectedItemId)
     return selected ? [selected, ...filtered] : filtered
   }
@@ -164,14 +166,14 @@ export function PurchaseRequisitionLinesTable({
     const matched = line.itemId
       ? catalogItems.find(
           (i) =>
-            i.id === line.itemId &&
-            normalizeEngineeringProductType(i.productType) === productType,
+            i.id === line.itemId && resolveCatalogItemProductType(i) === productType,
         )
       : undefined
     if (matched) {
       patch(line.key, { productType, category })
       return
     }
+    // Type no longer matches selected item — clear item fields (minimal friction).
     patch(line.key, {
       productType,
       category,
@@ -264,8 +266,8 @@ export function PurchaseRequisitionLinesTable({
           }
         />
       ) : (
-        <div className="purchase-pr-lines-scroll max-h-[min(32rem,60vh)] overflow-auto rounded-md border border-erp-border">
-          <table className="erp-table purchase-pr-lines-grid w-max min-w-full text-[12px]">
+        <div className="purchase-pr-lines-scroll max-h-[min(36rem,62vh)] overflow-auto rounded-[10px] border border-erp-border bg-white">
+          <table className="erp-table purchase-pr-lines-grid purchase-doc-lines-grid w-max min-w-full text-[12.5px]">
             <thead>
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-line">#</th>
@@ -349,8 +351,8 @@ export function PurchaseRequisitionLinesTable({
                           allowManual={false}
                           emptyCatalogHint={
                             line.productType
-                              ? 'No Item Master rows for this product type'
-                              : 'Select product type first'
+                              ? 'No items for this product type'
+                              : 'No matching items'
                           }
                           onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
                           onClearCatalog={() =>

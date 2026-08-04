@@ -143,6 +143,19 @@ export const splitPlanningRowSchema = z.object({
     .min(2, 'Provide at least two vendor splits.'),
 })
 
+export const createPoFromConsolidationSchema = z.object({
+  planningRowIds: z.array(z.string().uuid()).min(1),
+  allocations: z
+    .array(
+      z.object({
+        vendorId: z.string().uuid(),
+        quantity: z.number().positive(),
+        rate: z.number().positive(),
+      }),
+    )
+    .min(1),
+})
+
 export type ListPlanningSheetQuery = z.infer<typeof listPlanningSheetQuerySchema>
 export type UpdatePlanningRowInput = z.infer<typeof updatePlanningRowSchema>
 export type BulkAssignBuyerInput = z.infer<typeof bulkAssignBuyerSchema>
@@ -151,3 +164,4 @@ export type BulkStatusInput = z.infer<typeof bulkStatusSchema>
 export type RecalculatePlanningInput = z.infer<typeof recalculatePlanningSchema>
 export type CreatePoFromPlanningInput = z.infer<typeof createPoFromPlanningSchema>
 export type SplitPlanningRowInput = z.infer<typeof splitPlanningRowSchema>
+export type CreatePoFromConsolidationInput = z.infer<typeof createPoFromConsolidationSchema>

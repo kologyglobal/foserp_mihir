@@ -151,10 +151,7 @@ export interface ApiPurchaseNotificationFlags {
   email: boolean
 }
 
-/** Read-only — notifications are ON_HOLD server-side and never persisted. */
 export interface ApiPurchaseSetupNotifications {
-  status: 'ON_HOLD'
-  message: string
   prPendingApproval: ApiPurchaseNotificationFlags
   rfqResponseDue: ApiPurchaseNotificationFlags
   poDeliveryApproaching: ApiPurchaseNotificationFlags
@@ -212,7 +209,7 @@ export type ApiPurchaseNumberSeriesInput = Partial<
   Record<ApiPurchaseNumberSeriesKey, { prefix: string; padLength: number }>
 >
 
-/** Nested PUT/PATCH body — notifications are intentionally not accepted. */
+/** Nested PUT/PATCH body. */
 export interface ApiPurchaseSetupInput {
   version?: number
   selfApprovalPolicy?: ApiSelfApprovalPolicy
@@ -227,6 +224,7 @@ export interface ApiPurchaseSetupInput {
   receiving?: Partial<ApiPurchaseSetupReceiving>
   quality?: Partial<ApiPurchaseSetupQuality>
   print?: Partial<Omit<ApiPurchaseSetupPrint, 'logoPlaceholderUrl'>>
+  notifications?: Partial<ApiPurchaseSetupNotifications>
 }
 
 export interface ApiPurchasePlantSetup {

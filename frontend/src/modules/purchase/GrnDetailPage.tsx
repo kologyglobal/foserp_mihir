@@ -369,7 +369,7 @@ export function GrnDetailPage() {
           subtitle="Identity, vendor, and receipt details"
           collapsible
           defaultOpen
-          columns={4}
+          columns={6}
         >
           <ErpViewField label="GRN Number" value={grn.documentNumber} />
           <ErpViewField label="GRN Date" value={formatDate(grn.documentDate)} />

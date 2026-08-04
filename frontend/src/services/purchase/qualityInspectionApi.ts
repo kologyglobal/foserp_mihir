@@ -24,6 +24,11 @@ export async function getQualityInspectionApi(id: string) {
   return apiRequest<ApiQualityInspection>(`${base()}/${id}`)
 }
 
+/** Prefill for Create Purchase Return from a completed QI (rejected remaining qty). */
+export async function getQiPurchaseReturnPrefillApi(id: string) {
+  return apiRequest<Record<string, unknown>>(`${base()}/${id}/purchase-return-prefill`)
+}
+
 export async function createQualityInspectionApi(payload: Record<string, unknown>) {
   return apiRequest<ApiQualityInspection>(base(), {
     method: 'POST',

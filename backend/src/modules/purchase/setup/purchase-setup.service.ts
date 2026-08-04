@@ -16,10 +16,12 @@ import {
   PurchaseSetupVersionConflictError,
 } from './purchase-setup.errors.js'
 import {
+  DEFAULT_PURCHASE_NOTIFICATIONS,
   docTypeFromApi,
   gstFromApi,
   mapPurchasePlantSettingsToDto,
   mapPurchaseSettingsToDto,
+  normalizeNotificationPreferences,
   NUMBER_SERIES_ENTITY_MAP,
   orientationFromApi,
   paperFromApi,
@@ -27,6 +29,7 @@ import {
   roundOffFromApi,
   type NumberSeriesDto,
   type NumberSeriesKey,
+  type PurchaseNotificationPreferences,
 } from './purchase-setup.mapper.js'
 import * as repo from './purchase-setup.repository.js'
 import {
@@ -359,6 +362,7 @@ function mergeScalarData(
   input: UpsertPurchaseSetupInput,
   payment: { code: string | null; name: string | null },
   forCreate: boolean,
+  existingNotificationPreferences?: unknown,
 ): Prisma.PurchaseSettingsUncheckedCreateInput | Prisma.PurchaseSettingsUncheckedUpdateInput {
   const g = input.general
   const r = input.requisition
@@ -367,12 +371,25 @@ function mergeScalarData(
   const tax = input.tax
   const match = input.invoiceMatchTolerances
   const print = input.print
+  const notifications = input.notifications
   const defaults = repo.SERVER_DEFAULT_SETUP
 
   const data: Record<string, unknown> = {}
 
   const set = (key: string, value: unknown) => {
     if (value !== undefined) data[key] = value
+  }
+
+  const resolveNotificationJson = (existingRaw?: unknown): PurchaseNotificationPreferences => {
+    if (!notifications) {
+      return existingRaw === undefined
+        ? structuredClone(DEFAULT_PURCHASE_NOTIFICATIONS)
+        : normalizeNotificationPreferences(existingRaw)
+    }
+    return normalizeNotificationPreferences({
+      ...normalizeNotificationPreferences(existingRaw),
+      ...notifications,
+    })
   }
 
   if (forCreate) {
@@ -408,6 +425,10 @@ function mergeScalarData(
       requireExpectedDeliveryDate:
         g?.requireExpectedDeliveryDate ?? defaults.requireExpectedDeliveryDate,
       requirePaymentTerms: g?.requirePaymentTerms ?? defaults.requirePaymentTerms,
+      planningConsolidationEnabled:
+        g?.planningConsolidationEnabled ??
+        (defaults as { planningConsolidationEnabled?: boolean }).planningConsolidationEnabled ??
+        true,
       allowOverReceipt: g?.allowOverReceipt ?? defaults.allowOverReceipt,
       overReceiptTolerancePct: g?.overReceiptTolerancePct ?? defaults.overReceiptTolerancePct,
       requireApprovalOnPoRevision:
@@ -486,6 +507,7 @@ function mergeScalarData(
       printOrientation: print?.orientation
         ? orientationFromApi(print.orientation)
         : defaults.printOrientation,
+      notificationPreferences: resolveNotificationJson(null),
       selfApprovalPolicy: input.selfApprovalPolicy ?? defaults.selfApprovalPolicy,
     })
     return data
@@ -534,6 +556,8 @@ function mergeScalarData(
     if (g.requireExpectedDeliveryDate !== undefined)
       set('requireExpectedDeliveryDate', g.requireExpectedDeliveryDate)
     if (g.requirePaymentTerms !== undefined) set('requirePaymentTerms', g.requirePaymentTerms)
+    if (g.planningConsolidationEnabled !== undefined)
+      set('planningConsolidationEnabled', g.planningConsolidationEnabled)
   }
   set('defaultPaymentTermCode', payment.code)
   set('defaultPaymentTermName', payment.name)
@@ -613,6 +637,9 @@ function mergeScalarData(
       set('printOrientation', orientationFromApi(print.orientation))
   }
   if (input.selfApprovalPolicy !== undefined) set('selfApprovalPolicy', input.selfApprovalPolicy)
+  if (notifications) {
+    set('notificationPreferences', resolveNotificationJson(existingNotificationPreferences))
+  }
 
   return data
 }
@@ -722,7 +749,12 @@ export async function upsertPurchaseSetup(
       tenantId,
       actorId,
       existing.version,
-      mergeScalarData(input, payment, false),
+      mergeScalarData(
+        input,
+        payment,
+        false,
+        (existing as { notificationPreferences?: unknown }).notificationPreferences,
+      ),
       tx,
     )
     if (!row) return null

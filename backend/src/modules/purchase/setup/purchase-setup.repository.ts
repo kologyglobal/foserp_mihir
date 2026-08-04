@@ -71,6 +71,7 @@ export const SERVER_DEFAULT_SETUP = {
   requirePoWarehouse: false,
   requireExpectedDeliveryDate: false,
   requirePaymentTerms: false,
+  planningConsolidationEnabled: true,
   allowOverReceipt: false,
   overReceiptTolerancePct: 0,
   requireApprovalOnPoRevision: true,
@@ -118,6 +119,7 @@ export const SERVER_DEFAULT_SETUP = {
   printDefaultCopies: 1,
   printPaperSize: 'A4' as PurchasePrintPaperSize,
   printOrientation: 'PORTRAIT' as PurchasePrintOrientation,
+  notificationPreferences: null as unknown,
   selfApprovalPolicy: 'PERMISSION_ONLY' as SelfApprovalPolicy,
   version: 0,
 }

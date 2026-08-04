@@ -1,3 +1,109 @@
+## 2026-08-04 — Partial raise PO from Planning consolidation
+
+### Shipped
+- Procure allocation modal allows **partial Create PO(s)** when `0 < allocated ≤ required` (was blocked by exact-balance only + disabled Create button).
+- BE `assertAllocationBalances` + create-from-consolidation: FIFO for allocated amount only; residual `netPurchaseQuantity` stays open; row → `PARTIALLY_ORDERED` (not fully closed).
+- `derivePrConversionStatus`: pure `PARTIALLY_ORDERED` → PR `PARTIALLY_CONVERTED` (not `CONVERTED_TO_PO`).
+- Demo facade path mirrors residual net + partially_ordered status.
+- Qty recalculate skips PARTIALLY_ORDERED / PO_CREATED so residual is not wiped.
+- Tests: consolidation partial FIFO + PR conversion unit; docs `PLANNING_CONSOLIDATION.md`.
+
+### Conditions
+- Subsequent raise uses remaining net on same product group (Allocate again).
+
+---
+
+## 2026-08-04 — Supplier Quality Closure live E2E + OTD KPI
+
+### Shipped
+- Live E2E MySQL suite `tests/supplier-quality-closure-live.test.ts` (`npm run test:supplier-quality-closure-live`): QI reject → return prefill → ship (REJECTED→BLOCKED) → complete → Vendor Adjustment DRAFT; REPLACEMENT link-GRN + replacement QI in trace; scorecard OTD.
+- OTD: real calculation on scorecard — GRN `receiptDate` vs PO `expectedDeliveryDate` (fallback line `requiredDate`); `onTimeDeliveryPct` remains `null` when no sample.
+- Unit coverage for OTD helpers + existing return/QI validation units.
+- **Bugfix:** supplier quality trace selected non-existent PO field `requisitionId` → corrected to `purchaseRequisitionId` (trace 400 → OK).
+
+### Conditions
+- Migration `20260804150000_supplier_quality_closure` (local deploy OK when schema up to date).
+- VA draft still requires posted Purchase Invoice coverage of returned lines (by design — see VENDOR_ADJUSTMENT.md).
+- FE return wizard still dual-mode prefill wiring.
+- Live evidence (this session, MySQL up): unit **6/6 PASS**; live **3/3 PASS, 0 skipped**.
+
+---
+
+## 2026-08-04 — Supplier Quality Closure & Commercial Settlement
+
+### Shipped
+- QI disposition: `decisionCode` + required `decisionReason` on complete.
+- Purchase Return: `returnType`, remaining-returnable calc, ship transit stock, complete issues rejected stock via InventoryPostingService, AP handoff sets `accountingStatus`.
+- Wizard/prefill: `/returns/wizard-prefill`, QI purchase-return-prefill with remaining qty; optional NCR + return.
+- Replacement: `link-replacement-grn`; trace API PR→PO→GRN→QI→Return→Adj→Replacement.
+- Supplier quality reports/scorecard/item history + dashboard widgets under `/purchase/supplier-quality/*`.
+- Docs: `PURCHASE_RETURN_WORKFLOW.md`, `SUPPLIER_QUALITY.md`, `SUPPLIER_PERFORMANCE.md`, `VENDOR_ADJUSTMENT.md`.
+
+### Conditions
+- Migration `20260804150000_supplier_quality_closure`.
+- FE return wizard still demo/API dual-mode — wire create page to prefill when opening from QI.
+
+---
+
+## 2026-08-04 — Incoming Quality Unification
+
+
+### Shipped
+- Purchase QI remains canonical supplier inspection (`purchase_quality_inspections`); not merged with mfg QI.
+- Schema: plan id/revision snapshots, priority/result, assign/start timestamps; QI parameters `sourceParameterId`/`parameterCode`; NCR `sourceType`/`sourceId`/`goodsReceiptId`.
+- `/quality/incoming` command center: line-level workbench, filters, assign/start, stock panel, reports strip.
+- APIs: incoming queue/reports/stock-status; QI assign/start/ncr/return-prefill/stock-status; plan snapshot on create via `inspectionPlanId`.
+- Inventory fail-closed path retained (QC_HOLD → UNRESTRICTED / REJECTED).
+- Roles: Incoming QC Inspector, Quality Manager + `quality.incoming.*` / `inventory.stock_status.view`.
+- Docs: `docs/quality/INCOMING_QUALITY_UNIFICATION.md` · unit tests `incoming-quality-unification.test.ts`.
+
+### Conditions
+- Apply migration `20260804140000_incoming_quality_unification` (deployed locally).
+- Sync permissions for new keys; live QI lifecycle re-run with MySQL.
+- Item 360 / GRN detail stock panel can call same stock-status API (Incoming UI wired).
+- Do not auto-create NCR on reject.
+
+---
+
+## 2026-08-04 — Put-away workbench + Item 360 serials (documents)
+
+### Shipped
+- `/inventory/store/put-away` — real queue: GRNs awaiting inventory post vs ready for put-away; Transfer to storage / Scan uses transfer engine with GRN prefill (no put-away SoT).
+- Item 360 Bin/Serial tabs load GRN document bins + serial masters/document serials (unmerged).
+- Transfer editor + API transfer create panel honor query prefill from put-away.
+
+---
+
+## 2026-08-04 — Store & Inventory Operations (Phase)
+
+
+### Shipped
+- Store Dashboard at `/inventory` (`StoreDashboardPage`) — KPI cards + needs-action queue over `inventory/store-workbench` API + balances.
+- Operation hubs (choose type → existing engines): receive, issue, transfer, put-away, picking, count, scan.
+- Store reservations release UI; inventory timeline (ledger).
+- Item Stock 360 tabbed mobile-first cards (`ItemStock360Page`).
+- Nav + routes dual-mode; docs: `STORE_OPERATIONS.md`, `ITEM_360.md`, `INVENTORY_OPERATIONS.md`.
+- **No new inventory tables** — ledger/balance engines reused.
+
+### Conditions
+- Put-away is guided transfer after GRN (no dedicated put-away SoT).
+- Demo needs-action is illustrative; live queues need API + stock/purchase data.
+
+---
+
+## 2026-08-04 — Consolidated Operational Views (FE aggregation)
+
+### Shipped
+- Service: `frontend/src/services/inventory/operationalViewsService.ts` — balances SoT (item×warehouse); GRN/PO kept as unmerged audit lines; dual-mode via `isApiMode` + purchase/inventory services (facade for transfers/reservations).
+- Inventory UI: `/inventory/stock`, `/inventory/stock/:itemId` (360, not ledger), `/inventory/ops/{warehouses,analytics,search}`.
+- Purchase ops UI: `/purchase/ops/{receipts,item-summary,vendors}`.
+- Types + exports via `types/operationalStockViews.ts` and `services/inventory/index.ts`.
+
+### Conditions
+- FE-only aggregation; no dedicated ops backend. Warehouse outgoing qty stays 0 until warehouse-scoped issue totals. Demo/API purchase docs still dual-mode.
+
+---
+
 ## 2026-08-04 — Unify CRM Tax Invoice + Money In Sales Invoice
 
 ### Shipped

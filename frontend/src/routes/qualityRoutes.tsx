@@ -19,7 +19,8 @@ import {
   ApiInspectionPlanMasterPage,
   ApiInspectionPlanDetailPage,
 } from '@/modules/quality/ApiQcMasterPages'
-import { QualityReportsPage, IncomingQcQueuePage } from '@/modules/quality/QualityProductionPages'
+import { QualityReportsPage } from '@/modules/quality/QualityProductionPages'
+import { IncomingQcQueuePage } from '@/modules/quality/QualityIncomingCommandCenter'
 import { ApiQualityReportsPage } from '@/modules/quality/ApiQualityReportsPage'
 import { QcParameterMasterPage, QcParameterFormPage, InspectionPlanMasterPage, InspectionPlanDetailPage } from '@/modules/quality/QcMasterPages'
 

@@ -279,7 +279,7 @@ export function PurchaseCardFormShell({
 
   factBoxStorageKey = factBox ? PURCHASE_FACTBOX_COLLAPSED_KEY : undefined,
 
-  factBoxLabel = 'Document Insights',
+  factBoxLabel = 'Smart context',
 
   factBoxSubtitle = 'Vendor, history, and linked documents for this record.',
 
@@ -428,17 +428,12 @@ export function PurchaseCardFormShell({
     backLink,
 
     className: cn(
-
       themeClass,
-
       'enterprise-workspace--purchase',
-
+      'purchase-zoho',
       factBox && 'enterprise-workspace--purchase-doc-factbox',
-
       useStickyRecordHeader && 'crm-lead-form-page--sticky-record',
-
       className,
-
     ),
 
     stickyFooter: Boolean(footer) && stickyFooter,

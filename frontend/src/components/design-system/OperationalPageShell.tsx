@@ -143,12 +143,15 @@ export function OperationalPageShell({
     Boolean(!kpiStrip?.length && insights?.length) ||
     Boolean(!isEnterprise && !mergeHeader && commandBar)
 
+  const isPurchaseSurface = badge === 'Purchase' || isPurchasePath(pathname)
+
   return (
     <div
       className={cn(
         'erp-page saas-page-shell',
         variant === 'dynamics' && 'dyn-page-shell',
         isEnterprise && 'erp-page--enterprise',
+        isPurchaseSurface && 'purchase-zoho-register',
         className,
       )}
     >

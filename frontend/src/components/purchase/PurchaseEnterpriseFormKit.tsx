@@ -91,7 +91,7 @@ export function PurchaseEnterpriseFactBox({
   metrics,
   summary,
   actions,
-  title = 'Purchase Insights',
+  title = 'Smart context',
   children,
 }: {
   metrics?: EnterpriseFormMetric[]
@@ -106,8 +106,8 @@ export function PurchaseEnterpriseFactBox({
       <EnterpriseBusinessFactBox title={title}>
         <PurchaseAiInsightsShell
           embedded
-          title="AI Insights"
-          subtitle="Suggested summary and next actions for this document."
+          title="Next actions"
+          subtitle="Suggested summary and steps for this document."
         >
           <PurchaseAiOverviewBlock title="Overview" rows={summary} />
           {actions?.length ? (

@@ -969,10 +969,17 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
   const [rows, setRows] = useState<ApiInventoryDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState('')
-  const [showCreate, setShowCreate] = useState(false)
-  const [creating, setCreating] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
-  const [xfer, setXfer] = useState({ fromWarehouseId: '', toWarehouseId: '', itemId: '', quantity: '', remarks: '' })
+  const [searchParams] = useSearchParams()
+  const [showCreate, setShowCreate] = useState(searchParams.get('create') === '1')
+  const [creating, setCreating] = useState(false)
+  const [xfer, setXfer] = useState({
+    fromWarehouseId: searchParams.get('fromWarehouseId') ?? '',
+    toWarehouseId: searchParams.get('toWarehouseId') ?? '',
+    itemId: searchParams.get('itemId') ?? '',
+    quantity: searchParams.get('quantity') ?? '',
+    remarks: searchParams.get('remarks') ?? '',
+  })
   const [countForm, setCountForm] = useState({ warehouseId: '', remarks: '' })
   const [adjForm, setAdjForm] = useState({ warehouseId: '', itemId: '', quantity: '', reason: 'PHYSICAL_COUNT', remarks: '' })
 

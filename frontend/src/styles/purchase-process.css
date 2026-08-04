@@ -4,6 +4,7 @@
   border: 1px solid var(--dyn-border, #edebe9);
   background: var(--dyn-bg-card, #fff);
   padding: 16px 18px 14px;
+  border-radius: 8px;
 }
 
 .purchase-process-map__header {
@@ -94,7 +95,8 @@
   min-height: 72px;
   padding: 10px 10px 8px;
   border: 1px solid var(--dyn-border, #edebe9);
-  background: var(--dyn-bg-subtle, #faf9f8);
+  border-radius: 8px;
+  background: #fff;
   text-decoration: none;
   color: inherit;
   transition: border-color 0.12s ease, background 0.12s ease;
@@ -630,9 +632,11 @@ a.purchase-process-map__step:hover {
   box-sizing: border-box;
 }
 
-/* PR Quick Entry — stacked labels, 4 compact fields per row */
-.pr-quick-entry .erp-card-section__grid--cols-4 {
-  gap: 10px 12px;
+/* PR Quick Entry — stacked labels, dense fields per row */
+.pr-quick-entry .erp-card-section__grid--cols-4,
+.pr-quick-entry .erp-card-section__grid--cols-5,
+.pr-quick-entry .erp-card-section__grid--cols-6 {
+  gap: 8px 10px;
 }
 
 .pr-quick-entry .erp-field-row:not(.erp-field-row--horizontal) .erp-field-label {

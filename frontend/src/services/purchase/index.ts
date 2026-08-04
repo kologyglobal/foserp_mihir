@@ -106,6 +106,7 @@ export {
   getPurchaseOrderSeriesOptions,
   createPurchaseOrderFromPlanningRow,
   createPurchaseOrdersFromPlanningSelection,
+  createPurchaseOrdersFromConsolidation,
   getRFQs,
   getRFQById,
   getRfqList,
@@ -194,12 +195,18 @@ export {
   getPurchaseReturns,
   getPurchaseReturnList,
   getPurchaseReturnById,
+  getReturnWizardPrefill,
+  getSupplierQualityDashboardWidgets,
+  getVendorQualityScorecard,
+  getItemSupplierQualityHistory,
   createPurchaseReturnFromGrn,
   createPurchaseReturnFromQualityInspection,
   createPurchaseReturnFromReason,
   submitPurchaseReturn,
   approvePurchaseReturn,
+  shipPurchaseReturn,
   postPurchaseReturn,
+  linkReplacementGrnToReturn,
   cancelPurchaseReturn,
   createDebitNoteFromReturn,
   createReplacementPoFromReturn,
@@ -241,3 +248,9 @@ export {
   isPurchaseReportId,
   runPurchaseReport,
 } from './purchaseReportsService'
+
+export {
+  getPurchaseOrderReceiptRollup,
+  requirePurchaseOrderReceiptRollup,
+  buildPurchaseOrderReceiptRollup,
+} from './poReceiptRollupService'
