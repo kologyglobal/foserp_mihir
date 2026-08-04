@@ -1,0 +1,157 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { RefreshCw } from 'lucide-react'
+import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { LoadingState } from '@/design-system/components/LoadingState'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Package } from 'lucide-react'
+import { isApiMode } from '@/config/apiConfig'
+import { listInventoryLedger, type InventoryStockMovement } from '@/services/api/inventoryApi'
+import type { ItemTimelineEvent } from '@/types/operationalStockViews'
+import { formatDate } from '@/utils/dates/format'
+import { formatNumber } from '@/utils/formatters/currency'
+
+function mapMovement(m: InventoryStockMovement): ItemTimelineEvent {
+  const kind =
+    m.movementType === 'ISSUE' || m.referenceType === 'ISSUE_TO_WO' || m.referenceType === 'ISSUE_TO_MAINTENANCE'
+      ? 'issue'
+      : m.referenceType === 'GRN'
+        ? 'grn'
+        : m.movementType === 'INWARD' || m.movementType === 'OPENING'
+          ? 'receipt'
+          : 'other'
+  return {
+    id: m.id,
+    at: m.movementDate || m.createdAt,
+    kind,
+    title: `${m.movementType} · ${m.movementNumber}`,
+    subtitle: m.item ? `${m.item.code} — ${m.item.name}` : m.itemId,
+    href: '/inventory/ledger',
+    qty: Number(m.quantity ?? 0),
+    meta: m.warehouse?.code ?? m.warehouseId,
+  }
+}
+
+/** Chronological inventory activity — ledger rows as audit truth. */
+export function InventoryTimelinePage() {
+  const navigate = useNavigate()
+  const [events, setEvents] = useState<ItemTimelineEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [token, setToken] = useState(0)
+  const [filter, setFilter] = useState<'all' | 'issue' | 'receipt' | 'grn' | 'other'>('all')
+
+  const load = useCallback(async () => {
+    void token
+    setLoading(true)
+    try {
+      if (!isApiMode()) {
+        // Demo: seed a few placeholder timeline events from a known path if any stock 360 has timeline
+        setEvents([])
+        return
+      }
+      const res = await listInventoryLedger({ page: 1, limit: 100 })
+      const rows = (res.data ?? []).map(mapMovement)
+      rows.sort((a, b) => b.at.localeCompare(a.at))
+      setEvents(rows)
+    } catch {
+      setEvents([])
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const visible = useMemo(
+    () => (filter === 'all' ? events : events.filter((e) => e.kind === filter)),
+    [events, filter],
+  )
+
+  return (
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Store"
+      title="Inventory Timeline"
+      description="Chronological ledger activity — GRNs and documents stay unmerged; each row is an immutable movement."
+      backLink={{ to: '/inventory', label: 'Store Dashboard' }}
+      breadcrumbs={[
+        { label: 'Store', to: '/inventory' },
+        { label: 'Timeline' },
+      ]}
+      autoBreadcrumbs={false}
+      favoritePath="/inventory/store/timeline"
+      commandBar={(
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={{
+            id: 'refresh',
+            label: 'Refresh',
+            icon: RefreshCw,
+            onClick: () => setToken((n) => n + 1),
+          }}
+          secondaryActions={[
+            { id: 'ledger', label: 'Open ledger', onClick: () => navigate('/inventory/ledger') },
+          ]}
+        />
+      )}
+    >
+      <div className="store-chip-row mb-3">
+        {(['all', 'receipt', 'grn', 'issue', 'other'] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            className={filter === f ? 'store-chip store-chip--active' : 'store-chip'}
+            onClick={() => setFilter(f)}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {loading ? <LoadingState variant="card" /> : null}
+      {!loading && visible.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title="No timeline events"
+          description={
+            isApiMode()
+              ? 'Post receipts, issues, or GRNs to populate the inventory ledger.'
+              : 'Demo mode shows empty timeline — use API mode for live ledger events.'
+          }
+        />
+      ) : null}
+      {!loading && visible.length > 0 ? (
+        <ol className="store-timeline">
+          {visible.map((ev) => (
+            <li key={ev.id} className="store-timeline__item">
+              <div className="store-timeline__dot" />
+              <div className="store-timeline__card">
+                <div className="store-timeline__meta">
+                  <span className="store-timeline__kind">{ev.kind}</span>
+                  <span>{formatDate(ev.at)}</span>
+                </div>
+                {ev.href ? (
+                  <Link to={ev.href} className="store-timeline__title hover:underline">
+                    {ev.title}
+                  </Link>
+                ) : (
+                  <div className="store-timeline__title">{ev.title}</div>
+                )}
+                {ev.subtitle ? <div className="store-timeline__sub">{ev.subtitle}</div> : null}
+                <div className="store-timeline__foot">
+                  {ev.qty != null ? <span className="font-mono">qty {formatNumber(ev.qty)}</span> : null}
+                  {ev.meta ? <span>{ev.meta}</span> : null}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </OperationalPageShell>
+  )
+}
