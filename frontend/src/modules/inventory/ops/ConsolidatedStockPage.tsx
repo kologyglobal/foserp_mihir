@@ -1,14 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import type { ColumnDef } from '@tanstack/react-table'
 import { Package, RefreshCw, Search } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 import { listConsolidatedStock } from '@/services/inventory'
 import type { ConsolidatedStockRow, StockHealthStatus } from '@/types/operationalStockViews'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
+import { cn } from '@/utils/cn'
 import { StockStatusBadge } from './opsShared'
+
+function NumericCell({ value, mono }: { value: string; mono?: boolean }) {
+  return (
+    <span className={cn('ent-td-numeric tabular-nums', mono && 'font-mono text-[13px]')}>
+      {value}
+    </span>
+  )
+}
 
 export function ConsolidatedStockPage() {
   const navigate = useNavigate()
@@ -34,6 +46,14 @@ export function ConsolidatedStockPage() {
         status: status === 'all' ? undefined : status,
       })
       setRows(data)
+      if (!warehouseId) {
+        const map = new Map<string, string>()
+        for (const r of data) {
+          if (r.warehouseId) map.set(r.warehouseId, r.warehouseName)
+        }
+        const next = [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+        if (next.length > 0) setAllWh(next)
+      }
     } catch {
       setRows([])
       setError(true)
@@ -54,20 +74,7 @@ export function ConsolidatedStockPage() {
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [rows])
 
-  // Warehouse options from full set — load all once for filter labels when filtered empty
   const [allWh, setAllWh] = useState<Array<[string, string]>>([])
-  useEffect(() => {
-    void listConsolidatedStock()
-      .then((all) => {
-        const map = new Map<string, string>()
-        for (const r of all) {
-          if (r.warehouseId) map.set(r.warehouseId, r.warehouseName)
-        }
-        setAllWh([...map.entries()].sort((a, b) => a[1].localeCompare(b[1])))
-      })
-      .catch(() => undefined)
-  }, [])
-
   const whOptions = allWh.length > 0 ? allWh : warehouses
 
   const kpis = useMemo(() => {
@@ -87,11 +94,117 @@ export function ConsolidatedStockPage() {
     setToken((n) => n + 1)
   }
 
+  const openItem = useCallback(
+    (row: ConsolidatedStockRow) => {
+      navigate(`/inventory/stock/${row.itemId}?warehouse=${row.warehouseId}`)
+    },
+    [navigate],
+  )
+
+  const columns: ColumnDef<ConsolidatedStockRow, unknown>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'itemCode',
+        header: 'Item',
+        meta: { columnLabel: 'Item' },
+        cell: ({ row }) => {
+          const r = row.original
+          return (
+            <div className="min-w-[11rem] max-w-[16rem]">
+              <button
+                type="button"
+                className="ent-record-cell__id block max-w-full truncate text-left font-mono text-erp-primary hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openItem(r)
+                }}
+              >
+                {r.itemCode}
+              </button>
+              <div className="ent-record-cell__meta mt-0.5 truncate" title={r.itemName}>
+                {r.itemName}
+              </div>
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: 'warehouseCode',
+        header: 'Warehouse',
+        meta: { columnLabel: 'Warehouse' },
+        cell: ({ row }) => {
+          const r = row.original
+          return (
+            <div className="min-w-[9rem] max-w-[14rem]">
+              <div className="ent-record-cell__primary truncate font-mono text-[13px]">
+                {r.warehouseCode}
+              </div>
+              <div className="ent-record-cell__meta mt-0.5 truncate" title={r.warehouseName}>
+                {r.warehouseName}
+              </div>
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: 'onHand',
+        header: 'On Hand',
+        meta: { align: 'right', columnLabel: 'On Hand' },
+        cell: ({ row }) => <NumericCell value={formatNumber(row.original.onHand)} mono />,
+      },
+      {
+        accessorKey: 'reserved',
+        header: 'Reserved',
+        meta: { align: 'right', columnLabel: 'Reserved' },
+        cell: ({ row }) => <NumericCell value={formatNumber(row.original.reserved)} mono />,
+      },
+      {
+        accessorKey: 'available',
+        header: 'Available',
+        meta: { align: 'right', columnLabel: 'Available' },
+        cell: ({ row }) => (
+          <span className="ent-td-numeric font-medium tabular-nums font-mono text-[13px]">
+            {formatNumber(row.original.available)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'incoming',
+        header: 'Incoming',
+        meta: { align: 'right', columnLabel: 'Incoming' },
+        cell: ({ row }) => <NumericCell value={formatNumber(row.original.incoming)} mono />,
+      },
+      {
+        accessorKey: 'avgCost',
+        header: 'Avg Cost',
+        meta: { align: 'right', columnLabel: 'Avg Cost' },
+        cell: ({ row }) => <NumericCell value={formatCurrency(row.original.avgCost)} mono />,
+      },
+      {
+        accessorKey: 'reorderLevel',
+        header: 'Reorder',
+        meta: { align: 'right', columnLabel: 'Reorder' },
+        cell: ({ row }) => <NumericCell value={formatNumber(row.original.reorderLevel)} mono />,
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        meta: { align: 'center', columnLabel: 'Status' },
+        cell: ({ row }) => (
+          <div className="flex justify-center">
+            <StockStatusBadge status={row.original.status} />
+          </div>
+        ),
+      },
+    ],
+    [openItem],
+  )
+
   return (
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory"
+      badge="Store"
       title="Consolidated Stock"
       description="One balance row per item × warehouse. Drill into item 360 for GRNs and ledger history (documents stay separate)."
       breadcrumbs={[
@@ -198,48 +311,23 @@ export function ConsolidatedStockPage() {
         <EmptyState icon={Package} title="No stock balances" description="Adjust filters or post receipts / opening stock." />
       ) : null}
       {!loading && !error && rows.length > 0 ? (
-        <div className="overflow-x-auto rounded border border-erp-border bg-white">
-          <table className="erp-table w-full">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Warehouse</th>
-                <th className="text-right">On Hand</th>
-                <th className="text-right">Reserved</th>
-                <th className="text-right">Available</th>
-                <th className="text-right">Incoming</th>
-                <th className="text-right">Avg Cost</th>
-                <th className="text-right">Reorder</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr
-                  key={`${r.itemId}::${r.warehouseId}`}
-                  className="cursor-pointer hover:bg-erp-bg-subtle"
-                  onClick={() => navigate(`/inventory/stock/${r.itemId}?warehouse=${r.warehouseId}`)}
-                >
-                  <td>
-                    <div className="font-mono text-[11px] text-erp-muted">{r.itemCode}</div>
-                    <div className="text-[13px] font-medium text-[#0078d4]">{r.itemName}</div>
-                  </td>
-                  <td>
-                    <span className="font-mono text-[11px]">{r.warehouseCode}</span>
-                    <span className="ml-1 text-[12px] text-erp-muted">{r.warehouseName}</span>
-                  </td>
-                  <td className="text-right font-mono tabular-nums">{formatNumber(r.onHand)}</td>
-                  <td className="text-right font-mono tabular-nums">{formatNumber(r.reserved)}</td>
-                  <td className="text-right font-mono tabular-nums">{formatNumber(r.available)}</td>
-                  <td className="text-right font-mono tabular-nums">{formatNumber(r.incoming)}</td>
-                  <td className="text-right font-mono tabular-nums">{formatCurrency(r.avgCost)}</td>
-                  <td className="text-right font-mono tabular-nums">{formatNumber(r.reorderLevel)}</td>
-                  <td><StockStatusBadge status={r.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <EnterpriseRegisterTableShell className="min-w-0">
+          <ErpDataGrid
+            className="inventory-consolidated-stock-table"
+            data={rows}
+            columns={columns}
+            getRowId={(r) => `${r.itemId}::${r.warehouseId}`}
+            stickyFirstColumn
+            enableColumnSorting
+            showCompactSearch={false}
+            showToolbarView={false}
+            showToolbarExport={false}
+            emptyMessage="No stock balances"
+            onRowSelect={openItem}
+            recordLabel="balance"
+            exportFileName="consolidated-stock"
+          />
+        </EnterpriseRegisterTableShell>
       ) : null}
     </OperationalPageShell>
   )

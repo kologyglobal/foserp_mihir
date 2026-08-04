@@ -399,9 +399,9 @@ export async function completeQualityInspection(
     await transitionQi(tenantId, existing, actorId, 'DEVIATION_PENDING', 'QI_DEVIATION_PENDING', `${body.remarks ?? ''}${role}`.trim())
     return toQiDto(tenantId, await loadOrThrow(tenantId, id))
   }
-  if (rejected && defaults.allowRejectedStockInQuarantine && !defaults.defaultRejectedLocationId && !defaults.defaultQualityHoldLocationId) {
-    throw new QualityInspectionValidationError('Configure a rejected or quality-hold location before quarantining rejected stock.')
-  }
+  // Rejected qty posts via InventoryPostingService.transferStatus (QC_HOLD → REJECTED)
+  // on the GRN warehouse. defaultRejectedLocationId / defaultQualityHoldLocationId are
+  // Purchase Setup planning metadata only and must not block disposition.
   const accepted = lines.reduce((sum, line) => sum + line.acceptedQuantity + (defaults.allowAcceptanceUnderDeviation ? line.deviationQuantity : 0), 0)
   const status: QualityInspectionStatus = rejected && accepted ? 'PARTIALLY_ACCEPTED' : rejected ? 'REJECTED' : 'ACCEPTED'
   let result = resultFromStatus(status)

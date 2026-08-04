@@ -4,6 +4,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import {
   ChevronDown,
   ChevronRight,
+  Copy,
   Eye,
   Pencil,
   Search,
@@ -17,7 +18,7 @@ import { MasterListShell } from '../../components/masters/MasterListShell'
 import { DetailLayout, DetailSection, DetailGrid, DetailField, FormLayout, FormSection, MasterNotFound } from '../../components/masters/MasterLayouts'
 import { Badge } from '../../components/ui/Badge'
 import { FormField } from '../../components/forms/FormField'
-import { Input, Textarea, Checkbox } from '../../components/forms/Inputs'
+import { Input, Textarea, Checkbox, Select } from '../../components/forms/Inputs'
 import { ErpButton } from '../../components/erp/ErpButton'
 import { ErpCardSection } from '../../components/erp/card-form'
 import { AdminSkeleton } from '../../components/admin'
@@ -33,8 +34,11 @@ import { useMasterLifecycle } from '../../hooks/useMasterLifecycle'
 import { useAdminStore } from '../../store/adminStore'
 import { resolveStoreAction } from '../../store/storeAction'
 import { formatApiError } from '../../services/api/apiErrors'
+import { cloneAdminRoleApi } from '../../services/api/adminApi'
+import { isApiMode } from '../../config/apiConfig'
 import { notify } from '../../store/toastStore'
 import { canAdminPermission } from '../../utils/permissions'
+import { appConfirm } from '../../store/confirmDialogStore'
 import { ensureViewDependencies, permissionModuleLabel } from '../../utils/permissions/moduleLabels'
 import {
   ROLE_PERMISSION_PRESETS,
@@ -122,7 +126,8 @@ function RoleScopeBadge({ tenantId, isSystem }: { tenantId: string | null; isSys
   return <Badge color={tenantId ? 'blue' : 'gray'}>{tenantId ? 'Tenant' : 'Platform'}</Badge>
 }
 
-function RoleRowActions({ role, canEdit, canDelete }: { role: AdminRoleSummary; canEdit: boolean; canDelete: boolean }) {
+function RoleRowActions({ role, canEdit, canDelete, canCreate }: { role: AdminRoleSummary; canEdit: boolean; canDelete: boolean; canCreate: boolean }) {
+  const navigate = useNavigate()
   const deleteRole = useAdminStore((s) => s.deleteRole)
   const lifecycle = useMasterLifecycle({
     delete: async (id: string) => {
@@ -137,10 +142,62 @@ function RoleRowActions({ role, canEdit, canDelete }: { role: AdminRoleSummary; 
   if (canEdit && !role.isSystem) {
     actions.push({ id: 'edit', label: 'Edit', icon: Pencil, to: `/admin/roles/${role.id}/edit` })
   }
+  if (canCreate) {
+    actions.push({
+      id: 'clone',
+      label: 'Clone role',
+      icon: Copy,
+      onClick: () => {
+        void (async () => {
+          const ok = await appConfirm({
+            title: `Clone “${role.name}”?`,
+            description: 'Creates a new custom role with the same permission set.',
+            confirmLabel: 'Clone',
+          })
+          if (!ok) return
+          try {
+            if (isApiMode()) {
+              const res = await cloneAdminRoleApi(role.id)
+              notify.success(`Cloned as ${res.data.name}`)
+              navigate(`/admin/roles/${res.data.id}/edit`)
+            } else {
+              const res = await resolveStoreAction(
+                useAdminStore.getState().createRole({
+                  name: `${role.name} (copy)`,
+                  description: role.description ?? undefined,
+                  permissionNames: useAdminStore.getState().getRoleDetail(role.id)?.permissions ?? [],
+                }),
+              )
+              if (!res.ok) {
+                notify.error(res.error ?? 'Clone failed')
+                return
+              }
+              // load detail for permissions first if missing
+              await useAdminStore.getState().loadRoleDetail(role.id)
+              const perms = useAdminStore.getState().getRoleDetail(role.id)?.permissions ?? []
+              if (perms.length && res.roleId) {
+                await resolveStoreAction(
+                  useAdminStore.getState().updateRole(res.roleId, {
+                    name: `${role.name} (copy)`,
+                    description: role.description,
+                    permissionNames: perms,
+                  }),
+                )
+              }
+              notify.success('Role cloned (demo)')
+              if (res.roleId) navigate(`/admin/roles/${res.roleId}/edit`)
+            }
+          } catch (err) {
+            notify.error(formatApiError(err))
+          }
+        })()
+      },
+    })
+  }
   if (canDelete && !role.isSystem) {
     actions.push({
       id: 'delete',
-      label: 'Delete',
+      label: role.isSystem ? 'Deactivate' : 'Delete / Deactivate',
       icon: Trash2,
       danger: true,
       separator: true,
@@ -197,7 +254,7 @@ export function RoleAdminListPage() {
       id: 'actions',
       header: 'Actions',
       enableSorting: false,
-      cell: ({ row }) => <RoleRowActions role={row.original} canEdit={canEdit} canDelete={canDelete} />,
+      cell: ({ row }) => <RoleRowActions role={row.original} canEdit={canEdit} canDelete={canDelete} canCreate={canCreate} />,
     },
   ]
 
@@ -416,10 +473,15 @@ export function RoleAdminDetailPage() {
   const loadRoleDetail = useAdminStore((s) => s.loadRoleDetail)
   const permissionCatalog = useAdminStore((s) => s.permissionCatalog)
   const canEdit = canAdminPermission('role.update')
+  const canCreate = canAdminPermission('role.create')
   const [attempted, setAttempted] = useState(false)
   const [search, setSearch] = useState('')
   const [showAllCatalog, setShowAllCatalog] = useState(false)
   const [openModules, setOpenModules] = useState<Set<string>>(new Set())
+  const [compareRoleId, setCompareRoleId] = useState('')
+  const roles = useAdminStore((s) => s.roles)
+  const compareDetail = useAdminStore((s) => (compareRoleId ? s.getRoleDetail(compareRoleId) : undefined))
+  const loadRoleDetailStore = useAdminStore((s) => s.loadRoleDetail)
 
   useEffect(() => {
     if (!id) return
@@ -617,12 +679,87 @@ export function RoleAdminDetailPage() {
                 Edit role &amp; permissions
               </ErpButton>
             ) : null}
+            {canCreate ? (
+              <ErpButton
+                size="sm"
+                variant="secondary"
+                icon={Copy}
+                onClick={() => {
+                  void (async () => {
+                    const ok = await appConfirm({
+                      title: `Clone “${detail.name}”?`,
+                      description: 'Creates a custom role with the same permissions (system roles become tenant custom).',
+                      confirmLabel: 'Clone',
+                    })
+                    if (!ok) return
+                    try {
+                      if (isApiMode()) {
+                        const res = await cloneAdminRoleApi(detail.id)
+                        notify.success(`Cloned as ${res.data.name}`)
+                        navigate(`/admin/roles/${res.data.id}/edit`)
+                      } else {
+                        const res = await resolveStoreAction(
+                          useAdminStore.getState().createRole({
+                            name: `${detail.name} (copy)`,
+                            description: detail.description ?? undefined,
+                            permissionNames: detail.permissions,
+                          }),
+                        )
+                        if (!res.ok) {
+                          notify.error(res.error ?? 'Clone failed')
+                          return
+                        }
+                        notify.success('Role cloned (demo)')
+                        if (res.roleId) navigate(`/admin/roles/${res.roleId}/edit`)
+                      }
+                    } catch (err) {
+                      notify.error(formatApiError(err))
+                    }
+                  })()
+                }}
+              >
+                Clone role
+              </ErpButton>
+            ) : null}
             <ErpButton size="sm" variant="secondary" onClick={() => navigate('/admin/users')}>
               Manage user assignments
             </ErpButton>
             <ErpButton size="sm" variant="ghost" onClick={() => navigate('/admin/roles')}>
               Back to roles list
             </ErpButton>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-erp-border p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-erp-muted">Compare with another role</p>
+            <div className="flex flex-wrap items-end gap-2">
+              <Select
+                value={compareRoleId}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setCompareRoleId(v)
+                  if (v) void loadRoleDetailStore(v)
+                }}
+                className="min-w-[200px]"
+              >
+                <option value="">— Select —</option>
+                {roles
+                  .filter((r) => r.id !== detail.id)
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+              </Select>
+            </div>
+            {compareDetail ? (
+              <p className="mt-2 text-xs text-erp-muted">
+                Only in {detail.name}:{' '}
+                {detail.permissions.filter((p) => !compareDetail.permissions.includes(p)).length} · Only in{' '}
+                {compareDetail.name}:{' '}
+                {compareDetail.permissions.filter((p) => !detail.permissions.includes(p)).length} · Shared:{' '}
+                {detail.permissions.filter((p) => compareDetail.permissions.includes(p)).length}
+              </p>
+            ) : null}
           </div>
         </DetailSection>
 

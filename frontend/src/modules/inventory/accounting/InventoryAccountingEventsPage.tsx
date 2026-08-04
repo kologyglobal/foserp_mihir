@@ -134,9 +134,9 @@ export function InventoryAccountingEventsPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory"
+        badge="Store"
         title="Inventory Accounting"
-        breadcrumbs={[{ label: 'Inventory', to: '/inventory' }, { label: 'Accounting' }]}
+        breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Accounting' }]}
         autoBreadcrumbs={false}
       >
         <EmptyState icon={ShieldOff} title="Access denied" />
@@ -148,14 +148,14 @@ export function InventoryAccountingEventsPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory"
+      badge="Store"
       title="Inventory Accounting"
       description={
         api
           ? 'Live GRN / adjustment / dispatch accounting events. GL posts only when INVENTORY_ACCOUNTING is enabled.'
           : 'Demo preview of inventory accounting events. Switch to API mode for live data.'
       }
-      breadcrumbs={[{ label: 'Inventory', to: '/inventory' }, { label: 'Accounting' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Accounting' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/accounting"
       showDescription

@@ -4,6 +4,31 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Admin People & Access (2026-08-04)
+
+| Field | Value |
+|-------|-------|
+| Module | Admin People & Access |
+| Description | Permission workspace extension on existing IAM: overrides DENY/ALLOW enforced in request-context + JWT, user register columns/bulk (scope/branch/wh), invite wizard, overrides UI, copy access picker, role clone/compare, access-review buckets + soft SoD |
+| Status | **done in code** — **READY WITH CONDITIONS** |
+| Doc | [`docs/admin/USER_ACCESS_MANAGEMENT.md`](admin/USER_ACCESS_MANAGEMENT.md), [`USER_ACCESS_UAT.md`](admin/USER_ACCESS_UAT.md) |
+| Next step | `migrate deploy` `20260804190000_people_access_extension`; live smoke DENY → next request 403; optional SPA UAT |
+| Deferred | Campaign/attestation persistence; hard SoD blocks |
+
+---
+
+## Open — Document Governance live enforcement (not this phase)
+
+| Field | Value |
+|-------|-------|
+| Module | Platform Document Governance |
+| Description | Configuration framework shipped 2026-08-04 (policies, profiles, allowances, exception model, Admin Date Controls). **Next phases:** turn on `DOCUMENT_GOVERNANCE_DATE_CONTROL` and wire per document type (CRM then Purchase); exception request lifecycle UI; closed-period interaction |
+| Status | **config done** / enforcement **open** |
+| Doc | [`docs/platform/DOCUMENT_GOVERNANCE_DATE_CONTROL.md`](platform/DOCUMENT_GOVERNANCE_DATE_CONTROL.md) |
+| Next step | Only after product decision: integrate `getDocumentDatePolicy` + `evaluateDocumentDatePolicy` behind flag on chosen document save/post paths |
+
+---
+
 ## Open — CRM Notifications (post-MVP)
 
 | Field | Value |

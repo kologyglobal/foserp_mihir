@@ -64,10 +64,10 @@ export function InventoryItemDetailPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title="Item Details"
         breadcrumbs={[
-          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Store', to: '/inventory' },
           { label: 'Items', to: '/inventory/items' },
           { label: 'Details' },
         ]}
@@ -89,10 +89,10 @@ export function InventoryItemDetailPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title="Item Details"
         breadcrumbs={[
-          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Store', to: '/inventory' },
           { label: 'Items', to: '/inventory/items' },
           { label: 'Details' },
         ]}
@@ -129,10 +129,10 @@ export function InventoryItemDetailPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={item.itemName}
       description={`${item.itemCode} · ${INVENTORY_ITEM_TYPE_LABELS[item.itemType]}`}
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Items', to: '/inventory/items' }, { label: item.itemCode }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Items', to: '/inventory/items' }, { label: item.itemCode }]}
       autoBreadcrumbs={false}
       favoritePath={`/inventory/items/${recordId}`}
       commandBar={(

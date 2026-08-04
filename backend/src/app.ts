@@ -47,7 +47,10 @@ import executiveRoutes from './modules/executive/dashboard.routes.js'
 import roleRoutes from './modules/roles/role.routes.js'
 import tenantRoutes from './modules/tenants/tenant.routes.js'
 import userRoutes from './modules/users/user.routes.js'
+import userAccessExtensionRoutes from './modules/users/user-access-extension.routes.js'
+import approvalAuthorityRoutes from './modules/approval-authority/approval-authority.routes.js'
 import indiaMartWebhookRoutes from './modules/crm/integrations/indiamart/indiamart.webhook.routes.js'
+import documentGovernanceRoutes from './modules/document-governance/document-governance.routes.js'
 import mobileDeviceTokenRoutes from './modules/mobile/device-tokens/device-token.routes.js'
 import { sendError, sendSuccess } from './utils/response.js'
 /** Dev-only — excluded from production build (see tsconfig.build.json). */
@@ -152,10 +155,12 @@ export function createApp() {
 
   app.use('/api/v1/tenants', tenantRoutes)
   app.use('/api/v1/tenants/:tenantId/users', userRoutes)
+  app.use('/api/v1/tenants/:tenantId/users', userAccessExtensionRoutes)
   app.use('/api/v1/tenants/:tenantId/users', scopeRoutes)
   app.use('/api/v1/tenants/:tenantId/users', userResponsibilityRoutes)
   app.use('/api/v1/tenants/:tenantId/users', userEffectiveAccessRoutes)
   app.use('/api/v1/tenants/:tenantId/users', userSecurityRouter)
+  app.use('/api/v1/tenants/:tenantId/approval-authority', approvalAuthorityRoutes)
   app.use('/api/v1/tenants/:tenantId/departments', departmentRoutes)
   app.use('/api/v1/tenants/:tenantId/responsibilities', responsibilityRoutes)
   app.use('/api/v1/tenants/:tenantId/access-review', accessReviewRoutes)
@@ -191,13 +196,16 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/reports', opsReportsRoutes)
   app.use('/api/v1/tenants/:tenantId/operations/exceptions', operationalExceptionRoutes)
   app.use('/api/v1/tenants/:tenantId/executive', executiveRoutes)
+  app.use('/api/v1/tenants/:tenantId/admin/document-governance', documentGovernanceRoutes)
 
   // Tenant slug aliases
   app.use('/api/v1/t/:tenantSlug/users', userRoutes)
+  app.use('/api/v1/t/:tenantSlug/users', userAccessExtensionRoutes)
   app.use('/api/v1/t/:tenantSlug/users', scopeRoutes)
   app.use('/api/v1/t/:tenantSlug/users', userResponsibilityRoutes)
   app.use('/api/v1/t/:tenantSlug/users', userEffectiveAccessRoutes)
   app.use('/api/v1/t/:tenantSlug/users', userSecurityRouter)
+  app.use('/api/v1/t/:tenantSlug/approval-authority', approvalAuthorityRoutes)
   app.use('/api/v1/t/:tenantSlug/departments', departmentRoutes)
   app.use('/api/v1/t/:tenantSlug/responsibilities', responsibilityRoutes)
   app.use('/api/v1/t/:tenantSlug/access-review', accessReviewRoutes)
@@ -230,6 +238,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/reports', opsReportsRoutes)
   app.use('/api/v1/t/:tenantSlug/operations/exceptions', operationalExceptionRoutes)
   app.use('/api/v1/t/:tenantSlug/executive', executiveRoutes)
+  app.use('/api/v1/t/:tenantSlug/admin/document-governance', documentGovernanceRoutes)
 
   // Unknown API routes must return JSON 404 — never Express default HTML and
   // never the SPA shell (Phase 8C Wave 1 / 8B-R-015 SPA gate).

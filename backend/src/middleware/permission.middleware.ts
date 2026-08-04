@@ -3,6 +3,7 @@ import { permissionSetIncludes } from '../constants/permissions.js'
 import { prisma } from '../config/prisma.js'
 import { createAuditLog } from '../services/audit.service.js'
 import { AuthenticationError, AuthorizationError } from '../utils/errors.js'
+import { loadEffectivePermissionNames } from '../modules/effective-access/resolve-permissions.js'
 
 export async function attachRequestContext(req: Request, _res: Response, next: NextFunction): Promise<void> {
   try {
@@ -12,17 +13,7 @@ export async function attachRequestContext(req: Request, _res: Response, next: N
     }
     const user = await prisma.user.findFirst({
       where: { id: req.context.userId, tenantId: req.context.tenantId, deletedAt: null, status: 'ACTIVE' },
-      include: {
-        userRoles: {
-          include: {
-            role: {
-              include: {
-                rolePermissions: { include: { permission: true } },
-              },
-            },
-          },
-        },
-      },
+      select: { id: true },
     })
 
     if (!user) {
@@ -30,10 +21,11 @@ export async function attachRequestContext(req: Request, _res: Response, next: N
       return
     }
 
-    const roles = user.userRoles.map((ur) => ur.role.name)
-    const permissions = [
-      ...new Set(user.userRoles.flatMap((ur) => ur.role.rolePermissions.map((rp) => rp.permission.name))),
-    ]
+    // Role grants + ALLOW/DENY overrides (DENY wins) — same rules as effective-access report.
+    const { roles, permissions } = await loadEffectivePermissionNames(
+      req.context.userId,
+      req.context.tenantId,
+    )
 
     req.context = {
       ...req.context,

@@ -10,8 +10,8 @@ import {
   type StoreNeedsActionRow,
   type InventoryStoreWorkbenchSummary,
 } from '../api/inventoryStoreWorkbenchApi'
-import { listInventoryLedger } from '../api/inventoryApi'
-import { listConsolidatedStock } from './operationalViewsService'
+import { listInventoryLedger, type InventoryStockMovement } from '../api/inventoryApi'
+import { listDashboardStockAlerts } from './operationalViewsService'
 import type { ConsolidatedStockRow, ItemTimelineEvent } from '../../types/operationalStockViews'
 
 export type StoreDashKpi = {
@@ -69,68 +69,78 @@ function demoQueue(): StoreNeedsActionRow[] {
   ]
 }
 
+function mapTodayMoves(rows: InventoryStockMovement[], asOf: string): ItemTimelineEvent[] {
+  const today = new Date().toISOString().slice(0, 10)
+  return rows
+    .filter(
+      (m) =>
+        String(m.movementDate ?? '').startsWith(today) || String(m.createdAt ?? '').startsWith(today),
+    )
+    .slice(0, 15)
+    .map((m) => ({
+      id: m.id,
+      at: m.movementDate ?? m.createdAt ?? asOf,
+      kind: String(m.movementType).includes('ISSUE')
+        ? ('issue' as const)
+        : String(m.referenceType).includes('GRN')
+          ? ('grn' as const)
+          : ('other' as const),
+      title: `${m.movementType} · ${m.movementNumber}`,
+      subtitle: m.item ? `${m.item.code} — ${m.item.name}` : m.itemId,
+      href: `/inventory/ledger`,
+      qty: Number(m.quantity ?? 0),
+    }))
+}
+
 export async function getStoreDashboard(): Promise<StoreDashboardData> {
-  const balances = await listConsolidatedStock().catch(() => [] as ConsolidatedStockRow[])
-  const lowStock = balances.filter((r) => r.status === 'low' || r.status === 'out').slice(0, 12)
-  const negativeStock = balances.filter((r) => r.status === 'negative').slice(0, 12)
+  const asOfFallback = new Date().toISOString()
 
-  let queue: StoreNeedsActionRow[] = []
-  let rawSummary: InventoryStoreWorkbenchSummary | null = null
-  let asOf = new Date().toISOString()
+  // All data sources in parallel — never wait on full consolidated stock (PO/GRN fan-out).
+  const [alerts, workbench, ledgerRes] = await Promise.all([
+    listDashboardStockAlerts(12).catch(() => ({
+      lowStock: [] as ConsolidatedStockRow[],
+      negativeStock: [] as ConsolidatedStockRow[],
+      lowStockCount: 0,
+      negativeStockCount: 0,
+    })),
+    isApiMode()
+      ? Promise.all([
+          getInventoryStoreWorkbenchSummary().catch(() => null),
+          listInventoryStoreNeedsAction({ limit: 80 }).catch(() => null),
+        ]).then(([sumRes, needsRes]) => ({
+          rawSummary: sumRes?.data ?? null,
+          queue: needsRes?.data?.rows ?? ([] as StoreNeedsActionRow[]),
+          asOf: sumRes?.data?.asOf ?? needsRes?.data?.asOf ?? asOfFallback,
+        }))
+      : Promise.resolve({
+          rawSummary: null as InventoryStoreWorkbenchSummary | null,
+          queue: demoQueue(),
+          asOf: asOfFallback,
+        }),
+    isApiMode()
+      ? listInventoryLedger({ page: 1, limit: 30 }).catch(() => null)
+      : Promise.resolve(null),
+  ])
 
-  if (isApiMode()) {
-    try {
-      const [sumRes, needsRes] = await Promise.all([
-        getInventoryStoreWorkbenchSummary(),
-        listInventoryStoreNeedsAction({ limit: 80 }),
-      ])
-      rawSummary = sumRes.data ?? null
-      queue = needsRes.data?.rows ?? []
-      asOf = rawSummary?.asOf ?? needsRes.data?.asOf ?? asOf
-    } catch {
-      queue = []
-      rawSummary = null
-    }
-  } else {
-    queue = demoQueue()
-  }
+  const { lowStock, negativeStock, lowStockCount, negativeStockCount } = alerts
+  const queue = workbench.queue
+  const rawSummary = workbench.rawSummary
+  const asOf = workbench.asOf
+
+  const ledgerRows = ledgerRes
+    ? Array.isArray(ledgerRes)
+      ? ledgerRes
+      : ((ledgerRes as { data?: InventoryStockMovement[] }).data ?? [])
+    : []
+  const todayMoves = mapTodayMoves(ledgerRows, asOf)
 
   const mfg = rawSummary?.manufacturing?.kpis ?? emptyManuKpis()
   const pendingGrn = countCategory(queue, ['GRN_POSTING_PENDING', 'GRN_QC_PENDING', 'PURCHASE_QI_OPEN'])
-  const pendingPutAway = countCategory(queue, ['GRN_POSTING_PENDING']) // stock land then put-away via transfer
-  const pendingIssue =
-    mfg.waitingIssue + countCategory(queue, ['WO_ISSUE_PENDING'])
+  const pendingPutAway = countCategory(queue, ['GRN_POSTING_PENDING'])
+  const pendingIssue = mfg.waitingIssue + countCategory(queue, ['WO_ISSUE_PENDING'])
   const pendingTransfer = countDomain(queue, 'transfers')
   const pendingCount = countDomain(queue, 'stock-counts')
   const reservations = mfg.activeWoReservations + mfg.waitingReservation
-
-  // Today movements from ledger (API) or empty (demo uses empty list until store seed)
-  let todayMoves: ItemTimelineEvent[] = []
-  if (isApiMode()) {
-    try {
-      const today = new Date().toISOString().slice(0, 10)
-      const ledger = await listInventoryLedger({ page: 1, limit: 30 })
-      const rows = ledger.data ?? []
-      todayMoves = rows
-        .filter((m) => String(m.movementDate ?? '').startsWith(today) || String(m.createdAt ?? '').startsWith(today))
-        .slice(0, 15)
-        .map((m) => ({
-          id: m.id,
-          at: m.movementDate ?? m.createdAt ?? asOf,
-          kind: String(m.movementType).includes('ISSUE')
-            ? ('issue' as const)
-            : String(m.referenceType).includes('GRN')
-              ? ('grn' as const)
-              : ('other' as const),
-          title: `${m.movementType} · ${m.movementNumber}`,
-          subtitle: m.item ? `${m.item.code} — ${m.item.name}` : m.itemId,
-          href: `/inventory/ledger`,
-          qty: Number(m.quantity ?? 0),
-        }))
-    } catch {
-      todayMoves = []
-    }
-  }
 
   const kpis: StoreDashKpi[] = [
     {
@@ -178,15 +188,15 @@ export async function getStoreDashboard(): Promise<StoreDashboardData> {
     {
       id: 'lowStock',
       label: 'Low Stock',
-      value: lowStock.length,
-      tone: lowStock.length > 0 ? 'warning' : 'ok',
+      value: lowStockCount,
+      tone: lowStockCount > 0 ? 'warning' : 'ok',
       href: '/inventory/stock?lowStock=1',
     },
     {
       id: 'negativeStock',
       label: 'Negative Stock',
-      value: negativeStock.length,
-      tone: negativeStock.length > 0 ? 'critical' : 'ok',
+      value: negativeStockCount,
+      tone: negativeStockCount > 0 ? 'critical' : 'ok',
       href: '/inventory/stock',
     },
     {

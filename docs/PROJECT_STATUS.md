@@ -1,8 +1,9 @@
 # Project Status
 
-Last verified against codebase: **2026-08-04** (Store & Inventory Operations FE hub — dashboard/hubs/Item 360 over existing ledger and engines; no duplicate stock tables). Prior **2026-07-31** (HRMS UI/UX redesign — Zoho People–inspired FE). Prior **2026-07-31**: Phase 11 Exit & F&F; Phase 10 Loans; Phase 9 Payslip/Accounting/Payment; Phase 8 Statutory; Phase 7 Payroll. Prior **2026-07-30**: HRMS Phase 6 Salary Structures; Phase 5 Overtime; Leave + attendance; Phase 2 Shift/Roster; Phase 1 Employee. Prior **2026-07-29**: FIN-CLOSE-1 stop; MFG Fuel Tank READY.
+Last verified against codebase: **2026-08-04** (Admin People & Access permission workspace — **READY WITH CONDITIONS**). Prior: Document Governance Date Control configuration framework.
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** see [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
+**Document Governance:** see [`docs/platform/DOCUMENT_GOVERNANCE_DATE_CONTROL.md`](platform/DOCUMENT_GOVERNANCE_DATE_CONTROL.md).
 
 Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocked
 
@@ -25,7 +26,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 |----------|---------|
 | **Completed (API mode)** | **Auth** (login/JWT/self-service) + **Admin tenants/users/roles**; … **AR 3A–3C** (invoice/receipt/CN + allocation) + **3B6/3C6 Money In UI** + receipt/CN/allocation/journal reverse + corrections hub; **AP Money Out UI** + corrections + AP reversal history; Dispatch→SI invoice-ready + POD gate on manual create |
 | **Not started** | HRMS EPFO-ESIC-TRACES portal filing / Form 16 / recruitment / ATS / performance management / LMS / employee self-service portal / interest-bearing loan products / live bank payment APIs … |
-| **Partially completed** | **HRMS** through Phase 11 Exit & Full/Final Settlement in code (READY WITH CONDITIONS); mobile CRM; sales-order fulfilment beyond confirm/close; **Admin A8** broader demo-mix pack beyond security regression |
+| **Partially completed** | **HRMS** through Phase 11 Exit & Full/Final Settlement in code (READY WITH CONDITIONS); mobile CRM; sales-order fulfilment beyond confirm/close; **Admin A8** broader demo-mix pack beyond security regression; **Document Governance Date Control** (config framework READY WITH CONDITIONS — flag OFF, no live enforcement); **Admin People & Access** (READY WITH CONDITIONS — DENY wired; live 403 smoke + migrate) |
 | **Scaffolding (not shipped)** | — (Accounting: some CoA/voucher demo surfaces; Period Close **P1 + hardening + year-end P&L→RE** live — accruals/prepaid/FX/calendar still demo; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode) |
 | **Blocked** | — (none currently) |
 | **Deferred by design** | Broad QMS beyond shipped Quality scope (CAPA/calibration/SPC — see `docs/quality/QUALITY_SCOPE_AND_DEFERRALS.md`); SO MRP / dispatch client production hardening leftovers |
@@ -36,6 +37,8 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Risk | Status |
 |------|--------|
+| Document Governance Date Control | **Configuration-only READY WITH CONDITIONS (2026-08-04).** Migration `20260804200000_document_governance_date_control` + Admin API/UI + pure evaluator. Feature flag `DOCUMENT_GOVERNANCE_DATE_CONTROL` default OFF. **Must not** wire CRM/Purchase enforcement until explicit phase. Docs: `docs/platform/DOCUMENT_GOVERNANCE_*`. |
+| Admin People & Access | **READY WITH CONDITIONS (2026-08-04).** DENY/ALLOW overrides applied in `attachRequestContext` + JWT `loadUserPermissions`. Invite wizard, registers, access-review buckets, role clone. Conditions: migrate `20260804190000_people_access_extension`; live DENY→403 smoke; SoD soft-only. Docs: `docs/admin/USER_ACCESS_*.md`. |
 | Production deployment parity | **hPanel redeploy pending (2026-07-21)** — API health is JSON/connected, but live SPA still serves a July 17 Vite hash. Root Hostinger build/start/verification architecture is now fixed in code; configure hPanel per `HOSTINGER_GIT_DEPLOYMENT.md` and verify `/build-meta.json` before closing. |
 | Local API-mode empty data | Backend must listen on `:5000`; not a demo/API mix bug |
 | DB cleanup scripts | `cleanup-leads.ts`, `cleanup-opp-quotations.ts`, `cleanup-sales-orders.ts` — local one-offs; do not run on prod without intent |
@@ -103,27 +106,27 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ✅ | `UserAdminPages` list/invite/edit/detail + role assign at `/admin/users` |
-| Backend | ✅ | CRUD + role assign under `/t/:slug/users`; `assertPasswordMeetsPolicy` on create |
-| DB | ✅ | users, user_roles |
+| Frontend | ✅ | `UserAdminPages` list/invite wizard/edit/detail + roles, overrides, copy access, scopes at `/admin/users` |
+| Backend | ✅ | CRUD + role assign + bulk + overrides + copy access under `/t/:slug/users`; DENY enforced in request context |
+| DB | ✅ | users, user_roles, user_permission_overrides, dataAccessLevel |
 | API | ✅ | Permission-gated |
-| Tests | ✅ | FE `test:admin-iam`; BE smoke + `admin-security-regression` / invitations suites |
-| Demo mode | ✅ | `data/admin/seed.ts` seed users |
+| Tests | ⚠️ | Unit override resolution 5/5 PASS; live DENY→403 smoke pending DB |
+| Demo mode | ✅ | `data/admin/seed.ts` seed users; wizard + bulk roles |
 | API mode | ✅ | Hydrates via `syncAdminUsersFromApi()` |
-| Remaining gap | — |
+| Remaining gap | Live 403 smoke after DENY; branch grants in-invite optional |
 
 ### Roles
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ✅ | `RoleAdminPages` list/create/edit/detail + permission matrix at `/admin/roles` |
-| Backend | ✅ | `/t/:slug/roles` |
+| Frontend | ✅ | `RoleAdminPages` list/create/edit/detail + clone + compare + permission matrix at `/admin/roles` |
+| Backend | ✅ | `/t/:slug/roles` + clone |
 | DB | ✅ | roles, role_permissions |
 | API | ✅ | |
 | Tests | ✅ | FE `test:admin-iam`; BE smoke create/patch role + catalog |
 | Demo mode | ✅ | `data/admin/seed.ts` seed roles + permission catalog |
 | API mode | ✅ | Hydrates via `syncAdminRolesFromApi()` |
-| Remaining gap | — |
+| Remaining gap | Soft-delete unused roles UI only via existing delete |
 
 ### Permissions
 

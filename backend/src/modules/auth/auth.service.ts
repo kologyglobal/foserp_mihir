@@ -86,22 +86,10 @@ const userSelect = {
 } as const
 
 export async function loadUserPermissions(userId: string, tenantId: string): Promise<UserPermissions> {
-  const userRoles = await prisma.userRole.findMany({
-    where: { userId, tenantId },
-    include: {
-      role: {
-        include: {
-          rolePermissions: { include: { permission: true } },
-        },
-      },
-    },
-  })
-
-  const roles = userRoles.map((ur) => ur.role.name)
-  const permissions = [
-    ...new Set(userRoles.flatMap((ur) => ur.role.rolePermissions.map((rp) => rp.permission.name))),
-  ]
-
+  const { loadEffectivePermissionNames } = await import(
+    '../effective-access/resolve-permissions.js'
+  )
+  const { roles, permissions } = await loadEffectivePermissionNames(userId, tenantId)
   return { roles, permissions }
 }
 

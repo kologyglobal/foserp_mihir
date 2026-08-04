@@ -20,6 +20,8 @@ import { Select } from '../../components/forms/Inputs'
 import { SaaSPageShell } from '../../components/saas/SaaSPageShell'
 import { SELECT_PLACEHOLDER } from '../../components/forms/selectStandards'
 import { notify } from '../../store/toastStore'
+import { appConfirm } from '../../store/confirmDialogStore'
+import { systemPrompt } from '../../utils/systemConfirm'
 import { useExecutiveDashboardStore } from '../../store/executiveDashboardStore'
 import type { DashboardTemplateKey, WidgetModule, WidgetVisualization } from '../../types/executiveDashboard'
 import { DASHBOARD_TEMPLATE_OPTIONS, getWidgetDefinition } from './executiveWidgetCatalog'
@@ -186,8 +188,15 @@ export function CeoDashboardPage() {
               label: 'Rename',
               onClick: () => {
                 if (!active) return
-                const name = window.prompt('Dashboard name', active.name)
-                if (name?.trim()) void renameDashboard(active.id, name.trim())
+                void (async () => {
+                  const name = await systemPrompt({
+                    title: 'Dashboard name',
+                    defaultValue: active.name,
+                    required: true,
+                    confirmLabel: 'Rename',
+                  })
+                  if (name?.trim()) void renameDashboard(active.id, name.trim())
+                })()
               },
             },
             {
@@ -205,7 +214,15 @@ export function CeoDashboardPage() {
               icon: Trash2,
               onClick: () => {
                 if (!active) return
-                if (window.confirm(`Delete “${active.name}”?`)) void deleteDashboard(active.id)
+                void (async () => {
+                  const ok = await appConfirm({
+                    title: `Delete “${active.name}”?`,
+                    description: 'This dashboard layout will be removed.',
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
+                  if (ok) void deleteDashboard(active.id)
+                })()
               },
             },
           ]}

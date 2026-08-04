@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { useWorkspacePageHeaderSetters } from '@/context/WorkspacePageHeaderContext'
 import { getInspection, type QualityInspection } from '@/services/api/qualityApi'
 import { notify } from '@/store/toastStore'
 
@@ -17,6 +18,58 @@ function fmtDate(iso: string | null | undefined) {
     return new Date(iso).toLocaleString()
   } catch {
     return iso
+  }
+}
+
+function formatCategory(category: string): string {
+  switch (category) {
+    case 'IN_PROCESS':
+      return 'In-process QC'
+    case 'FINAL':
+      return 'Final QC'
+    case 'INCOMING':
+      return 'Incoming QC'
+    case 'SUBCONTRACT_RETURN':
+      return 'Subcontract return QC'
+    default:
+      return category.replace(/_/g, ' ')
+  }
+}
+
+function formatStatus(status: string): string {
+  switch (status) {
+    case 'PENDING':
+      return 'Awaiting decision'
+    case 'PASSED':
+      return 'Passed'
+    case 'REWORK':
+      return 'Rework required'
+    case 'REJECTED':
+      return 'Rejected'
+    case 'CANCELLED':
+      return 'Cancelled'
+    default:
+      return status.replace(/_/g, ' ')
+  }
+}
+
+function formatDecision(decision: string | null | undefined): string {
+  if (!decision) return '—'
+  switch (decision) {
+    case 'PASS':
+      return 'Pass'
+    case 'CONDITIONAL_PASS':
+      return 'Conditional pass'
+    case 'REWORK':
+      return 'Rework'
+    case 'REJECT':
+      return 'Reject'
+    case 'HOLD':
+      return 'Hold'
+    case 'USE_AS_IS':
+      return 'Use as is'
+    default:
+      return decision.replace(/_/g, ' ')
   }
 }
 
@@ -36,6 +89,8 @@ function measuredDisplay(row: {
 export function ApiQcInspectionReportPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const headerSetters = useWorkspacePageHeaderSetters()
+  const setHeader = headerSetters?.setHeader
   const [loading, setLoading] = useState(true)
   const [inspection, setInspection] = useState<QualityInspection | null>(null)
 
@@ -57,6 +112,30 @@ export function ApiQcInspectionReportPage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (!setHeader) return
+    const number = inspection?.inspectionNumber ?? 'QC Report'
+    setHeader({
+      meta: {
+        title: `${number} report`,
+        badge: 'Quality',
+        favoritePath: id ? `/quality/inspections/${id}/report` : '/quality/queue',
+        breadcrumbs: [
+          { label: 'Quality', to: '/quality' },
+          { label: 'QC Queue', to: '/quality/queue' },
+          ...(inspection
+            ? [
+                { label: inspection.inspectionNumber, to: `/quality/inspections/${inspection.id}` },
+                { label: 'Report' },
+              ]
+            : [{ label: 'Report' }]),
+        ],
+      },
+      commandBar: null,
+      actions: null,
+    })
+    return () => setHeader({ meta: null, commandBar: null, actions: null })
+  }, [setHeader, inspection, id])
   if (loading) return <LoadingState variant="card" />
   if (!inspection) {
     return (
@@ -93,6 +172,8 @@ export function ApiQcInspectionReportPage() {
         }))
 
   const detailPath = `/quality/inspections/${inspection.id}`
+  const productLabel = [inspection.itemCode, inspection.itemName].filter(Boolean).join(' — ')
+  const workOrderLabel = inspection.productionOrderNumber || null
 
   return (
     <div className="po-print-page erp-page">
@@ -118,8 +199,14 @@ export function ApiQcInspectionReportPage() {
 
       <article className="po-print-doc">
         <header className="mb-4 border-b border-slate-300 pb-3">
-          <h1 className="m-0 text-lg font-bold tracking-tight text-slate-900">Quality Control Report</h1>
-          <p className="m-0 mt-1 text-[12px] text-slate-600">{inspection.title}</p>
+          <h1 className="m-0 text-lg font-bold tracking-tight text-slate-900">
+            Quality Control Report · {inspection.inspectionNumber}
+          </h1>
+          <p className="m-0 mt-1 text-[12px] text-slate-600">
+            {[formatCategory(inspection.category), productLabel || workOrderLabel || inspection.title]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
         </header>
 
         <section className="mb-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
@@ -127,19 +214,19 @@ export function ApiQcInspectionReportPage() {
             <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
               Inspection No.
             </p>
-            <p className="m-0 font-mono font-semibold">{inspection.inspectionNumber}</p>
+            <p className="m-0 font-semibold">{inspection.inspectionNumber}</p>
           </div>
           <div>
             <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Category</p>
-            <p className="m-0">{inspection.category.replace(/_/g, ' ')}</p>
+            <p className="m-0">{formatCategory(inspection.category)}</p>
           </div>
           <div>
             <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Status</p>
-            <p className="m-0 font-semibold">{inspection.status}</p>
+            <p className="m-0 font-semibold">{formatStatus(inspection.status)}</p>
           </div>
           <div>
             <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Decision</p>
-            <p className="m-0 font-semibold">{fmt(inspection.decision)}</p>
+            <p className="m-0 font-semibold">{formatDecision(inspection.decision)}</p>
           </div>
           <div>
             <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Plan</p>
@@ -152,7 +239,22 @@ export function ApiQcInspectionReportPage() {
           </div>
           <div>
             <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Work order</p>
-            <p className="m-0 font-mono text-[12px]">{fmt(inspection.productionOrderId)}</p>
+            <p className="m-0 font-semibold">
+              {workOrderLabel && inspection.productionOrderId ? (
+                <Link
+                  to={`/manufacturing/work-orders/${inspection.productionOrderId}`}
+                  className="text-erp-primary hover:underline"
+                >
+                  {workOrderLabel}
+                </Link>
+              ) : (
+                '—'
+              )}
+            </p>
+          </div>
+          <div>
+            <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Product</p>
+            <p className="m-0 font-semibold">{productLabel || '—'}</p>
           </div>
           <div>
             <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">

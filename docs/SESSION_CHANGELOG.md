@@ -1,3 +1,67 @@
+## 2026-08-04 — Admin People & Access permission workspace (completion pass)
+
+### Delivered
+- **Authz:** `loadEffectivePermissionNames` + `applyPermissionOverrides` used by `attachRequestContext` and JWT `loadUserPermissions` so DENY/ALLOW enforce on every API request (not only Effective Access report).
+- **Users list:** Primary Role, Branch, Scope, Sensitive, Overrides, Sessions, Last Login + filters (role, no roles, sensitive, overrides, scope) + bulk Change Scope / Assign Branch / Warehouse.
+- **User detail:** Overrides panel (INHERIT/ALLOW/DENY), Copy Access picker + preview, approval limits section, data access level save.
+- **Invite wizard:** multi-step Details → Role → Org → Scope → Preview → Invite (demo + API).
+- **Roles:** Clone from list/detail; simple role compare.
+- **Access Review:** buckets (no roles, excessive, sensitive, inactive+sessions, unused roles, many overrides, self-approval SoD soft warnings); demo partial heuristics.
+- **Tests:** `backend/tests/people-access-overrides.test.ts` (unit DENY/ALLOW/multi-role).
+- **Docs:** `docs/admin/USER_ACCESS_*.md`, ACCESS_REVIEW.
+
+### Conditions
+- Migrate `people_access_extension` + live 403 smoke after DENY.
+- Access-review SoD soft only; invite wizard branch/warehouse post-invite via detail/bulk.
+- Live admin harness optional when MySQL available.
+
+### Verdict
+**ADMIN PEOPLE & ACCESS — READY WITH CONDITIONS**
+
+---
+
+## 2026-08-04 — Admin People & Access permission workspace
+
+### Delivered
+- Extended **existing** Admin IAM (users/roles/scopes/sessions) — not a separate product.
+- **Nav:** Permission Matrix, Data Scopes, Approval Authority under People & Access.
+- **User register:** multi-select bulk (assign/remove role, activate/deactivate, revoke sessions), richer filters/columns.
+- **User detail:** Profile, Roles (+ Copy Access), Effective Access, Data scopes, Sessions, Audit link.
+- **Permission Matrix** human-readable rows/actions + presets + soft SoD warnings (`adminAccessWorkspace.ts`).
+- **API:** role clone, bulk users, permission overrides (ALLOW/DENY), copy access, dataAccessLevel, approval-authority CRUD.
+- **Schema migration** `20260804190000_people_access_extension`.
+- **Effective access** explains ROLE / USER_ALLOW / USER_DENY.
+- Docs: `docs/admin/USER_ACCESS_*.md` suite.
+
+### Conditions
+- Wire DENY into JWT/request-context permission loader for hard API enforcement (compute after roles).
+- Invite wizard multi-step UI partially still single form + matrix/scopes pages.
+- Request-context must call override resolution on every authenticated request.
+
+### Verdict
+**ADMIN PEOPLE & ACCESS — READY WITH CONDITIONS**
+
+---
+
+
+### Shipped
+- Prisma models + migration `20260804200000_document_governance_date_control` (policies, profiles, allowances, exception requests).
+- Document registry (CRM + Purchase initial); pure `evaluateDocumentDatePolicy` + LE/branch resolution; Admin CRUD APIs under `/admin/document-governance/*`.
+- Feature flag `DOCUMENT_GOVERNANCE_DATE_CONTROL` default **OFF**; no CRM/Purchase save/post wiring.
+- Permissions `platform.document_governance.{view,manage,activate,approve,override}` (tenant admin grant via catalog).
+- Admin UI `/admin/document-governance/date-controls` (config-only banner); profiles API; config audits only.
+- Unit tests `tests/document-governance-date-control.test.ts`; docs `docs/platform/DOCUMENT_GOVERNANCE_*`.
+
+### Conditions
+- Migrate + `db:sync-permissions` per env before Admin use.
+- Do **not** enable live date blocking until explicit integration phase.
+- Live policy CRUD smoke optional after migrate.
+
+### Verdict
+**DOCUMENT GOVERNANCE CONFIGURATION: READY WITH CONDITIONS**
+
+---
+
 ## 2026-08-04 — Partial raise PO from Planning consolidation
 
 ### Shipped

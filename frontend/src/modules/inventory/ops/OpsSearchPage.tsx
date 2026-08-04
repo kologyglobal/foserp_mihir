@@ -52,7 +52,7 @@ export function OpsSearchPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory"
+      badge="Store"
       title="Operations Search"
       description="Find item stock, recent GRNs, and open PO pending quantity."
       breadcrumbs={[

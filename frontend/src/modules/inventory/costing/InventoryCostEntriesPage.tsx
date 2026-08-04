@@ -148,7 +148,15 @@ export function InventoryCostEntriesPage() {
       {error ? <p className="px-3 py-3 text-[13px] text-rose-700">{error}</p> : null}
 
       {!loading && !error && visible.length === 0 ? (
-        <EmptyState icon={FileSpreadsheet} title="No cost entries" description="Post a GRN, WO issue, or dispatch to generate valuation entries." />
+        <EmptyState
+          icon={FileSpreadsheet}
+          title="No cost entries"
+          description={
+            itemId
+              ? 'This is live data, not a demo stub. Valuation by item uses stock balances (on-hand × avg cost). Cost entries are a separate ledger written when inventory movements post through the costing engine. This item has balance value but no posted cost-entry rows yet.'
+              : 'Cost entries are created when stock posts (GRN put-away, issues, adjustments). Seeded or pre-costing balances can show value without entries — open inventory movements to audit qty, then post live stock to build this ledger.'
+          }
+        />
       ) : null}
 
       {!loading && !error && visible.length > 0 ? (

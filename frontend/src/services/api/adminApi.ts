@@ -527,9 +527,13 @@ export interface AdminAccessReviewItem {
   roleCount: number
   permissionCount: number
   sensitiveCount: number
+  overrideCount?: number
+  activeSessionCount?: number
   unrestrictedScope: boolean
   lastLoginAt: string | null
   createdAt: string
+  buckets?: string[]
+  sodWarnings?: string[]
 }
 
 export interface AdminAccessReviewReport {
@@ -541,6 +545,8 @@ export interface AdminAccessReviewReport {
     medium: number
     low: number
   }
+  buckets?: Record<string, number>
+  unusedRoles?: Array<{ roleId: string; name: string; userCount: number; permissionCount: number }>
   items: AdminAccessReviewItem[]
 }
 
@@ -724,4 +730,226 @@ export async function fetchAdminAuditLogsApi(params?: {
   limit?: number
 }) {
   return apiRequest<AdminAuditLogRow[]>(tenantPath(`/security/audit-logs${buildQuery(params)}`))
+}
+
+// ─── Document Governance (configuration-only date controls) ─────────────────
+
+export interface DocumentDateControlRow {
+  id: string
+  tenantId: string
+  legalEntityId: string | null
+  branchId: string | null
+  moduleKey: string
+  documentType: string
+  policyEnabled: boolean
+  futureDateMode: string
+  pastDateMode: string
+  maxFutureDays: number | null
+  maxBackDateDays: number | null
+  approvalRequired: boolean
+  allowEmergencyOverride: boolean
+  policyProfile: string | null
+  profileId: string | null
+  profile: { id: string; code: string; name: string } | null
+  effectiveFrom: string | null
+  effectiveTo: string | null
+  active: boolean
+  allowances: Array<{ id: string; kind: string; roleId: string | null; userId: string | null }>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DocumentGovernanceDocumentType {
+  moduleKey: string
+  moduleLabel: string
+  documentType: string
+  documentLabel: string
+}
+
+export interface DocumentGovernanceProfile {
+  id: string
+  code: string
+  name: string
+  description: string | null
+  futureDateMode: string
+  pastDateMode: string
+  maxFutureDays: number | null
+  maxBackDateDays: number | null
+  approvalRequired: boolean
+  allowEmergencyOverride: boolean
+  active: boolean
+}
+
+export async function fetchDateControlsApi(params?: {
+  moduleKey?: string
+  documentType?: string
+  active?: string
+  policyEnabled?: string
+  page?: number
+  limit?: number
+}) {
+  return apiRequest<DocumentDateControlRow[]>(
+    tenantPath(`/admin/document-governance/date-controls${buildQuery(params)}`),
+  )
+}
+
+export async function fetchDateControlApi(id: string) {
+  return apiRequest<DocumentDateControlRow>(
+    tenantPath(`/admin/document-governance/date-controls/${id}`),
+  )
+}
+
+export async function createDateControlApi(body: Record<string, unknown>) {
+  return apiRequest<DocumentDateControlRow>(tenantPath('/admin/document-governance/date-controls'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updateDateControlApi(id: string, body: Record<string, unknown>) {
+  return apiRequest<DocumentDateControlRow>(
+    tenantPath(`/admin/document-governance/date-controls/${id}`),
+    { method: 'PATCH', body: JSON.stringify(body) },
+  )
+}
+
+export async function activateDateControlApi(id: string) {
+  return apiRequest<DocumentDateControlRow>(
+    tenantPath(`/admin/document-governance/date-controls/${id}/activate`),
+    { method: 'POST' },
+  )
+}
+
+export async function deactivateDateControlApi(id: string) {
+  return apiRequest<DocumentDateControlRow>(
+    tenantPath(`/admin/document-governance/date-controls/${id}/deactivate`),
+    { method: 'POST' },
+  )
+}
+
+export async function resetDateControlApi(id: string) {
+  return apiRequest<DocumentDateControlRow>(
+    tenantPath(`/admin/document-governance/date-controls/${id}/reset-current-behaviour`),
+    { method: 'POST' },
+  )
+}
+
+export async function fetchDocumentGovernanceTypesApi(moduleKey?: string) {
+  return apiRequest<{ items: DocumentGovernanceDocumentType[] }>(
+    tenantPath(`/admin/document-governance/document-types${buildQuery({ moduleKey })}`),
+  )
+}
+
+export async function fetchDocumentGovernanceProfilesApi() {
+  return apiRequest<DocumentGovernanceProfile[]>(
+    tenantPath('/admin/document-governance/profiles'),
+  )
+}
+
+export async function createDocumentGovernanceProfileApi(body: Record<string, unknown>) {
+  return apiRequest<DocumentGovernanceProfile>(
+    tenantPath('/admin/document-governance/profiles'),
+    { method: 'POST', body: JSON.stringify(body) },
+  )
+}
+
+export async function updateDocumentGovernanceProfileApi(id: string, body: Record<string, unknown>) {
+  return apiRequest<DocumentGovernanceProfile>(
+    tenantPath(`/admin/document-governance/profiles/${id}`),
+    { method: 'PATCH', body: JSON.stringify(body) },
+  )
+}
+
+// ─── People & Access extension ───────────────────────────────────────────────
+
+export async function cloneAdminRoleApi(roleId: string, name?: string) {
+  return apiRequest<{ id: string; name: string }>(tenantPath(`/roles/${roleId}/clone`), {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function bulkAdminUsersApi(body: {
+  userIds: string[]
+  action: string
+  roleId?: string
+  branchId?: string
+  warehouseId?: string
+  dataAccessLevel?: string
+}) {
+  return apiRequest<{ affected: number; action: string }>(tenantPath('/users/bulk'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function fetchAdminUserOverridesApi(userId: string) {
+  return apiRequest<
+    Array<{ id: string; permissionName: string; module: string; effect: 'ALLOW' | 'DENY'; reason: string | null }>
+  >(tenantPath(`/users/${userId}/overrides`))
+}
+
+export async function upsertAdminUserOverrideApi(
+  userId: string,
+  body: { permissionName: string; effect: 'ALLOW' | 'DENY'; reason?: string | null },
+) {
+  return apiRequest(tenantPath(`/users/${userId}/overrides`), {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function removeAdminUserOverrideApi(userId: string, permissionName: string) {
+  return apiRequest(tenantPath(`/users/${userId}/overrides/${encodeURIComponent(permissionName)}`), {
+    method: 'DELETE',
+  })
+}
+
+export async function previewCopyAdminAccessApi(toUserId: string, fromUserId: string) {
+  return apiRequest(tenantPath(`/users/${toUserId}/copy-access/preview`), {
+    method: 'POST',
+    body: JSON.stringify({ fromUserId }),
+  })
+}
+
+export async function applyCopyAdminAccessApi(
+  toUserId: string,
+  body: {
+    fromUserId: string
+    includeRoles?: boolean
+    includeScopes?: boolean
+    includeOverrides?: boolean
+    includeDataAccessLevel?: boolean
+  },
+) {
+  return apiRequest(tenantPath(`/users/${toUserId}/copy-access`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function fetchAdminUserApprovalLimitsApi(userId: string) {
+  return apiRequest<Array<Record<string, unknown>>>(tenantPath(`/users/${userId}/approval-limits`))
+}
+
+export async function patchAdminUserDataAccessLevelApi(userId: string, dataAccessLevel: string) {
+  return apiRequest(tenantPath(`/users/${userId}/data-access-level`), {
+    method: 'PATCH',
+    body: JSON.stringify({ dataAccessLevel }),
+  })
+}
+
+export async function fetchApprovalAuthorityRulesApi() {
+  return apiRequest<Array<Record<string, unknown>>>(tenantPath('/approval-authority'))
+}
+
+export async function createApprovalAuthorityRuleApi(body: Record<string, unknown>) {
+  return apiRequest(tenantPath('/approval-authority'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteApprovalAuthorityRuleApi(ruleId: string) {
+  return apiRequest(tenantPath(`/approval-authority/${ruleId}`), { method: 'DELETE' })
 }

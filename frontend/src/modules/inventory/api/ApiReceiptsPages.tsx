@@ -75,9 +75,9 @@ function AccessDenied({ title }: { title: string }) {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={title}
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: title }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: title }]}
       autoBreadcrumbs={false}
     >
       <EmptyState icon={Lock} title="Access denied" description="You do not hold the required inventory permission." />
@@ -164,10 +164,10 @@ export function ApiReceiptsRegisterPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Receipts"
       description="Live inward stock movements. Purchase-order receipts post via Purchase GRN."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Receipts' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Receipts' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/movements/receipts"
       commandBar={(
@@ -361,11 +361,11 @@ export function ApiReceiptPostPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Direct Receive"
       description="Posts an inward movement to live stock. For purchase-order receipts use Purchase GRN."
       breadcrumbs={[
-        { label: 'Inventory & Warehouse', to: '/inventory' },
+        { label: 'Store', to: '/inventory' },
         { label: 'Receipts', to: '/inventory/movements/receipts' },
         { label: 'Direct Receive' },
       ]}
@@ -521,10 +521,10 @@ export function ApiReceiptDetailPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title="Receipt"
         breadcrumbs={[
-          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Store', to: '/inventory' },
           { label: 'Receipts', to: '/inventory/movements/receipts' },
           { label: 'Receipt' },
         ]}
@@ -540,10 +540,10 @@ export function ApiReceiptDetailPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title="Receipt"
         breadcrumbs={[
-          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Store', to: '/inventory' },
           { label: 'Receipts', to: '/inventory/movements/receipts' },
           { label: 'Receipt' },
         ]}
@@ -567,11 +567,11 @@ export function ApiReceiptDetailPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={row.movementNumber}
       description={`Inward receipt · ${formatDate(row.movementDate)}`}
       breadcrumbs={[
-        { label: 'Inventory & Warehouse', to: '/inventory' },
+        { label: 'Store', to: '/inventory' },
         { label: 'Receipts', to: '/inventory/movements/receipts' },
         { label: row.movementNumber },
       ]}

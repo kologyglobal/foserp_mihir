@@ -68,6 +68,9 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   PURCHASE_RETURN_NOT_FOUND: 'Purchase return not found.',
   PURCHASE_RETURN_INVALID_STATE: 'This action is not allowed for the current return status.',
   SERVER_TYPE_ERROR: 'Server configuration error while saving. Please retry or contact support.',
+  P2021: 'Database schema is out of date (missing table). Run: npx tsx scripts/prisma-cli.ts migrate deploy',
+  P2022: 'Database schema is out of date (missing column). Run: npx tsx scripts/prisma-cli.ts migrate deploy',
+  DATABASE_ERROR: 'Database operation failed. If schema was recently updated, run purchase migrations.',
 
   // Legacy aliases
   PURCHASE_REQUISITION_NOT_FOUND: 'Purchase requisition not found.',

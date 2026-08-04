@@ -75,11 +75,20 @@ export function ApiQcQueuePage() {
                       {row.inspectionNumber}
                     </Link>
                   </td>
-                  <td className="px-4 py-2">{row.category.replace(/_/g, ' ')}</td>
+                  <td className="px-4 py-2">
+                    {row.category === 'IN_PROCESS'
+                      ? 'In-process'
+                      : row.category === 'FINAL'
+                        ? 'Final'
+                        : row.category.replace(/_/g, ' ')}
+                  </td>
                   <td className="px-4 py-2">
                     {row.productionOrderId ? (
-                      <Link to={`/manufacturing/work-orders/${row.productionOrderId}`} className="text-erp-primary hover:underline">
-                        View WO
+                      <Link
+                        to={`/manufacturing/work-orders/${row.productionOrderId}`}
+                        className="font-semibold text-erp-primary hover:underline"
+                      >
+                        {row.productionOrderNumber || 'Open work order'}
                       </Link>
                     ) : (
                       '—'

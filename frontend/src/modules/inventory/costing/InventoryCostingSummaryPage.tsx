@@ -289,7 +289,13 @@ export function InventoryCostingSummaryPage() {
                         <td>
                           <DynamicsStatusChip
                             label={r.costStatus}
-                            tone={r.costStatus === 'Costed' ? 'success' : r.costStatus === 'Uncosted' ? 'warning' : 'neutral'}
+                            tone={
+                              r.costStatus === 'Costed'
+                                ? 'success'
+                                : r.costStatus === 'Uncosted' || r.costStatus === 'Balance only'
+                                  ? 'warning'
+                                  : 'neutral'
+                            }
                           />
                         </td>
                         <td className="text-right">

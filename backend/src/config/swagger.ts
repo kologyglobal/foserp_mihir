@@ -304,6 +304,7 @@ export const swaggerSpecDraft = {
     { name: 'Roles' },
     { name: 'Security' },
     { name: 'Modules' },
+    { name: 'Document Governance' },
     { name: 'CRM Companies' },
     { name: 'CRM Contacts' },
     { name: 'CRM Leads' },
@@ -369,6 +370,97 @@ export const swaggerSpecDraft = {
         summary: 'Health check',
         security: [],
         responses: { 200: { description: 'OK — database + environment' } },
+      },
+    },
+
+    '/t/{tenantSlug}/admin/document-governance/date-controls': {
+      get: {
+        tags: ['Document Governance'],
+        summary: 'List document date policies (configuration only)',
+        parameters: [
+          { name: 'tenantSlug', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'moduleKey', in: 'query', schema: { type: 'string' } },
+          { name: 'active', in: 'query', schema: { type: 'string', enum: ['true', 'false', 'all'] } },
+        ],
+        responses: { 200: { description: 'Paginated date controls' } },
+      },
+      post: {
+        tags: ['Document Governance'],
+        summary: 'Create document date policy (defaults keep CURRENT_BEHAVIOUR)',
+        parameters: [
+          { name: 'tenantSlug', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { 201: { description: 'Created policy' } },
+      },
+    },
+    '/t/{tenantSlug}/admin/document-governance/date-controls/{id}': {
+      get: {
+        tags: ['Document Governance'],
+        summary: 'Get date policy by id',
+        parameters: [
+          { name: 'tenantSlug', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Policy' } },
+      },
+      patch: {
+        tags: ['Document Governance'],
+        summary: 'Update date policy',
+        parameters: [
+          { name: 'tenantSlug', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Updated policy' } },
+      },
+    },
+    '/t/{tenantSlug}/admin/document-governance/date-controls/{id}/activate': {
+      post: {
+        tags: ['Document Governance'],
+        summary: 'Activate policy (config row only — not live document enforcement)',
+        parameters: [
+          { name: 'tenantSlug', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Activated' } },
+      },
+    },
+    '/t/{tenantSlug}/admin/document-governance/date-controls/{id}/deactivate': {
+      post: {
+        tags: ['Document Governance'],
+        summary: 'Deactivate policy',
+        parameters: [
+          { name: 'tenantSlug', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Deactivated' } },
+      },
+    },
+    '/t/{tenantSlug}/admin/document-governance/document-types': {
+      get: {
+        tags: ['Document Governance'],
+        summary: 'Document type registry (CRM + Purchase initial)',
+        parameters: [
+          { name: 'tenantSlug', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { 200: { description: 'Registry items' } },
+      },
+    },
+    '/t/{tenantSlug}/admin/document-governance/profiles': {
+      get: {
+        tags: ['Document Governance'],
+        summary: 'List reusable date policy profiles',
+        parameters: [
+          { name: 'tenantSlug', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { 200: { description: 'Profiles' } },
+      },
+      post: {
+        tags: ['Document Governance'],
+        summary: 'Create profile template (not auto-assigned)',
+        parameters: [
+          { name: 'tenantSlug', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { 201: { description: 'Created profile' } },
       },
     },
 

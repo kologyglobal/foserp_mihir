@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowDownToLine,
@@ -7,6 +7,7 @@ import {
   Package,
   RefreshCw,
   ScanLine,
+  Search,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
@@ -18,7 +19,7 @@ import type { ItemSearchSnapshot, ItemStock360 } from '@/types/operationalStockV
 import type { SupplierQualityTimelineEvent } from '@/types/purchaseDomain'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
-import { OpsMetric, StockStatusBadge } from '../ops/opsShared'
+import { StockStatusBadge } from '../ops/opsShared'
 import { cn } from '@/utils/cn'
 
 type Stock360Tab =
@@ -50,7 +51,87 @@ const TABS: Array<{ id: Stock360Tab; label: string }> = [
   { id: 'cost', label: 'Cost' },
 ]
 
-/** Main inventory page — balance first, documents unmerged on expand/history tabs. */
+function KpiTile({
+  label,
+  value,
+  hint,
+  emphasize,
+}: {
+  label: string
+  value: string
+  hint?: string
+  emphasize?: boolean
+}) {
+  return (
+    <div className="stock-360-kpi">
+      <span className="stock-360-kpi__label">{label}</span>
+      <span className={cn('stock-360-kpi__value', emphasize && 'stock-360-kpi__value--accent')}>
+        {value}
+      </span>
+      {hint ? <span className="stock-360-kpi__hint">{hint}</span> : null}
+    </div>
+  )
+}
+
+function StockTable({
+  columns,
+  children,
+  isEmpty,
+  empty,
+}: {
+  columns: Array<{ key: string; label: string; align?: 'left' | 'right' | 'center' }>
+  children: ReactNode
+  isEmpty?: boolean
+  empty?: string
+}) {
+  return (
+    <div className="stock-360-table-wrap">
+      <table className="stock-360-table">
+        <thead>
+          <tr>
+            {columns.map((c) => (
+              <th
+                key={c.key}
+                className={cn(
+                  c.align === 'right' && 'is-right',
+                  c.align === 'center' && 'is-center',
+                )}
+              >
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {isEmpty ? (
+            <tr>
+              <td colSpan={columns.length} className="stock-360-table__empty">
+                {empty ?? 'No records'}
+              </td>
+            </tr>
+          ) : (
+            children
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function PanelHint({ children }: { children: ReactNode }) {
+  return <p className="stock-360-hint">{children}</p>
+}
+
+function SectionHead({ title, aside }: { title: string; aside?: ReactNode }) {
+  return (
+    <div className="stock-360-section-head">
+      <h3 className="stock-360-section-title">{title}</h3>
+      {aside}
+    </div>
+  )
+}
+
+/** Item Stock 360 — Zoho-style dense operational detail. */
 export function ItemStock360Page() {
   const { itemId } = useParams()
   const [params, setParams] = useSearchParams()
@@ -72,6 +153,12 @@ export function ItemStock360Page() {
     else p.set('tab', next)
     setParams(p, { replace: true })
   }
+
+  const runSearch = useCallback(() => {
+    void searchItemOpsSnapshot(searchQ)
+      .then(setSearchHits)
+      .catch(() => setSearchHits([]))
+  }, [searchQ])
 
   const load = useCallback(async () => {
     if (!itemId) return
@@ -138,7 +225,7 @@ export function ItemStock360Page() {
         layout="enterprise"
         badge="Store"
         title="Item Stock 360"
-        backLink={{ to: '/inventory/stock', label: 'Consolidated stock' }}
+        backLink={{ to: '/inventory/stock', label: 'Back to Consolidated Stock' }}
       >
         <EmptyState
           icon={Package}
@@ -155,15 +242,18 @@ export function ItemStock360Page() {
   }
 
   const { overview } = data
+  const activeWh = warehouseId
+    ? data.warehouses.find((w) => w.warehouseId === warehouseId)
+    : null
 
   return (
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
       badge="Store"
-      title={`${data.itemCode}`}
+      title={data.itemCode}
       description={data.itemName}
-      backLink={{ to: '/inventory/stock', label: 'Consolidated stock' }}
+      backLink={{ to: '/inventory/stock', label: 'Back to Consolidated Stock' }}
       breadcrumbs={[
         { label: 'Store', to: '/inventory' },
         { label: 'Stock', to: '/inventory/stock' },
@@ -215,76 +305,90 @@ export function ItemStock360Page() {
         />
       )}
     >
-      <div className="store-ops-page store-item-360">
-        <div className="ops-filter-bar mb-2">
-          <input
-            className="erp-input h-10 min-w-[12rem] flex-1 text-[14px]"
-            placeholder="Search items…"
-            value={searchQ}
-            onChange={(e) => setSearchQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                void searchItemOpsSnapshot(searchQ).then(setSearchHits).catch(() => setSearchHits([]))
-              }
-            }}
-          />
-          <button
-            type="button"
-            className="erp-btn erp-btn-secondary h-10 px-4 text-[13px]"
-            onClick={() => void searchItemOpsSnapshot(searchQ).then(setSearchHits).catch(() => setSearchHits([]))}
-          >
-            Search
-          </button>
-        </div>
+      <div className="item-stock-360">
+        {/* Identity + search */}
+        <section className="stock-360-identity" aria-label="Item summary">
+          <div className="stock-360-identity__main">
+            <div className="stock-360-identity__code-row">
+              <span className="stock-360-identity__code">{data.itemCode}</span>
+              <StockStatusBadge status={overview.status} />
+              <span className="stock-360-identity__uom">{data.uom}</span>
+            </div>
+            <h2 className="stock-360-identity__name">{data.itemName}</h2>
+            <p className="stock-360-identity__meta">
+              {activeWh
+                ? `Warehouse filter · ${activeWh.warehouseCode} — ${activeWh.warehouseName}`
+                : `All warehouses · ${data.warehouses.length} location${data.warehouses.length === 1 ? '' : 's'}`}
+              {' · '}
+              Stock value {formatCurrency(overview.stockValue)}
+            </p>
+          </div>
+          <div className="stock-360-search">
+            <label className="stock-360-search__field">
+              <Search className="h-3.5 w-3.5 text-erp-muted" aria-hidden />
+              <input
+                className="stock-360-search__input"
+                placeholder="Find item by code or name…"
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') runSearch()
+                }}
+              />
+            </label>
+            <button type="button" className="erp-btn erp-btn-secondary h-9 px-3 text-[12px]" onClick={runSearch}>
+              Find
+            </button>
+          </div>
+        </section>
+
         {searchHits.length > 0 ? (
-          <ul className="store-card-list mb-3">
+          <div className="stock-360-search-results">
             {searchHits.map((h) => (
-              <li key={h.itemId}>
-                <button
-                  type="button"
-                  className="store-action-card"
-                  onClick={() => {
-                    navigate(`/inventory/stock/${h.itemId}`)
-                    setSearchHits([])
-                  }}
-                >
-                  <div className="store-action-card__title">
-                    <span className="font-mono text-[11px] text-erp-muted">{h.itemCode}</span> {h.itemName}
-                  </div>
-                  <div className="store-action-card__detail">
-                    Stock {formatNumber(h.currentStock)} · avail {formatNumber(h.available)}
-                  </div>
-                </button>
-              </li>
+              <button
+                key={h.itemId}
+                type="button"
+                className="stock-360-search-result"
+                onClick={() => {
+                  navigate(`/inventory/stock/${h.itemId}`)
+                  setSearchHits([])
+                  setSearchQ('')
+                }}
+              >
+                <span className="stock-360-search-result__code">{h.itemCode}</span>
+                <span className="stock-360-search-result__name">{h.itemName}</span>
+                <span className="stock-360-search-result__qty">
+                  {formatNumber(h.currentStock)} on hand
+                </span>
+              </button>
             ))}
-          </ul>
+          </div>
         ) : null}
 
-        <div className="store-summary-hero mb-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <StockStatusBadge status={overview.status} />
-            <span className="text-[12px] text-erp-muted">{data.uom}</span>
-          </div>
-          <div className="ops-summary-card__metrics">
-            <OpsMetric label="On hand" value={formatNumber(overview.onHand)} mono />
-            <OpsMetric label="Available" value={formatNumber(overview.available)} mono />
-            <OpsMetric label="Reserved" value={formatNumber(overview.reserved)} mono />
-            <OpsMetric label="Incoming" value={formatNumber(overview.incoming)} mono />
-            <OpsMetric label="Outgoing (issues)" value={formatNumber(outgoing)} mono />
-            <OpsMetric label="Avg cost" value={formatCurrency(overview.avgCost)} mono />
-            <OpsMetric label="Last purchase" value={lastPurchase ? formatDate(lastPurchase) : '—'} />
-            <OpsMetric label="Last issue" value={lastIssue ? formatDate(lastIssue) : '—'} />
-          </div>
-        </div>
+        {/* KPI strip */}
+        <section className="stock-360-kpi-grid" aria-label="Stock metrics">
+          <KpiTile label="On hand" value={formatNumber(overview.onHand)} emphasize />
+          <KpiTile label="Available" value={formatNumber(overview.available)} emphasize />
+          <KpiTile label="Reserved" value={formatNumber(overview.reserved)} />
+          <KpiTile label="Incoming" value={formatNumber(overview.incoming)} />
+          <KpiTile label="Issues (qty)" value={formatNumber(outgoing)} />
+          <KpiTile label="Avg cost" value={formatCurrency(overview.avgCost)} />
+          <KpiTile
+            label="Last purchase"
+            value={lastPurchase ? formatDate(lastPurchase) : '—'}
+          />
+          <KpiTile label="Last issue" value={lastIssue ? formatDate(lastIssue) : '—'} />
+        </section>
 
-        <div className="store-tabs" role="tablist" aria-label="Item stock sections">
+        {/* Tabs */}
+        <div className="stock-360-tabs" role="tablist" aria-label="Item stock sections">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               role="tab"
               aria-selected={tab === t.id}
-              className={cn('store-tab', tab === t.id && 'store-tab--active')}
+              className={cn('stock-360-tab', tab === t.id && 'stock-360-tab--active')}
               onClick={() => setTab(t.id)}
             >
               {t.label}
@@ -292,333 +396,458 @@ export function ItemStock360Page() {
           ))}
         </div>
 
-        <div className="store-tab-panel" role="tabpanel">
+        {/* Tab body */}
+        <div className="stock-360-panel" role="tabpanel">
           {tab === 'overview' ? (
-            <div className="space-y-3">
-              <p className="text-[13px] text-erp-muted">
-                Operational balance by warehouse is the working view. Open Receipts / Timeline for unmerged audit documents.
-              </p>
-              <div className="store-chip-row">
+            <div className="stock-360-stack">
+              <SectionHead title="Warehouse balances" />
+              <PanelHint>
+                Working balance by warehouse. Receipts and timeline stay as separate documents.
+              </PanelHint>
+              <div className="stock-360-chips">
                 <button
                   type="button"
-                  className={!warehouseId ? 'store-chip store-chip--active' : 'store-chip'}
+                  className={cn('stock-360-chip', !warehouseId && 'stock-360-chip--active')}
                   onClick={() => {
                     const p = new URLSearchParams(params)
                     p.delete('warehouse')
                     setParams(p, { replace: true })
                   }}
                 >
-                  All WH
+                  All warehouses
                 </button>
                 {data.warehouses.map((w) => (
                   <button
                     key={w.warehouseId}
                     type="button"
-                    className={warehouseId === w.warehouseId ? 'store-chip store-chip--active' : 'store-chip'}
+                    className={cn(
+                      'stock-360-chip',
+                      warehouseId === w.warehouseId && 'stock-360-chip--active',
+                    )}
                     onClick={() => {
                       const p = new URLSearchParams(params)
                       p.set('warehouse', w.warehouseId)
                       setParams(p, { replace: true })
                     }}
                   >
-                    {w.warehouseCode} · {formatNumber(w.onHand)}
+                    {w.warehouseCode}
+                    <span className="stock-360-chip__qty">{formatNumber(w.onHand)}</span>
                   </button>
                 ))}
               </div>
-              <ul className="store-card-list">
+              <StockTable
+                columns={[
+                  { key: 'wh', label: 'Warehouse' },
+                  { key: 'oh', label: 'On Hand', align: 'right' },
+                  { key: 'res', label: 'Reserved', align: 'right' },
+                  { key: 'av', label: 'Available', align: 'right' },
+                  { key: 'in', label: 'Incoming', align: 'right' },
+                  { key: 'cost', label: 'Avg Cost', align: 'right' },
+                  { key: 'val', label: 'Value', align: 'right' },
+                ]}
+                isEmpty={data.warehouses.length === 0}
+                empty="No warehouse balances."
+              >
                 {data.warehouses.map((w) => (
-                  <li key={w.warehouseId}>
-                    <div className="store-action-card">
-                      <div className="store-action-card__title">{w.warehouseName}</div>
-                      <div className="ops-summary-card__metrics mt-2">
-                        <OpsMetric label="On hand" value={formatNumber(w.onHand)} mono />
-                        <OpsMetric label="Avail" value={formatNumber(w.available)} mono />
-                        <OpsMetric label="Reserved" value={formatNumber(w.reserved)} mono />
-                        <OpsMetric label="Incoming" value={formatNumber(w.incoming)} mono />
-                      </div>
-                    </div>
-                  </li>
+                  <tr
+                    key={w.warehouseId}
+                    className={cn(
+                      'stock-360-table__row-clickable',
+                      warehouseId === w.warehouseId && 'is-selected',
+                    )}
+                    onClick={() => {
+                      const p = new URLSearchParams(params)
+                      p.set('warehouse', w.warehouseId)
+                      setParams(p, { replace: true })
+                    }}
+                  >
+                    <td>
+                      <div className="stock-360-cell-primary font-mono">{w.warehouseCode}</div>
+                      <div className="stock-360-cell-meta">{w.warehouseName}</div>
+                    </td>
+                    <td className="is-right is-num">{formatNumber(w.onHand)}</td>
+                    <td className="is-right is-num">{formatNumber(w.reserved)}</td>
+                    <td className="is-right is-num is-strong">{formatNumber(w.available)}</td>
+                    <td className="is-right is-num">{formatNumber(w.incoming)}</td>
+                    <td className="is-right is-num">{formatCurrency(w.avgCost)}</td>
+                    <td className="is-right is-num">{formatCurrency(w.stockValue)}</td>
+                  </tr>
                 ))}
-              </ul>
+              </StockTable>
             </div>
           ) : null}
 
           {tab === 'warehouse' ? (
-            <ul className="store-card-list">
-              {data.warehouses.length === 0 ? (
-                <p className="text-[13px] text-erp-muted">No warehouse balances.</p>
-              ) : null}
-              {data.warehouses.map((w) => (
-                <li key={w.warehouseId}>
-                  <div className="store-action-card">
-                    <div className="store-action-card__title">
-                      {w.warehouseCode} — {w.warehouseName}
-                    </div>
-                    <div className="ops-summary-card__metrics mt-2">
-                      <OpsMetric label="On hand" value={formatNumber(w.onHand)} mono />
-                      <OpsMetric label="Reserved" value={formatNumber(w.reserved)} mono />
-                      <OpsMetric label="Available" value={formatNumber(w.available)} mono />
-                      <OpsMetric label="Incoming" value={formatNumber(w.incoming)} mono />
-                      <OpsMetric label="Avg cost" value={formatCurrency(w.avgCost)} mono />
-                      <OpsMetric label="Value" value={formatCurrency(w.stockValue)} mono />
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="stock-360-stack">
+              <SectionHead title="All warehouses" />
+              <StockTable
+                columns={[
+                  { key: 'wh', label: 'Warehouse' },
+                  { key: 'oh', label: 'On Hand', align: 'right' },
+                  { key: 'res', label: 'Reserved', align: 'right' },
+                  { key: 'av', label: 'Available', align: 'right' },
+                  { key: 'in', label: 'Incoming', align: 'right' },
+                  { key: 'cost', label: 'Avg Cost', align: 'right' },
+                  { key: 'val', label: 'Stock Value', align: 'right' },
+                ]}
+                isEmpty={data.warehouses.length === 0}
+                empty="No warehouse balances."
+              >
+                {data.warehouses.map((w) => (
+                  <tr key={w.warehouseId}>
+                    <td>
+                      <div className="stock-360-cell-primary font-mono">{w.warehouseCode}</div>
+                      <div className="stock-360-cell-meta">{w.warehouseName}</div>
+                    </td>
+                    <td className="is-right is-num">{formatNumber(w.onHand)}</td>
+                    <td className="is-right is-num">{formatNumber(w.reserved)}</td>
+                    <td className="is-right is-num is-strong">{formatNumber(w.available)}</td>
+                    <td className="is-right is-num">{formatNumber(w.incoming)}</td>
+                    <td className="is-right is-num">{formatCurrency(w.avgCost)}</td>
+                    <td className="is-right is-num">{formatCurrency(w.stockValue)}</td>
+                  </tr>
+                ))}
+              </StockTable>
+            </div>
           ) : null}
 
           {tab === 'bin' ? (
-            data.bins.length === 0 ? (
-              <p className="text-[13px] text-erp-muted">
-                No bin references on documents for this item. Put-away records storage bins on transfer/GRN lines —
-                there is no separate bin balance table.
-              </p>
-            ) : (
-              <ul className="store-card-list">
-                {data.bins.map((b, i) => (
-                  <li key={`${b.binCode}-${i}`}>
-                    <div className="store-action-card">
-                      <div className="store-action-card__title font-mono">{b.binCode}</div>
-                      <div className="store-action-card__detail">
-                        {b.warehouseName} · qty {formatNumber(b.qty)}
-                        {b.note ? ` · ${b.note}` : ''}
-                      </div>
-                      {b.sourceDocumentNo ? (
-                        <div className="store-action-card__detail text-[11px]">
-                          Doc {b.sourceDocumentNo}
-                          {b.href ? (
-                            <>
-                              {' '}
-                              ·{' '}
-                              <Link to={b.href} className="font-semibold text-[#0078d4]">
-                                Open
-                              </Link>
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )
-          ) : null}
-
-          {tab === 'serial' ? (
-            (data.serials?.length ?? 0) === 0 ? (
-              <p className="text-[13px] text-erp-muted">
-                No serial tracking records or document serials for this item. Serials live on inventory serial masters and
-                GRN/issue lines — they are never rolled into a balance table.
-              </p>
-            ) : (
-              <ul className="store-card-list">
-                {(data.serials ?? []).map((s, i) => (
-                  <li key={`${s.serialNo}-${i}`}>
-                    <div className="store-action-card">
-                      <div className="store-action-card__top">
-                        <span className="store-action-card__severity">{s.source === 'master' ? 'MASTER' : 'DOCUMENT'}</span>
-                        <span className="store-action-card__domain">{s.status}</span>
-                      </div>
-                      <div className="store-action-card__title font-mono">{s.serialNo}</div>
-                      <div className="store-action-card__detail">{s.warehouseName}</div>
-                      {s.sourceDocumentNo ? (
-                        <div className="store-action-card__detail text-[11px]">
-                          Source {s.sourceDocumentNo}
-                          {s.href ? (
-                            <>
-                              {' '}
-                              ·{' '}
-                              <Link to={s.href} className="font-semibold text-[#0078d4]">
-                                Open doc
-                              </Link>
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )
+            <div className="stock-360-stack">
+              <SectionHead title="Bin references" />
+              {data.bins.length === 0 ? (
+                <PanelHint>
+                  No bin references on documents for this item. Put-away records storage bins on transfer /
+                  GRN lines — there is no separate bin balance table.
+                </PanelHint>
+              ) : (
+                <StockTable
+                  columns={[
+                    { key: 'bin', label: 'Bin' },
+                    { key: 'wh', label: 'Warehouse' },
+                    { key: 'qty', label: 'Qty', align: 'right' },
+                    { key: 'doc', label: 'Source document' },
+                    { key: 'note', label: 'Note' },
+                  ]}
+                >
+                  {data.bins.map((b, i) => (
+                    <tr key={`${b.binCode}-${i}`}>
+                      <td className="font-mono is-strong">{b.binCode}</td>
+                      <td>{b.warehouseName}</td>
+                      <td className="is-right is-num">{formatNumber(b.qty)}</td>
+                      <td>
+                        {b.sourceDocumentNo ? (
+                          b.href ? (
+                            <Link to={b.href} className="stock-360-link">
+                              {b.sourceDocumentNo}
+                            </Link>
+                          ) : (
+                            b.sourceDocumentNo
+                          )
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="stock-360-cell-meta">{b.note || '—'}</td>
+                    </tr>
+                  ))}
+                </StockTable>
+              )}
+            </div>
           ) : null}
 
           {tab === 'batch' ? (
-            data.batches.length === 0 ? (
-              <p className="text-[13px] text-erp-muted">No batch balances (item may not be batch-tracked).</p>
-            ) : (
-              <ul className="store-card-list">
-                {data.batches.map((b, i) => (
-                  <li key={`${b.batchNo}-${i}`}>
-                    <div className="store-action-card">
-                      <div className="store-action-card__title font-mono">{b.batchNo}</div>
-                      <div className="store-action-card__detail">
-                        {b.warehouseName} · {formatNumber(b.qty)} · {b.status}
-                        {b.expiryDate ? ` · exp ${formatDate(b.expiryDate)}` : ''}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )
+            <div className="stock-360-stack">
+              <SectionHead title="Batches" />
+              {data.batches.length === 0 ? (
+                <PanelHint>No batch balances (item may not be batch-tracked).</PanelHint>
+              ) : (
+                <StockTable
+                  columns={[
+                    { key: 'batch', label: 'Batch' },
+                    { key: 'wh', label: 'Warehouse' },
+                    { key: 'qty', label: 'Qty', align: 'right' },
+                    { key: 'st', label: 'Status' },
+                    { key: 'exp', label: 'Expiry' },
+                  ]}
+                >
+                  {data.batches.map((b, i) => (
+                    <tr key={`${b.batchNo}-${i}`}>
+                      <td className="font-mono is-strong">{b.batchNo}</td>
+                      <td>{b.warehouseName}</td>
+                      <td className="is-right is-num">{formatNumber(b.qty)}</td>
+                      <td>{b.status}</td>
+                      <td>{b.expiryDate ? formatDate(b.expiryDate) : '—'}</td>
+                    </tr>
+                  ))}
+                </StockTable>
+              )}
+            </div>
+          ) : null}
+
+          {tab === 'serial' ? (
+            <div className="stock-360-stack">
+              <SectionHead title="Serials" />
+              {(data.serials?.length ?? 0) === 0 ? (
+                <PanelHint>
+                  No serial tracking records or document serials for this item. Serials live on inventory
+                  serial masters and GRN/issue lines — they are never rolled into a balance table.
+                </PanelHint>
+              ) : (
+                <StockTable
+                  columns={[
+                    { key: 'ser', label: 'Serial no.' },
+                    { key: 'src', label: 'Source' },
+                    { key: 'st', label: 'Status' },
+                    { key: 'wh', label: 'Warehouse' },
+                    { key: 'doc', label: 'Document' },
+                  ]}
+                >
+                  {(data.serials ?? []).map((s, i) => (
+                    <tr key={`${s.serialNo}-${i}`}>
+                      <td className="font-mono is-strong">{s.serialNo}</td>
+                      <td>
+                        <span className="stock-360-tag">
+                          {s.source === 'master' ? 'Master' : 'Document'}
+                        </span>
+                      </td>
+                      <td>{s.status}</td>
+                      <td>{s.warehouseName}</td>
+                      <td>
+                        {s.sourceDocumentNo ? (
+                          s.href ? (
+                            <Link to={s.href} className="stock-360-link">
+                              {s.sourceDocumentNo}
+                            </Link>
+                          ) : (
+                            s.sourceDocumentNo
+                          )
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </StockTable>
+              )}
+            </div>
           ) : null}
 
           {tab === 'reservations' ? (
-            data.reservations.length === 0 ? (
-              <p className="text-[13px] text-erp-muted">No reservations.</p>
-            ) : (
-              <ul className="store-card-list">
-                {data.reservations.map((r) => (
-                  <li key={r.id}>
-                    <div className="store-action-card">
-                      <div className="store-action-card__title">{r.referenceNo}</div>
-                      <div className="store-action-card__detail">
-                        {r.demandType} · {r.warehouseName} · qty {formatNumber(r.qty)} · {r.status}
-                      </div>
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn-secondary mt-2 h-9 px-3 text-[13px]"
-                        onClick={() => navigate('/inventory/store/reservations')}
-                      >
-                        Manage reservations
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )
+            <div className="stock-360-stack">
+              <SectionHead
+                title="Reservations"
+                aside={(
+                  <button
+                    type="button"
+                    className="erp-btn erp-btn-secondary h-8 px-3 text-[12px]"
+                    onClick={() => navigate('/inventory/store/reservations')}
+                  >
+                    Manage
+                  </button>
+                )}
+              />
+              {data.reservations.length === 0 ? (
+                <PanelHint>No reservations for this item.</PanelHint>
+              ) : (
+                <StockTable
+                  columns={[
+                    { key: 'ref', label: 'Reference' },
+                    { key: 'type', label: 'Demand' },
+                    { key: 'wh', label: 'Warehouse' },
+                    { key: 'qty', label: 'Qty', align: 'right' },
+                    { key: 'st', label: 'Status' },
+                  ]}
+                >
+                  {data.reservations.map((r) => (
+                    <tr key={r.id}>
+                      <td className="is-strong">{r.referenceNo}</td>
+                      <td>{r.demandType}</td>
+                      <td>{r.warehouseName}</td>
+                      <td className="is-right is-num">{formatNumber(r.qty)}</td>
+                      <td>{r.status}</td>
+                    </tr>
+                  ))}
+                </StockTable>
+              )}
+            </div>
           ) : null}
 
           {tab === 'receipts' ? (
-            <div className="space-y-3">
-              <div className="ops-summary-card">
-                <div className="ops-summary-card__metrics">
-                  <OpsMetric label="Receipt lines" value={data.receiptSummary.totalReceipts} mono />
-                  <OpsMetric label="Qty" value={formatNumber(data.receiptSummary.totalQtyReceived)} mono />
-                  <OpsMetric label="Avg rate" value={formatCurrency(data.receiptSummary.averagePurchaseRate)} mono />
-                  <OpsMetric label="GRNs" value={data.receiptSummary.grnCount} mono />
-                  <OpsMetric label="Vendors" value={data.receiptSummary.vendorCount} mono />
-                  <OpsMetric
-                    label="Last purchase"
-                    value={data.receiptSummary.lastPurchaseDate ? formatDate(data.receiptSummary.lastPurchaseDate) : '—'}
-                  />
-                </div>
+            <div className="stock-360-stack">
+              <SectionHead title="Purchase receipts" />
+              <div className="stock-360-kpi-grid stock-360-kpi-grid--compact">
+                <KpiTile label="Receipt lines" value={String(data.receiptSummary.totalReceipts)} />
+                <KpiTile label="Qty received" value={formatNumber(data.receiptSummary.totalQtyReceived)} />
+                <KpiTile label="Avg rate" value={formatCurrency(data.receiptSummary.averagePurchaseRate)} />
+                <KpiTile label="GRNs" value={String(data.receiptSummary.grnCount)} />
+                <KpiTile label="Vendors" value={String(data.receiptSummary.vendorCount)} />
+                <KpiTile
+                  label="Last purchase"
+                  value={
+                    data.receiptSummary.lastPurchaseDate
+                      ? formatDate(data.receiptSummary.lastPurchaseDate)
+                      : '—'
+                  }
+                />
               </div>
-              <p className="text-[12px] text-erp-muted">Each GRN is listed separately — never merged.</p>
-              <ul className="store-card-list">
+              <PanelHint>Each GRN is listed separately — never merged.</PanelHint>
+              <StockTable
+                columns={[
+                  { key: 'grn', label: 'GRN' },
+                  { key: 'date', label: 'Date' },
+                  { key: 'vendor', label: 'Vendor' },
+                  { key: 'wh', label: 'Warehouse' },
+                  { key: 'qty', label: 'Qty', align: 'right' },
+                  { key: 'rate', label: 'Rate', align: 'right' },
+                  { key: 'st', label: 'Status' },
+                ]}
+                isEmpty={data.receipts.length === 0}
+                empty="No receipts."
+              >
                 {data.receipts.map((r, idx) => (
-                  <li key={`${r.grnId}-${idx}`}>
-                    <div className="store-action-card">
-                      <div className="store-action-card__title font-mono">{r.grnNumber}</div>
-                      <div className="store-action-card__detail">
-                        {formatDate(r.receiptDate)} · {r.vendorName} · {r.warehouseName}
-                      </div>
-                      <div className="store-action-card__qty font-mono">
-                        {formatNumber(r.qty)} @ {formatCurrency(r.rate)} · {r.status}
-                      </div>
-                      <Link to={r.href} className="mt-1 inline-block text-[13px] font-semibold text-[#0078d4]">
-                        Open GRN
+                  <tr key={`${r.grnId}-${idx}`}>
+                    <td>
+                      <Link to={r.href} className="stock-360-link font-mono">
+                        {r.grnNumber}
                       </Link>
-                    </div>
-                  </li>
+                    </td>
+                    <td className="is-num">{formatDate(r.receiptDate)}</td>
+                    <td>{r.vendorName}</td>
+                    <td>{r.warehouseName}</td>
+                    <td className="is-right is-num">{formatNumber(r.qty)}</td>
+                    <td className="is-right is-num">{formatCurrency(r.rate)}</td>
+                    <td>{r.status}</td>
+                  </tr>
                 ))}
-              </ul>
+              </StockTable>
             </div>
           ) : null}
 
           {tab === 'issues' ? (
-            <ul className="store-card-list">
-              {data.issues.length === 0 ? <p className="text-[13px] text-erp-muted">No issues loaded.</p> : null}
-              {data.issues.map((iss) => (
-                <li key={iss.id}>
-                  <div className="store-action-card">
-                    <div className="store-action-card__title">{iss.number}</div>
-                    <div className="store-action-card__detail">
-                      {formatDate(iss.date)} · {iss.reference}
-                    </div>
-                    <div className="store-action-card__qty font-mono">qty {formatNumber(iss.qty)}</div>
-                    {iss.href ? (
-                      <Link to={iss.href} className="text-[13px] font-semibold text-[#0078d4]">
-                        Open
-                      </Link>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="stock-360-stack">
+              <SectionHead title="Material issues" />
+              <StockTable
+                columns={[
+                  { key: 'no', label: 'Issue no.' },
+                  { key: 'date', label: 'Date' },
+                  { key: 'ref', label: 'Reference' },
+                  { key: 'qty', label: 'Qty', align: 'right' },
+                  { key: 'open', label: '' },
+                ]}
+                isEmpty={data.issues.length === 0}
+                empty="No issues loaded."
+              >
+                {data.issues.map((iss) => (
+                  <tr key={iss.id}>
+                    <td className="is-strong font-mono">{iss.number}</td>
+                    <td className="is-num">{formatDate(iss.date)}</td>
+                    <td>{iss.reference}</td>
+                    <td className="is-right is-num">{formatNumber(iss.qty)}</td>
+                    <td>
+                      {iss.href ? (
+                        <Link to={iss.href} className="stock-360-link">
+                          Open
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </StockTable>
+            </div>
           ) : null}
 
           {tab === 'transfers' ? (
-            <ul className="store-card-list">
-              {data.transfers.length === 0 ? <p className="text-[13px] text-erp-muted">No transfers.</p> : null}
-              {data.transfers.map((t) => (
-                <li key={t.id}>
-                  <div className="store-action-card">
-                    <div className="store-action-card__title font-mono">{t.number}</div>
-                    <div className="store-action-card__detail">
-                      {formatDate(t.date)} · {t.fromWh} → {t.toWh}
-                    </div>
-                    <div className="store-action-card__qty font-mono">qty {formatNumber(t.qty)}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="stock-360-stack">
+              <SectionHead title="Transfers" />
+              <StockTable
+                columns={[
+                  { key: 'no', label: 'Transfer no.' },
+                  { key: 'date', label: 'Date' },
+                  { key: 'route', label: 'From → To' },
+                  { key: 'qty', label: 'Qty', align: 'right' },
+                ]}
+                isEmpty={data.transfers.length === 0}
+                empty="No transfers."
+              >
+                {data.transfers.map((t) => (
+                  <tr key={t.id}>
+                    <td className="font-mono is-strong">{t.number}</td>
+                    <td className="is-num">{formatDate(t.date)}</td>
+                    <td>
+                      {t.fromWh} → {t.toWh}
+                    </td>
+                    <td className="is-right is-num">{formatNumber(t.qty)}</td>
+                  </tr>
+                ))}
+              </StockTable>
+            </div>
           ) : null}
 
           {tab === 'timeline' ? (
-            <ol className="store-timeline">
-              {data.timeline.length === 0 ? <p className="text-[13px] text-erp-muted">No events.</p> : null}
-              {data.timeline.map((ev) => (
-                <li key={ev.id} className="store-timeline__item">
-                  <div className="store-timeline__dot" />
-                  <div className="store-timeline__card">
-                    <div className="store-timeline__meta">
-                      <span className="store-timeline__kind">{ev.kind}</span>
-                      <span>{formatDate(ev.at)}</span>
-                    </div>
-                    <div className="store-timeline__title">
-                      {ev.href ? (
-                        <Link to={ev.href} className="text-[#0078d4] hover:underline">
-                          {ev.title}
-                        </Link>
-                      ) : (
-                        ev.title
-                      )}
-                    </div>
-                    {ev.subtitle ? <div className="store-timeline__sub">{ev.subtitle}</div> : null}
-                    {ev.qty != null ? (
-                      <div className="store-timeline__foot font-mono">qty {formatNumber(ev.qty)}</div>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ol>
+            <div className="stock-360-stack">
+              <SectionHead title="Operational timeline" />
+              {data.timeline.length === 0 ? (
+                <PanelHint>No events recorded for this item.</PanelHint>
+              ) : (
+                <ol className="stock-360-timeline">
+                  {data.timeline.map((ev) => (
+                    <li key={ev.id} className="stock-360-timeline__item">
+                      <div className="stock-360-timeline__dot" />
+                      <div className="stock-360-timeline__card">
+                        <div className="stock-360-timeline__meta">
+                          <span className="stock-360-tag">{ev.kind}</span>
+                          <span>{formatDate(ev.at)}</span>
+                        </div>
+                        <div className="stock-360-timeline__title">
+                          {ev.href ? (
+                            <Link to={ev.href} className="stock-360-link">
+                              {ev.title}
+                            </Link>
+                          ) : (
+                            ev.title
+                          )}
+                        </div>
+                        {ev.subtitle ? (
+                          <div className="stock-360-timeline__sub">{ev.subtitle}</div>
+                        ) : null}
+                        {ev.qty != null ? (
+                          <div className="stock-360-timeline__foot">qty {formatNumber(ev.qty)}</div>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
           ) : null}
 
           {tab === 'supplier_quality' ? (
-            <div className="space-y-3">
-              <p className="text-[13px] text-erp-muted">
-                GRN receipt → purchase inspection → return → vendor adjustment / replacement (API).
-              </p>
+            <div className="stock-360-stack">
+              <SectionHead title="Supplier quality history" />
+              <PanelHint>
+                GRN receipt → purchase inspection → return → vendor adjustment / replacement.
+              </PanelHint>
               {sqLoading ? (
                 <LoadingState variant="card" />
               ) : sqTimeline.length === 0 ? (
-                <p className="text-[13px] text-erp-muted">
+                <PanelHint>
                   No supplier quality events for this item (or API off / no receipts).
-                </p>
+                </PanelHint>
               ) : (
-                <ol className="store-timeline">
+                <ol className="stock-360-timeline">
                   {sqTimeline.map((ev, idx) => (
-                    <li key={`${ev.type}-${ev.number}-${idx}`} className="store-timeline__item">
-                      <div className="store-timeline__dot" />
-                      <div className="store-timeline__card">
-                        <div className="store-timeline__meta">
-                          <span className="store-timeline__kind">{ev.type.replace(/_/g, ' ')}</span>
+                    <li key={`${ev.type}-${ev.number}-${idx}`} className="stock-360-timeline__item">
+                      <div className="stock-360-timeline__dot" />
+                      <div className="stock-360-timeline__card">
+                        <div className="stock-360-timeline__meta">
+                          <span className="stock-360-tag">{ev.type.replace(/_/g, ' ')}</span>
                           <span>{ev.at ? formatDate(ev.at.slice(0, 10)) : '—'}</span>
                         </div>
-                        <div className="store-timeline__title">
+                        <div className="stock-360-timeline__title">
                           {ev.href ? (
-                            <Link to={ev.href} className="text-[#0078d4] hover:underline">
+                            <Link to={ev.href} className="stock-360-link">
                               {ev.number}
                             </Link>
                           ) : (
@@ -626,7 +855,9 @@ export function ItemStock360Page() {
                           )}
                           <span className="ml-2 text-[12px] text-erp-muted">{ev.status}</span>
                         </div>
-                        {ev.detail ? <div className="store-timeline__sub">{ev.detail}</div> : null}
+                        {ev.detail ? (
+                          <div className="stock-360-timeline__sub">{ev.detail}</div>
+                        ) : null}
                       </div>
                     </li>
                   ))}
@@ -636,40 +867,43 @@ export function ItemStock360Page() {
           ) : null}
 
           {tab === 'cost' ? (
-            <div className="ops-summary-card">
-              <div className="ops-summary-card__metrics">
-                <OpsMetric label="Average cost" value={formatCurrency(overview.avgCost)} mono />
-                <OpsMetric label="Stock value" value={formatCurrency(overview.stockValue)} mono />
-                <OpsMetric
+            <div className="stock-360-stack">
+              <SectionHead title="Cost snapshot" />
+              <div className="stock-360-kpi-grid stock-360-kpi-grid--compact">
+                <KpiTile label="Average cost" value={formatCurrency(overview.avgCost)} emphasize />
+                <KpiTile label="Stock value" value={formatCurrency(overview.stockValue)} emphasize />
+                <KpiTile
                   label="Last purchase rate"
-                  value={
-                    data.receipts[0] ? formatCurrency(data.receipts[0].rate) : '—'
-                  }
-                  mono
+                  value={data.receipts[0] ? formatCurrency(data.receipts[0].rate) : '—'}
                 />
+                <KpiTile label="Reorder level" value={formatNumber(overview.reorderLevel)} />
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" className="erp-btn erp-btn-secondary h-10 px-3" onClick={() => navigate('/inventory/costing')}>
+              <div className="stock-360-actions">
+                <button
+                  type="button"
+                  className="erp-btn erp-btn-secondary h-9 px-3 text-[12px]"
+                  onClick={() => navigate('/inventory/costing')}
+                >
                   Costing hub
                 </button>
                 <button
                   type="button"
-                  className="erp-btn erp-btn-secondary h-10 px-3"
+                  className="erp-btn erp-btn-secondary h-9 px-3 text-[12px]"
                   onClick={() => navigate('/inventory/costing/layers')}
                 >
                   FIFO layers
                 </button>
                 <button
                   type="button"
-                  className="erp-btn erp-btn-secondary h-10 px-3"
+                  className="erp-btn erp-btn-secondary h-9 px-3 text-[12px]"
                   onClick={() => navigate(`/inventory/items/${data.itemId}/ledger`)}
                 >
                   Item ledger
                 </button>
               </div>
-              <p className="mt-2 text-[12px] text-erp-muted">
-                Cost layers and valuation stay finance-owned. Store users see operational avg cost only.
-              </p>
+              <PanelHint>
+                Cost layers and valuation stay finance-owned. Store users see operational average cost only.
+              </PanelHint>
             </div>
           ) : null}
         </div>

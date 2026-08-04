@@ -355,3 +355,26 @@ export async function deleteRole(
 
   return detail
 }
+
+export async function cloneRole(
+  tenantId: string,
+  roleId: string,
+  name: string | undefined,
+  audit?: AuditMeta,
+  actor?: ActorAccess,
+): Promise<RoleDetail> {
+  const source = await getRoleById(tenantId, roleId)
+  const cloneName = (name?.trim() || `${source.name} (copy)`).slice(0, 100)
+  return createRole(
+    tenantId,
+    {
+      name: cloneName,
+      description: source.description
+        ? `Cloned from ${source.name}: ${source.description}`
+        : `Cloned from ${source.name}`,
+      permissionNames: source.permissions,
+    },
+    audit,
+    actor,
+  )
+}

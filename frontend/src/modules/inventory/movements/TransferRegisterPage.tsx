@@ -143,10 +143,10 @@ export function TransferRegisterPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Stock Transfer Register"
       description="Warehouse, plant and bin transfers with dispatch and receipt tracking."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Transfers' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Transfers' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/movements/transfers"
       commandBar={(

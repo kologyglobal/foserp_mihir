@@ -215,7 +215,7 @@ export function TransferEditorPage() {
 
   if (loading) {
     return (
-      <OperationalPageShell title="Transfer" badge="Inventory">
+      <OperationalPageShell title="Transfer" badge="Store">
         <LoadingState variant="card" />
       </OperationalPageShell>
     )
@@ -226,13 +226,13 @@ export function TransferEditorPage() {
   return (
     <ErpCardFormPage
       variant="dynamics"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={isNew ? 'Quick Transfer' : `Transfer ${doc?.documentNumber ?? ''}`}
       description="Select source warehouse, item and quantity — system loads availability, UOM and cost."
       recordNo={doc?.documentNumber}
       statusChip={<StatusDot label={statusLabel} tone={statusToneFromLabel(statusLabel)} />}
       breadcrumbs={[
-        { label: 'Inventory & Warehouse', to: '/inventory' },
+        { label: 'Store', to: '/inventory' },
         { label: 'Transfers', to: '/inventory/movements/transfers' },
         { label: isNew ? 'New' : doc?.documentNumber ?? 'Detail' },
       ]}

@@ -241,52 +241,56 @@ async function loadBalancesRaw(filter: ConsolidatedStockFilter = {}): Promise<
   }>
 > {
   if (isApiMode()) {
-    const pages: InventoryStockBalance[] = []
-    let page = 1
-    let totalPages = 1
-    while (page <= totalPages && page <= 20) {
-      const res = await inventoryApi.listInventoryBalances({
-        page,
-        limit: 200,
-        warehouseId: filter.warehouseId || undefined,
-        itemId: filter.itemId || undefined,
-      })
-      const chunk = Array.isArray(res) ? res : (res as { data?: InventoryStockBalance[] }).data ?? []
-      pages.push(...chunk)
-      const meta = (res as { meta?: { totalPages?: number } }).meta
-      totalPages = meta?.totalPages ?? 1
-      page += 1
-      if (chunk.length === 0) break
+    // Load balances + item catalog in parallel (avoid N+1 getItemById and serial page waterfalls).
+    const itemsPromise = getItems({}).catch(() => [] as Awaited<ReturnType<typeof getItems>>)
+
+    const firstRes = await inventoryApi.listInventoryBalances({
+      page: 1,
+      limit: 200,
+      warehouseId: filter.warehouseId || undefined,
+      itemId: filter.itemId || undefined,
+    })
+    const firstChunk: InventoryStockBalance[] = Array.isArray(firstRes)
+      ? firstRes
+      : ((firstRes as { data?: InventoryStockBalance[] }).data ?? [])
+    const meta = (firstRes as { meta?: { totalPages?: number } }).meta
+    const totalPages = Math.min(meta?.totalPages ?? 1, 20)
+
+    const [restChunks, items] = await Promise.all([
+      totalPages > 1
+        ? Promise.all(
+            Array.from({ length: totalPages - 1 }, (_, i) =>
+              inventoryApi
+                .listInventoryBalances({
+                  page: i + 2,
+                  limit: 200,
+                  warehouseId: filter.warehouseId || undefined,
+                  itemId: filter.itemId || undefined,
+                })
+                .then((res) =>
+                  Array.isArray(res) ? res : ((res as { data?: InventoryStockBalance[] }).data ?? []),
+                )
+                .catch(() => [] as InventoryStockBalance[]),
+            ),
+          )
+        : Promise.resolve([] as InventoryStockBalance[][]),
+      itemsPromise,
+    ])
+
+    const pages = firstChunk.concat(...restChunks)
+    const reorderById = new Map<string, { reorder: number; max?: number }>()
+    for (const it of items) {
+      reorderById.set(it.id, { reorder: it.reorderLevel ?? 0, max: it.maximumStock })
     }
 
-    // Prefer reorder from item master when available
-    const itemCache = new Map<string, { reorder: number; max?: number }>()
-    const resolveReorder = async (itemId: string) => {
-      if (itemCache.has(itemId)) return itemCache.get(itemId)!
-      try {
-        const item = await getItemById(itemId)
-        const meta = {
-          reorder: item?.reorderLevel ?? 0,
-          max: item?.maximumStock,
-        }
-        itemCache.set(itemId, meta)
-        return meta
-      } catch {
-        const meta = { reorder: 0, max: undefined as number | undefined }
-        itemCache.set(itemId, meta)
-        return meta
-      }
-    }
-
-    const rows = []
-    for (const b of pages) {
-      const reorderMeta = await resolveReorder(b.itemId)
+    return pages.map((b) => {
+      const reorderMeta = reorderById.get(b.itemId) ?? { reorder: 0, max: undefined as number | undefined }
       const onHand = num(b.onHandQty)
       const reserved = num(b.reservedQty)
       const available = num(b.freeQty ?? b.unrestrictedQty ?? onHand - reserved)
       const avgCost = num(b.avgRate)
       const stockValue = num(b.stockValue) || onHand * avgCost
-      rows.push({
+      return {
         itemId: b.itemId,
         itemCode: b.item?.code ?? '',
         itemName: b.item?.name ?? '',
@@ -300,9 +304,8 @@ async function loadBalancesRaw(filter: ConsolidatedStockFilter = {}): Promise<
         stockValue,
         reorderLevel: reorderMeta.reorder,
         maxStock: reorderMeta.max,
-      })
-    }
-    return rows
+      }
+    })
   }
 
   const stock = await getStockAvailability({
@@ -328,6 +331,11 @@ async function loadBalancesRaw(filter: ConsolidatedStockFilter = {}): Promise<
   }))
 }
 
+/** Open POs only (incoming qty) — avoid loading every GRN + return on stock views. */
+async function loadOpenPurchaseOrders() {
+  return getPurchaseOrders().catch(() => [] as PurchaseOrder[])
+}
+
 async function loadDocs() {
   const [grns, pos, returns] = await Promise.all([
     getGRNs().catch(() => [] as GoodsReceiptNote[]),
@@ -337,10 +345,123 @@ async function loadDocs() {
   return { grns, pos, returns }
 }
 
+/**
+ * Store dashboard stock snippets — lightweight (no GRN/PO fan-out, no per-balance getItemById).
+ * Uses one balances page + one item catalog for reorder levels.
+ */
+export async function listDashboardStockAlerts(limit = 12): Promise<{
+  lowStock: ConsolidatedStockRow[]
+  negativeStock: ConsolidatedStockRow[]
+  lowStockCount: number
+  negativeStockCount: number
+}> {
+  const toRow = (
+    b: {
+      itemId: string
+      itemCode: string
+      itemName: string
+      warehouseId: string
+      warehouseCode: string
+      warehouseName: string
+      onHand: number
+      reserved: number
+      available: number
+      avgCost: number
+      stockValue: number
+      reorderLevel: number
+      maxStock?: number
+    },
+  ): ConsolidatedStockRow => ({
+    itemId: b.itemId,
+    itemCode: b.itemCode,
+    itemName: b.itemName,
+    warehouseId: b.warehouseId,
+    warehouseCode: b.warehouseCode,
+    warehouseName: b.warehouseName,
+    onHand: b.onHand,
+    reserved: b.reserved,
+    available: b.available,
+    incoming: 0,
+    avgCost: b.avgCost,
+    stockValue: b.stockValue,
+    reorderLevel: b.reorderLevel,
+    status: stockHealthStatus(b.onHand, b.available, b.reorderLevel, b.maxStock),
+  })
+
+  let rows: ConsolidatedStockRow[] = []
+
+  if (isApiMode()) {
+    const [balRes, items] = await Promise.all([
+      inventoryApi.listInventoryBalances({ page: 1, limit: 200 }).catch(() => null),
+      getItems({}).catch(() => [] as Awaited<ReturnType<typeof getItems>>),
+    ])
+    const chunk: InventoryStockBalance[] = balRes
+      ? Array.isArray(balRes)
+        ? balRes
+        : ((balRes as { data?: InventoryStockBalance[] }).data ?? [])
+      : []
+    const reorderById = new Map<string, { reorder: number; max?: number }>()
+    for (const it of items) {
+      reorderById.set(it.id, { reorder: it.reorderLevel ?? 0, max: it.maximumStock })
+    }
+    rows = chunk.map((b) => {
+      const meta = reorderById.get(b.itemId) ?? { reorder: 0, max: undefined as number | undefined }
+      const onHand = num(b.onHandQty)
+      const reserved = num(b.reservedQty)
+      const available = num(b.freeQty ?? b.unrestrictedQty ?? onHand - reserved)
+      const avgCost = num(b.avgRate)
+      const stockValue = num(b.stockValue) || onHand * avgCost
+      return toRow({
+        itemId: b.itemId,
+        itemCode: b.item?.code ?? '',
+        itemName: b.item?.name ?? '',
+        warehouseId: b.warehouseId,
+        warehouseCode: b.warehouse?.code ?? '',
+        warehouseName: b.warehouse?.name ?? '',
+        onHand,
+        reserved,
+        available,
+        avgCost,
+        stockValue,
+        reorderLevel: meta.reorder,
+        maxStock: meta.max,
+      })
+    })
+  } else {
+    const stock = await getStockAvailability({}).catch(() => [])
+    rows = stock.map((r) =>
+      toRow({
+        itemId: r.itemId,
+        itemCode: r.itemCode,
+        itemName: r.itemName,
+        warehouseId: r.warehouseId,
+        warehouseCode: r.warehouseCode,
+        warehouseName: r.warehouseName,
+        onHand: r.onHand,
+        reserved: r.reserved,
+        available: r.available,
+        avgCost: r.onHand > 0 ? r.stockValue / r.onHand : 0,
+        stockValue: r.stockValue,
+        reorderLevel: r.reorderLevel,
+      }),
+    )
+  }
+
+  const lowAll = rows.filter((r) => r.status === 'low' || r.status === 'out')
+  const negAll = rows.filter((r) => r.status === 'negative')
+  return {
+    lowStock: lowAll.slice(0, limit),
+    negativeStock: negAll.slice(0, limit),
+    lowStockCount: lowAll.length,
+    negativeStockCount: negAll.length,
+  }
+}
+
 export async function listConsolidatedStock(
   filter: ConsolidatedStockFilter = {},
 ): Promise<ConsolidatedStockRow[]> {
-  const [{ pos }, balances] = await Promise.all([loadDocs(), loadBalancesRaw(filter)])
+  // Balances + open POs only (incoming). Full GRN/return docs are not required for this register.
+  const [pos, balances] = await Promise.all([loadOpenPurchaseOrders(), loadBalancesRaw(filter)])
   const incomingByIw = computeIncomingByItemWarehouse(pos)
   const incomingByItem = computeIncomingByItem(pos)
 
@@ -348,13 +469,9 @@ export async function listConsolidatedStock(
     const incoming =
       incomingByIw.get(`${b.itemId}::${b.warehouseId}`) ??
       (b.warehouseId ? 0 : incomingByItem.get(b.itemId) ?? 0)
-    // If line WH empty, fall back to item-level incoming split is not applied — use item-level
-    // only when warehouse match is zero: still show 0 for WH-specific unless PO has WH
     const incomingFinal =
       (incomingByIw.get(`${b.itemId}::${b.warehouseId}`) ?? 0) ||
       (!b.warehouseId ? (incomingByItem.get(b.itemId) ?? 0) : 0)
-    // Prefer warehouse-matched; if PO lines lack warehouse, allocate item pending onto all WH rows as 0
-    // and show total on overview only — WH rows use wh-specific only.
     void incoming
     const status = stockHealthStatus(b.onHand, b.available, b.reorderLevel, b.maxStock)
     return {

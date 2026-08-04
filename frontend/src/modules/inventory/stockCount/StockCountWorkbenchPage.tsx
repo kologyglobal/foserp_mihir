@@ -342,14 +342,14 @@ export function StockCountWorkbenchPage({ mode }: { mode: 'new' | 'detail' }) {
   }
 
   const breadcrumbs = [
-    { label: 'Inventory & Warehouse', to: '/inventory' },
+    { label: 'Store', to: '/inventory' },
     { label: 'Stock Count', to: '/inventory/stock-count' },
     { label: isNew ? 'New' : count?.countNumber ?? '…' },
   ]
 
   if (!perms.canViewStockCount && !perms.canCreateStockCount) {
     return (
-      <OperationalPageShell variant="dynamics" layout="enterprise" badge="Inventory & Warehouse" title="Stock Count" breadcrumbs={breadcrumbs} autoBreadcrumbs={false}>
+      <OperationalPageShell variant="dynamics" layout="enterprise" badge="Store" title="Stock Count" breadcrumbs={breadcrumbs} autoBreadcrumbs={false}>
         <EmptyState icon={ShieldOff} title="Access denied" description="Missing stock count permission." />
       </OperationalPageShell>
     )
@@ -357,7 +357,7 @@ export function StockCountWorkbenchPage({ mode }: { mode: 'new' | 'detail' }) {
 
   if (loading) {
     return (
-      <OperationalPageShell variant="dynamics" layout="enterprise" badge="Inventory & Warehouse" title="Stock Count" breadcrumbs={breadcrumbs} autoBreadcrumbs={false}>
+      <OperationalPageShell variant="dynamics" layout="enterprise" badge="Store" title="Stock Count" breadcrumbs={breadcrumbs} autoBreadcrumbs={false}>
         <LoadingState variant="card" />
       </OperationalPageShell>
     )
@@ -367,7 +367,7 @@ export function StockCountWorkbenchPage({ mode }: { mode: 'new' | 'detail' }) {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title={isNew ? 'New Stock Count' : count?.countNumber ?? 'Stock Count'}
       description={count ? `${STOCK_COUNT_TYPE_LABELS[count.scope.countType]} · ${count.scope.warehouseName}` : 'Define count scope and create a stock snapshot'}
       breadcrumbs={breadcrumbs}

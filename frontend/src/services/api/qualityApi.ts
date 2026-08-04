@@ -69,9 +69,16 @@ export interface QualityInspection {
   status: QualityInspectionStatus
   decision: QualityInspectionDecision | null
   productionOrderId: string | null
+  productionOrderNumber?: string | null
   stageId: string | null
+  stageName?: string | null
   operationId: string | null
+  operationCode?: string | null
+  operationName?: string | null
+  operationSequence?: number | null
   itemId: string | null
+  itemCode?: string | null
+  itemName?: string | null
   inspectionPlanId?: string | null
   inspectionPlan?: {
     id: string
@@ -248,8 +255,12 @@ export interface QcKioskQueueResult {
     status: string
     title: string
     productionOrderId: string | null
+    productionOrderNumber?: string | null
     stageId: string | null
+    stageName?: string | null
     itemId: string | null
+    itemCode?: string | null
+    itemName?: string | null
     inspectedQty: string | null
     requestedAt: string
     planCode: string | null

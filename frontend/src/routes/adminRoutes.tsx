@@ -12,6 +12,9 @@ import { AdminInvitationsPage } from '@/modules/systemAdmin/AdminInvitationsPage
 import { AdminDepartmentsPage } from '@/modules/systemAdmin/AdminDepartmentsPage'
 import { AdminResponsibilitiesPage } from '@/modules/systemAdmin/AdminResponsibilitiesPage'
 import { AdminAccessReviewPage } from '@/modules/systemAdmin/AdminAccessReviewPage'
+import { AdminPermissionMatrixPage } from '@/modules/systemAdmin/AdminPermissionMatrixPage'
+import { AdminDataScopesPage } from '@/modules/systemAdmin/AdminDataScopesPage'
+import { AdminApprovalAuthorityPage } from '@/modules/systemAdmin/AdminApprovalAuthorityPage'
 import { AdminLoginActivityPage } from '@/modules/systemAdmin/AdminLoginActivityPage'
 import { AdminSecuritySessionsPage } from '@/modules/systemAdmin/AdminSecuritySessionsPage'
 import { AdminLockedAccountsPage } from '@/modules/systemAdmin/AdminLockedAccountsPage'
@@ -19,6 +22,7 @@ import { AdminSecurityPolicyPage } from '@/modules/systemAdmin/AdminSecurityPoli
 import { AdminModulesPage } from '@/modules/systemAdmin/AdminModulesPage'
 import { AdminOrgStructurePage } from '@/modules/systemAdmin/AdminOrgStructurePage'
 import { AdminAuditLogPage } from '@/modules/systemAdmin/AdminAuditLogPage'
+import { AdminDocumentGovernanceDateControlsPage } from '@/modules/systemAdmin/AdminDocumentGovernanceDateControlsPage'
 
 /**
  * System administration routes — overview, organization, people, security, and platform tenants.
@@ -40,6 +44,10 @@ export const adminRouteChildren: RouteObject[] = [
   { path: 'admin/roles/:id', element: <RoleAdminDetailPage /> },
   { path: 'admin/roles/:id/edit', element: <RoleAdminFormPage /> },
 
+  { path: 'admin/permission-matrix', element: <AdminPermissionMatrixPage /> },
+  { path: 'admin/data-scopes', element: <AdminDataScopesPage /> },
+  { path: 'admin/approval-authority', element: <AdminApprovalAuthorityPage /> },
+
   // Platform tenants CRUD lives under /platform/tenants (see platformRoutes) — /admin/tenants redirects there.
 
   { path: 'admin/invitations', element: <AdminInvitationsPage /> },
@@ -56,4 +64,8 @@ export const adminRouteChildren: RouteObject[] = [
   { path: 'admin/branches', element: <AdminBranchesPage /> },
   { path: 'admin/org-structure', element: <AdminOrgStructurePage /> },
   { path: 'admin/modules', element: <AdminModulesPage /> },
+  {
+    path: 'admin/document-governance/date-controls',
+    element: <AdminDocumentGovernanceDateControlsPage />,
+  },
 ]

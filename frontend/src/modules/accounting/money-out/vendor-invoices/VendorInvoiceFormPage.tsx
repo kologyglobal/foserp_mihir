@@ -35,6 +35,7 @@ import { useActiveVendors } from '@/hooks/useMasterLists'
 import { useMasterStore } from '@/store/masterStore'
 import { useTenantProfileStore } from '@/store/tenantProfileStore'
 import { notify } from '@/store/toastStore'
+import { resolveBlockedNavigation } from '@/utils/appConfirmLeave'
 import {
   partyMasterCreateRoute,
   partyMasterRoute,
@@ -330,9 +331,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const blocker = useBlocker(isDirty && !saving)
   useEffect(() => {
     if (blocker.state !== 'blocked') return
-    const ok = window.confirm('You have unsaved changes. Leave this page?')
-    if (ok) blocker.proceed()
-    else blocker.reset()
+    return resolveBlockedNavigation(blocker)
   }, [blocker])
 
   useEffect(() => {

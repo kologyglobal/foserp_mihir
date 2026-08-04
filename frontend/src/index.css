@@ -18,6 +18,7 @@
 @import './styles/masters-index.css';
 @import './styles/purchase-process.css';
 @import './styles/purchase-zoho.css';
+@import './styles/inventory-zoho.css';
 
 @tailwind base;
 @tailwind components;

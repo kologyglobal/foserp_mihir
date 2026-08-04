@@ -4,7 +4,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/': 'Executive Dashboard',
   '/executive': 'Executive Dashboard',
   '/inbox': 'Unified Inbox',
-  '/inventory': 'Inventory Workspace',
+  '/inventory': 'Store Home',
   '/inventory/ledger': 'Stock Ledger',
   '/inventory/opening-stock': 'Opening Stock',
   '/inventory/inward': 'Material Inward',
@@ -40,6 +40,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/production/control-tower': 'Production Control Tower',
   '/quality': 'Quality Workspace',
   '/quality/queue': 'QC Queue',
+  '/quality/inspections': 'Inspections',
   '/dispatch': 'Dispatch Workspace',
   '/dispatch/register': 'Dispatch Register',
   '/dispatch/plan': 'Dispatch Plan',
@@ -61,7 +62,7 @@ const PAGE_LABELS: Record<string, string> = {
 }
 
 const MODULE_HOME: Record<string, { label: string; to: string; group?: string }> = {
-  inventory: { label: 'Inventory', to: '/inventory', group: 'Operations' },
+  inventory: { label: 'Store', to: '/inventory', group: 'Operations' },
   purchase: { label: 'Purchase', to: '/purchase', group: 'Procurement' },
   sales: { label: 'Sales', to: '/sales', group: 'Commercial' },
   manufacturing: { label: 'Manufacturing', to: '/manufacturing/today', group: 'Shop Floor' },
@@ -86,6 +87,8 @@ export function getPageLabel(pathname: string): string {
   if (pathname.match(/\/purchase\/grns\/[^/]+$/)) return 'GRN Detail'
   if (pathname.match(/\/accounting\/money-in\/invoices\/[^/]+$/)) return 'Invoice Detail'
   if (pathname.match(/\/dispatch\/[^/]+$/)) return 'Dispatch Detail'
+  if (pathname.match(/\/quality\/inspections\/[^/]+\/report$/)) return 'QC Report'
+  if (pathname.match(/\/quality\/inspections\/[^/]+$/)) return 'Quality Inspection'
   if (pathname.startsWith('/masters/items')) return 'Item Master'
   if (pathname.startsWith('/masters/customers') || pathname.startsWith('/masters/companies')) return 'Company Master'
   if (pathname.startsWith('/masters/vendors')) return 'Vendor Master'

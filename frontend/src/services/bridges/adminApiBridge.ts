@@ -1,5 +1,7 @@
 import * as api from '../api/adminApi'
 import { formatApiError } from '../api/apiErrors'
+import { isApiMode } from '../../config/apiConfig'
+import { canAdminPermission, isSuperAdminUser } from '../../utils/permissions/admin'
 import { useAdminStore } from '../../store/adminStore'
 import type { StoreActionResult } from '../../store/storeAction'
 import type { AdminRoleDetail, AdminTenant, AdminUser } from '../../types/admin'
@@ -48,8 +50,12 @@ function upsertTenant(tenant: AdminTenant): void {
 
 // ─── Hydration ──────────────────────────────────────────────────────────────
 
-/** Requires `user.view` — swallow permission errors so non-admin logins never fail hydration. */
+/** Requires `user.view` — skip call for non-admins to avoid console 403 noise. */
 export async function syncAdminUsersFromApi(): Promise<AdminUser[]> {
+  if (isApiMode() && !canAdminPermission('user.view')) {
+    useAdminStore.setState({ users: [] })
+    return []
+  }
   try {
     const users = await api.fetchAdminUsersApi()
     useAdminStore.setState({ users })
@@ -60,8 +66,12 @@ export async function syncAdminUsersFromApi(): Promise<AdminUser[]> {
   }
 }
 
-/** Requires `role.view` — swallow permission errors so non-admin logins never fail hydration. */
+/** Requires `role.view` — skip call for non-admins to avoid console 403 noise. */
 export async function syncAdminRolesFromApi(): Promise<void> {
+  if (isApiMode() && !canAdminPermission('role.view')) {
+    useAdminStore.setState({ roles: [], permissionCatalog: [] })
+    return
+  }
   try {
     const [roles, permissionCatalog] = await Promise.all([
       api.fetchAdminRolesApi(),
@@ -73,8 +83,15 @@ export async function syncAdminRolesFromApi(): Promise<void> {
   }
 }
 
-/** Tenants list is Super Admin-only; swallow 403 for tenant-scoped admins. */
+/**
+ * Full tenants list is Super Admin only (`requireSuperAdmin` / `tenant.manage`).
+ * Tenant users must not call GET /tenants (403) — they only sync their own tenant later.
+ */
 export async function syncAdminTenantsFromApi(): Promise<void> {
+  if (isApiMode() && !isSuperAdminUser()) {
+    useAdminStore.setState({ tenants: [] })
+    return
+  }
   try {
     const tenants = await api.fetchAdminTenantsApi()
     useAdminStore.setState({ tenants })

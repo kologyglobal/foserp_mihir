@@ -17,6 +17,7 @@ import {
 import type { Branch, BranchType } from '@/types/financeSetup'
 import { useFinancePermissions } from '@/utils/permissions/finance'
 import { notify } from '@/store/toastStore'
+import { appConfirm } from '@/store/confirmDialogStore'
 import { FinanceSettingsShell } from './FinanceSettingsShell'
 import { FinanceSettingsTable } from './financeSettingsShared'
 
@@ -70,7 +71,12 @@ export function BranchesPage() {
   }
 
   const runAction = async (label: string, fn: () => Promise<unknown>) => {
-    if (!window.confirm(`${label}?`)) return
+    const ok = await appConfirm({
+      title: `${label}?`,
+      description: 'Please confirm this action.',
+      confirmLabel: label,
+    })
+    if (!ok) return
     try {
       await fn()
       notify.success(`${label} completed.`)

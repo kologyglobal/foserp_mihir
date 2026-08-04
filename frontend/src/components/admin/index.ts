@@ -19,5 +19,6 @@ export {
 export { AdminRoleBuilder, AdminEffectiveAccessPlaceholder } from './AdminRoleBuilder'
 export { AdminRoleBuilderWizard } from './AdminRoleBuilderWizard'
 export { AdminUserAccessPanels } from './AdminUserAccessPanels'
+export { AdminUserOverridesPanel } from './AdminUserOverridesPanel'
 export { AdminEffectiveAccessPanel } from './AdminEffectiveAccessPanel'
 

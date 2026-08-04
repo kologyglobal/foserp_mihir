@@ -24125,3 +24125,144 @@ a.crm-companies-table__name:hover {
 .purchase-planning-demand-table__nested tr:last-child td {
   border-bottom: none;
 }
+
+/* -- Incoming QC queue row actions -- */
+.qi-queue-actions-cell {
+  text-align: right;
+  vertical-align: middle !important;
+  white-space: nowrap;
+  padding-right: 12px !important;
+}
+
+.qi-queue-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 320px;
+}
+
+.qi-queue-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--erp-border, #d1d5db);
+  background: #fff;
+  color: var(--erp-text, #1f2933);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+}
+
+.qi-queue-action:hover {
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 35%, var(--erp-border, #d1d5db));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 6%, #fff);
+  color: var(--erp-primary, #0078d4);
+}
+
+.qi-queue-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--erp-primary, #0078d4) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.qi-queue-action:active {
+  transform: translateY(0.5px);
+  box-shadow: none;
+}
+
+.qi-queue-action__icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.qi-queue-action__label {
+  white-space: nowrap;
+}
+
+.qi-queue-action--primary {
+  border-color: var(--erp-primary, #0078d4);
+  background: var(--erp-primary, #0078d4);
+  color: #fff;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--erp-primary, #0078d4) 35%, transparent);
+}
+
+.qi-queue-action--primary:hover {
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 88%, #000);
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 88%, #000);
+  color: #fff;
+}
+
+.qi-queue-action--secondary {
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 28%, var(--erp-border));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 8%, #fff);
+  color: var(--erp-primary, #0078d4);
+}
+
+.qi-queue-action--secondary:hover {
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 14%, #fff);
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 45%, var(--erp-border));
+  color: var(--erp-primary, #0078d4);
+}
+
+.qi-queue-action--success {
+  border-color: color-mix(in srgb, #107c10 32%, var(--erp-border));
+  background: color-mix(in srgb, #107c10 9%, #fff);
+  color: #0b5a0b;
+}
+
+.qi-queue-action--success:hover {
+  border-color: #107c10;
+  background: color-mix(in srgb, #107c10 16%, #fff);
+  color: #0b5a0b;
+}
+
+.qi-queue-action--neutral {
+  border-color: var(--erp-border, #d1d5db);
+  background: #fff;
+  color: var(--erp-text, #323130);
+}
+
+.qi-queue-action--warning {
+  border-color: color-mix(in srgb, #ca5010 30%, var(--erp-border));
+  background: color-mix(in srgb, #ca5010 8%, #fff);
+  color: #8a3708;
+}
+
+.qi-queue-action--warning:hover {
+  border-color: #ca5010;
+  background: color-mix(in srgb, #ca5010 14%, #fff);
+  color: #8a3708;
+}
+
+.qi-queue-action--danger {
+  border-color: color-mix(in srgb, #a4262c 28%, var(--erp-border));
+  background: color-mix(in srgb, #a4262c 6%, #fff);
+  color: #a4262c;
+}
+
+.qi-queue-action--danger:hover {
+  border-color: #a4262c;
+  background: color-mix(in srgb, #a4262c 12%, #fff);
+  color: #a4262c;
+}
+
+tr:hover .qi-queue-action--neutral {
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 22%, var(--erp-border));
+}

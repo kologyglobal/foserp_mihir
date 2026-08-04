@@ -13,6 +13,7 @@ import { listAccounts, resolveLegalEntityId } from '@/services/bridges/financeAp
 import { createVendorPaymentDraft, getVendorPayment, updateVendorPaymentDraft } from '@/services/bridges/payablesApiBridge'
 import { useActiveVendors } from '@/hooks/useMasterLists'
 import { notify } from '@/store/toastStore'
+import { resolveBlockedNavigation } from '@/utils/appConfirmLeave'
 import type {
   CreateVendorPaymentInput,
   VendorPaymentAdjustmentInput,
@@ -99,9 +100,7 @@ export function VendorPaymentFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const blocker = useBlocker(isDirty)
   useEffect(() => {
     if (blocker.state !== 'blocked') return
-    const ok = window.confirm('You have unsaved changes. Leave this page?')
-    if (ok) blocker.proceed()
-    else blocker.reset()
+    return resolveBlockedNavigation(blocker)
   }, [blocker])
 
   useEffect(() => {

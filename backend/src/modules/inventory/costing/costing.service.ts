@@ -1208,6 +1208,17 @@ export async function listValuationItems(
         select: { postingDate: true, entryType: true },
       })
 
+      // Status is ledger-based: balance avg/value can exist without InventoryCostEntry rows
+      // (seeded stock, pre-costing posts). "Costed" only when entry ledger has posts.
+      const costStatus =
+        onHand === 0
+          ? 'No Stock'
+          : lastMovement
+            ? 'Costed'
+            : value > 0
+              ? 'Balance only'
+              : 'Uncosted'
+
       return {
         itemId: b.itemId,
         warehouseId: b.warehouseId,
@@ -1222,7 +1233,7 @@ export async function listValuationItems(
         inventoryValue: value,
         currentUnitCost: unitCostDisplay,
         unitCostLabel,
-        costStatus: onHand === 0 ? 'No Stock' : value > 0 ? 'Costed' : 'Uncosted',
+        costStatus,
         lastCostMovement: lastMovement
           ? {
               postingDate: lastMovement.postingDate.toISOString().slice(0, 10),

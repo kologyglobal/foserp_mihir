@@ -59,3 +59,15 @@ export async function remove(req: Request, res: Response): Promise<void> {
   const role = await roleService.deleteRole(getTenantId(req), getRouteParam(req, 'roleId'), auditMeta(req))
   sendSuccess(res, 'Role deleted', role)
 }
+
+export async function clone(req: Request, res: Response): Promise<void> {
+  const body = req.body as { name?: string }
+  const role = await roleService.cloneRole(
+    getTenantId(req),
+    getRouteParam(req, 'roleId'),
+    body?.name,
+    auditMeta(req),
+    actorAccess(req),
+  )
+  sendCreated(res, 'Role cloned', role)
+}

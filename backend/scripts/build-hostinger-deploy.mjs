@@ -83,35 +83,53 @@ if (skipFrontend) {
   // Prefer existing deps: on Windows a running Vite/dev server locks
   // @rolldown native .node bindings, so `npm ci` fails with EPERM unlink.
   // Hostinger: set FORCE_FRONTEND_NPM_CI=1 for a clean install every build.
-  // Locally: leave deps as-is unless node_modules is missing.
+  // Locally: reuse deps when Vite is already installed.
   const forceFrontendCi =
     process.env.FORCE_FRONTEND_NPM_CI === '1'
     || process.env.FORCE_FRONTEND_NPM_CI === 'true'
-  const frontendViteReady = existsSync(join(frontend, 'node_modules', 'vite', 'package.json'))
+  const frontendNodeModules = join(frontend, 'node_modules')
+  const frontendViteReady = existsSync(join(frontendNodeModules, 'vite', 'package.json'))
+  const hasFrontendModules = existsSync(frontendNodeModules)
+
   if (forceFrontendCi || !frontendViteReady) {
-    if (!frontendViteReady) {
-      console.log('[build-hostinger] Frontend node_modules missing — npm ci --include=dev…')
-    } else {
-      console.log('[build-hostinger] FORCE_FRONTEND_NPM_CI — npm ci --include=dev…')
-    }
+    const installArgs = forceFrontendCi || !hasFrontendModules
+      ? ['ci', '--include=dev']
+      : ['install', '--include=dev']
+    console.log(
+      `[build-hostinger] Frontend deps ${frontendViteReady ? 'forced reinstall' : 'incomplete'} — npm ${installArgs.join(' ')}…`,
+    )
     try {
-      runNpm(['ci', '--include=dev'], frontend, frontendInstallEnv())
+      runNpm(installArgs, frontend, frontendInstallEnv())
     } catch (err) {
-      if (frontendViteReady) {
+      const stillReady = existsSync(join(frontendNodeModules, 'vite', 'package.json'))
+      if (stillReady) {
         console.warn(
-          '[build-hostinger] npm ci failed (often EPERM while Vite/dev is running). '
-            + 'Reusing existing frontend node_modules and continuing with vite build.',
+          '[build-hostinger] Frontend install failed (often EPERM while Vite/dev is running). '
+            + 'Reusing existing frontend node_modules and continuing with vite build. '
+            + 'Stop Vite (npm run dev in frontend) and re-run with FORCE_FRONTEND_NPM_CI=1 if deps are stale.',
         )
       } else {
+        console.error(
+          '[build-hostinger] Frontend install failed and vite is not available. '
+            + 'Stop any running frontend Vite/dev server (it locks @rolldown/*.node on Windows), '
+            + 'then re-run: cd frontend && npm ci --include=dev',
+        )
         throw err
       }
     }
   } else {
     console.log(
-      '[build-hostinger] Frontend deps already present — skipping npm ci '
+      '[build-hostinger] Frontend deps already present — skipping npm install '
         + '(set FORCE_FRONTEND_NPM_CI=1 to reinstall).',
     )
   }
+
+  if (!existsSync(join(frontend, 'node_modules', 'vite', 'package.json'))) {
+    throw new Error(
+      '[build-hostinger] frontend/node_modules/vite is missing after install. Cannot build SPA.',
+    )
+  }
+
   const viteEnv = {
     ...frontendInstallEnv(),
     VITE_USE_API: process.env.VITE_USE_API ?? 'true',

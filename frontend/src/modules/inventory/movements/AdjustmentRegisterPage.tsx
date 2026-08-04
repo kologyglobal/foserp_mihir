@@ -137,10 +137,10 @@ export function AdjustmentRegisterPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Inventory Adjustments"
       description="Stock corrections with conditional approval and accounting preview."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Adjustments' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Adjustments' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/movements/adjustments"
       commandBar={(

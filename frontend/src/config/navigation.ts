@@ -131,7 +131,7 @@ export const moduleCategories: NavCategory[] = [
   },
   {
     id: 'inventory',
-    title: 'Inventory & Warehouse',
+    title: 'Store',
     items: [
       { label: 'Store Home', path: '/inventory', icon: LayoutDashboard, end: true, workspace: true },
       { label: 'Item Stock 360', path: '/inventory/stock', icon: Package },
@@ -336,6 +336,9 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Tenant Profile', path: '/admin/tenant-profile', icon: Building2, group: 'Organization', subNav: false },
       { label: 'Users', path: '/admin/users', icon: Users, end: true, group: 'People & Access' },
       { label: 'Roles', path: '/admin/roles', icon: ShieldCheck, group: 'People & Access' },
+      { label: 'Permission Matrix', path: '/admin/permission-matrix', icon: ClipboardList, group: 'People & Access' },
+      { label: 'Data Scopes', path: '/admin/data-scopes', icon: Network, group: 'People & Access' },
+      { label: 'Approval Authority', path: '/admin/approval-authority', icon: ShieldCheck, group: 'People & Access' },
       { label: 'Invitations', path: '/admin/invitations', icon: UserPlus, group: 'People & Access' },
       { label: 'Responsibilities', path: '/admin/responsibilities', icon: ClipboardList, group: 'People & Access' },
       { label: 'Access Review', path: '/admin/access-review', icon: ClipboardList, group: 'People & Access' },

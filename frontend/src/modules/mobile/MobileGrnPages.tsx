@@ -19,6 +19,7 @@ import {
 } from '../../components/mobile'
 import { mobileGrnCanReceive } from '../../utils/mobilePermissions'
 import { resolveMobileScan } from '../../utils/mobileScanResolver'
+import { systemPrompt } from '../../utils/systemConfirm'
 
 function isOpenPo(po: PurchaseOrder): boolean {
   if (['closed', 'cancelled'].includes(po.status)) return false
@@ -70,20 +71,27 @@ export function MobileGrnListPage() {
         type="button"
         className="mob-btn mob-btn-secondary mb-4"
         onClick={() => {
-          const code = window.prompt('Scan / enter PO number:')
-          if (!code) return
-          if (isApiMode()) {
-            const hit = apiPos.find(
-              (p) =>
-                p.documentNumber.toUpperCase() === code.trim().toUpperCase() ||
-                p.id === code.trim(),
-            )
-            if (hit) navigate(`/m/grn/${hit.id}`)
-            else setError(`PO not found: ${code}`)
-            return
-          }
-          const r = resolveMobileScan(code)
-          if (r.ok && r.preview.entityId) navigate(`/m/grn/${r.preview.entityId}`)
+          void (async () => {
+            const code = await systemPrompt({
+              title: 'Scan / enter PO number',
+              fieldLabel: 'PO number',
+              required: true,
+              confirmLabel: 'Find PO',
+            })
+            if (!code) return
+            if (isApiMode()) {
+              const hit = apiPos.find(
+                (p) =>
+                  p.documentNumber.toUpperCase() === code.trim().toUpperCase() ||
+                  p.id === code.trim(),
+              )
+              if (hit) navigate(`/m/grn/${hit.id}`)
+              else setError(`PO not found: ${code}`)
+              return
+            }
+            const r = resolveMobileScan(code)
+            if (r.ok && r.preview.entityId) navigate(`/m/grn/${r.preview.entityId}`)
+          })()
         }}
       >
         Scan PO

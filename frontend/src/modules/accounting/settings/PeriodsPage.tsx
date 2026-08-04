@@ -15,6 +15,7 @@ import {
 import type { AccountingPeriod, FinancialYear } from '@/types/financeSetup'
 import { useFinancePermissions } from '@/utils/permissions/finance'
 import { notify } from '@/store/toastStore'
+import { appConfirm } from '@/store/confirmDialogStore'
 import { FinanceSettingsShell } from './FinanceSettingsShell'
 import { FinanceSettingsTable } from './financeSettingsShared'
 
@@ -65,7 +66,13 @@ export function PeriodsPage() {
   }
 
   const handleClose = async (id: string) => {
-    if (!window.confirm('Close this period?')) return
+    const ok = await appConfirm({
+      title: 'Close this period?',
+      description: 'Closing locks the period for new postings.',
+      confirmLabel: 'Close period',
+      tone: 'warning',
+    })
+    if (!ok) return
     try {
       await closePeriod(id)
       notify.success('Period closed.')

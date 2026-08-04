@@ -157,9 +157,9 @@ export function StockAvailabilityPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
+        badge="Store"
         title="Stock Availability"
-        breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Stock Availability' }]}
+        breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Stock Availability' }]}
         autoBreadcrumbs={false}
       >
         <EmptyState
@@ -175,10 +175,10 @@ export function StockAvailabilityPage() {
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory & Warehouse"
+      badge="Store"
       title="Stock Availability"
       description="On-hand, available, reserved and quality-hold positions by warehouse."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Stock Availability' }]}
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Stock Availability' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/stock"
       commandBar={<ErpCommandBar inline sticky={false} secondaryActions={[

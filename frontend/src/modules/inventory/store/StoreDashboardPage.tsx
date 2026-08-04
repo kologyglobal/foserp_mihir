@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowDownToLine,
   ArrowLeftRight,
@@ -11,47 +11,60 @@ import {
   Search,
   Warehouse,
 } from 'lucide-react'
+import { DynamicsDashboardGrid, DynamicsDashboardPanel } from '@/components/dynamics'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { getStoreDashboard, type StoreDashKpi, type StoreDashboardData } from '@/services/inventory/storeOperationsService'
+import { LoadingState } from '@/design-system/components/LoadingState'
+import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
+import {
+  getStoreDashboard,
+  type StoreDashKpi,
+  type StoreDashboardData,
+} from '@/services/inventory/storeOperationsService'
 import { formatNumber } from '@/utils/formatters/currency'
-import { formatDate } from '@/utils/dates/format'
+import { formatDate, formatDateTime } from '@/utils/dates/format'
 import { cn } from '@/utils/cn'
-import { Link } from 'react-router-dom'
 
-function KpiCard({ k }: { k: StoreDashKpi }) {
-  const navigate = useNavigate()
-  return (
-    <button
-      type="button"
-      className={cn(
-        'store-kpi-card',
-        k.tone === 'warning' && 'store-kpi-card--warning',
-        k.tone === 'critical' && 'store-kpi-card--critical',
-        k.tone === 'ok' && 'store-kpi-card--ok',
-      )}
-      onClick={() => navigate(k.href)}
-    >
-      <span className="store-kpi-card__label">{k.label}</span>
-      <span className="store-kpi-card__value">{k.value}</span>
-    </button>
-  )
-}
-
-const QUICK: Array<{ label: string; href: string; icon: typeof Package; primary?: boolean }> = [
+const MODULE_LINKS: Array<{
+  label: string
+  href: string
+  icon: typeof Package
+  primary?: boolean
+}> = [
   { label: 'Receive', href: '/inventory/store/receive', icon: ArrowDownToLine, primary: true },
   { label: 'Issue', href: '/inventory/store/issue', icon: ArrowUpFromLine, primary: true },
   { label: 'Transfer', href: '/inventory/store/transfer', icon: ArrowLeftRight, primary: true },
-  { label: 'Count', href: '/inventory/store/count', icon: ClipboardList },
+  { label: 'Stock Count', href: '/inventory/store/count', icon: ClipboardList },
   { label: 'Scan', href: '/inventory/store/scan', icon: ScanLine },
-  { label: 'Search item', href: '/inventory/ops/search', icon: Search },
-  { label: 'Stock 360', href: '/inventory/stock', icon: Package },
-  { label: 'Warehouse', href: '/inventory/ops/warehouses', icon: Warehouse },
+  { label: 'Item Search', href: '/inventory/ops/search', icon: Search },
+  { label: 'Consolidated Stock', href: '/inventory/stock', icon: Package },
+  { label: 'Warehouses', href: '/inventory/ops/warehouses', icon: Warehouse },
 ]
 
-/** Daily store hub — balances/queue only; posts via existing engines. */
+function kpiAccent(tone: StoreDashKpi['tone']): EnterpriseKpiItem['accent'] {
+  if (tone === 'critical') return 'red'
+  if (tone === 'warning') return 'amber'
+  if (tone === 'ok') return 'green'
+  return 'blue'
+}
+
+function SeverityBadge({ severity }: { severity: string }) {
+  return (
+    <span
+      className={cn(
+        'inv-hub-badge',
+        severity === 'CRITICAL' && 'inv-hub-badge--critical',
+        severity === 'WARNING' && 'inv-hub-badge--warning',
+        severity === 'INFO' && 'inv-hub-badge--info',
+      )}
+    >
+      {severity}
+    </span>
+  )
+}
+
+/** Store / Inventory module home — desktop web hub (Zoho-style), not a mobile app shell. */
 export function StoreDashboardPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<StoreDashboardData | null>(null)
@@ -74,29 +87,53 @@ export function StoreDashboardPage() {
     void load()
   }, [load])
 
+  const kpiStrip: EnterpriseKpiItem[] | undefined = useMemo(() => {
+    if (!data) return undefined
+    return data.kpis.map((k) => ({
+      id: k.id,
+      label: k.label,
+      value: k.value,
+      accent: kpiAccent(k.tone),
+      onClick: () => navigate(k.href),
+    }))
+  }, [data, navigate])
+
   return (
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
       badge="Store"
-      title="Store Dashboard"
-      description="Daily work in a few taps. Balances for ops · Ledger & GRNs remain audit truth (never merged)."
-      breadcrumbs={[{ label: 'Store' }]}
+      title="Store"
+      description="Stock health, store queues, and warehouse operations — open registers and action items from one place."
+      breadcrumbs={[
+        { label: 'Home', to: '/home' },
+        { label: 'Store' },
+      ]}
       autoBreadcrumbs={false}
       favoritePath="/inventory"
+      kpiStrip={!loading && data ? kpiStrip : undefined}
       commandBar={(
         <ErpCommandBar
           inline
           sticky={false}
           primaryAction={{
-            id: 'refresh',
-            label: 'Refresh',
-            icon: RefreshCw,
-            onClick: () => setToken((n) => n + 1),
+            id: 'receive',
+            label: 'Receive',
+            icon: ArrowDownToLine,
+            onClick: () => navigate('/inventory/store/receive'),
           }}
           secondaryActions={[
+            { id: 'issue', label: 'Issue', icon: ArrowUpFromLine, onClick: () => navigate('/inventory/store/issue') },
+            { id: 'transfer', label: 'Transfer', icon: ArrowLeftRight, onClick: () => navigate('/inventory/store/transfer') },
+            { id: 'stock', label: 'Stock', icon: Package, onClick: () => navigate('/inventory/stock') },
             { id: 'timeline', label: 'Timeline', onClick: () => navigate('/inventory/store/timeline') },
             { id: 'mfg', label: 'Production queue', onClick: () => navigate('/manufacturing/store-workbench') },
+            {
+              id: 'refresh',
+              label: 'Refresh',
+              icon: RefreshCw,
+              onClick: () => setToken((n) => n + 1),
+            },
           ]}
         />
       )}
@@ -104,140 +141,224 @@ export function StoreDashboardPage() {
       {loading ? <LoadingState variant="dashboard" /> : null}
 
       {!loading && data ? (
-        <div className="store-ops-page">
-          <section className="store-quick-actions" aria-label="Quick actions">
-            {QUICK.map((q) => {
+        <div className="inv-hub">
+          <nav className="inv-hub-shortcuts" aria-label="Store modules">
+            {MODULE_LINKS.map((q) => {
               const Icon = q.icon
               return (
-                <button
+                <Link
                   key={q.href}
-                  type="button"
-                  className={cn('store-quick-btn', q.primary && 'store-quick-btn--primary')}
-                  onClick={() => navigate(q.href)}
+                  to={q.href}
+                  className={cn('inv-hub-shortcut', q.primary && 'inv-hub-shortcut--primary')}
                 >
-                  <Icon className="h-5 w-5" aria-hidden />
+                  <Icon className="inv-hub-shortcut__icon" aria-hidden />
                   <span>{q.label}</span>
-                </button>
+                </Link>
               )
             })}
-          </section>
+          </nav>
 
-          <section className="store-kpi-grid" aria-label="Store KPIs">
-            {data.kpis.map((k) => (
-              <KpiCard key={k.id} k={k} />
-            ))}
-          </section>
+          <p className="inv-hub-meta">
+            Updated {formatDateTime(data.asOf) || formatDate(data.asOf)}
+          </p>
 
-          <section className="store-section">
-            <div className="store-section__head">
-              <h2 className="store-section__title">Needs action</h2>
-              <span className="text-[12px] text-erp-muted">Updated {formatDate(data.asOf)}</span>
-            </div>
-            {data.queue.length === 0 ? (
-              <EmptyState icon={Package} title="All clear" description="No pending store actions in the current queues." />
-            ) : (
-              <ul className="store-card-list">
-                {data.queue.map((row) => (
-                  <li key={row.key}>
-                    <button
-                      type="button"
-                      className={cn(
-                        'store-action-card',
-                        row.severity === 'CRITICAL' && 'store-action-card--critical',
-                        row.severity === 'WARNING' && 'store-action-card--warning',
-                      )}
-                      onClick={() => {
-                        if (row.deepLink) navigate(row.deepLink)
-                      }}
-                    >
-                      <div className="store-action-card__top">
-                        <span className="store-action-card__severity">{row.severity}</span>
-                        <span className="store-action-card__domain">{row.domain}</span>
-                      </div>
-                      <div className="store-action-card__title">{row.title}</div>
-                      <div className="store-action-card__detail">{row.detail}</div>
-                      {row.quantity != null ? (
-                        <div className="store-action-card__qty font-mono">Qty {row.quantity}</div>
-                      ) : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+          <DynamicsDashboardPanel
+            title="Needs action"
+            noPadding
+            actions={(
+              <Link to="/inventory/store/timeline" className="inv-hub-panel-link">
+                View timeline →
+              </Link>
             )}
-          </section>
-
-          <div className="store-two-col">
-            <section className="store-section">
-              <div className="store-section__head">
-                <h2 className="store-section__title">Low stock</h2>
-                <Link to="/inventory/stock" className="text-[12px] font-semibold text-[#0078d4]">
-                  Open stock
-                </Link>
+          >
+            {data.queue.length === 0 ? (
+              <div className="px-4 py-8">
+                <EmptyState
+                  icon={Package}
+                  title="All clear"
+                  description="No pending store actions in the current queues."
+                />
               </div>
+            ) : (
+              <div className="inv-hub-table-wrap">
+                <table className="inv-hub-table">
+                  <thead>
+                    <tr>
+                      <th>Severity</th>
+                      <th>Domain</th>
+                      <th>Title</th>
+                      <th>Detail</th>
+                      <th className="inv-hub-table__num">Qty</th>
+                      <th className="inv-hub-table__action"> </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.queue.map((row) => (
+                      <tr
+                        key={row.key}
+                        className={cn(row.deepLink && 'inv-hub-table__row--clickable')}
+                        onClick={() => {
+                          if (row.deepLink) navigate(row.deepLink)
+                        }}
+                        onKeyDown={(e) => {
+                          if ((e.key === 'Enter' || e.key === ' ') && row.deepLink) {
+                            e.preventDefault()
+                            navigate(row.deepLink)
+                          }
+                        }}
+                        tabIndex={row.deepLink ? 0 : undefined}
+                        role={row.deepLink ? 'link' : undefined}
+                      >
+                        <td>
+                          <SeverityBadge severity={row.severity} />
+                        </td>
+                        <td className="inv-hub-table__muted">{row.domain}</td>
+                        <td className="inv-hub-table__strong">{row.title}</td>
+                        <td className="inv-hub-table__muted inv-hub-table__clamp">{row.detail}</td>
+                        <td className="inv-hub-table__num font-mono">
+                          {row.quantity != null && row.quantity !== '' ? row.quantity : '—'}
+                        </td>
+                        <td className="inv-hub-table__action">
+                          {row.deepLink ? (
+                            <span className="inv-hub-open">Open</span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DynamicsDashboardPanel>
+
+          <DynamicsDashboardGrid>
+            <DynamicsDashboardPanel
+              title="Low stock"
+              noPadding
+              actions={(
+                <Link to="/inventory/stock?lowStock=1" className="inv-hub-panel-link">
+                  Open stock →
+                </Link>
+              )}
+            >
               {data.lowStock.length === 0 ? (
-                <p className="text-[13px] text-erp-muted">No low-stock balances in the sample window.</p>
+                <p className="inv-hub-empty">No low-stock balances in the current window.</p>
               ) : (
-                <ul className="store-card-list">
-                  {data.lowStock.map((r) => (
-                    <li key={`${r.itemId}:${r.warehouseId}`}>
-                      <button
-                        type="button"
-                        className="store-action-card"
-                        onClick={() => navigate(`/inventory/stock/${r.itemId}?warehouse=${r.warehouseId}`)}
-                      >
-                        <div className="store-action-card__title">
-                          <span className="font-mono text-[11px] text-erp-muted">{r.itemCode}</span> {r.itemName}
-                        </div>
-                        <div className="store-action-card__detail">
-                          {r.warehouseName} · on hand {formatNumber(r.onHand)} · avail {formatNumber(r.available)}
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                <div className="inv-hub-table-wrap">
+                  <table className="inv-hub-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Warehouse</th>
+                        <th className="inv-hub-table__num">On hand</th>
+                        <th className="inv-hub-table__num">Available</th>
+                        <th className="inv-hub-table__num">Reorder</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.lowStock.map((r) => (
+                        <tr
+                          key={`${r.itemId}:${r.warehouseId}`}
+                          className="inv-hub-table__row--clickable"
+                          onClick={() =>
+                            navigate(`/inventory/stock/${r.itemId}?warehouse=${r.warehouseId}`)
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              navigate(`/inventory/stock/${r.itemId}?warehouse=${r.warehouseId}`)
+                            }
+                          }}
+                          tabIndex={0}
+                          role="link"
+                        >
+                          <td>
+                            <div className="inv-hub-item">
+                              <span className="inv-hub-item__code font-mono">{r.itemCode}</span>
+                              <span className="inv-hub-item__name">{r.itemName}</span>
+                            </div>
+                          </td>
+                          <td className="inv-hub-table__muted">{r.warehouseName}</td>
+                          <td className="inv-hub-table__num font-mono">{formatNumber(r.onHand)}</td>
+                          <td className="inv-hub-table__num font-mono">{formatNumber(r.available)}</td>
+                          <td className="inv-hub-table__num font-mono">
+                            {formatNumber(r.reorderLevel)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
-            </section>
+            </DynamicsDashboardPanel>
 
-            <section className="store-section">
-              <div className="store-section__head">
-                <h2 className="store-section__title">Today&apos;s movements</h2>
-                <Link to="/inventory/store/timeline" className="text-[12px] font-semibold text-[#0078d4]">
-                  Full timeline
+            <DynamicsDashboardPanel
+              title="Today's movements"
+              noPadding
+              actions={(
+                <Link to="/inventory/store/timeline" className="inv-hub-panel-link">
+                  Full timeline →
                 </Link>
-              </div>
-              {data.todayMoves.length === 0 ? (
-                <p className="text-[13px] text-erp-muted">No ledger movements today in the first page.</p>
-              ) : (
-                <ul className="store-card-list">
-                  {data.todayMoves.map((ev) => (
-                    <li key={ev.id}>
-                      <button
-                        type="button"
-                        className="store-action-card"
-                        onClick={() => (ev.href ? navigate(ev.href) : undefined)}
-                      >
-                        <div className="store-action-card__title">{ev.title}</div>
-                        {ev.subtitle ? <div className="store-action-card__detail">{ev.subtitle}</div> : null}
-                        {ev.qty != null ? (
-                          <div className="store-action-card__qty font-mono">qty {formatNumber(ev.qty)}</div>
-                        ) : null}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
               )}
-            </section>
-          </div>
+            >
+              {data.todayMoves.length === 0 ? (
+                <p className="inv-hub-empty">No ledger movements today in the first page.</p>
+              ) : (
+                <div className="inv-hub-table-wrap">
+                  <table className="inv-hub-table">
+                    <thead>
+                      <tr>
+                        <th>Movement</th>
+                        <th>Item</th>
+                        <th className="inv-hub-table__num">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.todayMoves.map((ev) => (
+                        <tr
+                          key={ev.id}
+                          className={cn(ev.href && 'inv-hub-table__row--clickable')}
+                          onClick={() => {
+                            if (ev.href) navigate(ev.href)
+                          }}
+                          onKeyDown={(e) => {
+                            if ((e.key === 'Enter' || e.key === ' ') && ev.href) {
+                              e.preventDefault()
+                              navigate(ev.href)
+                            }
+                          }}
+                          tabIndex={ev.href ? 0 : undefined}
+                          role={ev.href ? 'link' : undefined}
+                        >
+                          <td className="inv-hub-table__strong">{ev.title}</td>
+                          <td className="inv-hub-table__muted inv-hub-table__clamp">
+                            {ev.subtitle ?? '—'}
+                          </td>
+                          <td className="inv-hub-table__num font-mono">
+                            {ev.qty != null ? formatNumber(ev.qty) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </DynamicsDashboardPanel>
+          </DynamicsDashboardGrid>
         </div>
       ) : null}
 
       {!loading && !data ? (
         <EmptyState
           icon={Package}
-          title="Could not load store dashboard"
+          title="Could not load inventory dashboard"
           description="Check inventory permissions and API connectivity."
           action={(
-            <button type="button" className="erp-btn erp-btn-primary h-9 px-3" onClick={() => setToken((n) => n + 1)}>
+            <button
+              type="button"
+              className="erp-btn erp-btn-primary h-9 px-3"
+              onClick={() => setToken((n) => n + 1)}
+            >
               Retry
             </button>
           )}

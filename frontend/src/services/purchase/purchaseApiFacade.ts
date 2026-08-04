@@ -1849,10 +1849,11 @@ export async function getPurchaseDashboard(
 ): Promise<PurchaseDashboardData> {
   if (!isApiMode()) return demo.getPurchaseDashboard(filters)
 
+  // Soft-fail individual registers so one schema/API gap does not blank the whole dashboard.
   const [requisitions, rfqs, warehouses, orders, grns, invoices] = await Promise.all([
-    getPurchaseRequisitions(),
-    getRFQs(),
-    getPurchaseWarehouses(),
+    getPurchaseRequisitions().catch(() => [] as Awaited<ReturnType<typeof getPurchaseRequisitions>>),
+    getRFQs().catch(() => [] as Awaited<ReturnType<typeof getRFQs>>),
+    getPurchaseWarehouses().catch(() => [] as Awaited<ReturnType<typeof getPurchaseWarehouses>>),
     getPurchaseOrders().catch(() => [] as Awaited<ReturnType<typeof getPurchaseOrders>>),
     getGRNs().catch(() => [] as Awaited<ReturnType<typeof getGRNs>>),
     getPurchaseInvoices().catch(() => [] as Awaited<ReturnType<typeof getPurchaseInvoices>>),

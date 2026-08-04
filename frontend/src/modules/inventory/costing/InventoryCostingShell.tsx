@@ -35,9 +35,9 @@ export function InventoryCostingShell({
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory"
+        badge="Store"
         title="Costing"
-        breadcrumbs={[{ label: 'Inventory', to: '/inventory' }, { label: 'Costing' }]}
+        breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Costing' }]}
         autoBreadcrumbs={false}
       >
         <EmptyState icon={ShieldOff} title="Access denied" description="inventory.view_cost is required." />
@@ -61,12 +61,12 @@ export function InventoryCostingShell({
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Inventory"
+      badge="Store"
       title={title}
       description={description}
       showDescription={Boolean(description)}
       breadcrumbs={[
-        { label: 'Inventory', to: '/inventory' },
+        { label: 'Store', to: '/inventory' },
         { label: 'Costing', to: inventoryCostingPaths.summary },
         ...(title !== 'Inventory Costing' && title !== 'Valuation Summary' ? [{ label: title }] : []),
       ]}

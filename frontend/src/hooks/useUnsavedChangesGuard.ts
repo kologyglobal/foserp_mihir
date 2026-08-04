@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useBeforeUnload, useBlocker } from 'react-router-dom'
-import { appConfirm } from '@/store/confirmDialogStore'
+import { appConfirmLeaveUnsaved } from '@/utils/appConfirmLeave'
 
 /**
  * Blocks in-app navigation and browser unload when the form has unsaved changes.
@@ -9,8 +9,9 @@ import { appConfirm } from '@/store/confirmDialogStore'
  * Uses a ref for the blocker decision so `resetDirty()` + immediate `navigate()`
  * does not race React state and show a false "Unsaved changes" dialog.
  *
- * In-app leave uses `ConfirmDialog` via `appConfirm` — never `window.confirm`.
- * Tab/window close still uses the native beforeunload prompt (browsers require it).
+ * In-app leave uses the modern ConfirmDialog — never `window.confirm`.
+ * Tab/window close still uses the native beforeunload prompt (browsers require it
+ * and do not allow custom HTML dialogs on unload).
  *
  * Blocking reads `dirtyRef` (not React state) so `resetDirty()` then `navigate()`
  * in the same tick is not treated as leaving with unsaved changes.
@@ -54,13 +55,7 @@ export function useUnsavedChangesGuard(enabled: boolean) {
   useEffect(() => {
     if (blocker.state !== 'blocked') return
     let cancelled = false
-    void appConfirm({
-      title: 'Unsaved changes',
-      description: 'You have unsaved changes. Leave this page and discard them?',
-      confirmLabel: 'Leave page',
-      cancelLabel: 'Keep editing',
-      tone: 'default',
-    }).then((leave) => {
+    void appConfirmLeaveUnsaved().then((leave) => {
       if (cancelled) return
       if (leave) blocker.proceed()
       else blocker.reset()

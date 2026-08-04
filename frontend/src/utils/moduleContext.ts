@@ -41,6 +41,8 @@ function titleFromPathSegment(segment: string): string {
     .join(' ')
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 export function getPageTitle(pathname: string): string {
   const navLabel = findActiveNavLabel(pathname)
   if (navLabel) {
@@ -56,6 +58,7 @@ export function getPageTitle(pathname: string): string {
       if (pathname.includes('/create')) return `Create ${navLabel.replace(/s$/, '')}`
     }
     if (pathname.includes('/360')) return `${navLabel} 360`
+    if (pathname.match(/\/quality\/inspections\/[^/]+$/)) return 'Quality Inspection'
     if (pathname.match(/\/[^/]+\/[^/]+$/)) return navLabel
     return navLabel
   }
@@ -64,10 +67,18 @@ export function getPageTitle(pathname: string): string {
   if (pathname === '/executive') return 'Executive Control Tower'
   if (pathname === '/home/inbox') return 'Role Inbox'
   if (pathname === '/settings') return 'System Settings'
+  if (pathname.match(/\/quality\/inspections\/[^/]+$/)) return 'Quality Inspection'
 
   const segments = pathname.split('/').filter(Boolean)
   if (segments.length >= 2) {
-    return titleFromPathSegment(segments[segments.length - 1])
+    const last = segments[segments.length - 1]
+    // Never surface raw route UUIDs as the Dynamics workspace title.
+    if (UUID_RE.test(last)) {
+      const parent = segments[segments.length - 2]
+      if (parent === 'inspections') return 'Quality Inspection'
+      return titleFromPathSegment(parent)
+    }
+    return titleFromPathSegment(last)
   }
 
   return ''

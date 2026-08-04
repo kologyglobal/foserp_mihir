@@ -22,6 +22,7 @@ import { TableLink } from '@/components/ui/AppLink'
 import { DetailSection } from '@/components/masters/MasterLayouts'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { notify } from '@/store/toastStore'
+import { systemPrompt } from '@/utils/systemConfirm'
 import { getFulfilmentAutoMode } from '@/modules/manufacturing/ui'
 import { advanceAfterPickComplete } from '@/modules/dispatch/fulfilmentAutoAdvance'
 import {
@@ -362,7 +363,12 @@ function PickListLinesTable({
   compactActions?: boolean
 }) {
   async function shortage(line: DispatchPickLine) {
-    const qty = prompt('Shortage quantity', String(Math.max(0, line.reservedQuantity - line.pickedQuantity)))
+    const qty = await systemPrompt({
+      title: 'Shortage quantity',
+      defaultValue: String(Math.max(0, line.reservedQuantity - line.pickedQuantity)),
+      required: true,
+      confirmLabel: 'Record shortage',
+    })
     if (!qty) return
     setBusy(true)
     try {
@@ -381,7 +387,12 @@ function PickListLinesTable({
   }
 
   async function unpick(line: DispatchPickLine) {
-    const qty = prompt('Unpick quantity', String(line.pickedQuantity))
+    const qty = await systemPrompt({
+      title: 'Unpick quantity',
+      defaultValue: String(line.pickedQuantity),
+      required: true,
+      confirmLabel: 'Unpick',
+    })
     if (!qty) return
     setBusy(true)
     try {
