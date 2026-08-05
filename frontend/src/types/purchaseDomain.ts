@@ -2792,6 +2792,8 @@ export interface ReturnWizardPrefillLine {
   itemName: string
   returnQty: number
   unitCost: number
+  /** GST % from GRN/PO tax snapshot when wizard prefill includes it. */
+  gstRatePct?: number
   batchLotNo: string
   serialNumber: string
   availableReturnQty: number
