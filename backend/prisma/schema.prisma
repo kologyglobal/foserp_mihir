@@ -6682,6 +6682,15 @@ model PurchaseRequisitionLine {
   uomId                       String?
   estimatedRate               Decimal                       @default(0) @db.Decimal(18, 2)
   estimatedAmount             Decimal                       @default(0) @db.Decimal(18, 2)
+  hsnId                       String?
+  gstGroupId                  String?
+  hsnCodeSnapshot             String                        @default("") @db.VarChar(16)
+  gstGroupCodeSnapshot        String                        @default("") @db.VarChar(32)
+  gstRatePctSnapshot          Decimal                       @default(0) @db.Decimal(5, 2)
+  cgstRateSnapshot            Decimal                       @default(0) @db.Decimal(9, 4)
+  sgstRateSnapshot            Decimal                       @default(0) @db.Decimal(9, 4)
+  igstRateSnapshot            Decimal                       @default(0) @db.Decimal(9, 4)
+  gstSchemeSnapshot           String                        @default("cgst_sgst") @db.VarChar(16)
   warehouseId                 String?
   binId                       String?                       @db.VarChar(36)
   preferredVendorId           String?
@@ -6918,6 +6927,15 @@ model RequestForQuotationLine {
   itemNameSnapshot          String    @default("") @db.VarChar(300)
   description               String?   @db.Text
   requiredQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  hsnId                     String?
+  gstGroupId                String?
+  hsnCodeSnapshot           String    @default("") @db.VarChar(16)
+  gstGroupCodeSnapshot      String    @default("") @db.VarChar(32)
+  gstRatePctSnapshot        Decimal   @default(0) @db.Decimal(5, 2)
+  cgstRateSnapshot          Decimal   @default(0) @db.Decimal(9, 4)
+  sgstRateSnapshot          Decimal   @default(0) @db.Decimal(9, 4)
+  igstRateSnapshot          Decimal   @default(0) @db.Decimal(9, 4)
+  gstSchemeSnapshot         String    @default("cgst_sgst") @db.VarChar(16)
   uomId                     String?
   targetRate                Decimal?  @db.Decimal(18, 2)
   requiredDate              DateTime? @db.Date
@@ -7024,6 +7042,15 @@ model VendorQuotationLine {
   itemNameSnapshot          String   @default("") @db.VarChar(300)
   description               String?  @db.Text
   quantity                  Decimal  @default(0) @db.Decimal(18, 4)
+  hsnId                     String?
+  gstGroupId                String?
+  hsnCodeSnapshot           String   @default("") @db.VarChar(16)
+  gstGroupCodeSnapshot      String   @default("") @db.VarChar(32)
+  gstRatePctSnapshot        Decimal  @default(0) @db.Decimal(5, 2)
+  cgstRateSnapshot          Decimal  @default(0) @db.Decimal(9, 4)
+  sgstRateSnapshot          Decimal  @default(0) @db.Decimal(9, 4)
+  igstRateSnapshot          Decimal  @default(0) @db.Decimal(9, 4)
+  gstSchemeSnapshot         String   @default("cgst_sgst") @db.VarChar(16)
   uomId                     String?
   rate                      Decimal  @default(0) @db.Decimal(18, 2)
   amount                    Decimal  @default(0) @db.Decimal(18, 2)
@@ -8240,6 +8267,15 @@ model PurchaseReturnLine {
   returnQuantity      Decimal  @default(0) @db.Decimal(18, 4)
   rate                Decimal  @default(0) @db.Decimal(18, 2)
   amount              Decimal  @default(0) @db.Decimal(18, 2)
+  hsnIdSnapshot       String?  @db.VarChar(36)
+  hsnCodeSnapshot     String   @default("") @db.VarChar(16)
+  gstGroupIdSnapshot  String?  @db.VarChar(36)
+  gstGroupCodeSnapshot String  @default("") @db.VarChar(32)
+  gstRatePctSnapshot  Decimal  @default(0) @db.Decimal(5, 2)
+  cgstRateSnapshot    Decimal  @default(0) @db.Decimal(9, 4)
+  sgstRateSnapshot    Decimal  @default(0) @db.Decimal(9, 4)
+  igstRateSnapshot    Decimal  @default(0) @db.Decimal(9, 4)
+  gstSchemeSnapshot   String   @default("cgst_sgst") @db.VarChar(16)
   remarks             String?  @db.Text
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

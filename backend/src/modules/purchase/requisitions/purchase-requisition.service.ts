@@ -43,6 +43,30 @@ import {
   normalizeLineInputs,
   parseDateInput,
 } from './purchase-requisition.workflow.js'
+import {
+  enrichPurchaseUpstreamLinesWithTax,
+  toUpstreamTaxPersistFields,
+} from '../shared/purchase-upstream-line-enrichment.js'
+
+async function preparePrLines(
+  tenantId: string,
+  lines: ReturnType<typeof normalizeLineInputs>,
+  header: { requisitionDate: Date; warehouseId: string | null },
+) {
+  const taxLines = lines.map((l) => ({
+    itemId: l.itemId,
+    itemCodeSnapshot: l.itemCodeSnapshot,
+    itemNameSnapshot: l.itemNameSnapshot,
+  }))
+  await enrichPurchaseUpstreamLinesWithTax(tenantId, taxLines, {
+    asOfDate: header.requisitionDate,
+    deliveryWarehouseId: header.warehouseId,
+  })
+  return lines.map((l, i) => ({
+    ...l,
+    ...toUpstreamTaxPersistFields(taxLines[i]),
+  }))
+}
 
 async function loadOrThrow(tenantId: string, id: string) {
   const pr = await repo.findPurchaseRequisitionById(tenantId, id)
@@ -144,7 +168,11 @@ export async function createPurchaseRequisition(
   const requiredDate = parseDateInput(input.requiredDate) ?? null
   assertRequiredDateNotBeforeRequisition(requisitionDate, requiredDate)
 
-  const lines = normalizeLineInputs(input.lines ?? [])
+  const lines = await preparePrLines(
+    tenantId,
+    normalizeLineInputs(input.lines ?? []),
+    { requisitionDate, warehouseId },
+  )
   for (const line of lines) {
     assertRequiredDateNotBeforeRequisition(requisitionDate, line.requiredDate)
   }
@@ -192,6 +220,15 @@ export async function createPurchaseRequisition(
             uomId: line.uomId,
             estimatedRate: line.estimatedRate,
             estimatedAmount: line.estimatedAmount,
+            hsnId: line.hsnId,
+            gstGroupId: line.gstGroupId,
+            hsnCodeSnapshot: line.hsnCodeSnapshot,
+            gstGroupCodeSnapshot: line.gstGroupCodeSnapshot,
+            gstRatePctSnapshot: line.gstRatePctSnapshot,
+            cgstRateSnapshot: line.cgstRateSnapshot,
+            sgstRateSnapshot: line.sgstRateSnapshot,
+            igstRateSnapshot: line.igstRateSnapshot,
+            gstSchemeSnapshot: line.gstSchemeSnapshot,
             warehouseId: line.warehouseId,
             binId: line.binId,
             preferredVendorId: line.preferredVendorId,
@@ -283,7 +320,19 @@ export async function updatePurchaseRequisition(
   assertRequiredDateNotBeforeRequisition(requisitionDate, requiredDate)
 
   const lines =
-    input.lines !== undefined ? normalizeLineInputs(input.lines) : null
+    input.lines !== undefined
+      ? await preparePrLines(
+          tenantId,
+          normalizeLineInputs(input.lines),
+          {
+            requisitionDate,
+            warehouseId:
+              input.warehouseId !== undefined
+                ? input.warehouseId
+                : existing.warehouseId,
+          },
+        )
+      : null
   if (lines) {
     for (const line of lines) {
       assertRequiredDateNotBeforeRequisition(requisitionDate, line.requiredDate)

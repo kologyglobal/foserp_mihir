@@ -2154,7 +2154,7 @@ function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
     gstGroupId: item.gstGroupId ?? null,
     hsnId: item.hsnId ?? null,
     qualityTestGroupCode: item.qualityTestGroupCode ?? null,
-    gstRatePct: 18,
+    gstRatePct: 0,
     standardRate: Number(item.standardRate ?? 0),
     reorderLevel: Number(item.reorderLevel ?? 0),
     preferredVendorId: null,

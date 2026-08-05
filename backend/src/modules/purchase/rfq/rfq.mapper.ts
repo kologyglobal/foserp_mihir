@@ -79,6 +79,15 @@ export function mapRfqToDto(rfq: RfqWithRelations, userNames?: Map<string, strin
       targetRate: l.targetRate == null ? null : num(l.targetRate),
       requiredDate: dateStr(l.requiredDate),
       remarks: l.remarks,
+      hsnId: l.hsnId,
+      gstGroupId: l.gstGroupId,
+      hsnCode: l.hsnCodeSnapshot,
+      gstGroupCode: l.gstGroupCodeSnapshot,
+      gstRatePct: num(l.gstRatePctSnapshot),
+      cgstRatePct: num(l.cgstRateSnapshot),
+      sgstRatePct: num(l.sgstRateSnapshot),
+      igstRatePct: num(l.igstRateSnapshot),
+      gstScheme: l.gstSchemeSnapshot,
     })),
   }
 }

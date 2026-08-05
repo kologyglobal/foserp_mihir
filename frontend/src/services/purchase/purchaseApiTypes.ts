@@ -120,6 +120,15 @@ export interface ApiPurchaseRequisitionLine {
   status: string
   purchaseOrderId: string | null
   purchaseOrderNumber: string | null
+  hsnId?: string | null
+  gstGroupId?: string | null
+  hsnCode?: string
+  gstGroupCode?: string
+  gstRatePct?: number
+  cgstRatePct?: number
+  sgstRatePct?: number
+  igstRatePct?: number
+  gstScheme?: string
   createdAt: string | null
   updatedAt: string | null
 }
@@ -358,6 +367,15 @@ export interface ApiRfqLine {
   targetRate?: number | null
   requiredDate?: string | null
   remarks: string | null
+  hsnId?: string | null
+  gstGroupId?: string | null
+  hsnCode?: string
+  gstGroupCode?: string
+  gstRatePct?: number
+  cgstRatePct?: number
+  sgstRatePct?: number
+  igstRatePct?: number
+  gstScheme?: string
 }
 
 export interface ApiRequestForQuotation {
@@ -398,6 +416,15 @@ export interface ApiVendorQuotationLine {
   amount: number
   leadTimeDays?: number | null
   remarks?: string | null
+  hsnId?: string | null
+  gstGroupId?: string | null
+  hsnCode?: string
+  gstGroupCode?: string
+  gstRatePct?: number
+  cgstRatePct?: number
+  sgstRatePct?: number
+  igstRatePct?: number
+  gstScheme?: string
 }
 
 export interface ApiVendorQuotation {
@@ -975,6 +1002,13 @@ export interface ApiPurchaseReturnLine {
   rate: number
   amount: number
   remarks: string | null
+  hsnCode?: string
+  gstGroupCode?: string
+  gstRatePct?: number
+  cgstRatePct?: number
+  sgstRatePct?: number
+  igstRatePct?: number
+  gstScheme?: string
   createdAt: string | null
   updatedAt: string | null
 }

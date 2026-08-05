@@ -87,6 +87,9 @@ export function PurchasePlanningViewDrawer({ open, row, onClose, onEdit }: Props
           <ErpViewField label="Current Stock" value={String(row.currentStock)} />
           <ErpViewField label="Open PO Quantity" value={String(row.openPoQuantity)} />
           <ErpViewField label="Net Purchase Quantity" value={String(row.netPurchaseQuantity)} />
+          <ErpViewField label="Allocated Quantity" value={String(row.allocatedQuantity)} />
+          <ErpViewField label="PO Ordered Quantity" value={String(row.orderedQuantity)} />
+          <ErpViewField label="Remaining Quantity" value={String(row.remainingQuantity)} />
           <ErpViewField
             label="Required Date"
             value={row.requiredByDate ? formatDate(row.requiredByDate) : '—'}

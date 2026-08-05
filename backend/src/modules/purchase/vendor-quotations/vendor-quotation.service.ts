@@ -24,6 +24,10 @@ import type {
   ListVendorQuotationsQuery,
   UpdateVendorQuotationInput,
 } from './vendor-quotation.validation.js'
+import {
+  enrichPurchaseUpstreamLinesWithTax,
+  toUpstreamTaxPersistFields,
+} from '../shared/purchase-upstream-line-enrichment.js'
 
 const activeRfqStatuses = ['SENT', 'QUOTATION_RECEIVED', 'UNDER_COMPARISON', 'VENDOR_SELECTED', 'CONVERTED_TO_PO']
 const asDate = (value: string | null | undefined) => (value ? new Date(value) : null)
@@ -42,6 +46,48 @@ function normalizeLines(lines: CreateVendorQuotationInput['lines']) {
     amount: line.quantity * line.rate,
     leadTimeDays: line.leadTimeDays ?? null,
     remarks: line.remarks?.trim() || null,
+  }))
+}
+
+async function prepareVqLines(
+  tenantId: string,
+  lines: ReturnType<typeof normalizeLines>,
+  taxContext: {
+    asOfDate?: Date | string | null
+    vendorId: string
+    deliveryWarehouseId?: string | null
+  },
+) {
+  const rfqLineIds = [
+    ...new Set(
+      lines
+        .map((l) => l.requestForQuotationLineId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ]
+  const rfqLines = rfqLineIds.length
+    ? await prisma.requestForQuotationLine.findMany({
+        where: { tenantId, id: { in: rfqLineIds } },
+      })
+    : []
+  const rfqById = new Map(rfqLines.map((l) => [l.id, l]))
+  const taxLines = lines.map((l) => ({
+    itemId: l.itemId,
+    itemCodeSnapshot: l.itemCodeSnapshot,
+    itemNameSnapshot: l.itemNameSnapshot,
+  }))
+  await enrichPurchaseUpstreamLinesWithTax(
+    tenantId,
+    taxLines,
+    taxContext,
+    (_line, index) => {
+      const rfqLineId = lines[index].requestForQuotationLineId
+      return rfqLineId ? (rfqById.get(rfqLineId) ?? null) : null
+    },
+  )
+  return lines.map((l, i) => ({
+    ...l,
+    ...toUpstreamTaxPersistFields(taxLines[i]),
   }))
 }
 
@@ -101,9 +147,19 @@ export async function previewNextVendorQuotationNumber(tenantId: string) {
 }
 
 export async function createVendorQuotation(tenantId: string, actorId: string, input: CreateVendorQuotationInput) {
-  await assertVendorCanQuote(tenantId, input.requestForQuotationId, input.vendorId)
+  const rfq = await assertVendorCanQuote(tenantId, input.requestForQuotationId, input.vendorId)
+  const pr = rfq.purchaseRequisitionId
+    ? await prisma.purchaseRequisition.findFirst({
+        where: { id: rfq.purchaseRequisitionId, tenantId, deletedAt: null },
+        select: { warehouseId: true },
+      })
+    : null
   const quotationNumber = await nextPurchaseDocumentNumber(tenantId, 'VENDOR_QUOTATION', 'VQ')
-  const lines = normalizeLines(input.lines)
+  const lines = await prepareVqLines(tenantId, normalizeLines(input.lines), {
+    asOfDate: input.quotationDate ?? new Date(),
+    vendorId: input.vendorId,
+    deliveryWarehouseId: pr?.warehouseId ?? null,
+  })
   const basicTotal = lines.reduce((total, line) => total + line.amount, 0)
   const created = await prisma.$transaction(async (tx) => {
     const quotation = await repo.createVendorQuotation({
@@ -150,9 +206,29 @@ export async function createVendorQuotation(tenantId: string, actorId: string, i
 export async function updateVendorQuotation(tenantId: string, id: string, actorId: string, input: UpdateVendorQuotationInput) {
   const current = await loadOrThrow(tenantId, id)
   if (current.status !== 'DRAFT') throw new VendorQuotationNotEditableError()
+  let preparedLines: Awaited<ReturnType<typeof prepareVqLines>> | undefined
+  if (input.lines) {
+    const rfq = current.requestForQuotationId
+      ? await prisma.requestForQuotation.findFirst({
+          where: { id: current.requestForQuotationId, tenantId, deletedAt: null },
+          select: { purchaseRequisitionId: true },
+        })
+      : null
+    const pr = rfq?.purchaseRequisitionId
+      ? await prisma.purchaseRequisition.findFirst({
+          where: { id: rfq.purchaseRequisitionId, tenantId, deletedAt: null },
+          select: { warehouseId: true },
+        })
+      : null
+    preparedLines = await prepareVqLines(tenantId, normalizeLines(input.lines), {
+      asOfDate: current.quotationDate,
+      vendorId: current.vendorId,
+      deliveryWarehouseId: pr?.warehouseId ?? null,
+    })
+  }
   const updated = await prisma.$transaction(async (tx) => {
     await tx.vendorQuotation.update({ where: { id }, data: quotationData(input, actorId) })
-    if (input.lines) await repo.replaceVendorQuotationLines(tenantId, id, normalizeLines(input.lines), tx)
+    if (preparedLines) await repo.replaceVendorQuotationLines(tenantId, id, preparedLines, tx)
     const next = await repo.findVendorQuotationById(tenantId, id, tx)
     if (!next) throw new VendorQuotationNotFoundError()
     return next

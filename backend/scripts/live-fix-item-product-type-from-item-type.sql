@@ -1,12 +1,17 @@
 -- Backfill master_items.productType from itemType where blank (safe defaults).
 -- Review audit-item-product-type-consistency.sql output BEFORE running on live.
--- Adjust @tenantId if needed.
+-- Columns: code, name, itemType, productType (camelCase per Prisma).
 
-SET @tenantId = (SELECT id FROM tenants WHERE slug = 'vasant-trailers' LIMIT 1);
+SET @tenantSlug := 'vasant-trailers';  /* change if needed */
+SET @tenantId := (
+  SELECT id FROM tenants WHERE slug = @tenantSlug AND deletedAt IS NULL LIMIT 1
+);
+
+SELECT @tenantSlug AS tenant_slug, @tenantId AS tenant_id;
 
 -- Preview rows that will change
 SELECT
-  mi.itemCode,
+  mi.code AS itemCode,
   mi.itemType,
   mi.productType AS currentProductType,
   CASE mi.itemType

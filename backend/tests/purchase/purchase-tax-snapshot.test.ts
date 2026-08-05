@@ -6,6 +6,7 @@ import {
   taxSnapshotFromPoLine,
   taxSnapshotFromRates,
 } from '../../src/modules/purchase/shared/purchase-tax-snapshot.js'
+import { copyUpstreamTaxSnapshots } from '../../src/modules/purchase/shared/purchase-upstream-line-enrichment.js'
 
 describe('purchase tax snapshot helpers', () => {
   it('taxSnapshotFromRates combines CGST+SGST', () => {
@@ -67,5 +68,24 @@ describe('purchase tax snapshot helpers', () => {
   it('EMPTY_TAX_SNAPSHOT defaults to zero cgst_sgst', () => {
     expect(EMPTY_TAX_SNAPSHOT.gstRatePctSnapshot).toBe(0)
     expect(EMPTY_TAX_SNAPSHOT.gstSchemeSnapshot).toBe('cgst_sgst')
+  })
+
+  it('copyUpstreamTaxSnapshots copies PR line tax onto RFQ line', () => {
+    const target: { hsnId?: string | null; hsnCodeSnapshot?: string; gstRatePctSnapshot?: number } =
+      {}
+    const copied = copyUpstreamTaxSnapshots(target, {
+      hsnId: 'hsn-1',
+      gstGroupId: 'gst-1',
+      hsnCodeSnapshot: '7208',
+      gstGroupCodeSnapshot: 'GST18',
+      gstRatePctSnapshot: 18,
+      cgstRateSnapshot: 9,
+      sgstRateSnapshot: 9,
+      igstRateSnapshot: 0,
+      gstSchemeSnapshot: 'cgst_sgst',
+    })
+    expect(copied).toBe(true)
+    expect(target.hsnCodeSnapshot).toBe('7208')
+    expect(target.gstRatePctSnapshot).toBe(18)
   })
 })

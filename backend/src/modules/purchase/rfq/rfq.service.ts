@@ -32,6 +32,46 @@ import {
   assertRfqSendable,
   parseDateInput,
 } from './rfq.workflow.js'
+import {
+  enrichPurchaseUpstreamLinesWithTax,
+  toUpstreamTaxPersistFields,
+} from '../shared/purchase-upstream-line-enrichment.js'
+
+async function prepareRfqLines(
+  tenantId: string,
+  lines: ReturnType<typeof normalizeLines>,
+  taxContext: { asOfDate?: Date | string | null; deliveryWarehouseId?: string | null },
+) {
+  const prLineIds = [
+    ...new Set(
+      lines.map((l) => l.purchaseRequisitionLineId).filter((id): id is string => Boolean(id)),
+    ),
+  ]
+  const prLines = prLineIds.length
+    ? await prisma.purchaseRequisitionLine.findMany({
+        where: { tenantId, id: { in: prLineIds } },
+      })
+    : []
+  const prById = new Map(prLines.map((l) => [l.id, l]))
+  const taxLines = lines.map((l) => ({
+    itemId: l.itemId,
+    itemCodeSnapshot: l.itemCodeSnapshot,
+    itemNameSnapshot: l.itemNameSnapshot,
+  }))
+  await enrichPurchaseUpstreamLinesWithTax(
+    tenantId,
+    taxLines,
+    taxContext,
+    (_line, index) => {
+      const prLineId = lines[index].purchaseRequisitionLineId
+      return prLineId ? (prById.get(prLineId) ?? null) : null
+    },
+  )
+  return lines.map((l, i) => ({
+    ...l,
+    ...toUpstreamTaxPersistFields(taxLines[i]),
+  }))
+}
 
 async function loadOrThrow(tenantId: string, id: string) {
   const rfq = await repo.findRfqById(tenantId, id)
@@ -91,7 +131,19 @@ export async function createRfq(tenantId: string, actorId: string, input: Create
   const defaults = await resolveEffectivePurchaseDefaults(tenantId)
   const vendorCountError = assertRfqVendorCount(defaults, input.vendorIds.length)
   if (vendorCountError) throw new RfqVendorsRequiredError(vendorCountError)
-  const lines = normalizeLines(input.lines)
+  const rfqDate = parseDateInput(input.rfqDate) ?? new Date()
+  let deliveryWarehouseId: string | null = null
+  if (input.purchaseRequisitionId) {
+    const pr = await prisma.purchaseRequisition.findFirst({
+      where: { id: input.purchaseRequisitionId, tenantId, deletedAt: null },
+      select: { warehouseId: true },
+    })
+    deliveryWarehouseId = pr?.warehouseId ?? null
+  }
+  const lines = await prepareRfqLines(tenantId, normalizeLines(input.lines), {
+    asOfDate: rfqDate,
+    deliveryWarehouseId,
+  })
   const rfqNumber = await nextPurchaseDocumentNumber(tenantId, 'REQUEST_FOR_QUOTATION', 'RFQ')
 
   const created = await prisma.$transaction(async (tx) => {
@@ -99,7 +151,7 @@ export async function createRfq(tenantId: string, actorId: string, input: Create
       {
         tenant: { connect: { id: tenantId } },
         rfqNumber,
-        rfqDate: parseDateInput(input.rfqDate) ?? new Date(),
+        rfqDate,
         purchaseRequisition: input.purchaseRequisitionId
           ? { connect: { id: input.purchaseRequisitionId } }
           : undefined,
@@ -199,6 +251,15 @@ export async function updateRfq(
   const current = await loadOrThrow(tenantId, id)
   assertRfqDraftEditable(current.status)
 
+  let preparedLines: Awaited<ReturnType<typeof prepareRfqLines>> | undefined
+  if (input.lines) {
+    const deliveryWarehouseId = current.purchaseRequisition?.warehouse?.id ?? null
+    preparedLines = await prepareRfqLines(tenantId, normalizeLines(input.lines), {
+      asOfDate: current.rfqDate,
+      deliveryWarehouseId,
+    })
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     const data: Prisma.RequestForQuotationUpdateInput = {
       title: input.title === undefined ? undefined : input.title?.trim() || null,
@@ -210,8 +271,8 @@ export async function updateRfq(
       updatedById: actorId,
     }
     await tx.requestForQuotation.update({ where: { id }, data })
-    if (input.lines) {
-      await repo.replaceRfqLines(tenantId, id, normalizeLines(input.lines), tx)
+    if (preparedLines) {
+      await repo.replaceRfqLines(tenantId, id, preparedLines, tx)
     }
     if (input.vendorIds) {
       if (!input.vendorIds.length) throw new RfqVendorsRequiredError()

@@ -905,6 +905,7 @@ export function PurchaseRequisitionEditorPage() {
       uomConversionFactor: defaultUom?.factor ?? 1,
       hsnCode: item.hsnCode,
       sacCode: item.sacCode,
+      gstRatePct: item.gstRatePct ?? 0,
       estimatedRate: item.standardRate,
       quantity: Number(line.quantity) > 0 ? line.quantity : 1,
       itemType: category === 'job_work' || productType === 'service' ? 'service' : 'inventory',

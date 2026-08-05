@@ -15,6 +15,7 @@ import { mapPurchaseReturn, type PurchaseReturnEnrichment, type PurchaseReturnLi
 import * as repo from './purchase-return.repository.js'
 import type { CreatePurchaseReturnInput, ListPurchaseReturnsQuery, PurchaseReturnLineInput, UpdatePurchaseReturnInput } from './purchase-return.validation.js'
 import { assertReturnStatus, returnDate, returnMoney, returnQty, validateReturnLines } from './purchase-return.workflow.js'
+import { taxSnapshotFromGrnOrPoLine } from '../shared/purchase-tax-snapshot.js'
 import { computeRemainingReturnable } from './returnable-quantity.service.js'
 
 type ReturnRow = NonNullable<Awaited<ReturnType<typeof repo.findPurchaseReturnById>>>
@@ -245,12 +246,22 @@ function buildReturnLines(
       )
     }
     const rate = input.rate ?? returnQty(grnLine?.rate ?? poLine?.rate)
+    const taxSnap = taxSnapshotFromGrnOrPoLine(grnLine, poLine)
     return {
       lineNumber: index + 1, goodsReceiptLineId: grnLine?.id ?? null, purchaseOrderLineId: poLine?.id ?? grnLine?.purchaseOrderLineId ?? null,
       itemId: input.itemId ?? grnLine?.itemId ?? poLine?.itemId ?? null,
       itemCodeSnapshot: input.itemCode || grnLine?.itemCodeSnapshot || poLine?.itemCodeSnapshot || '',
       itemNameSnapshot: input.itemName || grnLine?.itemNameSnapshot || poLine?.itemNameSnapshot || '',
       returnQuantity: quantity, rate, amount: returnMoney(quantity * rate), remarks: input.remarks?.trim() || null,
+      hsnIdSnapshot: taxSnap?.hsnIdSnapshot ?? null,
+      hsnCodeSnapshot: taxSnap?.hsnCodeSnapshot ?? '',
+      gstGroupIdSnapshot: taxSnap?.gstGroupIdSnapshot ?? null,
+      gstGroupCodeSnapshot: taxSnap?.gstGroupCodeSnapshot ?? '',
+      gstRatePctSnapshot: taxSnap?.gstRatePctSnapshot ?? 0,
+      cgstRateSnapshot: taxSnap?.cgstRateSnapshot ?? 0,
+      sgstRateSnapshot: taxSnap?.sgstRateSnapshot ?? 0,
+      igstRateSnapshot: taxSnap?.igstRateSnapshot ?? 0,
+      gstSchemeSnapshot: taxSnap?.gstSchemeSnapshot ?? 'cgst_sgst',
     }
   })
 }

@@ -85,7 +85,7 @@ function emptyLine(partial?: Partial<VendorQuotationLine>): VendorQuotationLine 
     rate: 0,
     discountPct: 0,
     discountAmount: 0,
-    gstRatePct: 18,
+    gstRatePct: 0,
     taxAmount: 0,
     taxableAmount: 0,
     cgst: 0,
@@ -307,8 +307,8 @@ function LineEditRow({ line, rfqLineLabel, canRemove, onPatch, onRemove }: LineE
                 </span>
                 <input
                   className="erp-input h-8 w-full font-mono text-[11px]"
+                  readOnly
                   value={line.hsnCode}
-                  onChange={(e) => onPatch({ hsnCode: e.target.value })}
                 />
               </label>
               <label className="space-y-0.5">
@@ -557,6 +557,7 @@ export function VendorQuotationEditorPage() {
         description: l.specification || l.itemName,
         uom: l.uom,
         hsnCode: l.hsnCode,
+        gstRatePct: l.gstRatePct ?? 0,
         quantity: l.quantity,
         rate: l.targetPrice,
       }),

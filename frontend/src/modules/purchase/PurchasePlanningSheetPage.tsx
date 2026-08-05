@@ -528,6 +528,10 @@ export function PurchasePlanningSheetPage() {
         negotiatedRate: r.negotiatedRate,
         status: r.status,
         planningNumber: r.planningNumber,
+        currentStock: r.currentStock,
+        openPoQuantity: r.openPoQuantity,
+        orderedQuantity: r.orderedQuantity,
+        remainingQuantity: r.remainingQuantity,
       })),
     )
   }, [consolidationEnabled, filtered])
@@ -1337,7 +1341,16 @@ export function PurchasePlanningSheetPage() {
                         <th scope="col">Item</th>
                         <th scope="col">Location / UOM</th>
                         <th scope="col" className="text-right">
-                          Net qty
+                          Total req
+                        </th>
+                        <th scope="col" className="text-right">
+                          Net to buy
+                        </th>
+                        <th scope="col" className="text-right">
+                          PO ordered
+                        </th>
+                        <th scope="col" className="text-right">
+                          Remaining
                         </th>
                         <th scope="col" className="text-right">
                           PRs
@@ -1352,7 +1365,7 @@ export function PurchasePlanningSheetPage() {
                     <tbody>
                       {consolidatedGroups.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="purchase-planning-demand-table__empty">
+                          <td colSpan={11} className="purchase-planning-demand-table__empty">
                             <div className="flex flex-col items-center gap-2 py-10 text-center">
                               <Package className="h-8 w-8 text-erp-muted opacity-50" aria-hidden />
                               <p className="text-[13px] font-medium text-erp-text">
@@ -1368,7 +1381,13 @@ export function PurchasePlanningSheetPage() {
                       ) : (
                         consolidatedGroups.map((g) => {
                           const open = Boolean(expandedGroupKeys[g.groupKey])
-                          const qty = g.totalNetQty || g.totalRequiredQty
+                          const netQty = g.totalNetQty || g.totalRequiredQty
+                          const poQty = g.totalOrderedQty
+                          const remainingQty =
+                            g.totalRemainingQty > 0
+                              ? g.totalRemainingQty
+                              : Math.max(0, netQty - poQty)
+                          const allocateQty = remainingQty > 0 ? remainingQty : netQty
                           const overdueEarliest =
                             Boolean(g.earliestRequiredDate) && g.earliestRequiredDate! < todayIso()
                           return (
@@ -1430,7 +1449,27 @@ export function PurchasePlanningSheetPage() {
                                 </td>
                                 <td className="text-right">
                                   <span className="purchase-planning-demand-table__qty tabular-nums">
-                                    {qty}
+                                    {g.totalRequiredQty}
+                                  </span>
+                                </td>
+                                <td className="text-right">
+                                  <span className="purchase-planning-demand-table__qty tabular-nums font-medium">
+                                    {netQty}
+                                  </span>
+                                </td>
+                                <td className="text-right">
+                                  <span className="purchase-planning-demand-table__qty tabular-nums">
+                                    {poQty}
+                                  </span>
+                                </td>
+                                <td className="text-right">
+                                  <span
+                                    className={cn(
+                                      'purchase-planning-demand-table__qty tabular-nums font-medium',
+                                      remainingQty > 0 && 'text-erp-primary',
+                                    )}
+                                  >
+                                    {remainingQty}
                                   </span>
                                 </td>
                                 <td className="text-right">
@@ -1478,7 +1517,7 @@ export function PurchasePlanningSheetPage() {
                                     variant="primary"
                                     icon={ShoppingCart}
                                     disabled={
-                                      !perms.canCreatePoFromPlanning || qty <= 0
+                                      !perms.canCreatePoFromPlanning || allocateQty <= 0
                                     }
                                     onClick={() => setAllocateGroup(g)}
                                   >
@@ -1488,13 +1527,13 @@ export function PurchasePlanningSheetPage() {
                               </tr>
                               {open ? (
                                 <tr className="purchase-planning-demand-table__detail">
-                                  <td colSpan={8}>
+                                  <td colSpan={11}>
                                     <div className="purchase-planning-demand-table__detail-inner">
                                       <div className="purchase-planning-demand-table__detail-head">
                                         Contributing PR lines
                                         <span className="text-erp-muted font-normal normal-case">
                                           {' '}
-                                          · total {qty}
+                                          · net {netQty} · remaining {remainingQty}
                                         </span>
                                       </div>
                                       <table className="purchase-planning-demand-table__nested">
@@ -1502,12 +1541,21 @@ export function PurchasePlanningSheetPage() {
                                           <tr>
                                             <th>PR</th>
                                             <th>Planning #</th>
-                                            <th className="text-right">Qty</th>
+                                            <th className="text-right">Req</th>
+                                            <th className="text-right">Net</th>
+                                            <th className="text-right">PO ordered</th>
+                                            <th className="text-right">Remaining</th>
                                             <th className="text-right">Rate</th>
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {g.members.map((m) => (
+                                          {g.members.map((m) => {
+                                            const lineNet = m.netPurchaseQuantity || m.requiredQuantity
+                                            const lineRemaining = Math.max(
+                                              0,
+                                              lineNet - (Number(m.orderedQuantity) || 0),
+                                            )
+                                            return (
                                             <tr key={m.planningRowId}>
                                               <td>
                                                 <TableLink
@@ -1520,7 +1568,18 @@ export function PurchasePlanningSheetPage() {
                                                 {m.planningNumber || '—'}
                                               </td>
                                               <td className="text-right tabular-nums">
-                                                {m.netPurchaseQuantity || m.requiredQuantity}
+                                                {m.requiredQuantity}
+                                              </td>
+                                              <td className="text-right tabular-nums">
+                                                {lineNet}
+                                              </td>
+                                              <td className="text-right tabular-nums">
+                                                {m.orderedQuantity}
+                                              </td>
+                                              <td className="text-right tabular-nums">
+                                                {m.remainingQuantity > 0
+                                                  ? m.remainingQuantity
+                                                  : lineRemaining}
                                               </td>
                                               <td className="text-right tabular-nums">
                                                 {m.expectedRate != null && m.expectedRate > 0
@@ -1528,7 +1587,8 @@ export function PurchasePlanningSheetPage() {
                                                   : '—'}
                                               </td>
                                             </tr>
-                                          ))}
+                                            )
+                                          })}
                                         </tbody>
                                       </table>
                                     </div>

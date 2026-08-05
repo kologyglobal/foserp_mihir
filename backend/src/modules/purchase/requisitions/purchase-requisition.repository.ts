@@ -74,6 +74,15 @@ export async function replacePurchaseRequisitionLines(
     uomId: string | null
     estimatedRate: number
     estimatedAmount: number
+    hsnId: string | null
+    gstGroupId: string | null
+    hsnCodeSnapshot: string
+    gstGroupCodeSnapshot: string
+    gstRatePctSnapshot: number
+    cgstRateSnapshot: number
+    sgstRateSnapshot: number
+    igstRateSnapshot: number
+    gstSchemeSnapshot: string
     warehouseId: string | null
     binId: string | null
     preferredVendorId: string | null
@@ -99,6 +108,15 @@ export async function replacePurchaseRequisitionLines(
       uomId: line.uomId,
       estimatedRate: line.estimatedRate,
       estimatedAmount: line.estimatedAmount,
+      hsnId: line.hsnId,
+      gstGroupId: line.gstGroupId,
+      hsnCodeSnapshot: line.hsnCodeSnapshot,
+      gstGroupCodeSnapshot: line.gstGroupCodeSnapshot,
+      gstRatePctSnapshot: line.gstRatePctSnapshot,
+      cgstRateSnapshot: line.cgstRateSnapshot,
+      sgstRateSnapshot: line.sgstRateSnapshot,
+      igstRateSnapshot: line.igstRateSnapshot,
+      gstSchemeSnapshot: line.gstSchemeSnapshot,
       warehouseId: line.warehouseId,
       binId: line.binId,
       preferredVendorId: line.preferredVendorId,

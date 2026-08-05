@@ -278,10 +278,11 @@ export function PurchaseRequisitionLinesTable({
                 <th className="min-w-[9rem]">Specification</th>
                 <th className="num min-w-[11rem] purchase-doc-lines-grid__qty-col">Qty</th>
                 <th className="purchase-doc-lines-grid__uom-col">UOM</th>
+                <th className="min-w-[5rem] font-mono">HSN</th>
+                <th className="num min-w-[4rem]">GST %</th>
                 <th className="num">Est. Rate</th>
                 <th className="num">Est. Amount</th>
                 <th className="min-w-[9rem]">Preferred Vendor</th>
-                <th className="min-w-[8rem]">Warehouse</th>
                 <th className="min-w-[7rem]">BIN</th>
                 <th className="min-w-[8rem]">Required Date</th>
                 <th className="min-w-[8rem]">PO No.</th>
@@ -482,6 +483,14 @@ export function PurchaseRequisitionLinesTable({
                         )
                       })()}
                     </td>
+                    <td className="font-mono text-[11px] text-erp-muted">
+                      {line.hsnCode || '—'}
+                    </td>
+                    <td className="num tabular-nums text-[11px] text-erp-muted">
+                      {line.gstRatePct != null && line.gstRatePct > 0
+                        ? `${line.gstRatePct}%`
+                        : '—'}
+                    </td>
                     <td className="num" onKeyDown={rowEditable ? onCellKeyDown : undefined}>
                       {rowEditable ? (
                         <input
@@ -523,17 +532,6 @@ export function PurchaseRequisitionLinesTable({
                         </Select>
                       ) : (
                         displayOrDash(line.preferredVendorName)
-                      )}
-                    </td>
-                    <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
-                      {rowEditable ? (
-                        <input
-                          className="erp-input h-8 min-w-[8rem] text-[12px]"
-                          value={line.locationName}
-                          onChange={(e) => patch(line.key, { locationName: e.target.value })}
-                        />
-                      ) : (
-                        displayOrDash(line.locationName)
                       )}
                     </td>
                     <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
@@ -625,9 +623,11 @@ export function PurchaseRequisitionLinesTable({
                 <td colSpan={2} />
                 <td className="num tabular-nums">{totals.qty}</td>
                 <td />
+                <td />
+                <td />
                 <td className="num" />
                 <td className="num tabular-nums">{formatCurrency(totals.amount)}</td>
-                <td colSpan={6} />
+                <td colSpan={5} />
                 {!readOnly ? <td className="purchase-doc-lines-grid__sticky-actions" /> : null}
               </tr>
             </tfoot>

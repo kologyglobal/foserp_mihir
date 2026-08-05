@@ -65,6 +65,13 @@ export function mapPurchaseReturn(
         returnQuantity: returnQty(line.returnQuantity),
         rate: returnQty(line.rate),
         amount: returnQty(line.amount),
+        hsnCode: line.hsnCodeSnapshot,
+        gstGroupCode: line.gstGroupCodeSnapshot,
+        gstRatePct: returnQty(line.gstRatePctSnapshot),
+        cgstRatePct: returnQty(line.cgstRateSnapshot),
+        sgstRatePct: returnQty(line.sgstRateSnapshot),
+        igstRatePct: returnQty(line.igstRateSnapshot),
+        gstScheme: line.gstSchemeSnapshot,
       }
     }),
   }

@@ -24,6 +24,10 @@ export type FePlanningRowForGroup = {
   negotiatedRate?: number | null
   status: string
   planningNumber: string
+  currentStock?: number
+  openPoQuantity?: number
+  orderedQuantity?: number
+  remainingQuantity?: number
 }
 
 export type FeConsolidatedMember = {
@@ -34,6 +38,8 @@ export type FeConsolidatedMember = {
   purchaseRequisitionLineId: string
   requiredQuantity: number
   netPurchaseQuantity: number
+  orderedQuantity: number
+  remainingQuantity: number
   requiredDate: string | null
   status: string
   preferredVendorId: string | null
@@ -52,6 +58,12 @@ export type FeConsolidatedGroup = {
   deliveryLocationId: string | null
   totalRequiredQty: number
   totalNetQty: number
+  /** Item-level stock snapshot (same on each member row — use max). */
+  totalCurrentStock: number
+  /** Item-level open PO snapshot (same on each member row — use max). */
+  totalOpenPoQty: number
+  totalOrderedQty: number
+  totalRemainingQty: number
   prCount: number
   earliestRequiredDate: string | null
   suggestedVendors: Array<{ id: string; name: string; frequency: number }>
@@ -111,6 +123,10 @@ export function consolidatePlanningRows(rows: FePlanningRowForGroup[]): FeConsol
 
     const totalNet = members.reduce((s, m) => s + rowQty(m), 0)
     const totalRequired = members.reduce((s, m) => s + (Number(m.requiredQuantity) || 0), 0)
+    const totalOrdered = members.reduce((s, m) => s + (Number(m.orderedQuantity) || 0), 0)
+    const totalRemaining = members.reduce((s, m) => s + (Number(m.remainingQuantity) || 0), 0)
+    const totalCurrentStock = Math.max(0, ...members.map((m) => Number(m.currentStock) || 0))
+    const totalOpenPoQty = Math.max(0, ...members.map((m) => Number(m.openPoQuantity) || 0))
     const prIds = new Set(members.map((m) => m.purchaseRequisitionId))
 
     groups.push({
@@ -123,6 +139,10 @@ export function consolidatePlanningRows(rows: FePlanningRowForGroup[]): FeConsol
       deliveryLocationId: first.deliveryLocationId,
       totalRequiredQty: Number(totalRequired.toFixed(4)),
       totalNetQty: Number(totalNet.toFixed(4)),
+      totalCurrentStock: Number(totalCurrentStock.toFixed(4)),
+      totalOpenPoQty: Number(totalOpenPoQty.toFixed(4)),
+      totalOrderedQty: Number(totalOrdered.toFixed(4)),
+      totalRemainingQty: Number(totalRemaining.toFixed(4)),
       prCount: prIds.size,
       earliestRequiredDate: reqDates[0] ?? null,
       suggestedVendors: [...vendorFreq.values()].sort((a, b) => b.frequency - a.frequency),
@@ -137,6 +157,8 @@ export function consolidatePlanningRows(rows: FePlanningRowForGroup[]): FeConsol
           purchaseRequisitionLineId: m.purchaseRequisitionLineId,
           requiredQuantity: Number(m.requiredQuantity) || 0,
           netPurchaseQuantity: rowQty(m),
+          orderedQuantity: Number(m.orderedQuantity) || 0,
+          remainingQuantity: Number(m.remainingQuantity) || 0,
           requiredDate: m.requiredDate,
           status: m.status,
           preferredVendorId: m.preferredVendorId ?? null,

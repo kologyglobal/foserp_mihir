@@ -1327,6 +1327,8 @@ export interface PurchaseRequisitionLine {
   uomConversionFactor?: number
   hsnCode: string
   sacCode: string | null
+  /** Combined GST % snapshot from item master at PR save. */
+  gstRatePct?: number
   quantity: number
   /** Cumulative qty on PO(s). */
   orderedQuantity?: number
@@ -1619,6 +1621,7 @@ export interface RfqLine {
   specification: string
   hsnCode: string
   sacCode: string | null
+  gstRatePct?: number
   quantity: number
   uom: string
   requiredDate: IsoDate

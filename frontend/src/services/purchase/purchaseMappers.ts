@@ -375,8 +375,9 @@ export function mapApiLineToDomain(line: ApiPurchaseRequisitionLine): PurchaseRe
     productType,
     uomId: line.uomId ?? null,
     uom: uomCode,
-    hsnCode: '',
+    hsnCode: line.hsnCode ?? '',
     sacCode: null,
+    gstRatePct: Number(line.gstRatePct ?? 0),
     quantity: Number(line.requiredQuantity ?? 0),
     orderedQuantity: Number(line.orderedQuantity ?? 0),
     remainingQuantity: Number(
@@ -577,7 +578,7 @@ export function mapApiPlanningRowToDomain(row: ApiPurchasePlanningRow): Purchase
     specification: row.itemDescription ?? '',
     itemCategory: 'consumable',
     requiredQuantity: Number(row.requiredQuantity ?? 0),
-    uom: 'NOS',
+    uom: resolveApiUomCode(row),
     requiredByDate: row.requiredDate ?? '',
     currentStock: Number(row.currentStockQuantity ?? 0),
     openPoQuantity: Number(row.openPurchaseOrderQuantity ?? 0),
@@ -729,8 +730,9 @@ export function mapApiRfqToDomain(api: ApiRequestForQuotation): RequestForQuotat
     itemCode: l.itemCode ?? '',
     itemName: l.itemName ?? '',
     specification: l.description ?? '',
-    hsnCode: '',
+    hsnCode: l.hsnCode ?? '',
     sacCode: null,
+    gstRatePct: Number(l.gstRatePct ?? 0),
     quantity: Number(l.requiredQuantity ?? l.quantity ?? 0),
     uom: '',
     requiredDate: l.requiredDate ?? api.rfqDate ?? new Date().toISOString().slice(0, 10),
@@ -889,12 +891,12 @@ export function mapApiVendorQuotationToDomain(api: ApiVendorQuotation): VendorQu
     itemName: l.itemName ?? '',
     description: l.description ?? '',
     uom: '',
-    hsnCode: '',
+    hsnCode: l.hsnCode ?? '',
     quantity: Number(l.quantity ?? 0),
     rate: Number(l.rate ?? 0),
     discountPct: 0,
     discountAmount: 0,
-    gstRatePct: 0,
+    gstRatePct: Number(l.gstRatePct ?? 0),
     taxAmount: 0,
     taxableAmount: Number(l.amount ?? 0),
     cgst: 0,
@@ -2263,6 +2265,14 @@ export function mapApiPurchaseReturnToDomain(api: ApiPurchaseReturn): PurchaseRe
     lines: (api.lines ?? []).map((l) => {
       const qty = Number(l.returnQuantity) || 0
       const amount = Number(l.amount) || 0
+      const gstRatePct = Number(l.gstRatePct ?? 0)
+      const cgstRate = Number(l.cgstRatePct ?? 0)
+      const sgstRate = Number(l.sgstRatePct ?? 0)
+      const igstRate = Number(l.igstRatePct ?? 0)
+      const taxable = amount
+      const cgst = igstRate > 0 ? 0 : (taxable * cgstRate) / 100
+      const sgst = igstRate > 0 ? 0 : (taxable * sgstRate) / 100
+      const igst = igstRate > 0 ? (taxable * igstRate) / 100 : 0
       const receivedQty = Number(l.receivedQuantity) || qty
       const uom =
         (l.uom ?? '').trim() || resolveUomCode(l.uomId ?? null, '')
@@ -2276,20 +2286,20 @@ export function mapApiPurchaseReturnToDomain(api: ApiPurchaseReturn): PurchaseRe
         itemName: l.itemNameSnapshot || '',
         description: l.itemNameSnapshot || '',
         uom,
-        hsnCode: '',
+        hsnCode: l.hsnCode ?? '',
         batchLotNo,
         serialNumber: l.serialNumber || '',
         receivedQty,
         availableReturnQty: receivedQty,
         returnQty: qty,
         unitCost: Number(l.rate) || 0,
-        gstRatePct: 0,
-        taxableAmount: amount,
-        cgst: 0,
-        sgst: 0,
-        igst: 0,
+        gstRatePct,
+        taxableAmount: taxable,
+        cgst,
+        sgst,
+        igst,
         returnAmount: amount,
-        lineTotal: amount,
+        lineTotal: amount + cgst + sgst + igst,
         reason: returnReason,
         replacementQty: 0,
         remarks: l.remarks || '',

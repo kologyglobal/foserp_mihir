@@ -29,6 +29,15 @@ export function mapVendorQuotationToDto(quotation: VendorQuotationWithRelations)
     amount: num(line.amount),
     leadTimeDays: line.leadTimeDays,
     remarks: line.remarks,
+    hsnId: line.hsnId,
+    gstGroupId: line.gstGroupId,
+    hsnCode: line.hsnCodeSnapshot,
+    gstGroupCode: line.gstGroupCodeSnapshot,
+    gstRatePct: num(line.gstRatePctSnapshot),
+    cgstRatePct: num(line.cgstRateSnapshot),
+    sgstRatePct: num(line.sgstRateSnapshot),
+    igstRatePct: num(line.igstRateSnapshot),
+    gstScheme: line.gstSchemeSnapshot,
   }))
   const basicRateTotal = lines.reduce((total, line) => total + line.amount, 0)
   const leadTimes = lines
