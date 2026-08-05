@@ -1,8 +1,8 @@
 # HSN/GST Transaction Snapshot — Gap Report
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** 2026-08-05  
-**Status:** Phase 1 implementation in progress  
+**Status:** Phase 1 implemented — run migration `20260805140000_purchase_tax_snapshots` on target DB  
 **Prerequisite:** Purchase P1 certification PASS  
 
 ---
@@ -87,3 +87,4 @@ After migration:
 | Version | Date | Change |
 |---------|------|--------|
 | 1.0 | 2026-08-05 | Initial gap report + Phase 1 schema plan |
+| 1.1 | 2026-08-05 | Phase 1 shipped: schema, PO/GRN/Invoice wiring, comparison create spread, unit tests |

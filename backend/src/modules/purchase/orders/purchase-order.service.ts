@@ -308,19 +308,6 @@ async function fillLineMasterSnapshots(
   return lines
 }
 
-/** @deprecated use fillLineMasterSnapshots */
-async function fillItemSnapshots(
-  tenantId: string,
-  lines: ReturnType<typeof normalizeLineInputs>,
-  taxContext?: {
-    orderDate?: Date | string | null
-    vendorId?: string | null
-    deliveryWarehouseId?: string | null
-  },
-) {
-  return fillLineMasterSnapshots(tenantId, lines, taxContext)
-}
-
 /**
  * Default purchase UOM + conversion factor from item UOM mappings onto line inputs.
  */

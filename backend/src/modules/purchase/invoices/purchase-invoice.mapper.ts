@@ -36,7 +36,18 @@ export function mapPurchaseInvoice(
     createdAt: iso(invoice.createdAt),
     updatedAt: iso(invoice.updatedAt),
     allowedActions: invoiceAllowedActions(invoice.status, invoice.deletedAt),
-    lines: invoice.lines.map((line) => ({
+    lines: invoice.lines.map((line) => {
+      const tax = line as PurchaseInvoiceLine & {
+        hsnIdSnapshot?: string | null
+        hsnCodeSnapshot?: string
+        gstGroupIdSnapshot?: string | null
+        gstGroupCodeSnapshot?: string
+        cgstRateSnapshot?: unknown
+        sgstRateSnapshot?: unknown
+        igstRateSnapshot?: unknown
+        gstSchemeSnapshot?: string
+      }
+      return {
       ...line,
       quantity: invoiceQty(line.quantity),
       uomQuantitySnapshot: line.uomQuantitySnapshot != null ? invoiceQty(line.uomQuantitySnapshot) : null,
@@ -46,15 +57,16 @@ export function mapPurchaseInvoice(
       amount: invoiceQty(line.amount),
       taxRatePct: invoiceQty(line.taxRatePct),
       taxAmount: invoiceQty(line.taxAmount),
-      hsnId: line.hsnIdSnapshot ?? null,
-      hsnCode: line.hsnCodeSnapshot ?? '',
-      gstGroupId: line.gstGroupIdSnapshot ?? null,
-      gstGroupCode: line.gstGroupCodeSnapshot ?? '',
-      cgstRate: invoiceQty(line.cgstRateSnapshot),
-      sgstRate: invoiceQty(line.sgstRateSnapshot),
-      igstRate: invoiceQty(line.igstRateSnapshot),
-      gstScheme: line.gstSchemeSnapshot ?? 'cgst_sgst',
+      hsnId: tax.hsnIdSnapshot ?? null,
+      hsnCode: tax.hsnCodeSnapshot ?? '',
+      gstGroupId: tax.gstGroupIdSnapshot ?? null,
+      gstGroupCode: tax.gstGroupCodeSnapshot ?? '',
+      cgstRate: invoiceQty(tax.cgstRateSnapshot),
+      sgstRate: invoiceQty(tax.sgstRateSnapshot),
+      igstRate: invoiceQty(tax.igstRateSnapshot),
+      gstScheme: tax.gstSchemeSnapshot ?? 'cgst_sgst',
       lineTotal: invoiceQty(line.lineTotal),
-    })),
+    }
+    }),
   }
 }
