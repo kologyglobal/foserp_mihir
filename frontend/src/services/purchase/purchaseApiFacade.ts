@@ -10,7 +10,7 @@ import { isApiMode } from '../../config/apiConfig'
 import { apiRequest, tenantPath } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
 import type { Item as MasterItem, Vendor as MasterVendor } from '../../types/master'
-import { normalizeEngineeringProductType } from '../../utils/purchaseProductType'
+import { deriveEngineeringProductTypeFromMaster, normalizeEngineeringProductType } from '../../utils/purchaseProductType'
 import { resolveGstStateCode } from '../../utils/gstStateCode'
 import { determinePurchaseGstSupply } from '../../utils/gstSupply'
 import type {
@@ -2134,20 +2134,18 @@ function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
     useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomCode ??
     useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomName ??
     'NOS'
-  const productType =
-    normalizeEngineeringProductType(item.productType) ||
-    (item.itemType === 'finished_good' ? 'finish_product' : null) ||
-    (item.itemType === 'bought_out' ? 'boi' : null) ||
-    (item.itemType === 'raw' ? 'raw_material' : null) ||
-    (item.itemType === 'sub_assembly' ? 'sub_assembly' : null) ||
-    (item.itemType === 'service' ? 'service' : null) ||
-    (item.itemType === 'scrap' ? 'scrap' : null)
+  const productType = deriveEngineeringProductTypeFromMaster({
+    productType: item.productType,
+    itemType: item.itemType,
+    category: mapMasterItemToPurchaseCategory(item),
+  })
   return {
     id: item.id,
     itemCode: item.itemCode,
     itemName: item.itemName,
     category: mapMasterItemToPurchaseCategory(item),
-    productType,
+    productType: productType || null,
+    masterItemType: item.itemType,
     description: item.itemDescription ?? '',
     uomId: item.baseUomId || null,
     uom,

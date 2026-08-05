@@ -4,12 +4,11 @@ import {
   ClipboardList,
   FileText,
   Package,
-  Plus,
   Star,
-  Trash2,
   Truck,
   Users,
 } from 'lucide-react'
+import { PurchaseRfqLinesTable, type RfqEditorLine } from '@/components/purchase/PurchaseRfqLinesTable'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { PurchaseTermSelect } from '@/components/purchase/PurchaseTermSelect'
@@ -23,7 +22,7 @@ import {
 } from '@/components/erp/card-form'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { FormActionBar } from '@/components/erp/FormActionBar'
-import { Checkbox, DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
+import { Checkbox, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { Badge } from '@/components/ui/Badge'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
@@ -42,7 +41,6 @@ import {
 import type {
   PurchaseItem,
   PurchaseRequisition,
-  RfqLine,
   Vendor,
 } from '@/types/purchaseDomain'
 import {
@@ -62,6 +60,12 @@ import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
 import { useOptionalAuth } from '@/context/AuthProvider'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
+import {
+  mapPurchaseCategoryToEngineeringProductType,
+  normalizeEngineeringProductType,
+} from '@/utils/purchaseProductType'
+import { resolveCatalogItemProductType } from '@/utils/purchaseCatalogFilter'
+import { resolveDefaultPurchaseUom } from '@/utils/purchaseLineUom'
 
 type LocationOption = { id: string; code: string; name: string; state: string; city: string }
 
@@ -71,7 +75,7 @@ function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function emptyLine(partial?: Partial<RfqLine>): RfqLine {
+function emptyLine(partial?: Partial<RfqEditorLine>): RfqEditorLine {
   return {
     id: crypto.randomUUID(),
     lineNo: 1,
@@ -86,6 +90,9 @@ function emptyLine(partial?: Partial<RfqLine>): RfqLine {
     sacCode: null,
     quantity: 1,
     uom: 'NOS',
+    uomId: null,
+    uomConversionFactor: 1,
+    productType: '',
     requiredDate: today(),
     targetPrice: 0,
     amount: 0,
@@ -153,7 +160,7 @@ export function RfqEditorPage() {
   const [technicalContact, setTechnicalContact] = useState('')
   const [commercialContact, setCommercialContact] = useState('')
   const [remarks, setRemarks] = useState('')
-  const [lines, setLines] = useState<RfqLine[]>([emptyLine()])
+  const [lines, setLines] = useState<RfqEditorLine[]>([emptyLine()])
   const [vendorPicks, setVendorPicks] = useState<VendorPick[]>([])
 
   const [approvedPrs, setApprovedPrs] = useState<PurchaseRequisition[]>([])
@@ -168,25 +175,69 @@ export function RfqEditorPage() {
     [lines],
   )
 
-  const renumber = (next: RfqLine[]) =>
+  const catalogItemsForPicker = useMemo(
+    () =>
+      catalogItems.map((item) => ({
+        ...item,
+        lastPurchaseRate: item.standardRate,
+        availableStock: null,
+      })),
+    [catalogItems],
+  )
+
+  const applyItemCatalog = (lineId: string, itemId: string) => {
+    const line = lines.find((l) => l.id === lineId)
+    const item = catalogItems.find((i) => i.id === itemId)
+    if (!item || !line) return
+    const itemProductType = resolveCatalogItemProductType(item)
+    if (
+      line.productType &&
+      itemProductType &&
+      itemProductType !== normalizeEngineeringProductType(line.productType)
+    ) {
+      return
+    }
+    const productType =
+      normalizeEngineeringProductType(line.productType) ||
+      itemProductType ||
+      mapPurchaseCategoryToEngineeringProductType(item.category) ||
+      ''
+    const defaultUom = resolveDefaultPurchaseUom(item.id)
+    patchLine(lineId, {
+      itemId: item.id,
+      itemCode: item.itemCode,
+      itemName: item.itemName,
+      productType,
+      specification: item.description || line.specification,
+      uomId: defaultUom?.id ?? item.uomId ?? null,
+      uom: defaultUom?.code ?? item.uom,
+      uomConversionFactor: defaultUom?.factor ?? 1,
+      hsnCode: item.hsnCode,
+      sacCode: item.sacCode,
+      targetPrice: item.standardRate,
+      quantity: Number(line.quantity) > 0 ? line.quantity : 1,
+    })
+  }
+
+  const renumber = (next: RfqEditorLine[]) =>
     next.map((l, i) => ({
       ...l,
       lineNo: i + 1,
       amount: Number(((Number(l.quantity) || 0) * (Number(l.targetPrice) || 0)).toFixed(2)),
     }))
 
-  const setLinesDirty = (next: RfqLine[]) => {
+  const setLinesDirty = (next: RfqEditorLine[]) => {
     setLines(renumber(next))
     markDirty()
   }
 
-  const patchLine = (lineId: string, patch: Partial<RfqLine>) => {
+  const patchLine = (lineId: string, patch: Partial<RfqEditorLine>) => {
     setLinesDirty(lines.map((l) => (l.id === lineId ? { ...l, ...patch } : l)))
   }
 
   const applyPrs = useCallback(
     (prs: PurchaseRequisition[]) => {
-      const nextLines: RfqLine[] = []
+      const nextLines: RfqEditorLine[] = []
       for (const pr of prs) {
         for (const l of pr.lines) {
           nextLines.push(
@@ -202,6 +253,9 @@ export function RfqEditorPage() {
               sacCode: l.sacCode,
               quantity: l.quantity,
               uom: l.uom,
+              uomId: l.uomId ?? null,
+              uomConversionFactor: l.uomConversionFactor ?? 1,
+              productType: l.productType ?? '',
               requiredDate: l.requiredDate,
               targetPrice: l.estimatedRate,
               remarks: l.remarks,
@@ -840,6 +894,7 @@ export function RfqEditorPage() {
         defaultOpen
         dense
         columns={1}
+        className="purchase-doc-lines-section"
         badge={`${lines.length} line${lines.length === 1 ? '' : 's'}`}
         collapsedSummary={
           lines.length
@@ -847,152 +902,16 @@ export function RfqEditorPage() {
             : 'No lines'
         }
       >
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <ErpButton
-            type="button"
-            size="sm"
-            variant="secondary"
-            icon={Plus}
-            onClick={() => setLinesDirty([...lines, emptyLine()])}
-          >
-            Add line
-          </ErpButton>
-        </div>
-        <div className="overflow-x-auto rounded-md border border-erp-border">
-          <table className="erp-table text-[12px]">
-            <thead>
-              <tr>
-                <th className="sticky left-0 z-[1] bg-erp-surface-alt">#</th>
-                <th>Source PR</th>
-                <th>Item</th>
-                <th>Description</th>
-                <th>Specification</th>
-                <th className="num">Qty</th>
-                <th>UOM</th>
-                <th>Required</th>
-                <th className="num">Target Price</th>
-                <th className="num">Amount</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => (
-                <tr key={line.id}>
-                  <td className="sticky left-0 z-[1] bg-erp-surface font-mono text-erp-muted">
-                    {line.lineNo}
-                  </td>
-                  <td className="font-mono text-[11px]">
-                    {line.purchaseRequisitionNumber || '—'}
-                  </td>
-                  <td>
-                    <select
-                      className="erp-input h-8 min-w-[7.5rem] font-mono text-[12px]"
-                      value={line.itemId}
-                      onChange={(e) => {
-                        const item = catalogItems.find((i) => i.id === e.target.value)
-                        if (!item) {
-                          patchLine(line.id, { itemId: '', itemCode: '', itemName: '' })
-                          return
-                        }
-                        patchLine(line.id, {
-                          itemId: item.id,
-                          itemCode: item.itemCode,
-                          itemName: item.itemName,
-                          specification: item.description,
-                          hsnCode: item.hsnCode,
-                          sacCode: item.sacCode,
-                          uom: item.uom,
-                          targetPrice: item.standardRate,
-                        })
-                      }}
-                    >
-                      <option value="">Select…</option>
-                      {catalogItems.map((i) => (
-                        <option key={i.id} value={i.id}>
-                          {i.itemCode}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <input
-                      className="erp-input h-8 min-w-[9rem] text-[12px]"
-                      value={line.itemName}
-                      onChange={(e) => patchLine(line.id, { itemName: e.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="erp-input h-8 min-w-[7rem] text-[12px]"
-                      value={line.specification}
-                      onChange={(e) => patchLine(line.id, { specification: e.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <DecimalInput
-                      min={0}
-                      className="h-8 w-16 text-right text-[12px]"
-                      value={line.quantity}
-                      onChange={(v) => patchLine(line.id, { quantity: v })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="erp-input h-8 w-14 text-[12px]"
-                      value={line.uom}
-                      onChange={(e) => patchLine(line.id, { uom: e.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="date"
-                      className="erp-input h-8 text-[12px]"
-                      value={line.requiredDate}
-                      onChange={(e) => patchLine(line.id, { requiredDate: e.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      className="erp-input h-8 w-20 text-right text-[12px]"
-                      value={line.targetPrice}
-                      onChange={(e) =>
-                        patchLine(line.id, { targetPrice: Number(e.target.value) })
-                      }
-                    />
-                  </td>
-                  <td className="num font-medium tabular-nums">
-                    {formatCurrency(line.amount)}
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="text-erp-danger-fg"
-                      disabled={lines.length <= 1}
-                      aria-label="Remove line"
-                      onClick={() => setLinesDirty(lines.filter((l) => l.id !== line.id))}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-erp-surface-alt font-medium">
-                <td colSpan={5} className="sticky left-0 z-[1] bg-erp-surface-alt text-erp-muted">
-                  Totals
-                </td>
-                <td className="num tabular-nums">
-                  {lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0)}
-                </td>
-                <td colSpan={3} />
-                <td className="num tabular-nums">{formatCurrency(estimatedValue)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <PurchaseRfqLinesTable
+          lines={lines}
+          catalogItems={catalogItemsForPicker}
+          editable
+          formatCurrency={formatCurrency}
+          onAddLine={() => setLinesDirty([...lines, emptyLine()])}
+          onPatchLine={patchLine}
+          onRemoveLine={(lineId) => setLinesDirty(lines.filter((l) => l.id !== lineId))}
+          onSelectCatalogItem={applyItemCatalog}
+        />
       </ErpCardSection>
 
       <ErpCardSection

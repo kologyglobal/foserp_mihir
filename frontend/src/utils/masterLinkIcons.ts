@@ -51,7 +51,7 @@ const CRM_LINK_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   'qc-rules': ShieldCheck,
   'grn-tolerance': Percent,
   'return-reasons': Truck,
-  'bin-codes': MapPin,
+  bins: MapPin,
   'qc-parameters': ShieldCheck,
   'inspection-plans': ShieldCheck,
 }
@@ -79,6 +79,7 @@ const LINK_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   '/masters/gst-groups': Percent,
   '/masters/gst-rates': Percent,
   '/masters/locations': MapPin,
+  '/masters/bins': MapPin,
   '/masters/warehouses': Warehouse,
   '/masters/work-centers': Factory,
   '/masters/routing': GitBranch,

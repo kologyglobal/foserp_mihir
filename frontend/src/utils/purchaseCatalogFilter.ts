@@ -1,5 +1,5 @@
 import {
-  mapPurchaseCategoryToEngineeringProductType,
+  deriveEngineeringProductTypeFromMaster,
   normalizeEngineeringProductType,
 } from '@/utils/purchaseProductType'
 import type { EngineeringProductType } from '@/types/taxMaster'
@@ -10,6 +10,10 @@ export type CatalogProductTypeRow = {
   productType?: EngineeringProductType | '' | null | string
   /** Demo / legacy purchase seed rows often store category without productType. */
   category?: PurchaseItemCategory | string | null
+  /** Item Master itemType — disambiguates BOI vs sub-assembly vs finish product. */
+  itemType?: string | null
+  /** Alias populated from PurchaseItem.masterItemType in API mode. */
+  masterItemType?: string | null
 }
 
 /**
@@ -19,13 +23,11 @@ export type CatalogProductTypeRow = {
 export function resolveCatalogItemProductType(
   item: CatalogProductTypeRow,
 ): EngineeringProductType | '' {
-  return (
-    normalizeEngineeringProductType(item.productType) ||
-    mapPurchaseCategoryToEngineeringProductType(
-      item.category as PurchaseItemCategory | '' | null | undefined,
-    ) ||
-    ''
-  )
+  return deriveEngineeringProductTypeFromMaster({
+    productType: item.productType,
+    itemType: item.itemType ?? item.masterItemType,
+    category: item.category,
+  })
 }
 
 /**

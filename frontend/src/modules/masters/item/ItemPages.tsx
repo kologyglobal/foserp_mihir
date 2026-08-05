@@ -480,7 +480,7 @@ export function ItemFormPage() {
       return
     }
     setUomConversionRows(itemToUomConversionRows(existing))
-  }, [existing?.id, existing?.updatedAt, existing?.uomConversions?.length])
+  }, [existing?.id, existing?.updatedAt, existing?.uomConversions])
 
   useEffect(() => {
     if (hash === '#attachments' || hash === '#item-section-attachments') {

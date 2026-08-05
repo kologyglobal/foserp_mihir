@@ -111,9 +111,7 @@ import { purchaseUserMessage } from '@/utils/purchase/purchaseErrorMessages'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 import { useOptionalAuth } from '@/context/AuthProvider'
 import { useMasterStore } from '@/store/masterStore'
-import { isApiMode } from '@/config/apiConfig'
-import { fetchLookup } from '@/services/api/masterApi'
-import { usePurchaseMasterStore } from '@/store/purchaseMasterStore'
+import { useBinOptions } from '@/hooks/useBinOptions'
 import { loadQualityTestGroupOptions, type QualityTestGroupOption } from '@/utils/qualityTestGroupOptions'
 
 type LocationOption = {
@@ -149,6 +147,30 @@ function today() {
 import { formatPlaceOfSupplyLabel } from '../../utils/gstStateCode'
 import { determinePurchaseGstSupply } from '../../utils/gstSupply'
 import { resolveLineTaxFromLocalMasters } from '../../utils/commercialLineTax'
+
+/** Place of supply follows delivery warehouse state; IGST when vendor state ≠ delivery state. */
+function resolvePoGstFromLocations(
+  vendor: { state?: string; gstin?: string } | null | undefined,
+  deliveryLocation: LocationOption | undefined,
+  purchaseSetup: PurchaseSetup | null | undefined,
+  explicitPlaceOfSupply?: string,
+) {
+  const deliveryState = deliveryLocation?.state?.trim() || ''
+  const placeOfSupply =
+    explicitPlaceOfSupply?.trim() ||
+    (deliveryState ? formatPlaceOfSupplyLabel(null, deliveryState) : '') ||
+    formatPlaceOfSupplyLabel(
+      purchaseSetup?.tax.placeOfSupplyStateCode,
+      purchaseSetup?.tax.placeOfSupplyState,
+    )
+  return determinePurchaseGstSupply({
+    supplierState: vendor?.state,
+    supplierGstin: vendor?.gstin,
+    placeOfSupply,
+    defaultPlaceOfSupplyState: deliveryState || purchaseSetup?.tax.placeOfSupplyState,
+    defaultPlaceOfSupplyStateCode: purchaseSetup?.tax.placeOfSupplyStateCode,
+  })
+}
 
 function mentionsInsurance(...values: Array<string | null | undefined>) {
   return values.some((v) => Boolean(v && /insurance/i.test(v)))
@@ -500,7 +522,7 @@ export function PurchaseOrderEditorPage() {
   const [catalogItems, setCatalogItems] = useState<PurchaseItem[]>([])
   const [purchaseSetup, setPurchaseSetup] = useState<PurchaseSetup | null>(null)
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>([])
-  const [binOptions, setBinOptions] = useState<Array<{ id: string; code: string; name: string; warehouseId?: string }>>([])
+  const binOptions = useBinOptions()
   const [qualityTestGroupOptions, setQualityTestGroupOptions] = useState<QualityTestGroupOption[]>([])
 
   const originParam = (searchParams.get('origin') ?? '') as string
@@ -808,21 +830,18 @@ export function PurchaseOrderEditorPage() {
       patchHeader({ vendorId: '', vendorGstin: '', vendorState: '', vendorAddress: '', isInterstate: false })
       return
     }
-    const gst = determinePurchaseGstSupply({
-      supplierState: vendor.state,
-      supplierStateCode: vendor.stateCode,
-      supplierGstin: vendor.gstin,
-      placeOfSupply: header.placeOfSupply,
-      defaultPlaceOfSupplyState: purchaseSetup?.tax.placeOfSupplyState,
-      defaultPlaceOfSupplyStateCode: purchaseSetup?.tax.placeOfSupplyStateCode,
-    })
-    const placeOfSupply = header.placeOfSupply || gst.placeOfSupplyLabel
+    const gst = resolvePoGstFromLocations(
+      vendor,
+      selectedDeliveryLocation,
+      purchaseSetup,
+      header.placeOfSupply,
+    )
     patchHeader({
       vendorId: vendor.id,
       vendorGstin: vendor.gstin,
       vendorState: vendor.state,
       vendorAddress: formatVendorAddress(vendor),
-      placeOfSupply,
+      placeOfSupply: gst.placeOfSupplyLabel,
       isInterstate: gst.isInterstate,
       paymentTerms: header.paymentTerms || vendor.paymentTerms,
       deliveryTerms: header.deliveryTerms || vendor.deliveryTerms,
@@ -950,18 +969,16 @@ export function PurchaseOrderEditorPage() {
           (setup.general.defaultWarehouseId &&
             locs.find((l) => l.id === setup.general.defaultWarehouseId)?.id) ||
           ''
+        const defaultDelivery = preferred ? locs.find((l) => l.id === preferred) : locs[0]
+        const gst = resolvePoGstFromLocations(null, defaultDelivery, setup)
         setHeader((prev) => ({
           ...prev,
           purchaseLocationId: prev.purchaseLocationId || preferred,
           deliveryLocationId: prev.deliveryLocationId || preferred,
           paymentTerms: prev.paymentTerms || setup.general.defaultPaymentTerms || prev.paymentTerms,
           deliveryTerms: prev.deliveryTerms || setup.general.defaultDeliveryTerms || prev.deliveryTerms,
-          placeOfSupply:
-            prev.placeOfSupply ||
-            formatPlaceOfSupplyLabel(
-              setup.tax.placeOfSupplyStateCode,
-              setup.tax.placeOfSupplyState,
-            ),
+          placeOfSupply: prev.placeOfSupply || gst.placeOfSupplyLabel,
+          isInterstate: prev.vendorId ? prev.isInterstate : gst.isInterstate,
         }))
         void previewNextPurchaseOrderNumber()
           .then((next) => {
@@ -974,36 +991,6 @@ export function PurchaseOrderEditorPage() {
       setActiveBlankets(blankets.filter((b) => b.status === 'active'))
     })
   }, [isNew])
-
-  useEffect(() => {
-    if (isApiMode()) {
-      let cancelled = false
-      fetchLookup('bins')
-        .then((res) => {
-          if (cancelled) return
-          setBinOptions(
-            res.data.map((b) => ({
-              id: b.id,
-              code: b.code ?? b.name,
-              name: b.name,
-              warehouseId: b.warehouseId,
-            })),
-          )
-        })
-        .catch(() => undefined)
-      return () => {
-        cancelled = true
-      }
-    }
-    const demoBins = usePurchaseMasterStore.getState().getByKind('bin-codes', true)
-    setBinOptions(
-      demoBins.map((e) => ({
-        id: e.code,
-        code: e.code,
-        name: e.name,
-      })),
-    )
-  }, [])
 
   useEffect(() => {
     if (isNew || !id) return
@@ -1425,24 +1412,44 @@ export function PurchaseOrderEditorPage() {
             <ErpFieldRow label="Vendor GST Number" readOnly>
               <Input value={header.vendorGstin} readOnly className="bg-erp-surface-alt font-mono" />
             </ErpFieldRow>
-            <ErpFieldRow label="Place of Supply">
+            <ErpFieldRow
+              label="Place of Supply"
+              hint={
+                header.vendorId
+                  ? header.isInterstate
+                    ? 'Inter-state supply → IGST on lines and totals'
+                    : 'Intra-state supply → CGST + SGST on lines and totals'
+                  : 'Set vendor and delivery location to derive GST split'
+              }
+            >
               <Input
                 value={header.placeOfSupply}
                 disabled={!editable}
                 onChange={(e) => {
-                  const placeOfSupply = e.target.value
-                  const gst = determinePurchaseGstSupply({
-                    supplierState: header.vendorState,
-                    supplierGstin: header.vendorGstin,
-                    placeOfSupply,
-                    defaultPlaceOfSupplyState: purchaseSetup?.tax.placeOfSupplyState,
-                    defaultPlaceOfSupplyStateCode: purchaseSetup?.tax.placeOfSupplyStateCode,
-                  })
+                  const gst = resolvePoGstFromLocations(
+                    selectedVendor,
+                    selectedDeliveryLocation,
+                    purchaseSetup,
+                    e.target.value,
+                  )
                   patchHeader({
-                    placeOfSupply,
+                    placeOfSupply: gst.placeOfSupplyLabel,
                     isInterstate: gst.isInterstate,
                   })
                 }}
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="GST scheme" readOnly>
+              <Input
+                readOnly
+                className="bg-erp-surface-alt"
+                value={
+                  !header.vendorId
+                    ? '—'
+                    : header.isInterstate
+                      ? 'IGST (inter-state)'
+                      : 'CGST + SGST (intra-state)'
+                }
               />
             </ErpFieldRow>
             <ErpFormSpan span={3}>
@@ -1477,7 +1484,20 @@ export function PurchaseOrderEditorPage() {
               <Select
                 value={header.deliveryLocationId}
                 disabled={!editable}
-                onChange={(e) => patchHeader({ deliveryLocationId: e.target.value })}
+                onChange={(e) => {
+                  const deliveryLocationId = e.target.value
+                  const loc = locationOptions.find((l) => l.id === deliveryLocationId)
+                  const gst = resolvePoGstFromLocations(
+                    selectedVendor,
+                    loc,
+                    purchaseSetup,
+                  )
+                  patchHeader({
+                    deliveryLocationId,
+                    placeOfSupply: gst.placeOfSupplyLabel,
+                    isInterstate: gst.isInterstate,
+                  })
+                }}
               >
                 {locationOptions.map((l) => (
                   <option key={l.id} value={l.id}>

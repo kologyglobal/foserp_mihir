@@ -273,11 +273,11 @@ export function PurchaseRequisitionLinesTable({
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-line">#</th>
                 <th className="purchase-doc-lines-grid__sticky-type">Product Type</th>
-                <th className="purchase-doc-lines-grid__sticky-item">Item Code</th>
-                <th className="min-w-[10rem]">Item Name</th>
+                <th className="purchase-doc-lines-grid__sticky-item">Item</th>
+                <th className="min-w-[11rem]">Description</th>
                 <th className="min-w-[9rem]">Specification</th>
-                <th className="num">Required Qty</th>
-                <th>UOM</th>
+                <th className="num min-w-[11rem] purchase-doc-lines-grid__qty-col">Qty</th>
+                <th className="purchase-doc-lines-grid__uom-col">UOM</th>
                 <th className="num">Est. Rate</th>
                 <th className="num">Est. Amount</th>
                 <th className="min-w-[9rem]">Preferred Vendor</th>
@@ -348,8 +348,8 @@ export function PurchaseRequisitionLinesTable({
                           itemCode={line.itemCode}
                           itemName={line.itemName}
                           catalogItems={rowCatalog}
-                          labelMode="code"
-                          allowManual={false}
+                          textClassName="text-[11px]"
+                          className="w-full min-w-0 max-w-none"
                           emptyCatalogHint={
                             line.productType
                               ? 'No items for this product type'
@@ -377,10 +377,10 @@ export function PurchaseRequisitionLinesTable({
                     <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
                       {rowEditable ? (
                         <input
-                          className="erp-input h-8 min-w-[10rem] text-[12px]"
+                          className="erp-input h-8 min-w-[11rem] text-[11px]"
                           value={line.itemName}
                           onChange={(e) => patch(line.key, { itemName: e.target.value })}
-                          placeholder="Item name"
+                          placeholder="Description"
                         />
                       ) : (
                         displayOrDash(line.itemName)
@@ -399,7 +399,7 @@ export function PurchaseRequisitionLinesTable({
                     </td>
                     <td
                       className={cn(
-                        'num',
+                        'num purchase-doc-lines-grid__qty-col min-w-[11rem]',
                         (miss.missingQty || qtyError) && rowEditable && 'ring-1 ring-inset ring-amber-400/70',
                       )}
                       onKeyDown={rowEditable ? onCellKeyDown : undefined}
@@ -435,7 +435,10 @@ export function PurchaseRequisitionLinesTable({
                         />
                       )}
                     </td>
-                    <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
+                    <td
+                      className="purchase-doc-lines-grid__uom-col"
+                      onKeyDown={rowEditable ? onCellKeyDown : undefined}
+                    >
                       {(() => {
                         const uomOptions = getPurchaseLineUomOptions(line.itemId)
                         const multi = uomOptions.length > 1
@@ -451,7 +454,7 @@ export function PurchaseRequisitionLinesTable({
                         if (multi) {
                           return (
                             <Select
-                              className="h-8 w-full max-w-[4.5rem] px-0.5 text-center text-[10px]"
+                              className="h-8 w-full px-0.5 text-center text-[10px]"
                               value={line.uomId || uomOptions[0]?.id || ''}
                               title="Select purchase unit from Item Master"
                               onChange={(e) => {
@@ -682,9 +685,9 @@ export function PurchaseRequisitionLinesTable({
           position: sticky;
           left: 12rem;
           z-index: 11;
-          width: 10rem;
-          min-width: 10rem;
-          max-width: 10rem;
+          width: 20rem;
+          min-width: 20rem;
+          max-width: 20rem;
           box-sizing: border-box;
           background: #fff;
           box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);

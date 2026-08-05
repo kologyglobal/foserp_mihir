@@ -69,11 +69,9 @@ import {
 } from '@/utils/purchaseLineUom'
 import { notify } from '@/store/toastStore'
 import { systemConfirm } from '@/utils/systemConfirm'
-import { isApiMode } from '@/config/apiConfig'
 import { useActiveWarehouses, useActiveLocations } from '@/hooks/useMasterLists'
 import { useMasterStore } from '@/store/masterStore'
-import { usePurchaseMasterStore } from '@/store/purchaseMasterStore'
-import { fetchLookup } from '@/services/api/masterApi'
+import { useBinOptions } from '@/hooks/useBinOptions'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
 /**
@@ -102,14 +100,6 @@ function warehouseFromPoDelivery(
     return { id: setupDefaultWarehouseId, name: '' }
   }
   return { id: '', name: '' }
-}
-
-type BinOption = {
-  id: string
-  code: string
-  name: string
-  warehouseId?: string
-  storageLocationId?: string
 }
 
 function today() {
@@ -155,38 +145,7 @@ export function GrnEditorPage() {
 
   const warehouses = useActiveWarehouses()
   const storageLocations = useActiveLocations()
-  const [bins, setBins] = useState<BinOption[]>([])
-
-  useEffect(() => {
-    let cancelled = false
-    if (isApiMode()) {
-      fetchLookup('bins')
-        .then((res) => {
-          if (cancelled) return
-          setBins(
-            res.data.map((b) => ({
-              id: b.id,
-              code: b.code ?? b.name,
-              name: b.name,
-              warehouseId: b.warehouseId,
-              storageLocationId: b.storageLocationId,
-            })),
-          )
-        })
-        .catch(() => undefined)
-      return () => {
-        cancelled = true
-      }
-    }
-    const demoBins = usePurchaseMasterStore.getState().getByKind('bin-codes', true)
-    setBins(
-      demoBins.map((e) => ({
-        id: e.code,
-        code: e.code,
-        name: e.name,
-      })),
-    )
-  }, [])
+  const bins = useBinOptions()
 
   const warehouseLocations = useMemo(
     () => storageLocations.filter((l) => !warehouseId || l.warehouseId === warehouseId),
@@ -823,24 +782,46 @@ export function GrnEditorPage() {
               </div>
             ) : (
               <>
-                <ErpFieldRow
-                  label="Vendor"
-                  required
-                  fieldError={fieldErrors.vendorId}
-                  fieldState={fieldErrors.vendorId ? 'error' : 'idle'}
-                >
-                  <ErpSmartSelect
-                    className="max-w-md"
-                    options={vendorSelectOptions}
-                    value={vendorId}
-                    disabled={readOnlyHeaderPo}
-                    onChange={(v) => onSelectVendor(v || '')}
-                    allowEmpty
-                    placeholder={SELECT_PLACEHOLDER}
-                    appearance="combo"
-                    dropdownMinWidth={320}
-                  />
-                </ErpFieldRow>
+                <div className="grn-po-source-row">
+                  <ErpFieldRow
+                    label="Vendor"
+                    required
+                    fieldError={fieldErrors.vendorId}
+                    fieldState={fieldErrors.vendorId ? 'error' : 'idle'}
+                  >
+                    <ErpSmartSelect
+                      className="w-full"
+                      options={vendorSelectOptions}
+                      value={vendorId}
+                      disabled={readOnlyHeaderPo}
+                      onChange={(v) => onSelectVendor(v || '')}
+                      allowEmpty
+                      placeholder={SELECT_PLACEHOLDER}
+                      appearance="combo"
+                      dropdownMinWidth={320}
+                    />
+                  </ErpFieldRow>
+                  <ErpFieldRow
+                    label="Purchase Order"
+                    required
+                    fieldError={fieldErrors.poId}
+                    fieldState={fieldErrors.poId ? 'error' : 'idle'}
+                  >
+                    <ErpSmartSelect
+                      className="w-full"
+                      options={poSelectOptions}
+                      value={poId}
+                      disabled={readOnlyHeaderPo || !vendorId}
+                      onChange={(v) => void onSelectPo(v || '')}
+                      allowEmpty
+                      placeholder={vendorId ? 'Search PO number…' : 'Select vendor first…'}
+                      emptyMessage={vendorId ? 'No receivable POs for this vendor' : 'Select a vendor first'}
+                      appearance="combo"
+                      dropdownMinWidth={360}
+                      resolveOrphanLabel={(id) => orders.find((o) => o.id === id)?.documentNumber}
+                    />
+                  </ErpFieldRow>
+                </div>
                 {vendorId && vendorApprovedNotReleased.length > 0 ? (
                   <p className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
                     {vendorApprovedNotReleased.length} approved PO
@@ -852,26 +833,6 @@ export function GrnEditorPage() {
                     . Only released POs appear in the list below.
                   </p>
                 ) : null}
-                <ErpFieldRow
-                  label="Purchase Order"
-                  required
-                  fieldError={fieldErrors.poId}
-                  fieldState={fieldErrors.poId ? 'error' : 'idle'}
-                >
-                  <ErpSmartSelect
-                    className="max-w-md"
-                    options={poSelectOptions}
-                    value={poId}
-                    disabled={readOnlyHeaderPo || !vendorId}
-                    onChange={(v) => void onSelectPo(v || '')}
-                    allowEmpty
-                    placeholder={vendorId ? 'Search PO number…' : 'Select vendor first…'}
-                    emptyMessage={vendorId ? 'No receivable POs for this vendor' : 'Select a vendor first'}
-                    appearance="combo"
-                    dropdownMinWidth={360}
-                    resolveOrphanLabel={(id) => orders.find((o) => o.id === id)?.documentNumber}
-                  />
-                </ErpFieldRow>
               </>
             )}
           </ErpFormSpan>
@@ -1177,7 +1138,7 @@ export function GrnEditorPage() {
                   Rejected
                   <span className="block text-[10px] font-normal text-erp-muted">(incl. damage)</span>
                 </th>
-                <th>UOM</th>
+                <th className="purchase-doc-lines-grid__uom-col">UOM</th>
                 {showWeightCol ? <th className="num">Weight</th> : null}
                 <th className="num">Qty Tol %</th>
                 {showWeightCol ? <th className="num">Wt Tol %</th> : null}
@@ -1256,7 +1217,9 @@ export function GrnEditorPage() {
                       }
                     />
                   </td>
-                  <td>{l.uom}</td>
+                  <td className="purchase-doc-lines-grid__uom-col text-[11px] font-medium uppercase">
+                    {l.uom || '—'}
+                  </td>
                   {showWeightCol ? (
                     <td className="num">
                       {l.receiptEntryMode === 'UNIT_ONLY' ? (

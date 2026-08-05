@@ -10,6 +10,7 @@ import {
 import { createPortal } from 'react-dom'
 import { ChevronDown, Search } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { resolveCatalogItemProductType } from '@/utils/purchaseCatalogFilter'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { type PurchaseItem } from '@/types/purchaseDomain'
 import { ENGINEERING_PRODUCT_TYPE_LABELS } from '@/types/taxMaster'
@@ -89,14 +90,15 @@ export function PurchaseItemCodeCell({
     const q = query.trim().toLowerCase()
     if (!q) return catalogItems
     return catalogItems.filter((item) => {
-      const productTypeLabel = item.productType
-        ? ENGINEERING_PRODUCT_TYPE_LABELS[item.productType]
+      const effectiveType = resolveCatalogItemProductType(item)
+      const productTypeLabel = effectiveType
+        ? ENGINEERING_PRODUCT_TYPE_LABELS[effectiveType]
         : ''
       return (
         item.itemCode.toLowerCase().includes(q) ||
         item.itemName.toLowerCase().includes(q) ||
         productTypeLabel.toLowerCase().includes(q) ||
-        (item.productType ?? '').toLowerCase().includes(q)
+        effectiveType.toLowerCase().includes(q)
       )
     })
   }, [catalogItems, query])
@@ -303,8 +305,9 @@ export function PurchaseItemCodeCell({
                     ) : (
                       filtered.map((item) => {
                         const lastRate = lastRateFor(item)
-                        const productTypeLabel = item.productType
-                          ? ENGINEERING_PRODUCT_TYPE_LABELS[item.productType]
+                        const effectiveType = resolveCatalogItemProductType(item)
+                        const productTypeLabel = effectiveType
+                          ? ENGINEERING_PRODUCT_TYPE_LABELS[effectiveType]
                           : '—'
                         return (
                           <tr

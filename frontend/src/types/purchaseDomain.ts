@@ -670,6 +670,8 @@ export interface PurchaseItem {
   category: PurchaseItemCategory
   /** Item Master engineering product type (source of truth for PR Product Type UI). */
   productType?: EngineeringProductType | null
+  /** Item Master itemType — used when productType is unset (API / legacy rows). */
+  masterItemType?: string | null
   description: string
   /** Master UOM UUID — required by purchase APIs. */
   uomId?: string | null

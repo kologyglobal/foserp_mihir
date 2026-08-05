@@ -57,15 +57,56 @@ export function mapPurchaseCategoryToEngineeringProductType(
   switch (category) {
     case 'raw_material':
       return 'raw_material'
-    case 'component':
-      return 'boi'
     case 'consumable':
     case 'packing_material':
     case 'maintenance':
       return 'raw_material'
     case 'job_work':
       return 'service'
+    /** Ambiguous — BOI, sub-assembly, and finish product all map to component in purchase lines. */
+    case 'component':
+      return ''
     default:
       return ''
   }
+}
+
+/** Master row shape for deriving the engineering product type used in purchase filters. */
+export type MasterProductTypeSource = {
+  productType?: string | null
+  itemType?: string | null
+  category?: PurchaseItemCategory | string | null
+}
+
+/**
+ * Single source of truth: Item Master productType → itemType → unambiguous purchase category.
+ * Never map generic `component` category to BOI (that pulled SFG/FG rows into BOI pickers).
+ */
+export function deriveEngineeringProductTypeFromMaster(
+  item: MasterProductTypeSource,
+): EngineeringProductType | '' {
+  const fromProductType = normalizeEngineeringProductType(item.productType)
+  if (fromProductType) return fromProductType
+
+  switch (item.itemType) {
+    case 'raw':
+    case 'consumable':
+      return 'raw_material'
+    case 'bought_out':
+      return 'boi'
+    case 'sub_assembly':
+      return 'sub_assembly'
+    case 'finished_good':
+      return 'finish_product'
+    case 'scrap':
+      return 'scrap'
+    case 'service':
+      return 'service'
+    default:
+      break
+  }
+
+  return mapPurchaseCategoryToEngineeringProductType(
+    item.category as PurchaseItemCategory | '' | null | undefined,
+  )
 }

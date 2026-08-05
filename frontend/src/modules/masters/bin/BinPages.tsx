@@ -25,7 +25,7 @@ import {
 } from '../../../services/api/masterApi'
 import { formatApiError } from '../../../services/api/apiErrors'
 import { notifyMasterSaved } from '../../../store/toastStore'
-import { usePurchaseMasterStore } from '../../../store/purchaseMasterStore'
+import { DEMO_BIN_OPTIONS } from '../../../data/masters/demoBinSeed'
 
 export interface BinRecord {
   id: string
@@ -71,16 +71,15 @@ function useBinRecords() {
         const rows = await fetchMasterBins()
         setRecords(rows.map(mapDtoToBin))
       } else {
-        const demo = usePurchaseMasterStore.getState().getByKind('bin-codes', false)
         setRecords(
-          demo.map((e) => ({
-            id: e.code,
-            code: e.code,
-            name: e.name,
-            warehouseId: '',
-            storageLocationId: '',
+          DEMO_BIN_OPTIONS.map((b) => ({
+            id: b.id,
+            code: b.code,
+            name: b.name,
+            warehouseId: b.warehouseId ?? '',
+            storageLocationId: b.storageLocationId ?? '',
             binType: null,
-            isActive: e.status !== 'inactive',
+            isActive: true,
           })),
         )
       }

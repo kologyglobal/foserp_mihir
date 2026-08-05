@@ -615,6 +615,183 @@ a.purchase-process-map__step:hover {
   max-width: 100%;
 }
 
+/* Shared purchase document line grid — compact UOM + QC test group columns */
+.purchase-doc-lines-grid__uom-col {
+  width: 3.25rem !important;
+  min-width: 3.25rem !important;
+  max-width: 3.25rem !important;
+  padding: 6px 4px !important;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.purchase-doc-lines-grid thead .purchase-doc-lines-grid__uom-col {
+  padding: 8px 4px !important;
+}
+
+.purchase-doc-lines-grid__uom-col .erp-input,
+.purchase-doc-lines-grid__uom-col select {
+  width: 100% !important;
+  max-width: 3.25rem !important;
+  min-width: 0 !important;
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+  text-align: center;
+  font-size: 10px;
+}
+
+.purchase-doc-lines-grid__qtg-col {
+  width: 5.5rem !important;
+  min-width: 5.5rem !important;
+  max-width: 5.5rem !important;
+  padding: 6px 4px !important;
+  vertical-align: middle;
+}
+
+.purchase-doc-lines-grid__qtg-col .erp-input,
+.purchase-doc-lines-grid__qtg-col select {
+  width: 100% !important;
+  max-width: 5.5rem !important;
+  min-width: 0 !important;
+  font-size: 10px;
+}
+
+/* GRN new — vendor + PO on one row */
+.grn-po-source-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem 1rem;
+}
+
+@media (min-width: 768px) {
+  .grn-po-source-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.grn-po-source-row .erp-field-row {
+  min-width: 0;
+}
+
+.grn-po-source-row .erp-smart-select {
+  max-width: none;
+  width: 100%;
+}
+
+.purchase-doc-lines-grid-scroll {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  max-height: min(32rem, 60vh);
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.purchase-doc-lines-grid-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.purchase-doc-lines-grid-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--erp-border-strong, #cbd5e1);
+}
+
+.purchase-doc-lines-grid-scroll::-webkit-scrollbar-track {
+  background: var(--erp-surface-alt, #f8fafc);
+}
+
+.purchase-doc-lines-grid__qty-col {
+  min-width: 11rem;
+  width: 11rem;
+}
+
+.purchase-doc-lines-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--erp-surface-alt, #f8fafc);
+}
+
+.purchase-doc-lines-grid__sticky-line {
+  position: sticky;
+  left: 0;
+  z-index: 13;
+  min-width: 2.5rem;
+  width: 2.5rem;
+  background: #fff;
+  box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
+}
+
+.purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-line,
+.purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-line {
+  z-index: 22;
+  background: var(--erp-surface-alt, #f8fafc);
+}
+
+.purchase-doc-lines-grid__sticky-type {
+  position: sticky;
+  left: 2.5rem;
+  z-index: 12;
+  width: 9.5rem;
+  min-width: 9.5rem;
+  max-width: 9.5rem;
+  box-sizing: border-box;
+  background: #fff;
+  border-right: 1px solid var(--erp-border, #e2e8f0);
+}
+
+.purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-type,
+.purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-type {
+  z-index: 21;
+  background: var(--erp-surface-alt, #f8fafc);
+}
+
+.purchase-doc-lines-grid__sticky-item {
+  position: sticky;
+  left: 12rem;
+  z-index: 11;
+  width: 20rem;
+  min-width: 20rem;
+  max-width: 20rem;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  background: #fff;
+  border-right: 1px solid var(--erp-border, #e2e8f0);
+  box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
+  overflow: visible;
+}
+
+.purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-item,
+.purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-item {
+  z-index: 21;
+  background: var(--erp-surface-alt, #f8fafc);
+}
+
+.purchase-doc-lines-grid__sticky-actions {
+  position: sticky;
+  right: 0;
+  z-index: 12;
+  min-width: 2.75rem;
+  width: 2.75rem;
+  text-align: center;
+  background: #fff;
+  border-left: 1px solid var(--erp-border, #e2e8f0);
+  box-shadow: -4px 0 8px rgb(15 23 42 / 0.06);
+}
+
+.purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-actions,
+.purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-actions {
+  z-index: 22;
+  background: var(--erp-surface-alt, #f8fafc);
+}
+
 /* Purchase Setup uses one consistent 32px dropdown across every tab. */
 .purchase-setup-page .erp-select-wrap,
 .purchase-setup-page .erp-smart-select,

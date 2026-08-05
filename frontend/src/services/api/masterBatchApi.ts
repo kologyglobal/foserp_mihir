@@ -517,6 +517,14 @@ export function itemToApiPayload(data: Item): Record<string, unknown> {
     drawingNo: data.drawingNo || null,
     subAssemblyRule: data.subAssemblyRule,
     status: toStatus(data.isActive),
+    uomConversions: (data.uomConversions ?? [])
+      .filter((row) => row.uomId)
+      .map((row) => ({
+        uomId: row.uomId,
+        conversionFactor: row.uomId === data.baseUomId ? 1 : Number(row.conversionFactor) || 1,
+        isPurchaseAllowed: row.isPurchaseAllowed !== false,
+        isDefaultPurchase: Boolean(row.isDefaultPurchase),
+      })),
   }
 }
 

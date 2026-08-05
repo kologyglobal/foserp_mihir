@@ -9,7 +9,6 @@ export type PurchaseMasterKind =
   | 'grn-tolerance'
   | 'buyers'
   | 'return-reasons'
-  | 'bin-codes'
 
 /** Commercial term kinds used on PO/RFQ forms — payment & delivery resolve from CRM */
 export type PurchaseCommercialTermKind = 'payment-terms' | 'delivery-terms' | 'freight-terms'

@@ -141,7 +141,7 @@ export function PurchaseOrderLinesTable({
   binOptions = [],
   qualityTestGroupOptions = [],
   editable,
-  isInterstate: _isInterstate,
+  isInterstate,
   dirty,
   formatCurrency,
   onAddLine,
@@ -165,9 +165,12 @@ export function PurchaseOrderLinesTable({
         qty: acc.qty + (Number(l.quantity) || 0),
         taxable: acc.taxable + (Number(l.taxableAmount) || 0),
         tax: acc.tax + (Number(l.taxAmount) || 0),
+        cgst: acc.cgst + (Number(l.cgst) || 0),
+        sgst: acc.sgst + (Number(l.sgst) || 0),
+        igst: acc.igst + (Number(l.igst) || 0),
         lineTotal: acc.lineTotal + (Number(l.lineTotal) || 0),
       }),
-      { qty: 0, taxable: 0, tax: 0, lineTotal: 0 },
+      { qty: 0, taxable: 0, tax: 0, cgst: 0, sgst: 0, igst: 0, lineTotal: 0 },
     )
   }, [lines])
 
@@ -331,6 +334,9 @@ export function PurchaseOrderLinesTable({
                 <th className="num min-w-[5rem]">Discount</th>
                 <th className="num min-w-[4rem]">Tax %</th>
                 <th className="num min-w-[5.75rem]">Taxable Amount</th>
+                <th className="num min-w-[4.5rem]">CGST</th>
+                <th className="num min-w-[4.5rem]">SGST</th>
+                <th className="num min-w-[4.5rem]">IGST</th>
                 <th className="num min-w-[5.75rem]">Line Total</th>
                 <th className="min-w-[9rem]">Expected Delivery Date</th>
                 <th className="min-w-[8rem]">Requisition no.</th>
@@ -340,7 +346,7 @@ export function PurchaseOrderLinesTable({
                 <th className="num min-w-[7.5rem]">Received</th>
                 <th className="num min-w-[7.5rem]">Invoiced</th>
                 <th className="min-w-[4rem]">QC Required</th>
-                <th className="min-w-[7rem]">Quality Test Group</th>
+                <th className="purchase-doc-lines-grid__qtg-col">Quality Test Group</th>
                 <th className="min-w-[7rem]">Bin Code</th>
                 <th className="purchase-doc-lines-grid__sticky-actions">Actions</th>
               </tr>
@@ -443,7 +449,7 @@ export function PurchaseOrderLinesTable({
                         if (multi) {
                           return (
                             <select
-                              className="erp-input h-8 w-full max-w-[2.75rem] px-0.5 text-center text-[10px]"
+                              className="erp-input h-8 w-full px-0.5 text-center text-[10px]"
                               value={line.uomId || uomOptions[0]?.id || ''}
                               title="Select purchase unit from Item Master"
                               onChange={(e) => {
@@ -540,6 +546,15 @@ export function PurchaseOrderLinesTable({
                       />
                     </td>
                     <td className="num tabular-nums">{formatCurrency(line.taxableAmount)}</td>
+                    <td className="num tabular-nums text-erp-muted">
+                      {isInterstate ? '—' : formatCurrency(line.cgst)}
+                    </td>
+                    <td className="num tabular-nums text-erp-muted">
+                      {isInterstate ? '—' : formatCurrency(line.sgst)}
+                    </td>
+                    <td className="num tabular-nums text-erp-muted">
+                      {!isInterstate ? '—' : formatCurrency(line.igst)}
+                    </td>
                     <td className="num tabular-nums font-medium">{formatCurrency(line.lineTotal)}</td>
                     <td onKeyDown={onCellKeyDown}>
                       <input
@@ -645,9 +660,9 @@ export function PurchaseOrderLinesTable({
                     <td className="text-center">
                       <input type="checkbox" checked={Boolean(line.qcRequired)} disabled readOnly />
                     </td>
-                    <td>
+                    <td className="purchase-doc-lines-grid__qtg-col">
                       <select
-                        className="erp-input h-8 min-w-[7rem] text-[11px]"
+                        className="erp-input h-8 w-full text-[10px]"
                         disabled={!editable}
                         value={line.qualityTestGroupCode ?? ''}
                         onChange={(e) =>
@@ -720,6 +735,15 @@ export function PurchaseOrderLinesTable({
                   {formatCurrency(totals.tax)}
                 </td>
                 <td className="num tabular-nums">{formatCurrency(totals.taxable)}</td>
+                <td className="num tabular-nums">
+                  {isInterstate ? '—' : formatCurrency(totals.cgst)}
+                </td>
+                <td className="num tabular-nums">
+                  {isInterstate ? '—' : formatCurrency(totals.sgst)}
+                </td>
+                <td className="num tabular-nums">
+                  {!isInterstate ? '—' : formatCurrency(totals.igst)}
+                </td>
                 <td className="num tabular-nums">{formatCurrency(totals.lineTotal)}</td>
                 <td colSpan={2} />
                 <td colSpan={8} />
@@ -753,18 +777,6 @@ export function PurchaseOrderLinesTable({
         }
         .purchase-doc-lines-grid-scroll::-webkit-scrollbar-track {
           background: var(--erp-surface-alt, #f8fafc);
-        }
-        .purchase-doc-lines-grid__uom-col {
-          width: 2.75rem !important;
-          min-width: 2.75rem !important;
-          max-width: 2.75rem !important;
-          padding: 6px 2px !important;
-          text-align: center;
-          white-space: nowrap;
-          overflow: hidden;
-        }
-        .purchase-doc-lines-grid thead .purchase-doc-lines-grid__uom-col {
-          padding: 8px 2px !important;
         }
         .purchase-doc-lines-grid__qty-col {
           min-width: 11rem;

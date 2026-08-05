@@ -35,6 +35,7 @@ const LINKED_COUNT_KEYS: Record<string, string | undefined> = {
   'approval-matrix': undefined,
   'qc-parameters': undefined,
   'inspection-plans': undefined,
+  bins: 'bins',
 }
 
 /**
