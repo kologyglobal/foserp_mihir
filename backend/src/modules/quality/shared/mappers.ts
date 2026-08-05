@@ -10,8 +10,20 @@ function dec(value: unknown): string | null {
   return String(value)
 }
 
+type InspectionPhotoRow = {
+  id: string
+  inspectionId: string
+  originalFilename: string
+  mimeType: string
+  fileSize: number
+  caption: string | null
+  uploadedBy: string | null
+  uploadedAt: Date
+}
+
 type InspectionWithExtras = ManufacturingQualityInspection & {
   parameterResults?: QualityInspectionParameterResult[]
+  photos?: InspectionPhotoRow[]
   inspectionPlan?: Pick<QualityInspectionPlan, 'id' | 'planCode' | 'planName' | 'category' | 'status'> | null
   productionOrder?: { id: string; orderNumber: string } | null
   item?: { id: string; code: string; name: string } | null
@@ -21,6 +33,7 @@ type InspectionWithExtras = ManufacturingQualityInspection & {
 
 export const inspectionDetailInclude = {
   parameterResults: { orderBy: { sortOrder: 'asc' as const } },
+  photos: { where: { deletedAt: null }, orderBy: { uploadedAt: 'asc' as const } },
   inspectionPlan: { select: { id: true, planCode: true, planName: true, category: true, status: true } },
   productionOrder: { select: { id: true, orderNumber: true } },
   item: { select: { id: true, code: true, name: true } },
@@ -77,6 +90,23 @@ export function mapInspection(row: InspectionWithExtras) {
       passed: r.passed,
       remarks: r.remarks,
     })),
+    photos: (row.photos ?? []).map((p) => ({
+      id: p.id,
+      inspectionId: p.inspectionId,
+      originalFilename: p.originalFilename,
+      mimeType: p.mimeType,
+      fileSize: p.fileSize,
+      caption: p.caption,
+      uploadedBy: p.uploadedBy,
+      uploadedAt: p.uploadedAt.toISOString(),
+    })),
+    photoCount: (row.photos ?? []).length,
+    photoRequired: (() => {
+      const snap = Array.isArray(row.parameterSnapshotJson)
+        ? (row.parameterSnapshotJson as Array<{ photoRequired?: boolean; parameterType?: string }>)
+        : []
+      return snap.some((s) => s.photoRequired === true || s.parameterType === 'PHOTO_REQUIRED')
+    })(),
     inspectedQty: dec(row.inspectedQty),
     acceptedQty: dec(row.acceptedQty),
     rejectedQty: dec(row.rejectedQty),

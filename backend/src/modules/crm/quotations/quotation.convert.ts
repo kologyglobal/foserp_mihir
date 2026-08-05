@@ -80,7 +80,7 @@ async function buildSoLines(
     const gstAmount = taxableValue * (taxPct / 100)
     const lineTotal = taxableValue + gstAmount
     return {
-      id: line.id ?? crypto.randomUUID(),
+      id: crypto.randomUUID(),
       lineNo,
       productOrItem: line.productOrItem,
       description: line.description ?? '',
@@ -95,6 +95,16 @@ async function buildSoLines(
       taxableValue: Math.round(taxableValue * 100) / 100,
       gstAmount: Math.round(gstAmount * 100) / 100,
       lineTotal: Math.round(lineTotal * 100) / 100,
+      hsnCode: (line as { hsnCode?: string | null }).hsnCode ?? null,
+      taxScheme: (line as { taxScheme?: string | null }).taxScheme ?? null,
+      cgstRate: (line as { cgstRate?: number | null }).cgstRate ?? null,
+      sgstRate: (line as { sgstRate?: number | null }).sgstRate ?? null,
+      utgstRate: (line as { utgstRate?: number | null }).utgstRate ?? null,
+      igstRate: (line as { igstRate?: number | null }).igstRate ?? null,
+      cgstAmount: (line as { cgstAmount?: number | null }).cgstAmount ?? null,
+      sgstAmount: (line as { sgstAmount?: number | null }).sgstAmount ?? null,
+      utgstAmount: (line as { utgstAmount?: number | null }).utgstAmount ?? null,
+      igstAmount: (line as { igstAmount?: number | null }).igstAmount ?? null,
     }
   })
   const lines = await Promise.all(linesRaw.map((line) => normalizeSalesLineForWrite(tenantId, line)))
@@ -300,6 +310,31 @@ export async function convertQuotationToSalesOrder(
         throw new ValidationError('Quotation lines must have an Item before converting to a sales order')
       }
 
+      const billingAddress = formatAddress([
+        company.addressLine1,
+        company.addressLine2,
+        company.city,
+        company.state,
+        company.pincode,
+        company.country,
+      ])
+      const shippingAddress = billingAddress
+
+      const { resolveSalesOrderTaxHeader, taxHeaderToPrismaCreate } = await import(
+        '../sales-orders/sales-order-tax-header.js'
+      )
+      const taxHeader = await resolveSalesOrderTaxHeader({
+        tenantId,
+        legalEntityId: quotation.legalEntityId,
+        customer: { state: company.state, gstin: company.gstin },
+        lines,
+        input: {
+          deliveryLocation: input.deliveryLocation ?? null,
+          shippingAddress,
+          billingAddress,
+        },
+      })
+
       const salesOrder = await tx.crmSalesOrder.create({
         data: {
           tenantId,
@@ -339,22 +374,8 @@ export async function convertQuotationToSalesOrder(
           customerPoNumber: input.customerPoNumber ?? null,
           customerPoDate: parseDate(input.customerPoDate),
           deliveryLocation: input.deliveryLocation ?? null,
-          billingAddress: formatAddress([
-            company.addressLine1,
-            company.addressLine2,
-            company.city,
-            company.state,
-            company.pincode,
-            company.country,
-          ]),
-          shippingAddress: formatAddress([
-            company.addressLine1,
-            company.addressLine2,
-            company.city,
-            company.state,
-            company.pincode,
-            company.country,
-          ]),
+          billingAddress,
+          shippingAddress,
           salesOwnerId: doc.salesOwnerId ?? quotation.salesOwnerId,
           salesOwnerName: doc.salesOwnerName ?? quotation.salesOwnerName,
           internalRemarks: input.internalRemarks ?? null,
@@ -362,6 +383,7 @@ export async function convertQuotationToSalesOrder(
           legalEntityId: quotation.legalEntityId,
           branchId: quotation.branchId,
           lines: lines as unknown as Prisma.InputJsonValue,
+          ...taxHeaderToPrismaCreate(taxHeader),
           createdBy: userId,
           updatedBy: userId,
         },

@@ -81,6 +81,7 @@ export function determinePurchaseGstSupply(opts: {
 
 /**
  * Sales (AR / CRM): inter-state when company billing state ≠ customer billing / place of supply.
+ * Union Territory intra-state → CGST+UTGST (utgst_pair).
  */
 export function determineSalesGstSupply(opts: {
   companyState?: string | null
@@ -108,9 +109,12 @@ export function determineSalesGstSupply(opts: {
       ? companyCode !== customerPosCode
       : false
 
+  const utCodes = new Set(['01', '04', '07', '26', '31', '34', '35', '38'])
+  const isUt = Boolean(customerPosCode && utCodes.has(customerPosCode))
+
   return {
     isInterstate,
-    gstScheme: isInterstate ? 'igst' : 'cgst_sgst',
+    gstScheme: isInterstate ? 'igst' : isUt ? 'utgst_pair' : 'cgst_sgst',
     placeOfSupplyStateCode: customerPosCode,
     placeOfSupplyLabel: formatPlaceOfSupplyLabel(customerPosCode, opts.customerState),
   }

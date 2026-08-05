@@ -36,6 +36,9 @@ export function canCrmPermission(permission: string): boolean {
     return canPermission('sales', 'view')
   }
   if (permission.includes('.delete')) return canPermission('sales', 'override')
+  if (permission.includes('tax_place_override') || permission.includes('.override')) {
+    return canPermission('sales', 'override')
+  }
   if (
     permission.includes('.create')
     || permission.includes('.update')

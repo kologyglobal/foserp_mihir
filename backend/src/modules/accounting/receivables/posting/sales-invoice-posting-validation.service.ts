@@ -24,6 +24,10 @@ import type { SalesInvoicePostingValidationContext } from './sales-invoice-posti
 import type { SalesInvoiceWithLines } from '../sales-invoices/sales-invoice.types.js'
 import { buildSalesInvoicePostingRequest } from './sales-invoice-accounting-builder.service.js'
 import type { PostingRequest } from '../../posting/posting.types.js'
+import { requiresLutCoverage } from '../../tax-compliance/export-sez-lut.util.js'
+import { resolveLutForSalesInvoice } from '../../tax-compliance/gst-export-lut.service.js'
+import { resolveCompanyGstinScope } from '../../tax-compliance/gst-registration-scope.util.js'
+import { prisma } from '../../../../config/prisma.js'
 
 function amountsDrift(invoice: SalesInvoiceWithLines, calc: ReturnType<typeof calculateSalesInvoice>): boolean {
   return (
@@ -64,6 +68,40 @@ export async function validateSalesInvoiceForPosting(
   await requireActiveCustomerParty(tenantId, invoice.customerId)
 
   const legalEntity = await getLegalEntityOrThrow(tenantId, invoice.legalEntityId)
+
+  // Phase 10 — LUT gate for export/SEZ without payment of IGST
+  if (requiresLutCoverage(invoice.taxTreatment)) {
+    let branchGstin: string | null = null
+    if (invoice.branchId) {
+      const br = await prisma.branch.findFirst({
+        where: { id: invoice.branchId, tenantId, legalEntityId: invoice.legalEntityId },
+        select: { gstin: true },
+      })
+      branchGstin = br?.gstin ?? null
+    }
+    const scope = resolveCompanyGstinScope({
+      legalEntityId: legalEntity.id,
+      legalEntityGstin: legalEntity.gstin,
+      branchId: invoice.branchId,
+      branchGstin,
+    })
+    const companyGstin = 'ok' in scope ? null : scope.gstin
+    const { assessment } = await resolveLutForSalesInvoice({
+      tenantId,
+      legalEntityId: invoice.legalEntityId,
+      taxTreatment: invoice.taxTreatment,
+      invoiceDate: invoice.invoiceDate,
+      companyGstin,
+      lutId: (invoice as { lutId?: string | null }).lutId ?? null,
+    })
+    if (assessment.blockers.length) {
+      throw new SalesInvoicePostingValidationFailedError(
+        assessment.blockers[0] ?? 'Valid LUT required for zero-rated without payment',
+        assessment.blockers.map((m) => ({ field: 'lutId', message: m })),
+      )
+    }
+  }
+
   const calcInput = buildCalculationInputFromStoredInvoice(invoice, legalEntity.stateCode)
   if (!calcInput) {
     throw new SalesInvoicePostingValidationFailedError('Invoice calculation context is missing')

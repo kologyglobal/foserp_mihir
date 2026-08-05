@@ -40,7 +40,7 @@ import { Lead360RecordHeader } from '@/components/crm/Lead360RecordHeader'
 import { LeadChangeStageControl } from '@/components/crm/LeadChangeStageControl'
 import { LeadSummaryCard, resolveLeadContactDesignation } from '@/components/crm/LeadSummaryCard'
 import { LeadSmartOverviewPanel } from '@/components/crm/LeadSmartOverviewPanel'
-import { ErpLineItemsGrid } from '@/components/erp/ErpLineItemsGrid'
+import { ErpProductPricingPanel } from '@/components/erp/ErpProductPricingSection'
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
 import { useLeadAttachmentStore } from '@/store/leadAttachmentStore'
 import { useLeadRoutes } from '@/hooks/useLeadRoutes'
@@ -103,7 +103,18 @@ export function Lead360Workspace() {
   const products = useMasterStore((s) => s.products)
   const items = useMasterStore((s) => s.items)
   const uoms = useMasterStore((s) => s.uoms)
-  const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
+  const leadRequirementPickIds = useMemo(() => {
+    if (!lead) return [] as Array<string | null | undefined>
+    const decoded = decodeLeadRequirementLines(lead.productRequirement ?? '', lead.expectedQty, lead.remarks).lines
+    return decoded.flatMap((l) => [l.itemId, l.productId])
+  }, [lead])
+  const { options: productOptions, pickMap } = useProductMasterOptionMap(
+    products,
+    items,
+    uoms,
+    undefined,
+    leadRequirementPickIds,
+  )
   const advanceLeadStage = useSalesStore((s) => s.advanceLeadStage)
   const archiveLead = useSalesStore((s) => s.archiveLead)
   const updateLead = useSalesStore((s) => s.updateLead)
@@ -691,14 +702,13 @@ export function Lead360Workspace() {
             panels={{
               requirement: (
                 <div className="space-y-4">
-                  <ErpLineItemsGrid
+                  <ErpProductPricingPanel
                     lines={decodeLeadRequirementLines(lead.productRequirement ?? '', lead.expectedQty, lead.remarks).lines}
                     onChange={() => {}}
                     productOptions={productOptions}
                     productPickMap={pickMap}
-                    probability={lead.probability ?? 0}
-                    variant="opportunity"
                     readOnly
+                    showAdjustments={false}
                   />
                   <div className="erp-form-grid erp-form-grid--dense erp-form-grid--cols-3">
                     <ErpViewField label="Industry" value={lead.industry} />

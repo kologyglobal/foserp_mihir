@@ -11966,22 +11966,6 @@ a.crm-companies-table__name:hover {
   flex-direction: column;
   gap: 14px;
   min-width: 0;
-  width: 100%;
-}
-
-/* Line-item tables must span the full card width (not 1/3 of a dense 3-col grid). */
-.so-pricing-section .erp-card-section__body {
-  min-width: 0;
-}
-
-.so-pricing-section .erp-card-section__grid,
-.so-pricing-section .erp-card-section__grid--cols-1 {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.so-pricing-section .erp-card-section__grid > * {
-  min-width: 0;
-  max-width: 100%;
 }
 
 .so-pricing-panel--pro {
@@ -11995,25 +11979,36 @@ a.crm-companies-table__name:hover {
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+  -webkit-overflow-scrolling: touch;
 }
 
+/*
+ * Fixed-layout grid: numeric/money cols use hard widths so headers stay fully legible.
+ * Product has no fixed width and absorbs leftover space. Table min-width is the sum of
+ * fixed cols + a usable product floor so the wrap scrolls instead of crushing columns.
+ */
 .so-pricing-table {
   width: 100%;
-  min-width: 860px;
+  /* Floor covers fixed numeric/money cols + usable Product; wrap scrolls before crush */
+  min-width: 78rem;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 12.5px;
 }
 
-.so-pricing-col-idx { width: 40px; }
-.so-pricing-col-product { width: 32%; min-width: 200px; }
-.so-pricing-col-qty { width: 72px; }
-.so-pricing-col-price { width: 104px; }
-.so-pricing-col-disc { width: 72px; }
-.so-pricing-col-gst { width: 80px; }
-.so-pricing-col-money { width: 96px; }
-.so-pricing-col-action { width: 44px; }
+.so-pricing-col-idx { width: 2.5rem; }
+/* Product flex column — leave width unset so remaining space lands here */
+.so-pricing-col-product { width: auto; }
+.so-pricing-col-hsn { width: 5.5rem; }
+.so-pricing-col-qty { width: 5rem; }
+.so-pricing-col-price { width: 7rem; }
+.so-pricing-col-disc { width: 5rem; }
+.so-pricing-col-gst { width: 5.5rem; }
+.so-pricing-col-scheme { width: 6.5rem; }
+.so-pricing-col-money { width: 6.75rem; }
+.so-pricing-col-money-wide { width: 7.75rem; }
+.so-pricing-col-action { width: 2.75rem; }
 
 .so-pricing-th {
   position: sticky;
@@ -12029,6 +12024,7 @@ a.crm-companies-table__name:hover {
   text-transform: uppercase;
   text-align: left;
   white-space: nowrap;
+  overflow: visible;
 }
 
 .so-pricing-th--right { text-align: right; }
@@ -12066,6 +12062,7 @@ a.crm-companies-table__name:hover {
   color: #64748b;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .so-pricing-row:hover .so-pricing-td--calc {
@@ -12077,6 +12074,7 @@ a.crm-companies-table__name:hover {
   font-weight: 700;
   color: var(--erp-primary, #2563eb);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .so-pricing-row:hover .so-pricing-td--total {
@@ -12090,10 +12088,10 @@ a.crm-companies-table__name:hover {
   min-width: 0;
 }
 
-.so-pricing-td--product .erp-smart-select .erp-input,
-.so-pricing-td--product .erp-smart-select button {
+/* Only the in-cell trigger — never style portaled option nodes (avoids transparent buttons). */
+.so-pricing-td--product .erp-smart-select .erp-smart-select__anchor,
+.so-pricing-td--product .erp-smart-select .erp-smart-select__input {
   min-height: 34px;
-  height: 34px;
   font-size: 12.5px;
   border-radius: 8px;
 }
@@ -13159,54 +13157,6 @@ a.crm-companies-table__name:hover {
 .so-commercial-group textarea.erp-input,
 .so-commercial-group .erp-input {
   border-radius: 8px;
-}
-
-/* Sales Order create — Customer PO row (4-up grid, label above control) */
-.so-qe-po-group {
-  margin-top: 4px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--erp-border, #d0d5dd) 90%, transparent);
-  background: color-mix(in srgb, #fff 92%, var(--erp-surface-alt, #f8fafc));
-}
-
-.so-qe-po-group .erp-field-group__label {
-  margin-bottom: 2px;
-  color: #64748b;
-}
-
-.so-qe-po-group .erp-field-row {
-  min-width: 0;
-}
-
-.so-qe-po-group .erp-field-row__control-wrap,
-.so-qe-po-group .erp-field-control,
-.so-qe-po-group .erp-input {
-  width: 100%;
-  min-width: 0;
-}
-
-.so-qe-po-group .erp-form-grid {
-  gap: 12px 14px;
-  align-items: start;
-}
-
-@media (min-width: 900px) {
-  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .so-qe-po-group .erp-form-grid--cols-4 {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  }
-}
-
-@media (max-width: 899px) {
-  .so-qe-po-group .erp-form-grid--cols-4 {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-}
-
-@media (max-width: 559px) {
-  .so-qe-po-group .erp-form-grid--cols-4 {
-    grid-template-columns: 1fr !important;
-  }
 }
 
 /* Quotation Validity / SO commercial: keep 4-up row even when Smart Context / factbox is open.
@@ -17437,20 +17387,35 @@ a.crm-companies-table__name:hover {
   }
 }
 
-.erp-smart-select__dropdown {
+/*
+ * Portaled smart-select menu — solid white only (!important beats form shells).
+ * Mounted under #erp-portal-root (z-index max) so table layers cannot bleed through.
+ */
+.erp-smart-select__dropdown,
+.erp-smart-select__dropdown--portal,
+div.erp-smart-select__dropdown {
   max-height: min(420px, calc(100dvh - 24px));
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  border: 1px solid color-mix(in srgb, var(--erp-border) 80%, #94a3b8);
+  border: 1px solid #cbd5e1;
   border-radius: 0.625rem;
-  background: var(--erp-surface);
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  opacity: 1 !important;
+  isolation: isolate !important;
+  mix-blend-mode: normal !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   box-shadow:
-    0 12px 32px rgb(15 23 42 / 0.12),
-    0 2px 8px rgb(15 23 42 / 0.06);
-  animation: erp-smart-select-in 0.12s ease-out;
+    0 16px 40px rgb(15 23 42 / 0.18),
+    0 4px 12px rgb(15 23 42 / 0.1);
+  /* No opacity animation — can leave the panel translucent mid-frame */
+  animation: none !important;
   transform-origin: top center;
+  color: #0f172a !important;
 }
 
 .erp-smart-select--compact .erp-smart-select__dropdown {
@@ -17463,9 +17428,12 @@ a.crm-companies-table__name:hover {
   list-style: none;
   margin: 0;
   padding: 0.2rem;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
 }
 
-.erp-smart-select__option {
+.erp-smart-select__option,
+.erp-smart-select__dropdown [role='option'] {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -17474,20 +17442,21 @@ a.crm-companies-table__name:hover {
   padding: 0.4rem 0.55rem;
   border: 0;
   border-radius: 0.375rem;
-  background: transparent;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.1s ease, color 0.1s ease;
 }
 
 .erp-smart-select__option:hover,
 .erp-smart-select__option--selected,
-.erp-smart-select__option--highlight {
-  background: var(--erp-primary-soft);
-}
-
-.erp-smart-select__option--highlight:not(.erp-smart-select__option--selected) {
-  background: color-mix(in srgb, var(--erp-primary-soft, #e8f1fb) 85%, #fff);
+.erp-smart-select__option--highlight,
+.erp-smart-select__dropdown [role='option']:hover,
+.erp-smart-select__dropdown [role='option'].erp-smart-select__option--selected,
+.erp-smart-select__dropdown [role='option'].erp-smart-select__option--highlight {
+  background: #e8f1fb !important;
+  background-color: #e8f1fb !important;
 }
 
 .erp-smart-select__option--selected {
@@ -17501,14 +17470,26 @@ a.crm-companies-table__name:hover {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--erp-muted);
-  border-bottom: 1px solid var(--erp-border);
+  color: var(--erp-muted, #64748b);
+  border-bottom: 1px solid var(--erp-border, #e2e8f0);
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.erp-smart-select__empty {
+  margin: 0;
+  padding: 0.85rem 0.75rem;
+  font-size: 12.5px;
+  color: var(--erp-muted, #64748b);
+  background: #ffffff;
 }
 
 .erp-smart-select__option-label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--erp-text);
+  color: var(--erp-text, #0f172a);
   line-height: 1.35;
 }
 
@@ -17516,7 +17497,7 @@ a.crm-companies-table__name:hover {
   font-size: 11px;
   font-weight: 400;
   line-height: 1.35;
-  color: var(--erp-muted);
+  color: var(--erp-muted, #64748b);
 }
 
 .erp-smart-select__option--rich {
@@ -17579,12 +17560,6 @@ a.crm-companies-table__name:hover {
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--erp-muted);
-}
-
-.erp-smart-select__empty {
-  padding: 0.85rem 0.75rem;
-  font-size: 12px;
   color: var(--erp-muted);
 }
 

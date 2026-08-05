@@ -36,6 +36,8 @@ export interface AccountingGstRateLookup {
   cgstRate: string
   sgstRate: string
   igstRate: string
+  utgstRate?: string
+  cessRate?: string
   /** Combined GST % (CGST+SGST or IGST). */
   gstRate: string
   fromState: string
@@ -71,6 +73,8 @@ function mapRate(row: {
   cgst: Prisma.Decimal
   sgst: Prisma.Decimal
   igst: Prisma.Decimal
+  utgst?: Prisma.Decimal | null
+  cess?: Prisma.Decimal | null
   fromState: string
   locationStateCode: string
   dateFrom: Date
@@ -80,6 +84,8 @@ function mapRate(row: {
   const cgst = Number(row.cgst)
   const sgst = Number(row.sgst)
   const igst = Number(row.igst)
+  const utgst = row.utgst != null ? Number(row.utgst) : 0
+  const cess = row.cess != null ? Number(row.cess) : 0
   const combined = Math.abs(cgst) + Math.abs(sgst) > 0 ? cgst + sgst : igst
   return {
     id: row.id,
@@ -88,6 +94,8 @@ function mapRate(row: {
     cgstRate: String(row.cgst),
     sgstRate: String(row.sgst),
     igstRate: String(row.igst),
+    utgstRate: String(utgst),
+    cessRate: String(cess),
     gstRate: String(combined),
     fromState: row.fromState,
     locationStateCode: row.locationStateCode,

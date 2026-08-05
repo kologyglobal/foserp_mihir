@@ -59,6 +59,8 @@
     "db:seed:purchase-demo": "tsx scripts/seed-purchase-demo-data.ts",
     "db:seed:purchase-test-pack": "tsx scripts/seed-purchase-test-pack.ts",
     "db:sync-permissions": "tsx scripts/sync-permissions.ts",
+    "db:repair-gst-utgst": "tsx scripts/repair-master-gst-rates-utgst.ts",
+    "uat:gst-books": "tsx scripts/uat-gst-books-period.ts",
     "db:setup": "npm run db:generate && tsx scripts/prisma-cli.ts migrate deploy && npm run db:seed",
     "db:studio": "tsx scripts/prisma-cli.ts studio"
   },

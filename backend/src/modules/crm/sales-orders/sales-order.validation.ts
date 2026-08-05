@@ -31,8 +31,20 @@ const salesOrderLineSchema = z.object({
   uom: z.string().trim().min(1).default('NOS'),
   unitPrice: z.number().nonnegative(),
   discountPct: z.number().min(0).max(100).default(0),
-  taxPct: z.number().min(0).max(100).default(18),
+  /** Required at create — resolvers must not invent 18%. .default removed for silent invent safety. */
+  taxPct: z.number().min(0).max(100),
   technicalScopeRef: z.string().trim().optional().nullable(),
+  hsnCode: z.string().trim().max(32).optional().nullable(),
+  hsnId: z.string().uuid().optional().nullable(),
+  taxScheme: z.string().trim().max(32).optional().nullable(),
+  cgstRate: z.number().min(0).max(100).optional().nullable(),
+  sgstRate: z.number().min(0).max(100).optional().nullable(),
+  utgstRate: z.number().min(0).max(100).optional().nullable(),
+  igstRate: z.number().min(0).max(100).optional().nullable(),
+  cgstAmount: z.number().nonnegative().optional().nullable(),
+  sgstAmount: z.number().nonnegative().optional().nullable(),
+  utgstAmount: z.number().nonnegative().optional().nullable(),
+  igstAmount: z.number().nonnegative().optional().nullable(),
 })
 
 export const listSalesOrdersQuerySchema = paginationSchema.extend({
@@ -91,8 +103,29 @@ export const createSalesOrderSchema = z
     remarks: z.string().trim().optional().nullable(),
     directSoReason: z.string().trim().optional().nullable(),
     lines: z.array(salesOrderLineSchema).optional(),
+    /** GST PoS header — auto resolved unless placeOfSupplyOverride */
+    placeOfSupply: z.string().trim().max(200).optional().nullable(),
+    placeOfSupplyOverride: z.boolean().optional(),
+    placeOfSupplyOverrideReason: z.string().trim().max(500).optional().nullable(),
+    supplierStateCode: z.string().trim().max(8).optional().nullable(),
   })
   .superRefine((data, ctx) => {
+    if (data.placeOfSupplyOverride) {
+      if (!data.placeOfSupply?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'placeOfSupply is required when override is enabled',
+          path: ['placeOfSupply'],
+        })
+      }
+      if (!data.placeOfSupplyOverrideReason?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'placeOfSupplyOverrideReason is required when override is enabled',
+          path: ['placeOfSupplyOverrideReason'],
+        })
+      }
+    }
     const hasLines = Boolean(data.lines?.length)
     if (!hasLines && !data.itemId && (data.qty == null || data.unitPrice == null)) {
       ctx.addIssue({
@@ -135,6 +168,27 @@ export const updateSalesOrderSchema = z.object({
   salesOwnerId: optionalUuid,
   salesOwnerName: z.string().trim().optional().nullable(),
   lines: z.array(salesOrderLineSchema).optional(),
+  placeOfSupply: z.string().trim().max(200).optional().nullable(),
+  placeOfSupplyOverride: z.boolean().optional(),
+  placeOfSupplyOverrideReason: z.string().trim().max(500).optional().nullable(),
+  supplierStateCode: z.string().trim().max(8).optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.placeOfSupplyOverride) {
+    if (!data.placeOfSupply?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'placeOfSupply is required when override is enabled',
+        path: ['placeOfSupply'],
+      })
+    }
+    if (!data.placeOfSupplyOverrideReason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'placeOfSupplyOverrideReason is required when override is enabled',
+        path: ['placeOfSupplyOverrideReason'],
+      })
+    }
+  }
 })
 
 export type ListSalesOrdersQuery = z.infer<typeof listSalesOrdersQuerySchema>

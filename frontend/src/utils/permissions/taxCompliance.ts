@@ -1,8 +1,7 @@
 /**
  * GST & TDS Compliance fine-grained frontend permissions.
  *
- * API mode: maps to `finance.tax.view` / `finance.tax.extract` /
- * `finance.tax.einvoice.manage` / `finance.tax.eway.manage`.
+ * API mode: maps to `finance.tax.*` / `tax.gst.*` backend codes.
  * Demo mode: role packs for the mock workspace.
  *
  * SECURITY: Backend enforces tenant isolation + RBAC on GST reads/mutations.
@@ -23,6 +22,7 @@ export const TAX_COMPLIANCE_PERMISSIONS = [
   'accounting.tax.gst.view',
   'accounting.tax.gst.reconcile',
   'accounting.tax.gst.prepare_return',
+  'accounting.tax.gst.file_return',
   'accounting.tax.gst.mark_filed',
   'accounting.tax.gst.manage_exceptions',
   'accounting.tax.gst.e_invoice',
@@ -57,6 +57,7 @@ const GST_EXEC: TaxCompliancePermission[] = [
   ...VIEW_GST,
   'accounting.tax.gst.reconcile',
   'accounting.tax.gst.prepare_return',
+  'accounting.tax.gst.file_return',
   'accounting.tax.gst.manage_exceptions',
   'accounting.tax.gst.e_invoice',
   'accounting.tax.gst.e_way',
@@ -105,24 +106,38 @@ function resolveTaxPermissions(role: ErpRole): Set<TaxCompliancePermission> {
   return new Set(ROLE_PACKS[role] ?? ACCOUNTANT)
 }
 
+function apiPermissionSet(): Set<string> {
+  return new Set(getStoredSession()?.user.permissions ?? [])
+}
+
+function hasApiPerm(...codes: string[]): boolean {
+  if (hasWorkspaceAdminRole()) return true
+  const set = apiPermissionSet()
+  return codes.some((c) => set.has(c) || set.has('tenant.manage'))
+}
+
 function hasApiTaxView(): boolean {
-  return hasWorkspaceAdminRole() || hasFinancePermission('finance.tax.view')
+  return hasApiPerm('finance.tax.view', 'tax.gst.view', 'tax.gst.reconcile') || hasFinancePermission('finance.tax.view')
 }
 
 function hasApiTaxExtract(): boolean {
   return (
-    hasWorkspaceAdminRole() ||
-    hasFinancePermission('finance.tax.extract') ||
-    hasFinancePermission('finance.tax.view')
+    hasApiTaxView() ||
+    hasApiPerm('finance.tax.extract') ||
+    hasFinancePermission('finance.tax.extract')
   )
 }
 
 function hasApiEInvoiceManage(): boolean {
-  return hasWorkspaceAdminRole() || hasFinancePermission('finance.tax.einvoice.manage')
+  return hasApiPerm('finance.tax.einvoice.manage') || hasFinancePermission('finance.tax.einvoice.manage')
 }
 
 function hasApiEWayManage(): boolean {
-  return hasWorkspaceAdminRole() || hasFinancePermission('finance.tax.eway.manage')
+  return hasApiPerm('finance.tax.eway.manage') || hasFinancePermission('finance.tax.eway.manage')
+}
+
+function hasApiGstReconcile(): boolean {
+  return hasApiPerm('tax.gst.reconcile')
 }
 
 export function hasTaxCompliancePermission(permission: TaxCompliancePermission, role?: ErpRole): boolean {
@@ -138,9 +153,12 @@ export function hasTaxCompliancePermission(permission: TaxCompliancePermission, 
     ) {
       return hasApiTaxView()
     }
+    if (permission === 'accounting.tax.gst.reconcile') return hasApiGstReconcile()
+    if (permission === 'accounting.tax.gst.prepare_return') return hasApiPerm('tax.gst.returns.prepare')
+    if (permission === 'accounting.tax.gst.file_return') return hasApiPerm('tax.gst.returns.file')
+    if (permission === 'accounting.tax.gst.mark_filed') return hasApiPerm('tax.gst.returns.mark_filed')
     if (permission === 'accounting.tax.gst.e_invoice') return hasApiEInvoiceManage()
     if (permission === 'accounting.tax.gst.e_way') return hasApiEWayManage()
-    // Filing / TDS / notices remain demo-gated off in API mode
     return false
   }
   const effective = role ?? getSessionUser().role
@@ -160,10 +178,30 @@ export function useTaxCompliancePermissions() {
         can: (p: TaxCompliancePermission) => hasTaxCompliancePermission(p, role),
         canView,
         canExport,
-        canSetup: false,
+        canSetup: hasApiPerm('tax.gst.setup.manage', 'tax.gst.rates.manage'),
         canGstView: canView,
-        canGstReconcile: false,
-        canGstMarkFiled: false,
+        canGstReconcile: hasApiGstReconcile(),
+        canGstPrepareReturn: hasApiPerm('tax.gst.returns.prepare'),
+        canGstLockReturn: hasApiPerm('tax.gst.returns.lock'),
+        canGstFileReturn: hasApiPerm('tax.gst.returns.file'),
+        canGstMarkFiled: hasApiPerm('tax.gst.returns.mark_filed'),
+        canRateOpsView: hasApiPerm('tax.gst.rates.view', 'tax.gst.setup.manage', 'tax.gst.view', 'finance.tax.view'),
+        canRateOpsManage: hasApiPerm('tax.gst.rates.manage', 'tax.gst.setup.manage'),
+        canDataQualityView: hasApiPerm(
+          'tax.gst.quality.view',
+          'tax.gst.setup.manage',
+          'tax.gst.view',
+          'finance.tax.view',
+        ),
+        canDataQualityManage: hasApiPerm('tax.gst.quality.manage', 'tax.gst.setup.manage'),
+        canGlReconView: hasApiPerm(
+          'tax.gst.gl_recon.view',
+          'tax.gst.reconcile',
+          'tax.gst.setup.manage',
+          'tax.gst.view',
+          'finance.tax.view',
+        ),
+        canGlReconManage: hasApiPerm('tax.gst.gl_recon.manage', 'tax.gst.setup.manage', 'tax.gst.reconcile'),
         canEInvoice: hasApiEInvoiceManage(),
         canEWay: hasApiEWayManage(),
         canTdsView: false,
@@ -184,7 +222,16 @@ export function useTaxCompliancePermissions() {
       canSetup: can('accounting.tax.setup'),
       canGstView: can('accounting.tax.gst.view'),
       canGstReconcile: can('accounting.tax.gst.reconcile'),
+      canGstPrepareReturn: can('accounting.tax.gst.prepare_return'),
+      canGstLockReturn: can('accounting.tax.gst.prepare_return'),
+      canGstFileReturn: can('accounting.tax.gst.file_return'),
       canGstMarkFiled: can('accounting.tax.gst.mark_filed'),
+      canRateOpsView: can('accounting.tax.gst.view') || can('accounting.tax.setup'),
+      canRateOpsManage: can('accounting.tax.setup'),
+      canDataQualityView: can('accounting.tax.gst.view') || can('accounting.tax.setup'),
+      canDataQualityManage: can('accounting.tax.setup'),
+      canGlReconView: can('accounting.tax.gst.view') || can('accounting.tax.gst.reconcile') || can('accounting.tax.setup'),
+      canGlReconManage: can('accounting.tax.setup') || can('accounting.tax.gst.reconcile'),
       canEInvoice: can('accounting.tax.gst.e_invoice'),
       canEWay: can('accounting.tax.gst.e_way'),
       canTdsView: can('accounting.tax.tds.view'),

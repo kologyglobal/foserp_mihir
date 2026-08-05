@@ -30,16 +30,24 @@ export function buildSalesOrderPrintLines(
   order: SalesOrder,
   product?: Product | null,
   products: Product[] = [],
+  items: Array<{ id: string; hsnCode?: string | null }> = [],
 ): SalesOrderPrintLine[] {
   if (order.lines && order.lines.length > 0) {
     return order.lines.map((l: SalesOrderLine, idx) => {
       const lineProduct = l.productId
         ? products.find((p) => p.id === l.productId)
         : undefined
+      const item = l.itemId ? items.find((i) => i.id === l.itemId) : undefined
+      // Snapshot first — do not prefer live master over saved hsnCode.
+      const hsn =
+        (l.hsnCode ?? '').trim() ||
+        (item?.hsnCode ?? '').trim() ||
+        (lineProduct?.hsnCode ?? product?.hsnCode ?? '').trim() ||
+        '—'
       return {
         lineNo: l.lineNo || idx + 1,
         description: l.description || l.productOrItem || lineProduct?.productName || product?.productName || '—',
-        hsn: lineProduct?.hsnCode ?? product?.hsnCode ?? '—',
+        hsn,
         qty: l.qty,
         uom: l.uom || 'Nos',
         unitPrice: l.unitPrice,
@@ -56,8 +64,9 @@ export function buildSalesOrderPrintLines(
   const unitPrice = order.unitPrice ?? product?.standardPrice ?? 0
   const discountPct = order.discountPct ?? 0
   const taxable = Math.max(0, qty * unitPrice * (1 - discountPct / 100))
-  const taxPct = 18
-  const gstAmount = order.gstAmount ?? taxable * (taxPct / 100)
+  // No silent 18 — use header gstAmount when present, else 0 until resolved.
+  const taxPct = 0
+  const gstAmount = order.gstAmount ?? 0
   const lineTotal = order.grandTotal ?? taxable + gstAmount
 
   return [

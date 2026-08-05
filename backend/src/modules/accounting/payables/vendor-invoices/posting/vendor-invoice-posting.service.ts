@@ -249,6 +249,30 @@ export async function postVendorInvoice(
           throw new VendorInvoiceConcurrentPostError()
         }
 
+        const { recordVendorInvoiceGstLedger } = await import(
+          '../../../tax-compliance/gst-ledger.service.js'
+        )
+        await recordVendorInvoiceGstLedger(tx, {
+          tenantId: txContext.tenantId,
+          vendorInvoiceId: invoice.id,
+          accountingVoucherId: voucherId,
+          postingEventId: eventId,
+          documentNumber: vendorInvoiceNumber,
+        })
+
+        if (invoice.taxTreatment === 'REVERSE_CHARGE') {
+          const { recordRcmRegisterFromVendorInvoice } = await import(
+            '../../../tax-compliance/gst-rcm.service.js'
+          )
+          await recordRcmRegisterFromVendorInvoice(tx, {
+            tenantId: txContext.tenantId,
+            vendorInvoiceId: invoice.id,
+            accountingVoucherId: voucherId,
+            postingEventId: eventId,
+            documentNumber: vendorInvoiceNumber,
+          })
+        }
+
         void voucherNumber
       },
     })

@@ -59,7 +59,7 @@ export function ItcReconciliationPage() {
   return (
     <TaxComplianceShell
       title="ITC Reconciliation"
-      description="Two-pane books vs GSTR-2B workbench. Low-confidence matches require override reason."
+      description="Two-pane books vs GSTR-2B workbench. Suggestions only — no auto ITC claim / no GL post. AP ITC eligibility remains on vendor invoices."
       periodFilter={filter}
       onPeriodChange={setFilter}
       denseBanner
@@ -157,14 +157,17 @@ export function ItcReconciliationPage() {
                     onChange={(e) => setOverrideReason(e.target.value)}
                   />
                 </label>
+                <p className="mt-2 text-[11px] text-erp-muted">
+                  ITC claim class is a recon suggestion. Auto-claim is always blocked; update vendor invoice ITC in AP after review.
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" className="erp-btn erp-btn-primary h-8 px-3 text-[12px]" disabled={!perms.canGstReconcile} onClick={() => void applyStatus('Accepted')}>
+                  <button type="button" className="erp-btn erp-btn-primary h-8 px-3 text-[12px]" disabled={!perms.canGstReconcile || perms.isApiMode} onClick={() => void applyStatus('Accepted')}>
                     Accept
                   </button>
-                  <button type="button" className="erp-btn erp-btn-ghost h-8 px-3 text-[12px]" disabled={!perms.canGstReconcile} onClick={() => void applyStatus('Rejected')}>
+                  <button type="button" className="erp-btn erp-btn-ghost h-8 px-3 text-[12px]" disabled={!perms.canGstReconcile || perms.isApiMode} onClick={() => void applyStatus('Rejected')}>
                     Reject
                   </button>
-                  <button type="button" className="erp-btn erp-btn-ghost h-8 px-3 text-[12px]" disabled={!perms.canGstReconcile} onClick={() => void applyStatus('Deferred')}>
+                  <button type="button" className="erp-btn erp-btn-ghost h-8 px-3 text-[12px]" disabled={!perms.canGstReconcile || perms.isApiMode} onClick={() => void applyStatus('Deferred')}>
                     Defer
                   </button>
                 </div>

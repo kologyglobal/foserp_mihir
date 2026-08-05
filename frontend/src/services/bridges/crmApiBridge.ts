@@ -731,12 +731,15 @@ export async function apiAssignOpportunity(id: string, ownerId: string, notes?: 
 
 function mapOpportunityLinesForApi(lines: NonNullable<Opportunity['lines']> | undefined) {
   if (!lines) return undefined
-  return lines.map((line) => ({
-    lineNo: line.lineNo,
+  // Mirror Sales Order: only catalog item lines — empty draft rows break BE line zod (productOrItem min 1 + itemId required).
+  const catalog = lines.filter((line) => isUuid(line.itemId ?? undefined) && Boolean(line.productOrItem?.trim() || line.itemCode?.trim()))
+  if (!catalog.length) return []
+  return catalog.map((line, index) => ({
+    lineNo: index + 1,
     productId: null,
-    itemId: isUuid(line.itemId ?? undefined) ? line.itemId : null,
+    itemId: line.itemId,
     itemCode: line.itemCode,
-    productOrItem: line.productOrItem,
+    productOrItem: line.productOrItem?.trim() || line.itemCode || 'Item',
     description: line.description,
     productFamily: line.productFamily,
     itemType: line.itemType,

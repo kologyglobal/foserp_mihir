@@ -1255,11 +1255,16 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
               <FormField label="Customer PO">
                 <Input placeholder="Optional PO reference" {...form.register('customerPoNumber')} />
               </FormField>
-              <FormField label="Supply type">
-                <Select {...form.register('supplyType')}>
-                  <option value="INTRA_STATE">Intra-state (CGST + SGST)</option>
-                  <option value="INTER_STATE">Inter-state (IGST)</option>
-                </Select>
+              <FormField label="Supply type" hint="Derived from company state vs place of supply">
+                <Input
+                  readOnly
+                  value={
+                    watched.supplyType === 'INTER_STATE'
+                      ? 'Inter-state (IGST)'
+                      : 'Intra-state (CGST + SGST)'
+                  }
+                  className="font-medium"
+                />
               </FormField>
               <FormField label="Tax treatment">
                 <Select {...form.register('taxTreatment')}>

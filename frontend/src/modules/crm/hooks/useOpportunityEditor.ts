@@ -18,6 +18,7 @@ import type { OpportunityLine, OpportunityPriority, OpportunityStage } from '../
 import {
   calcOpportunityLinesSummary,
   calcWeightedValue,
+  filterCatalogOpportunityLines,
   opportunityLineUnitPriceFieldKey,
   resolveOpportunityLines,
   syncOpportunityLines,
@@ -134,7 +135,7 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
   const [contactId, setContactId] = useState(opportunity?.contactId ?? '')
   const [lines, setLines] = useState<OpportunityLine[]>(initialLines)
   const retainItemIds = useMemo(
-    () => [...lines.map((l) => l.itemId), opportunity?.productId],
+    () => [...lines.map((l) => l.itemId ?? l.productId), opportunity?.productId],
     [lines, opportunity?.productId],
   )
   const { options: productOptions, pickMap } = useProductMasterOptionMap(
@@ -366,7 +367,7 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
     setIsSaving(true)
     try {
       const ownerRecord = ownerOptions.find((o) => o.value === ownerId) ?? { value: ownerId, label: opportunity.ownerName }
-      const syncedLines = syncOpportunityLines(lines)
+      const syncedLines = filterCatalogOpportunityLines(lines)
       const r = await resolveStoreAction(
         updateOpportunity(opportunityId, {
           opportunityName: opportunityName.trim(),

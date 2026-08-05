@@ -1,0 +1,68 @@
+-- Phase 14 — GSTR-9 annual return worksheet + multi-year FY archive (books-side).
+-- Not portal GSTR-9 submit · not FULL GST COMPLIANT.
+-- Notices / audit packs / cockpit health owned by later Phase 15–16 agents — NOT recreated here.
+-- Ordered after Phase 12 `20260805240000_gst_phase12_portal_filing` (room for Phase 13 @ 250000).
+
+CREATE TABLE IF NOT EXISTS `gst_annual_returns` (
+  `id` VARCHAR(191) NOT NULL,
+  `tenantId` VARCHAR(191) NOT NULL,
+  `legalEntityId` VARCHAR(191) NOT NULL,
+  `companyGstin` VARCHAR(20) NOT NULL,
+  `financialYear` VARCHAR(16) NOT NULL,
+  `returnType` ENUM('GSTR9', 'GSTR9C') NOT NULL DEFAULT 'GSTR9',
+  `status` ENUM('OPEN', 'DRAFT', 'LOCKED', 'MARKED_FILED_EXTERNAL', 'ARCHIVED') NOT NULL DEFAULT 'OPEN',
+  `preparedAt` DATETIME(3) NULL,
+  `preparedBy` VARCHAR(191) NULL,
+  `lockedAt` DATETIME(3) NULL,
+  `lockedBy` VARCHAR(191) NULL,
+  `unlockedAt` DATETIME(3) NULL,
+  `unlockedBy` VARCHAR(191) NULL,
+  `unlockReason` VARCHAR(500) NULL,
+  `markedFiledAt` DATETIME(3) NULL,
+  `markedFiledBy` VARCHAR(191) NULL,
+  `acknowledgmentRef` VARCHAR(100) NULL,
+  `filedOnPortalDate` DATE NULL,
+  `archivedAt` DATETIME(3) NULL,
+  `archivedBy` VARCHAR(191) NULL,
+  `archiveReason` VARCHAR(500) NULL,
+  `monthsCovered` INT NOT NULL DEFAULT 0,
+  `monthsFiledHint` INT NOT NULL DEFAULT 0,
+  `draftVersion` INT NOT NULL DEFAULT 0,
+  `snapshotJson` JSON NULL,
+  `warningsJson` JSON NULL,
+  `remarks` VARCHAR(1000) NULL,
+  `createdBy` VARCHAR(191) NULL,
+  `updatedBy` VARCHAR(191) NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updatedAt` DATETIME(3) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `gst_annual_return_unique`(`tenantId`, `legalEntityId`, `companyGstin`, `financialYear`, `returnType`),
+  INDEX `gst_annual_le_fy_idx`(`tenantId`, `legalEntityId`, `financialYear`),
+  INDEX `gst_annual_status_idx`(`tenantId`, `status`),
+  CONSTRAINT `gst_annual_returns_tenantId_fkey` FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `gst_annual_returns_legalEntityId_fkey` FOREIGN KEY (`legalEntityId`) REFERENCES `legal_entities`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `gst_fy_archives` (
+  `id` VARCHAR(191) NOT NULL,
+  `tenantId` VARCHAR(191) NOT NULL,
+  `legalEntityId` VARCHAR(191) NOT NULL,
+  `companyGstin` VARCHAR(20) NOT NULL,
+  `financialYear` VARCHAR(16) NOT NULL,
+  `status` ENUM('OPEN', 'ARCHIVED') NOT NULL DEFAULT 'OPEN',
+  `archivedAt` DATETIME(3) NULL,
+  `archivedBy` VARCHAR(191) NULL,
+  `retainUntil` DATE NULL,
+  `notes` VARCHAR(1000) NULL,
+  `snapshotCountsJson` JSON NULL,
+  `createdBy` VARCHAR(191) NULL,
+  `updatedBy` VARCHAR(191) NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updatedAt` DATETIME(3) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `gst_fy_archive_unique`(`tenantId`, `legalEntityId`, `companyGstin`, `financialYear`),
+  INDEX `gst_fy_archive_le_idx`(`tenantId`, `legalEntityId`),
+  INDEX `gst_fy_archive_status_idx`(`tenantId`, `status`),
+  CONSTRAINT `gst_fy_archives_tenantId_fkey` FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `gst_fy_archives_legalEntityId_fkey` FOREIGN KEY (`legalEntityId`) REFERENCES `legal_entities`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

@@ -174,7 +174,8 @@ export function buildVendorInvoiceAccountingPreview(params: BuildVendorInvoiceAc
     }
   }
 
-  if (amountsResult.isRcm) {
+  // Credit RCM payables when any self-assessed reverse-charge tax was computed.
+  if (amountsResult.isRcm || !isZero(amountsResult.rcmTaxTotals.totalTaxAmount)) {
     pushLine('RCM_CGST_PAYABLE', 'CREDIT', amountsResult.rcmTaxTotals.cgstAmount, 'RCM CGST payable (self-assessed)')
     pushLine('RCM_SGST_PAYABLE', 'CREDIT', amountsResult.rcmTaxTotals.sgstAmount, 'RCM SGST payable (self-assessed)')
     pushLine('RCM_IGST_PAYABLE', 'CREDIT', amountsResult.rcmTaxTotals.igstAmount, 'RCM IGST payable (self-assessed)')

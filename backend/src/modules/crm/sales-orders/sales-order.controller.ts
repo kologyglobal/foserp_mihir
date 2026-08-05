@@ -20,15 +20,17 @@ export const getSalesOrder = asyncHandler(async (req: Request, res: Response) =>
 
 export const createSalesOrder = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
-  const { userId } = getContext(req)
-  const data = await service.createSalesOrder(tenantId, userId, req.body)
+  const { userId, permissions } = getContext(req)
+  const data = await service.createSalesOrder(tenantId, userId, req.body, { permissions })
   sendCreated(res, 'Sales order created', data)
 })
 
 export const updateSalesOrder = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
-  const { userId } = getContext(req)
-  const data = await service.updateSalesOrder(tenantId, getRouteParam(req, 'id'), userId, req.body)
+  const { userId, permissions } = getContext(req)
+  const data = await service.updateSalesOrder(tenantId, getRouteParam(req, 'id'), userId, req.body, {
+    permissions,
+  })
   sendSuccess(res, 'Sales order updated', data)
 })
 

@@ -540,7 +540,8 @@ export const useCrmStore = create<CrmState>()(
           }
         }
         const audit = stampCreated()
-        const syncedLines = syncOpportunityLines(input.lines ?? [])
+        // Persist only catalog item lines (drop blank SO-style draft rows).
+        const syncedLines = syncOpportunityLines(input.lines ?? []).filter((l) => Boolean(l.itemId?.trim()))
         const summary = calcOpportunityLinesSummary(syncedLines)
         const primaryItemId = syncedLines[0]?.itemId ?? null
         const sellable = assertSellableItemIds([
@@ -887,7 +888,7 @@ export const useCrmStore = create<CrmState>()(
         if (!opp) return { ok: false, error: 'Opportunity not found' }
         let nextPatch = { ...patch }
         if (patch.lines) {
-          const syncedLines = syncOpportunityLines(patch.lines)
+          const syncedLines = syncOpportunityLines(patch.lines).filter((l) => Boolean(l.itemId?.trim()))
           nextPatch = {
             ...nextPatch,
             lines: syncedLines.map((l) => ({ ...l, productId: null })),

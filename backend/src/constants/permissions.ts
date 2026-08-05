@@ -104,6 +104,8 @@ export const PERMISSIONS = [
   'crm.commercial.allocation.view',
   'crm.commercial.allocation.create',
   'crm.commercial.allocation.reverse',
+  /** Authorised Place of Supply override on commercial docs (SO / PI / TI). */
+  'crm.commercial.tax_place_override',
 
   'crm.follow_up.view',
   'crm.follow_up.create',
@@ -552,8 +554,50 @@ export const PERMISSIONS = [
   // Tax compliance Phase 2 â€” e-invoice / e-way (simulated NIC by default)
   'finance.tax.einvoice.manage',
   'finance.tax.eway.manage',
+  'tax.gst.view',
+  'tax.gst.setup.manage',
+  'tax.gst.override',
+  // Phase 3 — GSTR-2B import + ITC reconciliation workbench (no auto-claim)
+  'tax.gst.reconcile',
+  // Phase 5 — registers & GSTR-1/3B preparation (not portal filing)
+  'tax.gst.returns.prepare',
+  'tax.gst.returns.lock',
+  'tax.gst.returns.mark_filed',
+  // Phase 12 — portal filing foundation (SIMULATED default)
+  'tax.gst.returns.file',
+  // Phase 8 — GST payment / PMT-06 style (not portal generate)
+  'tax.gst.payment.prepare',
+  'tax.gst.payment.confirm',
+  'tax.gst.payment.post',
+  'tax.gst.payment.close',
+  // Phase 10 — export / SEZ / LUT
+  'tax.gst.export.view',
+  'tax.gst.lut.manage',
+  // Phase 11 — specials / advances / GST TDS-TCS books
+  'tax.gst.specials.view',
+  'tax.gst.specials.manage',
+  // Phase 13 — go-live UAT / period books readiness
+  'tax.gst.compliance.view',
+  'tax.gst.compliance.uat',
+  // Phase 14 — GSTR-9 annual worksheet + multi-year FY archive
+  'tax.gst.annual.view',
+  'tax.gst.annual.prepare',
+  'tax.gst.annual.archive',
+  // Phase 15 — compliance cockpit / multi-period health / audit packs / notices / GSTR-9 foundation
+  'tax.gst.ops.view',
+  'tax.gst.ops.manage',
+  'tax.gst.ops.export',
+  // Phase 16 — GST rate master ops / determination continuity
+  'tax.gst.rates.view',
+  'tax.gst.rates.manage',
+  // Phase 17 — data quality / GSTIN backfill / freeze checklist
+  'tax.gst.quality.view',
+  'tax.gst.quality.manage',
+  // Phase 18 — GST vs GL control recon
+  'tax.gst.gl_recon.view',
+  'tax.gst.gl_recon.manage',
 
-  // Finance Fixed Assets Phase 1â€“2 â€” register, capitalize, depreciate, simple dispose
+  // Finance Fixed Assets Phase 1–2 — register, capitalize, depreciate, simple dispose
   'finance.fa.view',
   'finance.fa.create',
   'finance.fa.edit',
@@ -1367,6 +1411,35 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
   ],
   'Finance Manager': [
     ...FINANCE_PERMISSIONS,
+    'tax.gst.view',
+    'tax.gst.reconcile',
+    'tax.gst.setup.manage',
+    'tax.gst.returns.prepare',
+    'tax.gst.returns.lock',
+    'tax.gst.returns.mark_filed',
+    'tax.gst.returns.file',
+    'tax.gst.payment.prepare',
+    'tax.gst.payment.confirm',
+    'tax.gst.payment.post',
+    'tax.gst.payment.close',
+    'tax.gst.export.view',
+    'tax.gst.lut.manage',
+    'tax.gst.specials.view',
+    'tax.gst.specials.manage',
+    'tax.gst.compliance.view',
+    'tax.gst.compliance.uat',
+    'tax.gst.annual.view',
+    'tax.gst.annual.prepare',
+    'tax.gst.annual.archive',
+    'tax.gst.ops.view',
+    'tax.gst.ops.manage',
+    'tax.gst.ops.export',
+    'tax.gst.rates.view',
+    'tax.gst.rates.manage',
+    'tax.gst.quality.view',
+    'tax.gst.quality.manage',
+    'tax.gst.gl_recon.view',
+    'tax.gst.gl_recon.manage',
     'organisation.view',
     'organisation.create',
     'organisation.update',
@@ -1581,6 +1654,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'crm.commercial.receipt.accounting_draft.create',
     'crm.commercial.invoice.view', 'crm.commercial.invoice.create', 'crm.commercial.invoice.post', 'crm.commercial.invoice.cancel',
     'crm.commercial.allocation.view', 'crm.commercial.allocation.create', 'crm.commercial.allocation.reverse',
+    'crm.commercial.tax_place_override',
     'crm.import.view', 'crm.import.execute',
     'crm.master.view', 'crm.master.create', 'crm.master.update', 'crm.master.delete',
     'crm.dashboard.view', 'crm.report.view', 'crm.search.view', 'crm.export.view', 'crm.export.execute',

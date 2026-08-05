@@ -30,6 +30,8 @@ export interface SalesOrderLine {
   description: string
   productId?: string | null
   itemId?: string | null
+  itemCodeSnapshot?: string | null
+  itemNameSnapshot?: string | null
   qty: number
   uom: string
   unitPrice: number
@@ -39,6 +41,18 @@ export interface SalesOrderLine {
   gstAmount: number
   lineTotal: number
   technicalScopeRef?: string | null
+  /** HSN/SAC snapshot at resolve time */
+  hsnCode?: string | null
+  hsnId?: string | null
+  taxScheme?: string | null
+  cgstRate?: number | null
+  sgstRate?: number | null
+  utgstRate?: number | null
+  igstRate?: number | null
+  cgstAmount?: number | null
+  sgstAmount?: number | null
+  utgstAmount?: number | null
+  igstAmount?: number | null
 }
 
 export interface SalesOrder {
@@ -93,6 +107,19 @@ export interface SalesOrder {
   directSoReason?: string | null
   lines?: SalesOrderLine[]
   locationId?: string | null
+  placeOfSupply?: string | null
+  placeOfSupplyStateCode?: string | null
+  placeOfSupplySource?: string | null
+  placeOfSupplyOverride?: boolean
+  placeOfSupplyOverrideReason?: string | null
+  supplierStateCode?: string | null
+  supplyType?: string | null
+  gstScheme?: string | null
+  cgstAmount?: number | null
+  sgstAmount?: number | null
+  utgstAmount?: number | null
+  igstAmount?: number | null
+  cessAmount?: number | null
 }
 
 export interface MrpMaterialLine {

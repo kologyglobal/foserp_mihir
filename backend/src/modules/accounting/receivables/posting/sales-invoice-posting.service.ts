@@ -187,6 +187,17 @@ export async function postSalesInvoice(
         if (updated.count !== 1) {
           throw new SalesInvoiceConcurrentPostError()
         }
+
+        const { recordSalesInvoiceGstLedger } = await import(
+          '../../tax-compliance/gst-ledger.service.js'
+        )
+        await recordSalesInvoiceGstLedger(tx, {
+          tenantId: context.tenantId,
+          salesInvoiceId: invoice.id,
+          accountingVoucherId: voucherId,
+          postingEventId: eventId,
+          documentNumber: invoiceNumber,
+        })
       },
     })
 

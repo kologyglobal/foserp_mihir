@@ -7,7 +7,9 @@ import {
   getGstr2bLines,
   importGstr2bPreview,
   loadPeriodFilter,
+  reconcileActiveGstr2bBatch,
 } from '@/services/accounting/taxComplianceService'
+import { isApiMode } from '@/config/apiConfig'
 import type { Gstr2bLine, PeriodFilterState } from '@/types/taxCompliance'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
@@ -22,6 +24,7 @@ export function Gstr2bImportPage() {
   const [fileName, setFileName] = useState('gstr2b-jun2026-demo.json')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [batchStatus, setBatchStatus] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -29,6 +32,7 @@ export function Gstr2bImportPage() {
       const res = await getGstr2bLines(filter)
       setLines(res.lines)
       setImported(res.imported)
+      setBatchStatus(res.batchStatus ?? null)
     } finally {
       setLoading(false)
     }
@@ -40,13 +44,15 @@ export function Gstr2bImportPage() {
 
   const onImport = async () => {
     if (!perms.canGstReconcile) {
-      notify.error('Permission denied for GSTR-2B import preview.')
+      notify.error('Permission denied for GSTR-2B import.')
       return
     }
     setBusy(true)
     try {
       const res = await importGstr2bPreview(fileName)
-      notify.success(`Imported ${res.importedCount} GSTR-2B lines from “${res.fileName}” (demo preview — not GST portal).`)
+      notify.success(
+        `Imported ${res.importedCount} GSTR-2B lines from “${res.fileName}” (${isApiMode() ? 'immutable batch — not GST portal' : 'demo preview — not GST portal'}).`,
+      )
       await load()
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Import failed')
@@ -55,10 +61,29 @@ export function Gstr2bImportPage() {
     }
   }
 
+  const onReconcile = async () => {
+    if (!perms.canGstReconcile) {
+      notify.error('Permission denied for GSTR-2B reconcile.')
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await reconcileActiveGstr2bBatch(filter)
+      notify.success(
+        `Reconciled batch. Opened ${res.followUpsOpened} follow-up(s). No ITC auto-claim.`,
+      )
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Reconcile failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <TaxComplianceShell
       title="GSTR-2B"
-      description="Import wizard for offline/demo GSTR-2B extract. Does not download from GST portal."
+      description="Offline GSTR-2B import + match to posted vendor invoices. Does not download from GST portal. No automatic ITC claim."
       periodFilter={filter}
       onPeriodChange={setFilter}
       commandBar={
@@ -67,12 +92,19 @@ export function Gstr2bImportPage() {
           sticky={false}
           primaryAction={{
             id: 'import',
-            label: busy ? 'Importing…' : 'Import Preview File',
+            label: busy ? 'Working…' : isApiMode() ? 'Import Batch' : 'Import Preview File',
             icon: Upload,
             disabled: busy || !perms.canGstReconcile,
             onClick: () => void onImport(),
           }}
           secondaryActions={[
+            {
+              id: 'reconcile',
+              label: 'Reconcile vs Books',
+              icon: RefreshCw,
+              disabled: busy || !perms.canGstReconcile || !imported,
+              onClick: () => void onReconcile(),
+            },
             { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
             {
               id: 'export',
@@ -85,21 +117,28 @@ export function Gstr2bImportPage() {
       }
     >
       <ol className="mb-3 list-decimal space-y-1 pl-4 text-[12px] text-erp-muted">
-        <li>Obtain GSTR-2B JSON/CSV offline from your GST practice tooling.</li>
-        <li>Enter demo file name below and run Import Preview (session only).</li>
-        <li>Review lines, then continue to ITC Reconciliation — no auto-accept of low confidence.</li>
+        <li>Obtain GSTR-2B extract offline from practice tooling (not integrated portal download).</li>
+        <li>
+          {isApiMode()
+            ? 'Import creates an immutable batch (re-import after void to correct amounts). Sample seed rows used if you only provide a file name.'
+            : 'Enter demo file name and run Import Preview (session only).'}
+        </li>
+        <li>Reconcile against posted AP vendor invoices, then open ITC Reconciliation. Auto-claim remains blocked.</li>
       </ol>
       <div className="mb-3 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-0.5 text-[11px] font-semibold text-erp-muted">
-          Demo file name
+          File name
           <input
             className="h-8 w-72 rounded border border-erp-border px-2 text-[12px]"
             value={fileName}
             onChange={(e) => setFileName(e.target.value)}
-            aria-label="GSTR-2B demo file name"
+            aria-label="GSTR-2B file name"
           />
         </label>
         <TaxStatusBadge status={imported ? 'Ready for Review' : 'Open'} />
+        {batchStatus ? (
+          <span className="text-[11px] text-erp-muted">Batch status: {batchStatus}</span>
+        ) : null}
       </div>
       {loading ? (
         <LoadingState />

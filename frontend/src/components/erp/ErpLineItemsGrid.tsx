@@ -13,9 +13,9 @@ import {
   opportunityLineUnitPriceFieldKey,
   syncOpportunityLines,
   UNIT_PRICE_REQUIRED_MESSAGE,
+  buildOpportunityLineFromItem,
 } from '../../utils/opportunityLineCalc'
 import type { ProductMasterPick } from '../../utils/opportunityProductOptions'
-import { buildOpportunityLineFromItem } from '../../utils/opportunityLineCalc'
 import { useMasterStore } from '../../store/masterStore'
 import { cn } from '../../utils/cn'
 import { isItemSellable, itemNotSellableForSalesMessage } from '../../utils/opportunityItemOptions'
@@ -100,6 +100,11 @@ export function ErpLineItemsGrid({
   }
 
   function selectItem(lineId: string, itemId: string) {
+    if (!itemId) {
+      const idx = synced.findIndex((l) => l.id === lineId)
+      updateLine(lineId, createEmptyOpportunityLine(idx >= 0 ? idx + 1 : 1, { id: lineId }))
+      return
+    }
     const pick = productPickMap.get(itemId)
     if (!pick) return
     if (!isItemSellable(pick.item)) {
@@ -108,7 +113,8 @@ export function ErpLineItemsGrid({
     }
     const idx = synced.findIndex((l) => l.id === lineId)
     const built = buildOpportunityLineFromItem(pick.item, pick.uomName, idx + 1)
-    updateLine(lineId, built)
+    // Keep stable row id (same as Sales Order / ErpProductPricingPanel).
+    updateLine(lineId, { ...built, id: lineId })
   }
 
   const productCount = synced.filter((l) => Boolean(l.productOrItem?.trim() || l.itemId)).length
@@ -238,10 +244,22 @@ export function ErpLineItemsGrid({
                             <ErpSmartSelect
                               options={productOptions}
                               value={line.itemId ?? ''}
-                              onChange={(itemId) => selectItem(line.id, itemId)}
+                              onChange={(itemId) => selectItem(line.id, itemId ?? '')}
                               placeholder="Select sellable item…"
                               appearance="dropdown"
-                              emptyMessage="Only items allowed for sales are listed."
+                              allowEmpty
+                              emptyMessage="No sellable items match. Enable Sales allowed on the Item master."
+                              resolveOrphanLabel={(id) => {
+                                if (line.itemId === id) {
+                                  if (line.itemCode?.trim()) {
+                                    return line.productOrItem?.trim() && line.productOrItem !== line.itemCode
+                                      ? `${line.itemCode} — ${line.productOrItem}`
+                                      : line.itemCode
+                                  }
+                                  if (line.productOrItem?.trim()) return line.productOrItem.trim()
+                                }
+                                return undefined
+                              }}
                             />
                           )}
                           {line.itemCode ? (

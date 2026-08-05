@@ -18,6 +18,18 @@ export interface SalesOrderLineDto {
   gstAmount: number
   lineTotal: number
   technicalScopeRef?: string | null
+  /** HSN/SAC snapshot at line resolve — not live item master. */
+  hsnCode?: string | null
+  hsnId?: string | null
+  taxScheme?: string | null
+  cgstRate?: number | null
+  sgstRate?: number | null
+  utgstRate?: number | null
+  igstRate?: number | null
+  cgstAmount?: number | null
+  sgstAmount?: number | null
+  utgstAmount?: number | null
+  igstAmount?: number | null
 }
 
 export type SalesOrderWithCompany = CrmSalesOrder & {
@@ -69,6 +81,20 @@ export interface SalesOrderDto {
   directSoReason: string | null
   locationId: string | null
   lines: SalesOrderLineDto[]
+  /** GST header snapshot (PoS / supply type / scheme aggregates). */
+  placeOfSupply: string | null
+  placeOfSupplyStateCode: string | null
+  placeOfSupplySource: string | null
+  placeOfSupplyOverride: boolean
+  placeOfSupplyOverrideReason: string | null
+  supplierStateCode: string | null
+  supplyType: string | null
+  gstScheme: string | null
+  cgstAmount: number | null
+  sgstAmount: number | null
+  utgstAmount: number | null
+  igstAmount: number | null
+  cessAmount: number | null
   createdById: string | null
   createdByName: string | null
   modifiedById: string | null
@@ -125,6 +151,19 @@ export function mapSalesOrderToDto(order: SalesOrderWithCompany, names?: AuditUs
     directSoReason: order.directSoReason ?? null,
     locationId: order.locationId,
     lines: parseLines(order.lines),
+    placeOfSupply: order.placeOfSupply ?? null,
+    placeOfSupplyStateCode: order.placeOfSupplyStateCode ?? null,
+    placeOfSupplySource: order.placeOfSupplySource ?? null,
+    placeOfSupplyOverride: Boolean(order.placeOfSupplyOverride),
+    placeOfSupplyOverrideReason: order.placeOfSupplyOverrideReason ?? null,
+    supplierStateCode: order.supplierStateCode ?? null,
+    supplyType: order.supplyType ?? null,
+    gstScheme: order.gstScheme ?? null,
+    cgstAmount: order.cgstAmount != null ? decimalToNumber(order.cgstAmount) : null,
+    sgstAmount: order.sgstAmount != null ? decimalToNumber(order.sgstAmount) : null,
+    utgstAmount: order.utgstAmount != null ? decimalToNumber(order.utgstAmount) : null,
+    igstAmount: order.igstAmount != null ? decimalToNumber(order.igstAmount) : null,
+    cessAmount: order.cessAmount != null ? decimalToNumber(order.cessAmount) : null,
     ...mapAuditFields(order, names),
   }
 }

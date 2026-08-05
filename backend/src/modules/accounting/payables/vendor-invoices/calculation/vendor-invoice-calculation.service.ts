@@ -197,6 +197,7 @@ export async function calculateVendorInvoice(
     duplicateAssessment,
     accountReadiness,
     accountingPreview,
+    isReverseCharge: amounts.isRcm || Number(amounts.rcmTaxTotals.totalTaxAmount) > 0,
   })
 
   return assembleResult(
@@ -244,6 +245,7 @@ export function calculateVendorInvoiceSync(input: VendorInvoiceCalculationInput)
     duplicateAssessment,
     accountReadiness,
     accountingPreview,
+    isReverseCharge: amounts.isRcm || Number(amounts.rcmTaxTotals.totalTaxAmount) > 0,
   })
 
   return assembleResult(

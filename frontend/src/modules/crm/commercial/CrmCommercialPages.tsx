@@ -69,7 +69,16 @@ import {
 import { SalesTaxInvoiceListPage } from '../../sales/SalesTaxInvoiceListPage'
 import { cn } from '../../../utils/cn'
 import type { CrmCommercialLine } from '../../../types/crmCommercial'
-import { DEFAULT_GST_RATE } from '../../../types/invoice'
+import { COMPANY_STATE } from '../../../types/invoice'
+import {
+  CommercialGstSupplyPanel,
+  type CommercialGstSupplyValue,
+} from '../../../components/sales/CommercialGstSupplyPanel'
+import {
+  formatTaxSchemeLabel,
+  resolveHsnSacDisplay,
+} from '../../../utils/commercialLineSnapshot'
+import { resolveGstStateCode } from '../../../utils/gstStateCode'
 
 type InvoiceCreateSource = 'sales_order' | 'proforma' | 'direct'
 
@@ -87,7 +96,7 @@ function recomputePrefill(prefill: TaxInvoicePrefill, lines: CrmCommercialLine[]
   const taxable = withNos.reduce((s, l) => s + l.taxableValue, 0)
   const avgRate = withNos.length
     ? withNos.reduce((s, l) => s + l.taxPct, 0) / withNos.length
-    : DEFAULT_GST_RATE
+    : 0
   return {
     ...prefill,
     lines: withNos,
@@ -164,8 +173,25 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
   const [prefillLoading, setPrefillLoading] = useState(
     Boolean(isEdit || salesOrderId || proformaId || customerIdParam),
   )
+  const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>(() => ({
+    placeOfSupply: '',
+    placeOfSupplyOverride: false,
+    placeOfSupplyOverrideReason: '',
+    supplierStateCode: resolveGstStateCode(COMPANY_STATE) ?? '27',
+  }))
 
   const isDirect = sourceType === 'direct' || prefill?.source === 'direct'
+
+  // Seed auto Place of Supply when customer context loads (don't clobber authorise override).
+  useEffect(() => {
+    if (!prefill?.customerState) return
+    setGstSupply((prev) => {
+      if (prev.placeOfSupplyOverride) return prev
+      const code = resolveGstStateCode(prefill.customerState) ?? ''
+      if (code === prev.placeOfSupply) return prev
+      return { ...prev, placeOfSupply: code }
+    })
+  }, [prefill?.customerId, prefill?.customerState])
 
   const confirmedSos = useMemo(
     () => salesOrders.filter((s) => s.status !== 'open' && s.status !== 'closed'),
@@ -414,17 +440,44 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
     }
     const item = getItem(itemId)
     setError(null)
-    setPrefill(
-      patchPrefillLine(prefill, lineId, {
-        itemId,
-        itemCode: item?.itemCode ?? '',
-        description: item?.itemName ?? '',
-        hsnCode: item?.hsnCode ?? '',
-        uom: 'Nos',
-        unitPrice: item?.defaultSalesRate ?? item?.standardRate ?? 0,
-        taxPct: DEFAULT_GST_RATE,
-      }),
-    )
+    void (async () => {
+      const { resolveCommercialLineTax } = await import('../../../utils/commercialLineTax')
+      const { useMasterStore: ms } = await import('../../../store/masterStore')
+      const store = ms.getState()
+      const snap = await resolveCommercialLineTax({
+        direction: 'SALES',
+        item: item ?? null,
+        companyState: COMPANY_STATE,
+        companyStateCode: gstSupply.supplierStateCode || resolveGstStateCode(COMPANY_STATE),
+        partyState: prefill.customerState,
+        partyGstin: prefill.customerGstin,
+        placeOfSupply: gstSupply.placeOfSupplyOverride
+          ? gstSupply.placeOfSupply
+          : prefill.customerState,
+        hsnById: (hid) => store.getHsn(hid),
+        hsnByCode: (code) => store.getHsnByCode(code),
+        gstRates: store.gstRates,
+      })
+      const taxPct = snap.resolved ? snap.taxPct : 0
+      if (!snap.resolved && snap.blockers.length) {
+        notify.warning(snap.blockers[0] ?? 'GST could not be resolved from masters')
+      }
+      setPrefill(
+        patchPrefillLine(prefill, lineId, {
+          itemId,
+          itemCode: item?.itemCode ?? '',
+          description: item?.itemName ?? '',
+          hsnCode: snap.hsnSacCode || item?.hsnCode || '',
+          uom: 'Nos',
+          unitPrice: item?.defaultSalesRate ?? item?.standardRate ?? 0,
+          taxPct,
+          taxScheme: snap.taxScheme,
+          cgstRate: snap.cgstRate,
+          sgstRate: snap.sgstRate,
+          igstRate: snap.igstRate,
+        }),
+      )
+    })()
   }
 
   useEffect(() => {
@@ -1058,6 +1111,17 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                   </p>
                 </div>
               </div>
+
+              <div className="mt-4 col-span-full">
+                <CommercialGstSupplyPanel
+                  value={gstSupply}
+                  onChange={setGstSupply}
+                  customerState={prefill.customerState}
+                  customerGstin={prefill.customerGstin}
+                  shipToState={prefill.shippingAddress || prefill.customerState}
+                  billToState={prefill.billingAddress || prefill.customerState}
+                />
+              </div>
             </div>
           </ErpCardSection>
           </div>
@@ -1067,8 +1131,8 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
             title="Product & Pricing"
             subtitle={
               isDirect
-                ? 'Add sellable items and set quantity, rate, and tax.'
-                : 'Adjust quantity for a partial invoice (capped at remaining).'
+                ? 'HSN/SAC and GST resolve from tax masters when you pick an item (CGST+SGST / IGST / UTGST).'
+                : 'HSN and scheme carry from SO/PI. Adjust quantity for a partial invoice (capped at remaining).'
             }
             icon={ClipboardList}
             accent="green"
@@ -1081,20 +1145,41 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
               <div className="col-span-full so-pricing-panel so-pricing-panel--pro">
                 <div className="so-pricing-table-wrap">
                   <table className="so-pricing-table">
+                    <colgroup>
+                      <col className="so-pricing-col-idx" />
+                      <col className="so-pricing-col-product" />
+                      <col className="so-pricing-col-hsn" />
+                      <col className="so-pricing-col-qty" />
+                      <col className="so-pricing-col-price" />
+                      <col className="so-pricing-col-disc" />
+                      <col className="so-pricing-col-gst" />
+                      <col className="so-pricing-col-scheme" />
+                      <col className="so-pricing-col-money" />
+                      <col className="so-pricing-col-money" />
+                      <col className="so-pricing-col-money-wide" />
+                      <col className="so-pricing-col-action" />
+                    </colgroup>
                     <thead>
                       <tr>
                         <th className="so-pricing-th so-pricing-th--center">#</th>
                         <th className="so-pricing-th">Product</th>
+                        <th className="so-pricing-th">HSN/SAC</th>
                         <th className="so-pricing-th so-pricing-th--right">Qty</th>
                         <th className="so-pricing-th so-pricing-th--right">Unit price</th>
                         <th className="so-pricing-th so-pricing-th--right">Disc %</th>
                         <th className="so-pricing-th so-pricing-th--right">GST %</th>
-                        <th className="so-pricing-th so-pricing-th--right">Line total</th>
+                        <th className="so-pricing-th">Scheme</th>
+                        <th className="so-pricing-th so-pricing-th--right so-pricing-th--calc">Taxable</th>
+                        <th className="so-pricing-th so-pricing-th--right so-pricing-th--calc">GST</th>
+                        <th className="so-pricing-th so-pricing-th--right so-pricing-th--calc">Line total</th>
                         <th className="so-pricing-th so-pricing-th--center" aria-label="Actions" />
                       </tr>
                     </thead>
                     <tbody>
-                      {prefill.lines.map((line, idx) => (
+                      {prefill.lines.map((line, idx) => {
+                        const item = line.itemId ? getItem(line.itemId) : undefined
+                        const hsn = resolveHsnSacDisplay(line, item)
+                        return (
                         <tr key={line.id} className="so-pricing-row">
                           <td className="so-pricing-td so-pricing-td--center tabular-nums text-erp-muted">
                             {idx + 1}
@@ -1111,6 +1196,14 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                               dropdownMinWidth={360}
                               emptyMessage="Only items allowed for sales can be selected."
                             />
+                          </td>
+                          <td className="so-pricing-td tabular-nums text-[12px] text-erp-muted">
+                            {hsn.code || '—'}
+                            {!hsn.fromSnapshot && hsn.code ? (
+                              <span className="ml-1 text-[10px] text-amber-700" title="From item master">
+                                live
+                              </span>
+                            ) : null}
                           </td>
                           <td className="so-pricing-td">
                             <Input
@@ -1163,7 +1256,7 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                               onChange={(e) =>
                                 setPrefill(
                                   patchPrefillLine(prefill, line.id, {
-                                    taxPct: Number(e.target.value) || DEFAULT_GST_RATE,
+                                    taxPct: Number(e.target.value) || 0,
                                   }),
                                 )
                               }
@@ -1173,7 +1266,19 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                                   {rate}%
                                 </option>
                               ))}
+                              {!GST_RATE_OPTIONS.includes(line.taxPct as (typeof GST_RATE_OPTIONS)[number]) ? (
+                                <option value={line.taxPct}>{line.taxPct}%</option>
+                              ) : null}
                             </select>
+                          </td>
+                          <td className="so-pricing-td text-[11px] text-erp-muted">
+                            {formatTaxSchemeLabel(line.taxScheme)}
+                          </td>
+                          <td className="so-pricing-td so-pricing-td--right tabular-nums text-erp-muted">
+                            {formatCurrency(line.taxableValue)}
+                          </td>
+                          <td className="so-pricing-td so-pricing-td--right tabular-nums text-erp-muted">
+                            {formatCurrency(line.gstAmount)}
                           </td>
                           <td className="so-pricing-td so-pricing-td--right so-pricing-td--total tabular-nums">
                             {formatCurrency(line.lineTotal)}
@@ -1190,7 +1295,8 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1201,15 +1307,18 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                   <p className="so-pricing-toolbar__hint">
                     <span className="so-pricing-toolbar__count">{prefill.lines.length}</span>
                     {' '}line{prefill.lines.length === 1 ? '' : 's'}
+                    {' · '}GST from tax masters on item pick
                   </p>
                 </div>
               </div>
             ) : (
               <div className="col-span-full overflow-x-auto erp-line-items-grid">
-                <table className="w-full min-w-[720px] text-[12px] erp-line-items-grid__table">
+                <table className="w-full min-w-[820px] text-[12px] erp-line-items-grid__table">
                   <thead>
                     <tr className="border-b border-erp-border bg-erp-surface-alt/60 text-left text-[11px] uppercase tracking-wide text-erp-muted">
                       <th className="px-2 py-2">Item</th>
+                      <th className="px-2 py-2">HSN/SAC</th>
+                      <th className="px-2 py-2">Scheme</th>
                       <th className="px-2 py-2 text-right">Qty</th>
                       <th className="px-2 py-2 text-right">Max</th>
                       <th className="px-2 py-2 text-right">Rate</th>
@@ -1218,11 +1327,20 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                     </tr>
                   </thead>
                   <tbody>
-                    {prefill.lines.map((line) => (
+                    {prefill.lines.map((line) => {
+                      const item = line.itemId ? getItem(line.itemId) : undefined
+                      const hsn = resolveHsnSacDisplay(line, item)
+                      return (
                       <tr key={line.id} className="border-b border-erp-border/60">
                         <td className="px-2 py-2">
                           <div className="font-medium text-erp-text">{line.itemCode || '—'}</div>
                           <div className="text-[11px] text-erp-muted">{line.description}</div>
+                        </td>
+                        <td className="px-2 py-2 font-mono text-[11px] text-erp-muted">
+                          {hsn.code || '—'}
+                        </td>
+                        <td className="px-2 py-2 text-[11px] text-erp-muted">
+                          {formatTaxSchemeLabel(line.taxScheme)}
                         </td>
                         <td className="px-2 py-2">
                           <Input
@@ -1244,7 +1362,8 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                           {formatCurrency(line.lineTotal)}
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

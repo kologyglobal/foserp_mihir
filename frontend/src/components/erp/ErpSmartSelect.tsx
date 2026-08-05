@@ -56,6 +56,93 @@ interface ErpSmartSelectProps<T = string> {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+/** Dedicated body portal so table stacking contexts cannot punch through the menu. */
+const PORTAL_ROOT_ID = 'erp-portal-root'
+const PORTAL_STYLE_ID = 'erp-smart-select-portal-style'
+
+function ensurePortalStyles() {
+  if (typeof document === 'undefined') return
+  const existing = document.getElementById(PORTAL_STYLE_ID)
+  if (existing) existing.remove()
+  const style = document.createElement('style')
+  style.id = PORTAL_STYLE_ID
+  // Last-in head style beats almost everything without fighting cascade layers.
+  style.textContent = `
+#erp-portal-root {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  z-index: 2147483000;
+  pointer-events: none;
+}
+#erp-portal-root .erp-smart-select__dropdown,
+#erp-portal-root .erp-smart-select__dropdown--portal {
+  pointer-events: auto !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  opacity: 1 !important;
+  mix-blend-mode: normal !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  isolation: isolate !important;
+  color: #0f172a !important;
+  animation: none !important;
+  box-shadow: 0 18px 48px rgba(15,23,42,0.22), 0 4px 14px rgba(15,23,42,0.12) !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 10px !important;
+}
+#erp-portal-root .erp-smart-select__dropdown *,
+#erp-portal-root .erp-smart-select__dropdown--portal * {
+  opacity: 1 !important;
+}
+#erp-portal-root .erp-smart-select__list,
+#erp-portal-root .erp-smart-select__empty,
+#erp-portal-root [role="option"] {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+#erp-portal-root [role="option"].erp-smart-select__option--highlight,
+#erp-portal-root [role="option"].erp-smart-select__option--selected,
+#erp-portal-root [role="option"]:hover {
+  background: #e8f1fb !important;
+  background-color: #e8f1fb !important;
+}
+#erp-portal-root .erp-smart-select__hint {
+  background: #f8fafc !important;
+  background-color: #f8fafc !important;
+}
+#erp-portal-root .erp-smart-select__scrim {
+  pointer-events: none !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+`
+  document.head.appendChild(style)
+}
+
+function getPortalRoot(): HTMLElement {
+  if (typeof document === 'undefined') {
+    throw new Error('ErpSmartSelect portal requires document')
+  }
+  ensurePortalStyles()
+  let root = document.getElementById(PORTAL_ROOT_ID)
+  if (!root) {
+    root = document.createElement('div')
+    root.id = PORTAL_ROOT_ID
+    root.setAttribute('data-erp-portal', 'true')
+    document.body.appendChild(root)
+  }
+  // Always re-assert mount-node layout (HMR / old full-screen fixed portal would keep bleeding).
+  root.style.cssText =
+    'position:absolute;left:0;top:0;width:0;height:0;overflow:visible;z-index:2147483000;pointer-events:none;'
+  return root
+}
+
 /** Closed-control label when value is not in options — never title-case a UUID. */
 export function formatSmartSelectOrphanLabel(
   value: string,
@@ -77,6 +164,30 @@ function matchQuery(searchText: string, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
   return q.split(/\s+/).every((token) => searchText.includes(token))
+}
+
+/** Always opaque white panel — never theme tokens / animation / CSS cascade. */
+const SOLID_PANEL: CSSProperties = {
+  backgroundColor: '#ffffff',
+  backgroundImage: 'none',
+  opacity: 1,
+  mixBlendMode: 'normal',
+  colorScheme: 'light',
+  color: '#0f172a',
+  border: '1px solid #cbd5e1',
+  borderRadius: 10,
+  boxShadow: '0 18px 48px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(15, 23, 42, 0.12)',
+  overflowX: 'hidden',
+  overflowY: 'auto',
+  WebkitOverflowScrolling: 'touch',
+  overscrollBehavior: 'contain',
+  pointerEvents: 'auto',
+  zIndex: 2147483000,
+  // Force a dedicated compositor layer so underlying table cannot "bleed" through.
+  transform: 'translateZ(0)',
+  WebkitBackfaceVisibility: 'hidden',
+  backfaceVisibility: 'hidden',
+  isolation: 'isolate',
 }
 
 function computeDropdownStyle(
@@ -106,7 +217,7 @@ function computeDropdownStyle(
       left,
       width,
       maxHeight,
-      zIndex: 10050,
+      ...SOLID_PANEL,
     }
   }
 
@@ -117,7 +228,7 @@ function computeDropdownStyle(
     left,
     width,
     maxHeight,
-    zIndex: 10050,
+    ...SOLID_PANEL,
   }
 }
 
@@ -304,6 +415,212 @@ export function ErpSmartSelect<T extends string = string>({
     }
   }
 
+  const dropdownNode =
+    open && dropdownStyle ? (
+      <div
+        ref={dropdownRef}
+        className="erp-smart-select__dropdown erp-smart-select__dropdown--portal"
+        style={dropdownStyle}
+        role="listbox"
+      >
+        {/* Absolute solid sheet — belt-and-suspenders if any child is transparent */}
+        <div
+          aria-hidden
+          className="erp-smart-select__scrim"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 0,
+            backgroundColor: '#ffffff',
+            borderRadius: 10,
+            pointerEvents: 'none',
+          }}
+        />
+        <div style={{ position: 'relative', zIndex: 1, backgroundColor: '#ffffff' }}>
+          {filtered.length === 0 ? (
+            <p
+              className="erp-smart-select__empty"
+              style={{
+                margin: 0,
+                padding: '12px 14px',
+                fontSize: 12.5,
+                color: '#64748b',
+                backgroundColor: '#ffffff',
+              }}
+            >
+              {emptyMessage}
+            </p>
+          ) : (
+            <>
+              <p
+                className="erp-smart-select__hint"
+                style={{
+                  margin: 0,
+                  padding: '6px 10px',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  color: '#64748b',
+                  borderBottom: '1px solid #e2e8f0',
+                  backgroundColor: '#f8fafc',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 2,
+                }}
+              >
+                {filtered.length} option{filtered.length === 1 ? '' : 's'}
+                {filterQuery.trim() ? ` matching “${filterQuery.trim()}”` : ''}
+              </p>
+              <ul
+                className="erp-smart-select__list"
+                style={{
+                  listStyle: 'none',
+                  margin: 0,
+                  padding: 4,
+                  backgroundColor: '#ffffff',
+                }}
+              >
+                {filtered.map((opt, index) => {
+                  const rich = Boolean(opt.subtitle || opt.trailing || opt.badge)
+                  const active = index === highlightIndex || value === opt.value
+                  return (
+                    <li key={opt.value} style={{ listStyle: 'none', backgroundColor: '#ffffff' }}>
+                      {/* div+role avoids button preflight transparent backgrounds */}
+                      <div
+                        role="option"
+                        aria-selected={value === opt.value}
+                        tabIndex={-1}
+                        className={cn(
+                          'erp-smart-select__option',
+                          rich && 'erp-smart-select__option--rich',
+                          value === opt.value && 'erp-smart-select__option--selected',
+                          index === highlightIndex && 'erp-smart-select__option--highlight',
+                        )}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          gap: rich ? 4 : 2,
+                          width: '100%',
+                          padding: rich ? '8px 10px' : '6px 10px',
+                          border: 0,
+                          borderRadius: 6,
+                          backgroundColor: active ? '#e8f1fb' : '#ffffff',
+                          color: '#0f172a',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          boxSizing: 'border-box',
+                          boxShadow: value === opt.value ? 'inset 2px 0 0 #0078d4' : undefined,
+                        }}
+                        onMouseEnter={() => setHighlightIndex(index)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => selectOption(opt)}
+                      >
+                        <span
+                          className="erp-smart-select__option-head"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 12,
+                            width: '100%',
+                          }}
+                        >
+                          <span
+                            className="erp-smart-select__option-label"
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: '#0f172a',
+                              lineHeight: 1.35,
+                            }}
+                          >
+                            {opt.label}
+                          </span>
+                          <span
+                            className="erp-smart-select__option-end"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}
+                          >
+                            {opt.trailing ? (
+                              <span
+                                className="erp-smart-select__option-trailing"
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: '#0078d4',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {opt.trailing}
+                              </span>
+                            ) : null}
+                            {value === opt.value ? (
+                              <Check
+                                className="erp-smart-select__option-check"
+                                strokeWidth={2.5}
+                                aria-hidden
+                                style={{ width: 15, height: 15, color: '#0078d4', flexShrink: 0 }}
+                              />
+                            ) : null}
+                          </span>
+                        </span>
+                        {opt.subtitle ? (
+                          <span
+                            className="erp-smart-select__option-subtitle"
+                            style={{
+                              fontSize: 11.5,
+                              fontWeight: 500,
+                              lineHeight: 1.35,
+                              color: '#4b5563',
+                            }}
+                          >
+                            {opt.subtitle}
+                          </span>
+                        ) : opt.meta ? (
+                          <span
+                            className="erp-smart-select__option-meta"
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 400,
+                              lineHeight: 1.35,
+                              color: '#64748b',
+                            }}
+                          >
+                            {opt.meta}
+                          </span>
+                        ) : null}
+                        {opt.badge ? (
+                          <span
+                            className="erp-smart-select__option-badge"
+                            style={{
+                              display: 'inline-flex',
+                              marginTop: 2,
+                              padding: '2px 6px',
+                              borderRadius: 999,
+                              border: '1px solid #e2e8f0',
+                              backgroundColor: '#f8fafc',
+                              fontSize: 10,
+                              fontWeight: 600,
+                              letterSpacing: '0.02em',
+                              textTransform: 'uppercase',
+                              color: '#64748b',
+                            }}
+                          >
+                            {opt.badge}
+                          </span>
+                        ) : null}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
+        </div>
+      </div>
+    ) : null
+
   return (
     <div className={cn(
       'erp-smart-select',
@@ -368,66 +685,7 @@ export function ErpSmartSelect<T extends string = string>({
         <ChevronDown className={cn('erp-smart-select__chevron h-4 w-4', open && 'erp-smart-select__chevron--open')} aria-hidden />
       </div>
 
-      {open && dropdownStyle
-        ? createPortal(
-        <div ref={dropdownRef} className="erp-smart-select__dropdown" style={dropdownStyle} role="listbox">
-          {filtered.length === 0 ? (
-            <p className="erp-smart-select__empty">{emptyMessage}</p>
-          ) : (
-            <>
-              <p className="erp-smart-select__hint">
-                {filtered.length} option{filtered.length === 1 ? '' : 's'}
-                {filterQuery.trim() ? ` matching “${filterQuery.trim()}”` : ''}
-              </p>
-              <ul className="erp-smart-select__list">
-                {filtered.map((opt, index) => {
-                  const rich = Boolean(opt.subtitle || opt.trailing || opt.badge)
-                  return (
-                    <li key={opt.value}>
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={value === opt.value}
-                        className={cn(
-                          'erp-smart-select__option',
-                          rich && 'erp-smart-select__option--rich',
-                          value === opt.value && 'erp-smart-select__option--selected',
-                          index === highlightIndex && 'erp-smart-select__option--highlight',
-                        )}
-                        onMouseEnter={() => setHighlightIndex(index)}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => selectOption(opt)}
-                      >
-                        <span className="erp-smart-select__option-head">
-                          <span className="erp-smart-select__option-label">{opt.label}</span>
-                          <span className="erp-smart-select__option-end">
-                            {opt.trailing ? (
-                              <span className="erp-smart-select__option-trailing">{opt.trailing}</span>
-                            ) : null}
-                            {value === opt.value ? (
-                              <Check className="erp-smart-select__option-check" strokeWidth={2.5} aria-hidden />
-                            ) : null}
-                          </span>
-                        </span>
-                        {opt.subtitle ? (
-                          <span className="erp-smart-select__option-subtitle">{opt.subtitle}</span>
-                        ) : opt.meta ? (
-                          <span className="erp-smart-select__option-meta">{opt.meta}</span>
-                        ) : null}
-                        {opt.badge ? (
-                          <span className="erp-smart-select__option-badge">{opt.badge}</span>
-                        ) : null}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            </>
-          )}
-        </div>,
-        document.body,
-      )
-        : null}
+      {dropdownNode ? createPortal(dropdownNode, getPortalRoot()) : null}
     </div>
   )
 }

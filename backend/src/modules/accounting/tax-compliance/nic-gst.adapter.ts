@@ -1,14 +1,22 @@
 /**
  * NIC / GST portal adapter interface.
- * Default implementation is SIMULATED — deterministic local IRN/EWB generation.
- * Swap via GST_NIC_PROVIDER=live later without changing callers.
+ * Default: SIMULATED — deterministic local IRN/EWB generation.
  *
- * Live NIC must follow current official GST / NIC e-Way Bill API specs
- * (auth, encryption, error codes). Do not treat EWB number as a free-text field.
+ * Mode resolution (Phase 6):
+ *   GST_EINVOICE_PROVIDER_MODE = SIMULATED | LIVE   (preferred)
+ *   GST_NIC_PROVIDER            = SIMULATED | LIVE   (legacy fallback)
+ *
+ * LIVE requires UAT certification flag + credentials + explicit HTTP transport opt-in.
+ * See `einvoice-readiness.util.ts` / `docs/tax/PHASE6_EINVOICE.md`.
  */
 import { createHash, randomBytes } from 'crypto'
+import {
+  assertLiveEInvoiceConfigured,
+  resolveEInvoiceProviderMode,
+  type EInvoiceProviderMode,
+} from './einvoice-readiness.util.js'
 
-export type NicProviderMode = 'SIMULATED' | 'LIVE'
+export type NicProviderMode = EInvoiceProviderMode
 
 export interface NicIrnRequest {
   sellerGstin: string
@@ -65,6 +73,14 @@ export interface NicEwbVehicleUpdateRequest {
   reasonCode?: string | null
 }
 
+export interface NicEwbExtendRequest {
+  ewbNumber: string
+  /** Hours to add to current validity (SIMULATED cap applied in product util). */
+  extensionHours: number
+  currentValidUpto: Date
+  reason?: string | null
+}
+
 export interface NicGstAdapter {
   readonly mode: NicProviderMode
   generateIrn(input: NicIrnRequest): Promise<NicIrnResult>
@@ -83,6 +99,12 @@ export interface NicGstAdapter {
   }>
   updateEwbVehicle(input: NicEwbVehicleUpdateRequest): Promise<{
     updatedAt: Date
+    providerRef: string
+    requestSnapshot: Record<string, unknown>
+    responseSnapshot: Record<string, unknown>
+  }>
+  extendEwb(input: NicEwbExtendRequest): Promise<{
+    validUpto: Date
     providerRef: string
     requestSnapshot: Record<string, unknown>
     responseSnapshot: Record<string, unknown>
@@ -197,21 +219,91 @@ export class SimulatedNicAdapter implements NicGstAdapter {
       responseSnapshot,
     }
   }
+
+  async extendEwb(input: NicEwbExtendRequest) {
+    const hours = Math.min(Math.max(input.extensionHours, 1), 24)
+    const validUpto = new Date(input.currentValidUpto)
+    validUpto.setHours(validUpto.getHours() + hours)
+    const requestSnapshot = {
+      ewbNumber: input.ewbNumber,
+      extensionHours: hours,
+      currentValidUpto: input.currentValidUpto.toISOString(),
+      reason: input.reason ?? null,
+      mode: this.mode,
+    }
+    const responseSnapshot = {
+      ewbNo: input.ewbNumber,
+      validUpto: validUpto.toISOString(),
+      status: 'ACT',
+      mode: this.mode,
+    }
+    return {
+      validUpto,
+      providerRef: `SIM-EWB-EXT-${hashToken([input.ewbNumber, String(hours)], 10)}`,
+      requestSnapshot,
+      responseSnapshot,
+    }
+  }
+}
+
+/**
+ * LIVE adapter shell — refuses all calls unless fully gated.
+ * Real NIC/GSP HTTP is intentionally not embedded; enable only after certified UAT.
+ */
+export class LiveNicAdapter implements NicGstAdapter {
+  readonly mode: NicProviderMode = 'LIVE'
+
+  private refuse(operation: string): never {
+    const { ready, blockers } = assertLiveEInvoiceConfigured()
+    if (!ready) {
+      throw new Error(
+        `GST e-invoice LIVE (${operation}) blocked: ${blockers.join('; ')}. Keep GST_EINVOICE_PROVIDER_MODE=SIMULATED until portal UAT.`,
+      )
+    }
+    // Defensive: core factory should never reach here without a plugged-in LiveHttp adapter.
+    throw new Error(
+      `GST e-invoice LIVE (${operation}): gates passed but no Live HTTP adapter factory is registered in this process.`,
+    )
+  }
+
+  async generateIrn(_input: NicIrnRequest): Promise<NicIrnResult> {
+    this.refuse('generateIrn')
+  }
+
+  async cancelIrn(_irn: string, _reason: string) {
+    this.refuse('cancelIrn')
+  }
+
+  async generateEwb(_input: NicEwbRequest): Promise<NicEwbResult> {
+    this.refuse('generateEwb')
+  }
+
+  async cancelEwb(_ewbNumber: string, _reason: string) {
+    this.refuse('cancelEwb')
+  }
+
+  async updateEwbVehicle(_input: NicEwbVehicleUpdateRequest) {
+    this.refuse('updateEwbVehicle')
+  }
+
+  async extendEwb(_input: NicEwbExtendRequest) {
+    this.refuse('extendEwb')
+  }
 }
 
 let cached: NicGstAdapter | null = null
 
-/** Resolve adapter — only SIMULATED is shipped; LIVE throws until configured. */
+/** Resolve adapter — SIMULATED default; LIVE uses gated LiveNicAdapter. */
 export function getNicGstAdapter(): NicGstAdapter {
   if (cached) return cached
-  const mode = (process.env.GST_NIC_PROVIDER ?? 'SIMULATED').toUpperCase()
-  if (mode === 'LIVE') {
-    throw new Error(
-      'GST_NIC_PROVIDER=LIVE is not configured — live NIC auth/encryption must follow current official GST specs',
-    )
-  }
-  cached = new SimulatedNicAdapter()
+  const mode = resolveEInvoiceProviderMode()
+  cached = mode === 'LIVE' ? new LiveNicAdapter() : new SimulatedNicAdapter()
   return cached
+}
+
+/** Current resolved mode (for APIs / status banners). */
+export function getEInvoiceProviderMode(): NicProviderMode {
+  return resolveEInvoiceProviderMode()
 }
 
 /** Test helper — clear cached adapter between suites. */

@@ -20,6 +20,7 @@ import {
   isLikelyUuid,
   resolveCatalogProductLabel,
 } from './catalogProductLabel'
+import { resolveLineTaxFromLocalMasters } from './commercialLineTax'
 
 export function taxCategoryToPct(tax: TaxCategory | string | undefined): number {
   if (tax === 'gst_12') return 12
@@ -38,10 +39,48 @@ export function calcOpportunityLineDerived(
   return { basicAmount, discountAmount, taxableValue, gstAmount, lineTotal }
 }
 
+/** True when a catalog product/item is bound (not a blank draft row). */
+export function opportunityLineHasCatalogItem(
+  line: Pick<OpportunityLine, 'itemId' | 'productId'>,
+): boolean {
+  const itemId = typeof line.itemId === 'string' ? line.itemId.trim() : line.itemId
+  const productId = typeof line.productId === 'string' ? line.productId.trim() : line.productId
+  return Boolean(itemId || productId)
+}
+
+/**
+ * Drop empty draft rows before persist (same rule as Sales Order payload lines).
+ * Blank "Add product line" rows must never hit the API / demo store as real lines.
+ */
+export function filterCatalogOpportunityLines(lines: OpportunityLine[] | null | undefined): OpportunityLine[] {
+  return syncOpportunityLines(lines).filter((l) => opportunityLineHasCatalogItem(l) && Boolean(l.itemId?.trim()))
+}
+
+/** Collect item ids for sellable-item option retain (SO-style item master pickers). */
+export function retainOpportunityItemIds(
+  lines: Array<Pick<OpportunityLine, 'itemId' | 'productId'> | null | undefined> | null | undefined,
+  extraIds?: Array<string | null | undefined>,
+): Array<string | null | undefined> {
+  const fromLines = (lines ?? []).flatMap((l) => (l ? [l.itemId, l.productId] : []))
+  return [...fromLines, ...(extraIds ?? [])]
+}
+
+/**
+ * Red “Tax unresolved” only after a catalog item is selected and tax masters failed.
+ * Blank Create Lead / empty draft rows must never warn — even if flags were left unclean.
+ */
+export function shouldShowTaxUnresolvedWarning(
+  line: Pick<OpportunityLine, 'taxUnresolved' | 'itemId' | 'productId'>,
+): boolean {
+  if (!opportunityLineHasCatalogItem(line)) return false
+  return line.taxUnresolved === true
+}
+
 export function syncOpportunityLines(lines: OpportunityLine[] | null | undefined): OpportunityLine[] {
   if (!Array.isArray(lines)) return []
   return lines.map((line, idx) => {
     const derived = calcOpportunityLineDerived(line)
+    const hasCatalog = opportunityLineHasCatalogItem(line)
     return {
       ...line,
       lineNo: idx + 1,
@@ -49,6 +88,8 @@ export function syncOpportunityLines(lines: OpportunityLine[] | null | undefined
       taxableValue: derived.taxableValue,
       gstAmount: derived.gstAmount,
       lineTotal: derived.lineTotal,
+      // Never carry a false-positive unresolved flag on empty draft rows (e.g. rehydrated encodes).
+      taxUnresolved: hasCatalog ? Boolean(line.taxUnresolved) : false,
     }
   })
 }
@@ -406,11 +447,15 @@ export function createEmptyOpportunityLine(lineNo = 1, patch?: Partial<Opportuni
     discountPct: 0,
     discountAmount: 0,
     taxableValue: 0,
-    taxPct: 18,
+    taxPct: 0,
     gstAmount: 0,
     lineTotal: 0,
     expectedDeliveryDate: null,
     remarks: '',
+    hsnCode: '',
+    // Empty draft lines are not tax errors — unresolved only after an item is chosen.
+    taxSource: 'UNRESOLVED',
+    taxUnresolved: false,
     ...patch,
   }
   return syncOpportunityLines([base])[0]!
@@ -440,6 +485,14 @@ export function buildOpportunityLineFromProduct(
 
 /** Primary CRM path — build opportunity line from MasterItem (salesAllowed). */
 export function buildOpportunityLineFromItem(item: Item, uomName: string, lineNo: number): OpportunityLine {
+  const ms = useMasterStore.getState()
+  const snap = resolveLineTaxFromLocalMasters({
+    direction: 'SALES',
+    item,
+    hsnById: (id) => ms.getHsn(id),
+    hsnByCode: (code) => ms.getHsnByCode(code),
+    gstRates: ms.gstRates,
+  })
   return createEmptyOpportunityLine(lineNo, {
     productId: null,
     itemId: item.id,
@@ -450,8 +503,15 @@ export function buildOpportunityLineFromItem(item: Item, uomName: string, lineNo
     itemType: item.itemType,
     uom: uomName,
     unitPrice: item.defaultSalesRate ?? item.standardRate ?? 0,
-    taxPct: 18,
+    taxPct: snap.taxPct,
     qty: 1,
+    hsnCode: snap.hsnSacCode || item.hsnCode || '',
+    taxScheme: snap.taxScheme,
+    taxSource: snap.source,
+    taxUnresolved: !snap.resolved,
+    cgstRate: snap.cgstRate,
+    sgstRate: snap.sgstRate,
+    igstRate: snap.igstRate,
   })
 }
 

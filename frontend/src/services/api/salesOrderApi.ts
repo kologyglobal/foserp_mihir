@@ -66,7 +66,22 @@ export type CreateSalesOrderBody = {
     discountPct?: number
     taxPct?: number
     technicalScopeRef?: string | null
+    hsnCode?: string | null
+    hsnId?: string | null
+    taxScheme?: string | null
+    cgstRate?: number | null
+    sgstRate?: number | null
+    utgstRate?: number | null
+    igstRate?: number | null
+    cgstAmount?: number | null
+    sgstAmount?: number | null
+    utgstAmount?: number | null
+    igstAmount?: number | null
   }>
+  placeOfSupply?: string | null
+  placeOfSupplyOverride?: boolean
+  placeOfSupplyOverrideReason?: string | null
+  supplierStateCode?: string | null
 }
 
 export type UpdateSalesOrderBody = Partial<
@@ -96,6 +111,10 @@ export type UpdateSalesOrderBody = Partial<
     | 'salesOwnerId'
     | 'salesOwnerName'
     | 'lines'
+    | 'placeOfSupply'
+    | 'placeOfSupplyOverride'
+    | 'placeOfSupplyOverrideReason'
+    | 'supplierStateCode'
   >
 >
 

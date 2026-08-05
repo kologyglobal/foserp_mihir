@@ -23,7 +23,7 @@
 | **Notifications** | No | N/A | High | No Prisma model, list, unread count, mark-read, deep-link, or push registration. Purchase setup notifications tab is ON_HOLD placeholder. |
 | **Manufacturing My Work** | Yes | Yes (`manufacturing.operator.my_work` + kiosk any-of) | Low–Med | Routes under manufacturing my-work / kiosk. Web shell already maps. Needs native offline policy later only. |
 | **Daily Production update** | Yes | Yes (`manufacturing.daily_production.*`) | Med | Backend ready; dedicated polished mobile form thin/demo. Idempotency/conflict TBD per action payload. |
-| **QC queue** | Yes | Yes (`quality.view` / submit / `manufacturing.quality.inspect`) | Low–Med | Kiosk queue + decide APIs exist. **No QC photo upload API** even when plan/photo flags elevate remarks. |
+| **QC queue** | Yes | Yes (`quality.view` / submit / `manufacturing.quality.inspect`) | Low–Med | Kiosk queue + decide + multipart photo upload (`/quality/kiosk/inspections/:id/photos`). Mobile inspection screen attaches camera/gallery evidence; PASS blocked when plan marks PHOTO_REQUIRED without photos. |
 | **Maintenance breakdown** | Yes | Yes (`maintenance.*` + `requireModule('maintenance')`) | Med | Ticket lifecycle + multipart photos. **No first-class `/m/maintenance` web route**; desktop V1 is API-backed. Close-readiness gates exist on BE. |
 | **Store issue / return** | Yes | Yes (`manufacturing.materials.issue` / `.return`) | Low–Med | Issue **requires** body `idempotencyKey`. Web mobile pages generate keys in API mode. Returns optional key — safer if always sent. |
 | **Dispatch pick** | Yes | Yes (`dispatch.pick_list.*`) | Med | Phase 7C2 pick lifecycle APIs. POD is separate (base64). Multi-step pick/pack/post needs careful state machine on device. |
@@ -46,7 +46,7 @@
 | CRM attachments | Yes | Entity/attachment perms | Med | Base64 JSON upload; no signed URL. Large camera files painful. |
 | Maintenance photos | Yes | `maintenance.*` | Low–Med | Multipart — preferred camera path. |
 | Dispatch POD | Yes | Dispatch POD perms | Med | Base64; filesystem tenant scope. |
-| QC photos | No | N/A | High (for camera QC) | Only remarks elevation; no binary store. |
+| QC photos | Yes | `quality.submit` / inspect / create | Low–Med | Multipart upload to tenant folder (`QUALITY_UPLOAD_DIR`); soft-delete; required before PASS when plan marks PHOTO_REQUIRED / photoRequired. |
 | Idempotency support | Partial | N/A | Med | Not global. Finance headers + many posting body keys. Document per endpoint in M2 feature work. |
 | LE / branch scope | Partial | Scope admin APIs | Med | Not in login payload; CRM list scope opt-in; incomplete global enforcement. |
 
@@ -62,6 +62,12 @@ Use after login with Bearer token:
 | Modules | `/api/v1/t/:tenantSlug/modules` |
 | Follow-ups | `/api/v1/t/:tenantSlug/crm/follow-ups` |
 | Purchase approvals | `/api/v1/t/:tenantSlug/purchase/approvals` |
+| Purchase requisitions | `/api/v1/t/:tenantSlug/purchase/requisitions` (**mobile Phase B live** — view + submit) |
+| Purchase orders | `/api/v1/t/:tenantSlug/purchase/orders` (**mobile Phase A live**) |
+| PO receivable lines | `/api/v1/t/:tenantSlug/purchase/orders/:id/receivable-lines` (**mobile Phase B**) |
+| Purchase GRN | `/api/v1/t/:tenantSlug/purchase/grns` (**mobile Phase A live**) |
+| Purchase QI | `/api/v1/t/:tenantSlug/purchase/quality-inspections` (**mobile Phase B** handoff, read-only) |
+| Goods receipts | `/api/v1/t/:tenantSlug/purchase/grns` create/submit/post-inventory (**mobile Phase A live**) |
 | Accounting approvals | `/api/v1/t/:tenantSlug/accounting/approvals` |
 | MFG My Work | `/api/v1/t/:tenantSlug/manufacturing/…` (my-work / kiosk) |
 | Daily production | `/api/v1/t/:tenantSlug/manufacturing/daily-production…` |

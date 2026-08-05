@@ -62,7 +62,10 @@ export function ItemLookupSelect({
       top: rect.bottom + 4,
       left: Math.max(8, left),
       width,
-      zIndex: 10050,
+      zIndex: 12050,
+      backgroundColor: '#ffffff',
+      background: '#ffffff',
+      opacity: 1,
     })
   }, [])
 

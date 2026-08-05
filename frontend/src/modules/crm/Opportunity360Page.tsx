@@ -19,7 +19,7 @@ import {
   ErpAdditionalSectionNav,
 } from '../../components/erp/card-form'
 import { ErpButton } from '../../components/erp/ErpButton'
-import { ErpLineItemsGrid } from '../../components/erp/ErpLineItemsGrid'
+import { ErpProductPricingPanel } from '../../components/erp/ErpProductPricingSection'
 import { Button } from '../../components/ui/Button'
 import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip'
 import {
@@ -118,7 +118,12 @@ export function Opportunity360Page() {
     items,
     uoms,
     undefined,
-    opportunity ? [opportunity.productId, ...(opportunity.lines?.map((l) => l.productId) ?? [])] : undefined,
+    opportunity
+      ? [
+          opportunity.productId,
+          ...(opportunity.lines?.flatMap((l) => [l.itemId, l.productId]) ?? []),
+        ]
+      : undefined,
   )
 
   const [followUpOpen, setFollowUpOpen] = useState(false)
@@ -841,14 +846,13 @@ export function Opportunity360Page() {
                 title=""
                 panels={{
                 products: (
-                  <ErpLineItemsGrid
-                    lines={oppLines}
+                  <ErpProductPricingPanel
+                    lines={oppLines.length ? oppLines : []}
                     onChange={() => {}}
                     productOptions={productOptions}
                     productPickMap={pickMap}
-                    probability={opportunity.probability}
                     readOnly
-                    variant="opportunity"
+                    showAdjustments={false}
                   />
                 ),
                 activities: (

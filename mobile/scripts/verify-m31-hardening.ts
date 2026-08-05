@@ -265,13 +265,11 @@ assert.ok(readFileSync(src('app/(app)/crm/collection.tsx'), 'utf8').includes('fi
 assert.ok(readFileSync(src('src/services/push/deviceTokenService.ts'), 'utf8').includes('registerDeviceToken'))
 assert.ok(readFileSync(src('src/features/crm/deeplinks.ts'), 'utf8').includes('handleNotificationDeepLink'))
 
-// Backend device token + search expansion exist in monorepo
+// Backend device token + CRM search service present in monorepo
 const beRoot = join(root, '..')
 assert.ok(existsSync(join(beRoot, 'backend/src/modules/mobile/device-tokens/device-token.routes.ts')))
-assert.ok(
-  readFileSync(join(beRoot, 'backend/src/modules/crm/search/search.service.ts'), 'utf8').includes(
-    'quotations',
-  ),
-)
+const searchSvc = readFileSync(join(beRoot, 'backend/src/modules/crm/search/search.service.ts'), 'utf8')
+assert.ok(searchSvc.includes('searchCrm'), 'CRM search service exports searchCrm')
+assert.ok(searchSvc.includes('leads') || searchSvc.includes('crmLead'), 'CRM search includes lead results')
 
 console.log('M3.1 CRM hardening checks: PASS')

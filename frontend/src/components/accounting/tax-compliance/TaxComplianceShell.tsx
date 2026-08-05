@@ -17,6 +17,15 @@ const EXTRACT_LIVE_PATHS = new Set([
   '/accounting/tax-compliance/gst/inward-supplies',
   '/accounting/tax-compliance/gst/e-invoices',
   '/accounting/tax-compliance/gst/e-way-bills',
+  '/accounting/tax-compliance/gst/registers/sales',
+  '/accounting/tax-compliance/gst/registers/purchase',
+  '/accounting/tax-compliance/gst/registers/rcm',
+  '/accounting/tax-compliance/gst/registers/hsn',
+  '/accounting/tax-compliance/gst/registers/state',
+  '/accounting/tax-compliance/gst/registers/liability',
+  '/accounting/tax-compliance/gst/registers/itc',
+  '/accounting/tax-compliance/gst/registers/payment',
+  '/accounting/tax-compliance/gst/payments',
 ])
 
 const FILING_DEMO_PATHS = [
@@ -28,9 +37,10 @@ const FILING_DEMO_PATHS = [
 function bannerVariantForPath(pathname: string): TaxComplianceBannerVariant {
   const normalized = pathname.replace(/\/$/, '') || '/'
   if (FILING_DEMO_PATHS.some((p) => normalized === p || normalized.startsWith(`${p}/`))) {
+    // Preparation workspace (ledger-backed draft/lock) — not portal filing.
     return 'filing-demo'
   }
-  if (EXTRACT_LIVE_PATHS.has(normalized)) {
+  if (EXTRACT_LIVE_PATHS.has(normalized) || normalized.startsWith('/accounting/tax-compliance/gst/registers/')) {
     return 'extract-live'
   }
   return 'auto'

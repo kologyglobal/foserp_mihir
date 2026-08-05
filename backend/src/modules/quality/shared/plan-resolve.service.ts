@@ -17,6 +17,7 @@ export type ParameterSnapshotEntry = {
   dropdownOptions: string[] | null
   sortOrder: number
   remarksRequired: boolean
+  photoRequired: boolean
 }
 
 function num(value: unknown): number | null {
@@ -53,6 +54,9 @@ function buildSnapshotFromPlan(lines: Array<{
       : null,
     sortOrder: line.sortOrder,
     remarksRequired: line.remarksRequired || line.photoRequiredOverride === true,
+    photoRequired:
+      line.photoRequiredOverride === true ||
+      line.parameter.parameterType === 'PHOTO_REQUIRED',
   }))
 }
 
@@ -167,11 +171,19 @@ export function validatePassAgainstSnapshot(
     measuredNumeric?: number | null
     passed?: boolean | null
   }>,
+  opts?: { photoCount?: number },
 ): string | null {
   if (!snapshot.length) return null
   const byId = new Map(results.map((r) => [r.parameterId, r]))
   for (const snap of snapshot) {
     if (!snap.mandatory) continue
+    // Photo-only parameters are satisfied by uploaded inspection photos, not measured values.
+    if (snap.parameterType === 'PHOTO_REQUIRED' || snap.photoRequired) {
+      if ((opts?.photoCount ?? 0) < 1) {
+        return `Mandatory photo parameter missing photo evidence: ${snap.parameterCode}`
+      }
+      continue
+    }
     const result = byId.get(snap.parameterId)
     if (!result) return `Missing mandatory parameter result: ${snap.parameterCode}`
     const passed = evaluateParameterResult(snap, result)

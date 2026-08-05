@@ -83,6 +83,12 @@ import {
   type OrderDiscountMode,
 } from '../../utils/opportunityLineCalc'
 import { ChargeEditor, OrderAdjustmentsPanel } from '../../components/erp/OrderAdjustmentsGrid'
+import {
+  CommercialGstSupplyPanel,
+  type CommercialGstSupplyValue,
+} from '../../components/sales/CommercialGstSupplyPanel'
+import { COMPANY_STATE } from '../../types/invoice'
+import { resolveGstStateCode } from '../../utils/gstStateCode'
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
 
@@ -95,6 +101,11 @@ interface SoLineDraft {
   unitPrice: number
   discountPct: number
   taxPct: number
+  hsnCode?: string
+  taxScheme?: string
+  cgstRate?: number
+  sgstRate?: number
+  igstRate?: number
 }
 
 interface SoAttachment {
@@ -121,7 +132,12 @@ function newLineDraft(itemId = '', unitPrice = 0): SoLineDraft {
     qty: 1,
     unitPrice,
     discountPct: 0,
-    taxPct: 18,
+    taxPct: 0,
+    hsnCode: '',
+    taxScheme: undefined,
+    cgstRate: 0,
+    sgstRate: 0,
+    igstRate: 0,
   }
 }
 
@@ -253,6 +269,12 @@ export function SalesOrderNewPage() {
   const [orderDiscountMode, setOrderDiscountMode] = useState<OrderDiscountMode>('flat')
   const [orderDiscountInput, setOrderDiscountInput] = useState(0)
   const [attachments, setAttachments] = useState<SoAttachment[]>([])
+  const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>(() => ({
+    placeOfSupply: '',
+    placeOfSupplyOverride: false,
+    placeOfSupplyOverrideReason: '',
+    supplierStateCode: resolveGstStateCode(COMPANY_STATE) ?? '27',
+  }))
 
   const customer = customerId ? getCustomer(customerId) : undefined
   const fromOpportunity = Boolean(opportunityPrefill)
@@ -577,6 +599,7 @@ export function SalesOrderNewPage() {
       const quotationId = linkedQuo?.id ?? opportunityPrefill?.quotationId ?? null
       const linePayload = lines.map((l) => {
         const item = getItem(l.itemId)
+        const totals = computeLineTotals(l)
         return {
           productOrItem: item?.itemName ?? l.itemId,
           description: item?.itemName ?? '',
@@ -586,6 +609,23 @@ export function SalesOrderNewPage() {
           unitPrice: l.unitPrice,
           discountPct: l.discountPct,
           taxPct: l.taxPct,
+          hsnCode: l.hsnCode || item?.hsnCode || null,
+          taxScheme: l.taxScheme ?? null,
+          cgstRate: l.cgstRate ?? null,
+          sgstRate: l.sgstRate ?? null,
+          igstRate: l.igstRate ?? null,
+          cgstAmount:
+            l.taxScheme === 'igst'
+              ? 0
+              : Math.round(totals.taxableValue * ((l.cgstRate ?? l.taxPct / 2) / 100) * 100) / 100,
+          sgstAmount:
+            l.taxScheme === 'igst'
+              ? 0
+              : Math.round(totals.taxableValue * ((l.sgstRate ?? l.taxPct / 2) / 100) * 100) / 100,
+          igstAmount:
+            l.taxScheme === 'igst'
+              ? Math.round(totals.taxableValue * ((l.igstRate ?? l.taxPct) / 100) * 100) / 100
+              : 0,
         }
       })
 
@@ -613,6 +653,14 @@ export function SalesOrderNewPage() {
           quotationDocumentId: quotationDocumentId || null,
           customerPoDate: customerPoDate || null,
           lines: linePayload,
+          placeOfSupply: gstSupply.placeOfSupplyOverride
+            ? gstSupply.placeOfSupply || null
+            : (customer?.state ?? gstSupply.placeOfSupply) || null,
+          placeOfSupplyOverride: gstSupply.placeOfSupplyOverride || undefined,
+          placeOfSupplyOverrideReason: gstSupply.placeOfSupplyOverride
+            ? gstSupply.placeOfSupplyOverrideReason.trim() || null
+            : null,
+          supplierStateCode: gstSupply.supplierStateCode || null,
         })
       } else {
         r = createDirect({
@@ -639,13 +687,29 @@ export function SalesOrderNewPage() {
           customerPoDate: customerPoDate || undefined,
           freightAmount: showFreight ? orderSummary.freightAmount : 0,
           orderDiscountAmount: orderSummary.orderDiscountAmount,
-          lines: lines.map((l) => ({
+          placeOfSupply: gstSupply.placeOfSupplyOverride
+            ? gstSupply.placeOfSupply
+            : customer?.state ?? gstSupply.placeOfSupply,
+          placeOfSupplyOverride: gstSupply.placeOfSupplyOverride,
+          placeOfSupplyOverrideReason: gstSupply.placeOfSupplyOverrideReason,
+          supplierStateCode: gstSupply.supplierStateCode,
+          lines: lines.map((l) => {
+            const totals = computeLineTotals(l)
+            return {
             itemId: l.itemId,
             qty: l.qty,
             unitPrice: l.unitPrice,
             discountPct: l.discountPct,
             taxPct: l.taxPct,
-          })),
+            hsnCode: l.hsnCode,
+            taxScheme: l.taxScheme,
+            cgstRate: l.cgstRate,
+            sgstRate: l.sgstRate,
+            igstRate: l.igstRate,
+            taxableValue: totals.taxableValue,
+            gstAmount: totals.gstAmount,
+            lineTotal: totals.lineTotal,
+          }}),
         })
       }
       if (r.ok && r.salesOrderId && opportunityPrefill?.opportunityId) {
@@ -920,19 +984,21 @@ export function SalesOrderNewPage() {
           <colgroup>
             <col className="so-pricing-col-idx" />
             <col className="so-pricing-col-product" />
+            <col className="so-pricing-col-hsn" />
             <col className="so-pricing-col-qty" />
             <col className="so-pricing-col-price" />
             <col className="so-pricing-col-disc" />
             <col className="so-pricing-col-gst" />
             <col className="so-pricing-col-money" />
             <col className="so-pricing-col-money" />
-            <col className="so-pricing-col-money" />
+            <col className="so-pricing-col-money-wide" />
             <col className="so-pricing-col-action" />
           </colgroup>
           <thead>
             <tr>
               <th className="so-pricing-th so-pricing-th--center">#</th>
               <th className="so-pricing-th">Product</th>
+              <th className="so-pricing-th">HSN/SAC</th>
               <th className="so-pricing-th so-pricing-th--right">Qty</th>
               <th className="so-pricing-th so-pricing-th--right">Unit price</th>
               <th className="so-pricing-th so-pricing-th--right">Disc %</th>
@@ -965,10 +1031,36 @@ export function SalesOrderNewPage() {
                           notify.warning(sellable.error ?? 'Item is not allowed for sales')
                           return
                         }
-                        updateLine(line.key, {
-                          itemId: id,
-                          unitPrice: nextItem?.defaultSalesRate ?? nextItem?.standardRate ?? draft.unitPrice,
-                        })
+                        void (async () => {
+                          const { resolveCommercialLineTax } = await import(
+                            '../../utils/commercialLineTax'
+                          )
+                          const { useMasterStore: ms } = await import('../../store/masterStore')
+                          const store = ms.getState()
+                          const snap = await resolveCommercialLineTax({
+                            direction: 'SALES',
+                            item: nextItem,
+                            hsnById: (hid) => store.getHsn(hid),
+                            hsnByCode: (code) => store.getHsnByCode(code),
+                            gstRates: store.gstRates,
+                          })
+                          updateLine(line.key, {
+                            itemId: id,
+                            unitPrice:
+                              nextItem?.defaultSalesRate ?? nextItem?.standardRate ?? draft.unitPrice,
+                            taxPct: snap.taxPct,
+                            hsnCode: snap.hsnSacCode || nextItem?.hsnCode || '',
+                            taxScheme: snap.taxScheme,
+                            cgstRate: snap.cgstRate,
+                            sgstRate: snap.sgstRate,
+                            igstRate: snap.igstRate,
+                          })
+                          if (!snap.resolved) {
+                            notify.warning(
+                              snap.blockers[0] ?? 'GST unresolved for selected item — check masters',
+                            )
+                          }
+                        })()
                       }}
                       placeholder="Select sellable item…"
                       appearance="dropdown"
@@ -979,6 +1071,14 @@ export function SalesOrderNewPage() {
                       <p className="so-pricing-warn">
                         <ShieldAlert className="h-3 w-3" /> {itemNotSellableForSalesMessage(item)}
                       </p>
+                    ) : null}
+                  </td>
+                  <td className="so-pricing-td tabular-nums text-[12px] text-erp-muted">
+                    {(draft.hsnCode ?? '').trim() || (item?.hsnCode ?? '').trim() || '—'}
+                    {draft.taxScheme === 'igst' ? (
+                      <div className="text-[10px] uppercase tracking-wide">IGST</div>
+                    ) : draft.taxScheme === 'cgst_sgst' ? (
+                      <div className="text-[10px] uppercase tracking-wide">CGST+SGST</div>
                     ) : null}
                   </td>
                   <td className="so-pricing-td">
@@ -1412,6 +1512,17 @@ export function SalesOrderNewPage() {
             />
           </ErpFieldGroup>
         ) : null}
+
+        <CommercialGstSupplyPanel
+          value={gstSupply}
+          onChange={setGstSupply}
+          customerState={customer?.state}
+          customerGstin={customer?.gstin}
+          shipToState={deliveryLocation || customer?.state}
+          billToState={customer?.state}
+          isServiceDocument={isServices}
+          className="so-commercial-group"
+        />
 
         <ErpFieldGroup label="Notes" className="so-commercial-group" columns={1}>
           {needsDirectReasonField ? (

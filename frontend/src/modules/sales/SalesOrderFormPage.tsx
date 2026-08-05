@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
@@ -6,7 +6,6 @@ import {
   ClipboardList,
   FileText,
   MapPin,
-  Package,
   Save,
 } from 'lucide-react'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '../../components/erp/card-form'
@@ -36,23 +35,36 @@ import { handleInvalidSubmit, type FieldErrorMap } from '../../utils/formValidat
 import { useMrpStore } from '../../store/mrpStore'
 import { useMasterStore } from '../../store/masterStore'
 import { isApiMode } from '../../config/apiConfig'
-import { apiFetchSalesOrder, apiUpdateSalesOrder } from '../../services/bridges/salesOrderApiBridge'
-import { SalesOrderLinesEditor } from '../../components/sales/SalesOrderLinesEditor'
-import {
-  computeSoLineTotals,
-  soLineDraftsFromOrder,
-  soLineDraftsToApiPayload,
-  type SoLineDraft,
-} from '../../utils/salesOrderLineDraft'
+import { apiUpdateSalesOrder, apiFetchSalesOrder } from '../../services/bridges/salesOrderApiBridge'
 import { formatCurrency, formatNumber } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { formatStatus } from '../../components/ui/Badge'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { locationDisplayLabel } from '../../utils/locationUtils'
-import { resolveSalesOrderValue } from '../../components/sales/SalesOrder360Sections'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { quotationNoWithRevision } from '../../utils/quotationEngine/revisionLabels'
+import {
+  SalesOrderLinesEditor,
+  buildSoLineApiPayload,
+  computeSoLineTotals,
+  emptySoOrderCharges,
+  newSoLineDraft,
+  parseSoOrderCharges,
+  serializeSoOrderCharges,
+  soLinesFromOrder,
+  summarizeSoLines,
+  type SoLineDraft,
+  type SoOrderCharges,
+} from '../../components/sales/SalesOrderLinesEditor'
+import { canUseItemInSales } from '../../utils/opportunityItemOptions'
+import type { SalesOrderLine } from '../../types/mrp'
+import {
+  CommercialGstSupplyPanel,
+  type CommercialGstSupplyValue,
+} from '../../components/sales/CommercialGstSupplyPanel'
+import { COMPANY_STATE } from '../../types/invoice'
+import { resolveGstStateCode } from '../../utils/gstStateCode'
 
 export { SalesOrderNewPage } from './SalesOrderCreatePage'
 
@@ -67,12 +79,12 @@ export function SalesOrderEditPage() {
   const so = useMrpStore((s) => (id ? s.salesOrders.find((o) => o.id === id) : undefined))
   const updateDraft = useMrpStore((s) => s.updateSalesOrderDraft)
   const customers = useMasterStore((s) => s.customers)
-  const getItem = useMasterStore((s) => s.getItem)
   const locations = useMasterStore((s) => s.locations)
+  const getItem = useMasterStore((s) => s.getItem)
   const [validationErrors, setValidationErrors] = useState<FieldErrorMap>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [hydrated, setHydrated] = useState(!isApiMode())
-  const [lines, setLines] = useState<SoLineDraft[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const [customerPoNumber, setCustomerPoNumber] = useState('')
   const [customerPoDate, setCustomerPoDate] = useState('')
@@ -82,22 +94,38 @@ export function SalesOrderEditPage() {
   const [deliveryTerms, setDeliveryTerms] = useState('')
   const [deliveryTime, setDeliveryTime] = useState('')
   const [internalRemarks, setInternalRemarks] = useState('')
+  const [lines, setLines] = useState<SoLineDraft[]>(() => [newSoLineDraft('', 0)])
+  const [charges, setCharges] = useState<SoOrderCharges>(() => emptySoOrderCharges())
+  const [scopeNotes, setScopeNotes] = useState('')
+  const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>({
+    placeOfSupply: '',
+    placeOfSupplyOverride: false,
+    placeOfSupplyOverrideReason: '',
+    supplierStateCode: resolveGstStateCode(COMPANY_STATE) ?? '27',
+  })
   const deliveryTimeOptions = useDeliveryTimeOptions()
   const { locationId, setLocationId } = useDocumentLocation('sales', so?.locationId)
   const showLocationField = !useTenantProfileStore((s) => s.isServices())
+  const showFreight = !useTenantProfileStore((s) => s.isServices())
+  const isServices = useTenantProfileStore((s) => s.isServices())
+  /** Prevent re-seeding editor after user edits when store reference changes. */
+  const linesSeedKeyRef = useRef<string | null>(null)
 
+  // Always hydrate full SO (incl. lines[]) in API mode ΓÇö list rows may be incomplete.
   useEffect(() => {
     if (!id || !isApiMode()) return
+    let cancelled = false
+    setDetailLoading(true)
+    setLoadError(null)
     void apiFetchSalesOrder(id).then((r) => {
-      if (r.ok) setHydrated(true)
-      else notify.error(r.error ?? 'Failed to load sales order')
+      if (cancelled) return
+      setDetailLoading(false)
+      if (!r.ok) setLoadError(r.error ?? 'Could not load sales order')
     })
+    return () => {
+      cancelled = true
+    }
   }, [id])
-
-  useEffect(() => {
-    if (!so) return
-    setLines(soLineDraftsFromOrder(so))
-  }, [so?.id])
 
   useEffect(() => {
     if (!so) return
@@ -110,53 +138,79 @@ export function SalesOrderEditPage() {
     setDeliveryTime(so.deliveryTime?.trim() ?? '')
     setInternalRemarks(so.internalRemarks ?? '')
     if (so.locationId) setLocationId(so.locationId)
+    setGstSupply({
+      placeOfSupply: so.placeOfSupplyStateCode ?? so.placeOfSupply ?? '',
+      placeOfSupplyOverride: Boolean(so.placeOfSupplyOverride),
+      placeOfSupplyOverrideReason: so.placeOfSupplyOverrideReason ?? '',
+      supplierStateCode: so.supplierStateCode ?? resolveGstStateCode(COMPANY_STATE) ?? '27',
+    })
   }, [so, setLocationId])
+
+  // Seed product lines once per order; re-seed when API detail upgrades list stub ΓåÆ multi-lines.
+  useEffect(() => {
+    if (!so) return
+    if (isApiMode() && detailLoading) return
+    const lineCount = so.lines?.length ?? 0
+    const seedKey = `${so.id}|L${lineCount}`
+    const prev = linesSeedKeyRef.current
+    if (prev === seedKey) return
+
+    const isSameOrder = Boolean(prev?.startsWith(`${so.id}|`))
+    const wasStub = prev === `${so.id}|L0`
+    const upgradingToLines = wasStub && lineCount > 0
+    if (isSameOrder && !upgradingToLines && prev !== null) return
+
+    linesSeedKeyRef.current = seedKey
+    setLines(soLinesFromOrder(so, getItem))
+    setCharges(parseSoOrderCharges(so.commercialNotes))
+    setScopeNotes(so.technicalNotes ?? '')
+  }, [so, detailLoading, getItem])
 
   const customer = useMemo(
     () => (so ? customers.find((c) => c.id === so.customerId) : undefined),
     [so, customers],
   )
-  const lineSummary = useMemo(() => {
-    const totals = lines.map((line) => computeSoLineTotals(line))
-    const totalQty = lines.reduce((s, l) => s + l.qty, 0)
-    const grandTotal = totals.reduce((s, t) => s + t.lineTotal, 0)
-    return { totalQty, grandTotal }
-  }, [lines])
 
-  const displayValue = so
-    ? (lineSummary.grandTotal > 0 ? lineSummary.grandTotal : resolveSalesOrderValue(so))
-    : 0
+  const orderSummary = useMemo(
+    () => summarizeSoLines(lines, getItem, charges, { showFreight }),
+    [lines, getItem, charges, showFreight],
+  )
 
-  const primaryItemName = lines[0]?.itemId ? getItem(lines[0].itemId)?.itemName : undefined
-  const lineItemsLabel = lines.length > 1
-    ? `${lines.length} lines`
-    : (primaryItemName ?? '—')
-
-  const linesDone = lines.length > 0
-    && lines.every((l) => l.itemId && l.qty >= 1 && l.unitPrice > 0)
+  const primaryLine = lines[0]
+  const primaryItem = primaryLine?.itemId ? getItem(primaryLine.itemId) : undefined
+  const displayValue = orderSummary.grandTotal
+  const totalQty = orderSummary.totalQty
+  const productLabel =
+    primaryItem?.itemName
+    ?? lines.find((l) => l.itemId)?.itemId
+    ?? 'ΓÇö'
 
   const poDone = Boolean(customerPoNumber.trim())
   const deliveryDone = Boolean(expectedDeliveryDate)
   const commercialDone = Boolean(paymentTerms.trim() && deliveryTerms.trim() && deliveryTime.trim())
+  const hasValidLines =
+    lines.length > 0 && lines.every((l) => l.itemId && l.qty >= 1 && l.unitPrice > 0)
 
   const completionItems = useMemo(() => [
     { id: 'context', label: 'Order Context', done: Boolean(so?.customerId) },
-    { id: 'lines', label: 'Line Items', done: linesDone },
+    { id: 'lines', label: 'Products', done: hasValidLines },
     { id: 'po', label: 'PO & Delivery', done: poDone && deliveryDone },
     { id: 'commercial', label: 'Commercial', done: commercialDone },
-  ], [so?.customerId, linesDone, poDone, deliveryDone, commercialDone])
+  ], [so?.customerId, hasValidLines, poDone, deliveryDone, commercialDone])
 
   const completionPercent = Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
 
-  if (!id || !so || (isApiMode() && !hydrated)) {
+  if (!id || !so) {
     return (
       <div className="erp-page flex flex-col items-center justify-center gap-3 p-12 text-center">
-        <p className="text-erp-muted">{!so && hydrated ? 'Sales order not found.' : 'Loading sales order…'}</p>
-        {(!so && hydrated) || !isApiMode() ? (
-          <AppLink to={listPath} className="text-sm font-semibold text-erp-primary">
-            Back to {fromCrm ? 'CRM sales orders' : 'sales orders'}
-          </AppLink>
-        ) : null}
+        <p className="text-erp-muted">
+          {detailLoading
+            ? 'Loading sales orderΓÇª'
+            : loadError ?? 'Sales order not found.'}
+        </p>
+        <AppLink to={listPath} className="text-sm font-semibold text-erp-primary">
+          Back to {fromCrm ? 'CRM sales orders' : 'sales orders'}
+        </AppLink>
       </div>
     )
   }
@@ -178,23 +232,64 @@ export function SalesOrderEditPage() {
   const draftSo = so
 
   function validateDraft(): FieldErrorMap {
-    const errors = validateSalesOrderDraft({
+    const fieldErrors = validateSalesOrderDraft({
       paymentTerms,
       deliveryTerms,
       deliveryTime,
       expectedDeliveryDate,
       customerPoDate,
     }).fieldErrors
-    if (!lines.length) {
-      errors.lines = 'Add at least one item line.'
-    } else if (lines.some((l) => !l.itemId)) {
-      errors.lines = 'Every line needs an item.'
-    } else if (lines.some((l) => !l.qty || l.qty < 1)) {
-      errors.lines = 'Line quantities must be at least 1.'
-    } else if (lines.some((l) => l.unitPrice <= 0)) {
-      errors.lines = 'Line unit prices must be greater than zero.'
+
+    if (!lines.length || lines.every((l) => !l.itemId)) {
+      fieldErrors.lines = 'Add at least one product line'
+    } else {
+      for (const line of lines) {
+        if (!line.itemId) {
+          fieldErrors.lines = 'Select a product on every line'
+          break
+        }
+        if (line.qty < 1) {
+          fieldErrors.lines = 'Quantity must be at least 1'
+          break
+        }
+        const sellable = canUseItemInSales(line.itemId)
+        if (!sellable.ok) {
+          fieldErrors.lines = sellable.error ?? 'Item is not allowed for sales'
+          break
+        }
+      }
     }
-    return errors
+    return fieldErrors
+  }
+
+  function toDemoLines(): SalesOrderLine[] {
+    return lines.map((l, idx) => {
+      const totals = computeSoLineTotals(l)
+      const item = getItem(l.itemId)
+      return {
+        id: l.id ?? crypto.randomUUID(),
+        lineNo: idx + 1,
+        productOrItem: item?.itemName ?? l.itemId,
+        description: item?.itemName ?? '',
+        itemId: l.itemId,
+        productId: null,
+        qty: l.qty,
+        uom: 'NOS',
+        unitPrice: l.unitPrice,
+        discountPct: l.discountPct,
+        taxPct: l.taxPct,
+        taxableValue: totals.taxableValue,
+        gstAmount: totals.gstAmount,
+        lineTotal: totals.lineTotal,
+        hsnCode: l.hsnCode || item?.hsnCode || null,
+        hsnId: l.hsnId || item?.hsnId || null,
+        taxScheme: l.taxScheme ?? null,
+        cgstRate: l.cgstRate ?? null,
+        sgstRate: l.sgstRate ?? null,
+        igstRate: l.igstRate ?? null,
+        utgstRate: l.utgstRate ?? null,
+      }
+    })
   }
 
   async function handleSave(mode: 'save' | 'close' = 'save') {
@@ -202,7 +297,14 @@ export function SalesOrderEditPage() {
     if (Object.keys(errors).length) {
       handleInvalidSubmit({
         errors,
-        fieldOrder: ['lines', 'paymentTerms', 'deliveryTerms', 'deliveryTime', 'expectedDeliveryDate', 'customerPoDate'],
+        fieldOrder: [
+          'lines',
+          'paymentTerms',
+          'deliveryTerms',
+          'deliveryTime',
+          'expectedDeliveryDate',
+          'customerPoDate',
+        ],
         onFieldErrors: setValidationErrors,
       })
       return
@@ -211,13 +313,9 @@ export function SalesOrderEditPage() {
 
     setIsSubmitting(true)
     const locLabel = locations.find((l) => l.id === locationId)
-    const primary = lines[0]
-    const linePayload = soLineDraftsToApiPayload(lines, (itemId) => getItem(itemId)?.itemName)
-    const patch = {
-      itemId: primary?.itemId,
-      qty: lines.reduce((s, l) => s + l.qty, 0),
-      unitPrice: primary?.unitPrice,
-      lines: linePayload,
+    const primary = lines[0]!
+    const linePayload = buildSoLineApiPayload(lines, getItem)
+    const commercial = {
       customerPoNumber: customerPoNumber.trim() || undefined,
       customerPoDate: customerPoDate || null,
       expectedDeliveryDate: expectedDeliveryDate || null,
@@ -228,10 +326,36 @@ export function SalesOrderEditPage() {
       deliveryTime: deliveryTime.trim() || undefined,
       internalRemarks: internalRemarks.trim() || null,
       requiredDate: expectedDeliveryDate || draftSo.requiredDate,
+      /** Full charges blob until SO has first-class charge columns. */
+      commercialNotes: serializeSoOrderCharges(charges),
+      technicalNotes: scopeNotes.trim() || null,
+      placeOfSupply: gstSupply.placeOfSupplyOverride
+        ? gstSupply.placeOfSupply || null
+        : (customer?.state ?? gstSupply.placeOfSupply) || null,
+      placeOfSupplyOverride: gstSupply.placeOfSupplyOverride || undefined,
+      placeOfSupplyOverrideReason: gstSupply.placeOfSupplyOverride
+        ? gstSupply.placeOfSupplyOverrideReason.trim() || null
+        : null,
+      supplierStateCode: gstSupply.supplierStateCode || null,
     }
+
     const r = isApiMode()
-      ? await apiUpdateSalesOrder(draftSo.id, patch)
-      : updateDraft(draftSo.id, patch)
+      ? await apiUpdateSalesOrder(draftSo.id, {
+          ...commercial,
+          lines: linePayload,
+        })
+      : updateDraft(draftSo.id, {
+          ...commercial,
+          qty: orderSummary.totalQty,
+          unitPrice: primary.unitPrice,
+          discountPct: primary.discountPct,
+          itemId: primary.itemId,
+          productId: primary.itemId,
+          basicAmount: orderSummary.basicAmount,
+          gstAmount: orderSummary.totalGst,
+          grandTotal: orderSummary.grandTotal,
+          lines: toDemoLines(),
+        })
     setIsSubmitting(false)
 
     if (r.ok) {
@@ -250,18 +374,18 @@ export function SalesOrderEditPage() {
   const documentStrip = [
     { label: 'SO No.', value: so.salesOrderNo, highlight: true },
     { label: 'Status', value: 'Draft' },
-    { label: 'Customer', value: customer?.customerName ?? '—', highlight: Boolean(customer) },
-    { label: 'Line items', value: lineItemsLabel },
-    { label: 'Qty', value: formatNumber(lineSummary.totalQty || so.qty) },
-    { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: displayValue > 0 },
-    { label: 'Customer PO', value: customerPoNumber.trim() || '—' },
+    { label: 'Customer', value: customer?.customerName ?? 'ΓÇö', highlight: Boolean(customer) },
+    { label: 'Product', value: productLabel },
+    { label: 'Qty', value: formatNumber(totalQty) },
+    { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : 'ΓÇö', highlight: displayValue > 0 },
+    { label: 'Customer PO', value: customerPoNumber.trim() || 'ΓÇö' },
     {
       label: 'Quotation Number (Reference)',
-      value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—',
+      value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : 'ΓÇö',
     },
   ]
 
-  /** Secondary nav only — Save / Cancel live in the sticky footer (same as New Lead). */
+  /** Secondary nav only ΓÇö Save / Cancel live in the sticky footer (same as New Lead). */
   const commandBar = (
     <ErpCardCommandBar
       inline
@@ -290,7 +414,13 @@ export function SalesOrderEditPage() {
         {
           id: 'next',
           label: 'Suggested Next',
-          value: !poDone ? 'Enter customer PO' : !commercialDone ? 'Set commercial terms' : 'Save and confirm order',
+          value: !hasValidLines
+            ? 'Complete product lines'
+            : !poDone
+              ? 'Enter customer PO'
+              : !commercialDone
+                ? 'Set commercial terms'
+                : 'Save and confirm order',
           tone: 'info' as const,
         },
       ]}
@@ -299,13 +429,13 @@ export function SalesOrderEditPage() {
         summaryTitle="Draft Summary"
         actionsTitle="Quick Actions"
         summary={[
-          { label: 'Customer', value: customer?.customerName ?? '—' },
-          { label: 'Line items', value: lineItemsLabel },
-          { label: 'Qty', value: formatNumber(lineSummary.totalQty || so.qty) },
+          { label: 'Customer', value: customer?.customerName ?? 'ΓÇö' },
+          { label: 'Lines', value: String(lines.length) },
+          { label: 'Qty', value: formatNumber(totalQty) },
           { label: 'Value', value: formatCurrency(displayValue), highlight: true },
-          { label: 'Customer PO', value: customerPoNumber.trim() || '—' },
-          { label: 'Delivery', value: expectedDeliveryDate ? formatDate(expectedDeliveryDate) : '—' },
-          { label: 'Payment', value: paymentTerms.trim() || '—' },
+          { label: 'Customer PO', value: customerPoNumber.trim() || 'ΓÇö' },
+          { label: 'Delivery', value: expectedDeliveryDate ? formatDate(expectedDeliveryDate) : 'ΓÇö' },
+          { label: 'Payment', value: paymentTerms.trim() || 'ΓÇö' },
         ]}
         actions={[
           { id: 'save', label: 'Save Changes', icon: Save, primary: true, onClick: () => void handleSave('save'), disabled: isSubmitting },
@@ -367,7 +497,7 @@ export function SalesOrderEditPage() {
             onSaveAndClose={() => void handleSave('close')}
             hint={(
               <span className="text-[12px] text-erp-muted">
-                {completionPercent}% complete · Edit lines, PO, and commercial terms
+                {completionPercent}% complete ┬╖ Edit product lines, PO, and commercial terms
               </span>
             )}
           />
@@ -386,30 +516,37 @@ export function SalesOrderEditPage() {
             <Input value={so.salesOrderNo} readOnly className="erp-input" />
           </ErpFieldRow>
           <ErpFieldRow label="Customer" readOnly>
-            <Input value={customer?.customerName ?? '—'} readOnly className="erp-input" />
+            <Input value={customer?.customerName ?? so.customerName ?? 'ΓÇö'} readOnly className="erp-input" />
           </ErpFieldRow>
           {so.quotationNo ? (
             <ErpFieldRow label="Quotation Number (Reference)" readOnly colSpan={2}>
-              <Input value={`${so.quotationNo} · Rev ${so.quotationRevisionNo ?? 1}`} readOnly className="erp-input" />
+              <Input value={`${so.quotationNo} ┬╖ Rev ${so.quotationRevisionNo ?? 1}`} readOnly className="erp-input" />
             </ErpFieldRow>
           ) : null}
         </ErpCardSection>
 
         <ErpCardSection
           id="so-edit-section-lines"
-          title="Line Items"
-          subtitle="Products, quantities, pricing, and GST."
-          icon={Package}
-          accent="violet"
+          title="Product & Pricing"
+          subtitle="Add products, order adjustments (discount / freight / installation / other), and scope notes."
+          icon={ClipboardList}
+          accent="blue"
           collapsible
           defaultOpen
+          className="!max-w-none so-pricing-section"
           columns={1}
-          className="so-pricing-section"
         >
-          {validationErrors.lines ? (
-            <p className="mb-3 text-sm text-red-600">{validationErrors.lines}</p>
-          ) : null}
-          <SalesOrderLinesEditor lines={lines} onChange={setLines} />
+          <SalesOrderLinesEditor
+            lines={lines}
+            onChange={setLines}
+            charges={charges}
+            onChargesChange={setCharges}
+            showFreight={showFreight}
+            showExtendedCharges
+            scopeNotes={scopeNotes}
+            onScopeNotesChange={setScopeNotes}
+            fieldError={validationErrors.lines}
+          />
         </ErpCardSection>
 
         <ErpCardSection
@@ -441,9 +578,30 @@ export function SalesOrderEditPage() {
               usage="sales"
               colSpan={2}
               label="Location Code"
-              hint="Fulfilment location from Lead → Opportunity → Quotation chain"
+              hint="Fulfilment location from Lead ΓåÆ Opportunity ΓåÆ Quotation chain"
             />
           ) : null}
+        </ErpCardSection>
+
+        <ErpCardSection
+          id="so-edit-section-gst"
+          title="GST Supply"
+          subtitle="Auto Place of Supply and supply type (read-only). Authorised override when permitted."
+          icon={Banknote}
+          accent="teal"
+          collapsible
+          defaultOpen
+          columns={1}
+        >
+          <CommercialGstSupplyPanel
+            value={gstSupply}
+            onChange={setGstSupply}
+            customerState={customer?.state}
+            customerGstin={customer?.gstin ?? (customer as { gstin?: string } | undefined)?.gstin}
+            shipToState={deliveryLocation || customer?.state}
+            billToState={customer?.state}
+            isServiceDocument={isServices}
+          />
         </ErpCardSection>
 
         <ErpCardSection

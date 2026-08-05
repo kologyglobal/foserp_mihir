@@ -1,0 +1,32 @@
+-- Phase 18 — GST subledger vs GL control recon evidence runs (books only).
+
+CREATE TABLE IF NOT EXISTS `gst_gl_recon_runs` (
+  `id` VARCHAR(191) NOT NULL,
+  `tenantId` VARCHAR(191) NOT NULL,
+  `legalEntityId` VARCHAR(191) NOT NULL,
+  `companyGstin` VARCHAR(20) NULL,
+  `returnPeriod` VARCHAR(7) NOT NULL,
+  `tolerance` DECIMAL(18, 4) NOT NULL DEFAULT 1,
+  `status` ENUM('GENERATED', 'ACKNOWLEDGED', 'VOID') NOT NULL DEFAULT 'GENERATED',
+  `matchCount` INT NOT NULL DEFAULT 0,
+  `varianceCount` INT NOT NULL DEFAULT 0,
+  `unmappedCount` INT NOT NULL DEFAULT 0,
+  `totalAbsVariance` DECIMAL(18, 4) NOT NULL DEFAULT 0,
+  `scorePct` INT NOT NULL DEFAULT 0,
+  `overall` VARCHAR(32) NOT NULL,
+  `reportJson` JSON NOT NULL,
+  `notes` VARCHAR(1000) NULL,
+  `generatedBy` VARCHAR(191) NULL,
+  `generatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `acknowledgedAt` DATETIME(3) NULL,
+  `acknowledgedBy` VARCHAR(191) NULL,
+  `createdBy` VARCHAR(191) NULL,
+  `updatedBy` VARCHAR(191) NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updatedAt` DATETIME(3) NOT NULL,
+  PRIMARY KEY (`id`),
+  INDEX `gst_gl_recon_le_period_idx`(`tenantId`, `legalEntityId`, `returnPeriod`),
+  INDEX `gst_gl_recon_status_idx`(`tenantId`, `status`),
+  CONSTRAINT `gst_gl_recon_runs_tenantId_fkey` FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `gst_gl_recon_runs_legalEntityId_fkey` FOREIGN KEY (`legalEntityId`) REFERENCES `legal_entities`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

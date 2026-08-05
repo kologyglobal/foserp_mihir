@@ -37,6 +37,7 @@ import {
   calcOpportunityLinesSummary,
   calcWeightedValue,
   createEmptyOpportunityLine,
+  filterCatalogOpportunityLines,
   opportunityLineUnitPriceFieldKey,
   syncOpportunityLines,
   UNIT_PRICE_REQUIRED_MESSAGE,
@@ -394,7 +395,8 @@ export function OpportunityNewPage() {
     setIsSubmitting(true)
     void (async () => {
       try {
-        const syncedLines = syncOpportunityLines(lines)
+        const syncedLines = filterCatalogOpportunityLines(lines)
+        const linesSummary = calcOpportunityLinesSummary(syncedLines)
         const r = await resolveStoreAction(
           createOpportunity({
             customerId,
@@ -406,7 +408,7 @@ export function OpportunityNewPage() {
               || opportunityName.trim(),
             lines: syncedLines.map((l) => ({ ...l, productId: null })),
             stage,
-            value: summary.grandTotal,
+            value: linesSummary.grandTotal,
             probability: Number(probability) || 0,
             expectedCloseDate,
             ownerId: owner.value,

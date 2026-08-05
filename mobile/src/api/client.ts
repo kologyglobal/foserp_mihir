@@ -224,6 +224,13 @@ async function rawRequest<T>(
     }
   }
 
+  // Let React Native / axios set multipart boundary for FormData uploads.
+  const isFormData =
+    typeof FormData !== 'undefined' && data != null && typeof data === 'object' && data instanceof FormData
+  if (isFormData) {
+    delete headers['Content-Type']
+  }
+
   const config: AxiosRequestConfig = {
     method,
     url: path.startsWith('/') ? path : `/${path}`,

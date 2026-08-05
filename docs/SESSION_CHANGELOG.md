@@ -1,3 +1,445 @@
+## 2026-08-05 — Commercial PoS override, supply-type chrome, UTGST/cess, SO header tax
+
+### Delivered
+- SO header GST columns (migration `20260805310000_so_place_of_supply_tax_header`) + MasterGstRate utgst/cess.
+- `resolveCommercialPlaceOfSupply` / `resolveCommercialSupplyType`; SO create/update/convert persist PoS + supply type.
+- Authorised override: `crm.commercial.tax_place_override` + reason → audit `PLACE_OF_SUPPLY_OVERRIDE`.
+- FE `CommercialGstSupplyPanel` on SO create/edit + Proforma; Invoice/Credit Note supply type read-only.
+- applySchemeToMasterRate UT → `utgst_pair` + cess; conversion pure chain tests.
+
+### Tests
+`npx vitest run tests/commercial-supply-pos-conversion.test.ts tests/commercial-conversion-chain.test.ts tests/sales-order-line-tax-snapshot.test.ts` — **13/13 PASS**.
+
+---
+
+## 2026-08-05 — Mobile Purchase Phase C (editor, RFQ, invoice, return, offline GRN, QI decide)
+
+### Delivered
+- **PR line editor** create/edit draft lines (scan item codes).
+- **RFQ** register, detail, send; convert approved PR → RFQ.
+- **Invoices** view + submit/approve lifecycle.
+- **Returns** register, detail, create-from-QI prefill + submit/ship/complete.
+- **QC decisions in Purchase** (`purchase.qi` accept/reject/hold/start).
+- **Offline GRN** queue (FileSystem/localStorage) with NetInfo flush on receive open.
+- Nav catalog + Phase C structural tests (`verify-purchase-phase-c.ts`).
+
+### Tests
+`cd mobile && npm run typecheck && npm run test:unit` — PASS.
+
+---
+
+## 2026-08-05 — Mobile Purchase Phase B (PR + QI handoff + polish)
+
+### Delivered
+- PR list/detail: view + draft submit (`purchase.pr.view` / `purchase.pr.submit`); no full editor.
+- Purchase QC handoff register (read-only); opens Quality inspection when module on — no PASS/REJECT in Purchase.
+- Catalog: requisitions + QI tiles (work/more); hub description updated.
+- Approvals deep link to PR; PO detail receipt progress strip; receive merges `receivable-lines` open qty.
+- Work tab: draft PR, pending QI tasks (isolated failures).
+- Tests: `verify-purchase-mobile.ts` Phase A+B; docs IMPLEMENTATION/UAT/permission/API matrix.
+
+### Non-goals
+PR editor, RFQ, invoices, returns, offline GRN, QC decisions inside Purchase.
+
+### Tests
+`cd mobile && npm run typecheck && npm run test:unit` (structural + pure helpers).
+
+---
+
+## 2026-08-05 — GST books period UAT harness
+
+### Delivered
+- `backend/scripts/uat-gst-books-period.ts` + `npm run uat:gst-books`.
+- Seeds isolated finance+GST tenant, walks prepare/lock/SIM portal, data-quality, GL recon, period health.
+- Local run: **GST_BOOKS_UAT_READY_WITH_CONDITIONS** (0 FAIL; SIMULATED portal only).
+- Doc: `docs/tax/GST_BOOKS_UAT.md`.
+
+---
+
+## 2026-08-05 — GST Phase 18 Subledger vs GL control recon
+
+### Delivered
+- Pure util `gst-gl-recon.util.ts` (bucket map, period range, variance/match/unmapped scoring).
+- Service `gst-gl-recon.service.ts` — period GST ledger vs `DefaultAccountMapping` GL movement.
+- Migration `20260806030000_gst_phase18_gl_recon` → `gst_gl_recon_runs`.
+- API `…/tax-compliance/gl-recon/*`; perms `tax.gst.gl_recon.view` / `manage`.
+- FE `/accounting/tax-compliance/gst/gl-recon` dual-mode.
+- Tests `gst-gl-recon-phase18.test.ts`. Doc `docs/tax/PHASE18_GL_RECON.md`.
+
+### Verdict
+**GST VS GL RECON — READY WITH CONDITIONS** (advisory only; not FULL GST COMPLIANT).
+
+---
+
+## 2026-08-05 — GST Phase 17 Data quality / companyGstin backfill / freeze checklist
+
+### Delivered
+- Pure util `gst-data-quality.util.ts` (null GSTIN scan, multi-GSTIN contamination, backfill plan, freeze checklist, honest capability matrix).
+- Service `gst-data-quality.service.ts` — scan, dry-run, confirm apply (null-only), freeze readiness, evidence runs.
+- Migration `20260806020000_gst_phase17_data_quality` → `gst_data_quality_runs`.
+- API `…/tax-compliance/data-quality/*`; perms `tax.gst.quality.view` / `tax.gst.quality.manage`.
+- FE `/accounting/tax-compliance/gst/data-quality` dual-mode.
+- Tests `gst-data-quality-phase17.test.ts` (**11/11 PASS**). Doc `docs/tax/PHASE17_DATA_QUALITY.md`.
+
+### Verdict
+**GST DATA QUALITY / BACKFILL / FREEZE — READY WITH CONDITIONS** (not FULL GST COMPLIANT; never re-tax).
+
+---
+
+## 2026-08-05 — GST Phase 13 Go-live / UAT hardening
+
+### Delivered
+- Pure util `gst-compliance-hardening.util.ts` (period books reconcile, pre-file gate, go-live UAT axes, honest capability matrix).
+- Service `gst-compliance-hardening.service.ts` + UAT sign-off lifecycle; adapters for Phase 15 audit packs / notices tables.
+- Migration `20260805250000_gst_phase13_compliance_hardening` (`gst_compliance_uat_signoffs`).
+- API prefix `…/tax-compliance/hardening/*`; permissions `tax.gst.compliance.view` / `tax.gst.compliance.uat`.
+- FE `/accounting/tax-compliance/gst/go-live`.
+- Tests `gst-hardening-phase13.test.ts` (**14/14 PASS**).
+- Doc `docs/tax/PHASE13_GO_LIVE_HARDENING.md`; plan Phase 13 section.
+
+### Collisions
+- Phase 12 portal filing coexists — Phase 13 observes session status only.
+- Phase 14 annual / Phase 15 multi-period ops layered beside; Phase 15 facade rolls up Phase 13 period health.
+
+### Verdict
+**GST GO-LIVE / UAT HARDENING — READY WITH CONDITIONS** (not FULL GST COMPLIANT).
+
+---
+
+## 2026-08-05 — GST Phase 12 Portal filing (SIMULATED)
+
+### Delivered
+- `GstrFilingSession` model + migration `20260805240000_gst_phase12_portal_filing`.
+- Package from Phase 5 **LOCKED** GSTR-1/3B snapshots only; SIMULATED submit + ARN; LIVE hard-gated.
+- Optional maker-checker; mark-filed reuses Phase 5 `markFiledExternally`.
+- Permissions `tax.gst.returns.file`; APIs under `…/tax-compliance/filing/*`.
+- FE `/accounting/tax-compliance/gst/portal-filing` dual-mode.
+- Tests `gst-portal-filing-phase12.test.ts`. Doc `docs/tax/PHASE12_PORTAL_FILING.md`.
+
+### Verdict
+**PORTAL FILING (SIMULATED) — READY WITH CONDITIONS** (not LIVE GSTN; not FULL GST COMPLIANT).
+
+---
+
+## 2026-08-05 — GST Phase 16 Rate Master Ops
+
+### Delivered
+- Pure util `gst-rate-ops.util.ts` (coverage gaps, expiries, overlaps, ledger-vs-master drift, impact roll-up, honest capability matrix).
+- Service + routes under `…/tax-compliance/rate-ops/*`; evidence runs table `gst_rate_ops_runs`.
+- Migration `20260806010000_gst_phase16_rate_ops`; permissions `tax.gst.rates.view` / `tax.gst.rates.manage`.
+- SI/VI ledger `sourceSnapshot.itemId` for future drift matching; FE `/gst/rate-ops`.
+- Tests `gst-rate-ops-phase16.test.ts`. Doc `docs/tax/PHASE16_RATE_OPS.md`.
+
+### Collision with 12–15
+- Phases 12–15 already landed util/service/schema for portal/hardening/annual/ops. Phase 16 is **additive rate master ops only** — no reimplementation of those themes.
+- Import-only fix for Phase 14/15 Zod schemas on tax-compliance routes so sibling wiring resolves.
+
+### Verdict
+**GST RATE MASTER OPS — READY WITH CONDITIONS** (not FULL GST COMPLIANT / not portal / not re-tax).
+
+---
+
+## 2026-08-05 — GST Phase 14 Annual / FY archive / cockpit
+
+### Delivered
+- Persistent GSTR-9/9C books worksheet (`GstAnnualReturn`) lifecycle prepare → lock → mark-filed-external → archive.
+- Multi-year FY retention marker (`GstFyArchive`) without ledger purge.
+- FY compliance cockpit score (monthly periods, RCM, optional Phase 15 notices, Phase 12 simulated filing sessions).
+- Migration `20260805260000_gst_phase14_annual_cockpit_archive`; perms `tax.gst.annual.*`.
+- APIs under `…/tax-compliance/annual/*`; FE `/accounting/tax-compliance/gst/annual`.
+- Pure tests `gst-annual-phase14.test.ts`. Doc `docs/tax/PHASE14_ANNUAL_COCKPIT_ARCHIVE.md`.
+
+### Collision notes
+- Phase 12 portal filing present — cockpit reads filing sessions only.
+- Phase 15 notices/ops tables not duplicated (migration deliberately omits notice table).
+- Plan had no Phase 13–14; Phase 14 is residual annual/archive after Phase 12 portal track.
+
+### Verdict
+**GST ANNUAL / FY ARCHIVE — READY WITH CONDITIONS** (not portal GSTR-9; not FULL GST COMPLIANT).
+
+---
+
+## 2026-08-05 — GST Phase 15 Compliance Ops Cockpit
+
+### Delivered
+- Pure util `gst-compliance-ops.util.ts` (multi-period score roll-up, FY months, audit manifest, notice due, GSTR-9 foundation skeleton).
+- Service facade `gst-compliance-ops.service.ts`: multi-period health via Phase 13 period health; notices + multi-period audit packs on Phase 13 tables; GSTR-9 foundation coverage roll-up only.
+- APIs under `…/tax-compliance/ops/*`; permissions `tax.gst.ops.view|manage|export`.
+- Migration `20260805300000_gst_phase15_compliance_ops` (no new tables — reuses Phase 13 DDL).
+- FE `/accounting/tax-compliance/gst/compliance-cockpit` dual-mode; tests `gst-compliance-ops-phase15.test.ts`.
+- Doc `docs/tax/PHASE15_COMPLIANCE_OPS.md`.
+
+### Collision
+- Phase 12 portal sessions: not reimplemented.
+- Phase 13: period health reused; notices/audit **tables** reused (service owns ops surface deferred from Phase 13 matrix).
+- Phase 14: annual **worksheet** not duplicated — foundation API only.
+- Phase 16 rate ops: orthogonal.
+
+### Verdict
+**GST COMPLIANCE OPS COCKPIT — READY WITH CONDITIONS** (not FULL GST COMPLIANT / not portal LIVE).
+
+---
+
+## 2026-08-05 — GST Phase 13 Go-live / UAT hardening
+
+### Delivered
+- Pure util `gst-compliance-hardening.util.ts` (period books reconcile, pre-file gate, go-live UAT axes, honest capability matrix).
+- Service `gst-compliance-hardening.service.ts` + UAT sign-off lifecycle; adapters for Phase 15 audit packs / notices tables.
+- Migration `20260805250000_gst_phase13_compliance_hardening` (`gst_compliance_uat_signoffs`).
+- API prefix `…/tax-compliance/hardening/*`; permissions `tax.gst.compliance.view` / `tax.gst.compliance.uat`.
+- FE `/accounting/tax-compliance/gst/go-live`.
+- Tests `gst-hardening-phase13.test.ts`.
+- Doc `docs/tax/PHASE13_GO_LIVE_HARDENING.md`; plan Section Phase 13 added.
+
+### Collisions
+- Phase 12 portal filing: schema/routes present — Phase 13 observes sessions only.
+- Phase 14 annual / Phase 15 multi-period ops: layered beside without reimplementing their owners; Phase 15 facade imports Phase 13 health.
+
+### Verdict
+**GST GO-LIVE / UAT HARDENING — READY WITH CONDITIONS** (not FULL GST COMPLIANT).
+
+---
+
+## 2026-08-05 — GST Phase 10 Export / SEZ / LUT
+
+
+### Delivered
+- Pure util `export-sez-lut.util.ts` (WPAY/WOPAY classification, LUT validity, zero-rated rate force, refund foundation).
+- Models `GstLut` + `GstExportRefundClaim`; SI shipping/LUT snapshot fields; migration `20260805220000_gst_phase10_export_sez_lut`.
+- Tax resolve `taxTreatmentHint`; SI post LUT soft/hard gate; ledger zero-tax WOPAY stamps + GSTR-1 WPAY/WOPAY partition.
+- APIs under `…/tax-compliance/export/*`; permissions `tax.gst.export.view` / `tax.gst.lut.manage`.
+- FE `/accounting/tax-compliance/gst/export-sez-lut`; tests `gst-export-phase10.test.ts`.
+- Doc `docs/tax/PHASE10_EXPORT_SEZ_LUT.md`.
+
+### Verdict
+**EXPORT / SEZ / LUT (BOOKS) — READY WITH CONDITIONS** (not portal LUT/RFD; not FULL GST COMPLIANT).
+
+---
+
+## 2026-08-05 — GST Phase 11 Special schemes / specials
+
+### Delivered
+- Classification gates for nil/exempt/non-GST/composition; tax resolve `supplyClass` + composition flags.
+- Ledger `supplyClass` + zero-tax nil visibility coexisting with Phase 10 export WOPAY rows.
+- Composition blocks e-invoice IRN.
+- Books GST TDS/TCS + customer advance adjust registers (not portal).
+- Job-work GST boundary eval util; honest capability matrix API + FE `/gst/specials`.
+- Migration `20260805230000_gst_phase11_specials`; permissions `tax.gst.specials.*`.
+- Tests `gst-specials-phase11.test.ts`. Doc `docs/tax/PHASE11_SPECIALS.md`.
+
+### Phase 10 collision
+- Phase 10 Export/SEZ/LUT was mid-flight / present (`20260805220000_gst_phase10_export_sez_lut`). Phase 11 layered after it without replacing LUT.
+
+### Verdict
+**GST SPECIALS — READY WITH CONDITIONS** (not FULL GST COMPLIANT / not portal).
+
+---
+
+## 2026-08-05 — Purchase mobile Phase A (PO + GRN + receive)
+
+### Delivered
+- Live PO list/detail (CRM-style cards); Receive goods CTA when receivable.
+- Live GRN list/detail; create via receive screen; submit + post-inventory separate.
+- ScanField on receive; Work tab tasks; approval deep links; verify-purchase-mobile tests.
+- Docs: PURCHASE_MOBILE_IMPLEMENTATION.md, PURCHASE_MOBILE_UAT.md, permission matrix.
+
+### Verdict
+**PURCHASE PHASE A — READY FOR CONTROLLED UAT** (manual pilot pending).
+
+---
+
+## 2026-08-05 — Mobile camera barcode (expo-camera)
+
+### Delivered
+- Added `expo-camera` (SDK 52) + plugin `barcodeScannerEnabled`.
+- `BarcodeCameraModal` + camera button on store `ScanField` (issue/return/stock/count/transfer and all ScanField users).
+- Permission copy updated for warehouse barcodes; web falls back to wedge/type.
+- Structural tests assert camera wiring.
+
+### Verdict
+**CAMERA BARCODE — LIVE ON IOS/ANDROID** (wedge still supported).
+
+---
+
+## 2026-08-05 — Mobile stock transfer (live)
+
+### Delivered
+- **Stock transfer** list / new / detail on native mobile against `GET/POST …/inventory/transfers` + submit/approve/dispatch/receive/cancel.
+- Create form: warehouses, wedge scan item code, qty/batch/serial; optional **Create & ship** advances only as far as caller's permissions allow; dispatch/receive use preserved **idempotencyKey**.
+- Structural checks in `verify-store-ops.ts`; permission matrix updated.
+
+### Verdict
+**STORE TRANSFER — LIVE ON MOBILE** (still no camera barcode package; keyboard-wedge scanners work).
+
+---
+
+## 2026-08-05 — Mobile store: return, stock, count, scan polish
+
+### Delivered
+- **Material return** (live): WO search/scan → net-issued lines only → `POST …/materials/return` + optional idempotency key.
+- **Stock inquiry** (live): item code scan → masters items + `/inventory/balances`.
+- **Stock count** (live): list/create → detail snapshot / enter counts / submit (route permissions).
+- **Barcode polish**: shared `ScanField` (hardware wedge Enter submit); auto-pick single WO; line filter by item code on issue/return.
+- Tests: `mobile/scripts/verify-store-ops.ts`; `typecheck` + `test:unit` PASS.
+
+### Verdict
+**STORE CORE OPS (issue/return/inquiry/count) — LIVE ON MOBILE** (transfers still stub).
+
+---
+
+## 2026-08-05 — GST Phase 9 Multi-GSTIN / Multi-branch
+
+### Delivered
+- Hard GSTIN isolation on ledger register loads; SI ledger stamps companyGstin from branch/LE.
+- GstRegistration map + LE `branchTransferTaxPolicy`; evaluate branch transfer.
+- APIs under `…/tax-compliance/registrations*`; util + tests `gst-multigstin-phase9.test.ts`.
+- Doc `docs/tax/PHASE9_MULTI_GSTIN.md`.
+
+### Verdict
+**MULTI-GSTIN ISOLATION — READY WITH CONDITIONS** (legacy null companyGstin needs backfill).
+
+---
+
+## 2026-08-05 — GST Phase 8 Payment & Liability
+
+### Delivered
+- Books liability proposal from GST ledger + interest/late fee; PMT-06 style challan register.
+- Lifecycle: propose → confirm external CPIN → optional GL post via `post()` → period close.
+- Migration `20260805200000_gst_phase8_payment_liability`; permissions `tax.gst.payment.*`.
+- FE `/accounting/tax-compliance/gst/payments`; pure tests `gst-payment-phase8.test.ts`.
+- Doc `docs/tax/PHASE8_PAYMENT_LIABILITY.md`.
+
+### Verdict
+**GST PAYMENT (BOOKS-SIDE) — READY WITH CONDITIONS** (not portal PMT-06 generate).
+
+---
+
+## 2026-08-05 — GST Phase 7 e-Way Bill harden
+
+### Delivered
+- Part A/B readiness, threshold util, SI + DC sources, vehicle update, cancel, **validity extend**.
+- Shared provider mode with Phase 6; EXCEPTION retry; audit snapshots/attempts.
+- Migration `20260805190000_gst_phase7_eway_harden`; tests `gst-eway-phase7.test.ts`.
+- Doc `docs/tax/PHASE7_EWAY.md`. FE Mode/vehicle columns.
+
+### Verdict
+**E-WAY REGISTER (SIMULATED) — READY WITH CONDITIONS** (not LIVE portal).
+
+---
+
+## 2026-08-05 — GST Phase 6 e-Invoice harden
+
+### Delivered
+- Provider mode: `GST_EINVOICE_PROVIDER_MODE` (preferred) / `GST_NIC_PROVIDER` fallback — SIMULATED default; LIVE gated (UAT + credentials + connector-ready flag).
+- IRN on canonical POSTED SalesInvoice only; readiness util; EXCEPTION retry; optional `idempotencyKey`; attempt + request/response audit columns.
+- `GET …/e-invoices/provider-status`; list returns `providerMode`.
+- Migration `20260805180000_gst_phase6_einvoice_harden`; pure tests `gst-einvoice-phase6.test.ts`.
+- FE e-invoice Mode column + honest SIMULATED/LIVE copy.
+- Doc `docs/tax/PHASE6_EINVOICE.md`.
+
+### Conditions
+- Keep SIMULATED until certified NIC/GSP UAT; core has no default LIVE HTTP transport.
+- Not FULL GST COMPLIANT / not portal-ready.
+
+### Verdict
+**E-INVOICE REGISTER (SIMULATED) — READY WITH CONDITIONS**
+
+---
+
+## 2026-08-05 — GST Phase 5 Registers & Returns Preparation
+
+### Delivered
+- Live registers from `gst_ledger_entries`: sales/purchase/CN-DN/RCM/export-SEZ/HSN/state/liability/ITC/payment summary.
+- GSTR-1 / GSTR-3B preparation with period states OPEN → DRAFT → LOCKED → MARKED_FILED_EXTERNAL (GSTIN-specific).
+- No silent rewrite of FILED ledger / locked period; mark filed externally is not portal submit.
+- APIs under `…/tax-compliance/registers` + `…/returns/:returnType/*`; FE dual-mode pages + nav.
+- Permissions `tax.gst.returns.prepare|lock|mark_filed`.
+- Migration `20260805170000_gst_phase5_returns_prep`; unit tests `gstr-registers-prep.test.ts`.
+- Doc `docs/tax/PHASE5_RETURNS_PREPARATION.md`.
+
+### Conditions
+- migrate + sync-permissions; LE GSTIN; ledger populated by Phase 2 posts; CN/DN export classification incomplete; no portal filing.
+
+### Verdict
+**GST RETURNS PREPARATION — READY WITH CONDITIONS** (not FULL GST COMPLIANT / not portal).
+
+---
+
+## 2026-08-05 — GST Phase 4 Reverse Charge (RCM)
+
+### Delivered
+- `RCM_ACCOUNTING_PENDING` blocks AP VI when RCM payable accounts unresolved.
+- `gst_rcm_register_entries` lifecycle LIABILITY_POSTED → PAID → ITC_RECOGNIZED; written on RCM VI post.
+- API: `GET/POST …/tax-compliance/rcm-register*` (view + mark paid / recognize ITC).
+- Dual-mode Reverse Charge FE register; pure tests `gst-rcm-lifecycle.test.ts`.
+- Migration `20260805160000_gst_phase4_rcm_register`; doc `docs/tax/PHASE4_REVERSE_CHARGE.md`.
+
+### Conditions
+- Liability paid = compliance gate only (not Phase 8 PMT-06 GL).
+- Concurrent INPUT GST still booked on VI post; map `GST_RCM_*_PAYABLE` required.
+
+### Verdict
+**REVERSE CHARGE — READY WITH CONDITIONS**
+
+---
+
+## 2026-08-05 — GST Phase 3 ITC / GSTR-2B
+
+### Delivered
+- See Phase 3 docs / code (2B import models, match util, reconcile APIs) shipped in parallel track.
+
+---
+
+## 2026-08-05 — GST Phase 2 Accounting & subledger
+
+### Delivered
+- Mapping keys: INPUT_CESS, RCM_*_PAYABLE, ITC_INELIGIBLE, GST_ROUND_OFF, GST_INTEREST, GST_LATE_FEE — wired to AP account resolvers.
+- `gst_ledger_entries` subledger written from **posted SI/VI line tax snapshots** (no re-resolve).
+- API `GET …/tax-compliance/gst-ledger`; SI/VI post hooks.
+- Migration `20260805120000_gst_phase2_ledger_and_mappings`; doc `docs/tax/PHASE2_GST_ACCOUNTING.md`.
+
+### Conditions
+- CN/adj ledger hooks, historical backfill, filing status machine, FE polish deferred.
+- Configure new mapping keys in tenant LE settings for RCM/cess.
+
+### Verdict
+**GST ACCOUNTING — READY WITH CONDITIONS**
+
+---
+
+## 2026-08-05 — GST Phase 1 Tax Determination (incremental)
+
+### Delivered
+- Central `resolveGstTax` + scheme apply (intra CGST+SGST / inter IGST); API resolve returns full determination with blockers.
+- Dual-mode FE `commercialLineTax` — product pick hydrates HSN/rate from masters (demo + API), **no silent 18%** on new SO/PI/commercial lines.
+- Erp product pricing grid: HSN + scheme; SO/proforma/PO defaults tax **0** until resolve.
+- BE: SO/commercial require explicit taxPct; permissions `tax.gst.view|setup.manage|override`.
+- Tests: `gst-tax-scheme.test.ts`. Doc: `docs/tax/PHASE1_TAX_DETERMINATION.md`.
+
+### Conditions
+- Full line component snapshots / override hard-gate / all doc types not complete.
+- Run `db:sync-permissions` for new tax.gst.* codes.
+
+### Verdict
+**TAX DETERMINATION — READY WITH CONDITIONS**
+
+---
+
+## 2026-08-05 — GST Compliance Platform Phase 0 (tax repository audit)
+
+### Delivered (docs only — no application code)
+- [`docs/tax/TAX_REPOSITORY_AUDIT.md`](tax/TAX_REPOSITORY_AUDIT.md) — full audit of masters, commercial silent 18%, AR/AP engines, POS, extract, e-invoice SIM, RCM/ITC, TDS boundary
+- [`docs/tax/TAX_GAP_MATRIX.md`](tax/TAX_GAP_MATRIX.md) — capability × document coverage gaps
+- [`docs/tax/TAX_IMPLEMENTATION_PLAN.md`](tax/TAX_IMPLEMENTATION_PLAN.md) — Phases 1–12 reuse plan; stop after each phase
+
+### Verdict
+**Phase 0 AUDIT COMPLETE.** TAX DETERMINATION **NOT READY**. GST ACCOUNTING partial (AR/AP only). No portal / full compliance claims.
+
+### Next
+Stakeholder review → Phase 1 only after approval (central resolve adoption, kill silent 18%, line snapshots on commercial docs).
+
+---
+
 ## 2026-08-04 — Admin People & Access permission workspace (completion pass)
 
 ### Delivered
