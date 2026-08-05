@@ -46,17 +46,27 @@ import {
 } from '@/services/purchase/grnTolerance'
 import {
   buildItemReceiptControls,
-  GRN_RECEIVING_CONDITION_LABELS,
   linesFromGrn,
   linesFromPo,
   recalcGrnLineDraft,
   type GrnLineDraft,
   type ItemReceiptControl,
 } from '@/modules/purchase/grnLineDraft'
-import { GRN_SHORT_CLOSE_REASONS } from '@/services/purchase/grnReceivingCondition'
+import {
+  GRN_LINES_RECEIVING_GUIDE,
+  GRN_RECEIVING_CONDITION_DESCRIPTIONS,
+  GRN_RECEIVING_CONDITION_LABELS,
+  GRN_SHORT_CLOSE_REASONS,
+  type GrnReceivingCondition,
+} from '@/services/purchase/grnReceivingCondition'
 import type { GrnInput, PurchaseOrder } from '@/types/purchaseDomain'
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
+import {
+  formatPurchaseQty,
+  purchaseLineHasDualUom,
+  purchaseQtyToBaseQty,
+} from '@/utils/purchaseLineUom'
 import { notify } from '@/store/toastStore'
 import { systemConfirm } from '@/utils/systemConfirm'
 import { isApiMode } from '@/config/apiConfig'
@@ -609,6 +619,7 @@ export function GrnEditorPage() {
     remarks,
     lines: lines.map((l) => ({
       purchaseOrderLineId: l.purchaseOrderLineId,
+      receivedUomQty: Number(l.receivedUomQty ?? l.receivedQty) || 0,
       receivedQty: Number(l.receivedQty) || 0,
       acceptedQty: Number(l.acceptedQty) || 0,
       rejectedQty: Number(l.rejectedQty) || 0,
@@ -1105,11 +1116,25 @@ export function GrnEditorPage() {
         {fieldErrors.lines ? (
           <p className="mb-2 text-sm text-red-600">{fieldErrors.lines}</p>
         ) : (
-          <div className="mb-2 space-y-1.5 text-[12px] text-erp-muted">
-            <p>
-              Enter received qty (0 = not received). Condition is auto-suggested from qty variance;
-              accepted/rejected split stock vs damage. Weight columns appear for casting / weight-based
-              items. Close open requires a reason and may need approval.
+          <div className="mb-2 space-y-2 text-[12px] text-erp-muted">
+            <p>{GRN_LINES_RECEIVING_GUIDE.intro}</p>
+            <details className="rounded border border-erp-border bg-erp-surface-alt px-3 py-2">
+              <summary className="cursor-pointer font-medium text-erp-text">
+                Short, excess, damage &amp; accepted/rejected — what each means
+              </summary>
+              <dl className="mt-2 space-y-2 border-t border-erp-border pt-2">
+                {GRN_LINES_RECEIVING_GUIDE.columns.map((row) => (
+                  <div key={row.term}>
+                    <dt className="font-medium text-erp-text">{row.term}</dt>
+                    <dd className="text-[11px] leading-snug text-erp-muted">{row.meaning}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+            <p className="text-[11px]">
+              Condition is auto-suggested from received vs pending and rejected qty — adjust if needed.
+              Weight columns appear for casting / KG items. Enter <strong>0</strong> in Received for
+              not received (line stays open).
             </p>
             {lineTotals.remainingOpenQty > 0 ||
             lineTotals.notReceivedCount > 0 ||
@@ -1136,17 +1161,35 @@ export function GrnEditorPage() {
                 <th className="num">PO Qty</th>
                 <th className="num">Prev. Recd</th>
                 <th className="num">Pending</th>
-                <th className="num">Received</th>
-                <th className="num">Accepted</th>
-                <th className="num">Rejected</th>
+                <th className="num" title={GRN_LINES_RECEIVING_GUIDE.columns[0].meaning}>
+                  Received
+                </th>
+                <th
+                  className="num"
+                  title={GRN_LINES_RECEIVING_GUIDE.columns[1].meaning}
+                >
+                  Accepted
+                </th>
+                <th
+                  className="num"
+                  title={GRN_LINES_RECEIVING_GUIDE.columns[2].meaning}
+                >
+                  Rejected
+                  <span className="block text-[10px] font-normal text-erp-muted">(incl. damage)</span>
+                </th>
                 <th>UOM</th>
                 {showWeightCol ? <th className="num">Weight</th> : null}
                 <th className="num">Qty Tol %</th>
                 {showWeightCol ? <th className="num">Wt Tol %</th> : null}
-                <th className="num">Var %</th>
-                <th>Condition</th>
-                <th>Status</th>
-                <th title="Close remaining open qty">Close open</th>
+                <th className="num" title={GRN_LINES_RECEIVING_GUIDE.columns[6].meaning}>
+                  Var %
+                </th>
+                <th title="Why qty differs from PO — not the same as tolerance %">
+                  Condition
+                  <span className="block text-[10px] font-normal text-erp-muted">Short / Excess / Dmg</span>
+                </th>
+                <th title="Tolerance result on quantity (and weight when applicable)">Status</th>
+                <th title={GRN_LINES_RECEIVING_GUIDE.columns[7].meaning}>Close open</th>
                 {showBatchSerialCol ? <th>Batch / Lot / Serial</th> : null}
                 {showExpiryCol ? <th>Mfg / Expiry</th> : null}
                 <th>Bin</th>
@@ -1168,13 +1211,22 @@ export function GrnEditorPage() {
                       className="w-24"
                       min={0}
                       value={Number(l.receivedUomQty ?? l.receivedQty) || 0}
-                      onChange={(v) =>
+                      onChange={(v) => {
+                        const factor = Number(l.uomConversionFactor) || 1
                         updateLine(i, {
                           receivedUomQty: v,
-                          receivedQty: v,
+                          receivedQty: purchaseQtyToBaseQty(v, factor),
                         })
-                      }
+                      }}
                     />
+                    {purchaseLineHasDualUom({
+                      itemId: l.itemId,
+                      uomConversionFactor: l.uomConversionFactor,
+                    }) && l.baseUom ? (
+                      <p className="mt-1 text-[10px] tabular-nums text-erp-muted">
+                        {formatPurchaseQty(Number(l.receivedQty) || 0)} {l.baseUom}
+                      </p>
+                    ) : null}
                     {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`] ? (
                       <p className="mt-1 text-xs text-red-600">
                         {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`]}
@@ -1241,20 +1293,26 @@ export function GrnEditorPage() {
                   </td>
                   <td>
                     <Select
-                      className="min-w-[7rem] text-[11px]"
+                      className="min-w-[8.5rem] text-[11px]"
                       value={l.receivingCondition}
+                      title={GRN_RECEIVING_CONDITION_DESCRIPTIONS[l.receivingCondition]}
                       onChange={(e) =>
                         updateLine(i, {
                           receivingCondition: e.target.value as GrnLineDraft['receivingCondition'],
                         })
                       }
                     >
-                      {Object.entries(GRN_RECEIVING_CONDITION_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
+                      {(Object.keys(GRN_RECEIVING_CONDITION_LABELS) as GrnReceivingCondition[]).map(
+                        (value) => (
+                          <option key={value} value={value} title={GRN_RECEIVING_CONDITION_DESCRIPTIONS[value]}>
+                            {GRN_RECEIVING_CONDITION_LABELS[value]}
+                          </option>
+                        ),
+                      )}
                     </Select>
+                    <p className="mt-1 max-w-[9rem] text-[10px] leading-snug text-erp-muted">
+                      {GRN_RECEIVING_CONDITION_DESCRIPTIONS[l.receivingCondition]}
+                    </p>
                   </td>
                   <td>
                     {GRN_TOLERANCE_STATUS_LABELS[

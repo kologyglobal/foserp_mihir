@@ -8,6 +8,11 @@ export const dbAvailable = await prisma
   .then(() => true)
   .catch(() => false)
 
+/** ISO date for live tests — avoids PO_BACKDATE_NOT_ALLOWED on tenants with date governance. */
+export function isoToday(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export const FULL_PURCHASE_PERMS = PERMISSIONS.filter(
   (p) => p.startsWith('purchase.'),
 ) as PermissionName[]
@@ -292,7 +297,7 @@ export async function createSentPo(
     .set(auth)
     .send({
       vendorId: opts.vendorId,
-      orderDate: opts.orderDate ?? '2026-07-21',
+      orderDate: opts.orderDate ?? isoToday(),
       deliveryWarehouseId: opts.warehouseId,
       ...(opts.expectedDeliveryDate ? { expectedDeliveryDate: opts.expectedDeliveryDate } : {}),
       lines: [
@@ -310,11 +315,14 @@ export async function createSentPo(
   const poId = createPo.body.data.id as string
   const poLineId = createPo.body.data.lines[0].id as string
   await request(app).post(`${poBase}/${poId}/submit`).set(auth).send({})
-  await request(app)
+  const approved = await request(app)
     .post(`${poBase}/${poId}/approve`)
     .set({ Authorization: `Bearer ${opts.approverToken}` })
     .send({})
-  await request(app).post(`${poBase}/${poId}/send-to-vendor`).set(auth).send({})
+  const poStatus = String(approved.body.data?.status ?? '')
+  if (poStatus !== 'SENT_TO_VENDOR') {
+    await request(app).post(`${poBase}/${poId}/send-to-vendor`).set(auth).send({})
+  }
   return { poId, poLineId }
 }
 
@@ -349,7 +357,7 @@ export async function createSubmittedGrn(
     .set(auth)
     .send({
       purchaseOrderId: opts.poId,
-      receiptDate: opts.receiptDate ?? '2026-07-21',
+      receiptDate: opts.receiptDate ?? isoToday(),
       warehouseId: opts.warehouseId,
       storageLocationId: opts.locationId,
       vendorChallanNumber: `CH-${Date.now()}`,

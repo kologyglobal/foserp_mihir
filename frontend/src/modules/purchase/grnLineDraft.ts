@@ -9,6 +9,11 @@ import {
 } from '@/services/purchase/grnReceivingCondition'
 import type { GoodsReceiptNote, PurchaseOrder } from '@/types/purchaseDomain'
 import type { Item } from '@/types/master'
+import {
+  getPurchaseLineBaseUomCode,
+  purchaseLineHasDualUom,
+  purchaseQtyToBaseQty,
+} from '@/utils/purchaseLineUom'
 
 export type ItemReceiptControl = {
   batch: boolean
@@ -30,9 +35,13 @@ export type GrnLineDraft = {
   itemName: string
   description: string
   uom: string
+  baseUom: string
+  uomConversionFactor: number
   orderedQty: number
+  orderedUomQty: number
   previouslyReceivedQty: number
   pendingQty: number
+  pendingUomQty: number
   receivedQty: number
   receivedUomQty?: number
   acceptedQty: number
@@ -230,6 +239,11 @@ export function linesFromPo(
     .map((l) => {
       const ctrl = itemControls[l.itemId]
       const qtyTol = ctrl?.quantityTolerancePct ?? 0
+      const factor = Number(l.uomConversionFactor) || 1
+      const pendingBase = Number(l.pendingQty) || 0
+      const pendingUom =
+        Number(l.outstandingQty) || (factor === 1 ? pendingBase : Number((pendingBase * factor).toFixed(4)))
+      const baseUom = getPurchaseLineBaseUomCode(l.itemId)
       const resolvedTol = resolveReceivingTolerancePct({
         itemTolerancePct: qtyTol,
         setupTolerancePct: setup.overReceiptTolerancePct,
@@ -242,10 +256,15 @@ export function linesFromPo(
         itemName: l.itemName,
         description: l.specification || l.itemName,
         uom: l.uom,
+        baseUom,
+        uomConversionFactor: factor,
         orderedQty: l.quantity,
-        previouslyReceivedQty: l.receivedQty,
-        pendingQty: l.pendingQty,
-        receivedQty: l.pendingQty,
+        orderedUomQty: Number(l.uomQuantity) || l.quantity,
+        previouslyReceivedQty: l.receivedQtyBase ?? l.receivedQty,
+        pendingQty: pendingBase,
+        pendingUomQty: pendingUom,
+        receivedQty: pendingBase,
+        receivedUomQty: pendingUom,
         acceptedQty: 0,
         rejectedQty: 0,
         shortQty: 0,
@@ -292,6 +311,7 @@ export function linesFromGrn(
 ): GrnLineDraft[] {
   return grn.lines.map((l) => {
     const ctrl = itemControls[l.itemId]
+    const factor = Number(l.uomConversionFactor) || 1
     const draft: GrnLineDraft = {
       purchaseOrderLineId: l.purchaseOrderLineId,
       itemId: l.itemId,
@@ -299,11 +319,16 @@ export function linesFromGrn(
       itemName: l.itemName,
       description: l.description,
       uom: l.uom,
+      baseUom: getPurchaseLineBaseUomCode(l.itemId) || l.uom,
+      uomConversionFactor: factor,
       orderedQty: l.orderedQty,
+      orderedUomQty: Number(l.orderedUomQty) || l.orderedQty,
       previouslyReceivedQty: l.previouslyReceivedQty,
       pendingQty: l.pendingQty,
+      pendingUomQty:
+        factor === 1 ? l.pendingQty : Number((l.pendingQty * factor).toFixed(4)),
       receivedQty: l.receivedQty,
-      receivedUomQty: l.receivedUomQty,
+      receivedUomQty: l.receivedUomQty ?? (factor === 1 ? l.receivedQty : l.receivedQty * factor),
       acceptedQty: l.acceptedQty,
       rejectedQty: l.rejectedQty,
       shortQty: l.shortQty,

@@ -52,6 +52,15 @@ export type GrnLineCreateData = {
   rejectedUomQuantity: number
   rate: number
   amount: number
+  hsnIdSnapshot: string | null
+  hsnCodeSnapshot: string
+  gstGroupIdSnapshot: string | null
+  gstGroupCodeSnapshot: string
+  gstRatePctSnapshot: number
+  cgstRateSnapshot: number
+  sgstRateSnapshot: number
+  igstRateSnapshot: number
+  gstSchemeSnapshot: string
   warehouseId: string | null
   storageLocationId: string | null
   binId: string | null

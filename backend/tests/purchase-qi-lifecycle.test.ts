@@ -160,7 +160,7 @@ describe.skipIf(!dbAvailable)('Purchase quality inspection lifecycle (live HTTP)
     const complete = await request(app)
       .post(`${qiBase()}/${qiId}/complete`)
       .set(auth())
-      .send({ outcome: 'ACCEPT' })
+      .send({ outcome: 'ACCEPT', decisionReason: 'Accepted per incoming inspection checklist.' })
     expect(complete.status).toBe(200)
     expect(complete.body.data.status).toBe('ACCEPTED')
 

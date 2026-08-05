@@ -49,6 +49,11 @@ import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { purchaseActionGate, usePurchasePermissions } from '@/utils/permissions'
 import { formatDate } from '@/utils/dates/format'
+import {
+  formatPurchaseQty,
+  getPurchaseLineBaseUomCode,
+  purchaseLineHasDualUom,
+} from '@/utils/purchaseLineUom'
 import { notify } from '@/store/toastStore'
 import { appConfirm, appPromptNote } from '@/store/confirmDialogStore'
 
@@ -657,6 +662,11 @@ export function GrnDetailPage() {
                   const netReceived = l.receivedQty - returnedTotal
                   const netAccepted = l.acceptedQty - returnedTotal
                   const lineUom = l.uom?.trim() || '—'
+                  const baseUom = getPurchaseLineBaseUomCode(l.itemId) || lineUom
+                  const dualReceived = purchaseLineHasDualUom({
+                    itemId: l.itemId,
+                    uomConversionFactor: l.uomConversionFactor,
+                  })
                   const dash = <td className="num text-erp-muted">—</td>
 
                   const receiptRow = (
@@ -672,7 +682,16 @@ export function GrnDetailPage() {
                       <td className="num tabular-nums">{formatNumber(l.orderedQty)}</td>
                       <td className="num tabular-nums">{formatNumber(l.previouslyReceivedQty)}</td>
                       <td className="num tabular-nums">{formatNumber(l.pendingQty)}</td>
-                      <td className="num tabular-nums">{formatNumber(l.receivedQty)}</td>
+                      <td className="num tabular-nums">
+                        <div>
+                          {formatNumber(l.receivedUomQty ?? l.receivedQty)} {lineUom}
+                        </div>
+                        {dualReceived && baseUom !== lineUom ? (
+                          <div className="text-[10px] text-erp-muted">
+                            {formatPurchaseQty(l.receivedQty)} {baseUom}
+                          </div>
+                        ) : null}
+                      </td>
                       <td className="num tabular-nums">{formatNumber(remainingPoOpenAfterGrn(l))}</td>
                       <td className="num tabular-nums">{formatNumber(l.tolerancePercentage ?? 0)}</td>
                       <td className="num tabular-nums">

@@ -3,6 +3,7 @@ import request from 'supertest'
 import { createApp } from '../src/app.js'
 import { prisma } from '../src/config/prisma.js'
 import { PERMISSIONS, type PermissionName } from '../src/constants/permissions.js'
+import { isoToday } from './helpers/purchase-live-fixture.js'
 
 /**
  * Phase 3 — Goods Receipt Note (live DB integration).
@@ -185,7 +186,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .set(auth())
       .send({
         vendorId,
-        orderDate: '2026-07-21',
+        orderDate: isoToday(),
         deliveryWarehouseId: warehouseId,
         lines: [{ itemCode: `ITM-${Date.now()}`, itemName: 'Setup Item', quantity: qty, uomId, rate: 1 }],
       })
@@ -194,7 +195,10 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
     const lineId = createPo.body.data.lines[0].id as string
     await request(app).post(`${poBase()}/${id}/submit`).set(auth()).send({})
     await request(app).post(`${poBase()}/${id}/approve`).set(auth(approverToken)).send({})
-    await request(app).post(`${poBase()}/${id}/send-to-vendor`).set(auth()).send({})
+    const approved = await request(app).get(`${poBase()}/${id}`).set(auth())
+    if (approved.body.data?.status !== 'SENT_TO_VENDOR') {
+      await request(app).post(`${poBase()}/${id}/send-to-vendor`).set(auth()).send({})
+    }
     return { poId: id, lineId }
   }
 
@@ -293,7 +297,8 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .set(auth())
       .send({
         vendorId,
-        orderDate: '2026-07-21',
+        orderDate: isoToday(),
+        deliveryWarehouseId: warehouseId,
         lines: [
           {
             itemCode: 'ITM-1',
@@ -322,9 +327,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .set(auth(approverToken))
       .send({})
     expect(approved.status).toBe(200)
-    const sent = await request(app).post(`${poBase()}/${poId}/send-to-vendor`).set(auth()).send({})
-    expect(sent.status).toBe(200)
-    expect(sent.body.data.status).toBe('SENT_TO_VENDOR')
+    expect(approved.body.data.status).toBe('SENT_TO_VENDOR')
   }, 180_000)
 
   afterAll(async () => {
@@ -335,7 +338,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
   function draftPayload(overrides: Record<string, unknown> = {}) {
     return {
       purchaseOrderId: poId,
-      receiptDate: '2026-07-21',
+      receiptDate: isoToday(),
       warehouseId,
       storageLocationId: locationId,
       vendorChallanNumber: `CH-${Date.now()}`,
@@ -396,7 +399,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
     expect(res.status).toBe(201)
     expect(res.body.data.status).toBe('DRAFT')
     expect(res.body.data.toleranceApprovalRequired).toBe(true)
-    expect(res.body.data.lines[0].toleranceStatus).toBe('EXCESS_OUTSIDE')
+    expect(res.body.data.lines[0].toleranceStatus).toBe('EXCESS_OUTSIDE_TOLERANCE')
 
     const submit = await request(app)
       .post(`${grnBase()}/${res.body.data.id}/submit`)
@@ -426,7 +429,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
         }),
       )
     expect(res.status).toBe(201)
-    expect(res.body.data.lines[0].toleranceStatus).toBe('EXCESS_WITHIN')
+    expect(res.body.data.lines[0].toleranceStatus).toBe('EXCESS_WITHIN_TOLERANCE')
 
     const overTol = await request(app)
       .post(grnBase())
@@ -439,7 +442,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
         }),
       )
     expect(overTol.status).toBe(201)
-    expect(overTol.body.data.lines[0].toleranceStatus).toBe('EXCESS_OUTSIDE')
+    expect(overTol.body.data.lines[0].toleranceStatus).toBe('EXCESS_OUTSIDE_TOLERANCE')
     const submit = await request(app)
       .post(`${grnBase()}/${overTol.body.data.id}/submit`)
       .set(auth())
@@ -504,7 +507,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
         }),
       )
     expect(res.status).toBe(201)
-    expect(res.body.data.lines[0].toleranceStatus).toBe('EXCESS_OUTSIDE')
+    expect(res.body.data.lines[0].toleranceStatus).toBe('EXCESS_OUTSIDE_TOLERANCE')
   })
 
   it('zero received is NOT_RECEIVED; approve/reject tolerance paths work', async () => {
@@ -574,7 +577,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .set(auth())
       .send({
         vendorId,
-        orderDate: '2026-07-21',
+        orderDate: isoToday(),
         lines: [{ itemCode: 'X', itemName: 'X', quantity: 5, uomId, rate: 1 }],
       })
     const cancelId = createPo.body.data.id
@@ -648,7 +651,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .set(auth())
       .send({
         vendorId,
-        orderDate: '2026-07-21',
+        orderDate: isoToday(),
         lines: [{ itemCode: 'R', itemName: 'Reverse Item', quantity: 20, uomId, rate: 5 }],
       })
     const rPoId = createPo.body.data.id
@@ -688,7 +691,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .set(auth())
       .send({
         vendorId,
-        orderDate: '2026-07-21',
+        orderDate: isoToday(),
         lines: [{ itemCode: 'E', itemName: 'Edit Block', quantity: 10, uomId, rate: 1 }],
       })
     const ePoId = createPo.body.data.id
@@ -738,7 +741,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .set(auth())
       .send({
         vendorId,
-        orderDate: '2026-07-21',
+        orderDate: isoToday(),
         lines: [{ itemCode: 'T', itemName: 'Tenant', quantity: 3, uomId, rate: 1 }],
       })
     const tPoId = createPo.body.data.id
@@ -784,7 +787,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .set(auth())
       .send({
         vendorId,
-        orderDate: '2026-07-21',
+        orderDate: isoToday(),
         lines: [{ itemCode: 'P', itemName: 'Persist', quantity: 8, uomId, rate: 1 }],
       })
     const pPoId = createPo.body.data.id

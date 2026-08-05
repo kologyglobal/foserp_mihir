@@ -30,6 +30,7 @@ import {
   previewPurchaseDocumentNumber,
 } from '../shared/purchase-document-number.js'
 import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
+import { taxSnapshotFromPoLine } from '../shared/purchase-tax-snapshot.js'
 import {
   deriveReceiptStatus,
   resolvePoReceivableStatuses,
@@ -470,6 +471,7 @@ async function buildLineCreates(
       rejectedUomQuantity: rejectedUom,
       rate,
       amount: money(lineAmountFromVendor(rate, receivedUom)),
+      ...taxSnapshotFromPoLine(poLine),
       warehouseId: lineWarehouseId,
       storageLocationId: lineStorageId,
       binId: bin?.id ?? null,

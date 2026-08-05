@@ -22,6 +22,10 @@ import {
   resolveDocumentApprovalRoles,
 } from '../shared/purchase-setup-enforcement.js'
 import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
+import {
+  resolvePurchaseLineTaxSnapshot,
+  type PurchaseLineTaxSnapshot,
+} from '../shared/purchase-tax-snapshot.js'
 import { enrichPoLinesWithItemUomMappings } from '../shared/item-uom-resolution.js'
 import {
   PurchaseOrderNotFoundError,
@@ -192,6 +196,11 @@ async function resolveSourceWarehouseId(
 async function fillLineMasterSnapshots(
   tenantId: string,
   lines: ReturnType<typeof normalizeLineInputs>,
+  taxContext?: {
+    orderDate?: Date | string | null
+    vendorId?: string | null
+    deliveryWarehouseId?: string | null
+  },
 ) {
   const itemIds = [...new Set(lines.map((l) => l.itemId).filter((v): v is string => Boolean(v)))]
   const items = itemIds.length
@@ -283,6 +292,17 @@ async function fillLineMasterSnapshots(
     if (line.binId && !binById.has(line.binId)) {
       throw new ValidationError('Bin code not found in tenant')
     }
+
+    const tax: PurchaseLineTaxSnapshot = await resolvePurchaseLineTaxSnapshot({
+      tenantId,
+      itemId: line.itemId,
+      hsnId: line.hsnId,
+      gstGroupId: line.gstGroupId,
+      asOfDate: taxContext?.orderDate,
+      vendorId: taxContext?.vendorId,
+      deliveryWarehouseId: taxContext?.deliveryWarehouseId,
+    })
+    Object.assign(line, tax)
   }
 
   return lines
@@ -292,8 +312,13 @@ async function fillLineMasterSnapshots(
 async function fillItemSnapshots(
   tenantId: string,
   lines: ReturnType<typeof normalizeLineInputs>,
+  taxContext?: {
+    orderDate?: Date | string | null
+    vendorId?: string | null
+    deliveryWarehouseId?: string | null
+  },
 ) {
-  return fillLineMasterSnapshots(tenantId, lines)
+  return fillLineMasterSnapshots(tenantId, lines, taxContext)
 }
 
 /**
@@ -318,6 +343,31 @@ function computeTotals(
     freightAmount: money(freightAmount),
     totalAmount: money(subtotal + taxAmount + freightAmount),
   }
+}
+
+/** Shared PO line pipeline: item UOM enrichment → dual qty normalize → master snapshots. */
+export async function preparePurchaseOrderLinesForCreate(
+  tenantId: string,
+  lines: CreatePurchaseOrderInput['lines'],
+  taxContext?: {
+    orderDate?: Date | string | null
+    vendorId?: string | null
+    deliveryWarehouseId?: string | null
+  },
+) {
+  const enrichedLines = await enrichLinesWithItemUom(tenantId, lines)
+  const normalized = normalizeLineInputs(enrichedLines)
+  const withSnapshots = await fillLineMasterSnapshots(tenantId, normalized, taxContext)
+  await assertLineMastersActive(tenantId, withSnapshots)
+  return withSnapshots
+}
+
+export function computePurchaseOrderTotals(
+  lines: Array<{ amount: number }>,
+  taxAmount: number,
+  freightAmount: number,
+) {
+  return computeTotals(lines, taxAmount, freightAmount)
 }
 
 async function toPurchaseOrderDto(
@@ -385,9 +435,6 @@ export async function createPurchaseOrder(
   input: CreatePurchaseOrderInput,
 ) {
   await assertVendorActive(tenantId, input.vendorId)
-  const enrichedLines = await enrichLinesWithItemUom(tenantId, input.lines)
-  const lines = await fillItemSnapshots(tenantId, normalizeLineInputs(enrichedLines))
-  await assertLineMastersActive(tenantId, lines)
 
   const sourceWarehouseId = await resolveSourceWarehouseId(tenantId, input.purchaseRequisitionId)
   const deliveryWarehouseId = await resolveDeliveryWarehouseId({
@@ -395,6 +442,13 @@ export async function createPurchaseOrder(
     explicitWarehouseId: input.deliveryWarehouseId,
     sourceWarehouseId,
   })
+  const orderDate = parseDateInput(input.orderDate) ?? new Date()
+  const lines = await preparePurchaseOrderLinesForCreate(tenantId, input.lines, {
+    orderDate,
+    vendorId: input.vendorId,
+    deliveryWarehouseId,
+  })
+
   const settings = await resolveEffectivePurchaseDefaults(tenantId)
   const directPoError = assertDirectPoAllowed(settings, Boolean(input.purchaseRequisitionId))
   if (directPoError) {
@@ -411,7 +465,6 @@ export async function createPurchaseOrder(
   }
   if (deliveryWarehouseId) await assertWarehouseActive(tenantId, deliveryWarehouseId)
 
-  const orderDate = parseDateInput(input.orderDate) ?? new Date()
   assertPoOrderDateAllowed(orderDate, toPoBackdatePolicy(settings))
 
   const totals = computeTotals(lines, input.taxAmount ?? 0, input.freightAmount ?? 0)
@@ -498,7 +551,12 @@ export async function updatePurchaseOrder(
   let lines: ReturnType<typeof normalizeLineInputs> | null = null
   if (input.lines !== undefined) {
     const enrichedLines = await enrichLinesWithItemUom(tenantId, input.lines)
-    lines = await fillItemSnapshots(tenantId, normalizeLineInputs(enrichedLines))
+    const taxContext = {
+      orderDate: input.orderDate !== undefined ? parseDateInput(input.orderDate) : existing.orderDate,
+      vendorId: input.vendorId ?? existing.vendorId,
+      deliveryWarehouseId: input.deliveryWarehouseId ?? existing.deliveryWarehouseId,
+    }
+    lines = await fillLineMasterSnapshots(tenantId, normalizeLineInputs(enrichedLines), taxContext)
     await assertLineMastersActive(tenantId, lines)
     // Preserve PR/Planning references when the client resends existing lines by id.
     const existingById = new Map(existing.lines.map((l) => [l.id, l]))
