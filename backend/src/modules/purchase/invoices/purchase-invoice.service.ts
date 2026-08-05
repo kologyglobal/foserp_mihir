@@ -219,7 +219,10 @@ function buildLines(
       dual.uomQuantitySnapshot ?? (dual.uomConversionFactorSnapshot === 1 ? quantity : quantity * (dual.uomConversionFactorSnapshot ?? 1)),
     )
     const amount = invoiceMoney(lineAmountFromVendor(rate, vendorQty))
-    const taxSnap = taxSnapshotFromGrnOrPoLine(grnLine, poLine)
+    const taxSnap = taxSnapshotFromGrnOrPoLine(
+      grnLine as Parameters<typeof taxSnapshotFromGrnOrPoLine>[0],
+      poLine as Parameters<typeof taxSnapshotFromGrnOrPoLine>[1],
+    )
     const taxRatePct =
       taxSnap && taxSnap.gstRatePctSnapshot > 0
         ? taxSnap.gstRatePctSnapshot

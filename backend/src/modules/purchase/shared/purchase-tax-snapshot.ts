@@ -76,11 +76,18 @@ export async function resolvePurchaseLineTaxSnapshot(input: {
 
   let plantState: string | null = null
   if (input.deliveryWarehouseId) {
-    const wh = await prisma.masterWarehouse.findFirst({
-      where: { tenantId: input.tenantId, id: input.deliveryWarehouseId, deletedAt: null },
-      select: { plant: { select: { state: true } } },
+    const setup = await prisma.purchaseSettings.findFirst({
+      where: { tenantId: input.tenantId },
+      select: { placeOfSupplyState: true },
     })
-    plantState = wh?.plant?.state ?? null
+    plantState = setup?.placeOfSupplyState ?? null
+    if (!plantState) {
+      const tenant = await prisma.tenant.findFirst({
+        where: { id: input.tenantId },
+        select: { state: true },
+      })
+      plantState = tenant?.state ?? null
+    }
   }
 
   const resolved = await resolveLineGstFromMasters({
