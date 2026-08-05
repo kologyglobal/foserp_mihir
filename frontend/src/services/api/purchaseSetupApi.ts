@@ -4,7 +4,7 @@ export type ApiDuplicateChallanPolicy = 'BLOCK' | 'WARN' | 'ALLOW'
 
 export type ApiSelfApprovalPolicy = 'NEVER' | 'PERMISSION_ONLY' | 'EVERYONE'
 
-export type ApiGstScheme = 'cgst_sgst' | 'igst'
+export type ApiGstScheme = 'cgst_sgst' | 'igst' | 'utgst_pair'
 
 export type ApiRoundOffRule = 'none' | 'nearest_rupee' | 'nearest_paisa'
 
