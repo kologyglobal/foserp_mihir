@@ -28,12 +28,14 @@ import { Modal } from '@/design-system/components/Modal'
 import { ErpButton } from '@/components/erp/ErpButton'
 import {
   approveToleranceGRN,
+  cancelGRN,
   createPurchaseReturnFromGrn,
   getGRNById,
   GRN_LINE_INSPECTION_STATUS_LABELS,
   postGRN,
   PurchaseServiceError,
   rejectToleranceGRN,
+  reverseGRN,
   submitGRN,
 } from '@/services/purchase'
 import { GRN_TOLERANCE_STATUS_LABELS } from '@/services/purchase/grnTolerance'
@@ -48,6 +50,7 @@ import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { purchaseActionGate, usePurchasePermissions } from '@/utils/permissions'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
+import { appConfirm, appPromptNote } from '@/store/confirmDialogStore'
 
 export function GrnDetailPage() {
   const { id } = useParams()
@@ -143,12 +146,16 @@ export function GrnDetailPage() {
   }
 
   const statusLabel = formatGrnStatusLabel(grn.status, grn.lines)
-  const canEdit = grn.status === 'draft' || grn.status === 'pending_inspection'
-  const canSubmit = grn.status === 'draft'
+  const actions = grn.allowedActions
+  const canEdit = actions?.canEdit ?? (grn.status === 'draft' || grn.status === 'pending_inspection')
+  const canSubmit = actions?.canSubmit ?? grn.status === 'draft'
+  const canCancel = actions?.canCancel ?? false
+  const canReverse = actions?.canReverse ?? false
   const canPost =
-    grn.status === 'accepted' ||
-    grn.status === 'partially_accepted' ||
-    (grn.status === 'pending_inspection' && !grn.inspectionRequired)
+    actions?.canPostInventory ??
+    (grn.status === 'accepted' ||
+      grn.status === 'partially_accepted' ||
+      (grn.status === 'pending_inspection' && !grn.inspectionRequired))
   const postGate = purchaseActionGate({
     permission: 'purchase.grn.post',
     statusAllowed: canPost,
@@ -157,9 +164,30 @@ export function GrnDetailPage() {
     permission: 'purchase.grn.create',
     statusAllowed: canSubmit || canEdit,
   })
+  const reverseGate = purchaseActionGate({
+    permission: 'purchase.grn.post',
+    statusAllowed: canReverse,
+  })
+  const cancelGate = purchaseActionGate({
+    permission: 'purchase.grn.create',
+    statusAllowed: canCancel,
+  })
+  const hasReturnableQty = grn.lines.some(
+    (l) =>
+      (l.returnableQty ?? 0) > 0 ||
+      l.rejectedQty > 0 ||
+      l.acceptedQty > 0 ||
+      l.receivedQty > 0,
+  )
+  const totalReturned = grn.totalReturnedQty ?? grn.lines.reduce((s, l) => s + (l.returnedQty ?? 0), 0)
+  const totalReturnable = grn.totalReturnableQty ?? grn.lines.reduce((s, l) => s + (l.returnableQty ?? 0), 0)
   const returnGate = purchaseActionGate({
     permission: 'purchase.return.create',
-    statusAllowed: grn.lines.some((l) => l.rejectedQty > 0),
+    statusAllowed:
+      grn.status !== 'draft' &&
+      grn.status !== 'cancelled' &&
+      grn.status !== 'reversed' &&
+      hasReturnableQty,
   })
 
   const documentFactBox = (
@@ -333,13 +361,13 @@ export function GrnDetailPage() {
             },
             {
               id: 'return',
-              label: 'Create Purchase Return',
+              label: 'Create Material Return',
               icon: RotateCcw,
               onClick: async () => {
                 setBusy(true)
                 try {
                   const ret = await createPurchaseReturnFromGrn(grn.id)
-                  notify.success(`Return ${ret.documentNumber} created`)
+                  notify.success(`Material return ${ret.documentNumber} created`)
                   navigate(`/purchase/returns/${ret.id}`)
                 } catch (err) {
                   notify.error(err instanceof PurchaseServiceError ? err.message : 'Return failed')
@@ -349,7 +377,62 @@ export function GrnDetailPage() {
               },
               hidden: returnGate.hidden,
               disabled: busy || returnGate.disabled,
-              disabledReason: returnGate.disabledReason,
+              disabledReason: returnGate.disabledReason ?? 'No returnable quantity on this GRN',
+            },
+            {
+              id: 'reverse-grn',
+              label: 'Reverse GRN',
+              icon: RotateCcw,
+              onClick: async () => {
+                const ok = await appConfirm({
+                  title: 'Reverse entire GRN?',
+                  description:
+                    'This creates a full reversal: stock is compensated, PO receipt quantities are restored, and this GRN becomes Reversed. Use Material Return for partial vendor returns.',
+                  confirmLabel: 'Continue',
+                  tone: 'danger',
+                })
+                if (!ok) return
+                const reason = await appPromptNote({
+                  title: 'Reversal reason',
+                  description: 'Enter a reason for reversing this goods receipt.',
+                  confirmLabel: 'Reverse GRN',
+                  note: {
+                    required: true,
+                    label: 'Reason',
+                    placeholder: 'e.g. Wrong challan, duplicate receipt…',
+                  },
+                })
+                if (!reason?.trim()) return
+                await run(() => reverseGRN(grn.id, reason.trim()), 'GRN reversed')
+              },
+              hidden: reverseGate.hidden,
+              disabled: busy || reverseGate.disabled,
+              disabledReason: reverseGate.disabledReason,
+            },
+            {
+              id: 'cancel-grn',
+              label: 'Cancel GRN',
+              icon: XCircle,
+              onClick: async () => {
+                const ok = await appConfirm({
+                  title: 'Cancel GRN?',
+                  description:
+                    'Cancel this draft or in-progress receipt. Posted stock on QC-pending receipts will be unwound.',
+                  confirmLabel: 'Cancel GRN',
+                  tone: 'danger',
+                })
+                if (!ok) return
+                const reason = await appPromptNote({
+                  title: 'Cancellation reason',
+                  description: 'Optional note for audit trail.',
+                  confirmLabel: 'Confirm cancel',
+                  note: { required: false, label: 'Note' },
+                })
+                await run(() => cancelGRN(grn.id, reason?.trim() ?? ''), 'GRN cancelled')
+              },
+              hidden: cancelGate.hidden,
+              disabled: busy || cancelGate.disabled,
+              disabledReason: cancelGate.disabledReason,
             },
           ]}
         />
@@ -358,6 +441,13 @@ export function GrnDetailPage() {
       stickyFooter={false}
     >
       <div className="space-y-3">
+        {grn.status === 'reversed' ? (
+          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-950">
+            This GRN was fully reversed
+            {grn.reversedAt ? ` on ${formatDate(grn.reversedAt.slice(0, 10))}` : ''}. The original
+            document is immutable — use Material Return documents for partial vendor returns.
+          </div>
+        ) : null}
         {grn.status === 'pending_tolerance_approval' ? (
           <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
             Outside receiving tolerance — awaiting Purchase Manager approval. Use Approve / Reject
@@ -469,7 +559,25 @@ export function GrnDetailPage() {
             </div>
             <div className="rounded-md border border-erp-border p-3">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Return</div>
-              <p className="mt-1">Returnable qty comes from the Purchase Return API.</p>
+              <p className="mt-1">
+                {totalReturned > 0 ? (
+                  <>
+                    <strong className="tabular-nums">{formatNumber(totalReturned)}</strong> returned
+                    {totalReturnable > 0 ? (
+                      <>
+                        {' '}
+                        ·{' '}
+                        <strong className="tabular-nums">{formatNumber(totalReturnable)}</strong>{' '}
+                        still returnable
+                      </>
+                    ) : (
+                      <> · fully returned</>
+                    )}
+                  </>
+                ) : (
+                  <>Material returns reduce stock; received qty on the GRN is unchanged.</>
+                )}
+              </p>
               <button
                 type="button"
                 className="mt-2 font-semibold text-erp-primary hover:underline disabled:opacity-50"
@@ -516,13 +624,15 @@ export function GrnDetailPage() {
           <p className="mb-2 text-[11px] text-erp-muted">
             <strong>PO open (before GRN)</strong> is the open PO quantity when this GRN was created (snapshot).
             <strong> Still on PO</strong> is what remains open on the purchase order after this GRN&apos;s received qty.
+            Material returns appear as <strong>negative rows</strong> under each receipt line; the net row shows qty still on hand.
           </p>
           <div className="min-w-0 w-full overflow-x-auto rounded-md border border-erp-border">
-            <table className="erp-table w-full min-w-[960px] text-left text-[12px]">
+            <table className="erp-table w-full min-w-[1120px] text-left text-[12px]">
               <thead>
                 <tr>
                   <th className="w-10">#</th>
                   <th>Item</th>
+                  <th className="w-16">UOM</th>
                   <th className="num">Ordered</th>
                   <th className="num">Prev</th>
                   <th className="num" title="Open PO quantity when this GRN was created">PO open (before)</th>
@@ -539,38 +649,111 @@ export function GrnDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {grn.lines.map((l) => (
-                  <tr key={l.id}>
-                    <td className="tabular-nums text-erp-muted">{l.lineNo}</td>
-                    <td className="min-w-[10rem]">
-                      <div className="font-mono text-[11px] text-erp-muted whitespace-nowrap">
-                        {l.itemCode}
-                      </div>
-                      <div className="font-medium text-erp-text">{l.itemName}</div>
-                    </td>
-                    <td className="num tabular-nums">{formatNumber(l.orderedQty)}</td>
-                    <td className="num tabular-nums">{formatNumber(l.previouslyReceivedQty)}</td>
-                    <td className="num tabular-nums">{formatNumber(l.pendingQty)}</td>
-                    <td className="num tabular-nums">{formatNumber(l.receivedQty)}</td>
-                    <td className="num tabular-nums">{formatNumber(remainingPoOpenAfterGrn(l))}</td>
-                    <td className="num tabular-nums">{formatNumber(l.tolerancePercentage ?? 0)}</td>
-                    <td className="num tabular-nums">
-                      {l.variancePercentage == null ? '—' : `${formatNumber(l.variancePercentage)}%`}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      {GRN_TOLERANCE_STATUS_LABELS[
-                        (l.toleranceStatus ?? 'EXACT') as keyof typeof GRN_TOLERANCE_STATUS_LABELS
-                      ] ?? l.toleranceStatus}
-                    </td>
-                    <td className="num tabular-nums">{formatNumber(l.acceptedQty)}</td>
-                    <td className="num tabular-nums">{formatNumber(l.rejectedQty)}</td>
-                    <td className="font-mono text-[11px] whitespace-nowrap">{l.batchNumber || '—'}</td>
-                    <td className="whitespace-nowrap">
-                      {GRN_LINE_INSPECTION_STATUS_LABELS[l.inspectionStatus]}
-                    </td>
-                    <td className="text-erp-muted">{l.remarks || '—'}</td>
-                  </tr>
-                ))}
+                {grn.lines.flatMap((l) => {
+                  const returnRows = (grn.materialReturnLines ?? []).filter(
+                    (r) => r.goodsReceiptLineId === l.id,
+                  )
+                  const returnedTotal = l.returnedQty ?? returnRows.reduce((s, r) => s + r.returnQuantity, 0)
+                  const netReceived = l.receivedQty - returnedTotal
+                  const netAccepted = l.acceptedQty - returnedTotal
+                  const lineUom = l.uom?.trim() || '—'
+                  const dash = <td className="num text-erp-muted">—</td>
+
+                  const receiptRow = (
+                    <tr key={l.id}>
+                      <td className="tabular-nums text-erp-muted">{l.lineNo}</td>
+                      <td className="min-w-[10rem]">
+                        <div className="font-mono text-[11px] text-erp-muted whitespace-nowrap">
+                          {l.itemCode}
+                        </div>
+                        <div className="font-medium text-erp-text">{l.itemName}</div>
+                      </td>
+                      <td className="whitespace-nowrap font-mono text-[11px] text-erp-muted">{lineUom}</td>
+                      <td className="num tabular-nums">{formatNumber(l.orderedQty)}</td>
+                      <td className="num tabular-nums">{formatNumber(l.previouslyReceivedQty)}</td>
+                      <td className="num tabular-nums">{formatNumber(l.pendingQty)}</td>
+                      <td className="num tabular-nums">{formatNumber(l.receivedQty)}</td>
+                      <td className="num tabular-nums">{formatNumber(remainingPoOpenAfterGrn(l))}</td>
+                      <td className="num tabular-nums">{formatNumber(l.tolerancePercentage ?? 0)}</td>
+                      <td className="num tabular-nums">
+                        {l.variancePercentage == null ? '—' : `${formatNumber(l.variancePercentage)}%`}
+                      </td>
+                      <td className="whitespace-nowrap">
+                        {GRN_TOLERANCE_STATUS_LABELS[
+                          (l.toleranceStatus ?? 'EXACT') as keyof typeof GRN_TOLERANCE_STATUS_LABELS
+                        ] ?? l.toleranceStatus}
+                      </td>
+                      <td className="num tabular-nums">{formatNumber(l.acceptedQty)}</td>
+                      <td className="num tabular-nums">{formatNumber(l.rejectedQty)}</td>
+                      <td className="font-mono text-[11px] whitespace-nowrap">{l.batchNumber || '—'}</td>
+                      <td className="whitespace-nowrap">
+                        {GRN_LINE_INSPECTION_STATUS_LABELS[l.inspectionStatus]}
+                      </td>
+                      <td className="text-erp-muted">{l.remarks || '—'}</td>
+                    </tr>
+                  )
+
+                  const materialReturnRows = returnRows.map((r) => (
+                    <tr key={`${l.id}-return-${r.purchaseReturnId}`} className="bg-violet-50/60">
+                      <td />
+                      <td className="min-w-[10rem] pl-6">
+                        <Link
+                          to={`/purchase/returns/${r.purchaseReturnId}`}
+                          className="font-mono text-[11px] font-semibold text-erp-primary hover:underline"
+                        >
+                          ↳ {r.returnNumber}
+                        </Link>
+                        <div className="text-[11px] text-violet-800">Material return to vendor</div>
+                      </td>
+                      <td className="whitespace-nowrap font-mono text-[11px] text-violet-800">{lineUom}</td>
+                      {dash}
+                      {dash}
+                      {dash}
+                      <td className="num tabular-nums font-medium text-red-700">
+                        −{formatNumber(r.returnQuantity)}
+                      </td>
+                      {dash}
+                      {dash}
+                      {dash}
+                      {dash}
+                      <td className="num tabular-nums font-medium text-red-700">
+                        −{formatNumber(r.returnQuantity)}
+                      </td>
+                      {dash}
+                      {dash}
+                      {dash}
+                      <td className="text-erp-muted">Material return</td>
+                    </tr>
+                  ))
+
+                  const netRow =
+                    returnRows.length > 0 ? (
+                      <tr key={`${l.id}-net`} className="border-t border-erp-border bg-slate-50/90 font-semibold">
+                        <td />
+                        <td className="pl-6 text-[12px] text-erp-text">Net after returns</td>
+                        <td className="whitespace-nowrap font-mono text-[11px] text-erp-text">{lineUom}</td>
+                        {dash}
+                        {dash}
+                        {dash}
+                        <td className="num tabular-nums text-erp-text">{formatNumber(netReceived)}</td>
+                        {dash}
+                        {dash}
+                        {dash}
+                        {dash}
+                        <td className="num tabular-nums text-erp-text">{formatNumber(netAccepted)}</td>
+                        {dash}
+                        {dash}
+                        {dash}
+                        <td className="text-[11px] text-erp-muted">
+                          {(l.returnableQty ?? 0) > 0
+                            ? `${formatNumber(l.returnableQty ?? 0)} still returnable`
+                            : 'Fully returned'}
+                        </td>
+                      </tr>
+                    ) : null
+
+                  return [receiptRow, ...materialReturnRows, netRow].filter(Boolean)
+                })}
               </tbody>
             </table>
           </div>

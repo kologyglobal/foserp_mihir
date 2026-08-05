@@ -157,6 +157,8 @@ async function resolveBin(
 
 const itemReceiptConfigSelect = {
   id: true,
+  batchTracked: true,
+  serialTracked: true,
   receivingToleranceId: true,
   receivingTolerancePercentage: true,
   receiptEntryMode: true,
@@ -172,6 +174,8 @@ const itemReceiptConfigSelect = {
 
 type ItemReceiptConfig = {
   id: string
+  batchTracked: boolean
+  serialTracked: boolean
   receivingToleranceId: string | null
   receivingTolerancePercentage: unknown
   receiptEntryMode: 'UNIT_ONLY' | 'WEIGHT_ONLY' | 'UNIT_AND_WEIGHT'
@@ -504,6 +508,53 @@ function assertGrnPolicyFields(
   }
 }
 
+async function assertGrnItemTraceability(
+  tenantId: string,
+  po: { lines: Array<{ id: string; itemId: string | null }> },
+  lines: GoodsReceiptLineInput[],
+) {
+  const poLineById = new Map(po.lines.map((l) => [l.id, l]))
+  const itemIds = [
+    ...new Set(po.lines.map((l) => l.itemId).filter((id): id is string => Boolean(id))),
+  ]
+  const itemConfigById = await loadItemReceiptConfigMap(tenantId, itemIds)
+  const errors: Array<{ field: string; message: string }> = []
+
+  lines.forEach((line, index) => {
+    const received = Number(line.receivedQuantity ?? line.receivedUomQuantity ?? 0)
+    if (received <= 0) return
+    const poLine = poLineById.get(line.purchaseOrderLineId)
+    const itemId = poLine?.itemId
+    if (!itemId) return
+    const itemConfig = itemConfigById.get(itemId)
+    if (!itemConfig) return
+    if (
+      itemConfig.batchTracked &&
+      !line.batchNumber?.toString().trim() &&
+      !line.lotNumber?.toString().trim()
+    ) {
+      errors.push({
+        field: `lines[${index}].batchNumber`,
+        message: 'Batch or lot number is required for batch-tracked items.',
+      })
+    }
+    if (itemConfig.serialTracked && !line.serialNumber?.toString().trim()) {
+      errors.push({
+        field: `lines[${index}].serialNumber`,
+        message: 'Serial number is required for serial-tracked items.',
+      })
+    }
+  })
+
+  if (errors.length) {
+    throw new GoodsReceiptValidationError(
+      purchaseMessage(PURCHASE_ERROR_CODE.GRN_VALIDATION_FAILED),
+      PURCHASE_ERROR_CODE.GRN_VALIDATION_FAILED,
+      errors,
+    )
+  }
+}
+
 async function assertDuplicateChallanPolicy(
   tenantId: string,
   vendorId: string,
@@ -536,7 +587,19 @@ export async function listGoodsReceipts(tenantId: string, query: ListGoodsReceip
 
 export async function getGoodsReceipt(tenantId: string, id: string) {
   const grn = await loadOrThrow(tenantId, id)
-  return mapGoodsReceiptToDto(grn)
+  const uomIds = [...new Set(grn.lines.map((l) => l.uomId).filter(Boolean))] as string[]
+  const uoms = uomIds.length
+    ? await prisma.masterUom.findMany({
+        where: { id: { in: uomIds }, tenantId, deletedAt: null },
+        select: { id: true, code: true },
+      })
+    : []
+  const uomCodeById = new Map(uoms.map((u) => [u.id, u.code]))
+  const { summarizeMaterialReturnsForGrn } = await import(
+    '../returns/returnable-quantity.service.js'
+  )
+  const returnStats = await summarizeMaterialReturnsForGrn(tenantId, id)
+  return mapGoodsReceiptToDto(grn, returnStats, uomCodeById)
 }
 
 export async function previewNextGoodsReceiptNumber(tenantId: string) {
@@ -650,6 +713,7 @@ export async function createGoodsReceipt(
   const po = await loadReceivablePo(tenantId, input.purchaseOrderId)
   const settings = await resolveEffectivePurchaseDefaults(tenantId, input.plantId)
   assertGrnPolicyFields(settings, input, input.lines ?? [])
+  await assertGrnItemTraceability(tenantId, po, input.lines ?? [])
 
   // Prefer explicit warehouse → PO delivery warehouse → setup default (never first master).
   const resolvedWarehouseId =
@@ -808,6 +872,7 @@ export async function updateGoodsReceipt(
   let lines: repo.GrnLineCreateData[] | undefined
   if (input.lines) {
     const po = await loadReceivablePo(tenantId, existing.purchaseOrderId)
+    await assertGrnItemTraceability(tenantId, po, input.lines)
     lines = await buildLineCreates(
       tenantId,
       po,
@@ -1433,6 +1498,42 @@ export async function cancelGoodsReceipt(
   return mapGoodsReceiptToDto(await loadOrThrow(tenantId, id))
 }
 
+const OPEN_RETURN_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'SHIPPED'] as const
+const BLOCKING_INVOICE_STATUSES = ['APPROVED', 'MATCHED', 'PARTIALLY_MATCHED', 'POSTED', 'CLOSED'] as const
+
+async function assertReverseNotBlocked(tenantId: string, grnId: string): Promise<void> {
+  const openReturns = await prisma.purchaseReturn.count({
+    where: {
+      tenantId,
+      goodsReceiptId: grnId,
+      deletedAt: null,
+      status: { in: [...OPEN_RETURN_STATUSES] },
+    },
+  })
+  if (openReturns > 0) {
+    throw new GoodsReceiptWorkflowError(
+      purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_OPEN_RETURN),
+      PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_OPEN_RETURN,
+    )
+  }
+
+  const blockingInvoice = await prisma.purchaseInvoice.findFirst({
+    where: {
+      tenantId,
+      goodsReceiptId: grnId,
+      deletedAt: null,
+      status: { in: [...BLOCKING_INVOICE_STATUSES] },
+    },
+    select: { id: true, invoiceNumber: true },
+  })
+  if (blockingInvoice) {
+    throw new GoodsReceiptWorkflowError(
+      purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_INVOICE),
+      PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_INVOICE,
+    )
+  }
+}
+
 export async function reverseGoodsReceipt(
   tenantId: string,
   id: string,
@@ -1441,6 +1542,7 @@ export async function reverseGoodsReceipt(
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertReversible(existing)
+  await assertReverseNotBlocked(tenantId, id)
 
   const deltas = existing.lines.map((l) => ({
     purchaseOrderLineId: l.purchaseOrderLineId,
@@ -1450,19 +1552,31 @@ export async function reverseGoodsReceipt(
   }))
 
   const reversalMovements = await prisma.$transaction(async (tx) => {
-    const movements =
-      existing.status === 'INVENTORY_POSTED' && existing.warehouseId
-        ? await reverseGrnStockInward({
-            tenantId,
-            grnId: existing.id,
-            grnNumber: existing.grnNumber,
-            warehouseId: existing.warehouseId,
-            lines: existing.lines,
-            useAcceptedQuantity: existing.inspectionRequired,
-            actorId,
-            tx,
-          })
-        : []
+    let movements: Awaited<ReturnType<typeof reverseGrnStockInward>> = []
+    if (existing.warehouseId) {
+      if (existing.status === 'INVENTORY_POSTED') {
+        movements = await reverseGrnStockInward({
+          tenantId,
+          grnId: existing.id,
+          grnNumber: existing.grnNumber,
+          warehouseId: existing.warehouseId,
+          lines: existing.lines,
+          useAcceptedQuantity: existing.inspectionRequired,
+          actorId,
+          tx,
+        })
+      } else if (existing.inspectionRequired && existing.status === 'QC_PENDING') {
+        movements = await reverseGrnQcHold({
+          tenantId,
+          grnId: existing.id,
+          grnNumber: existing.grnNumber,
+          warehouseId: existing.warehouseId,
+          lines: existing.lines,
+          actorId,
+          tx,
+        })
+      }
+    }
     await repo.updateGoodsReceipt(
       tenantId,
       id,

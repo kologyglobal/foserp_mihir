@@ -7705,6 +7705,10 @@ model PurchaseSettings {
   printOrientation               PurchasePrintOrientation    @default(PORTRAIT)
   /// In-app / email toggles per purchase event key (JSON object). Null → server defaults.
   notificationPreferences        Json?
+  /// When true, returns above qty/value thresholds stay SUBMITTED until manager approval.
+  requireReturnApproval          Boolean                     @default(false)
+  returnApprovalQtyThreshold       Decimal?                    @db.Decimal(18, 4)
+  returnApprovalValueThreshold     Decimal?                    @db.Decimal(18, 2)
   selfApprovalPolicy             SelfApprovalPolicy          @default(PERMISSION_ONLY)
   version                        Int                         @default(1)
   createdById                    String?                     @db.VarChar(36)

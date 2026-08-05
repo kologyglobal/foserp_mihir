@@ -672,6 +672,8 @@ export interface ApiGoodsReceiptLine {
   tolerancePercentage?: number
   variancePercentage?: number | null
   toleranceStatus?: string
+  returnedQuantity?: number
+  returnableQuantity?: number
   closeOpenQuantity?: boolean
   remarks: string | null
 }
@@ -721,6 +723,8 @@ export interface ApiGoodsReceipt {
   totalReceivedQty: number
   totalAcceptedQty: number
   totalRejectedQty: number
+  totalReturnedQty?: number
+  totalReturnableQty?: number
   totalAmount: number
   currencyCode: string
   expectedDeliveryDate: string | null
@@ -728,6 +732,16 @@ export interface ApiGoodsReceipt {
   deliveryTerms: string
   allowedActions: ApiGoodsReceiptAllowedActions
   lines: ApiGoodsReceiptLine[]
+  materialReturnLines?: ApiGrnMaterialReturnLine[]
+}
+
+export interface ApiGrnMaterialReturnLine {
+  purchaseReturnId: string
+  returnNumber: string
+  goodsReceiptLineId: string
+  returnQuantity: number
+  status: string
+  completedAt: string | null
 }
 
 export interface ApiReceivableLine {
@@ -939,6 +953,12 @@ export interface ApiPurchaseReturnLine {
   itemId: string | null
   itemCodeSnapshot: string | null
   itemNameSnapshot: string | null
+  uomId?: string | null
+  uom?: string | null
+  receivedQuantity?: number
+  batchNumber?: string | null
+  lotNumber?: string | null
+  serialNumber?: string | null
   returnQuantity: number
   rate: number
   amount: number

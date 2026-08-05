@@ -1590,8 +1590,9 @@ function mapApiGrnStatus(status: string): GrnDomainStatus {
     case 'INVENTORY_POSTED':
     case 'CLOSED':
       return 'posted'
-    case 'CANCELLED':
     case 'REVERSED':
+      return 'reversed'
+    case 'CANCELLED':
       return 'cancelled'
     default:
       return 'draft'
@@ -1641,6 +1642,18 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
     allowExcess: api.allowExcess,
     toleranceApprovalRequired: Boolean(api.toleranceApprovalRequired),
     qualityInspectionId: null,
+    allowedActions: api.allowedActions
+      ? {
+          canEdit: Boolean(api.allowedActions.canEdit),
+          canSubmit: Boolean(api.allowedActions.canSubmit),
+          canCancel: Boolean(api.allowedActions.canCancel),
+          canReverse: Boolean(api.allowedActions.canReverse),
+          canPostInventory: Boolean(api.allowedActions.canPostInventory),
+          canApproveTolerance: Boolean(api.allowedActions.canApproveTolerance),
+          canRejectTolerance: Boolean(api.allowedActions.canRejectTolerance),
+        }
+      : undefined,
+    reversedAt: api.reversedAt ?? null,
     lines: (api.lines ?? []).map((l) => ({
       id: l.id,
       lineNo: l.lineNumber,
@@ -1649,7 +1662,7 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       itemCode: l.itemCode,
       itemName: l.itemName,
       description: l.description || l.itemName,
-      uom: l.uom,
+      uom: (l.uom ?? '').trim() || resolveUomCode(l.uomId ?? null, ''),
       hsnCode: '',
       orderedQty: Number(l.orderedQuantity) || 0,
       orderedUomQty: Number(l.orderedUomQuantity) || 0,
@@ -1660,6 +1673,8 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       uomConversionFactor: Number(l.uomConversionFactor) || 1,
       acceptedQty: Number(l.acceptedQuantity) || 0,
       rejectedQty: Number(l.rejectedQuantity) || 0,
+      returnedQty: Number(l.returnedQuantity) || 0,
+      returnableQty: Number(l.returnableQuantity) || 0,
       shortQty: Number(l.shortQuantity) || 0,
       excessQty: Number(l.excessQuantity) || 0,
       damagedQty: Number(l.damagedQuantity) || 0,
@@ -1702,6 +1717,16 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
     otherCharges: 0,
     roundOff: 0,
     totalAmount: api.totalAmount,
+    totalReturnedQty: Number(api.totalReturnedQty) || 0,
+    totalReturnableQty: Number(api.totalReturnableQty) || 0,
+    materialReturnLines: (api.materialReturnLines ?? []).map((r) => ({
+      purchaseReturnId: r.purchaseReturnId,
+      returnNumber: r.returnNumber,
+      goodsReceiptLineId: r.goodsReceiptLineId,
+      returnQuantity: Number(r.returnQuantity) || 0,
+      status: r.status,
+      completedAt: r.completedAt,
+    })),
     createdAt: api.createdAt || new Date().toISOString(),
     updatedAt: api.updatedAt || new Date().toISOString(),
     createdBy: api.receivedByName || '',
@@ -2224,6 +2249,10 @@ export function mapApiPurchaseReturnToDomain(api: ApiPurchaseReturn): PurchaseRe
     lines: (api.lines ?? []).map((l) => {
       const qty = Number(l.returnQuantity) || 0
       const amount = Number(l.amount) || 0
+      const receivedQty = Number(l.receivedQuantity) || qty
+      const uom =
+        (l.uom ?? '').trim() || resolveUomCode(l.uomId ?? null, '')
+      const batchLotNo = [l.batchNumber, l.lotNumber].filter(Boolean).join(' / ') || ''
       return {
         id: l.id,
         lineNo: l.lineNumber,
@@ -2232,12 +2261,12 @@ export function mapApiPurchaseReturnToDomain(api: ApiPurchaseReturn): PurchaseRe
         itemCode: l.itemCodeSnapshot || '',
         itemName: l.itemNameSnapshot || '',
         description: l.itemNameSnapshot || '',
-        uom: '',
+        uom,
         hsnCode: '',
-        batchLotNo: '',
-        serialNumber: '',
-        receivedQty: qty,
-        availableReturnQty: qty,
+        batchLotNo,
+        serialNumber: l.serialNumber || '',
+        receivedQty,
+        availableReturnQty: receivedQty,
         returnQty: qty,
         unitCost: Number(l.rate) || 0,
         gstRatePct: 0,

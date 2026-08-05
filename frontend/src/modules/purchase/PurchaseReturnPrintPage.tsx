@@ -68,7 +68,7 @@ export function PurchaseReturnPrintPage() {
     >
       <article className="po-print-doc">
         <PurchaseDocumentLetterhead
-          docType="Purchase Return Challan"
+          docType="Material Return / Reverse Receipt Challan"
           docNumber={doc.documentNumber}
           meta={[
             { label: 'Date', value: formatDate(doc.documentDate) },
@@ -105,16 +105,19 @@ export function PurchaseReturnPrintPage() {
               <th>#</th>
               <th>Item</th>
               <th>Batch / Serial</th>
-              <th>Return Qty</th>
+              <th>Original Received</th>
+              <th>Returned (this doc)</th>
+              <th>Balance after</th>
               <th>UOM</th>
               <th>Unit Cost</th>
-              <th>Tax</th>
               <th>Amount</th>
               <th>Reason</th>
             </tr>
           </thead>
           <tbody>
-            {doc.lines.map((l) => (
+            {doc.lines.map((l) => {
+              const balance = Math.max(0, (Number(l.receivedQty) || 0) - (Number(l.returnQty) || 0))
+              return (
               <tr key={l.id}>
                 <td>{l.lineNo}</td>
                 <td>
@@ -126,14 +129,15 @@ export function PurchaseReturnPrintPage() {
                   {l.batchLotNo || '—'}
                   {l.serialNumber ? ` / ${l.serialNumber}` : ''}
                 </td>
+                <td>{formatNumber(l.receivedQty)}</td>
                 <td>{formatNumber(l.returnQty)}</td>
+                <td>{formatNumber(balance)}</td>
                 <td>{l.uom}</td>
                 <td>{formatCurrency(l.unitCost)}</td>
-                <td>{formatCurrency(l.cgst + l.sgst + l.igst)}</td>
                 <td>{formatCurrency(l.returnAmount)}</td>
                 <td>{PURCHASE_RETURN_REASON_LABELS[l.reason]}</td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
 

@@ -558,6 +558,18 @@ function mergeScalarData(
     if (g.requirePaymentTerms !== undefined) set('requirePaymentTerms', g.requirePaymentTerms)
     if (g.planningConsolidationEnabled !== undefined)
       set('planningConsolidationEnabled', g.planningConsolidationEnabled)
+    if ((g as { requireReturnApproval?: boolean }).requireReturnApproval !== undefined)
+      set('requireReturnApproval', (g as { requireReturnApproval: boolean }).requireReturnApproval)
+    if ((g as { returnApprovalQtyThreshold?: number | null }).returnApprovalQtyThreshold !== undefined)
+      set(
+        'returnApprovalQtyThreshold',
+        (g as { returnApprovalQtyThreshold: number | null }).returnApprovalQtyThreshold,
+      )
+    if ((g as { returnApprovalValueThreshold?: number | null }).returnApprovalValueThreshold !== undefined)
+      set(
+        'returnApprovalValueThreshold',
+        (g as { returnApprovalValueThreshold: number | null }).returnApprovalValueThreshold,
+      )
   }
   set('defaultPaymentTermCode', payment.code)
   set('defaultPaymentTermName', payment.name)

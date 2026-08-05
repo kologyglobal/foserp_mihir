@@ -277,6 +277,10 @@ export interface Item extends MasterRecordAudit {
   qtyOnProductionOrder?: number
   qtyOnSalesOrder?: number
   qcRequired?: boolean
+  /** Batch/lot traceability at receipt and inventory posting. */
+  batchTracked?: boolean
+  /** Serial number traceability at receipt and inventory posting. */
+  serialTracked?: boolean
   qualityTestGroupCode?: string | null
   productionBomId?: string | null
   routingNo?: string | null

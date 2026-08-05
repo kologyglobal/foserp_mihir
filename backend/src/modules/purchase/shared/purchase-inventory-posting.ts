@@ -252,42 +252,31 @@ export async function postPurchaseReturnStockIssue(input: {
       continue
     }
 
-    // RETURNED_TO_VENDOR: issue out rejected (or blocked-in-transit) stock
+    // RETURNED_TO_VENDOR: issue out rejected (or blocked-in-transit) stock; fall back to unrestricted accepted stock.
     let movement: InventoryStockMovement | null = null
-    try {
-      movement = await postStockMovement(
-        {
-          tenantId: input.tenantId,
-          itemId: line.itemId,
-          warehouseId: input.warehouseId,
-          movementType: 'ISSUE',
-          referenceType: 'ISS',
-          quantity,
-          stockStatus: 'BLOCKED',
-          referenceNo: input.returnNumber,
-          remarks: `Purchase return to vendor ${input.returnNumber}`,
-          idempotencyKey: `prt-out:${input.returnId}:${line.id}`,
-          createdBy: input.actorId,
-        },
-        input.tx,
-      )
-    } catch {
-      movement = await postStockMovement(
-        {
-          tenantId: input.tenantId,
-          itemId: line.itemId,
-          warehouseId: input.warehouseId,
-          movementType: 'ISSUE',
-          referenceType: 'ISS',
-          quantity,
-          stockStatus: 'REJECTED',
-          referenceNo: input.returnNumber,
-          remarks: `Purchase return to vendor ${input.returnNumber}`,
-          idempotencyKey: `prt-out-rej:${input.returnId}:${line.id}`,
-          createdBy: input.actorId,
-        },
-        input.tx,
-      )
+    const issueBuckets: Array<'BLOCKED' | 'REJECTED' | 'UNRESTRICTED'> = ['BLOCKED', 'REJECTED', 'UNRESTRICTED']
+    for (const stockStatus of issueBuckets) {
+      try {
+        movement = await postStockMovement(
+          {
+            tenantId: input.tenantId,
+            itemId: line.itemId,
+            warehouseId: input.warehouseId,
+            movementType: 'ISSUE',
+            referenceType: 'ISS',
+            quantity,
+            stockStatus,
+            referenceNo: input.returnNumber,
+            remarks: `Purchase return to vendor ${input.returnNumber}`,
+            idempotencyKey: `prt-out-${stockStatus.toLowerCase()}:${input.returnId}:${line.id}`,
+            createdBy: input.actorId,
+          },
+          input.tx,
+        )
+        if (movement) break
+      } catch {
+        movement = null
+      }
     }
     if (movement) movements.push(movement)
   }

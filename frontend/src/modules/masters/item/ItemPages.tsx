@@ -183,6 +183,8 @@ const schema = z.object({
   isStockable: z.boolean(),
   isActive: z.boolean(),
   qcRequired: z.boolean(),
+  batchTracked: z.boolean().optional(),
+  serialTracked: z.boolean().optional(),
   qualityTestGroupCode: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
   productionBomId: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
   routingNo: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
@@ -270,6 +272,8 @@ function buildItemFormDefaults(
       subAssemblyRule: existing.subAssemblyRule ?? null,
       isBlocked: existing.isBlocked ?? false,
       qcRequired: existing.qcRequired ?? false,
+      batchTracked: existing.batchTracked ?? false,
+      serialTracked: existing.serialTracked ?? false,
       quantityPerUom: existing.quantityPerUom ?? 1,
       purchaseQtyPerUom: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
       uomConversionFactor: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
@@ -303,6 +307,8 @@ function buildItemFormDefaults(
     isStockable: true,
     isActive: true,
     qcRequired: false,
+    batchTracked: false,
+    serialTracked: false,
     qualityTestGroupCode: '',
     quantityPerUom: 1,
     purchaseQtyPerUom: 1,
@@ -581,10 +587,6 @@ export function ItemFormPage() {
     }
     if (errs.gstGroupId || errs.hsnId || errs.hsnCode) {
       bumpSection('item-section-tax')
-      return
-    }
-    if (errs.reorderLevel || errs.reorderQty) {
-      bumpSection('item-section-inventory')
       return
     }
     if (errs.qcRequired || errs.qualityTestGroupCode) {
@@ -1016,12 +1018,6 @@ export function ItemFormPage() {
           <FormField label="Qty. on Sales Order">
             <Input readOnly value={formatNumber(existing?.qtyOnSalesOrder ?? 0)} />
           </FormField>
-          <FormField label="Reorder Level">
-            <Input type="number" {...register('reorderLevel')} />
-          </FormField>
-          <FormField label="Reorder Qty">
-            <Input type="number" {...register('reorderQty')} />
-          </FormField>
         </ErpCardSection>
 
         <ErpCardSection
@@ -1037,6 +1033,12 @@ export function ItemFormPage() {
         >
           <FormField label="QC Required">
             <Checkbox {...register('qcRequired')} label="Inspection required before use" />
+          </FormField>
+          <FormField label="Batch tracking">
+            <Checkbox {...register('batchTracked')} label="Track batch / lot at receipt" />
+          </FormField>
+          <FormField label="Serial tracking">
+            <Checkbox {...register('serialTracked')} label="Track serial numbers at receipt" />
           </FormField>
           <FormField label="Quality Test Group Code">
             <Select
@@ -1152,6 +1154,8 @@ export function ItemDetailPage() {
       <DetailSection title="Quality & Manufacturing">
         <DetailGrid>
           <DetailField label="QC Required" value={item.qcRequired ? 'Yes' : 'No'} />
+          <DetailField label="Batch tracking" value={item.batchTracked ? 'Yes' : 'No'} />
+          <DetailField label="Serial tracking" value={item.serialTracked ? 'Yes' : 'No'} />
           <DetailField label="Test Group" value={item.qualityTestGroupCode ?? '—'} />
           <DetailField label="Routing No" value={item.routingNo ?? '—'} />
           <DetailField label="Drawing No" value={item.drawingNo ?? '—'} />

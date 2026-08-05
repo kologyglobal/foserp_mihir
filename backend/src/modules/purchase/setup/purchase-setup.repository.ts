@@ -120,6 +120,9 @@ export const SERVER_DEFAULT_SETUP = {
   printPaperSize: 'A4' as PurchasePrintPaperSize,
   printOrientation: 'PORTRAIT' as PurchasePrintOrientation,
   notificationPreferences: null as unknown,
+  requireReturnApproval: false,
+  returnApprovalQtyThreshold: null as number | null,
+  returnApprovalValueThreshold: null as number | null,
   selfApprovalPolicy: 'PERMISSION_ONLY' as SelfApprovalPolicy,
   version: 0,
 }

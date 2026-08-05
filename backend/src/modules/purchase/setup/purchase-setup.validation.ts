@@ -91,6 +91,9 @@ const generalSchema = z.object({
   requireExpectedDeliveryDate: z.boolean().optional(),
   requirePaymentTerms: z.boolean().optional(),
   planningConsolidationEnabled: z.boolean().optional(),
+  requireReturnApproval: z.boolean().optional(),
+  returnApprovalQtyThreshold: z.coerce.number().min(0).nullable().optional(),
+  returnApprovalValueThreshold: z.coerce.number().min(0).nullable().optional(),
 })
 
 const requisitionSchema = z.object({

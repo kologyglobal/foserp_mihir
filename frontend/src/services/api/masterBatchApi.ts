@@ -103,6 +103,8 @@ export interface ItemDto {
   weightUomId?: string | null
   standardWeightPerBaseUnit?: number | string
   qcRequired: boolean
+  batchTracked?: boolean
+  serialTracked?: boolean
   qualityTestGroupCode?: string | null
   productionBomId?: string | null
   routingNo?: string | null
@@ -336,6 +338,8 @@ export function mapItemDto(row: ItemDto): Item {
     weightUomId: row.weightUomId ?? null,
     standardWeightPerBaseUnit: num(row.standardWeightPerBaseUnit ?? 0),
     qcRequired: row.qcRequired,
+    batchTracked: row.batchTracked ?? false,
+    serialTracked: row.serialTracked ?? false,
     qualityTestGroupCode: row.qualityTestGroupCode ?? null,
     productionBomId: row.productionBomId ?? null,
     routingNo: row.routingNo ?? null,
@@ -502,6 +506,8 @@ export function itemToApiPayload(data: Item): Record<string, unknown> {
     weightUomId: data.weightUomId || null,
     standardWeightPerBaseUnit: data.standardWeightPerBaseUnit ?? 0,
     qcRequired: data.qcRequired ?? false,
+    batchTracked: data.batchTracked ?? false,
+    serialTracked: data.serialTracked ?? false,
     qualityTestGroupCode: data.qualityTestGroupCode || null,
     productionBomId: data.productionBomId || null,
     routingNo: data.routingNo || null,

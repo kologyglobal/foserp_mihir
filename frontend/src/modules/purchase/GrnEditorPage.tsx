@@ -96,6 +96,7 @@ type BinOption = {
 
 type LineDraft = {
   purchaseOrderLineId: string
+  itemId: string
   itemCode: string
   itemName: string
   description: string
@@ -135,6 +136,22 @@ function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function traceabilityFromControls(
+  itemId: string,
+  itemControls: Record<
+    string,
+    { batch: boolean; serial: boolean; expiry: boolean; receivingTolerancePercentage: number }
+  >,
+  fallback?: { batchControlled?: boolean; serialControlled?: boolean; expiryControlled?: boolean },
+) {
+  const ctrl = itemId ? itemControls[itemId] : undefined
+  return {
+    batchControlled: ctrl?.batch ?? fallback?.batchControlled ?? false,
+    serialControlled: ctrl?.serial ?? fallback?.serialControlled ?? false,
+    expiryControlled: ctrl?.expiry ?? fallback?.expiryControlled ?? false,
+  }
+}
+
 function linesFromPo(
   po: PurchaseOrder,
   itemControls: Record<
@@ -168,6 +185,7 @@ function linesFromPo(
       })
       return {
         purchaseOrderLineId: l.id,
+        itemId: l.itemId,
         itemCode: l.itemCode,
         itemName: l.itemName,
         description: l.specification || l.itemName,
@@ -191,9 +209,7 @@ function linesFromPo(
         binId: l.binId ?? null,
         bin: l.binCode ?? '',
         allowExcess: setup.allowOverReceipt,
-        batchControlled: ctrl.batch,
-        serialControlled: ctrl.serial,
-        expiryControlled: ctrl.expiry,
+        ...traceabilityFromControls(l.itemId, itemControls),
         tolerancePercentage: resolvedTol,
         variancePercentage: preview.variancePercentage,
         toleranceStatus: preview.toleranceStatus,
@@ -204,9 +220,16 @@ function linesFromPo(
     })
 }
 
-function linesFromGrn(grn: GoodsReceiptNote): LineDraft[] {
+function linesFromGrn(
+  grn: GoodsReceiptNote,
+  itemControls: Record<
+    string,
+    { batch: boolean; serial: boolean; expiry: boolean; receivingTolerancePercentage: number }
+  >,
+): LineDraft[] {
   return grn.lines.map((l) => ({
     purchaseOrderLineId: l.purchaseOrderLineId,
+    itemId: l.itemId,
     itemCode: l.itemCode,
     itemName: l.itemName,
     description: l.description,
@@ -230,9 +253,11 @@ function linesFromGrn(grn: GoodsReceiptNote): LineDraft[] {
     binId: l.binId ?? null,
     bin: l.bin,
     allowExcess: l.allowExcess,
-    batchControlled: l.batchControlled,
-    serialControlled: l.serialControlled,
-    expiryControlled: l.expiryControlled,
+    ...traceabilityFromControls(l.itemId, itemControls, {
+      batchControlled: l.batchControlled,
+      serialControlled: l.serialControlled,
+      expiryControlled: l.expiryControlled,
+    }),
     tolerancePercentage: l.tolerancePercentage ?? 0,
     variancePercentage: l.variancePercentage ?? null,
     toleranceStatus: l.toleranceStatus ?? 'EXACT',
@@ -432,6 +457,15 @@ export function GrnEditorPage() {
     }
   }, [lines, allowExcess, setupTolerancePct])
 
+  const showBatchSerialCol = useMemo(
+    () => lines.some((l) => l.batchControlled || l.serialControlled),
+    [lines],
+  )
+  const showExpiryCol = useMemo(
+    () => lines.some((l) => l.expiryControlled),
+    [lines],
+  )
+
   const receivingPeek = useMemo(
     () =>
       receivingSummary({
@@ -566,7 +600,7 @@ export function GrnEditorPage() {
         setInspectionRequired(grn.inspectionRequired)
         setAllowExcess(grn.allowExcess)
         setRemarks(grn.remarks)
-        setLines(linesFromGrn(grn))
+        setLines(linesFromGrn(grn, controls))
         resetDirty()
       } else {
         const initialPoId = searchParams.get('poId') ?? ''
@@ -770,14 +804,14 @@ export function GrnEditorPage() {
         const updated = await updateGRN(recordId, input)
         setDocumentNumber(updated.documentNumber)
         setStatus(updated.status)
-        setLines(linesFromGrn(updated))
+        setLines(linesFromGrn(updated, itemControls))
         notify.success(`Saved · ${updated.documentNumber}`)
       } else {
         const created = await createGRNFromPo(input)
         setRecordId(created.id)
         setDocumentNumber(created.documentNumber)
         setStatus(created.status)
-        setLines(linesFromGrn(created))
+        setLines(linesFromGrn(created, itemControls))
         notify.success(`Saved · ${created.documentNumber}`)
       }
       resetDirty()
@@ -1227,8 +1261,8 @@ export function GrnEditorPage() {
                 <th>Status</th>
                 <th title="Close remaining open qty (short outside → approval)">Close open</th>
                 <th>Short / Excess / Dmg</th>
-                <th>Batch / Lot / Serial</th>
-                <th>Mfg / Expiry</th>
+                {showBatchSerialCol ? <th>Batch / Lot / Serial</th> : null}
+                {showExpiryCol ? <th>Mfg / Expiry</th> : null}
                 <th>Bin</th>
                 <th>Remarks</th>
               </tr>
@@ -1309,48 +1343,61 @@ export function GrnEditorPage() {
                       />
                     </div>
                   </td>
-                  <td>
-                    <Input
-                      className="mb-1 w-36"
-                      placeholder="Batch"
-                      value={l.batchNumber}
-                      onChange={(e) => updateLine(i, { batchNumber: e.target.value })}
-                    />
-                    <Input
-                      className="mb-1 w-36"
-                      placeholder="Lot"
-                      value={l.lotNumber}
-                      onChange={(e) => updateLine(i, { lotNumber: e.target.value })}
-                    />
-                    <Input
-                      className="w-36"
-                      placeholder="Serial"
-                      value={l.serialNumber}
-                      onChange={(e) => updateLine(i, { serialNumber: e.target.value })}
-                    />
-                    {fieldErrors[`line-${i}-batch`] || fieldErrors[`line-${i}-serial`] ? (
-                      <p className="mt-1 text-xs text-red-600">
-                        {fieldErrors[`line-${i}-batch`] || fieldErrors[`line-${i}-serial`]}
-                      </p>
-                    ) : null}
-                  </td>
-                  <td>
-                    <Input
-                      type="date"
-                      className="mb-1 w-36"
-                      value={l.manufacturingDate}
-                      onChange={(e) => updateLine(i, { manufacturingDate: e.target.value })}
-                    />
-                    <Input
-                      type="date"
-                      className="w-36"
-                      value={l.expiryDate}
-                      onChange={(e) => updateLine(i, { expiryDate: e.target.value })}
-                    />
-                    {fieldErrors[`line-${i}-expiry`] ? (
-                      <p className="mt-1 text-xs text-red-600">{fieldErrors[`line-${i}-expiry`]}</p>
-                    ) : null}
-                  </td>
+                  {showBatchSerialCol ? (
+                    <td>
+                      {l.batchControlled ? (
+                        <Input
+                          className="mb-1 w-36"
+                          placeholder="Batch"
+                          value={l.batchNumber}
+                          onChange={(e) => updateLine(i, { batchNumber: e.target.value })}
+                        />
+                      ) : null}
+                      {l.batchControlled ? (
+                        <Input
+                          className="mb-1 w-36"
+                          placeholder="Lot"
+                          value={l.lotNumber}
+                          onChange={(e) => updateLine(i, { lotNumber: e.target.value })}
+                        />
+                      ) : null}
+                      {l.serialControlled ? (
+                        <Input
+                          className="w-36"
+                          placeholder="Serial"
+                          value={l.serialNumber}
+                          onChange={(e) => updateLine(i, { serialNumber: e.target.value })}
+                        />
+                      ) : null}
+                      {!l.batchControlled && !l.serialControlled ? (
+                        <span className="text-[11px] text-erp-muted">—</span>
+                      ) : null}
+                      {fieldErrors[`line-${i}-batch`] || fieldErrors[`line-${i}-serial`] ? (
+                        <p className="mt-1 text-xs text-red-600">
+                          {fieldErrors[`line-${i}-batch`] || fieldErrors[`line-${i}-serial`]}
+                        </p>
+                      ) : null}
+                    </td>
+                  ) : null}
+                  {showExpiryCol ? (
+                    <td>
+                      <Input
+                        type="date"
+                        className="mb-1 w-36"
+                        value={l.manufacturingDate}
+                        onChange={(e) => updateLine(i, { manufacturingDate: e.target.value })}
+                      />
+                      <Input
+                        type="date"
+                        className="w-36"
+                        value={l.expiryDate}
+                        onChange={(e) => updateLine(i, { expiryDate: e.target.value })}
+                      />
+                      {fieldErrors[`line-${i}-expiry`] ? (
+                        <p className="mt-1 text-xs text-red-600">{fieldErrors[`line-${i}-expiry`]}</p>
+                      ) : null}
+                    </td>
+                  ) : null}
                   <td>
                     <select
                       className="erp-input h-8 min-w-[7rem] text-[11px]"
