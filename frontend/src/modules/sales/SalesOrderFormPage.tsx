@@ -403,6 +403,8 @@ export function SalesOrderEditPage() {
           accent="violet"
           collapsible
           defaultOpen
+          columns={1}
+          className="so-pricing-section"
         >
           {validationErrors.lines ? (
             <p className="mb-3 text-sm text-red-600">{validationErrors.lines}</p>

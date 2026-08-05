@@ -114,6 +114,7 @@ import { useMasterStore } from '@/store/masterStore'
 import { isApiMode } from '@/config/apiConfig'
 import { fetchLookup } from '@/services/api/masterApi'
 import { usePurchaseMasterStore } from '@/store/purchaseMasterStore'
+import { loadQualityTestGroupOptions, type QualityTestGroupOption } from '@/utils/qualityTestGroupOptions'
 
 type LocationOption = {
   id: string
@@ -499,6 +500,7 @@ export function PurchaseOrderEditorPage() {
   const [purchaseSetup, setPurchaseSetup] = useState<PurchaseSetup | null>(null)
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>([])
   const [binOptions, setBinOptions] = useState<Array<{ id: string; code: string; name: string; warehouseId?: string }>>([])
+  const [qualityTestGroupOptions, setQualityTestGroupOptions] = useState<QualityTestGroupOption[]>([])
 
   const originParam = (searchParams.get('origin') ?? '') as string
   const originModeFromParam: PurchaseOrderOrigin =
@@ -902,7 +904,8 @@ export function PurchaseOrderEditorPage() {
       getBlanketOrders(),
       getPurchaseSetup(),
       getPurchaseWarehouses(),
-    ]).then(([vendorRows, items, blankets, setup, warehouses]) => {
+      loadQualityTestGroupOptions(),
+    ]).then(([vendorRows, items, blankets, setup, warehouses, qtgOptions]) => {
       setVendors(vendorRows.filter((v) => v.isActive))
       setCatalogItems(items)
       setPurchaseSetup(setup)
@@ -915,6 +918,7 @@ export function PurchaseOrderEditorPage() {
         city: w.city,
       }))
       setLocationOptions(locs)
+      setQualityTestGroupOptions(qtgOptions)
       if (isNew) {
         const preferred =
           (setup.general.defaultWarehouseId &&
@@ -1546,6 +1550,7 @@ export function PurchaseOrderEditorPage() {
                 catalogItems={catalogItemsForPicker}
                 warehouseOptions={locationOptions}
                 binOptions={warehouseBinOptions}
+                qualityTestGroupOptions={qualityTestGroupOptions}
                 editable={editable}
                 isInterstate={isInterstate}
                 dirty={dirty}

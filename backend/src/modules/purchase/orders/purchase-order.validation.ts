@@ -56,6 +56,7 @@ export const purchaseOrderLineInputSchema = z.object({
   gstGroupId: z.string().uuid().nullable().optional(),
   hsnId: z.string().uuid().nullable().optional(),
   binId: z.string().uuid().nullable().optional(),
+  qualityTestGroupCode: z.string().trim().max(64).nullable().optional(),
 }).superRefine((line, ctx) => {
   if (line.uomQuantity == null && line.quantity == null) {
     ctx.addIssue({

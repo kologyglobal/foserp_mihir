@@ -586,6 +586,7 @@ export interface ApiPurchaseOrderLineInput {
   gstGroupId?: string | null
   hsnId?: string | null
   binId?: string | null
+  qualityTestGroupCode?: string | null
 }
 
 export interface ApiPurchaseOrderInput {

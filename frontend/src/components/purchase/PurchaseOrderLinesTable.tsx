@@ -43,6 +43,7 @@ export type PurchaseOrderLinesTableProps = {
   catalogItems: PurchaseItemCodeCatalogOption[]
   warehouseOptions: Array<{ id: string; name: string }>
   binOptions?: Array<{ id: string; code: string; name: string }>
+  qualityTestGroupOptions?: Array<{ code: string; label: string }>
   editable: boolean
   isInterstate: boolean
   dirty?: boolean
@@ -138,6 +139,7 @@ export function PurchaseOrderLinesTable({
   catalogItems,
   warehouseOptions: _warehouseOptions,
   binOptions = [],
+  qualityTestGroupOptions = [],
   editable,
   isInterstate: _isInterstate,
   dirty,
@@ -644,12 +646,27 @@ export function PurchaseOrderLinesTable({
                       <input type="checkbox" checked={Boolean(line.qcRequired)} disabled readOnly />
                     </td>
                     <td>
-                      <input
+                      <select
                         className="erp-input h-8 min-w-[7rem] text-[11px]"
-                        disabled
-                        readOnly
+                        disabled={!editable}
                         value={line.qualityTestGroupCode ?? ''}
-                      />
+                        onChange={(e) =>
+                          onPatchLine(line.key, {
+                            qualityTestGroupCode: e.target.value.trim() || null,
+                          })
+                        }
+                      >
+                        <option value="">{SELECT_PLACEHOLDER}</option>
+                        {qualityTestGroupOptions.map((o) => (
+                          <option key={o.code} value={o.code}>
+                            {o.label}
+                          </option>
+                        ))}
+                        {line.qualityTestGroupCode &&
+                        !qualityTestGroupOptions.some((o) => o.code === line.qualityTestGroupCode) ? (
+                          <option value={line.qualityTestGroupCode}>{line.qualityTestGroupCode}</option>
+                        ) : null}
+                      </select>
                     </td>
                     <td onKeyDown={onCellKeyDown}>
                       <select
