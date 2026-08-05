@@ -264,6 +264,7 @@ export interface Item extends MasterRecordAudit {
   /** ±% band for GRN receiving vs open qty (legacy dual-read). */
   receivingTolerancePercentage?: number
   receivingToleranceId?: string | null
+  weightReceivingToleranceId?: string | null
   receiptEntryMode?: 'UNIT_ONLY' | 'WEIGHT_ONLY' | 'UNIT_AND_WEIGHT'
   conversionCalculationMode?: 'AUTOMATIC' | 'MANUAL'
   allowManualUnitQuantity?: boolean
@@ -277,6 +278,10 @@ export interface Item extends MasterRecordAudit {
   qtyOnProductionOrder?: number
   qtyOnSalesOrder?: number
   qcRequired?: boolean
+  /** Batch/lot traceability at receipt and inventory posting. */
+  batchTracked?: boolean
+  /** Serial number traceability at receipt and inventory posting. */
+  serialTracked?: boolean
   qualityTestGroupCode?: string | null
   productionBomId?: string | null
   routingNo?: string | null

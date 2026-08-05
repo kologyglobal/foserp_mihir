@@ -51,6 +51,12 @@ export const goodsReceiptLineInputSchema = z.object({
   closeOpenQuantity: z.boolean().optional(),
   shortCloseRequested: z.boolean().optional(),
   shortCloseReason: z.string().trim().max(500).optional().nullable(),
+  receivingCondition: z
+    .enum(['NORMAL', 'SHORT', 'EXCESS', 'DAMAGE', 'REJECTED', 'QUALITY_HOLD'])
+    .optional(),
+  receivingConditionReason: z.string().trim().max(500).optional().nullable(),
+  acceptedQuantity: z.coerce.number().min(0).optional(),
+  rejectedQuantity: z.coerce.number().min(0).optional(),
   remarks: z.string().trim().max(2000).optional().nullable(),
 }).superRefine((line, ctx) => {
   if (line.receivedUomQuantity == null && line.receivedQuantity == null) {

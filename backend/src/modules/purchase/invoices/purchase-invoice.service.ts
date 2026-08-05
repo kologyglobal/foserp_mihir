@@ -110,7 +110,13 @@ async function resolveReferences(
         include: {
           lines: {
             include: {
-              item: { include: { baseUom: { select: { code: true } }, purchaseUom: { select: { code: true } } } },
+              // GoodsReceiptLine has no `item` relation — UOM/item snapshots come via PO line.
+              purchaseOrderLine: {
+                include: {
+                  uom: { select: { code: true } },
+                  item: { include: { baseUom: { select: { code: true } }, purchaseUom: { select: { code: true } } } },
+                },
+              },
             },
           },
         },
@@ -146,21 +152,30 @@ function dualUomSnapshots(
     receivedUomQuantity: unknown
     uomConversionFactor: unknown
     uomCodeSnapshot: string
-    item?: { baseUom?: { code?: string | null } | null; purchaseUom?: { code?: string | null } | null } | null
+    purchaseOrderLine?: {
+      quantity: unknown
+      uomQuantity: unknown
+      uomConversionFactor: unknown
+      uom?: { code?: string | null } | null
+      item?: { baseUom?: { code?: string | null } | null; purchaseUom?: { code?: string | null } | null } | null
+    } | null
   },
   inputUom?: string,
 ) {
-  const factor = Number(poLine?.uomConversionFactor ?? grnLine?.uomConversionFactor ?? 1) || 1
+  const grnPoLine = grnLine?.purchaseOrderLine ?? undefined
+  const factor = Number(poLine?.uomConversionFactor ?? grnPoLine?.uomConversionFactor ?? grnLine?.uomConversionFactor ?? 1) || 1
   const purchaseUom = (
     poLine?.uom?.code ??
     poLine?.item?.purchaseUom?.code ??
+    grnPoLine?.uom?.code ??
+    grnPoLine?.item?.purchaseUom?.code ??
     grnLine?.uomCodeSnapshot ??
     inputUom ??
     ''
   ).trim().toUpperCase()
   const stockUom = (
     poLine?.item?.baseUom?.code ??
-    grnLine?.item?.baseUom?.code ??
+    grnPoLine?.item?.baseUom?.code ??
     inputUom ??
     purchaseUom
   ).trim().toUpperCase()
@@ -169,6 +184,8 @@ function dualUomSnapshots(
   let uomQty = factor === 1 ? quantity : quantity * factor
   if (poLine && poBase > 0) {
     uomQty = (Number(poLine.uomQuantity) / poBase) * quantity
+  } else if (grnPoLine && Number(grnPoLine.quantity) > 0) {
+    uomQty = (Number(grnPoLine.uomQuantity) / Number(grnPoLine.quantity)) * quantity
   } else if (grnLine && grnBase > 0) {
     uomQty = (Number(grnLine.receivedUomQuantity) / grnBase) * quantity
   }

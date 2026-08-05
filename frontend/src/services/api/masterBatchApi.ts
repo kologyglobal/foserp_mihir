@@ -95,6 +95,7 @@ export interface ItemDto {
   }>
   receivingTolerancePercentage?: number | string
   receivingToleranceId?: string | null
+  weightReceivingToleranceId?: string | null
   receiptEntryMode?: string
   conversionCalculationMode?: string
   allowManualUnitQuantity?: boolean
@@ -103,6 +104,8 @@ export interface ItemDto {
   weightUomId?: string | null
   standardWeightPerBaseUnit?: number | string
   qcRequired: boolean
+  batchTracked?: boolean
+  serialTracked?: boolean
   qualityTestGroupCode?: string | null
   productionBomId?: string | null
   routingNo?: string | null
@@ -328,6 +331,7 @@ export function mapItemDto(row: ItemDto): Item {
     })),
     receivingTolerancePercentage: num(row.receivingTolerancePercentage),
     receivingToleranceId: row.receivingToleranceId ?? null,
+    weightReceivingToleranceId: row.weightReceivingToleranceId ?? null,
     receiptEntryMode: (row.receiptEntryMode ?? 'UNIT_ONLY') as Item['receiptEntryMode'],
     conversionCalculationMode: (row.conversionCalculationMode ?? 'AUTOMATIC') as Item['conversionCalculationMode'],
     allowManualUnitQuantity: row.allowManualUnitQuantity ?? false,
@@ -336,6 +340,8 @@ export function mapItemDto(row: ItemDto): Item {
     weightUomId: row.weightUomId ?? null,
     standardWeightPerBaseUnit: num(row.standardWeightPerBaseUnit ?? 0),
     qcRequired: row.qcRequired,
+    batchTracked: row.batchTracked ?? false,
+    serialTracked: row.serialTracked ?? false,
     qualityTestGroupCode: row.qualityTestGroupCode ?? null,
     productionBomId: row.productionBomId ?? null,
     routingNo: row.routingNo ?? null,
@@ -494,6 +500,7 @@ export function itemToApiPayload(data: Item): Record<string, unknown> {
     uomConversionFactor: data.uomConversionFactor ?? data.purchaseQtyPerUom ?? 1,
     receivingTolerancePercentage: data.receivingTolerancePercentage ?? 0,
     receivingToleranceId: data.receivingToleranceId || null,
+    weightReceivingToleranceId: data.weightReceivingToleranceId || null,
     receiptEntryMode: data.receiptEntryMode ?? 'UNIT_ONLY',
     conversionCalculationMode: data.conversionCalculationMode ?? 'AUTOMATIC',
     allowManualUnitQuantity: data.allowManualUnitQuantity ?? false,
@@ -502,6 +509,8 @@ export function itemToApiPayload(data: Item): Record<string, unknown> {
     weightUomId: data.weightUomId || null,
     standardWeightPerBaseUnit: data.standardWeightPerBaseUnit ?? 0,
     qcRequired: data.qcRequired ?? false,
+    batchTracked: data.batchTracked ?? false,
+    serialTracked: data.serialTracked ?? false,
     qualityTestGroupCode: data.qualityTestGroupCode || null,
     productionBomId: data.productionBomId || null,
     routingNo: data.routingNo || null,

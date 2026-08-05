@@ -19,6 +19,7 @@ export type EvaluateGrnToleranceInput = {
   allowOverReceipt?: boolean
   shortCloseRequested?: boolean
   closeOpenQuantity?: boolean
+  shortCloseReason?: string | null
 }
 
 export type EvaluateGrnToleranceResult = {

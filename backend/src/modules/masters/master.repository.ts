@@ -276,7 +276,11 @@ async function assertNotReferenced(
   }
   if (config.slug === 'receiving-tolerances') {
     const itemCount = await prisma.masterItem.count({
-      where: { tenantId, receivingToleranceId: id, deletedAt: null },
+      where: {
+        tenantId,
+        deletedAt: null,
+        OR: [{ receivingToleranceId: id }, { weightReceivingToleranceId: id }],
+      },
     })
     if (itemCount > 0) throw new ConflictError('Receiving tolerance is referenced by items')
   }

@@ -3082,8 +3082,9 @@ model MasterReceivingTolerance {
   updatedAt   DateTime           @updatedAt
   deletedAt   DateTime?
 
-  tenant Tenant       @relation(fields: [tenantId], references: [id])
-  items  MasterItem[]
+  tenant                   Tenant       @relation(fields: [tenantId], references: [id])
+  itemsQuantityTolerance   MasterItem[] @relation("ItemQuantityReceivingTolerance")
+  itemsWeightTolerance     MasterItem[] @relation("ItemWeightReceivingTolerance")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3136,7 +3137,10 @@ model MasterItem {
   uomConversionFactor  Decimal            @default(1) @db.Decimal(18, 4)
   /// Legacy % — dual-read only; prefer receivingToleranceId. Removed in follow-up migration.
   receivingTolerancePercentage Decimal @default(0) @db.Decimal(5, 2)
+  /// Quantity (unit) excess tolerance vs open PO qty on GRN.
   receivingToleranceId         String?
+  /// Weight excess tolerance when receiptEntryMode is WEIGHT_ONLY or UNIT_AND_WEIGHT.
+  weightReceivingToleranceId   String?
   receiptEntryMode             ItemReceiptEntryMode          @default(UNIT_ONLY)
   conversionCalculationMode    ItemConversionCalculationMode @default(AUTOMATIC)
   allowManualUnitQuantity      Boolean                       @default(false)
@@ -3177,7 +3181,8 @@ model MasterItem {
   salesUom                 MasterUom?                @relation("ItemSalesUom", fields: [salesUomId], references: [id], onDelete: SetNull)
   hsn                      MasterHsnCode?            @relation(fields: [hsnId], references: [id])
   gstGroup                 MasterGstGroup?           @relation(fields: [gstGroupId], references: [id])
-  receivingTolerance       MasterReceivingTolerance? @relation(fields: [receivingToleranceId], references: [id])
+  receivingTolerance       MasterReceivingTolerance? @relation("ItemQuantityReceivingTolerance", fields: [receivingToleranceId], references: [id])
+  weightReceivingTolerance MasterReceivingTolerance? @relation("ItemWeightReceivingTolerance", fields: [weightReceivingToleranceId], references: [id])
   weightUom                MasterUom?                @relation("ItemWeightUom", fields: [weightUomId], references: [id])
   uomConversions           MasterItemUomConversion[]
   purchaseRequisitionLines PurchaseRequisitionLine[]
@@ -3236,6 +3241,7 @@ model MasterItem {
   @@index([tenantId, deletedAt])
   @@index([tenantId, salesAllowed])
   @@index([tenantId, receivingToleranceId])
+  @@index([tenantId, weightReceivingToleranceId])
   @@index([tenantId, weightUomId])
   @@map("master_items")
 }
@@ -7319,6 +7325,15 @@ enum GrnReceiptApprovalReason {
   SHORT_CLOSE_REQUESTED
 }
 
+enum GrnReceivingCondition {
+  NORMAL
+  SHORT
+  EXCESS
+  DAMAGE
+  REJECTED
+  QUALITY_HOLD
+}
+
 model GoodsReceipt {
   id                          String             @id @default(uuid())
   tenantId                    String
@@ -7435,6 +7450,10 @@ model GoodsReceiptLine {
   receivingToleranceCodeSnapshot     String    @default("") @db.VarChar(32)
   receivingToleranceNameSnapshot     String    @default("") @db.VarChar(200)
   receivingTolerancePercentageSnapshot Decimal @default(0) @db.Decimal(8, 4)
+  weightReceivingToleranceIdSnapshot       String?   @db.VarChar(36)
+  weightReceivingToleranceCodeSnapshot     String    @default("") @db.VarChar(32)
+  weightReceivingToleranceNameSnapshot     String    @default("") @db.VarChar(200)
+  weightReceivingTolerancePercentageSnapshot Decimal @default(0) @db.Decimal(8, 4)
   maximumAllowedUnitQuantity         Decimal   @default(0) @db.Decimal(18, 4)
   unitVariance                       Decimal   @default(0) @db.Decimal(18, 4)
   /// ((received - open) / open) * 100 when open > 0.
@@ -7457,6 +7476,8 @@ model GoodsReceiptLine {
   shortCloseReason           String?   @db.Text
   /// @deprecated Use shortCloseRequested — kept one release for back-compat reads.
   closeOpenQuantity          Boolean   @default(false)
+  receivingCondition         GrnReceivingCondition @default(NORMAL)
+  receivingConditionReason   String?               @db.Text
   remarks                    String?   @db.Text
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
@@ -7705,6 +7726,10 @@ model PurchaseSettings {
   printOrientation               PurchasePrintOrientation    @default(PORTRAIT)
   /// In-app / email toggles per purchase event key (JSON object). Null → server defaults.
   notificationPreferences        Json?
+  /// When true, returns above qty/value thresholds stay SUBMITTED until manager approval.
+  requireReturnApproval          Boolean                     @default(false)
+  returnApprovalQtyThreshold       Decimal?                    @db.Decimal(18, 4)
+  returnApprovalValueThreshold     Decimal?                    @db.Decimal(18, 2)
   selfApprovalPolicy             SelfApprovalPolicy          @default(PERMISSION_ONLY)
   version                        Int                         @default(1)
   createdById                    String?                     @db.VarChar(36)

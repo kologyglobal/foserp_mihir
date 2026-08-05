@@ -158,6 +158,7 @@ const schema = z.object({
   uomConversionFactor: z.preprocess(emptyToPositiveNumber(1), z.coerce.number().positive()),
   receivingToleranceId: optionalUuidField,
   receivingTolerancePercentage: z.coerce.number().min(0).max(100).optional(),
+  weightReceivingToleranceId: optionalUuidField,
   receiptEntryMode: z.enum(['UNIT_ONLY', 'WEIGHT_ONLY', 'UNIT_AND_WEIGHT']).optional(),
   standardWeightPerBaseUnit: z.coerce.number().min(0).optional(),
   weightUomId: optionalUuidField,
@@ -183,6 +184,8 @@ const schema = z.object({
   isStockable: z.boolean(),
   isActive: z.boolean(),
   qcRequired: z.boolean(),
+  batchTracked: z.boolean().optional(),
+  serialTracked: z.boolean().optional(),
   qualityTestGroupCode: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
   productionBomId: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
   routingNo: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
@@ -270,10 +273,13 @@ function buildItemFormDefaults(
       subAssemblyRule: existing.subAssemblyRule ?? null,
       isBlocked: existing.isBlocked ?? false,
       qcRequired: existing.qcRequired ?? false,
+      batchTracked: existing.batchTracked ?? false,
+      serialTracked: existing.serialTracked ?? false,
       quantityPerUom: existing.quantityPerUom ?? 1,
       purchaseQtyPerUom: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
       uomConversionFactor: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
       receivingToleranceId: optionalUuidFormValue(existing.receivingToleranceId),
+      weightReceivingToleranceId: optionalUuidFormValue(existing.weightReceivingToleranceId),
       receivingTolerancePercentage: existing.receivingTolerancePercentage ?? 0,
       receiptEntryMode: existing.receiptEntryMode ?? 'UNIT_ONLY',
       standardWeightPerBaseUnit: existing.standardWeightPerBaseUnit ?? 0,
@@ -303,11 +309,14 @@ function buildItemFormDefaults(
     isStockable: true,
     isActive: true,
     qcRequired: false,
+    batchTracked: false,
+    serialTracked: false,
     qualityTestGroupCode: '',
     quantityPerUom: 1,
     purchaseQtyPerUom: 1,
     uomConversionFactor: 1,
     receivingToleranceId: '',
+    weightReceivingToleranceId: '',
     receivingTolerancePercentage: 0,
     receiptEntryMode: 'UNIT_ONLY',
     standardWeightPerBaseUnit: 0,
@@ -583,10 +592,6 @@ export function ItemFormPage() {
       bumpSection('item-section-tax')
       return
     }
-    if (errs.reorderLevel || errs.reorderQty) {
-      bumpSection('item-section-inventory')
-      return
-    }
     if (errs.qcRequired || errs.qualityTestGroupCode) {
       bumpSection('item-section-quality')
       return
@@ -847,7 +852,7 @@ export function ItemFormPage() {
           <FormField label="Standard Rate">
             <Input type="number" step="0.01" {...register('standardRate')} />
           </FormField>
-          <FormField label="Receiving tolerance" error={errors.receivingToleranceId?.message}>
+          <FormField label="Quantity receiving tolerance" error={errors.receivingToleranceId?.message}>
             <Select
               value={watch('receivingToleranceId') ?? ''}
               onChange={(e) => {
@@ -865,7 +870,26 @@ export function ItemFormPage() {
               ))}
             </Select>
             <p className="mt-1 text-xs text-erp-muted">
-              Excess-only band vs open PO qty on GRN. Leave empty to use Purchase Setup fallback.
+              Excess-only band vs open PO unit qty on GRN. Leave empty to use Purchase Setup fallback.
+            </p>
+          </FormField>
+          <FormField label="Weight receiving tolerance" error={errors.weightReceivingToleranceId?.message}>
+            <Select
+              value={watch('weightReceivingToleranceId') ?? ''}
+              onChange={(e) => {
+                const tolId = e.target.value || null
+                setValue('weightReceivingToleranceId', tolId, { shouldValidate: true })
+              }}
+            >
+              <option value="">— Select —</option>
+              {receivingTolerances.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.code} — {r.name} ({r.percentage}%)
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-erp-muted">
+              Used when receipt entry mode is weight or unit+weight (casting / KG items).
             </p>
           </FormField>
           <FormField label="Receipt entry mode">
@@ -1016,12 +1040,6 @@ export function ItemFormPage() {
           <FormField label="Qty. on Sales Order">
             <Input readOnly value={formatNumber(existing?.qtyOnSalesOrder ?? 0)} />
           </FormField>
-          <FormField label="Reorder Level">
-            <Input type="number" {...register('reorderLevel')} />
-          </FormField>
-          <FormField label="Reorder Qty">
-            <Input type="number" {...register('reorderQty')} />
-          </FormField>
         </ErpCardSection>
 
         <ErpCardSection
@@ -1037,6 +1055,12 @@ export function ItemFormPage() {
         >
           <FormField label="QC Required">
             <Checkbox {...register('qcRequired')} label="Inspection required before use" />
+          </FormField>
+          <FormField label="Batch tracking">
+            <Checkbox {...register('batchTracked')} label="Track batch / lot at receipt" />
+          </FormField>
+          <FormField label="Serial tracking">
+            <Checkbox {...register('serialTracked')} label="Track serial numbers at receipt" />
           </FormField>
           <FormField label="Quality Test Group Code">
             <Select
@@ -1152,6 +1176,8 @@ export function ItemDetailPage() {
       <DetailSection title="Quality & Manufacturing">
         <DetailGrid>
           <DetailField label="QC Required" value={item.qcRequired ? 'Yes' : 'No'} />
+          <DetailField label="Batch tracking" value={item.batchTracked ? 'Yes' : 'No'} />
+          <DetailField label="Serial tracking" value={item.serialTracked ? 'Yes' : 'No'} />
           <DetailField label="Test Group" value={item.qualityTestGroupCode ?? '—'} />
           <DetailField label="Routing No" value={item.routingNo ?? '—'} />
           <DetailField label="Drawing No" value={item.drawingNo ?? '—'} />

@@ -95,6 +95,7 @@ const itemBaseSchema = z.object({
   /** ±% receiving tolerance vs open PO qty on GRN (legacy dual-read). */
   receivingTolerancePercentage: z.coerce.number().min(0).max(100).optional(),
   receivingToleranceId: z.string().uuid().nullable().optional(),
+  weightReceivingToleranceId: z.string().uuid().nullable().optional(),
   receiptEntryMode: z.enum(['UNIT_ONLY', 'WEIGHT_ONLY', 'UNIT_AND_WEIGHT']).optional(),
   conversionCalculationMode: z.enum(['AUTOMATIC', 'MANUAL']).optional(),
   allowManualUnitQuantity: z.boolean().optional(),

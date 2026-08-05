@@ -329,7 +329,7 @@ export function PurchaseReturnDetailPage() {
             </Link>
           </div>
         ) : null}
-        <ErpCardSection title="Header" collapsible defaultOpen>
+        <ErpCardSection title="Header" collapsible defaultOpen columns={1} dense={false}>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <ErpViewField label="Return Date" value={formatDate(doc.documentDate)} />
             <ErpViewField label="Vendor" value={`${doc.vendor.name} (${doc.vendor.gstin})`} />
@@ -379,7 +379,7 @@ export function PurchaseReturnDetailPage() {
           </div>
         </ErpCardSection>
 
-        <ErpCardSection title="Linked Documents" collapsible defaultOpen={false}>
+        <ErpCardSection title="Linked Documents" collapsible defaultOpen={false} columns={1} dense={false}>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <ErpViewField
               label="Replacement PO"
@@ -446,48 +446,48 @@ export function PurchaseReturnDetailPage() {
           </div>
         </ErpCardSection>
 
-        <ErpCardSection title="Lines" collapsible defaultOpen>
-          <div className="overflow-x-auto">
-            <table className="quo-editor-price__table w-full min-w-[1000px]">
+        <ErpCardSection title="Lines" collapsible defaultOpen columns={1} dense={false}>
+          <div className="quo-editor-price__table-wrap w-full min-w-0">
+            <table className="erp-table w-full min-w-[1000px] text-[12px]">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th className="w-10">#</th>
                   <th>Item</th>
                   <th>Batch / Serial</th>
-                  <th>Recv</th>
-                  <th>Avail</th>
-                  <th>Return Qty</th>
+                  <th className="num">Recv</th>
+                  <th className="num">Avail</th>
+                  <th className="num">Return Qty</th>
                   <th>UOM</th>
-                  <th>Unit Cost</th>
-                  <th>Tax</th>
-                  <th>Amount</th>
+                  <th className="num">Unit Cost</th>
+                  <th className="num">Tax</th>
+                  <th className="num">Amount</th>
                   <th>Reason</th>
-                  <th>Repl Qty</th>
+                  <th className="num">Repl Qty</th>
                 </tr>
               </thead>
               <tbody>
                 {doc.lines.map((l) => (
                   <tr key={l.id}>
-                    <td>{l.lineNo}</td>
+                    <td className="tabular-nums text-erp-muted">{l.lineNo}</td>
                     <td>
-                      <div className="font-mono text-[12px]">{l.itemCode}</div>
-                      <div className="text-[13px]">{l.description || l.itemName}</div>
+                      <div className="font-mono text-[11px] text-erp-muted">{l.itemCode}</div>
+                      <div className="font-medium text-erp-text">{l.description || l.itemName}</div>
                     </td>
                     <td>
                       {l.batchLotNo || '—'}
                       {l.serialNumber ? ` / ${l.serialNumber}` : ''}
                     </td>
-                    <td className="tabular-nums">{l.receivedQty}</td>
-                    <td className="tabular-nums">{l.availableReturnQty}</td>
-                    <td className="tabular-nums">{l.returnQty}</td>
-                    <td>{l.uom}</td>
-                    <td className="tabular-nums">{formatCurrency(l.unitCost)}</td>
-                    <td className="tabular-nums">
+                    <td className="num tabular-nums">{l.receivedQty}</td>
+                    <td className="num tabular-nums">{l.availableReturnQty}</td>
+                    <td className="num tabular-nums">{l.returnQty}</td>
+                    <td>{l.uom || '—'}</td>
+                    <td className="num tabular-nums">{formatCurrency(l.unitCost)}</td>
+                    <td className="num tabular-nums">
                       {formatCurrency(l.cgst + l.sgst + l.igst)}
                     </td>
-                    <td className="tabular-nums">{formatCurrency(l.returnAmount)}</td>
+                    <td className="num tabular-nums">{formatCurrency(l.returnAmount)}</td>
                     <td>{PURCHASE_RETURN_REASON_LABELS[l.reason]}</td>
-                    <td className="tabular-nums">{l.replacementQty}</td>
+                    <td className="num tabular-nums">{l.replacementQty}</td>
                   </tr>
                 ))}
               </tbody>

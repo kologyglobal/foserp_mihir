@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FileText,
   MapPin,
+  Package,
   Save,
 } from 'lucide-react'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '../../components/erp/card-form'
@@ -35,7 +36,14 @@ import { handleInvalidSubmit, type FieldErrorMap } from '../../utils/formValidat
 import { useMrpStore } from '../../store/mrpStore'
 import { useMasterStore } from '../../store/masterStore'
 import { isApiMode } from '../../config/apiConfig'
-import { apiUpdateSalesOrder } from '../../services/bridges/salesOrderApiBridge'
+import { apiFetchSalesOrder, apiUpdateSalesOrder } from '../../services/bridges/salesOrderApiBridge'
+import { SalesOrderLinesEditor } from '../../components/sales/SalesOrderLinesEditor'
+import {
+  computeSoLineTotals,
+  soLineDraftsFromOrder,
+  soLineDraftsToApiPayload,
+  type SoLineDraft,
+} from '../../utils/salesOrderLineDraft'
 import { formatCurrency, formatNumber } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { formatStatus } from '../../components/ui/Badge'
@@ -59,10 +67,12 @@ export function SalesOrderEditPage() {
   const so = useMrpStore((s) => (id ? s.salesOrders.find((o) => o.id === id) : undefined))
   const updateDraft = useMrpStore((s) => s.updateSalesOrderDraft)
   const customers = useMasterStore((s) => s.customers)
-  const products = useMasterStore((s) => s.products)
+  const getItem = useMasterStore((s) => s.getItem)
   const locations = useMasterStore((s) => s.locations)
   const [validationErrors, setValidationErrors] = useState<FieldErrorMap>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [hydrated, setHydrated] = useState(!isApiMode())
+  const [lines, setLines] = useState<SoLineDraft[]>([])
 
   const [customerPoNumber, setCustomerPoNumber] = useState('')
   const [customerPoDate, setCustomerPoDate] = useState('')
@@ -75,6 +85,19 @@ export function SalesOrderEditPage() {
   const deliveryTimeOptions = useDeliveryTimeOptions()
   const { locationId, setLocationId } = useDocumentLocation('sales', so?.locationId)
   const showLocationField = !useTenantProfileStore((s) => s.isServices())
+
+  useEffect(() => {
+    if (!id || !isApiMode()) return
+    void apiFetchSalesOrder(id).then((r) => {
+      if (r.ok) setHydrated(true)
+      else notify.error(r.error ?? 'Failed to load sales order')
+    })
+  }, [id])
+
+  useEffect(() => {
+    if (!so) return
+    setLines(soLineDraftsFromOrder(so))
+  }, [so?.id])
 
   useEffect(() => {
     if (!so) return
@@ -93,32 +116,47 @@ export function SalesOrderEditPage() {
     () => (so ? customers.find((c) => c.id === so.customerId) : undefined),
     [so, customers],
   )
-  const product = useMemo(
-    () => (so ? products.find((p) => p.id === so.productId) : undefined),
-    [so, products],
-  )
+  const lineSummary = useMemo(() => {
+    const totals = lines.map((line) => computeSoLineTotals(line))
+    const totalQty = lines.reduce((s, l) => s + l.qty, 0)
+    const grandTotal = totals.reduce((s, t) => s + t.lineTotal, 0)
+    return { totalQty, grandTotal }
+  }, [lines])
 
-  const displayValue = so ? resolveSalesOrderValue(so, product) : 0
+  const displayValue = so
+    ? (lineSummary.grandTotal > 0 ? lineSummary.grandTotal : resolveSalesOrderValue(so))
+    : 0
+
+  const primaryItemName = lines[0]?.itemId ? getItem(lines[0].itemId)?.itemName : undefined
+  const lineItemsLabel = lines.length > 1
+    ? `${lines.length} lines`
+    : (primaryItemName ?? '—')
+
+  const linesDone = lines.length > 0
+    && lines.every((l) => l.itemId && l.qty >= 1 && l.unitPrice > 0)
 
   const poDone = Boolean(customerPoNumber.trim())
   const deliveryDone = Boolean(expectedDeliveryDate)
   const commercialDone = Boolean(paymentTerms.trim() && deliveryTerms.trim() && deliveryTime.trim())
 
   const completionItems = useMemo(() => [
-    { id: 'context', label: 'Order Context', done: Boolean(so?.customerId && so?.productId) },
+    { id: 'context', label: 'Order Context', done: Boolean(so?.customerId) },
+    { id: 'lines', label: 'Line Items', done: linesDone },
     { id: 'po', label: 'PO & Delivery', done: poDone && deliveryDone },
     { id: 'commercial', label: 'Commercial', done: commercialDone },
-  ], [so?.customerId, so?.productId, poDone, deliveryDone, commercialDone])
+  ], [so?.customerId, linesDone, poDone, deliveryDone, commercialDone])
 
   const completionPercent = Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
 
-  if (!id || !so) {
+  if (!id || !so || (isApiMode() && !hydrated)) {
     return (
       <div className="erp-page flex flex-col items-center justify-center gap-3 p-12 text-center">
-        <p className="text-erp-muted">Sales order not found.</p>
-        <AppLink to={listPath} className="text-sm font-semibold text-erp-primary">
-          Back to {fromCrm ? 'CRM sales orders' : 'sales orders'}
-        </AppLink>
+        <p className="text-erp-muted">{!so && hydrated ? 'Sales order not found.' : 'Loading sales order…'}</p>
+        {(!so && hydrated) || !isApiMode() ? (
+          <AppLink to={listPath} className="text-sm font-semibold text-erp-primary">
+            Back to {fromCrm ? 'CRM sales orders' : 'sales orders'}
+          </AppLink>
+        ) : null}
       </div>
     )
   }
@@ -140,13 +178,23 @@ export function SalesOrderEditPage() {
   const draftSo = so
 
   function validateDraft(): FieldErrorMap {
-    return validateSalesOrderDraft({
+    const errors = validateSalesOrderDraft({
       paymentTerms,
       deliveryTerms,
       deliveryTime,
       expectedDeliveryDate,
       customerPoDate,
     }).fieldErrors
+    if (!lines.length) {
+      errors.lines = 'Add at least one item line.'
+    } else if (lines.some((l) => !l.itemId)) {
+      errors.lines = 'Every line needs an item.'
+    } else if (lines.some((l) => !l.qty || l.qty < 1)) {
+      errors.lines = 'Line quantities must be at least 1.'
+    } else if (lines.some((l) => l.unitPrice <= 0)) {
+      errors.lines = 'Line unit prices must be greater than zero.'
+    }
+    return errors
   }
 
   async function handleSave(mode: 'save' | 'close' = 'save') {
@@ -154,7 +202,7 @@ export function SalesOrderEditPage() {
     if (Object.keys(errors).length) {
       handleInvalidSubmit({
         errors,
-        fieldOrder: ['paymentTerms', 'deliveryTerms', 'deliveryTime', 'expectedDeliveryDate', 'customerPoDate'],
+        fieldOrder: ['lines', 'paymentTerms', 'deliveryTerms', 'deliveryTime', 'expectedDeliveryDate', 'customerPoDate'],
         onFieldErrors: setValidationErrors,
       })
       return
@@ -163,7 +211,13 @@ export function SalesOrderEditPage() {
 
     setIsSubmitting(true)
     const locLabel = locations.find((l) => l.id === locationId)
+    const primary = lines[0]
+    const linePayload = soLineDraftsToApiPayload(lines, (itemId) => getItem(itemId)?.itemName)
     const patch = {
+      itemId: primary?.itemId,
+      qty: lines.reduce((s, l) => s + l.qty, 0),
+      unitPrice: primary?.unitPrice,
+      lines: linePayload,
       customerPoNumber: customerPoNumber.trim() || undefined,
       customerPoDate: customerPoDate || null,
       expectedDeliveryDate: expectedDeliveryDate || null,
@@ -197,8 +251,8 @@ export function SalesOrderEditPage() {
     { label: 'SO No.', value: so.salesOrderNo, highlight: true },
     { label: 'Status', value: 'Draft' },
     { label: 'Customer', value: customer?.customerName ?? '—', highlight: Boolean(customer) },
-    { label: 'Product', value: product?.productName ?? '—' },
-    { label: 'Qty', value: formatNumber(so.qty) },
+    { label: 'Line items', value: lineItemsLabel },
+    { label: 'Qty', value: formatNumber(lineSummary.totalQty || so.qty) },
     { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: displayValue > 0 },
     { label: 'Customer PO', value: customerPoNumber.trim() || '—' },
     {
@@ -246,8 +300,8 @@ export function SalesOrderEditPage() {
         actionsTitle="Quick Actions"
         summary={[
           { label: 'Customer', value: customer?.customerName ?? '—' },
-          { label: 'Product', value: product?.productName ?? '—' },
-          { label: 'Qty', value: formatNumber(so.qty) },
+          { label: 'Line items', value: lineItemsLabel },
+          { label: 'Qty', value: formatNumber(lineSummary.totalQty || so.qty) },
           { label: 'Value', value: formatCurrency(displayValue), highlight: true },
           { label: 'Customer PO', value: customerPoNumber.trim() || '—' },
           { label: 'Delivery', value: expectedDeliveryDate ? formatDate(expectedDeliveryDate) : '—' },
@@ -313,7 +367,7 @@ export function SalesOrderEditPage() {
             onSaveAndClose={() => void handleSave('close')}
             hint={(
               <span className="text-[12px] text-erp-muted">
-                {completionPercent}% complete · Customer and product lines are locked on draft edit
+                {completionPercent}% complete · Edit lines, PO, and commercial terms
               </span>
             )}
           />
@@ -322,7 +376,7 @@ export function SalesOrderEditPage() {
         <ErpCardSection
           id="so-edit-section-context"
           title="Order Context"
-          subtitle="Customer, product, and quotation reference (read-only)."
+          subtitle="Customer and quotation reference (read-only)."
           icon={Building2}
           accent="blue"
           collapsible
@@ -334,20 +388,26 @@ export function SalesOrderEditPage() {
           <ErpFieldRow label="Customer" readOnly>
             <Input value={customer?.customerName ?? '—'} readOnly className="erp-input" />
           </ErpFieldRow>
-          <ErpFieldRow label="Product" readOnly>
-            <Input value={product?.productName ?? so.productId} readOnly className="erp-input" />
-          </ErpFieldRow>
-          <ErpFieldRow label="Quantity" readOnly>
-            <Input value={formatNumber(so.qty)} readOnly className="erp-input" />
-          </ErpFieldRow>
-          <ErpFieldRow label="Order Value" readOnly>
-            <Input value={formatCurrency(displayValue)} readOnly className="erp-input" />
-          </ErpFieldRow>
           {so.quotationNo ? (
             <ErpFieldRow label="Quotation Number (Reference)" readOnly colSpan={2}>
               <Input value={`${so.quotationNo} · Rev ${so.quotationRevisionNo ?? 1}`} readOnly className="erp-input" />
             </ErpFieldRow>
           ) : null}
+        </ErpCardSection>
+
+        <ErpCardSection
+          id="so-edit-section-lines"
+          title="Line Items"
+          subtitle="Products, quantities, pricing, and GST."
+          icon={Package}
+          accent="violet"
+          collapsible
+          defaultOpen
+        >
+          {validationErrors.lines ? (
+            <p className="mb-3 text-sm text-red-600">{validationErrors.lines}</p>
+          ) : null}
+          <SalesOrderLinesEditor lines={lines} onChange={setLines} />
         </ErpCardSection>
 
         <ErpCardSection

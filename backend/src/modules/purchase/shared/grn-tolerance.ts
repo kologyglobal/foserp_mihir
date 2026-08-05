@@ -18,6 +18,8 @@ export type EvaluateGrnToleranceInput = {
   itemTolerancePct?: number | null
   receivingToleranceId?: string | null
   masterTolerance?: ReceiptLineEvaluationInput['masterTolerance']
+  weightReceivingToleranceId?: string | null
+  weightMasterTolerance?: ReceiptLineEvaluationInput['weightMasterTolerance']
   setupTolerancePct?: number | null
   allowOverReceipt?: boolean
   closeOpenQuantity?: boolean
@@ -45,6 +47,11 @@ export type EvaluateGrnToleranceResult = {
   receivingToleranceCodeSnapshot: string
   receivingToleranceNameSnapshot: string
   receivingTolerancePercentageSnapshot: number
+  weightTolerancePercentage: number
+  weightReceivingToleranceIdSnapshot: string | null
+  weightReceivingToleranceCodeSnapshot: string
+  weightReceivingToleranceNameSnapshot: string
+  weightReceivingTolerancePercentageSnapshot: number
   maximumAllowedUnitQuantity: number
   unitVariance: number
   expectedWeight: number | null
@@ -86,6 +93,8 @@ export function evaluateGrnLineTolerance(input: EvaluateGrnToleranceInput): Eval
     receivingToleranceId: input.receivingToleranceId,
     masterTolerance: input.masterTolerance,
     receivingTolerancePercentage: input.itemTolerancePct,
+    weightReceivingToleranceId: input.weightReceivingToleranceId,
+    weightMasterTolerance: input.weightMasterTolerance,
     setupTolerancePct: input.setupTolerancePct,
     allowOverReceipt: input.allowOverReceipt,
     shortCloseRequested: input.shortCloseRequested ?? input.closeOpenQuantity,
@@ -116,6 +125,13 @@ export function evaluateGrnLineTolerance(input: EvaluateGrnToleranceInput): Eval
     receivingToleranceCodeSnapshot: evaluated.receivingToleranceCodeSnapshot,
     receivingToleranceNameSnapshot: evaluated.receivingToleranceNameSnapshot,
     receivingTolerancePercentageSnapshot: qtyToNumber(evaluated.receivingTolerancePercentageSnapshot),
+    weightTolerancePercentage: qtyToNumber(evaluated.weightTolerancePercentage),
+    weightReceivingToleranceIdSnapshot: evaluated.weightReceivingToleranceIdSnapshot,
+    weightReceivingToleranceCodeSnapshot: evaluated.weightReceivingToleranceCodeSnapshot,
+    weightReceivingToleranceNameSnapshot: evaluated.weightReceivingToleranceNameSnapshot,
+    weightReceivingTolerancePercentageSnapshot: qtyToNumber(
+      evaluated.weightReceivingTolerancePercentageSnapshot,
+    ),
     maximumAllowedUnitQuantity: qtyToNumber(evaluated.maximumAllowedUnitQuantity),
     unitVariance: qtyToNumber(evaluated.unitVariance),
     expectedWeight: evaluated.expectedWeight ? qtyToNumber(evaluated.expectedWeight) : null,
@@ -150,6 +166,8 @@ export type GrnToleranceLineSnapshot = {
   itemTolerancePct?: number | null
   receivingToleranceId?: string | null
   masterTolerance?: ReceiptLineEvaluationInput['masterTolerance']
+  weightReceivingToleranceId?: string | null
+  weightMasterTolerance?: ReceiptLineEvaluationInput['weightMasterTolerance']
   setupTolerancePct?: number | null
   allowOverReceipt?: boolean
   closeOpenQuantity?: boolean
@@ -182,6 +200,8 @@ export function evaluateGrnDocumentTolerance(
       itemTolerancePct: l.itemTolerancePct,
       receivingToleranceId: l.receivingToleranceId,
       masterTolerance: l.masterTolerance,
+      weightReceivingToleranceId: l.weightReceivingToleranceId,
+      weightMasterTolerance: l.weightMasterTolerance,
       setupTolerancePct: l.setupTolerancePct,
       allowOverReceipt: l.allowOverReceipt,
       closeOpenQuantity: l.closeOpenQuantity,

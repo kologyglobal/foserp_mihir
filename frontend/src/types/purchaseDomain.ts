@@ -249,6 +249,7 @@ export type GrnDomainStatus =
   | 'rejected'
   | 'posted'
   | 'cancelled'
+  | 'reversed'
 
 export const GRN_DOMAIN_STATUSES: readonly GrnDomainStatus[] = [
   'draft',
@@ -259,6 +260,7 @@ export const GRN_DOMAIN_STATUSES: readonly GrnDomainStatus[] = [
   'rejected',
   'posted',
   'cancelled',
+  'reversed',
 ] as const
 
 export const GRN_DOMAIN_STATUS_LABELS: Record<GrnDomainStatus, string> = {
@@ -270,6 +272,17 @@ export const GRN_DOMAIN_STATUS_LABELS: Record<GrnDomainStatus, string> = {
   rejected: 'Rejected',
   posted: 'Posted',
   cancelled: 'Cancelled',
+  reversed: 'Reversed',
+}
+
+export interface GoodsReceiptAllowedActions {
+  canEdit: boolean
+  canSubmit: boolean
+  canCancel: boolean
+  canReverse: boolean
+  canPostInventory: boolean
+  canApproveTolerance: boolean
+  canRejectTolerance: boolean
 }
 
 export type PurchaseInvoiceStatus =
@@ -414,16 +427,20 @@ export type PurchaseReturnReason =
   | 'specification_mismatch'
   | 'expired_material'
   | 'short_shelf_life'
+  | 'vendor_return'
+  | 'duplicate_receipt'
   | 'other'
 
 export const PURCHASE_RETURN_REASON_LABELS: Record<PurchaseReturnReason, string> = {
   quality_rejection: 'Quality Rejection',
-  damaged: 'Damaged',
-  wrong_item: 'Wrong Item',
-  excess_quantity: 'Excess Quantity',
+  damaged: 'Damaged Material',
+  wrong_item: 'Wrong Specification',
+  excess_quantity: 'Excess Material',
   specification_mismatch: 'Specification Mismatch',
   expired_material: 'Expired Material',
   short_shelf_life: 'Short Shelf Life',
+  vendor_return: 'Vendor Return',
+  duplicate_receipt: 'Duplicate Receipt',
   other: 'Other',
 }
 
@@ -2109,6 +2126,10 @@ export interface GoodsReceiptLine {
   unitCostPrimary?: number
   acceptedQty: number
   rejectedQty: number
+  /** Qty sent back via completed material returns (PRT). */
+  returnedQty?: number
+  /** Qty still eligible for material return. */
+  returnableQty?: number
   shortQty: number
   excessQty: number
   damagedQty: number
@@ -2143,10 +2164,21 @@ export interface GoodsReceiptLine {
     | 'EXCESS_OUTSIDE_TOLERANCE'
   closeOpenQuantity?: boolean
   shortCloseRequested?: boolean
+  shortCloseReason?: string | null
+  receivingCondition?:
+    | 'NORMAL'
+    | 'SHORT'
+    | 'EXCESS'
+    | 'DAMAGE'
+    | 'REJECTED'
+    | 'QUALITY_HOLD'
+  receivingConditionReason?: string | null
   receivedWeight?: number | null
   expectedWeight?: number | null
   maximumAllowedWeight?: number | null
+  weightVariancePercentage?: number | null
   weightToleranceStatus?: string
+  weightTolerancePercentage?: number
   requiresApproval?: boolean
   approvalReasons?: string[]
   receivingToleranceId?: string | null
@@ -2187,10 +2219,27 @@ export interface GoodsReceiptNote extends PurchaseMoneyTotals, PurchaseAuditFiel
   allowExcess: boolean
   toleranceApprovalRequired?: boolean
   qualityInspectionId: string | null
+  allowedActions?: GoodsReceiptAllowedActions
+  reversedAt?: IsoDateTime | null
+  /** Sum of completed material return qty on this GRN. */
+  totalReturnedQty?: number
+  /** Sum of remaining returnable qty (detail API only). */
+  totalReturnableQty?: number
+  /** Completed material return rows for negative line display (detail API only). */
+  materialReturnLines?: GrnMaterialReturnLine[]
   lines: GoodsReceiptLine[]
   postedAt: IsoDateTime | null
   /** Set after mock post — UI confirms inventory updates when backend is connected. */
   inventoryPostDeferred: boolean
+}
+
+export interface GrnMaterialReturnLine {
+  purchaseReturnId: string
+  returnNumber: string
+  goodsReceiptLineId: string
+  returnQuantity: number
+  status: string
+  completedAt: IsoDateTime | null
 }
 
 export interface GrnListRow {
@@ -2899,6 +2948,17 @@ export type GrnInput = {
     allowExcess?: boolean
     /** Close remaining open qty (short outside band → approval). */
     closeOpenQuantity?: boolean
+    shortCloseRequested?: boolean
+    shortCloseReason?: string | null
+    receivingCondition?:
+      | 'NORMAL'
+      | 'SHORT'
+      | 'EXCESS'
+      | 'DAMAGE'
+      | 'REJECTED'
+      | 'QUALITY_HOLD'
+    receivingConditionReason?: string | null
+    receivedWeight?: number | null
     remarks?: string
   }>
 }

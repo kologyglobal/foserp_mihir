@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import type { SalesOrder, SalesOrderStatus } from '../../types/mrp'
 import type { Customer, Product } from '../../types/master'
+import { resolveSalesOrderDisplayLines } from '../../utils/salesOrderLineDraft'
+import { useMasterStore } from '../../store/masterStore'
 import { formatCurrency, formatNumber } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { formatStatus } from '../ui/Badge'
@@ -23,7 +25,6 @@ import { salesOrderStatusLabel, salesOrderStatusToneKey } from '../../utils/sale
 import { HealthScoreRing } from '../crm/Opportunity360Sections'
 import { ErpButton } from '../erp/ErpButton'
 import { cn } from '../../utils/cn'
-import { useMasterStore } from '../../store/masterStore'
 import { locationDisplayLabel } from '../../utils/locationUtils'
 
 const FULFILLMENT_STEPS: { id: SalesOrderStatus; label: string }[] = [
@@ -551,7 +552,13 @@ export function OrderDeliveryCard({ order }: { order: SalesOrder }) {
 }
 
 export function OrderLineItemsPanel({ order }: { order: SalesOrder }) {
-  const lines = order.lines ?? []
+  const getItem = useMasterStore((s) => s.getItem)
+  const lines = resolveSalesOrderDisplayLines(order).map((line) => ({
+    ...line,
+    productOrItem: line.itemId
+      ? (getItem(line.itemId)?.itemName ?? line.productOrItem)
+      : line.productOrItem,
+  }))
   if (lines.length === 0) return null
 
   return (

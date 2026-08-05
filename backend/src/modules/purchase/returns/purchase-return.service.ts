@@ -11,7 +11,7 @@ import {
 } from './purchase-return-ap-handoff.service.js'
 import { logger } from '../../../config/logger.js'
 import { PurchaseReturnNotFoundError, PurchaseReturnValidationError } from './purchase-return.errors.js'
-import { mapPurchaseReturn, type PurchaseReturnEnrichment } from './purchase-return.mapper.js'
+import { mapPurchaseReturn, type PurchaseReturnEnrichment, type PurchaseReturnLineEnrichment } from './purchase-return.mapper.js'
 import * as repo from './purchase-return.repository.js'
 import type { CreatePurchaseReturnInput, ListPurchaseReturnsQuery, PurchaseReturnLineInput, UpdatePurchaseReturnInput } from './purchase-return.validation.js'
 import { assertReturnStatus, returnDate, returnMoney, returnQty, validateReturnLines } from './purchase-return.workflow.js'
@@ -70,9 +70,92 @@ async function enrichmentForReturns(
   return out
 }
 
+async function lineEnrichmentForReturns(
+  tenantId: string,
+  rows: Array<{ lines: Array<{ id: string; goodsReceiptLineId: string | null; purchaseOrderLineId: string | null }> }>,
+): Promise<Map<string, PurchaseReturnLineEnrichment>> {
+  const grnLineIds = [
+    ...new Set(
+      rows.flatMap((r) => r.lines.map((l) => l.goodsReceiptLineId).filter(Boolean)),
+    ),
+  ] as string[]
+  const poLineIds = [
+    ...new Set(
+      rows.flatMap((r) => r.lines.map((l) => l.purchaseOrderLineId).filter(Boolean)),
+    ),
+  ] as string[]
+
+  const [grnLines, poLines] = await Promise.all([
+    grnLineIds.length
+      ? prisma.goodsReceiptLine.findMany({
+          where: { tenantId, id: { in: grnLineIds } },
+          select: {
+            id: true,
+            uomId: true,
+            uomCodeSnapshot: true,
+            acceptedQuantity: true,
+            receivedQuantity: true,
+            batchNumber: true,
+            lotNumber: true,
+            serialNumber: true,
+          },
+        })
+      : Promise.resolve([]),
+    poLineIds.length
+      ? prisma.purchaseOrderLine.findMany({
+          where: { tenantId, id: { in: poLineIds } },
+          select: { id: true, uomId: true },
+        })
+      : Promise.resolve([]),
+  ])
+
+  const uomIds = [
+    ...new Set(
+      [...grnLines.map((l) => l.uomId), ...poLines.map((l) => l.uomId)].filter(Boolean),
+    ),
+  ] as string[]
+  const uoms = uomIds.length
+    ? await prisma.masterUom.findMany({
+        where: { id: { in: uomIds }, tenantId, deletedAt: null },
+        select: { id: true, code: true },
+      })
+    : []
+  const uomById = new Map(uoms.map((u) => [u.id, u.code]))
+
+  const grnById = new Map(grnLines.map((l) => [l.id, l]))
+  const poUomByLineId = new Map(poLines.map((l) => [l.id, l.uomId]))
+
+  const resolveUom = (uomId: string | null | undefined, snapshot: string | null | undefined) =>
+    (snapshot ?? '').trim() || (uomId ? uomById.get(uomId)?.trim() : '') || ''
+
+  const out = new Map<string, PurchaseReturnLineEnrichment>()
+  for (const row of rows) {
+    for (const line of row.lines) {
+      const grnLine = line.goodsReceiptLineId ? grnById.get(line.goodsReceiptLineId) : undefined
+      const poUomId = line.purchaseOrderLineId ? poUomByLineId.get(line.purchaseOrderLineId) : null
+      const uomId = grnLine?.uomId ?? poUomId ?? null
+      out.set(line.id, {
+        uom: grnLine
+          ? resolveUom(grnLine.uomId, grnLine.uomCodeSnapshot)
+          : resolveUom(poUomId, null),
+        uomId,
+        receivedQuantity: grnLine
+          ? returnQty(grnLine.acceptedQuantity) || returnQty(grnLine.receivedQuantity)
+          : 0,
+        batchNumber: grnLine?.batchNumber ?? null,
+        lotNumber: grnLine?.lotNumber ?? null,
+        serialNumber: grnLine?.serialNumber ?? null,
+      })
+    }
+  }
+  return out
+}
+
 async function toReturnDto(tenantId: string, row: ReturnRow) {
   const enrichment = await enrichmentForReturns(tenantId, [row])
-  return mapPurchaseReturn(row, enrichment.get(0))
+  const lineById = await lineEnrichmentForReturns(tenantId, [row])
+  const header = enrichment.get(0) ?? {}
+  return mapPurchaseReturn(row, { ...header, lineById })
 }
 
 async function loadOrThrow(tenantId: string, id: string) {
@@ -174,9 +257,12 @@ function buildReturnLines(
 export async function listPurchaseReturns(tenantId: string, query: ListPurchaseReturnsQuery) {
   const result = await repo.findPurchaseReturns(tenantId, query)
   const enrichment = await enrichmentForReturns(tenantId, result.items)
+  const lineById = await lineEnrichmentForReturns(tenantId, result.items)
   return {
     ...result,
-    items: result.items.map((row, index) => mapPurchaseReturn(row, enrichment.get(index))),
+    items: result.items.map((row, index) =>
+      mapPurchaseReturn(row, { ...(enrichment.get(index) ?? {}), lineById }),
+    ),
   }
 }
 export async function getPurchaseReturn(tenantId: string, id: string) {
@@ -262,8 +348,30 @@ async function transitionReturn(tenantId: string, existing: Awaited<ReturnType<t
   })
 }
 export async function submitPurchaseReturn(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
-  const existing = await loadOrThrow(tenantId, id); assertReturnStatus(existing.status, ['DRAFT'], 'submitted'); validateReturnLines(existing.lines)
-  await transitionReturn(tenantId, existing, actorId, 'SUBMITTED', 'RETURN_SUBMITTED', body.remarks, { submittedAt: new Date() })
+  const existing = await loadOrThrow(tenantId, id)
+  assertReturnStatus(existing.status, ['DRAFT'], 'submitted')
+  validateReturnLines(existing.lines)
+  const settings = await resolveEffectivePurchaseDefaults(tenantId, existing.plantId)
+  const totalQty = existing.lines.reduce((s, l) => s + returnQty(l.returnQuantity), 0)
+  const totalValue = existing.lines.reduce(
+    (s, l) => s + returnQty(l.returnQuantity) * returnMoney(l.rate),
+    0,
+  )
+  const qtyThreshold = settings.returnApprovalQtyThreshold
+  const valueThreshold = settings.returnApprovalValueThreshold
+  const overQtyThreshold = qtyThreshold != null && totalQty > Number(qtyThreshold)
+  const overValueThreshold = valueThreshold != null && totalValue > Number(valueThreshold)
+  const needsManagerApproval =
+    settings.requireReturnApproval && (overQtyThreshold || overValueThreshold)
+  if (needsManagerApproval) {
+    await transitionReturn(tenantId, existing, actorId, 'SUBMITTED', 'RETURN_SUBMITTED', body.remarks, {
+      submittedAt: new Date(),
+    })
+  } else {
+    await transitionReturn(tenantId, existing, actorId, 'APPROVED', 'RETURN_APPROVED', body.remarks, {
+      submittedAt: new Date(),
+    })
+  }
   return toReturnDto(tenantId, await loadOrThrow(tenantId, id))
 }
 

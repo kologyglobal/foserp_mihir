@@ -6,10 +6,18 @@ import type { ReceiptLineEvaluationInput, ReceiptLineEvaluationResult } from './
 import { toQty } from './purchase-quantity-decimal.js'
 
 export function evaluateReceiptLine(input: ReceiptLineEvaluationInput): ReceiptLineEvaluationResult {
-  const resolved = resolveReceivingTolerance({
+  const quantityTolerance = resolveReceivingTolerance({
     receivingToleranceId: input.receivingToleranceId,
     masterTolerance: input.masterTolerance ?? null,
     receivingTolerancePercentageLegacy: input.receivingTolerancePercentage,
+    setupTolerancePct: input.setupTolerancePct,
+    allowOverReceipt: input.allowOverReceipt,
+  })
+
+  const weightTolerance = resolveReceivingTolerance({
+    receivingToleranceId: input.weightReceivingToleranceId ?? input.receivingToleranceId,
+    masterTolerance: input.weightMasterTolerance ?? input.masterTolerance ?? null,
+    receivingTolerancePercentageLegacy: null,
     setupTolerancePct: input.setupTolerancePct,
     allowOverReceipt: input.allowOverReceipt,
   })
@@ -18,14 +26,14 @@ export function evaluateReceiptLine(input: ReceiptLineEvaluationInput): ReceiptL
   const unit = validateUnitReceipt({
     openUnitQuantity: input.openUnitQuantity,
     receivedUnitQuantity: input.receivedUnitQuantity,
-    tolerancePercentage: resolved.percentage,
+    tolerancePercentage: quantityTolerance.percentage,
   })
 
   const weight = validateWeightReceipt({
     receivedUnitQuantity: input.receivedUnitQuantity,
     receivedWeight: input.receivedWeight ?? 0,
     standardWeightPerBaseUnit: input.standardWeightPerBaseUnit ?? 0,
-    tolerancePercentage: resolved.percentage,
+    tolerancePercentage: weightTolerance.percentage,
     receiptEntryMode,
   })
 
@@ -44,11 +52,16 @@ export function evaluateReceiptLine(input: ReceiptLineEvaluationInput): ReceiptL
   const requiresApproval = approvalReasons.length > 0
 
   return {
-    tolerancePercentage: resolved.percentage,
-    receivingToleranceIdSnapshot: resolved.receivingToleranceId,
-    receivingToleranceCodeSnapshot: resolved.code,
-    receivingToleranceNameSnapshot: resolved.name,
-    receivingTolerancePercentageSnapshot: resolved.percentage,
+    tolerancePercentage: quantityTolerance.percentage,
+    receivingToleranceIdSnapshot: quantityTolerance.receivingToleranceId,
+    receivingToleranceCodeSnapshot: quantityTolerance.code,
+    receivingToleranceNameSnapshot: quantityTolerance.name,
+    receivingTolerancePercentageSnapshot: quantityTolerance.percentage,
+    weightTolerancePercentage: weightTolerance.percentage,
+    weightReceivingToleranceIdSnapshot: weightTolerance.receivingToleranceId,
+    weightReceivingToleranceCodeSnapshot: weightTolerance.code,
+    weightReceivingToleranceNameSnapshot: weightTolerance.name,
+    weightReceivingTolerancePercentageSnapshot: weightTolerance.percentage,
     maximumAllowedUnitQuantity: unit.maximumAllowedUnitQuantity,
     unitVariance: unit.unitVariance,
     variancePercentage: unit.variancePercentage,

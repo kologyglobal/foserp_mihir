@@ -4,10 +4,20 @@ import { returnAllowedActions, returnQty } from './purchase-return.workflow.js'
 const date = (value?: Date | null) => value?.toISOString().slice(0, 10) ?? null
 const iso = (value?: Date | null) => value?.toISOString() ?? null
 
+export type PurchaseReturnLineEnrichment = {
+  uom: string
+  uomId: string | null
+  receivedQuantity: number
+  batchNumber: string | null
+  lotNumber: string | null
+  serialNumber: string | null
+}
+
 export type PurchaseReturnEnrichment = {
   purchaseOrderNumber?: string | null
   goodsReceiptNumber?: string | null
   qualityInspectionNumber?: string | null
+  lineById?: Map<string, PurchaseReturnLineEnrichment>
 }
 
 export function mapPurchaseReturn(
@@ -42,11 +52,20 @@ export function mapPurchaseReturn(
     allowedActions: returnAllowedActions(row.status, row.deletedAt),
     totalAmount: row.lines.reduce((sum, line) => sum + returnQty(line.amount), 0),
     totalQuantity: row.lines.reduce((sum, line) => sum + returnQty(line.returnQuantity), 0),
-    lines: row.lines.map((line) => ({
-      ...line,
-      returnQuantity: returnQty(line.returnQuantity),
-      rate: returnQty(line.rate),
-      amount: returnQty(line.amount),
-    })),
+    lines: row.lines.map((line) => {
+      const ctx = enrichment?.lineById?.get(line.id)
+      return {
+        ...line,
+        uomId: ctx?.uomId ?? null,
+        uom: ctx?.uom ?? '',
+        receivedQuantity: ctx?.receivedQuantity ?? returnQty(line.returnQuantity),
+        batchNumber: ctx?.batchNumber ?? null,
+        lotNumber: ctx?.lotNumber ?? null,
+        serialNumber: ctx?.serialNumber ?? null,
+        returnQuantity: returnQty(line.returnQuantity),
+        rate: returnQty(line.rate),
+        amount: returnQty(line.amount),
+      }
+    }),
   }
 }

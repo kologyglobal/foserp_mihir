@@ -81,6 +81,9 @@ export type EffectivePurchaseDefaults = {
   printPaperSize: PurchasePrintPaperSize
   printOrientation: PurchasePrintOrientation
   selfApprovalPolicy: SelfApprovalPolicy
+  requireReturnApproval: boolean
+  returnApprovalQtyThreshold: number | null
+  returnApprovalValueThreshold: number | null
   inspectionRequiredCategories: string[]
   approvalMatrix: Array<{
     id: string
@@ -198,6 +201,17 @@ function mapTenantSetup(tenantSetup: NonNullable<
     printPaperSize: tenantSetup.printPaperSize,
     printOrientation: tenantSetup.printOrientation,
     selfApprovalPolicy: tenantSetup.selfApprovalPolicy,
+    requireReturnApproval: Boolean(
+      (tenantSetup as { requireReturnApproval?: boolean }).requireReturnApproval ?? false,
+    ),
+    returnApprovalQtyThreshold:
+      (tenantSetup as { returnApprovalQtyThreshold?: unknown }).returnApprovalQtyThreshold == null
+        ? null
+        : Number((tenantSetup as { returnApprovalQtyThreshold: unknown }).returnApprovalQtyThreshold),
+    returnApprovalValueThreshold:
+      (tenantSetup as { returnApprovalValueThreshold?: unknown }).returnApprovalValueThreshold == null
+        ? null
+        : Number((tenantSetup as { returnApprovalValueThreshold: unknown }).returnApprovalValueThreshold),
     inspectionRequiredCategories: (tenantSetup.inspectionCategories ?? []).map(
       (c) => c.categoryCode,
     ),

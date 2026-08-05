@@ -165,6 +165,8 @@ function dtoToInventoryItem(
     standardCost,
     averageCost: standardCost,
     qualityInspectionRequired: dto.qcRequired,
+    batchTracking: Boolean(dto.batchTracked),
+    serialTracking: Boolean(dto.serialTracked),
     preferredSource: dto.isPurchasable ? 'purchase' : 'production',
     availableQuantity: stock?.free ?? 0,
     createdAt: dto.createdAt,

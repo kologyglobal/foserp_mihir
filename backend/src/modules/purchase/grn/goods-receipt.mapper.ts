@@ -1,4 +1,5 @@
 import type { GoodsReceipt, GoodsReceiptLine, MasterVendor, MasterWarehouse, PurchaseOrder } from '@prisma/client'
+import type { GrnMaterialReturnEntry, GrnMaterialReturnLineSummary } from '../returns/returnable-quantity.service.js'
 import { allowedActions, qty } from './goods-receipt.workflow.js'
 
 const date = (value: Date | null | undefined) => value?.toISOString().slice(0, 10) ?? null
@@ -14,7 +15,16 @@ type GrnWithRelations = GoodsReceipt & {
   warehouse?: Pick<MasterWarehouse, 'id' | 'code' | 'name' | 'plantId'> | null
 }
 
-export function mapGoodsReceiptToDto(grn: GrnWithRelations) {
+export function mapGoodsReceiptToDto(
+  grn: GrnWithRelations,
+  returnStats?: {
+    byGrnLineId: Map<string, GrnMaterialReturnLineSummary>
+    totalReturnedQuantity: number
+    totalReturnableQuantity: number
+    entries: GrnMaterialReturnEntry[]
+  },
+  uomCodeById?: Map<string, string>,
+) {
   const totalReceived = grn.lines.reduce((s, l) => s + qty(l.receivedQuantity), 0)
   const totalAccepted = grn.lines.reduce((s, l) => s + qty(l.acceptedQuantity), 0)
   const totalRejected = grn.lines.reduce((s, l) => s + qty(l.rejectedQuantity), 0)
@@ -69,13 +79,18 @@ export function mapGoodsReceiptToDto(grn: GrnWithRelations) {
     totalReceivedQty: totalReceived,
     totalAcceptedQty: totalAccepted,
     totalRejectedQty: totalRejected,
+    totalReturnedQty: returnStats?.totalReturnedQuantity ?? 0,
+    totalReturnableQty: returnStats?.totalReturnableQuantity ?? 0,
+    materialReturnLines: returnStats?.entries ?? [],
     totalAmount,
     currencyCode: grn.purchaseOrder?.currencyCode ?? 'INR',
     expectedDeliveryDate: date(grn.purchaseOrder?.expectedDeliveryDate),
     paymentTerms: grn.purchaseOrder?.paymentTerms ?? '',
     deliveryTerms: grn.purchaseOrder?.deliveryTerms ?? '',
     allowedActions: allowedActions(grn),
-    lines: grn.lines.map((line) => ({
+    lines: grn.lines.map((line) => {
+      const returnLine = returnStats?.byGrnLineId?.get(line.id)
+      return {
       id: line.id,
       lineNumber: line.lineNumber,
       purchaseOrderLineId: line.purchaseOrderLineId,
@@ -84,7 +99,10 @@ export function mapGoodsReceiptToDto(grn: GrnWithRelations) {
       itemName: line.itemNameSnapshot,
       description: line.description,
       uomId: line.uomId,
-      uom: line.uomCodeSnapshot,
+      uom:
+        (line.uomCodeSnapshot ?? '').trim() ||
+        (line.uomId ? uomCodeById?.get(line.uomId)?.trim() : '') ||
+        '',
       uomConversionFactor: qty((line as { uomConversionFactor?: unknown }).uomConversionFactor ?? 1) || 1,
       unitCostPrimary: qty((line as { unitCostPrimary?: unknown }).unitCostPrimary ?? line.rate),
       orderedQuantity: qty(line.orderedQuantity),
@@ -102,6 +120,8 @@ export function mapGoodsReceiptToDto(grn: GrnWithRelations) {
       acceptedForQcQuantity: qty(line.acceptedForQcQuantity),
       acceptedQuantity: qty(line.acceptedQuantity),
       rejectedQuantity: qty(line.rejectedQuantity),
+      returnedQuantity: returnLine?.returnedQuantity ?? 0,
+      returnableQuantity: returnLine?.returnableQuantity ?? 0,
       rate: qty(line.rate),
       amount: qty(line.amount),
       warehouseId: line.warehouseId,
@@ -130,6 +150,19 @@ export function mapGoodsReceiptToDto(grn: GrnWithRelations) {
         (line as { receivingToleranceNameSnapshot?: string }).receivingToleranceNameSnapshot ?? '',
       receivingTolerancePercentageSnapshot: qty(
         (line as { receivingTolerancePercentageSnapshot?: unknown }).receivingTolerancePercentageSnapshot ?? 0,
+      ),
+      weightReceivingToleranceIdSnapshot:
+        (line as { weightReceivingToleranceIdSnapshot?: string | null }).weightReceivingToleranceIdSnapshot ??
+        null,
+      weightReceivingToleranceCodeSnapshot:
+        (line as { weightReceivingToleranceCodeSnapshot?: string }).weightReceivingToleranceCodeSnapshot ??
+        '',
+      weightReceivingToleranceNameSnapshot:
+        (line as { weightReceivingToleranceNameSnapshot?: string }).weightReceivingToleranceNameSnapshot ??
+        '',
+      weightReceivingTolerancePercentageSnapshot: qty(
+        (line as { weightReceivingTolerancePercentageSnapshot?: unknown })
+          .weightReceivingTolerancePercentageSnapshot ?? 0,
       ),
       maximumAllowedUnitQuantity: qty(
         (line as { maximumAllowedUnitQuantity?: unknown }).maximumAllowedUnitQuantity ?? 0,
@@ -174,8 +207,13 @@ export function mapGoodsReceiptToDto(grn: GrnWithRelations) {
         (line as { shortCloseRequested?: boolean }).shortCloseRequested ??
           (line as { closeOpenQuantity?: boolean }).closeOpenQuantity,
       ),
+      receivingCondition:
+        ((line as { receivingCondition?: string }).receivingCondition as string | undefined) ?? 'NORMAL',
+      receivingConditionReason:
+        (line as { receivingConditionReason?: string | null }).receivingConditionReason ?? null,
       remarks: line.remarks,
-    })),
+    }
+    }),
   }
 }
 
