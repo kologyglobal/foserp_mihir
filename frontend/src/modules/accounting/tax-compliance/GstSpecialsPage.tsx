@@ -84,7 +84,7 @@ export function GstSpecialsPage() {
       }
     >
       {loading ? (
-        <LoadingState label="Loading special schemes…" />
+        <LoadingState variant="card" />
       ) : (
         <div className="space-y-6">
           <section className="rounded border border-erp-border bg-white p-4">

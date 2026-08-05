@@ -113,7 +113,7 @@ export function GstAnnualCompliancePage() {
       }
     >
       {loading ? (
-        <LoadingState label="Loading annual compliance…" />
+        <LoadingState variant="card" />
       ) : (
         <div className="space-y-6">
           <section className="rounded border border-erp-border bg-white p-4">

@@ -105,7 +105,7 @@ export function GstPortalFilingPage() {
       }
     >
       {loading ? (
-        <LoadingState label="Loading portal filing…" />
+        <LoadingState variant="card" />
       ) : (
         <div className="space-y-4">
           <section className="rounded border border-erp-border bg-white p-4 text-[13px]">

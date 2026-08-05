@@ -110,7 +110,7 @@ export function GstRateOpsPage() {
       }
     >
       {loading ? (
-        <LoadingState label="Loading GST rate ops…" />
+        <LoadingState variant="card" />
       ) : (
         <div className="space-y-6">
           <section className="rounded border border-erp-border bg-white p-4">

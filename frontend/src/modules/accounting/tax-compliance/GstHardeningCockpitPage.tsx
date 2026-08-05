@@ -141,7 +141,7 @@ export function GstHardeningCockpitPage() {
       }
     >
       {loading ? (
-        <LoadingState label="Loading go-live cockpit…" />
+        <LoadingState variant="card" />
       ) : (
         <div className="space-y-6">
           <section className="rounded border border-erp-border bg-white p-4">

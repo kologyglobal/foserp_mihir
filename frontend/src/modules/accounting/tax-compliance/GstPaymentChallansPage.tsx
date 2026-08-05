@@ -86,7 +86,7 @@ export function GstPaymentChallansPage() {
       }
     >
       {loading ? (
-        <LoadingState label="Loading payment challans…" />
+        <LoadingState variant="card" />
       ) : (
         <div className="space-y-3">
           <p className="text-[12px] text-erp-muted">

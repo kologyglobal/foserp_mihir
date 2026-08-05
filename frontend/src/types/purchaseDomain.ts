@@ -24,7 +24,7 @@ export type PurchaseItemCategory =
   | 'maintenance'
   | 'job_work'
 
-export type PurchaseGstScheme = 'cgst_sgst' | 'igst'
+export type PurchaseGstScheme = 'cgst_sgst' | 'igst' | 'utgst_pair'
 
 export type PurchaseDocumentKind =
   | 'purchase_requisition'

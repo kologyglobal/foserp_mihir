@@ -76,14 +76,14 @@ export function GstExportSezLutPage() {
   const addLut = async () => {
     const lutNumber = await appPromptNote({
       title: 'LUT number',
-      message: 'Enter letter of undertaking number (books master).',
-      defaultValue: '',
+      description: 'Enter letter of undertaking number (books master).',
+      note: { defaultValue: '', label: 'LUT number', required: true },
     })
     if (!lutNumber?.trim()) return
     const validFrom = await appPromptNote({
       title: 'Valid from',
-      message: 'yyyy-MM-dd',
-      defaultValue: new Date().toISOString().slice(0, 10),
+      description: 'yyyy-MM-dd',
+      note: { defaultValue: new Date().toISOString().slice(0, 10), label: 'Valid from', required: true },
     })
     if (!validFrom?.trim()) return
     await run(
@@ -128,7 +128,7 @@ export function GstExportSezLutPage() {
       }
     >
       {loading ? (
-        <LoadingState label="Loading export / LUT…" />
+        <LoadingState variant="card" />
       ) : (
         <div className="space-y-6">
           <p className="text-[12px] text-erp-muted">

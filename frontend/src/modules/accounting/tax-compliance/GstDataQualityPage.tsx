@@ -160,7 +160,7 @@ export function GstDataQualityPage() {
       }
     >
       {loading ? (
-        <LoadingState label="Loading GST data quality…" />
+        <LoadingState variant="card" />
       ) : (
         <div className="space-y-6">
           <section className="rounded border border-erp-border bg-white p-4">

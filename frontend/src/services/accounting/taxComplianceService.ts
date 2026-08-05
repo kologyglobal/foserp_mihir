@@ -741,7 +741,6 @@ export async function getItcReconciliation(filter?: PeriodFilterState): Promise<
     const rowsRes = await listGstr2bRowsApi(active.id, { page: 1, pageSize: 500 })
     const rows: ItcReconRow[] = rowsRes.data.items.map((row) => {
       const g = mapApiRowToGstr2bLine(row)
-      const tax = g.igst + g.cgst + g.sgst + g.cess
       return {
         id: row.id,
         gstr2b: g,
