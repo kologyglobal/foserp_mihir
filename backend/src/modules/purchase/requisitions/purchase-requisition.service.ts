@@ -168,6 +168,13 @@ export async function createPurchaseRequisition(
   const requiredDate = parseDateInput(input.requiredDate) ?? null
   assertRequiredDateNotBeforeRequisition(requisitionDate, requiredDate)
 
+  const defaults = await getPurchasePolicy(tenantId)
+  const warehouseId =
+    input.warehouseId ||
+    defaults.defaultRequisitionWarehouseId ||
+    defaults.defaultWarehouseId ||
+    null
+
   const lines = await preparePrLines(
     tenantId,
     normalizeLineInputs(input.lines ?? []),
@@ -177,12 +184,6 @@ export async function createPurchaseRequisition(
     assertRequiredDateNotBeforeRequisition(requisitionDate, line.requiredDate)
   }
 
-  const defaults = await getPurchasePolicy(tenantId)
-  const warehouseId =
-    input.warehouseId ||
-    defaults.defaultRequisitionWarehouseId ||
-    defaults.defaultWarehouseId ||
-    null
   const rfqRequired =
     input.rfqRequired !== undefined ? input.rfqRequired : defaults.defaultRfqRequired
 
