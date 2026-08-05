@@ -22,7 +22,14 @@ export const QUOTATION_DOCUMENT_STATUSES = [
 
 export const CUSTOMER_APPROVAL_STATUSES = ['pending', 'approved', 'rejected'] as const
 
+/** @deprecated Do not use as a silent default on transactional lines — resolve from masters. */
 export const DEFAULT_GST_PCT = 18
+
+/**
+ * Prefer omitted header GST only for legacy demos.
+ * New lines must carry explicit taxPct from tax determination.
+ */
+export const LEGACY_QUOTATION_HEADER_GST_FALLBACK = DEFAULT_GST_PCT
 
 /** Align with frontend quotation create default (`crmStore` / quotation create page). */
 export const DEFAULT_VALIDITY_DAYS = 30

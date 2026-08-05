@@ -32,7 +32,7 @@ export async function findSalesOrders(
   }
 
   const companyInclude = {
-    company: { select: { id: true, name: true, companyCode: true } },
+    company: { select: { id: true, name: true, companyCode: true, state: true, gstin: true } },
   } as const
 
   const [items, total] = await Promise.all([
@@ -52,7 +52,7 @@ export async function findSalesOrders(
 export async function findSalesOrderById(tenantId: string, id: string) {
   return prisma.crmSalesOrder.findFirst({
     where: { id, ...tenantActiveFilter(tenantId) },
-    include: { company: { select: { id: true, name: true, companyCode: true } } },
+    include: { company: { select: { id: true, name: true, companyCode: true, state: true, gstin: true } } },
   })
 }
 
@@ -65,7 +65,7 @@ export async function findSalesOrderByQuotationId(tenantId: string, quotationId:
 export async function createSalesOrder(data: Prisma.CrmSalesOrderCreateInput) {
   return prisma.crmSalesOrder.create({
     data,
-    include: { company: { select: { id: true, name: true, companyCode: true } } },
+    include: { company: { select: { id: true, name: true, companyCode: true, state: true, gstin: true } } },
   })
 }
 
@@ -79,7 +79,7 @@ export async function updateSalesOrder(
   return prisma.crmSalesOrder.update({
     where: { id },
     data,
-    include: { company: { select: { id: true, name: true, companyCode: true } } },
+    include: { company: { select: { id: true, name: true, companyCode: true, state: true, gstin: true } } },
   })
 }
 

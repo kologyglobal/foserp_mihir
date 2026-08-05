@@ -148,6 +148,7 @@ function today() {
 
 import { formatPlaceOfSupplyLabel } from '../../utils/gstStateCode'
 import { determinePurchaseGstSupply } from '../../utils/gstSupply'
+import { resolveLineTaxFromLocalMasters } from '../../utils/commercialLineTax'
 
 function mentionsInsurance(...values: Array<string | null | undefined>) {
   return values.some((v) => Boolean(v && /insurance/i.test(v)))
@@ -189,7 +190,7 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     rate: 0,
     discountPct: 0,
     discountAmount: 0,
-    gstRatePct: 18,
+    gstRatePct: 0,
     taxAmount: 0,
     taxableAmount: 0,
     cgst: 0,
@@ -868,6 +869,24 @@ export function PurchaseOrderEditorPage() {
     const hsnId = item.hsnId ?? master?.hsnId ?? null
     const hsnMaster = hsnId ? useMasterStore.getState().getHsn(hsnId) : null
     const gstGroupMaster = gstGroupId ? useMasterStore.getState().getGstGroup(gstGroupId) : null
+    const store = useMasterStore.getState()
+    const masterItem =
+      master ??
+      ({
+        id: item.id,
+        hsnCode: item.hsnCode ?? '',
+        hsnId,
+        gstGroupId,
+      } as import('../../types/master').Item)
+    const taxSnap = resolveLineTaxFromLocalMasters({
+      direction: 'PURCHASE',
+      item: masterItem,
+      hsnById: (id) => store.getHsn(id),
+      hsnByCode: (code) => store.getHsnByCode(code),
+      gstRates: store.gstRates,
+      placeOfSupply: header.placeOfSupply,
+      partyState: vendors.find((v) => v.id === header.vendorId)?.state,
+    })
     patchLine(key, {
       itemId: item.id,
       itemCode: item.itemCode,
@@ -879,7 +898,7 @@ export function PurchaseOrderEditorPage() {
       uom: purchaseUomCode,
       uomId: purchaseUomId,
       uomConversionFactor: factor,
-      hsnCode: hsnMaster?.code ?? item.hsnCode,
+      hsnCode: taxSnap.hsnSacCode || hsnMaster?.code || item.hsnCode,
       hsnId,
       gstGroupId,
       gstGroupCode: gstGroupMaster?.code ?? '',
@@ -887,7 +906,14 @@ export function PurchaseOrderEditorPage() {
       qcRequired: Boolean(item.qcRequired ?? master?.qcRequired),
       qualityTestGroupCode: item.qualityTestGroupCode ?? master?.qualityTestGroupCode ?? null,
       rate: item.standardRate,
-      gstRatePct: item.gstRatePct,
+      gstRatePct: taxSnap.resolved
+        ? taxSnap.taxPct
+        : Number(item.gstRatePct) > 0
+          ? Number(item.gstRatePct)
+          : 0,
+      cgst: taxSnap.cgstRate,
+      sgst: taxSnap.sgstRate,
+      igst: taxSnap.igstRate,
     })
   }
 

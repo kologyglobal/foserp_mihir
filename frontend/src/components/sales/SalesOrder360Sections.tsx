@@ -84,7 +84,7 @@ export function buildSalesOrderHealthFactors(input: {
     {
       label: 'Order confirmed',
       ok: confirmed,
-      detail: confirmed ? formatStatus(input.status) : 'Still draft — confirm to start fulfilment',
+      detail: confirmed ? formatStatus(input.status) : 'Still draft ΓÇö confirm to start fulfilment',
     },
     {
       label: 'Delivery date',
@@ -180,7 +180,7 @@ export function OrderHeroCard({
               <span className="font-semibold text-erp-text group-hover:text-erp-primary">
                 {customer.customerName}
               </span>
-              <span>· {customer.city}</span>
+              <span>┬╖ {customer.city}</span>
             </button>
           ) : null}
 
@@ -209,11 +209,11 @@ export function OrderHeroCard({
         <div className="so-360-hero__value-block">
           <div className="so-360-hero__value-text">
             <p className="so-360-hero__value-label">Order value</p>
-            <p className="so-360-hero__value">{orderValue > 0 ? formatCurrency(orderValue) : '—'}</p>
+            <p className="so-360-hero__value">{orderValue > 0 ? formatCurrency(orderValue) : 'ΓÇö'}</p>
             {unitPrice != null ? (
               <p className="so-360-hero__value-sub">
                 {formatCurrency(unitPrice)} / unit
-                {order.discountPct ? ` · ${order.discountPct}% disc` : ''}
+                {order.discountPct ? ` ┬╖ ${order.discountPct}% disc` : ''}
               </p>
             ) : null}
           </div>
@@ -237,7 +237,7 @@ export function OrderHeroCard({
                         )}
                         title={f.detail}
                       >
-                        <span aria-hidden>{f.ok ? '✓' : '○'}</span>
+                        <span aria-hidden>{f.ok ? 'Γ£ô' : 'Γùï'}</span>
                         <span>
                           <span className="crm-smart-overview__factor-label">{f.label}</span>
                           {f.detail ? (
@@ -284,7 +284,7 @@ export function OrderFulfillmentStepper({
 
       {isClosed ? (
         <div className="opp-360-stepper__closed">
-          Fulfillment complete — order closed
+          Fulfillment complete ΓÇö order closed
         </div>
       ) : (
         <div className="opp-360-stepper__track">
@@ -363,7 +363,7 @@ export function OrderExecutionTiles({
     {
       id: 'billing',
       label: 'Billing',
-      value: '—',
+      value: 'ΓÇö',
       helper: 'Invoice after dispatch',
       icon: Receipt,
       tone: 'neutral' as const,
@@ -428,7 +428,7 @@ export function OrderLinkageStrip({
       <div className="so-360-linkage__items">
         {links.map((link, i) => (
           <span key={link.path} className="so-360-linkage__item-wrap">
-            {i > 0 ? <span className="so-360-linkage__sep" aria-hidden>→</span> : null}
+            {i > 0 ? <span className="so-360-linkage__sep" aria-hidden>ΓåÆ</span> : null}
             <button type="button" className="so-360-linkage__item" onClick={() => onNavigate(link.path)}>
               {link.label}
             </button>
@@ -454,21 +454,21 @@ export function OrderCommercialSummary({
 
   const moneyRows: Array<{ label: string; value: string; muted?: boolean }> = [
     { label: 'Quantity', value: formatNumber(order.qty) },
-    { label: 'Unit price', value: unitPrice != null ? formatCurrency(unitPrice) : '—' },
+    { label: 'Unit price', value: unitPrice != null ? formatCurrency(unitPrice) : 'ΓÇö' },
     ...(subtotal != null ? [{ label: 'Basic amount', value: formatCurrency(subtotal) }] : []),
     ...(discPct > 0 ? [{ label: 'Discount', value: `${discPct}%`, muted: true }] : []),
     ...(gst != null ? [{ label: 'GST', value: formatCurrency(gst) }] : []),
   ]
 
   const metaRows = [
-    { label: 'Payment terms', value: order.paymentTerms?.trim() || '—' },
-    { label: 'Delivery terms', value: order.deliveryTerms?.trim() || '—' },
-    { label: 'Delivery time', value: order.deliveryTime?.trim() || '—' },
+    { label: 'Payment terms', value: order.paymentTerms?.trim() || 'ΓÇö' },
+    { label: 'Delivery terms', value: order.deliveryTerms?.trim() || 'ΓÇö' },
+    { label: 'Delivery time', value: order.deliveryTime?.trim() || 'ΓÇö' },
     {
       label: 'Quotation ref',
       value: order.quotationNo
-        ? `${order.quotationNo} · Rev ${order.quotationRevisionNo ?? 1}`
-        : '—',
+        ? `${order.quotationNo} ┬╖ Rev ${order.quotationRevisionNo ?? 1}`
+        : 'ΓÇö',
     },
     ...(order.warrantyTerms?.trim()
       ? [{ label: 'Warranty', value: order.warrantyTerms.trim() }]
@@ -493,7 +493,7 @@ export function OrderCommercialSummary({
           </dl>
           <div className="so-360-commercial__total">
             <span>Grand total</span>
-            <strong>{orderValue > 0 ? formatCurrency(orderValue) : '—'}</strong>
+            <strong>{orderValue > 0 ? formatCurrency(orderValue) : 'ΓÇö'}</strong>
           </div>
         </div>
         <dl className="so-360-commercial__meta">
@@ -674,7 +674,7 @@ export function OrderNextActionPanel({
             </ErpButton>
           ) : (
             <p className="so-360-action-card__denied mt-3 text-[12px] font-medium text-erp-muted">
-              Open Manufacturing → Production Plan to push this confirmed order into planning.
+              Open Manufacturing ΓåÆ Production Plan to push this confirmed order into planning.
             </p>
           )}
         </div>
@@ -685,7 +685,7 @@ export function OrderNextActionPanel({
   return (
     <div className="so-360-action-card so-360-action-card--neutral">
       <p className="so-360-action-card__text">
-        Order is in <strong className="text-erp-text">{formatStatus(status)}</strong> — track work
+        Order is in <strong className="text-erp-text">{formatStatus(status)}</strong> ΓÇö track work
         orders and dispatch from the tabs above.
       </p>
     </div>

@@ -239,6 +239,10 @@ interface SalesState {
     customerPoDate?: string
     freightAmount?: number
     orderDiscountAmount?: number
+    placeOfSupply?: string
+    placeOfSupplyOverride?: boolean
+    placeOfSupplyOverrideReason?: string
+    supplierStateCode?: string
     lines?: Array<{
       productId?: string | null
       itemId?: string | null
@@ -247,6 +251,14 @@ interface SalesState {
       discountPct?: number
       taxPct?: number
       description?: string
+      hsnCode?: string
+      taxScheme?: string
+      cgstRate?: number
+      sgstRate?: number
+      igstRate?: number
+      taxableValue?: number
+      gstAmount?: number
+      lineTotal?: number
     }>
   }) => { ok: boolean; error?: string; salesOrderId?: string; salesOrderNo?: string }
   confirmSalesOrder: (salesOrderId: string) => { ok: boolean; error?: string }
@@ -1146,6 +1158,10 @@ export const useSalesStore = create<SalesState>()(
           directSoReason: input.directSoReason?.trim() || null,
           lines: builtLines,
           source: input.quotationId || input.opportunityId ? 'quotation' : 'direct',
+          placeOfSupply: input.placeOfSupply ?? customer.state ?? null,
+          placeOfSupplyOverride: input.placeOfSupplyOverride ?? false,
+          placeOfSupplyOverrideReason: input.placeOfSupplyOverrideReason ?? null,
+          supplierStateCode: input.supplierStateCode ?? null,
         })
       },
 

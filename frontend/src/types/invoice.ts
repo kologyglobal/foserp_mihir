@@ -6,7 +6,7 @@ export const COMPANY_GSTIN = '27AABCV1234E1Z9'
 export const COMPANY_PAN = 'AABCV1234E'
 export const DEFAULT_GST_RATE = 18
 
-export type GstScheme = 'cgst_sgst' | 'igst'
+export type GstScheme = 'cgst_sgst' | 'igst' | 'utgst_pair'
 
 export interface GstBreakdown {
   scheme: GstScheme

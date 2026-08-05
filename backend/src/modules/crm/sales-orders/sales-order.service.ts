@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../../config/prisma.js'
+import { createAuditLog } from '../../../services/audit.service.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { resolveUserNames } from '../../../shared/index.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
@@ -15,11 +16,19 @@ import {
   mergeUpdateLines,
   parseDateInput,
 } from './sales-order.workflow.js'
+import {
+  resolveSalesOrderTaxHeader,
+  taxHeaderToPrismaCreate,
+} from './sales-order-tax-header.js'
 import type {
   CreateSalesOrderInput,
   ListSalesOrdersQuery,
   UpdateSalesOrderInput,
 } from './sales-order.validation.js'
+
+export type SalesOrderWriteContext = {
+  permissions?: string[]
+}
 
 async function mapOrder(tenantId: string, order: NonNullable<Awaited<ReturnType<typeof repo.findSalesOrderById>>>) {
   const nameMap = await resolveUserNames([order.createdBy, order.updatedBy], tenantId, prisma)
@@ -61,7 +70,12 @@ export async function getSalesOrder(tenantId: string, id: string) {
   return mapOrder(tenantId, order)
 }
 
-export async function createSalesOrder(tenantId: string, userId: string, input: CreateSalesOrderInput) {
+export async function createSalesOrder(
+  tenantId: string,
+  userId: string,
+  input: CreateSalesOrderInput,
+  ctx?: SalesOrderWriteContext,
+) {
   const company = await companyRepo.findCompanyById(tenantId, input.customerId)
   if (!company) throw new ValidationError('Customer (CRM company) not found')
 
@@ -97,6 +111,23 @@ export async function createSalesOrder(tenantId: string, userId: string, input: 
 
   const { defaultOrgDimsForUser } = await import('../shared/crm-org-scope.js')
   const org = await defaultOrgDimsForUser(tenantId, userId)
+
+  const taxHeader = await resolveSalesOrderTaxHeader({
+    tenantId,
+    legalEntityId: org.legalEntityId,
+    customer: { state: company.state, gstin: company.gstin },
+    lines,
+    input: {
+      placeOfSupply: input.placeOfSupply,
+      placeOfSupplyOverride: input.placeOfSupplyOverride,
+      placeOfSupplyOverrideReason: input.placeOfSupplyOverrideReason,
+      supplierStateCode: input.supplierStateCode,
+      deliveryLocation: input.deliveryLocation,
+      shippingAddress,
+      billingAddress,
+    },
+    permissions: ctx?.permissions,
+  })
 
   const created = await repo.createSalesOrder({
     tenant: { connect: { id: tenantId } },
@@ -141,14 +172,40 @@ export async function createSalesOrder(tenantId: string, userId: string, input: 
     legalEntityId: org.legalEntityId ?? null,
     branchId: org.branchId ?? null,
     lines: lines as unknown as Prisma.InputJsonValue,
+    ...taxHeaderToPrismaCreate(taxHeader),
     createdBy: userId,
     updatedBy: userId,
   })
 
+  if (taxHeader.placeOfSupplyOverride) {
+    await createAuditLog({
+      tenantId,
+      userId,
+      module: 'crm',
+      entity: 'sales_order',
+      entityId: created.id,
+      action: 'PLACE_OF_SUPPLY_OVERRIDE',
+      newValues: {
+        placeOfSupply: taxHeader.placeOfSupply,
+        placeOfSupplyStateCode: taxHeader.placeOfSupplyStateCode,
+        placeOfSupplyOverrideReason: taxHeader.placeOfSupplyOverrideReason,
+        supplyType: taxHeader.supplyType,
+        gstScheme: taxHeader.gstScheme,
+        salesOrderNo: created.salesOrderNo,
+      },
+    })
+  }
+
   return mapOrder(tenantId, created)
 }
 
-export async function updateSalesOrder(tenantId: string, id: string, userId: string, input: UpdateSalesOrderInput) {
+export async function updateSalesOrder(
+  tenantId: string,
+  id: string,
+  userId: string,
+  input: UpdateSalesOrderInput,
+  ctx?: SalesOrderWriteContext,
+) {
   const existing = await repo.findSalesOrderById(tenantId, id)
   if (!existing) throw new NotFoundError('Sales order not found')
   assertDraftEditable(existing)
@@ -182,6 +239,9 @@ export async function updateSalesOrder(tenantId: string, id: string, userId: str
   if (input.unitPrice !== undefined && !lineBundle) data.unitPrice = input.unitPrice
   if (input.discountPct !== undefined && !lineBundle) data.discountPct = input.discountPct
 
+  let linesForTax = Array.isArray(existing.lines)
+    ? (existing.lines as never)
+    : []
   if (lineBundle) {
     const normalizedLines = await Promise.all(lineBundle.lines.map((line) => normalizeSalesLineForWrite(tenantId, line)))
     data.lines = normalizedLines as unknown as Prisma.InputJsonValue
@@ -192,6 +252,89 @@ export async function updateSalesOrder(tenantId: string, id: string, userId: str
     data.gstAmount = Math.round(normalizedLines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100
     data.grandTotal = Math.round(normalizedLines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100
     data.itemId = normalizedLines[0]?.itemId ?? existing.itemId
+    linesForTax = normalizedLines
+  }
+
+  const company = existing.company
+  const taxTouched =
+    input.placeOfSupply !== undefined ||
+    input.placeOfSupplyOverride !== undefined ||
+    input.placeOfSupplyOverrideReason !== undefined ||
+    input.supplierStateCode !== undefined ||
+    input.billingAddress !== undefined ||
+    input.shippingAddress !== undefined ||
+    input.deliveryLocation !== undefined ||
+    Boolean(lineBundle)
+
+  if (taxTouched) {
+    const taxHeader = await resolveSalesOrderTaxHeader({
+      tenantId,
+      legalEntityId: existing.legalEntityId,
+      customer: {
+        state: company?.state ?? null,
+        gstin: (company as { gstin?: string | null } | null | undefined)?.gstin ?? null,
+      },
+      lines: linesForTax as never,
+      input: {
+        placeOfSupply:
+          input.placeOfSupply !== undefined ? input.placeOfSupply : existing.placeOfSupply,
+        placeOfSupplyOverride:
+          input.placeOfSupplyOverride !== undefined
+            ? input.placeOfSupplyOverride
+            : existing.placeOfSupplyOverride,
+        placeOfSupplyOverrideReason:
+          input.placeOfSupplyOverrideReason !== undefined
+            ? input.placeOfSupplyOverrideReason
+            : existing.placeOfSupplyOverrideReason,
+        supplierStateCode:
+          input.supplierStateCode !== undefined
+            ? input.supplierStateCode
+            : existing.supplierStateCode,
+        deliveryLocation:
+          input.deliveryLocation !== undefined
+            ? input.deliveryLocation
+            : existing.deliveryLocation,
+        shippingAddress:
+          input.shippingAddress !== undefined
+            ? input.shippingAddress
+            : existing.shippingAddress,
+        billingAddress:
+          input.billingAddress !== undefined ? input.billingAddress : existing.billingAddress,
+      },
+      permissions: ctx?.permissions,
+    })
+    Object.assign(data, taxHeaderToPrismaCreate(taxHeader))
+
+    const wasOverride = Boolean(existing.placeOfSupplyOverride)
+    if (taxHeader.placeOfSupplyOverride) {
+      const changed =
+        !wasOverride ||
+        taxHeader.placeOfSupplyStateCode !== existing.placeOfSupplyStateCode ||
+        taxHeader.placeOfSupplyOverrideReason !== existing.placeOfSupplyOverrideReason
+      if (changed) {
+        await createAuditLog({
+          tenantId,
+          userId,
+          module: 'crm',
+          entity: 'sales_order',
+          entityId: id,
+          action: 'PLACE_OF_SUPPLY_OVERRIDE',
+          oldValues: {
+            placeOfSupply: existing.placeOfSupply,
+            placeOfSupplyStateCode: existing.placeOfSupplyStateCode,
+            placeOfSupplyOverride: existing.placeOfSupplyOverride,
+            placeOfSupplyOverrideReason: existing.placeOfSupplyOverrideReason,
+          },
+          newValues: {
+            placeOfSupply: taxHeader.placeOfSupply,
+            placeOfSupplyStateCode: taxHeader.placeOfSupplyStateCode,
+            placeOfSupplyOverrideReason: taxHeader.placeOfSupplyOverrideReason,
+            supplyType: taxHeader.supplyType,
+            gstScheme: taxHeader.gstScheme,
+          },
+        })
+      }
+    }
   }
 
   const updated = await repo.updateSalesOrder(tenantId, id, data)

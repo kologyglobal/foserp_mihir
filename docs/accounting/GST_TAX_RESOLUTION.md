@@ -15,7 +15,13 @@
 
 Forms must use this (or AR/AP calculate/validate preview) — **do not hardcode 18% / 9+9 in transactional forms**.
 
+**Phase 1 response** includes: `resolved`, `hsnSacCode`, `taxCategory`, `gstRate`, `taxScheme` (`cgst_sgst`|`igst`), component rates, `ruleId`/`ruleVersion`, `source`, `warnings`, `blockers`. Unresolved → `resolved: false` and empty rates — never invent 18%.
+
 ## FE helpers
 
-- `services/accounting/taxResolutionApi.ts` → `resolveGstTaxFromMasters`
-- `utils/gstEngine.ts` → `computeGstFromTaxMaster` (API); `computeGst` remains demo-only
+- `services/accounting/taxResolutionApi.ts` → `resolveGstTaxFromMasters` (full DTO)
+- `utils/commercialLineTax.ts` → dual-mode line determination (demo masters + API)
+- `utils/gstEngine.ts` → `computeGstFromTaxMaster` (API); `computeGst` remains demo-only split after an **explicit** rate is known
+- Product pick on commercial grids hydrates tax from masters (`buildOpportunityLineFromItem`, proforma/SO/PO pick handlers)
+
+See [`docs/tax/PHASE1_TAX_DETERMINATION.md`](../tax/PHASE1_TAX_DETERMINATION.md).

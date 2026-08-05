@@ -63,7 +63,13 @@ function addDays(dateStr: string, days: number): string {
 
 function computeLine(input: CreateInvoiceInput['lines'][number] | CreateProformaInput['lines'][number], lineNo: number) {
   const discountPct = input.discountPct ?? 0
-  const taxPct = input.taxPct ?? 18
+  // Require explicit tax from client (resolved via tax masters). Do not invent 18%.
+  if (input.taxPct == null || Number.isNaN(Number(input.taxPct))) {
+    throw new ValidationError(
+      `Line ${lineNo}: taxPct is required — resolve GST from item HSN/rate masters (no silent default)`,
+    )
+  }
+  const taxPct = Number(input.taxPct)
   const gross = input.qty * input.unitPrice
   const taxableValue = Math.round(gross * (1 - discountPct / 100) * 100) / 100
   const gstAmount = Math.round(taxableValue * (taxPct / 100) * 100) / 100

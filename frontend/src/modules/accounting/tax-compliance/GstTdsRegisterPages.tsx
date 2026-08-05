@@ -17,10 +17,12 @@ import {
   getTdsChallans,
   getTdsReturns,
   getTdsTransactions,
+  markRcmLiabilityPaid,
+  recognizeRcmItc,
 } from '@/services/accounting/taxComplianceService'
 import { appPromptNote } from '@/store/confirmDialogStore'
 import { notify } from '@/store/toastStore'
-import type { EInvoiceRow, EWayBillRow, PeriodFilterState } from '@/types/taxCompliance'
+import type { EInvoiceRow, EWayBillRow, GstSupplyRow, PeriodFilterState } from '@/types/taxCompliance'
 import { useTaxCompliancePermissions } from '@/utils/permissions/taxCompliance'
 import { inr, statusCell, TaxRegisterPage } from './TaxRegisterPage'
 import { formatDate } from '@/utils/dates/format'
@@ -81,21 +83,96 @@ export function InwardSuppliesPage() {
 }
 
 export function ReverseChargePage() {
+  const perms = useTaxCompliancePermissions()
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const loadRows = useCallback(
+    async (filter: PeriodFilterState) => {
+      void reloadKey
+      return getReverseChargeSupplies(filter)
+    },
+    [reloadKey],
+  )
+
+  const onMarkPaid = async (row: GstSupplyRow) => {
+    if (!perms.canGstReconcile && !perms.canGstView) return
+    const paymentRef = await appPromptNote({
+      title: 'Confirm RCM liability paid',
+      description:
+        'Records compliance confirmation that RCM self-assessment liability was paid to government. This is not PMT-06 bank posting (Phase 8).',
+      confirmLabel: 'Mark paid',
+      note: { required: false, label: 'Payment reference (challan / PMT ref)', placeholder: 'Optional' },
+    })
+    if (paymentRef === null) return
+    try {
+      await markRcmLiabilityPaid(row.id, {
+        liabilityPaidDate: new Date().toISOString().slice(0, 10),
+        liabilityPaymentRef: paymentRef.trim() || undefined,
+      })
+      notify.success('RCM liability marked paid')
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Failed to mark paid')
+    }
+  }
+
+  const onRecognizeItc = async (row: GstSupplyRow) => {
+    try {
+      await recognizeRcmItc(row.id)
+      notify.success('RCM ITC marked recognized on register')
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Recognize ITC failed')
+    }
+  }
+
   return (
     <TaxRegisterPage
       title="Reverse Charge"
-      description="Inward lines flagged for reverse charge (preview)."
+      description="Posted AP reverse-charge liability → payment confirmation → ITC recognition. Incomplete RCM GL maps block VI post with RCM_ACCOUNTING_PENDING."
       exportKind="reverse-charge"
-      loadRows={getReverseChargeSupplies}
-      searchKeys={(r) => `${r.docNo} ${r.partyName}`}
+      loadRows={loadRows}
+      searchKeys={(r) => `${r.docNo} ${r.partyName} ${r.rcmLifecycleStatus ?? ''}`}
+      emptyTitle="No reverse-charge liabilities"
+      emptyHint="Post a vendor invoice with tax treatment REVERSE_CHARGE to populate this register."
       columns={[
         { key: 'doc', header: 'Document', render: (r) => r.docNo },
         { key: 'date', header: 'Date', render: (r) => formatDate(r.docDate) },
         { key: 'party', header: 'Vendor', render: (r) => r.partyName },
-        { key: 'hsn', header: 'HSN/SAC', render: (r) => r.hsnSac },
         { key: 'taxable', header: 'Taxable', className: 'text-right', render: (r) => inr(r.taxableValue) },
-        { key: 'tax', header: 'RCM Tax Preview', className: 'text-right', render: (r) => inr(r.totalTax) },
-        { key: 'status', header: 'Status', render: (r) => statusCell(r.status) },
+        { key: 'tax', header: 'RCM Tax', className: 'text-right', render: (r) => inr(r.totalTax) },
+        {
+          key: 'life',
+          header: 'Lifecycle',
+          render: (r) => statusCell(r.rcmLifecycleStatus ?? r.status),
+        },
+        { key: 'status', header: 'UI status', render: (r) => statusCell(r.status) },
+        {
+          key: 'actions',
+          header: 'Actions',
+          render: (r) => (
+            <span className="inline-flex flex-wrap gap-1">
+              {r.rcmLifecycleStatus === 'LIABILITY_POSTED' ? (
+                <button
+                  type="button"
+                  className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] text-erp-text hover:bg-erp-surface"
+                  onClick={() => void onMarkPaid(r)}
+                >
+                  Mark liability paid
+                </button>
+              ) : null}
+              {r.rcmLifecycleStatus === 'LIABILITY_PAID' ? (
+                <button
+                  type="button"
+                  className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] text-erp-text hover:bg-erp-surface"
+                  onClick={() => void onRecognizeItc(r)}
+                >
+                  Recognize ITC
+                </button>
+              ) : null}
+            </span>
+          ),
+        },
       ]}
     />
   )
@@ -116,8 +193,9 @@ export function EInvoicesPage() {
   const onGenerate = async () => {
     if (!perms.canEInvoice) return
     const salesInvoiceId = await appPromptNote({
-      title: 'Generate e-invoice (simulated NIC)',
-      description: 'Enter the posted sales invoice UUID. IRN is generated locally — not sent to the GST portal.',
+      title: 'Generate e-invoice IRN',
+      description:
+        'Enter the posted sales invoice UUID (canonical AR only). Default mode is SIMULATED — not sent to the GST portal unless LIVE is explicitly gated after UAT.',
       confirmLabel: 'Generate IRN',
       note: { required: true, label: 'Sales invoice UUID', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
     })
@@ -135,7 +213,7 @@ export function EInvoicesPage() {
     if (!perms.canEInvoice || row.irnStatus !== 'Generated') return
     const reason = await appPromptNote({
       title: 'Cancel e-invoice',
-      description: `Cancel simulated IRN for ${row.invoiceNo}?`,
+      description: `Cancel IRN for ${row.invoiceNo}? (${row.providerMode ?? 'SIMULATED'} provider)`,
       confirmLabel: 'Cancel IRN',
       tone: 'danger',
       note: { required: true, label: 'Cancellation reason', placeholder: 'Reason…' },
@@ -143,7 +221,7 @@ export function EInvoicesPage() {
     if (!reason?.trim()) return
     try {
       await cancelEInvoice(row.id, reason.trim())
-      notify.success('E-invoice cancelled (simulated)')
+      notify.success(`E-invoice cancelled (${row.providerMode ?? 'SIMULATED'})`)
       setReloadKey((k) => k + 1)
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Cancel failed')
@@ -153,12 +231,12 @@ export function EInvoicesPage() {
   return (
     <TaxRegisterPage
       title="E-Invoices"
-      description="IRN register — generate/cancel via simulated NIC adapter (API mode). Demo seed when offline."
+      description="IRN register from posted AR sales invoices. Provider mode via GST_EINVOICE_PROVIDER_MODE (default SIMULATED). Demo seed when offline."
       exportKind="e-invoices"
       loadRows={loadRows}
       searchKeys={(r) => `${r.invoiceNo} ${r.customerName} ${r.irn ?? ''}`}
       emptyTitle="No e-invoices"
-      emptyHint="Generate from a posted B2B sales invoice (customer GSTIN required)."
+      emptyHint="Generate from a posted B2B sales invoice (customer GSTIN required). EXCEPTION rows can be retried."
       headerExtra={
         perms.canEInvoice && perms.isApiMode ? (
           <button
@@ -176,6 +254,7 @@ export function EInvoicesPage() {
         { key: 'party', header: 'Customer', render: (r) => r.customerName },
         { key: 'taxable', header: 'Taxable', className: 'text-right', render: (r) => inr(r.taxableValue) },
         { key: 'status', header: 'IRN Status', render: (r) => statusCell(r.irnStatus) },
+        { key: 'mode', header: 'Mode', render: (r) => r.providerMode ?? '—' },
         { key: 'irn', header: 'IRN / Ack', render: (r) => r.irn?.slice(0, 18) ?? r.ackNo ?? '—' },
         {
           key: 'act',
@@ -213,9 +292,9 @@ export function EWayBillsPage() {
   const onGenerate = async () => {
     if (!perms.canEWay) return
     const salesInvoiceId = await appPromptNote({
-      title: 'Generate e-way bill (simulated NIC)',
+      title: 'Generate e-way bill',
       description:
-        'Enter posted sales invoice UUID. Uses default route placeholders (100 km). Not sent to the GST portal.',
+        'Enter posted sales invoice UUID. Part A uses default route placeholders (100 km). Provider mode follows GST_EINVOICE_PROVIDER_MODE / GST_NIC_PROVIDER (default SIMULATED — not portal).',
       confirmLabel: 'Generate EWB',
       note: { required: true, label: 'Sales invoice UUID', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
     })
@@ -240,7 +319,7 @@ export function EWayBillsPage() {
     if (!perms.canEWay || row.ewbStatus !== 'Generated') return
     const reason = await appPromptNote({
       title: 'Cancel e-way bill',
-      description: `Cancel simulated EWB for ${row.docNo}?`,
+      description: `Cancel EWB for ${row.docNo}? (${row.providerMode ?? 'SIMULATED'})`,
       confirmLabel: 'Cancel EWB',
       tone: 'danger',
       note: { required: true, label: 'Cancellation reason', placeholder: 'Reason…' },
@@ -248,7 +327,7 @@ export function EWayBillsPage() {
     if (!reason?.trim()) return
     try {
       await cancelEWayBill(row.id, reason.trim())
-      notify.success('E-way bill cancelled (simulated)')
+      notify.success(`E-way cancelled (${row.providerMode ?? 'SIMULATED'})`)
       setReloadKey((k) => k + 1)
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Cancel failed')
@@ -258,12 +337,12 @@ export function EWayBillsPage() {
   return (
     <TaxRegisterPage
       title="E-Way Bills"
-      description="E-way register — generate/cancel via simulated NIC (API). Demo seed when offline."
+      description="E-way register from posted SI or issued delivery challan/dispatch. Part A (route) + Part B (vehicle/transporter). Default SIMULATED provider; LIVE gated after UAT."
       exportKind="e-way-bills"
       loadRows={loadRows}
       searchKeys={(r) => `${r.docNo} ${r.partyName} ${r.ewbNo ?? ''}`}
       emptyTitle="No e-way bills"
-      emptyHint="Generate from a posted sales invoice or issued delivery challan."
+      emptyHint="Generate from a posted sales invoice or issued delivery challan. EXCEPTION rows can be retried."
       headerExtra={
         perms.canEWay && perms.isApiMode ? (
           <button
@@ -280,7 +359,9 @@ export function EWayBillsPage() {
         { key: 'party', header: 'Party', render: (r) => r.partyName },
         { key: 'route', header: 'Route', render: (r) => `${r.fromPlace} → ${r.toPlace}` },
         { key: 'km', header: 'Km', render: (r) => String(r.distanceKm) },
+        { key: 'veh', header: 'Vehicle', render: (r) => r.vehicleNo ?? '—' },
         { key: 'status', header: 'Status', render: (r) => statusCell(r.ewbStatus) },
+        { key: 'mode', header: 'Mode', render: (r) => r.providerMode ?? '—' },
         { key: 'ewb', header: 'EWB No', render: (r) => r.ewbNo ?? '—' },
         {
           key: 'act',

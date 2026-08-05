@@ -25,10 +25,11 @@ import type {
   VendorInvoiceCalculationTotals,
   VendorInvoiceResolvedAccount,
 } from './vendor-invoice-calculation.types.js'
+import { isRcmPayableComponent, rcmAccountingPendingIssue } from '../../../tax-compliance/rcm-lifecycle.util.js'
 
 const ZERO = toDecimal(0)
 
-/** No default-mapping key exists for these components (CESS input credit / RCM payables) — override-only. */
+/** Components without a DefaultAccountMappingKey are override-only (should be none for core tax). */
 const DEFAULT_MAPPING_BY_COMPONENT: Partial<Record<VendorInvoiceAccountComponent, DefaultAccountMappingKey>> = {
   LINE_DEBIT: 'PURCHASE',
   GRIR_CLEARING: 'GRIR_CLEARING',
@@ -37,12 +38,16 @@ const DEFAULT_MAPPING_BY_COMPONENT: Partial<Record<VendorInvoiceAccountComponent
   INPUT_CGST: 'GST_INPUT_CGST',
   INPUT_SGST: 'GST_INPUT_SGST',
   INPUT_IGST: 'GST_INPUT_IGST',
+  INPUT_CESS: 'GST_INPUT_CESS',
+  RCM_CGST_PAYABLE: 'GST_RCM_CGST_PAYABLE',
+  RCM_SGST_PAYABLE: 'GST_RCM_SGST_PAYABLE',
+  RCM_IGST_PAYABLE: 'GST_RCM_IGST_PAYABLE',
   VENDOR_PAYABLE: 'VENDOR_PAYABLE',
   TDS_PAYABLE: 'TDS_PAYABLE',
   FREIGHT: 'FREIGHT_INWARD',
   /** No dedicated mapping key — fall back to PURCHASE for other purchase charges. */
   OTHER_CHARGE: 'PURCHASE',
-  ROUND_OFF: 'ROUNDING',
+  ROUND_OFF: 'GST_ROUND_OFF',
 }
 
 export interface RecoverableInputTaxByComponent {
@@ -234,8 +239,9 @@ export function buildRequiredAccountComponents(params: BuildRequiredAccountCompo
     )
   }
 
-  if (amountsResult.isRcm) {
-    const rcm = amountsResult.rcmTaxTotals
+  // Post RCM_*_PAYABLE whenever self-assessed RCM tax is present (header or line reverse-charge).
+  const rcm = amountsResult.rcmTaxTotals
+  if (amountsResult.isRcm || !isZero(rcm.totalTaxAmount)) {
     const rcmComponents: Array<{ component: VendorInvoiceAccountComponent; amount: string; override: typeof overrides.rcmCgstPayable }> = [
       { component: 'RCM_CGST_PAYABLE', amount: rcm.cgstAmount, override: overrides.rcmCgstPayable ?? null },
       { component: 'RCM_SGST_PAYABLE', amount: rcm.sgstAmount, override: overrides.rcmSgstPayable ?? null },
@@ -259,6 +265,13 @@ function issueForUnresolved(entry: VendorInvoiceResolvedAccount): { code: string
     return {
       code: VENDOR_INVOICE_CALC_CODES.ACCOUNT_NOT_CONFIGURED,
       message: `No debit/expense account resolved for line ${entry.lineNumber ?? '?'}`,
+    }
+  }
+  if (isRcmPayableComponent(entry.component)) {
+    const pending = rcmAccountingPendingIssue(entry.component)
+    return {
+      code: VENDOR_INVOICE_CALC_CODES.RCM_ACCOUNTING_PENDING,
+      message: pending.message,
     }
   }
   return {

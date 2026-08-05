@@ -289,11 +289,12 @@ export function CreditNoteFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 </Select>
               </FormField>
             )}
-            <FormField label="Supply type">
-              <Select {...form.register('supplyType')}>
-                <option value="INTRA_STATE">Intra-state</option>
-                <option value="INTER_STATE">Inter-state</option>
-              </Select>
+            <FormField label="Supply type" hint="Read-only — follows origin invoice / tax rules">
+              <Input
+                readOnly
+                value={watched.supplyType === 'INTER_STATE' ? 'Inter-state' : 'Intra-state'}
+                className="font-medium"
+              />
             </FormField>
             <FormField label="Tax treatment">
               <Select {...form.register('taxTreatment')}>

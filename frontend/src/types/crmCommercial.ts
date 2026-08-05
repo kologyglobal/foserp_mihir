@@ -65,6 +65,16 @@ export interface CrmCommercialLine {
   taxableValue: number
   gstAmount: number
   lineTotal: number
+  /** GST scheme snapshot (cgst_sgst | igst | utgst_pair) — not reinvented at display. */
+  taxScheme?: string | null
+  cgstRate?: number | null
+  sgstRate?: number | null
+  utgstRate?: number | null
+  igstRate?: number | null
+  cgstAmount?: number | null
+  sgstAmount?: number | null
+  utgstAmount?: number | null
+  igstAmount?: number | null
   /** Original SO/PI line qty — used for partial invoicing. */
   sourceLineId?: string | null
   maxQty?: number | null

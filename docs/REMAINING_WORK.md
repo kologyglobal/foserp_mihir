@@ -4,6 +4,160 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Open — Indian GST Compliance Platform (post Phase 18)
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phase 18 GST ledger vs GL control recon (advisory). Phases 1–17 books/SIM layers coexist. |
+| Status | **Phase 18 READY WITH CONDITIONS** |
+| Doc | [`docs/tax/PHASE18_GL_RECON.md`](tax/PHASE18_GL_RECON.md) |
+| Next step | **Books UAT harness READY WITH CONDITIONS** (`npm run uat:gst-books` — `docs/tax/GST_BOOKS_UAT.md`). Next product track: SPA walk on real/demo tenant or LIVE connector UAT (still not FULL GST COMPLIANT). |
+| Deferred | LIVE GSTN · FULL GST COMPLIANT · auto GL fix journals |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 17)
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phase 17 ledger data quality + null companyGstin backfill + books freeze checklist. Phases 1–16 coexist (portal SIM, UAT, annual, ops, rate ops). |
+| Status | **Phase 17 READY WITH CONDITIONS** |
+| Doc | [`docs/tax/PHASE17_DATA_QUALITY.md`](tax/PHASE17_DATA_QUALITY.md) |
+| Next step | migrate `20260806020000_gst_phase17_data_quality` (+ 12–16 if pending); `db:sync-permissions` for `tax.gst.quality.*`; run period freeze scan before multi-GSTIN close |
+| Deferred | LIVE GSTN/GSP · FULL GST COMPLIANT · silent re-tax |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 13)
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phase 13 go-live/UAT gate + period books hardening. Phase 12 SIMULATED portal filing coexists. Phase 14 annual + Phase 15 multi-period ops + Phase 16 rate ops may also be in code. |
+| Status | **Phase 13 READY WITH CONDITIONS** |
+| Doc | [`docs/tax/PHASE13_GO_LIVE_HARDENING.md`](tax/PHASE13_GO_LIVE_HARDENING.md) |
+| Next step | migrate `20260805250000_gst_phase13_compliance_hardening` + `db:sync-permissions` for `tax.gst.compliance.view` / `tax.gst.compliance.uat` |
+| Deferred | FULL GST COMPLIANT · LIVE GSTN certify |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 12)
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phases 1–12 foundation in code (tax determination through **SIMULATED** portal filing). Next: statutory multi-phase UAT; live NIC / GSP connectors only after signed UAT — never default LIVE. |
+| Status | **Phase 12 READY WITH CONDITIONS (SIMULATED)** |
+| Doc | [`docs/tax/PHASE12_PORTAL_FILING.md`](tax/PHASE12_PORTAL_FILING.md) |
+| Next step | migrate `20260805240000_gst_phase12_portal_filing` (+ Phase 5–11 if pending); `db:sync-permissions` for `tax.gst.returns.file`; lock GSTR before package; keep `GST_PORTAL_FILING_PROVIDER_MODE=SIMULATED` |
+| Deferred | Live GSP/GSTN submit; FULL GST COMPLIANT label |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 11)
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phases 1–11 in code through special schemes. Phase 12 portal filing foundation supersedes "next" for portal. |
+| Status | **Phase 11 READY WITH CONDITIONS** |
+| Doc | [`docs/tax/PHASE11_SPECIALS.md`](tax/PHASE11_SPECIALS.md) |
+| Next step | migrate `20260805230000_gst_phase11_specials` if pending; `db:sync-permissions` for `tax.gst.specials.*` |
+| Deferred | Live portal GSTR submit (see Phase 12 SIMULATED); FULL GST COMPLIANT |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 16)
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phase 16 rate master ops + determination continuity in code. Phases 12–15 mid-flight elsewhere (portal / hardening / annual / ops packs). Next: migrate/sync, production master data clean-up, optional Phase 12 LIVE UAT only after books UAT. |
+| Status | **Phase 16 READY WITH CONDITIONS** |
+| Doc | [`docs/tax/PHASE16_RATE_OPS.md`](tax/PHASE16_RATE_OPS.md) |
+| Next step | migrate `20260806010000_gst_phase16_rate_ops` (+ 12–15 if pending); `db:sync-permissions` for `tax.gst.rates.*` |
+| Deferred | LIVE portal GSTR; FULL GST COMPLIANT; silent re-tax of posted docs |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 15)
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phases 1–15 in code (incl. Phase 15 multi-period cockpit / notices / audit packs on Phase 13 tables). Phases 12–14: portal foundation, UAT/hardening, annual worksheet land in parallel. Next: statutory UAT + LIVE portal gates only after product sign-off. |
+| Status | **Phase 15 READY WITH CONDITIONS** |
+| Doc | [`docs/tax/PHASE15_COMPLIANCE_OPS.md`](tax/PHASE15_COMPLIANCE_OPS.md) |
+| Next step | migrate incl. `20260805250000` + `20260805300000`; `db:sync-permissions` for `tax.gst.ops.*` |
+| Deferred | LIVE portal notices/filing; FULL GST COMPLIANT; GSTR-9c auto |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 13)
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phase 13 go-live/UAT gate + period books hardening. Phase 12 portal filing foundation coexists (SIMULATED). Phase 14 annual + Phase 15 multi-period ops may also be in code. |
+| Status | **Phase 13 READY WITH CONDITIONS** |
+| Doc | [`docs/tax/PHASE13_GO_LIVE_HARDENING.md`](tax/PHASE13_GO_LIVE_HARDENING.md) |
+| Next step | migrate `20260805250000_gst_phase13_compliance_hardening` + `db:sync-permissions` for `tax.gst.compliance.view` / `tax.gst.compliance.uat`; statutory UAT evidence outside software for any full-compliance claim |
+| Deferred | FULL GST COMPLIANT · LIVE GSTN certify |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 10)
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phases 1–10: through Export / SEZ / LUT books. Superseded for "next" by Phase 12 entry above (Phase 11 specials coexists). |
+| Status | **Phase 10 READY WITH CONDITIONS** |
+| Doc | [`docs/tax/PHASE10_EXPORT_SEZ_LUT.md`](tax/PHASE10_EXPORT_SEZ_LUT.md) |
+| Next step | migrate `20260805220000_gst_phase10_export_sez_lut` if pending + `db:sync-permissions` for `tax.gst.export.view` / `tax.gst.lut.manage` |
+| Deferred | Live portal LUT/RFD; FULL GST COMPLIANT |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 5)
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phases 1–9: GST track through multi-GSTIN isolation + branch transfer policy. Superseded for "next" by Phase 10 entry above. |
+| Status | **Phase 5 READY WITH CONDITIONS** |
+| Doc | [`docs/tax/PHASE5_RETURNS_PREPARATION.md`](tax/PHASE5_RETURNS_PREPARATION.md) |
+| Next step | migrate `20260805170000_gst_phase5_returns_prep` + phase 3/4 if pending; `db:sync-permissions` for `tax.gst.returns.*` |
+| Deferred | Live portal GSTR submit; PMT-06; multi-GSTIN harden; FULL GST COMPLIANT |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 3) — advanced by Phase 4
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phase 3 ITC/GSTR-2B workbench. Superseded for "next" by Phase 4 entry above. |
+| Status | **Phase 3 READY WITH CONDITIONS** (still valid) |
+| Doc | [`docs/tax/PHASE3_ITC_GSTR2B.md`](tax/PHASE3_ITC_GSTR2B.md) |
+
+---
+
+## Open — Indian GST Compliance Platform (post Phase 2) — closed by Phase 3
+
+| Field | Value |
+|-------|-------|
+| Module | Tax / GST platform |
+| Description | Phase 1 determination + Phase 2 GST subledger + RCM/cess mapping keys. Superseded by Phase 3 entry above. |
+| Status | **Phase 2 READY WITH CONDITIONS** (shipped) |
+| Doc | [`docs/tax/PHASE2_GST_ACCOUNTING.md`](tax/PHASE2_GST_ACCOUNTING.md) |
+| Next step | mapping keys on LE; optional CN ledger hook |
+| Deferred | Live portal filing (was GSTR-2B — partial in Phase 3 offline) |
+
+---
+
 ## Done recently — Admin People & Access (2026-08-04)
 
 | Field | Value |

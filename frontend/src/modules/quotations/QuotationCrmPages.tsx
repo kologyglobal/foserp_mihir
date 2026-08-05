@@ -22,6 +22,7 @@ import { useMasterStore } from '../../store/masterStore'
 import { useUIStore } from '../../store/uiStore'
 import { notify } from '@/store/toastStore'
 import { isApiMode } from '../../config/apiConfig'
+import { formatApiError } from '../../services/api/apiErrors'
 import { syncQuotationsFromApi } from '../../services/bridges/quotationApiBridge'
 import { systemPrompt } from '@/utils/systemConfirm'
 import { exportRowsToCsv } from '../../utils/exportCsv'
@@ -135,8 +136,13 @@ export function CrmQuotationListPage() {
 
   useEffect(() => {
     if (!isApiMode()) return
-    void syncQuotationsFromApi().catch(() => {
-      notify.error('Could not refresh quotations from server')
+    void syncQuotationsFromApi().catch((err) => {
+      const detail = formatApiError(err)
+      notify.error(
+        detail
+          ? `Could not refresh quotations from server: ${detail}`
+          : 'Could not refresh quotations from server',
+      )
     })
   }, [])
 

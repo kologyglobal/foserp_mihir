@@ -22,6 +22,15 @@ export interface ProformaInvoiceLine {
   taxableValue: number
   gstAmount: number
   lineTotal: number
+  taxScheme?: string | null
+  cgstRate?: number | null
+  sgstRate?: number | null
+  utgstRate?: number | null
+  igstRate?: number | null
+  cgstAmount?: number | null
+  sgstAmount?: number | null
+  utgstAmount?: number | null
+  igstAmount?: number | null
 }
 
 export interface ProformaInvoice {

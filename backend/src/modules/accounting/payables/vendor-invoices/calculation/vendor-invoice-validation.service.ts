@@ -2,7 +2,7 @@
  * Merges the independent validation surfaces (amount calc, duplicate scan, account readiness,
  * accounting preview) into the single `VendorInvoiceCalculationValidation` returned to callers.
  */
-import { calcError, calcWarning, VENDOR_INVOICE_CALC_CODES } from './vendor-invoice-calculation.errors.js'
+import { calcError, calcInfo, calcWarning, VENDOR_INVOICE_CALC_CODES } from './vendor-invoice-calculation.errors.js'
 import type {
   VendorInvoiceAccountReadiness,
   VendorInvoiceAccountingPreview,
@@ -30,6 +30,8 @@ export interface MergeVendorInvoiceValidationParams {
   duplicateAssessment: VendorInvoiceDuplicateAssessment
   accountReadiness: VendorInvoiceAccountReadiness
   accountingPreview: VendorInvoiceAccountingPreview
+  /** When true, surface reverse-charge compliance info. */
+  isReverseCharge?: boolean
 }
 
 export function mergeVendorInvoiceValidation(params: MergeVendorInvoiceValidationParams): VendorInvoiceCalculationValidation {
@@ -58,6 +60,16 @@ export function mergeVendorInvoiceValidation(params: MergeVendorInvoiceValidatio
 
   if (!accountReadiness.isReady) {
     errors.push(...accountReadiness.issues)
+  }
+
+  if (params.isReverseCharge) {
+    information.push(
+      calcInfo(
+        VENDOR_INVOICE_CALC_CODES.REVERSE_CHARGE_TAX_EXCLUDED_FROM_PAYABLE,
+        'Reverse charge: GST is self-assessed and excluded from vendor payable. After post, confirm liability payment on the RCM register before marking ITC recognized.',
+        'taxTreatment',
+      ),
+    )
   }
 
   if (!accountingPreview.isBalanced) {

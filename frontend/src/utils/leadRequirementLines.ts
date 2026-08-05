@@ -77,9 +77,19 @@ export function decodeLeadRequirementLines(
 }
 
 export function encodeLeadRequirementLines(lines: OpportunityLine[]): string {
-  const synced = syncOpportunityLines(lines)
-  if (!hasLeadRequirementLines(synced)) return ''
-  return `${LEAD_REQUIREMENT_LINES_PREFIX}${JSON.stringify(synced)}`
+  // Drop blank SO-style draft rows so reload does not rehydrate phantom lines.
+  const meaningful = syncOpportunityLines(lines).filter(
+    (l) =>
+      Boolean(
+        l.itemId
+        || l.productId
+        || l.productOrItem.trim()
+        || l.description.trim()
+        || (l.qty > 0 && l.unitPrice > 0),
+      ),
+  )
+  if (!meaningful.length) return ''
+  return `${LEAD_REQUIREMENT_LINES_PREFIX}${JSON.stringify(meaningful)}`
 }
 
 export function leadRequirementQtyTotal(lines: OpportunityLine[]): number {

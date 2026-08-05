@@ -1,0 +1,33 @@
+-- Phase 5 — GSTR-1 / GSTR-3B preparation periods (DRAFT → LOCKED; mark filed external only)
+
+CREATE TABLE IF NOT EXISTS `gstr_return_periods` (
+  `id` VARCHAR(191) NOT NULL,
+  `tenantId` VARCHAR(191) NOT NULL,
+  `legalEntityId` VARCHAR(191) NOT NULL,
+  `companyGstin` VARCHAR(20) NOT NULL,
+  `returnPeriod` VARCHAR(7) NOT NULL,
+  `returnType` ENUM('GSTR1', 'GSTR3B') NOT NULL,
+  `status` ENUM('OPEN', 'DRAFT', 'LOCKED', 'MARKED_FILED_EXTERNAL') NOT NULL DEFAULT 'OPEN',
+  `preparedAt` DATETIME(3) NULL,
+  `preparedBy` VARCHAR(191) NULL,
+  `lockedAt` DATETIME(3) NULL,
+  `lockedBy` VARCHAR(191) NULL,
+  `unlockedAt` DATETIME(3) NULL,
+  `unlockedBy` VARCHAR(191) NULL,
+  `unlockReason` VARCHAR(500) NULL,
+  `markedFiledAt` DATETIME(3) NULL,
+  `markedFiledBy` VARCHAR(191) NULL,
+  `acknowledgmentRef` VARCHAR(100) NULL,
+  `filedOnPortalDate` DATE NULL,
+  `remarks` VARCHAR(1000) NULL,
+  `snapshotJson` JSON NULL,
+  `draftVersion` INTEGER NOT NULL DEFAULT 0,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updatedAt` DATETIME(3) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `gstr_return_period_unique`(`tenantId`, `legalEntityId`, `companyGstin`, `returnPeriod`, `returnType`),
+  INDEX `gstr_return_period_le_idx`(`tenantId`, `legalEntityId`, `returnPeriod`),
+  INDEX `gstr_return_period_status_idx`(`tenantId`, `status`),
+  CONSTRAINT `gstr_return_periods_tenantId_fkey` FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `gstr_return_periods_legalEntityId_fkey` FOREIGN KEY (`legalEntityId`) REFERENCES `legal_entities`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

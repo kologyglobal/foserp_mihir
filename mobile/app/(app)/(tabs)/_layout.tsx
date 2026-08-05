@@ -23,6 +23,10 @@ function TabBarIcon({
   )
 }
 
+/**
+ * Shared tabs only: Home · Work · Approvals · More.
+ * CRM customers/tasks stay as screens (hidden tabs) for deep links.
+ */
 export default function TabsLayout() {
   useOfflineDraftSync()
 
@@ -65,18 +69,9 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="customers"
+          name="work"
           options={{
-            title: 'Customers',
-            tabBarIcon: ({ color, focused }) => (
-              <TabBarIcon focused={focused} color={color} outline="people-outline" solid="people" />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="tasks"
-          options={{
-            title: 'Tasks',
+            title: 'Work',
             tabBarIcon: ({ color, focused }) => (
               <TabBarIcon
                 focused={focused}
@@ -110,6 +105,9 @@ export default function TabsLayout() {
             ),
           }}
         />
+        {/* Legacy CRM route hosts — keep for deep links; never fixed module tabs */}
+        <Tabs.Screen name="customers" options={{ href: null }} />
+        <Tabs.Screen name="tasks" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
       </Tabs>
     </View>

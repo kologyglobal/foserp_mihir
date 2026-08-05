@@ -48,6 +48,12 @@ import {
   type OrderDiscountMode,
 } from '../../utils/opportunityLineCalc'
 import { ChargeEditor, OrderAdjustmentsPanel } from '../../components/erp/OrderAdjustmentsGrid'
+import {
+  CommercialGstSupplyPanel,
+  type CommercialGstSupplyValue,
+} from '../../components/sales/CommercialGstSupplyPanel'
+import { COMPANY_STATE } from '../../types/invoice'
+import { resolveGstStateCode } from '../../utils/gstStateCode'
 import { notify } from '../../store/toastStore'
 
 type PiCreateMode = 'direct' | 'sales_order'
@@ -59,6 +65,7 @@ type PiLineRow = {
   unitPrice: string
   discountPct: string
   taxPct: string
+  hsnCode?: string
 }
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
@@ -82,6 +89,7 @@ function toLineRows(lines: ProformaInvoiceLine[]): PiLineRow[] {
     unitPrice: String(l.unitPrice),
     discountPct: String(l.discountPct),
     taxPct: String(l.taxPct),
+    hsnCode: l.hsnCode ?? '',
   }))
 }
 
@@ -93,20 +101,24 @@ function buildLinesFromRows(rows: PiLineRow[], items: ReturnType<typeof useMaste
       const qty = Number(row.qty) || 0
       const unitPrice = Number(row.unitPrice) || 0
       const discountPct = Number(row.discountPct) || 0
-      const taxPct = Number(row.taxPct) || 18
-      const totals = computeProformaLineTotals({ qty, unitPrice, discountPct, taxPct })
+      const taxPct = Number(row.taxPct)
+      if (!Number.isFinite(taxPct)) {
+        // Unset — treat as 0; UI should have resolved from masters
+      }
+      const safeTax = Number.isFinite(taxPct) ? taxPct : 0
+      const totals = computeProformaLineTotals({ qty, unitPrice, discountPct, taxPct: safeTax })
       return {
         id: row.key,
         lineNo: idx + 1,
         itemId: row.itemId,
         itemCode: item?.itemCode ?? '',
         description: item?.itemName ?? '',
-        hsnCode: item?.hsnCode ?? '',
+        hsnCode: (row.hsnCode ?? '').trim() || item?.hsnCode || '',
         qty,
         uom: 'Nos',
         unitPrice,
         discountPct,
-        taxPct,
+        taxPct: safeTax,
         ...totals,
       }
     })
@@ -143,13 +155,20 @@ export function ProformaInvoiceFormPage() {
   const [orderDiscountInput, setOrderDiscountInput] = useState(0)
   const { locationId, setLocationId } = useDocumentLocation('sales', null)
   const showLocationField = !useTenantProfileStore((s) => s.isServices())
+  const isServices = useTenantProfileStore((s) => s.isServices())
+  const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>(() => ({
+    placeOfSupply: '',
+    placeOfSupplyOverride: false,
+    placeOfSupplyOverrideReason: '',
+    supplierStateCode: resolveGstStateCode(COMPANY_STATE) ?? '27',
+  }))
   const [lineRows, setLineRows] = useState<PiLineRow[]>(() => [{
     key: crypto.randomUUID(),
     itemId: '',
     qty: '1',
     unitPrice: '0',
     discountPct: '0',
-    taxPct: '18',
+    taxPct: '0',
   }])
   const [toast, setToast] = useState<string | null>(null)
   const [errors, setErrors] = useState<string[]>([])
@@ -196,7 +215,7 @@ export function ProformaInvoiceFormPage() {
             qty: '1',
             unitPrice: '0',
             discountPct: '0',
-            taxPct: '18',
+            taxPct: '0',
           }],
     )
     setLinkedSoMeta({ salesOrderId: prefill.salesOrderId, salesOrderNo: prefill.salesOrderNo })
@@ -359,7 +378,7 @@ export function ProformaInvoiceFormPage() {
         qty: '1',
         unitPrice: '0',
         discountPct: '0',
-        taxPct: '18',
+        taxPct: '0',
       },
     ])
   }
@@ -540,19 +559,21 @@ export function ProformaInvoiceFormPage() {
           <colgroup>
             <col className="so-pricing-col-idx" />
             <col className="so-pricing-col-product" />
+            <col className="so-pricing-col-hsn" />
             <col className="so-pricing-col-qty" />
             <col className="so-pricing-col-price" />
             <col className="so-pricing-col-disc" />
             <col className="so-pricing-col-gst" />
             <col className="so-pricing-col-money" />
             <col className="so-pricing-col-money" />
-            <col className="so-pricing-col-money" />
+            <col className="so-pricing-col-money-wide" />
             <col className="so-pricing-col-action" />
           </colgroup>
           <thead>
             <tr>
               <th className="so-pricing-th so-pricing-th--center">#</th>
               <th className="so-pricing-th">Product</th>
+              <th className="so-pricing-th">HSN</th>
               <th className="so-pricing-th so-pricing-th--right">Qty</th>
               <th className="so-pricing-th so-pricing-th--right">Unit price</th>
               <th className="so-pricing-th so-pricing-th--right">Disc %</th>
@@ -585,12 +606,41 @@ export function ProformaInvoiceFormPage() {
                           itemId: v,
                           unitPrice: String(item?.defaultSalesRate ?? item?.standardRate ?? row.unitPrice),
                         })
+                        void (async () => {
+                          const { resolveCommercialLineTax } = await import('../../utils/commercialLineTax')
+                          const { useMasterStore: ms } = await import('../../store/masterStore')
+                          const store = ms.getState()
+                          const snap = await resolveCommercialLineTax({
+                            direction: 'SALES',
+                            item: item ?? null,
+                            hsnById: (hid) => store.getHsn(hid),
+                            hsnByCode: (code) => store.getHsnByCode(code),
+                            gstRates: store.gstRates,
+                          })
+                          patchLine(row.key, {
+                            taxPct: String(snap.taxPct),
+                            hsnCode: snap.hsnSacCode || item?.hsnCode || '',
+                          })
+                          if (!snap.resolved) {
+                            setErrors([
+                              snap.blockers[0] ??
+                                'GST unresolved for selected item — set HSN / GST group / rate masters',
+                            ])
+                          } else {
+                            setErrors([])
+                          }
+                        })()
                       }}
                       placeholder="Select sellable item…"
                       appearance="dropdown"
                       dropdownMinWidth={360}
                       emptyMessage="Only items allowed for sales can be selected."
                     />
+                  </td>
+                  <td className="so-pricing-td tabular-nums text-[12px] text-erp-muted">
+                    {(row.hsnCode ?? '').trim()
+                      || items.find((i) => i.id === row.itemId)?.hsnCode
+                      || '—'}
                   </td>
                   <td className="so-pricing-td">
                     <Input type="number" min={1} className="so-pricing-input so-pricing-input--num" value={row.qty} onChange={(e) => patchLine(row.key, { qty: e.target.value })} />
@@ -862,6 +912,17 @@ export function ProformaInvoiceFormPage() {
           <ErpFieldRow label="Customer PO">
             <Input value={customerPoNumber} onChange={(e) => setCustomerPoNumber(e.target.value)} placeholder="Optional customer PO reference" />
           </ErpFieldRow>
+          <div className="col-span-full">
+            <CommercialGstSupplyPanel
+              value={gstSupply}
+              onChange={setGstSupply}
+              customerState={customer?.state}
+              customerGstin={customer?.gstin}
+              shipToState={shippingAddress || customer?.state}
+              billToState={billingAddress || customer?.state}
+              isServiceDocument={isServices}
+            />
+          </div>
         </ErpCardSection>
         </div>
 

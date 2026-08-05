@@ -17,3 +17,13 @@ yarn-error.*
 .DS_Store
 *.log
 expo-env.d.ts
+
+# Local Android build toolchain / APK outputs
+.android-sdk/
+.tools/
+*.apk
+*.aab
+
+# Native projects (regenerate with: npx expo prebuild --platform android)
+/android
+/ios

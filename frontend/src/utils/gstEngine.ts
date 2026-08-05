@@ -106,7 +106,7 @@ export async function computeGstFromTaxMaster(
   params: ResolveGstTaxParams,
 ): Promise<GstBreakdown | null> {
   const resolved = await resolveGstTaxFromMasters(params)
-  if (!resolved) return null
+  if (!resolved?.resolved) return null
   return breakdownFromMasterRates(taxableAmount, {
     cgstRate: Number(resolved.cgstRate),
     sgstRate: Number(resolved.sgstRate),

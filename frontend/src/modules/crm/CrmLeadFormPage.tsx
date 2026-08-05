@@ -386,7 +386,8 @@ export function CrmLeadFormPage() {
     items,
     uoms,
     undefined,
-    requirementLines.map((l) => l.productId),
+    // SO-style: retain by Master Item id (not legacy productId)
+    requirementLines.map((l) => l.itemId ?? l.productId),
   )
 
   const requirementText = useMemo(

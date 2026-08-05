@@ -134,6 +134,15 @@ export interface OpportunityLine {
   lineTotal: number
   expectedDeliveryDate: string | null
   remarks: string
+  /** Phase 1 — HSN/SAC from item tax resolution (display / snapshot). */
+  hsnCode?: string
+  /** Intra vs inter scheme from place-of-supply + masters. */
+  taxScheme?: 'cgst_sgst' | 'igst' | 'utgst_pair'
+  taxSource?: 'MASTER' | 'UNRESOLVED' | 'OVERRIDE'
+  taxUnresolved?: boolean
+  cgstRate?: number
+  sgstRate?: number
+  igstRate?: number
 }
 
 export interface CrmActivity extends AuditTrail {

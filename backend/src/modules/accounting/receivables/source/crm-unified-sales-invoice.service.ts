@@ -327,7 +327,7 @@ export async function createUnifiedInvoice(
     unitPrice: String(l.unitPrice),
     lineDiscountType: 'PERCENTAGE' as const,
     lineDiscountValue: String(l.discountPct ?? 0),
-    gstRate: String(l.taxPct ?? 18),
+    gstRate: String(l.taxPct ?? 0),
     sourceLineId: l.sourceLineId ?? null,
   }))
 
@@ -498,7 +498,7 @@ export async function updateUnifiedInvoice(
     unitPrice: String(l.unitPrice),
     lineDiscountType: 'PERCENTAGE' as const,
     lineDiscountValue: String(l.discountPct ?? 0),
-    gstRate: String(l.taxPct ?? 18),
+    gstRate: String(l.taxPct ?? 0),
     sourceLineId: l.sourceLineId ?? null,
   }))
 

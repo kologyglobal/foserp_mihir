@@ -227,10 +227,25 @@ export async function decideInspection(req: Request, tenantId: string, id: strin
     ? (inspection.parameterSnapshotJson as ParameterSnapshotEntry[])
     : []
 
+  const photoRequired = snapshot.some(
+    (s) =>
+      (s as ParameterSnapshotEntry).photoRequired === true || s.parameterType === 'PHOTO_REQUIRED',
+  )
+  let photoCount = 0
+  if (photoRequired || snapshot.some((s) => s.parameterType === 'PHOTO_REQUIRED')) {
+    const { countActivePhotos } = await import('./inspection-photo.service.js')
+    photoCount = await countActivePhotos(tenantId, id)
+  }
+  if (photoRequired && (input.decision === 'PASS' || input.decision === 'CONDITIONAL_PASS')) {
+    if (photoCount < 1) {
+      throw new ValidationError('At least one QC photo is required before PASS / CONDITIONAL_PASS')
+    }
+  }
+
   // PASS / CONDITIONAL_PASS always require measurements when the plan snapshot has parameters
   // (including under flexible WO execution — skipQcGate may bypass the gate, not empty PASS).
   if ((input.decision === 'PASS' || input.decision === 'CONDITIONAL_PASS') && snapshot.length > 0) {
-    const err = validatePassAgainstSnapshot(snapshot, input.parameterResults ?? [])
+    const err = validatePassAgainstSnapshot(snapshot, input.parameterResults ?? [], { photoCount })
     if (err) throw new ValidationError(err)
   }
 

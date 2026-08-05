@@ -28,6 +28,10 @@ export type ComplianceStatus =
   | 'Marked Filed Externally'
   | 'Exception'
   | 'Overdue'
+  | 'DRAFT'
+  | 'LOCKED'
+  | 'OPEN'
+  | 'MARKED_FILED_EXTERNAL'
 
 export type MatchConfidence = 'High' | 'Medium' | 'Low' | 'Manual'
 
@@ -63,6 +67,12 @@ export type GstSupplyRow = {
   sourceDocPath?: string
   status: ComplianceStatus
   notes?: string
+  /** Phase 4 — RCM lifecycle when from RCM register (API) or demo seed. */
+  rcmLifecycleStatus?: string
+  vendorInvoiceId?: string
+  returnPeriod?: string
+  liabilityPaymentRef?: string | null
+  itcClaimBlocked?: boolean
 }
 
 export type Gstr2bLine = {
@@ -106,6 +116,11 @@ export type GstReturnPrep = {
   acknowledgmentRef?: string
   filedOnPortalDate?: string
   remarks?: string
+  companyGstin?: string
+  draftVersion?: number
+  sourceImmutable?: boolean
+  frozen?: boolean
+  disclaimer?: string
 }
 
 export type EInvoiceRow = {

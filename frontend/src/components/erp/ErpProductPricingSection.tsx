@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { ClipboardList, Plus, ShieldAlert, Trash2 } from 'lucide-react'
 import type { OpportunityLine } from '../../types/crm'
 import { ErpSmartSelect, type ErpSmartSelectOption } from './ErpSmartSelect'
@@ -11,6 +11,7 @@ import {
   createEmptyOpportunityLine,
   opportunityLineUnitPriceDomId,
   opportunityLineUnitPriceFieldKey,
+  shouldShowTaxUnresolvedWarning,
   syncOpportunityLines,
   UNIT_PRICE_REQUIRED_MESSAGE,
   type OrderDiscountMode,
@@ -21,6 +22,7 @@ import { isItemSellable, itemNotSellableForSalesMessage } from '../../utils/oppo
 import { notify } from '../../store/toastStore'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { cn } from '../../utils/cn'
+import { resolveCommercialLineTax } from '../../utils/commercialLineTax'
 import {
   ChargeEditor,
   OrderAdjustmentsPanel,
@@ -221,37 +223,85 @@ export function ErpProductPricingPanel({
   }
   const orderSummary = calcProductPricingSummary(synced, adjustments)
 
+  /**
+   * Always patch against the latest lines. Async tax resolve used to close over
+   * render-time `synced` and re-commit a blank draft after item pick — looking like
+   * “select does nothing” on Lead/Opportunity product grids.
+   */
+  const linesRef = useRef(synced)
+  linesRef.current = synced
+
   function commit(next: OpportunityLine[]) {
-    onChange(syncOpportunityLines(next))
+    const normalized = syncOpportunityLines(next)
+    linesRef.current = normalized
+    onChange(normalized)
   }
 
   function updateLine(id: string, patch: Partial<OpportunityLine>) {
-    commit(synced.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+    const base = syncOpportunityLines(linesRef.current)
+    commit(base.map((l) => (l.id === id ? { ...l, ...patch } : l)))
   }
 
   function addLine() {
-    commit([...synced, createEmptyOpportunityLine(synced.length + 1)])
+    const base = syncOpportunityLines(linesRef.current)
+    commit([...base, createEmptyOpportunityLine(base.length + 1)])
   }
 
   function removeLine(id: string) {
-    if (synced.length <= 1) {
+    const base = syncOpportunityLines(linesRef.current)
+    if (base.length <= 1) {
       commit([createEmptyOpportunityLine(1)])
       return
     }
-    commit(synced.filter((l) => l.id !== id))
+    commit(base.filter((l) => l.id !== id))
   }
 
   function selectItem(lineId: string, itemId: string) {
-    if (!itemId) return
+    const base = syncOpportunityLines(linesRef.current)
+    // Clear product → blank draft (must not show “Tax unresolved”).
+    if (!itemId) {
+      const idx = base.findIndex((l) => l.id === lineId)
+      updateLine(lineId, createEmptyOpportunityLine(idx >= 0 ? idx + 1 : 1, { id: lineId }))
+      return
+    }
     const pick = productPickMap.get(itemId)
     if (!pick) return
     if (!isItemSellable(pick.item)) {
       notify.warning(itemNotSellableForSalesMessage(pick.item))
       return
     }
-    const idx = synced.findIndex((l) => l.id === lineId)
+    const idx = base.findIndex((l) => l.id === lineId)
     const built = buildOpportunityLineFromItem(pick.item, pick.uomName, idx + 1)
-    updateLine(lineId, built)
+    // Keep stable row id so async tax resolve can still patch this line.
+    updateLine(lineId, { ...built, id: lineId })
+    if (built.taxUnresolved) {
+      notify.warning(
+        built.hsnCode
+          ? `GST unresolved for HSN ${built.hsnCode} — configure GST rate master or fix item tax group`
+          : 'GST unresolved — set HSN and GST group on Item master',
+      )
+    }
+    // API mode: re-resolve via central tax API (masters may not be in local store).
+    void resolveCommercialLineTax({ direction: 'SALES', item: pick.item }).then((snap) => {
+      if (snap.resolved) {
+        updateLine(lineId, {
+          taxPct: snap.taxPct,
+          hsnCode: snap.hsnSacCode,
+          taxScheme: snap.taxScheme,
+          taxSource: snap.source,
+          taxUnresolved: false,
+          cgstRate: snap.cgstRate,
+          sgstRate: snap.sgstRate,
+          igstRate: snap.igstRate,
+        })
+      } else if (snap.blockers.length) {
+        updateLine(lineId, {
+          taxUnresolved: true,
+          taxSource: 'UNRESOLVED',
+          hsnCode: snap.hsnSacCode || built.hsnCode,
+        })
+      }
+    })
   }
 
   const showCharges = showExtendedCharges
@@ -263,19 +313,21 @@ export function ErpProductPricingPanel({
           <colgroup>
             <col className="so-pricing-col-idx" />
             <col className="so-pricing-col-product" />
+            <col className="so-pricing-col-hsn" />
             <col className="so-pricing-col-qty" />
             <col className="so-pricing-col-price" />
             <col className="so-pricing-col-disc" />
             <col className="so-pricing-col-gst" />
             <col className="so-pricing-col-money" />
             <col className="so-pricing-col-money" />
-            <col className="so-pricing-col-money" />
+            <col className="so-pricing-col-money-wide" />
             {!readOnly ? <col className="so-pricing-col-action" /> : null}
           </colgroup>
           <thead>
             <tr>
               <th className="so-pricing-th so-pricing-th--center">#</th>
               <th className="so-pricing-th">Item</th>
+              <th className="so-pricing-th">HSN</th>
               <th className="so-pricing-th so-pricing-th--right">Qty</th>
               <th className="so-pricing-th so-pricing-th--right">Unit price</th>
               <th className="so-pricing-th so-pricing-th--right">Disc %</th>
@@ -314,10 +366,11 @@ export function ErpProductPricingPanel({
                       <ErpSmartSelect
                         options={productOptions}
                         value={line.itemId ?? ''}
-                        onChange={(id) => selectItem(line.id, id)}
+                        onChange={(id) => selectItem(line.id, id ?? '')}
                         placeholder="Select sellable item…"
                         appearance="dropdown"
-                        dropdownMinWidth={360}
+                        allowEmpty
+                        dropdownMinWidth={440}
                         emptyMessage="No sellable items match. Enable Sales allowed on the Item master."
                         resolveOrphanLabel={(id) => {
                           const orphan = productPickMap.get(id)?.item
@@ -348,6 +401,17 @@ export function ErpProductPricingPanel({
                     ) : null}
                     {productColumnErrors.length ? (
                       <p className="so-pricing-warn">{productColumnErrors.join(' · ')}</p>
+                    ) : null}
+                    {shouldShowTaxUnresolvedWarning(line) ? (
+                      <p className="so-pricing-warn">Tax unresolved — set Item HSN / GST group / rate masters</p>
+                    ) : null}
+                  </td>
+                  <td className="so-pricing-td tabular-nums text-[12px] text-erp-muted">
+                    {line.hsnCode || item?.hsnCode || '—'}
+                        {line.taxScheme ? (
+                      <div className="text-[10px] uppercase tracking-wide">
+                        {line.taxScheme === 'igst' ? 'IGST' : line.taxScheme === 'utgst_pair' ? 'CGST+UTGST' : 'CGST+SGST'}
+                      </div>
                     ) : null}
                   </td>
                   <td className="so-pricing-td">
@@ -405,16 +469,43 @@ export function ErpProductPricingPanel({
                   </td>
                   <td className="so-pricing-td">
                     {readOnly ? (
-                      <span className="tabular-nums">{line.taxPct}%</span>
+                      <span className="tabular-nums">
+                        {line.taxPct}%
+                        {line.taxSource === 'MASTER' ? (
+                          <span className="ml-1 text-[10px] text-erp-muted">master</span>
+                        ) : null}
+                      </span>
                     ) : (
                       <select
                         className="erp-input so-pricing-input so-pricing-input--select"
-                        value={line.taxPct}
-                        onChange={(e) => updateLine(line.id, { taxPct: Number(e.target.value) })}
-                        aria-label="GST percent"
+                        value={
+                          PRODUCT_PRICING_GST_RATES.includes(line.taxPct as (typeof PRODUCT_PRICING_GST_RATES)[number])
+                            ? line.taxPct
+                            : line.taxPct
+                        }
+                        onChange={(e) =>
+                          updateLine(line.id, {
+                            taxPct: Number(e.target.value),
+                            taxSource: 'OVERRIDE',
+                            taxUnresolved: false,
+                          })
+                        }
+                        aria-label="GST percent (from tax master; change only to override)"
+                        title={
+                          line.taxSource === 'MASTER'
+                            ? 'Rate from GST tax master — changing marks as override'
+                            : shouldShowTaxUnresolvedWarning(line)
+                              ? 'Unresolved tax — fix item masters or set rate deliberately'
+                              : undefined
+                        }
                       >
+                        {!PRODUCT_PRICING_GST_RATES.includes(line.taxPct as (typeof PRODUCT_PRICING_GST_RATES)[number]) ? (
+                          <option value={line.taxPct}>{line.taxPct}%</option>
+                        ) : null}
                         {PRODUCT_PRICING_GST_RATES.map((rate) => (
-                          <option key={rate} value={rate}>{rate}%</option>
+                          <option key={rate} value={rate}>
+                            {rate}%
+                          </option>
                         ))}
                       </select>
                     )}

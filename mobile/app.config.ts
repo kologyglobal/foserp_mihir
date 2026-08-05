@@ -30,7 +30,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       bundleIdentifier: 'com.fos.erp.mobile',
       buildNumber,
       infoPlist: {
-        NSCameraUsageDescription: 'Camera is used to scan business cards, capture CRM meeting photos, and document attachments.',
+        NSCameraUsageDescription:
+          'Camera is used to scan warehouse barcodes and QR codes, business cards, CRM photos, and documents.',
         NSPhotoLibraryUsageDescription: 'Photo library is used for business card import and CRM attachments.',
         NSMicrophoneUsageDescription: 'Microphone is used to record CRM voice notes on follow-ups and meetings.',
       },
@@ -52,10 +53,20 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       'expo-router',
       'expo-secure-store',
       [
+        'expo-camera',
+        {
+          cameraPermission:
+            'Allow FOS ERP to use the camera to scan barcodes, QR codes, business cards, and documents.',
+          microphonePermission: 'Allow FOS ERP to access the microphone when recording video.',
+          recordAudioAndroid: false,
+          barcodeScannerEnabled: true,
+        },
+      ],
+      [
         'expo-image-picker',
         {
           photosPermission: 'Allow FOS ERP to access photos for CRM attachments.',
-          cameraPermission: 'Allow FOS ERP to use the camera for CRM capture.',
+          cameraPermission: 'Allow FOS ERP to use the camera for CRM capture and barcode scanning.',
         },
       ],
       [

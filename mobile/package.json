@@ -5,12 +5,12 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "test:unit": "tsx scripts/verify-m1-foundation.ts && tsx scripts/verify-m3-crm.ts && tsx scripts/verify-m31-hardening.ts && tsx scripts/verify-m32-business-card.ts"
+    "test:unit": "tsx scripts/verify-m1-foundation.ts && tsx scripts/verify-m3-crm.ts && tsx scripts/verify-m31-hardening.ts && tsx scripts/verify-m32-business-card.ts && tsx scripts/verify-navigation-catalog.ts && tsx scripts/verify-purchase-approvals.ts && tsx scripts/verify-purchase-mobile.ts && tsx scripts/verify-purchase-phase-c.ts && tsx scripts/verify-store-material-issue.ts && tsx scripts/verify-store-ops.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.4",
@@ -21,6 +21,7 @@
     "expo": "~52.0.46",
     "expo-asset": "~11.0.5",
     "expo-av": "~15.0.2",
+    "expo-camera": "~16.0.18",
     "expo-constants": "~17.0.8",
     "expo-file-system": "~18.0.12",
     "expo-font": "~13.0.4",

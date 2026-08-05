@@ -1,6 +1,8 @@
 /**
- * E-Way bill register — generate/cancel/update-vehicle via NIC adapter (SIMULATED by default).
- * EWB number is never a user-editable field; only adapter + register persist it.
+ * E-Way bill register — generate / cancel / Part B vehicle update / validity extend.
+ * Sources: POSTED SalesInvoice or ISSUED DeliveryChallan (+ dispatch panel soft-link).
+ * Provider mode: same adapter as e-invoice (SIMULATED default; LIVE gated).
+ * EWB number is never user-editable.
  */
 import type { Request } from 'express'
 import { randomUUID } from 'crypto'
@@ -10,9 +12,18 @@ import { auditFromRequest, createAuditLog } from '../../../services/audit.servic
 import { AuthorizationError, NotFoundError } from '../../../utils/errors.js'
 import { formatForPersistence } from '../shared/finance-decimal.js'
 import { parseDateOnly, toDateOnlyString } from '../shared/finance.helpers.js'
-import { getNicGstAdapter } from './nic-gst.adapter.js'
+import {
+  checkEwaySourceReadiness,
+  evaluateThreshold,
+  planEwayExtension,
+  planEwayGenerate,
+  validateEwayPartA,
+  validateEwayPartB,
+} from './eway-readiness.util.js'
+import { getEInvoiceProviderMode, getNicGstAdapter } from './nic-gst.adapter.js'
 import {
   GstEWayBillCancelError,
+  GstEWayBillExtendError,
   GstEWayBillGenerateError,
   GstEWayBillNotReadyError,
   GstEWayBillVehicleUpdateError,
@@ -20,6 +31,7 @@ import {
 import type {
   CancelGstDocumentInput,
   EWayPanelQueryInput,
+  ExtendEWayBillInput,
   GenerateEWayBillInput,
   ListGstDocumentQueryInput,
   UpdateEWayVehicleInput,
@@ -63,6 +75,7 @@ type EwbRow = {
   vehicleNumber: string | null
   transporterName: string | null
   transporterId: string | null
+  transportMode?: string | null
   taxableAmount: { toString(): string }
   status: string
   ewbNumber: string | null
@@ -75,6 +88,9 @@ type EwbRow = {
   exceptionMessage: string | null
   providerMode: string
   providerRef: string | null
+  attemptCount?: number
+  extensionCount?: number
+  vehicleUpdatedAt?: Date | null
   lastRequestJson: unknown
   lastResponseJson: unknown
   createdAt: Date
@@ -99,6 +115,7 @@ function serialize(row: EwbRow) {
     vehicleNumber: row.vehicleNumber,
     transporterName: row.transporterName,
     transporterId: row.transporterId,
+    transportMode: row.transportMode ?? null,
     taxableAmount: money(row.taxableAmount),
     status: row.status,
     ewbNumber: row.ewbNumber,
@@ -111,6 +128,9 @@ function serialize(row: EwbRow) {
     exceptionMessage: row.exceptionMessage,
     providerMode: row.providerMode,
     providerRef: row.providerRef,
+    attemptCount: row.attemptCount ?? 0,
+    extensionCount: row.extensionCount ?? 0,
+    vehicleUpdatedAt: row.vehicleUpdatedAt?.toISOString() ?? null,
     lastRequestJson: row.lastRequestJson ?? null,
     lastResponseJson: row.lastResponseJson ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -118,8 +138,40 @@ function serialize(row: EwbRow) {
   }
 }
 
-function thresholdReason(taxable: number): string {
-  return `Taxable consignment exceeds applicable threshold (₹${EWAY_CONSIGNMENT_THRESHOLD_INR.toLocaleString('en-IN')}; value ₹${Math.round(taxable).toLocaleString('en-IN')})`
+function assertPartAB(input: GenerateEWayBillInput, sellerGstin: string) {
+  const partA = validateEwayPartA({
+    fromPlace: input.fromPlace,
+    toPlace: input.toPlace,
+    distanceKm: input.distanceKm,
+    sellerGstin,
+  })
+  if (!partA.ok) throw new GstEWayBillNotReadyError(partA.message)
+
+  const partB = validateEwayPartB(
+    {
+      vehicleNumber: input.vehicleNumber,
+      transporterId: input.transporterId,
+      transporterName: input.transporterName,
+      transportMode: input.transportMode,
+    },
+    { requirePartB: !input.allowIncompletePartB },
+  )
+  if (!partB.ok) throw new GstEWayBillNotReadyError(partB.message)
+  return partB.warnings
+}
+
+export function getEWayProviderStatus(req: Request) {
+  assertPerm(req, 'finance.tax.view')
+  const mode = getEInvoiceProviderMode()
+  return {
+    providerMode: mode,
+    isSimulated: mode === 'SIMULATED',
+    thresholdInr: EWAY_CONSIGNMENT_THRESHOLD_INR,
+    note:
+      mode === 'SIMULATED'
+        ? 'EWB is generated locally (SIMULATED). Not submitted to the GST e-Way portal.'
+        : 'LIVE mode selected — UAT/connector gates apply; not portal-ready without certified UAT.',
+  }
 }
 
 export async function listEWayBills(req: Request, tenantId: string, query: ListGstDocumentQueryInput) {
@@ -151,7 +203,13 @@ export async function listEWayBills(req: Request, tenantId: string, query: ListG
       take: query.pageSize,
     }),
   ])
-  return { items: rows.map(serialize), total, page: query.page, pageSize: query.pageSize }
+  return {
+    items: rows.map(serialize),
+    total,
+    page: query.page,
+    pageSize: query.pageSize,
+    providerMode: getEInvoiceProviderMode(),
+  }
 }
 
 export async function getEWayBill(req: Request, tenantId: string, id: string) {
@@ -196,21 +254,20 @@ export async function getEWayPanel(req: Request, tenantId: string, query: EWayPa
       outboundDispatchId: query.outboundDispatchId ?? null,
       ewayBill: null,
       canGenerate: false,
+      providerMode: getEInvoiceProviderMode(),
       message: 'No delivery challan found for e-Way evaluation',
     }
   }
 
   const taxable = await resolveChallanTaxableAmount(tenantId, challan)
-  const required = taxable >= EWAY_CONSIGNMENT_THRESHOLD_INR
-  const reason = required ? thresholdReason(taxable) : 'Consignment value is at or below the general ₹50,000 FAQ threshold (subject to rules/exceptions)'
-
+  const evalT = evaluateThreshold(taxable, EWAY_CONSIGNMENT_THRESHOLD_INR)
   const ewayBill = await prisma.gstEWayBill.findFirst({
     where: { tenantId, deliveryChallanId: challan.id },
   })
 
   return {
-    required,
-    reason,
+    required: evalT.required,
+    reason: evalT.reason,
     thresholdInr: EWAY_CONSIGNMENT_THRESHOLD_INR,
     taxableAmount: money(taxable),
     deliveryChallanId: challan.id,
@@ -222,7 +279,8 @@ export async function getEWayPanel(req: Request, tenantId: string, query: EWayPa
     transporterName: challan.transporterName,
     destination: challan.destination,
     ewayBill: ewayBill ? serialize(ewayBill) : null,
-    canGenerate: challan.status === 'ISSUED' && (required || Boolean(ewayBill)),
+    canGenerate: challan.status === 'ISSUED',
+    providerMode: getEInvoiceProviderMode(),
   }
 }
 
@@ -266,27 +324,29 @@ async function generateFromSalesInvoice(
   audit: ReturnType<typeof auditFromRequest>,
   input: GenerateEWayBillInput,
 ) {
+  const providerMode = getEInvoiceProviderMode()
   const invoice = await prisma.salesInvoice.findFirst({
     where: { id: input.salesInvoiceId!, tenantId },
     include: { legalEntity: true },
   })
   if (!invoice) throw new NotFoundError('Sales invoice not found')
-  if (invoice.status !== 'POSTED') {
-    throw new GstEWayBillNotReadyError('Only posted sales invoices can generate an e-way bill')
-  }
+
+  const sourceOk = checkEwaySourceReadiness({
+    sourceType: 'SALES_INVOICE',
+    documentStatus: invoice.status,
+  })
+  if (!sourceOk.ok) throw new GstEWayBillNotReadyError(sourceOk.message)
   if (!invoice.legalEntity.gstin) {
     throw new GstEWayBillNotReadyError('Legal entity GSTIN is required')
   }
 
-  const taxable = Number(invoice.taxableAmount)
-  const required = taxable >= EWAY_CONSIGNMENT_THRESHOLD_INR || Boolean(input.force)
-  const requiredReason = required
-    ? input.force && taxable < EWAY_CONSIGNMENT_THRESHOLD_INR
-      ? 'Forced generate (below threshold)'
-      : thresholdReason(taxable)
-    : null
+  assertPartAB(input, invoice.legalEntity.gstin)
 
-  if (!required) {
+  const taxable = Number(invoice.taxableAmount)
+  const evalT = evaluateThreshold(taxable, EWAY_CONSIGNMENT_THRESHOLD_INR, input.force)
+  const requiredReason = evalT.required ? evalT.reason : null
+
+  if (!evalT.required) {
     const existing = await prisma.gstEWayBill.findFirst({
       where: { tenantId, salesInvoiceId: invoice.id },
     })
@@ -308,11 +368,13 @@ async function generateFromSalesInvoice(
         vehicleNumber: input.vehicleNumber ?? null,
         transporterName: input.transporterName ?? null,
         transporterId: input.transporterId ?? null,
+        transportMode: input.transportMode ?? '1',
         taxableAmount: invoice.taxableAmount,
         status: 'NOT_REQUIRED',
-        requiredReason: 'Consignment value at or below general threshold',
+        requiredReason: evalT.reason,
         movementReason: input.movementReason ?? null,
-        providerMode: 'SIMULATED',
+        providerMode,
+        idempotencyKey: input.idempotencyKey ?? null,
         createdBy: userId,
       },
     })
@@ -322,8 +384,14 @@ async function generateFromSalesInvoice(
   const existing = await prisma.gstEWayBill.findFirst({
     where: { tenantId, salesInvoiceId: invoice.id },
   })
-  if (existing?.status === 'GENERATED') {
+  const plan = planEwayGenerate(
+    existing ? { status: existing.status, ewbNumber: existing.ewbNumber } : null,
+  )
+  if (plan.action === 'IDEMPOTENT_RETURN' && existing) {
     return { item: serialize(existing), idempotentReplay: true }
+  }
+  if (plan.action === 'BLOCK') {
+    throw new GstEWayBillGenerateError(plan.reason ?? 'Cannot generate e-way bill')
   }
 
   const adapter = getNicGstAdapter()
@@ -340,6 +408,7 @@ async function generateFromSalesInvoice(
     transporterId: input.transporterId ?? null,
     transporterName: input.transporterName ?? null,
     taxableAmount: money(invoice.taxableAmount),
+    transportMode: input.transportMode ?? '1',
     movementReason: input.movementReason ?? null,
   }
 
@@ -347,7 +416,60 @@ async function generateFromSalesInvoice(
   try {
     nic = await adapter.generateEwb(nicRequest)
   } catch (e) {
-    throw new GstEWayBillGenerateError(e instanceof Error ? e.message : 'NIC e-way generate failed')
+    const message = e instanceof Error ? e.message : 'NIC e-way generate failed'
+    const failed = await prisma.gstEWayBill.upsert({
+      where: { tenantId_salesInvoiceId: { tenantId, salesInvoiceId: invoice.id } },
+      create: {
+        id: randomUUID(),
+        tenantId,
+        legalEntityId: invoice.legalEntityId,
+        sourceType: 'SALES_INVOICE',
+        salesInvoiceId: invoice.id,
+        documentNumber: invoice.invoiceNumber ?? invoice.draftReference ?? invoice.id.slice(0, 8),
+        documentDate: invoice.invoiceDate,
+        partyName: invoice.customerNameSnapshot,
+        partyGstin: invoice.customerGstinSnapshot,
+        fromPlace: input.fromPlace,
+        toPlace: input.toPlace,
+        distanceKm: input.distanceKm,
+        vehicleNumber: input.vehicleNumber ?? null,
+        transporterName: input.transporterName ?? null,
+        transporterId: input.transporterId ?? null,
+        transportMode: input.transportMode ?? '1',
+        taxableAmount: invoice.taxableAmount,
+        status: 'EXCEPTION',
+        exceptionMessage: message.slice(0, 1000),
+        requiredReason,
+        movementReason: input.movementReason ?? null,
+        providerMode,
+        attemptCount: 1,
+        lastAttemptAt: new Date(),
+        lastRequestJson: asJson(nicRequest),
+        lastResponseJson: asJson({ error: message }),
+        createdBy: userId,
+      },
+      update: {
+        status: 'EXCEPTION',
+        exceptionMessage: message.slice(0, 1000),
+        attemptCount: { increment: 1 },
+        lastAttemptAt: new Date(),
+        lastRequestJson: asJson(nicRequest),
+        lastResponseJson: asJson({ error: message }),
+        updatedBy: userId,
+      },
+    })
+    await createAuditLog({
+      tenantId,
+      userId: audit.userId,
+      module: 'finance',
+      entity: 'gst_e_way_bill',
+      entityId: failed.id,
+      action: 'GENERATE_EXCEPTION',
+      newValues: { salesInvoiceId: invoice.id, mode: providerMode, message: message.slice(0, 500) },
+      ipAddress: audit.ipAddress,
+      userAgent: audit.userAgent,
+    })
+    throw new GstEWayBillGenerateError(message, failed.id)
   }
 
   const row = await prisma.gstEWayBill.upsert({
@@ -368,6 +490,7 @@ async function generateFromSalesInvoice(
       vehicleNumber: input.vehicleNumber ?? null,
       transporterName: input.transporterName ?? null,
       transporterId: input.transporterId ?? null,
+      transportMode: input.transportMode ?? '1',
       taxableAmount: invoice.taxableAmount,
       status: 'GENERATED',
       ewbNumber: nic.ewbNumber,
@@ -377,6 +500,9 @@ async function generateFromSalesInvoice(
       movementReason: input.movementReason ?? null,
       providerMode: nic.providerMode,
       providerRef: nic.providerRef,
+      idempotencyKey: input.idempotencyKey ?? null,
+      attemptCount: 1,
+      lastAttemptAt: new Date(),
       lastRequestJson: asJson(nic.requestSnapshot),
       lastResponseJson: asJson(nic.responseSnapshot),
       createdBy: userId,
@@ -392,10 +518,13 @@ async function generateFromSalesInvoice(
       vehicleNumber: input.vehicleNumber ?? null,
       transporterName: input.transporterName ?? null,
       transporterId: input.transporterId ?? null,
+      transportMode: input.transportMode ?? '1',
       requiredReason,
       movementReason: input.movementReason ?? null,
       providerMode: nic.providerMode,
       providerRef: nic.providerRef,
+      attemptCount: { increment: 1 },
+      lastAttemptAt: new Date(),
       lastRequestJson: asJson(nic.requestSnapshot),
       lastResponseJson: asJson(nic.responseSnapshot),
       exceptionMessage: null,
@@ -410,7 +539,12 @@ async function generateFromSalesInvoice(
     entity: 'gst_e_way_bill',
     entityId: row.id,
     action: 'GENERATE',
-    newValues: { ewbNumber: row.ewbNumber, sourceType: 'SALES_INVOICE', providerRef: row.providerRef },
+    newValues: {
+      ewbNumber: row.ewbNumber,
+      sourceType: 'SALES_INVOICE',
+      providerRef: row.providerRef,
+      mode: nic.providerMode,
+    },
     ipAddress: audit.ipAddress,
     userAgent: audit.userAgent,
   })
@@ -425,14 +559,18 @@ async function generateFromDeliveryChallan(
   audit: ReturnType<typeof auditFromRequest>,
   input: GenerateEWayBillInput,
 ) {
+  const providerMode = getEInvoiceProviderMode()
   const challan = await prisma.deliveryChallan.findFirst({
     where: { id: input.deliveryChallanId!, tenantId, deletedAt: null },
     include: { outboundDispatch: { select: { id: true, salesOrderId: true } } },
   })
   if (!challan) throw new NotFoundError('Delivery challan not found')
-  if (challan.status !== 'ISSUED') {
-    throw new GstEWayBillNotReadyError('Only issued delivery challans can generate an e-way bill')
-  }
+
+  const sourceOk = checkEwaySourceReadiness({
+    sourceType: 'DELIVERY_CHALLAN',
+    documentStatus: challan.status,
+  })
+  if (!sourceOk.ok) throw new GstEWayBillNotReadyError(sourceOk.message)
 
   const legalEntity = await prisma.legalEntity.findFirst({
     where: { tenantId, isActive: true },
@@ -441,6 +579,8 @@ async function generateFromDeliveryChallan(
   if (!legalEntity?.gstin) {
     throw new GstEWayBillNotReadyError('Active legal entity with GSTIN is required')
   }
+
+  assertPartAB(input, legalEntity.gstin)
 
   const customerSnap = (challan.customerSnapshotJson ?? {}) as Record<string, unknown>
   const partyName = String(customerSnap.name ?? customerSnap.customerName ?? 'Customer')
@@ -452,21 +592,23 @@ async function generateFromDeliveryChallan(
         : null
 
   const taxable = await resolveChallanTaxableAmount(tenantId, challan)
-  const required = taxable >= EWAY_CONSIGNMENT_THRESHOLD_INR || Boolean(input.force)
-  const requiredReason = required
-    ? input.force && taxable < EWAY_CONSIGNMENT_THRESHOLD_INR
-      ? 'Forced generate (below threshold)'
-      : thresholdReason(taxable)
-    : 'Consignment value at or below general threshold'
+  const evalT = evaluateThreshold(taxable, EWAY_CONSIGNMENT_THRESHOLD_INR, input.force)
+  const requiredReason = evalT.reason
 
   const existing = await prisma.gstEWayBill.findFirst({
     where: { tenantId, deliveryChallanId: challan.id },
   })
-  if (existing?.status === 'GENERATED') {
+  const plan = planEwayGenerate(
+    existing ? { status: existing.status, ewbNumber: existing.ewbNumber } : null,
+  )
+  if (plan.action === 'IDEMPOTENT_RETURN' && existing) {
     return { item: serialize(existing), idempotentReplay: true }
   }
+  if (plan.action === 'BLOCK') {
+    throw new GstEWayBillGenerateError(plan.reason ?? 'Cannot generate e-way bill')
+  }
 
-  if (!required) {
+  if (!evalT.required) {
     const row = existing
       ? await prisma.gstEWayBill.update({
           where: { id: existing.id },
@@ -474,6 +616,8 @@ async function generateFromDeliveryChallan(
             status: 'NOT_REQUIRED',
             requiredReason,
             taxableAmount: taxable,
+            transportMode: input.transportMode ?? '1',
+            providerMode,
             updatedBy: userId,
           },
         })
@@ -495,11 +639,12 @@ async function generateFromDeliveryChallan(
             vehicleNumber: input.vehicleNumber ?? challan.vehicleNumber,
             transporterName: input.transporterName ?? challan.transporterName,
             transporterId: input.transporterId ?? null,
+            transportMode: input.transportMode ?? '1',
             taxableAmount: taxable,
             status: 'NOT_REQUIRED',
             requiredReason,
             movementReason: input.movementReason ?? 'SALES_DELIVERY',
-            providerMode: 'SIMULATED',
+            providerMode,
             createdBy: userId,
           },
         })
@@ -521,6 +666,7 @@ async function generateFromDeliveryChallan(
     transporterId: input.transporterId ?? null,
     transporterName: input.transporterName ?? challan.transporterName,
     taxableAmount: money(taxable),
+    transportMode: input.transportMode ?? '1',
     movementReason: input.movementReason ?? 'SALES_DELIVERY',
   }
 
@@ -528,19 +674,53 @@ async function generateFromDeliveryChallan(
   try {
     nic = await adapter.generateEwb(nicRequest)
   } catch (e) {
-    if (existing) {
-      await prisma.gstEWayBill.update({
-        where: { id: existing.id },
-        data: {
-          status: 'EXCEPTION',
-          exceptionMessage: e instanceof Error ? e.message : 'NIC generate failed',
-          lastRequestJson: asJson(nicRequest),
-          lastResponseJson: asJson({ error: e instanceof Error ? e.message : String(e) }),
-          updatedBy: userId,
-        },
-      })
-    }
-    throw new GstEWayBillGenerateError(e instanceof Error ? e.message : 'NIC e-way generate failed')
+    const message = e instanceof Error ? e.message : 'NIC e-way generate failed'
+    const failed = existing
+      ? await prisma.gstEWayBill.update({
+          where: { id: existing.id },
+          data: {
+            status: 'EXCEPTION',
+            exceptionMessage: message.slice(0, 1000),
+            attemptCount: { increment: 1 },
+            lastAttemptAt: new Date(),
+            lastRequestJson: asJson(nicRequest),
+            lastResponseJson: asJson({ error: message }),
+            updatedBy: userId,
+          },
+        })
+      : await prisma.gstEWayBill.create({
+          data: {
+            id: randomUUID(),
+            tenantId,
+            legalEntityId: legalEntity.id,
+            sourceType: 'DELIVERY_CHALLAN',
+            deliveryChallanId: challan.id,
+            outboundDispatchId: challan.outboundDispatchId,
+            documentNumber: docNo,
+            documentDate: challan.documentDate,
+            partyName,
+            partyGstin,
+            fromPlace: input.fromPlace,
+            toPlace: nicRequest.toPlace,
+            distanceKm: input.distanceKm,
+            vehicleNumber: nicRequest.vehicleNumber,
+            transporterName: nicRequest.transporterName,
+            transporterId: input.transporterId ?? null,
+            transportMode: input.transportMode ?? '1',
+            taxableAmount: taxable,
+            status: 'EXCEPTION',
+            exceptionMessage: message.slice(0, 1000),
+            requiredReason,
+            movementReason: input.movementReason ?? 'SALES_DELIVERY',
+            providerMode,
+            attemptCount: 1,
+            lastAttemptAt: new Date(),
+            lastRequestJson: asJson(nicRequest),
+            lastResponseJson: asJson({ error: message }),
+            createdBy: userId,
+          },
+        })
+    throw new GstEWayBillGenerateError(message, failed.id)
   }
 
   const row = await prisma.$transaction(async (tx) => {
@@ -558,11 +738,12 @@ async function generateFromDeliveryChallan(
         partyName,
         partyGstin,
         fromPlace: input.fromPlace,
-        toPlace: input.toPlace || challan.destination || 'Destination',
+        toPlace: nicRequest.toPlace,
         distanceKm: input.distanceKm,
-        vehicleNumber: input.vehicleNumber ?? challan.vehicleNumber,
-        transporterName: input.transporterName ?? challan.transporterName,
+        vehicleNumber: nicRequest.vehicleNumber,
+        transporterName: nicRequest.transporterName,
         transporterId: input.transporterId ?? null,
+        transportMode: input.transportMode ?? '1',
         taxableAmount: taxable,
         status: 'GENERATED',
         ewbNumber: nic.ewbNumber,
@@ -572,6 +753,8 @@ async function generateFromDeliveryChallan(
         movementReason: input.movementReason ?? 'SALES_DELIVERY',
         providerMode: nic.providerMode,
         providerRef: nic.providerRef,
+        attemptCount: 1,
+        lastAttemptAt: new Date(),
         lastRequestJson: asJson(nic.requestSnapshot),
         lastResponseJson: asJson(nic.responseSnapshot),
         createdBy: userId,
@@ -583,23 +766,25 @@ async function generateFromDeliveryChallan(
         validUpto: nic.validUpto,
         outboundDispatchId: challan.outboundDispatchId,
         fromPlace: input.fromPlace,
-        toPlace: input.toPlace || challan.destination || 'Destination',
+        toPlace: nicRequest.toPlace,
         distanceKm: input.distanceKm,
-        vehicleNumber: input.vehicleNumber ?? challan.vehicleNumber,
-        transporterName: input.transporterName ?? challan.transporterName,
+        vehicleNumber: nicRequest.vehicleNumber,
+        transporterName: nicRequest.transporterName,
         transporterId: input.transporterId ?? null,
+        transportMode: input.transportMode ?? '1',
         taxableAmount: taxable,
         requiredReason,
         movementReason: input.movementReason ?? 'SALES_DELIVERY',
         providerMode: nic.providerMode,
         providerRef: nic.providerRef,
+        attemptCount: { increment: 1 },
+        lastAttemptAt: new Date(),
         lastRequestJson: asJson(nic.requestSnapshot),
         lastResponseJson: asJson(nic.responseSnapshot),
         exceptionMessage: null,
         updatedBy: userId,
       },
     })
-    // System snapshot only — not a manual edit path.
     await tx.deliveryChallan.update({
       where: { id: challan.id },
       data: {
@@ -618,7 +803,12 @@ async function generateFromDeliveryChallan(
     entity: 'gst_e_way_bill',
     entityId: row.id,
     action: 'GENERATE',
-    newValues: { ewbNumber: row.ewbNumber, sourceType: 'DELIVERY_CHALLAN', providerRef: row.providerRef },
+    newValues: {
+      ewbNumber: row.ewbNumber,
+      sourceType: 'DELIVERY_CHALLAN',
+      providerRef: row.providerRef,
+      mode: nic.providerMode,
+    },
     ipAddress: audit.ipAddress,
     userAgent: audit.userAgent,
   })
@@ -640,7 +830,13 @@ export async function cancelEWayBill(req: Request, tenantId: string, id: string,
   }
 
   const adapter = getNicGstAdapter()
-  const nic = await adapter.cancelEwb(row.ewbNumber, input.reason)
+  let nic
+  try {
+    nic = await adapter.cancelEwb(row.ewbNumber, input.reason)
+  } catch (e) {
+    throw new GstEWayBillCancelError(e instanceof Error ? e.message : 'NIC cancel failed')
+  }
+
   const updated = await prisma.gstEWayBill.update({
     where: { id: row.id },
     data: {
@@ -662,7 +858,7 @@ export async function cancelEWayBill(req: Request, tenantId: string, id: string,
     entity: 'gst_e_way_bill',
     entityId: row.id,
     action: 'CANCEL',
-    newValues: { reason: input.reason, ewbNumber: row.ewbNumber, providerRef: nic.providerRef },
+    newValues: { reason: input.reason, ewbNumber: row.ewbNumber, mode: getEInvoiceProviderMode() },
     ipAddress: audit.ipAddress,
     userAgent: audit.userAgent,
   })
@@ -705,6 +901,7 @@ export async function updateEWayVehicle(
       where: { id: row.id },
       data: {
         vehicleNumber: input.vehicleNumber,
+        vehicleUpdatedAt: nic.updatedAt,
         providerRef: nic.providerRef,
         lastRequestJson: asJson(nic.requestSnapshot),
         lastResponseJson: asJson(nic.responseSnapshot),
@@ -728,6 +925,76 @@ export async function updateEWayVehicle(
     entityId: row.id,
     action: 'UPDATE_VEHICLE',
     newValues: { vehicleNumber: input.vehicleNumber, ewbNumber: row.ewbNumber, providerRef: nic.providerRef },
+    ipAddress: audit.ipAddress,
+    userAgent: audit.userAgent,
+  })
+
+  return serialize(updated)
+}
+
+/** Validity extension (SIMULATED path + LIVE gate via same adapter). */
+export async function extendEWayBill(
+  req: Request,
+  tenantId: string,
+  id: string,
+  input: ExtendEWayBillInput,
+) {
+  assertPerm(req, 'finance.tax.eway.manage')
+  const userId = req.context?.userId
+  if (!userId) throw new AuthorizationError('User context required')
+  const audit = auditFromRequest(req)
+
+  const row = await prisma.gstEWayBill.findFirst({ where: { id, tenantId } })
+  if (!row) throw new NotFoundError('E-way bill not found')
+  if (!row.ewbNumber || !row.validUpto) {
+    throw new GstEWayBillExtendError('E-way bill has no EWB number / validity to extend')
+  }
+
+  const plan = planEwayExtension({
+    status: row.status,
+    validUpto: row.validUpto,
+    extensionHours: input.extensionHours,
+  })
+  if (!plan.ok) throw new GstEWayBillExtendError(plan.message)
+
+  const adapter = getNicGstAdapter()
+  let nic
+  try {
+    nic = await adapter.extendEwb({
+      ewbNumber: row.ewbNumber,
+      extensionHours: input.extensionHours,
+      currentValidUpto: row.validUpto,
+      reason: input.reason ?? null,
+    })
+  } catch (e) {
+    throw new GstEWayBillExtendError(e instanceof Error ? e.message : 'NIC extend failed')
+  }
+
+  const updated = await prisma.gstEWayBill.update({
+    where: { id: row.id },
+    data: {
+      validUpto: nic.validUpto,
+      extensionCount: { increment: 1 },
+      providerRef: nic.providerRef,
+      lastRequestJson: asJson(nic.requestSnapshot),
+      lastResponseJson: asJson(nic.responseSnapshot),
+      updatedBy: userId,
+    },
+  })
+
+  await createAuditLog({
+    tenantId,
+    userId: audit.userId,
+    module: 'finance',
+    entity: 'gst_e_way_bill',
+    entityId: row.id,
+    action: 'EXTEND',
+    newValues: {
+      ewbNumber: row.ewbNumber,
+      validUpto: nic.validUpto.toISOString(),
+      extensionHours: input.extensionHours,
+      mode: getEInvoiceProviderMode(),
+    },
     ipAddress: audit.ipAddress,
     userAgent: audit.userAgent,
   })

@@ -81,6 +81,8 @@ export async function normalizeSalesLineForWrite<T extends {
   uom?: string
   itemCodeSnapshot?: string | null
   itemNameSnapshot?: string | null
+  hsnCode?: string | null
+  hsnId?: string | null
 }>(
   tenantId: string,
   line: T,
@@ -92,11 +94,16 @@ export async function normalizeSalesLineForWrite<T extends {
   const snaps = buildSalesLineSnapshots(resolved.item, line.uom ?? 'NOS')
   const { productId: _ignored, ...rest } = line as T & { productId?: string | null }
   void _ignored
+  const hsnFromLine = line.hsnCode?.trim() || null
+  const hsnIdFromLine = line.hsnId?.trim() || null
   return {
     ...rest,
     itemId: resolved.item.id,
     productOrItem: line.productOrItem?.trim() || snaps.itemName,
     itemCodeSnapshot: snaps.itemCode,
     itemNameSnapshot: snaps.itemName,
+    // Prefer existing line HSN snapshot; fill from item only when blank (legacy).
+    hsnCode: hsnFromLine || snaps.hsnCode || null,
+    hsnId: hsnIdFromLine || resolved.item.hsnId || null,
   }
 }

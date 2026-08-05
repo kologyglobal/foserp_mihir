@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import {
   AppCard,
   Avatar,
+  EmptyState,
   ErrorState,
   IconButton,
   MetricCard,
@@ -17,22 +18,39 @@ import { QuickActionsBar } from '@/features/crm/components/QuickActionsBar'
 import { useCrmDashboard } from '@/features/crm/hooks'
 import { formatMoney, greetingForNow } from '@/features/crm/utils'
 import { useSessionStore } from '@/store/sessionStore'
-import { colors, layout, motion, radius, spacing, typography } from '@/theme'
-import { useModules } from '@/auth/modules'
+import { useNavigationAccess } from '@/auth/useNavigationAccess'
+import { canAny } from '@/auth/permissions'
+import { isModuleEnabled } from '@/auth/modules'
+import { colors, layout, radius, spacing, typography } from '@/theme'
 
-export default function CrmHomeScreen() {
+export default function HomeScreen() {
   const profile = useSessionStore((s) => s.profile)
-  const { data, isLoading, error, refetch } = useCrmDashboard()
-  const { isEnabled } = useModules()
+  const { home } = useNavigationAccess()
+  const perms = profile?.permissions ?? []
+  const crmOn =
+    isModuleEnabled('crm', profile?.modules) &&
+    canAny(
+      [
+        'crm.lead.view',
+        'crm.opportunity.view',
+        'crm.quotation.view',
+        'crm.follow_up.view',
+        'crm.company.view',
+      ],
+      perms,
+    )
+  const dash = useCrmDashboard()
+  const data = crmOn ? dash.data : undefined
+  const isLoading = crmOn && dash.isLoading
+  const error = crmOn ? dash.error : null
+  const refetch = dash.refetch
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const fullName = profile?.user
     ? `${profile.user.firstName} ${profile.user.lastName}`.trim()
     : 'User'
   const displayName =
-    profile?.user?.firstName?.trim() ||
-    fullName.split(/\s+/).filter(Boolean)[0] ||
-    'User'
+    profile?.user?.firstName?.trim() || fullName.split(/\s+/).filter(Boolean)[0] || 'User'
   const dayLabel = new Date().toLocaleDateString('en-GB', {
     weekday: 'short',
     day: 'numeric',
@@ -46,10 +64,9 @@ export default function CrmHomeScreen() {
   const meetingsToday = data?.activities?.today ?? 0
   const pendingApprovals = data?.panels?.pendingApprovalCount ?? 0
   const pipeline = data?.opportunities?.pipelineValue ?? 0
-  const pendingQuotes = data?.panels?.pendingApprovalQuotations?.length ?? 0
   const notificationBadge = pendingApprovals + fuToday
 
-  void isEnabled
+  const operationalTiles = home.filter((e) => e.group !== 'crm' && e.id !== 'crm-home-tile')
 
   return (
     <View style={styles.flex}>
@@ -70,17 +87,19 @@ export default function CrmHomeScreen() {
             />
             <View style={styles.headerText}>
               <Text style={styles.greet} numberOfLines={1}>
-                {greetingForNow()}, {displayName} 👋
+                {greetingForNow()}, {displayName}
               </Text>
               <Text style={styles.tagline} numberOfLines={1}>
-                Let's close more deals today.
+                {operationalTiles.length > 0
+                  ? 'Your operational workspace'
+                  : crmOn
+                    ? "Let's close more deals today."
+                    : 'No operational modules assigned'}
               </Text>
               <View style={styles.metaRow}>
                 <View style={styles.metaItem}>
                   <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
-                  <Text style={styles.metaText} numberOfLines={1}>
-                    {dayLabel}
-                  </Text>
+                  <Text style={styles.metaText}>{dayLabel}</Text>
                 </View>
                 <Text style={styles.metaDot}>·</Text>
                 <View style={[styles.metaItem, styles.metaItemFlex]}>
@@ -93,16 +112,20 @@ export default function CrmHomeScreen() {
             </View>
           </View>
           <View style={styles.headerActions}>
-            <IconButton
-              name="search-outline"
-              accessibilityLabel="Search"
-              onPress={() => router.push('/(app)/crm/search')}
-            />
+            {crmOn ? (
+              <IconButton
+                name="search-outline"
+                accessibilityLabel="Search"
+                onPress={() => router.push('/(app)/crm/search')}
+              />
+            ) : null}
             <IconButton
               name="notifications-outline"
               accessibilityLabel="Notifications"
               badgeCount={notificationBadge}
-              onPress={() => router.push('/(app)/crm/notifications')}
+              onPress={() =>
+                router.push(crmOn ? '/(app)/crm/notifications' : '/(app)/(tabs)/approvals')
+              }
             />
             <Pressable
               accessibilityRole="button"
@@ -115,102 +138,83 @@ export default function CrmHomeScreen() {
           </View>
         </View>
 
-        {isLoading ? <SkeletonMetricRow /> : null}
-        {error ? <ErrorState error={error} onRetry={() => void refetch()} /> : null}
-
-        {!isLoading && !error ? (
+        {operationalTiles.length > 0 ? (
           <>
-            <View style={styles.metrics}>
-              <MetricCard
-                label="Follow-ups"
-                value={fuToday}
-                hint="Due today"
-                icon="alarm-outline"
-                tone="warning"
-                trendLabel={fuToday > 0 ? 'Act now' : 'Clear'}
-                onPress={() => router.push('/(app)/crm/follow-ups')}
-              />
-              <MetricCard
-                label="Meetings"
-                value={meetingsToday}
-                hint="Activities today"
-                icon="calendar-outline"
-                tone="info"
-              />
-            </View>
-            <View style={styles.metrics}>
-              <MetricCard
-                label="Quotes"
-                value={pendingQuotes}
-                hint="Awaiting approval"
-                icon="document-text-outline"
-                tone={pendingQuotes > 0 ? 'warning' : 'default'}
-                onPress={() => router.push('/(app)/crm/quotations')}
-              />
-              <MetricCard
-                label="Approvals"
-                value={pendingApprovals}
-                hint="Needs your review"
-                icon="checkmark-done-outline"
-                tone={pendingApprovals > 0 ? 'danger' : 'success'}
-                onPress={() => router.push('/(app)/(tabs)/approvals')}
-              />
-            </View>
-            <View style={styles.metrics}>
-              <MetricCard
-                label="Pipeline"
-                value={formatMoney(pipeline)}
-                hint="Open opportunity value"
-                icon="trending-up-outline"
-                tone="success"
-                onPress={() => router.push('/(app)/crm/opportunities')}
-              />
-              <MetricCard
-                label="Collection"
-                value="Open"
-                hint="Customer outstanding"
-                icon="wallet-outline"
-                tone="info"
-                onPress={() => router.push('/(app)/crm/collection')}
-              />
+            <SectionHeader title="Modules" />
+            <View style={styles.tileGrid}>
+              {operationalTiles.map((e) => (
+                <Pressable
+                  key={e.id}
+                  onPress={() => router.push(e.href as never)}
+                  style={({ pressed }) => [styles.tile, pressed && { opacity: 0.9 }]}
+                >
+                  <View style={styles.tileIcon}>
+                    <Ionicons
+                      name={(e.icon as keyof typeof Ionicons.glyphMap) || 'apps-outline'}
+                      size={22}
+                      color={colors.primary}
+                    />
+                  </View>
+                  <Text style={styles.tileLabel} numberOfLines={2}>
+                    {e.label}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </>
         ) : null}
 
-        <QuickActionsBar />
+        {crmOn ? (
+          <>
+            {isLoading ? <SkeletonMetricRow /> : null}
+            {error ? <ErrorState error={error} onRetry={() => void refetch()} /> : null}
+            {!isLoading && !error ? (
+              <>
+                <View style={styles.metrics}>
+                  <MetricCard label="Follow-ups" value={String(fuToday)} />
+                  <MetricCard label="Meetings" value={String(meetingsToday)} />
+                  <MetricCard label="Pipeline" value={formatMoney(pipeline)} />
+                </View>
+                {/* CRM entry points: QuickActionsBar includes scan → /(app)/crm/business-card */}
+                <QuickActionsBar />
+                <SectionHeader title="Today's focus" />
+                {todaysFollowUps.length === 0 ? (
+                  <EmptyState
+                    title="No follow-ups due today"
+                    description="Stay ready — new tasks will show here."
+                    icon="sunny-outline"
+                  />
+                ) : (
+                  todaysFollowUps.slice(0, 5).map((fu, idx) => (
+                    <PriorityFollowUpRow
+                      key={String((fu as { id?: string }).id ?? idx)}
+                      row={fu as Record<string, unknown>}
+                      onPress={() => router.push('/(app)/crm/follow-ups')}
+                    />
+                  ))
+                )}
+              </>
+            ) : null}
+          </>
+        ) : null}
 
-        <SectionHeader
-          title="Today's plan"
-          variant="label"
-          actionLabel="See all"
-          onAction={() => router.push('/(app)/crm/follow-ups')}
-        />
-        <AppCard padded={false} style={styles.listCard}>
-          {todaysFollowUps.slice(0, 5).map((f, idx, arr) => {
-            const row = f as Record<string, unknown>
-            return (
-              <PriorityFollowUpRow
-                key={String(row.id ?? idx)}
-                row={row}
-                showDivider={idx < arr.length - 1}
-                onPress={() => router.push('/(app)/crm/follow-ups')}
-              />
-            )
-          })}
-          {todaysFollowUps.length === 0 ? (
-            <View style={styles.emptyPad}>
-              <View style={styles.emptyIcon}>
-                <Ionicons name="sunny-outline" size={22} color={colors.success} />
-              </View>
-              <Text style={styles.emptyTitle}>You're clear for today</Text>
-              <Text style={styles.emptyBody}>
-                Schedule a follow-up or pull leads into your day plan.
-              </Text>
-            </View>
-          ) : null}
-        </AppCard>
+        {!crmOn && operationalTiles.length === 0 ? (
+          <EmptyState
+            title="Nothing to show"
+            description="Ask your administrator to enable modules and grant permissions for your role."
+            icon="lock-closed-outline"
+          />
+        ) : null}
+
+        {operationalTiles.length > 0 && !crmOn ? (
+          <AppCard style={styles.hintCard}>
+            <Text style={styles.hintText}>
+              Open Work for queues, Approvals for sign-off, and More for the full catalogue.
+            </Text>
+          </AppCard>
+        ) : null}
       </ScrollView>
-      <CrmFab />
+      {crmOn ? <CrmFab /> : null}
     </View>
   )
 }
@@ -219,90 +223,53 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   scroll: {
     paddingHorizontal: layout.screenPadding,
-    paddingBottom: 128,
+    paddingBottom: spacing.hero,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.section,
-  },
-  headerLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
     gap: spacing.sm,
-    minWidth: 0,
   },
-  headerText: { flex: 1, minWidth: 0, paddingTop: 2 },
-  greet: {
-    ...typography.subtitle,
-    fontSize: 18,
-    lineHeight: 24,
-    color: colors.text,
-    letterSpacing: -0.25,
-  },
-  tagline: {
-    ...typography.caption,
-    marginTop: 2,
-    color: colors.textSecondary,
-  },
-  metaRow: {
+  headerLeft: { flexDirection: 'row', flex: 1, gap: spacing.sm, minWidth: 0 },
+  headerText: { flex: 1, minWidth: 0 },
+  greet: { ...typography.title, fontSize: 20 },
+  tagline: { ...typography.caption, marginTop: 2 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, gap: 4 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaItemFlex: { flex: 1, minWidth: 0 },
+  metaText: { ...typography.micro, color: colors.textMuted },
+  metaDot: { color: colors.textMuted },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  avatarBtn: { borderRadius: 21 },
+  avatarPressed: { opacity: 0.85 },
+  tileGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    gap: spacing.xs,
-    minWidth: 0,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaItemFlex: { flexShrink: 1, minWidth: 0 },
-  metaText: {
-    ...typography.micro,
-    fontWeight: '500',
-    color: colors.textMuted,
-  },
-  metaDot: {
-    ...typography.micro,
-    color: colors.textMuted,
-    marginHorizontal: 2,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: spacing.sm,
-    paddingTop: 0,
+    marginBottom: spacing.lg,
   },
-  avatarBtn: {
-    borderRadius: radius.full,
-    borderWidth: 2,
-    borderColor: colors.primarySoft,
+  tile: {
+    width: '47%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    minHeight: 88,
   },
-  avatarPressed: { opacity: 0.88, transform: [{ scale: motion.pressScale }] },
-  metrics: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
-  listCard: { marginBottom: spacing.xxl, overflow: 'hidden' },
-  emptyPad: {
-    padding: spacing.xxl,
-    alignItems: 'flex-start',
-  },
-  emptyIcon: {
-    width: 44,
-    height: 44,
+  tileIcon: {
+    width: 40,
+    height: 40,
     borderRadius: radius.md,
-    backgroundColor: colors.successMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
-  emptyTitle: { ...typography.bodyStrong, fontSize: 16 },
-  emptyBody: {
-    ...typography.caption,
-    marginTop: spacing.xs,
-    color: colors.textMuted,
-    lineHeight: 19,
-  },
+  tileLabel: { ...typography.bodyStrong, fontSize: 14 },
+  metrics: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  hintCard: { marginTop: spacing.md },
+  hintText: { ...typography.caption, color: colors.textSecondary },
 })

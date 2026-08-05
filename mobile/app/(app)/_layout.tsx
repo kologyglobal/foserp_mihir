@@ -25,6 +25,10 @@ export default function AppLayout() {
       <Stack.Screen name="profile" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="crm" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="purchase" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="quality" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="store" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="gate" options={{ animation: 'slide_from_right' }} />
     </Stack>
   )
 }

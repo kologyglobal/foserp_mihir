@@ -1,0 +1,51 @@
+-- Phase 12 — GSTR portal filing foundation (SIMULATED by default).
+-- Not LIVE GSTN/GSP certification · not FULL GST COMPLIANT.
+-- Links Phase 5 locked return snapshots to an external filing session + audit payloads.
+
+CREATE TABLE IF NOT EXISTS `gstr_filing_sessions` (
+  `id` VARCHAR(191) NOT NULL,
+  `tenantId` VARCHAR(191) NOT NULL,
+  `legalEntityId` VARCHAR(191) NOT NULL,
+  `companyGstin` VARCHAR(20) NOT NULL,
+  `returnPeriod` VARCHAR(7) NOT NULL,
+  `returnType` ENUM('GSTR1', 'GSTR3B') NOT NULL,
+  `returnPeriodId` VARCHAR(191) NOT NULL,
+  `status` ENUM(
+    'DRAFT',
+    'PACKAGE_READY',
+    'PENDING_CHECKER',
+    'SUBMITTED_SIMULATED',
+    'ACCEPTED_SIMULATED',
+    'LIVE_BLOCKED',
+    'FAILED',
+    'MARKED_FILED'
+  ) NOT NULL DEFAULT 'DRAFT',
+  `providerMode` VARCHAR(16) NOT NULL DEFAULT 'SIMULATED',
+  `packageJson` JSON NULL,
+  `packageVersion` INT NOT NULL DEFAULT 1,
+  `requestJson` JSON NULL,
+  `responseJson` JSON NULL,
+  `acknowledgmentRef` VARCHAR(100) NULL,
+  `filedOnPortalDate` DATE NULL,
+  `providerRef` VARCHAR(128) NULL,
+  `failureMessage` VARCHAR(1000) NULL,
+  `makerUserId` VARCHAR(191) NULL,
+  `checkerUserId` VARCHAR(191) NULL,
+  `submittedAt` DATETIME(3) NULL,
+  `submittedBy` VARCHAR(191) NULL,
+  `acceptedAt` DATETIME(3) NULL,
+  `markedFiledAt` DATETIME(3) NULL,
+  `markedFiledBy` VARCHAR(191) NULL,
+  `remarks` VARCHAR(1000) NULL,
+  `createdBy` VARCHAR(191) NULL,
+  `updatedBy` VARCHAR(191) NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updatedAt` DATETIME(3) NOT NULL,
+  PRIMARY KEY (`id`),
+  INDEX `gstr_filing_session_le_period_idx`(`tenantId`, `legalEntityId`, `returnPeriod`),
+  INDEX `gstr_filing_session_status_idx`(`tenantId`, `status`),
+  INDEX `gstr_filing_session_return_idx`(`tenantId`, `returnPeriodId`),
+  CONSTRAINT `gstr_filing_sessions_tenantId_fkey` FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `gstr_filing_sessions_legalEntityId_fkey` FOREIGN KEY (`legalEntityId`) REFERENCES `legal_entities`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `gstr_filing_sessions_returnPeriodId_fkey` FOREIGN KEY (`returnPeriodId`) REFERENCES `gstr_return_periods`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

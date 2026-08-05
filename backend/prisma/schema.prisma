@@ -455,6 +455,7 @@ model Tenant {
   qualityInspectionPlanLines        QualityInspectionPlanLine[]
   qualityInspectionPlanRevisions    QualityInspectionPlanRevision[]
   qualityInspectionParameterResults QualityInspectionParameterResult[]
+  qualityInspectionPhotos           QualityInspectionPhoto[]
   qualityCertificates               QualityCertificate[]
   jobWorkOrders                     JobWorkOrder[]
   jobWorkMaterialLines              JobWorkMaterialLine[]
@@ -477,6 +478,28 @@ model Tenant {
   inventoryAccountingEvents         InventoryAccountingEvent[]
   gstEInvoices                      GstEInvoice[]
   gstEWayBills                      GstEWayBill[]
+  gstLedgerEntries                  GstLedgerEntry[]
+  gstRcmRegisterEntries             GstRcmRegisterEntry[]
+  gstr2bImportBatches               Gstr2bImportBatch[]
+  gstr2bImportRows                  Gstr2bImportRow[]
+  gstr2bVendorFollowUps             Gstr2bVendorFollowUp[]
+  gstrReturnPeriods                 GstrReturnPeriod[]
+  gstrFilingSessions                GstrFilingSession[]
+  gstPaymentChallans                GstPaymentChallan[]
+  gstRegistrations                  GstRegistration[]
+  gstLuts                           GstLut[]
+  gstExportRefundClaims             GstExportRefundClaim[]
+  gstWithholdingEntries             GstWithholdingEntry[]
+  gstAdvanceEntries                 GstAdvanceEntry[]
+  gstAdvanceAdjustments             GstAdvanceAdjustment[]
+  gstComplianceUatSignOffs          GstComplianceUatSignOff[]
+  gstAnnualReturns                  GstAnnualReturn[]
+  gstFyArchives                     GstFyArchive[]
+  gstComplianceAuditPacks           GstComplianceAuditPack[]
+  gstComplianceNotices              GstComplianceNotice[]
+  gstRateOpsRuns                    GstRateOpsRun[]
+  gstDataQualityRuns                GstDataQualityRun[]
+  gstGlReconRuns                    GstGlReconRun[]
   workOrderCostSnapshots            WorkOrderCostSnapshot[]
   workOrderCostEntries              WorkOrderCostEntry[]
   productionFinishedGoodsReceipts   ProductionFinishedGoodsReceipt[]
@@ -2215,6 +2238,24 @@ model CrmSalesOrder {
   projectRef                  String?   @db.VarChar(100)
   projectNameSnapshot         String?   @db.VarChar(200)
   lines                       Json      @default("[]")
+  /// GST place of supply label / state (auto or override)
+  placeOfSupply               String?   @db.VarChar(200)
+  placeOfSupplyStateCode      String?   @db.VarChar(8)
+  /// AUTO | CUSTOMER | SHIP_TO | BILL_TO | OVERRIDE
+  placeOfSupplySource         String?   @db.VarChar(32)
+  placeOfSupplyOverride       Boolean   @default(false)
+  placeOfSupplyOverrideReason String?   @db.VarChar(500)
+  /// Seller registration state code at document time
+  supplierStateCode           String?   @db.VarChar(8)
+  /// INTRA_STATE | INTER_STATE | UNRESOLVED
+  supplyType                  String?   @db.VarChar(32)
+  /// cgst_sgst | igst | utgst_pair
+  gstScheme                   String?   @db.VarChar(32)
+  cgstAmount                  Decimal?  @db.Decimal(18, 2)
+  sgstAmount                  Decimal?  @db.Decimal(18, 2)
+  utgstAmount                 Decimal?  @db.Decimal(18, 2)
+  igstAmount                  Decimal?  @db.Decimal(18, 2)
+  cessAmount                  Decimal?  @db.Decimal(18, 2)
   createdBy                   String?
   updatedBy                   String?
   createdAt                   DateTime  @default(now())
@@ -3045,6 +3086,10 @@ model MasterGstRate {
   sgst              Decimal             @default(0) @db.Decimal(5, 2)
   cgst              Decimal             @default(0) @db.Decimal(5, 2)
   igst              Decimal             @default(0) @db.Decimal(5, 2)
+  /// Union Territory GST component (intra-state UT supplies; 0 for normal states)
+  utgst             Decimal             @default(0) @db.Decimal(5, 2)
+  /// Compensation / other cess % when configured on rate master
+  cess              Decimal             @default(0) @db.Decimal(5, 2)
   /// Sales / purchase / both — finance engine filters by document context.
   applicableFor     GstTaxApplicability @default(BOTH)
   status            MasterRecordStatus  @default(ACTIVE)
@@ -3444,6 +3489,19 @@ enum DefaultAccountMappingKey {
   GST_OUTPUT_SGST
   GST_OUTPUT_IGST
   GST_OUTPUT_CESS
+  /// Phase 2 — input cess credit
+  GST_INPUT_CESS
+  /// Phase 2 — reverse charge liability (self-assessed)
+  GST_RCM_CGST_PAYABLE
+  GST_RCM_SGST_PAYABLE
+  GST_RCM_IGST_PAYABLE
+  /// Phase 2 — ineligible ITC expensed (when mapped)
+  ITC_INELIGIBLE_EXPENSE
+  /// Phase 2 — GST-specific rounding (optional; ROUNDING remains generic)
+  GST_ROUND_OFF
+  /// Phase 2 — statutory interest / late fee (optional)
+  GST_INTEREST
+  GST_LATE_FEE
   TDS_RECEIVABLE
   TDS_PAYABLE
   BANK_CHARGES
@@ -3585,6 +3643,8 @@ model LegalEntity {
   pan                   String?         @db.VarChar(10)
   cin                   String?         @db.VarChar(21)
   gstin                 String?         @db.VarChar(15)
+  /// Phase 9 — branch stock transfer tax policy (policy-driven; not a second engine).
+  branchTransferTaxPolicy GstBranchTransferTaxPolicy @default(NOT_CONFIGURED)
   baseCurrency          String          @default("INR") @db.VarChar(8)
   countryCode           String          @default("IN") @db.VarChar(2)
   stateCode             String?         @db.VarChar(8)
@@ -3715,6 +3775,25 @@ model LegalEntity {
   productionAccountingEvents   ProductionAccountingEvent[]
   gstEInvoices                 GstEInvoice[]
   gstEWayBills                 GstEWayBill[]
+  gstLedgerEntries             GstLedgerEntry[]
+  gstRcmRegisterEntries        GstRcmRegisterEntry[]
+  gstr2bImportBatches          Gstr2bImportBatch[]
+  gstrReturnPeriods            GstrReturnPeriod[]
+  gstrFilingSessions           GstrFilingSession[]
+  gstPaymentChallans           GstPaymentChallan[]
+  gstRegistrations             GstRegistration[]
+  gstLuts                      GstLut[]
+  gstExportRefundClaims        GstExportRefundClaim[]
+  gstWithholdingEntries        GstWithholdingEntry[]
+  gstAdvanceEntries            GstAdvanceEntry[]
+  gstComplianceUatSignOffs     GstComplianceUatSignOff[]
+  gstAnnualReturns             GstAnnualReturn[]
+  gstFyArchives                GstFyArchive[]
+  gstComplianceAuditPacks      GstComplianceAuditPack[]
+  gstComplianceNotices         GstComplianceNotice[]
+  gstRateOpsRuns               GstRateOpsRun[]
+  gstDataQualityRuns           GstDataQualityRun[]
+  gstGlReconRuns               GstGlReconRun[]
   manufacturingCostingPolicies ManufacturingCostingPolicy[]
 
   hrDesignations     HrDesignation[]
@@ -3830,6 +3909,8 @@ model Branch {
   hrEmployeeLoans                  HrEmployeeLoan[]
   hrEmployeeExits                  HrEmployeeExit[]
   hrFullFinalSettlements           HrFullFinalSettlement[]
+  gstRegistrations                 GstRegistration[]
+
   @@unique([legalEntityId, code])
   @@index([tenantId])
   @@index([tenantId, legalEntityId])
@@ -5385,6 +5466,14 @@ model SalesInvoice {
   createdChannel        SalesInvoiceCreatedChannel @default(ACCOUNTING)
   commercialMetadata    Json?
 
+  /// Phase 10 — Export / SEZ / LUT linkage (books snapshot; not portal RFD).
+  lutId               String?
+  lutNumberSnapshot   String?   @db.VarChar(64)
+  shippingBillNumber  String?   @db.VarChar(64)
+  shippingBillDate    DateTime? @db.Date
+  shippingPortCode    String?   @db.VarChar(16)
+  exportFobValue      Decimal?  @db.Decimal(18, 4)
+
   createdBy String?
   updatedBy String?
   createdAt DateTime @default(now())
@@ -5397,6 +5486,7 @@ model SalesInvoice {
   accountingVoucher AccountingVoucher?       @relation(fields: [accountingVoucherId], references: [id])
   postingEvent      PostingEvent?            @relation(fields: [postingEventId], references: [id])
   reversalVoucher   AccountingVoucher?       @relation("SalesInvoiceReversalVoucher", fields: [reversalVoucherId], references: [id])
+  lut               GstLut?                  @relation(fields: [lutId], references: [id])
   lines             SalesInvoiceLine[]
   sourceLinks       SalesInvoiceSourceLink[]
 
@@ -5422,6 +5512,7 @@ model SalesInvoice {
   @@index([tenantId, createdChannel])
   @@index([tenantId, salesOrderId])
   @@index([tenantId, legacyCrmInvoiceNo])
+  @@index([tenantId, lutId], map: "sales_inv_lut_idx")
   @@map("sales_invoices")
 }
 
@@ -15016,6 +15107,7 @@ model ManufacturingQualityInspection {
   ncrs                   QualityNcr[]
   parameterResults       QualityInspectionParameterResult[]
   certificates           QualityCertificate[]
+  photos                 QualityInspectionPhoto[]
 
   @@unique([tenantId, inspectionNumber])
   @@unique([tenantId, idempotencyKey])
@@ -15028,6 +15120,29 @@ model ManufacturingQualityInspection {
   @@index([tenantId, inspectionPlanRevisionId])
   @@index([tenantId, releaseIdempotencyKey])
   @@map("mfg_quality_inspections")
+}
+
+/// Evidence photos for manufacturing QC inspections (multipart upload; tenant-scoped disk storage).
+model QualityInspectionPhoto {
+  id               String    @id @default(uuid())
+  tenantId         String
+  inspectionId     String
+  originalFilename String    @db.VarChar(255)
+  storedFilename   String    @db.VarChar(255)
+  mimeType         String    @db.VarChar(120)
+  fileSize         Int
+  storagePath      String    @db.VarChar(500)
+  caption          String?   @db.VarChar(500)
+  uploadedBy       String?
+  uploadedAt       DateTime  @default(now())
+  deletedAt        DateTime?
+
+  tenant     Tenant                         @relation(fields: [tenantId], references: [id])
+  inspection ManufacturingQualityInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, inspectionId])
+  @@map("quality_inspection_photos")
 }
 
 model QualityInspectionParameterResult {
@@ -16198,6 +16313,14 @@ model GstEInvoice {
   exceptionMessage String?           @db.VarChar(1000)
   providerMode     String            @default("SIMULATED") @db.VarChar(32)
   providerRef      String?           @db.VarChar(150)
+  /// Client-supplied retry/idempotency key (same SI + key → same outcome).
+  idempotencyKey   String?           @db.VarChar(100)
+  attemptCount     Int               @default(0)
+  lastAttemptAt    DateTime?
+  /// Last outbound provider request (secrets redacted at write time).
+  lastRequestJson  Json?
+  /// Last provider response (errors preserved).
+  lastResponseJson Json?
   createdBy        String?
   updatedBy        String?
   createdAt        DateTime          @default(now())
@@ -16212,6 +16335,7 @@ model GstEInvoice {
   @@index([tenantId], map: "gst_einv_tenant_idx")
   @@index([tenantId, legalEntityId, status], map: "gst_einv_le_status_idx")
   @@index([tenantId, legalEntityId, invoiceDate], map: "gst_einv_le_date_idx")
+  @@index([tenantId, idempotencyKey], map: "gst_einv_idem_idx")
   @@map("gst_e_invoices")
 }
 
@@ -16235,6 +16359,8 @@ model GstEWayBill {
   transporterName    String?               @db.VarChar(200)
   /// Transporter GSTIN / ID when provided to NIC.
   transporterId      String?               @db.VarChar(20)
+  /// NIC transport mode: 1 Road · 2 Rail · 3 Air · 4 Ship (Part B).
+  transportMode      String?               @db.VarChar(4)
   taxableAmount      Decimal               @default(0) @db.Decimal(18, 4)
   status             GstEWayBillStatus     @default(REQUIRED)
   ewbNumber          String?               @db.VarChar(64)
@@ -16250,6 +16376,11 @@ model GstEWayBill {
   exceptionMessage   String?               @db.VarChar(1000)
   providerMode       String                @default("SIMULATED") @db.VarChar(32)
   providerRef        String?               @db.VarChar(150)
+  idempotencyKey     String?               @db.VarChar(100)
+  attemptCount       Int                   @default(0)
+  lastAttemptAt      DateTime?
+  extensionCount     Int                   @default(0)
+  vehicleUpdatedAt   DateTime?
   /// Last outbound NIC request payload (redact secrets at write time).
   lastRequestJson    Json?
   /// Last NIC / government response payload (exact errors preserved).
@@ -16271,7 +16402,1070 @@ model GstEWayBill {
   @@index([tenantId, legalEntityId, status], map: "gst_ewb_le_status_idx")
   @@index([tenantId, legalEntityId, documentDate], map: "gst_ewb_le_date_idx")
   @@index([tenantId, outboundDispatchId], map: "gst_ewb_tenant_ob_idx")
+  @@index([tenantId, idempotencyKey], map: "gst_ewb_idem_idx")
   @@map("gst_e_way_bills")
+}
+
+/// Phase 2 — GST compliance subledger (document-line tax truth). GL remains accounting truth.
+enum GstLedgerDirection {
+  OUTWARD
+  INWARD
+}
+
+enum GstLedgerDocumentType {
+  SALES_INVOICE
+  VENDOR_INVOICE
+  CUSTOMER_CREDIT_NOTE
+  VENDOR_ADJUSTMENT
+}
+
+enum GstLedgerTaxType {
+  OUTPUT_CGST
+  OUTPUT_SGST
+  OUTPUT_IGST
+  OUTPUT_CESS
+  INPUT_CGST
+  INPUT_SGST
+  INPUT_IGST
+  INPUT_CESS
+  RCM_CGST
+  RCM_SGST
+  RCM_IGST
+}
+
+enum GstLedgerFilingStatus {
+  NOT_FILED
+  INCLUDED_IN_DRAFT
+  FILED
+  AMENDED
+}
+
+model GstLedgerEntry {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  branchId           String?
+  direction          GstLedgerDirection
+  documentType       GstLedgerDocumentType
+  documentId         String
+  /// Empty string when header-level (no line grain).
+  documentLineId     String                @default("") @db.VarChar(64)
+  documentNumber     String                @db.VarChar(64)
+  documentDate       DateTime              @db.Date
+  /// Return period key yyyy-MM derived from postingDate coalesce documentDate.
+  returnPeriod       String                @db.VarChar(7)
+  partyGstin         String?               @db.VarChar(20)
+  companyGstin       String?               @db.VarChar(20)
+  placeOfSupply      String?               @db.VarChar(100)
+  hsnSacCode         String?               @db.VarChar(16)
+  taxType            GstLedgerTaxType
+  taxableValue       Decimal               @default(0) @db.Decimal(18, 4)
+  taxRate            Decimal               @default(0) @db.Decimal(9, 4)
+  taxAmount          Decimal               @default(0) @db.Decimal(18, 4)
+  isReverseCharge    Boolean               @default(false)
+  itcEligibility     String?               @db.VarChar(40)
+  /// Phase 11 — TAXABLE | NIL_RATED | EXEMPT | ZERO_RATED | NON_GST | REVERSE_CHARGE | COMPOSITION
+  supplyClass        String?               @db.VarChar(32)
+  filingStatus       GstLedgerFilingStatus @default(NOT_FILED)
+  accountingVoucherId String?
+  postingEventId     String?
+  /// Source document tax snapshot fingerprints — not re-resolved later.
+  sourceSnapshot     Json?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@unique([tenantId, documentId, documentLineId, taxType], map: "gst_ledger_doc_line_tax_key")
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gst_ledger_le_period_idx")
+  @@index([tenantId, legalEntityId, documentDate], map: "gst_ledger_le_date_idx")
+  @@index([tenantId, documentType, documentId], map: "gst_ledger_doc_idx")
+  @@index([tenantId, filingStatus], map: "gst_ledger_filing_idx")
+  @@index([tenantId, legalEntityId, supplyClass], map: "gst_ledger_supply_class_idx")
+  @@map("gst_ledger_entries")
+}
+
+
+// ─── Phase 4 — Reverse charge (RCM) liability → payment → ITC recognition ─────
+
+/// Compliance lifecycle for self-assessed RCM on posted AP vendor invoices.
+/// GL remains accounting truth via VI post(); this register tracks payment gate + ITC claim readiness.
+enum GstRcmLifecycleStatus {
+  /// RCM liability credited on VI post (RCM_*_PAYABLE).
+  LIABILITY_POSTED
+  /// User confirmed RCM liability paid to government (full payment GL is Phase 8).
+  LIABILITY_PAID
+  /// ITC marked recognized for compliance after liability paid (no auto-claim).
+  ITC_RECOGNIZED
+  /// Explicitly not claimable (books ineligible / policy).
+  ITC_NOT_CLAIMABLE
+  /// Source document reversed/cancelled.
+  VOID
+}
+
+model GstRcmRegisterEntry {
+  id                   String                @id @default(uuid())
+  tenantId             String
+  legalEntityId        String
+  vendorInvoiceId      String                @unique
+  returnPeriod         String                @db.VarChar(7)
+  documentNumber       String                @db.VarChar(64)
+  documentDate         DateTime              @db.Date
+  vendorId             String
+  vendorName           String                @db.VarChar(300)
+  vendorGstin          String?               @db.VarChar(20)
+  placeOfSupply        String?               @db.VarChar(100)
+  taxableValue         Decimal               @default(0) @db.Decimal(18, 4)
+  cgstAmount           Decimal               @default(0) @db.Decimal(18, 4)
+  sgstAmount           Decimal               @default(0) @db.Decimal(18, 4)
+  igstAmount           Decimal               @default(0) @db.Decimal(18, 4)
+  cessAmount           Decimal               @default(0) @db.Decimal(18, 4)
+  totalTaxAmount       Decimal               @default(0) @db.Decimal(18, 4)
+  recoverableTaxAmount Decimal               @default(0) @db.Decimal(18, 4)
+  itcEligibility       String?               @db.VarChar(40)
+  status               GstRcmLifecycleStatus @default(LIABILITY_POSTED)
+  /// True when VI post booked INPUT_* debits concurrently with RCM payables (AP concurrent path).
+  glInputTaxBookedAtPost Boolean             @default(true)
+  liabilityPaidAt      DateTime?
+  liabilityPaidBy      String?
+  liabilityPaidDate    DateTime?             @db.Date
+  liabilityPaymentRef  String?               @db.VarChar(128)
+  liabilityPaidNotes   String?               @db.VarChar(1000)
+  itcRecognizedAt      DateTime?
+  itcRecognizedBy      String?
+  itcClaimNotes        String?               @db.VarChar(1000)
+  accountingVoucherId  String?
+  postingEventId       String?
+  notes                String?               @db.VarChar(1000)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gst_rcm_le_period_idx")
+  @@index([tenantId, legalEntityId, status], map: "gst_rcm_le_status_idx")
+  @@index([tenantId, vendorInvoiceId], map: "gst_rcm_vi_idx")
+  @@map("gst_rcm_register_entries")
+}
+
+// ─── Phase 3 — GSTR-2B import (immutable batches) + ITC recon / follow-up ──────
+
+/// Books-side ITC review (extends AP InputTaxCreditEligibility language for reports).
+enum GstItcClaimClass {
+  REVIEW_REQUIRED
+  ELIGIBLE
+  PARTIALLY_ELIGIBLE
+  INELIGIBLE
+  BLOCKED
+  CAPITAL_GOODS
+  INPUT_SERVICE
+  INPUT_GOODS
+  RCM_ELIGIBLE
+  NOT_APPLICABLE
+}
+
+enum Gstr2bBatchStatus {
+  IMPORTED
+  RECONCILING
+  RECONCILED
+  VOID
+}
+
+enum Gstr2bMatchStatus {
+  UNMATCHED
+  MATCHED
+  PARTIAL_MATCH
+  MISSING_IN_BOOKS
+  MISSING_IN_2B
+  VALUE_MISMATCH
+  TAX_MISMATCH
+  GSTIN_MISMATCH
+  DUPLICATE
+  REVIEW_REQUIRED
+}
+
+enum Gstr2bFollowUpStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  WAIVED
+}
+
+/// Immutable import batch — never mutate row amounts after import; void + re-import instead.
+model Gstr2bImportBatch {
+  id                 String            @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  returnPeriod       String            @db.VarChar(7)
+  source             String            @default("FILE") @db.VarChar(32)
+  fileName           String?           @db.VarChar(260)
+  providerMode       String            @default("SIMULATED") @db.VarChar(32)
+  status             Gstr2bBatchStatus @default(IMPORTED)
+  rowCount           Int               @default(0)
+  matchedCount       Int               @default(0)
+  mismatchCount      Int               @default(0)
+  missingInBooks     Int               @default(0)
+  missingIn2b        Int               @default(0)
+  payloadChecksum    String?           @db.VarChar(128)
+  importNotes        String?           @db.VarChar(1000)
+  importedAt         DateTime          @default(now())
+  importedBy         String?
+  reconciledAt       DateTime?
+  reconciledBy       String?
+  voidedAt           DateTime?
+  voidReason         String?           @db.VarChar(500)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity      @relation(fields: [legalEntityId], references: [id])
+  rows        Gstr2bImportRow[]
+  followUps   Gstr2bVendorFollowUp[]
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gstr2b_batch_le_period_idx")
+  @@index([tenantId, status], map: "gstr2b_batch_status_idx")
+  @@map("gstr2b_import_batches")
+}
+
+model Gstr2bImportRow {
+  id                   String            @id @default(uuid())
+  tenantId             String
+  batchId              String
+  lineNo               Int               @default(0)
+  supplierGstin        String            @db.VarChar(20)
+  supplierName         String?           @db.VarChar(300)
+  invoiceNumber        String            @db.VarChar(128)
+  invoiceNumberNorm    String            @db.VarChar(128)
+  invoiceDate          DateTime          @db.Date
+  taxableValue         Decimal           @default(0) @db.Decimal(18, 4)
+  cgstAmount           Decimal           @default(0) @db.Decimal(18, 4)
+  sgstAmount           Decimal           @default(0) @db.Decimal(18, 4)
+  igstAmount           Decimal           @default(0) @db.Decimal(18, 4)
+  cessAmount           Decimal           @default(0) @db.Decimal(18, 4)
+  placeOfSupply        String?           @db.VarChar(100)
+  documentTypeHint     String?           @db.VarChar(40)
+  matchStatus          Gstr2bMatchStatus @default(UNMATCHED)
+  matchScore           Int               @default(0)
+  matchedVendorInvoiceId String?
+  matchNotes           String?           @db.VarChar(1000)
+  /// Books-side claim class suggestion — never auto-post ITC.
+  itcClaimClass        GstItcClaimClass  @default(REVIEW_REQUIRED)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id])
+  batch  Gstr2bImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  followUps Gstr2bVendorFollowUp[]
+
+  @@index([tenantId, batchId], map: "gstr2b_row_batch_idx")
+  @@index([tenantId, supplierGstin, invoiceNumberNorm], map: "gstr2b_row_gstin_inv_idx")
+  @@index([tenantId, matchStatus], map: "gstr2b_row_match_idx")
+  @@map("gstr2b_import_rows")
+}
+
+model Gstr2bVendorFollowUp {
+  id               String               @id @default(uuid())
+  tenantId         String
+  legalEntityId    String
+  batchId          String?
+  rowId            String?
+  vendorInvoiceId  String?
+  vendorId         String?
+  vendorGstin      String?              @db.VarChar(20)
+  vendorName       String?              @db.VarChar(300)
+  reasonCode       String               @db.VarChar(64)
+  status           Gstr2bFollowUpStatus @default(OPEN)
+  notes            String?              @db.VarChar(2000)
+  assignedToUserId String?
+  resolvedAt       DateTime?
+  resolvedBy       String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  tenant Tenant             @relation(fields: [tenantId], references: [id])
+  batch  Gstr2bImportBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  row    Gstr2bImportRow?   @relation(fields: [rowId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, legalEntityId, status], map: "gstr2b_fu_le_status_idx")
+  @@index([tenantId, vendorGstin], map: "gstr2b_fu_gstin_idx")
+  @@map("gstr2b_vendor_follow_ups")
+}
+
+// ─── Phase 5 — GSTR-1 / GSTR-3B preparation periods (not portal filing) ────────
+
+enum GstrReturnType {
+  GSTR1
+  GSTR3B
+}
+
+/// OPEN → DRAFT (prepare) → LOCKED → MARKED_FILED_EXTERNAL (after outside portal filing).
+/// Unlock only from LOCKED; never unlock after MARKED_FILED_EXTERNAL.
+enum GstrReturnPeriodStatus {
+  OPEN
+  DRAFT
+  LOCKED
+  MARKED_FILED_EXTERNAL
+}
+
+model GstrReturnPeriod {
+  id                 String                 @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  /// GSTIN-specific period slice (company registration).
+  companyGstin       String                 @db.VarChar(20)
+  returnPeriod       String                 @db.VarChar(7)
+  returnType         GstrReturnType
+  status             GstrReturnPeriodStatus @default(OPEN)
+  preparedAt         DateTime?
+  preparedBy         String?
+  lockedAt           DateTime?
+  lockedBy           String?
+  unlockedAt         DateTime?
+  unlockedBy         String?
+  unlockReason       String?                @db.VarChar(500)
+  markedFiledAt      DateTime?
+  markedFiledBy      String?
+  acknowledgmentRef  String?                @db.VarChar(100)
+  filedOnPortalDate  DateTime?              @db.Date
+  remarks            String?                @db.VarChar(1000)
+  /// Frozen aggregates when DRAFT/LOCKED/FILED — not re-resolved after lock.
+  snapshotJson       Json?
+  draftVersion       Int                    @default(0)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+  filingSessions GstrFilingSession[]
+
+  @@unique([tenantId, legalEntityId, companyGstin, returnPeriod, returnType], map: "gstr_return_period_unique")
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gstr_return_period_le_idx")
+  @@index([tenantId, status], map: "gstr_return_period_status_idx")
+  @@map("gstr_return_periods")
+}
+
+// ─── Phase 12 — GSTR portal filing session (SIMULATED default; not LIVE GSTN) ─
+
+enum GstrFilingSessionStatus {
+  DRAFT
+  PACKAGE_READY
+  PENDING_CHECKER
+  SUBMITTED_SIMULATED
+  ACCEPTED_SIMULATED
+  LIVE_BLOCKED
+  FAILED
+  MARKED_FILED
+}
+
+/// Filing package + simulated/external submit trail for GSTR-1 / GSTR-3B.
+/// Reuses Phase 5 locked snapshot — does **not** recompute returns.
+model GstrFilingSession {
+  id                  String                  @id @default(uuid())
+  tenantId            String
+  legalEntityId       String
+  companyGstin        String                  @db.VarChar(20)
+  returnPeriod        String                  @db.VarChar(7)
+  returnType          GstrReturnType
+  returnPeriodId      String
+  status              GstrFilingSessionStatus @default(DRAFT)
+  /// SIMULATED (default) | LIVE (hard-gated env; no core HTTP transport)
+  providerMode        String                  @default("SIMULATED") @db.VarChar(16)
+  packageJson         Json?
+  packageVersion      Int                     @default(1)
+  requestJson         Json?
+  responseJson        Json?
+  acknowledgmentRef   String?                 @db.VarChar(100)
+  filedOnPortalDate   DateTime?               @db.Date
+  providerRef         String?                 @db.VarChar(128)
+  failureMessage      String?                 @db.VarChar(1000)
+  makerUserId         String?
+  checkerUserId       String?
+  submittedAt         DateTime?
+  submittedBy         String?
+  acceptedAt          DateTime?
+  markedFiledAt       DateTime?
+  markedFiledBy       String?
+  remarks             String?                 @db.VarChar(1000)
+  createdBy           String?
+  updatedBy           String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id])
+  legalEntity  LegalEntity      @relation(fields: [legalEntityId], references: [id])
+  returnPeriodRow GstrReturnPeriod @relation(fields: [returnPeriodId], references: [id])
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gstr_filing_session_le_period_idx")
+  @@index([tenantId, status], map: "gstr_filing_session_status_idx")
+  @@index([tenantId, returnPeriodId], map: "gstr_filing_session_return_idx")
+  @@map("gstr_filing_sessions")
+}
+
+// ─── Phase 8 — GST payment / PMT-06 style challan (books-side; not portal generate) ─
+
+enum GstPaymentChallanStatus {
+  DRAFT
+  PROPOSED
+  CONFIRMED_EXTERNAL
+  POSTED_GL
+  CLOSED
+  VOID
+}
+
+/// Books liability proposal + external payment refs + optional GL settle via post().
+model GstPaymentChallan {
+  id                    String                   @id @default(uuid())
+  tenantId              String
+  legalEntityId         String
+  companyGstin          String                   @db.VarChar(20)
+  returnPeriod          String                   @db.VarChar(7)
+  status                GstPaymentChallanStatus  @default(DRAFT)
+  outputCgst            Decimal                  @default(0) @db.Decimal(18, 4)
+  outputSgst            Decimal                  @default(0) @db.Decimal(18, 4)
+  outputIgst            Decimal                  @default(0) @db.Decimal(18, 4)
+  outputCess            Decimal                  @default(0) @db.Decimal(18, 4)
+  rcmCgst               Decimal                  @default(0) @db.Decimal(18, 4)
+  rcmSgst               Decimal                  @default(0) @db.Decimal(18, 4)
+  rcmIgst               Decimal                  @default(0) @db.Decimal(18, 4)
+  rcmCess               Decimal                  @default(0) @db.Decimal(18, 4)
+  itcCgst               Decimal                  @default(0) @db.Decimal(18, 4)
+  itcSgst               Decimal                  @default(0) @db.Decimal(18, 4)
+  itcIgst               Decimal                  @default(0) @db.Decimal(18, 4)
+  itcCess               Decimal                  @default(0) @db.Decimal(18, 4)
+  totalLiability        Decimal                  @default(0) @db.Decimal(18, 4)
+  totalItc              Decimal                  @default(0) @db.Decimal(18, 4)
+  netTaxPayable         Decimal                  @default(0) @db.Decimal(18, 4)
+  interestAmount        Decimal                  @default(0) @db.Decimal(18, 4)
+  lateFeeAmount         Decimal                  @default(0) @db.Decimal(18, 4)
+  roundOffAmount        Decimal                  @default(0) @db.Decimal(18, 4)
+  totalPayable          Decimal                  @default(0) @db.Decimal(18, 4)
+  cashLedgerJson        Json?
+  creditLedgerJson      Json?
+  liabilitySnapshotJson Json?
+  cpin                  String?                  @db.VarChar(64)
+  challanNumber         String?                  @db.VarChar(64)
+  bankReference         String?                  @db.VarChar(128)
+  paymentDate           DateTime?                @db.Date
+  bankAccountId         String?
+  remarks               String?                  @db.VarChar(1000)
+  accountingVoucherId    String?
+  postingEventId        String?
+  proposedAt            DateTime?
+  proposedBy            String?
+  confirmedAt           DateTime?
+  confirmedBy           String?
+  postedAt              DateTime?
+  postedBy              String?
+  closedAt              DateTime?
+  closedBy              String?
+  voidedAt              DateTime?
+  voidedBy              String?
+  voidReason            String?                  @db.VarChar(500)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gst_pay_le_period_idx")
+  @@index([tenantId, status], map: "gst_pay_status_idx")
+  @@index([tenantId, companyGstin, returnPeriod], map: "gst_pay_gstin_period_idx")
+  @@map("gst_payment_challans")
+}
+
+// ─── Phase 9 — Multi-GSTIN registrations + branch transfer policy ─────────────
+
+enum GstBranchTransferTaxPolicy {
+  NOT_CONFIGURED
+  SAME_GSTIN_STOCK_NO_TAX
+  CROSS_GSTIN_TAXABLE_SUPPLY
+  PROHIBITED
+}
+
+/// Explicit GST registration map (LE / branch). Complements LegalEntity.gstin + Branch.gstin.
+model GstRegistration {
+  id                   String    @id @default(uuid())
+  tenantId             String
+  legalEntityId        String
+  branchId             String?
+  gstin                String    @db.VarChar(20)
+  stateCode            String?   @db.VarChar(8)
+  registrationType     String    @default("REGULAR") @db.VarChar(40)
+  isPrimary            Boolean   @default(false)
+  seriesPrefix         String?   @db.VarChar(32)
+  placeOfSupplyDefault String?   @db.VarChar(100)
+  effectiveFrom        DateTime  @db.Date
+  effectiveTo          DateTime? @db.Date
+  isActive             Boolean   @default(true)
+  notes                String?   @db.VarChar(500)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity  @relation(fields: [legalEntityId], references: [id])
+  branch      Branch?      @relation(fields: [branchId], references: [id])
+
+  @@unique([tenantId, gstin], map: "gst_reg_tenant_gstin_key")
+  @@index([tenantId, legalEntityId], map: "gst_reg_le_idx")
+  @@index([tenantId, branchId], map: "gst_reg_branch_idx")
+  @@map("gst_registrations")
+}
+
+// ─── Phase 10 — Export / SEZ / LUT ────────────────────────────────────────────
+
+enum GstLutStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+/// Letter of Undertaking bond for zero-rated export / SEZ without payment of IGST (books master).
+model GstLut {
+  id                 String       @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  companyGstin       String?      @db.VarChar(20)
+  lutNumber          String       @db.VarChar(64)
+  financialYearLabel String?      @db.VarChar(16)
+  validFrom          DateTime     @db.Date
+  validTo            DateTime?    @db.Date
+  status             GstLutStatus @default(ACTIVE)
+  isActive           Boolean      @default(true)
+  notes              String?      @db.VarChar(1000)
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  legalEntity   LegalEntity    @relation(fields: [legalEntityId], references: [id])
+  salesInvoices SalesInvoice[]
+
+  @@unique([tenantId, legalEntityId, lutNumber], map: "gst_lut_tenant_le_number_key")
+  @@index([tenantId, legalEntityId, isActive], map: "gst_lut_le_active_idx")
+  @@index([tenantId, companyGstin], map: "gst_lut_gstin_idx")
+  @@map("gst_luts")
+}
+
+enum GstExportRefundClaimType {
+  IGST_REFUND
+  ITC_REFUND
+  OTHER
+}
+
+enum GstExportRefundClaimStatus {
+  DRAFT
+  PREPARED
+  SUBMITTED_EXTERNAL
+  VOID
+}
+
+/// Books-only refund claim skeleton (not GST portal RFD submit).
+model GstExportRefundClaim {
+  id            String                     @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  companyGstin  String?                    @db.VarChar(20)
+  returnPeriod  String                     @db.VarChar(7)
+  claimType     GstExportRefundClaimType   @default(IGST_REFUND)
+  status        GstExportRefundClaimStatus @default(DRAFT)
+  taxableValue  Decimal                    @default(0) @db.Decimal(18, 4)
+  igstAmount    Decimal                    @default(0) @db.Decimal(18, 4)
+  currencyCode  String                     @default("INR") @db.VarChar(8)
+  externalArn   String?                    @db.VarChar(64)
+  notes         String?                    @db.VarChar(1000)
+  snapshotJson  Json?
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gst_exp_refund_le_period_idx")
+  @@index([tenantId, status], map: "gst_exp_refund_status_idx")
+  @@map("gst_export_refund_claims")
+}
+
+// ─── Phase 11 — Special schemes / advances / GST TDS-TCS (books-side) ─────────
+
+enum GstWithholdingKind {
+  GST_TDS
+  GST_TCS
+}
+
+enum GstWithholdingStatus {
+  OPEN
+  PAID
+  ADJUSTED
+  VOID
+}
+
+/// Sec 51/52 style GST TDS/TCS liability prep — not portal GSTR-7/8, not IT Act TDS.
+model GstWithholdingEntry {
+  id                   String               @id @default(uuid())
+  tenantId             String
+  legalEntityId        String
+  companyGstin         String?              @db.VarChar(20)
+  kind                 GstWithholdingKind
+  status               GstWithholdingStatus @default(OPEN)
+  returnPeriod         String               @db.VarChar(7)
+  documentDate         DateTime             @db.Date
+  partyName            String               @db.VarChar(300)
+  partyGstin           String?              @db.VarChar(20)
+  partyId              String?
+  sourceDocumentType   String?              @db.VarChar(64)
+  sourceDocumentId     String?
+  sourceDocumentNumber String?              @db.VarChar(64)
+  taxableValue         Decimal              @default(0) @db.Decimal(18, 4)
+  ratePct              Decimal              @default(0) @db.Decimal(9, 4)
+  tdsCgst              Decimal              @default(0) @db.Decimal(18, 4)
+  tdsSgst              Decimal              @default(0) @db.Decimal(18, 4)
+  tdsIgst              Decimal              @default(0) @db.Decimal(18, 4)
+  totalWithheld        Decimal              @default(0) @db.Decimal(18, 4)
+  isInterstate         Boolean              @default(false)
+  paymentRef           String?              @db.VarChar(128)
+  paidAt               DateTime?
+  paidBy               String?
+  voidedAt             DateTime?
+  voidedBy             String?
+  voidReason           String?              @db.VarChar(500)
+  notes                String?              @db.VarChar(1000)
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gst_wh_le_period_idx")
+  @@index([tenantId, status], map: "gst_wh_status_idx")
+  @@index([tenantId, kind], map: "gst_wh_kind_idx")
+  @@map("gst_withholding_entries")
+}
+
+enum GstAdvanceStatus {
+  RECEIVED
+  PARTIALLY_ADJUSTED
+  ADJUSTED
+  CLOSED
+  VOID
+}
+
+/// Customer advance GST adjustment foundation — not full GSTR-1 Table 11 engine.
+model GstAdvanceEntry {
+  id                    String           @id @default(uuid())
+  tenantId              String
+  legalEntityId         String
+  companyGstin          String?          @db.VarChar(20)
+  status                GstAdvanceStatus @default(RECEIVED)
+  returnPeriod          String           @db.VarChar(7)
+  advanceDate           DateTime         @db.Date
+  customerName          String           @db.VarChar(300)
+  customerGstin         String?          @db.VarChar(20)
+  customerId            String?
+  receiptDocumentType   String?          @db.VarChar(64)
+  receiptDocumentId     String?
+  receiptDocumentNumber String?          @db.VarChar(64)
+  advanceTaxable        Decimal          @default(0) @db.Decimal(18, 4)
+  advanceTax            Decimal          @default(0) @db.Decimal(18, 4)
+  adjustedTaxable       Decimal          @default(0) @db.Decimal(18, 4)
+  adjustedTax           Decimal          @default(0) @db.Decimal(18, 4)
+  placeOfSupply         String?          @db.VarChar(100)
+  notes                 String?          @db.VarChar(1000)
+  voidedAt              DateTime?
+  voidedBy              String?
+  voidReason            String?          @db.VarChar(500)
+  createdBy             String?
+  updatedBy             String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity            @relation(fields: [legalEntityId], references: [id])
+  adjustments GstAdvanceAdjustment[]
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gst_adv_le_period_idx")
+  @@index([tenantId, status], map: "gst_adv_status_idx")
+  @@map("gst_advance_entries")
+}
+
+model GstAdvanceAdjustment {
+  id              String    @id @default(uuid())
+  tenantId        String
+  advanceEntryId  String
+  salesInvoiceId  String?
+  invoiceNumber   String?   @db.VarChar(64)
+  invoiceDate     DateTime? @db.Date
+  adjustedTaxable Decimal   @default(0) @db.Decimal(18, 4)
+  adjustedTax     Decimal   @default(0) @db.Decimal(18, 4)
+  notes           String?   @db.VarChar(500)
+  createdBy       String?
+  createdAt       DateTime  @default(now())
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id])
+  advance GstAdvanceEntry @relation(fields: [advanceEntryId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, advanceEntryId], map: "gst_adv_adj_entry_idx")
+  @@map("gst_advance_adjustments")
+}
+
+// ─── Phase 13 — Go-live / statutory UAT gate (not portal LIVE / not FULL COMPLIANT) ─
+
+enum GstUatSignOffStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REVOKED
+}
+
+/// Maker-checker UAT axis register for go-live candidacy (IRN / e-Way / GSTR / payment / multi-GSTIN).
+model GstComplianceUatSignOff {
+  id                  String              @id @default(uuid())
+  tenantId            String
+  legalEntityId       String
+  companyGstin        String?             @db.VarChar(20)
+  status              GstUatSignOffStatus @default(DRAFT)
+  checklistJson       Json
+  gateSnapshotJson    Json?
+  overallAxesPassed   Int                 @default(0)
+  overallAxesTotal    Int                 @default(0)
+  submittedAt         DateTime?
+  submittedBy         String?
+  approvedAt          DateTime?
+  approvedBy          String?
+  revokedAt           DateTime?
+  revokedBy           String?
+  revokeReason        String?             @db.VarChar(500)
+  notes               String?             @db.VarChar(1000)
+  createdBy           String?
+  updatedBy           String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId, legalEntityId, status], map: "gst_uat_le_status_idx")
+  @@index([tenantId, companyGstin], map: "gst_uat_gstin_idx")
+  @@map("gst_compliance_uat_signoffs")
+}
+
+// ─── Phase 14 — Annual return worksheet + multi-year FY archive (books-side) ──
+
+enum GstAnnualReturnType {
+  GSTR9
+  GSTR9C
+}
+
+enum GstAnnualReturnStatus {
+  OPEN
+  DRAFT
+  LOCKED
+  MARKED_FILED_EXTERNAL
+  ARCHIVED
+}
+
+/// GSTR-9 / 9C books worksheet for a financial year — not portal annual submit.
+model GstAnnualReturn {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  companyGstin       String                @db.VarChar(20)
+  financialYear      String                @db.VarChar(16)
+  returnType         GstAnnualReturnType   @default(GSTR9)
+  status             GstAnnualReturnStatus @default(OPEN)
+  preparedAt         DateTime?
+  preparedBy         String?
+  lockedAt           DateTime?
+  lockedBy           String?
+  unlockedAt         DateTime?
+  unlockedBy         String?
+  unlockReason       String?               @db.VarChar(500)
+  markedFiledAt      DateTime?
+  markedFiledBy      String?
+  acknowledgmentRef  String?               @db.VarChar(100)
+  filedOnPortalDate  DateTime?             @db.Date
+  archivedAt         DateTime?
+  archivedBy         String?
+  archiveReason      String?               @db.VarChar(500)
+  monthsCovered      Int                   @default(0)
+  monthsFiledHint    Int                   @default(0)
+  draftVersion       Int                   @default(0)
+  snapshotJson       Json?
+  warningsJson       Json?
+  remarks            String?               @db.VarChar(1000)
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@unique([tenantId, legalEntityId, companyGstin, financialYear, returnType], map: "gst_annual_return_unique")
+  @@index([tenantId, legalEntityId, financialYear], map: "gst_annual_le_fy_idx")
+  @@index([tenantId, status], map: "gst_annual_status_idx")
+  @@map("gst_annual_returns")
+}
+
+enum GstFyArchiveStatus {
+  OPEN
+  ARCHIVED
+}
+
+/// Multi-year FY retention flag — does not purge ledger or monthly periods.
+model GstFyArchive {
+  id                 String             @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  companyGstin       String             @db.VarChar(20)
+  financialYear      String             @db.VarChar(16)
+  status             GstFyArchiveStatus @default(OPEN)
+  archivedAt         DateTime?
+  archivedBy         String?
+  retainUntil        DateTime?          @db.Date
+  notes              String?            @db.VarChar(1000)
+  snapshotCountsJson Json?
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@unique([tenantId, legalEntityId, companyGstin, financialYear], map: "gst_fy_archive_unique")
+  @@index([tenantId, legalEntityId], map: "gst_fy_archive_le_idx")
+  @@index([tenantId, status], map: "gst_fy_archive_status_idx")
+  @@map("gst_fy_archives")
+}
+
+// ─── Phase 13/15 — Compliance notices + audit packs (migration 20260805250000) ─
+// Phase 15 owns multi-period ops API surface; tables were created in Phase 13 SQL.
+
+enum GstComplianceAuditPackStatus {
+  GENERATED
+  ARCHIVED
+}
+
+/// Books-side period audit freeze — not portal filing payload.
+model GstComplianceAuditPack {
+  id               String                        @id @default(uuid())
+  tenantId         String
+  legalEntityId    String
+  companyGstin     String                        @db.VarChar(20)
+  returnPeriod     String                        @db.VarChar(7)
+  status           GstComplianceAuditPackStatus  @default(GENERATED)
+  packJson         Json
+  checklistJson    Json?
+  exceptionCount   Int                           @default(0)
+  blockerCount     Int                           @default(0)
+  warningCount     Int                           @default(0)
+  digestHash       String?                       @db.VarChar(128)
+  generatedAt      DateTime?
+  generatedBy      String?
+  archivedAt       DateTime?
+  archivedBy       String?
+  notes            String?                       @db.VarChar(1000)
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gst_audit_pack_le_period_idx")
+  @@index([tenantId, companyGstin, returnPeriod], map: "gst_audit_pack_gstin_period_idx")
+  @@index([tenantId, status], map: "gst_audit_pack_status_idx")
+  @@map("gst_compliance_audit_packs")
+}
+
+enum GstComplianceNoticeStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESPONDED
+  CLOSED
+  VOID
+}
+
+/// Manual GST notice / correspondence tracker — not portal notice download.
+model GstComplianceNotice {
+  id              String                     @id @default(uuid())
+  tenantId        String
+  legalEntityId   String
+  companyGstin    String                     @db.VarChar(20)
+  noticeRef       String                     @db.VarChar(100)
+  noticeDate      DateTime                   @db.Date
+  noticeType      String                     @db.VarChar(64)
+  status          GstComplianceNoticeStatus  @default(OPEN)
+  subject         String                     @db.VarChar(500)
+  dueDate         DateTime?                  @db.Date
+  amountDemanded  Decimal                    @default(0) @db.Decimal(18, 4)
+  responseNotes   String?                    @db.VarChar(2000)
+  respondedAt     DateTime?
+  respondedBy     String?
+  closedAt        DateTime?
+  closedBy        String?
+  notes           String?                    @db.VarChar(1000)
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId, legalEntityId, status], map: "gst_notice_le_status_idx")
+  @@index([tenantId, companyGstin], map: "gst_notice_gstin_idx")
+  @@index([tenantId, dueDate], map: "gst_notice_due_idx")
+  @@map("gst_compliance_notices")
+}
+
+// ─── Phase 16 — GST rate master ops evidence (not master CRUD; not portal) ────
+
+enum GstRateOpsRunKind {
+  COVERAGE
+  DRIFT
+  FULL_REPORT
+}
+
+enum GstRateOpsRunStatus {
+  GENERATED
+  ACKNOWLEDGED
+  VOID
+}
+
+/// Stored coverage / drift report for tax ops review. Never rewrites posted tax.
+model GstRateOpsRun {
+  id              String              @id @default(uuid())
+  tenantId        String
+  legalEntityId   String
+  companyGstin    String?             @db.VarChar(20)
+  returnPeriod    String              @db.VarChar(7)
+  asOfDate        DateTime            @db.Date
+  runKind         GstRateOpsRunKind   @default(FULL_REPORT)
+  status          GstRateOpsRunStatus @default(GENERATED)
+  gapCount        Int                 @default(0)
+  expiringCount   Int                 @default(0)
+  overlapCount    Int                 @default(0)
+  driftCount      Int                 @default(0)
+  scorePct        Int                 @default(0)
+  overall         String              @db.VarChar(32)
+  reportJson      Json
+  notes           String?             @db.VarChar(1000)
+  generatedBy     String?
+  generatedAt     DateTime            @default(now())
+  acknowledgedAt  DateTime?
+  acknowledgedBy  String?
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gst_rate_ops_le_period_idx")
+  @@index([tenantId, status], map: "gst_rate_ops_status_idx")
+  @@map("gst_rate_ops_runs")
+}
+
+// ─── Phase 17 — GST data quality / companyGstin backfill / freeze checklist ───
+
+enum GstDataQualityRunKind {
+  SCAN
+  BACKFILL_DRY_RUN
+  FULL_REPORT
+}
+
+enum GstDataQualityRunStatus {
+  GENERATED
+  ACKNOWLEDGED
+  VOID
+}
+
+/// Evidence run for ledger GSTIN hygiene + books freeze readiness (not portal).
+model GstDataQualityRun {
+  id                      String                   @id @default(uuid())
+  tenantId                String
+  legalEntityId           String
+  companyGstin            String?                  @db.VarChar(20)
+  returnPeriod            String                   @db.VarChar(7)
+  runKind                 GstDataQualityRunKind    @default(FULL_REPORT)
+  status                  GstDataQualityRunStatus  @default(GENERATED)
+  nullGstinCount          Int                      @default(0)
+  filedNullCount          Int                      @default(0)
+  distinctGstinCount      Int                      @default(0)
+  backfillCandidateCount  Int                      @default(0)
+  unresolvableCount       Int                      @default(0)
+  scorePct                Int                      @default(0)
+  overall                 String                   @db.VarChar(32)
+  freezeReady             Boolean                  @default(false)
+  reportJson              Json
+  notes                   String?                  @db.VarChar(1000)
+  generatedBy             String?
+  generatedAt             DateTime                 @default(now())
+  acknowledgedAt          DateTime?
+  acknowledgedBy          String?
+  createdBy               String?
+  updatedBy               String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gst_dq_le_period_idx")
+  @@index([tenantId, status], map: "gst_dq_status_idx")
+  @@map("gst_data_quality_runs")
+}
+
+
+// ─── Phase 18 — GST subledger vs GL control recon evidence ────────────────────
+
+enum GstGlReconRunStatus {
+  GENERATED
+  ACKNOWLEDGED
+  VOID
+}
+
+/// Advisory GST ledger vs CoA control mapping period recon (books only).
+model GstGlReconRun {
+  id                String              @id @default(uuid())
+  tenantId          String
+  legalEntityId     String
+  companyGstin      String?             @db.VarChar(20)
+  returnPeriod      String              @db.VarChar(7)
+  tolerance         Decimal             @default(1) @db.Decimal(18, 4)
+  status            GstGlReconRunStatus @default(GENERATED)
+  matchCount        Int                 @default(0)
+  varianceCount     Int                 @default(0)
+  unmappedCount     Int                 @default(0)
+  totalAbsVariance  Decimal             @default(0) @db.Decimal(18, 4)
+  scorePct          Int                 @default(0)
+  overall           String              @db.VarChar(32)
+  reportJson        Json
+  notes             String?             @db.VarChar(1000)
+  generatedBy       String?
+  generatedAt       DateTime            @default(now())
+  acknowledgedAt    DateTime?
+  acknowledgedBy    String?
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId, legalEntityId, returnPeriod], map: "gst_gl_recon_le_period_idx")
+  @@index([tenantId, status], map: "gst_gl_recon_status_idx")
+  @@map("gst_gl_recon_runs")
 }
 
 // ─── Inventory accounting GL events (feature-flagged) ─────────────────────────

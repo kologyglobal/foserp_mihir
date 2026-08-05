@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-08-04** (Admin People & Access permission workspace — **READY WITH CONDITIONS**). Prior: Document Governance Date Control configuration framework.
+Last verified against codebase: **2026-08-05** (GST **books period UAT** harness green — `docs/tax/GST_BOOKS_UAT.md`; Phases 1–18 RWC on disk + migrate/sync applied locally).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** see [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 **Document Governance:** see [`docs/platform/DOCUMENT_GOVERNANCE_DATE_CONTROL.md`](platform/DOCUMENT_GOVERNANCE_DATE_CONTROL.md).

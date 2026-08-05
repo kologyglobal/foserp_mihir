@@ -80,6 +80,12 @@ interface MrpState {
     lines?: SalesOrderLine[]
     source?: SalesOrderSource
     directSoReason?: string | null
+    placeOfSupply?: string | null
+    placeOfSupplyOverride?: boolean
+    placeOfSupplyOverrideReason?: string | null
+    supplierStateCode?: string | null
+    supplyType?: string | null
+    gstScheme?: string | null
   }) => { ok: boolean; error?: string; salesOrderId?: string; salesOrderNo?: string }
   updateSalesOrderDraft: (
     salesOrderId: string,
@@ -88,6 +94,9 @@ interface MrpState {
       | 'locationId'
       | 'internalRemarks' | 'paymentTerms' | 'deliveryTerms' | 'deliveryTime' | 'warrantyTerms'
       | 'commercialNotes' | 'technicalNotes' | 'remarks' | 'requiredDate' | 'qty' | 'grandTotal'
+      | 'unitPrice' | 'discountPct' | 'basicAmount' | 'gstAmount' | 'productId' | 'itemId' | 'lines'
+      | 'placeOfSupply' | 'placeOfSupplyOverride' | 'placeOfSupplyOverrideReason' | 'supplierStateCode'
+      | 'supplyType' | 'gstScheme' | 'placeOfSupplyStateCode' | 'placeOfSupplySource'
     >>,
   ) => { ok: boolean; error?: string }
   deleteSalesOrderDraft: (salesOrderId: string) => { ok: boolean; error?: string }
@@ -235,6 +244,12 @@ export const useMrpStore = create<MrpState>()(
       internalRemarks: input.internalRemarks ?? null,
       directSoReason: input.directSoReason ?? null,
       lines: input.lines ?? [],
+      placeOfSupply: input.placeOfSupply ?? null,
+      placeOfSupplyOverride: input.placeOfSupplyOverride ?? false,
+      placeOfSupplyOverrideReason: input.placeOfSupplyOverrideReason ?? null,
+      supplierStateCode: input.supplierStateCode ?? null,
+      supplyType: input.supplyType ?? null,
+      gstScheme: input.gstScheme ?? null,
     }
     set((s) => ({ salesOrders: [so, ...s.salesOrders] }))
     return { ok: true, salesOrderId: so.id, salesOrderNo: so.salesOrderNo }

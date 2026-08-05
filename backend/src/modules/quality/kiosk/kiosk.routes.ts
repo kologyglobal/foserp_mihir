@@ -8,9 +8,11 @@ import { tenantRouteParamSchema, uuidParamSchema } from '../../../utils/paginati
 import { getRouteParam, getTenantId } from '../../../types/request-context.js'
 import { asyncHandler } from '../../../utils/asyncHandler.js'
 import { sendSuccess } from '../../../utils/response.js'
+import { ValidationError } from '../../../utils/errors.js'
 import { z } from 'zod'
 import { decideInspectionSchema } from '../inspections/inspection.schemas.js'
 import * as inspectionService from '../inspections/inspection.service.js'
+import * as photoService from '../inspections/inspection-photo.service.js'
 import * as service from './kiosk.service.js'
 
 const router = Router({ mergeParams: true })
@@ -73,6 +75,33 @@ router.post(
     const id = getRouteParam(req, 'id')
     const result = await inspectionService.decideInspection(req, tenantId, id, req.body)
     return sendSuccess(res, 'Inspection decided', result)
+  }),
+)
+
+router.get(
+  '/inspections/:id/photos',
+  validateParams(uuidParamSchema),
+  requirePermission('quality.view'),
+  asyncHandler(async (req, res) => {
+    const tenantId = getTenantId(req)
+    const id = getRouteParam(req, 'id')
+    const photos = await photoService.listInspectionPhotos(tenantId, id)
+    return sendSuccess(res, 'QC photos listed', photos)
+  }),
+)
+
+router.post(
+  '/inspections/:id/photos',
+  validateParams(uuidParamSchema),
+  requireAnyPermission('quality.submit', 'manufacturing.quality.inspect', 'quality.create'),
+  photoService.qualityPhotoUpload.single('file'),
+  asyncHandler(async (req, res) => {
+    const tenantId = getTenantId(req)
+    const id = getRouteParam(req, 'id')
+    if (!req.file) throw new ValidationError('file is required')
+    const caption = typeof req.body?.caption === 'string' ? req.body.caption : null
+    const photo = await photoService.uploadInspectionPhoto(req, tenantId, id, req.file, caption)
+    return sendSuccess(res, 'QC photo uploaded', photo)
   }),
 )
 

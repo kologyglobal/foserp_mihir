@@ -69,7 +69,7 @@ export function getUserFriendlyMessage(error: unknown): string {
       case 'account_disabled':
         return 'This account is inactive or blocked. Contact your administrator.'
       case 'forbidden':
-        return 'You do not have permission to perform this action.'
+        return 'You are not authorised to perform this action.'
       case 'not_found':
         return error.message || 'The requested resource was not found.'
       case 'validation':
