@@ -151,6 +151,19 @@ export function mapGoodsReceiptToDto(
       receivingTolerancePercentageSnapshot: qty(
         (line as { receivingTolerancePercentageSnapshot?: unknown }).receivingTolerancePercentageSnapshot ?? 0,
       ),
+      weightReceivingToleranceIdSnapshot:
+        (line as { weightReceivingToleranceIdSnapshot?: string | null }).weightReceivingToleranceIdSnapshot ??
+        null,
+      weightReceivingToleranceCodeSnapshot:
+        (line as { weightReceivingToleranceCodeSnapshot?: string }).weightReceivingToleranceCodeSnapshot ??
+        '',
+      weightReceivingToleranceNameSnapshot:
+        (line as { weightReceivingToleranceNameSnapshot?: string }).weightReceivingToleranceNameSnapshot ??
+        '',
+      weightReceivingTolerancePercentageSnapshot: qty(
+        (line as { weightReceivingTolerancePercentageSnapshot?: unknown })
+          .weightReceivingTolerancePercentageSnapshot ?? 0,
+      ),
       maximumAllowedUnitQuantity: qty(
         (line as { maximumAllowedUnitQuantity?: unknown }).maximumAllowedUnitQuantity ?? 0,
       ),
@@ -194,6 +207,10 @@ export function mapGoodsReceiptToDto(
         (line as { shortCloseRequested?: boolean }).shortCloseRequested ??
           (line as { closeOpenQuantity?: boolean }).closeOpenQuantity,
       ),
+      receivingCondition:
+        ((line as { receivingCondition?: string }).receivingCondition as string | undefined) ?? 'NORMAL',
+      receivingConditionReason:
+        (line as { receivingConditionReason?: string | null }).receivingConditionReason ?? null,
       remarks: line.remarks,
     }
     }),

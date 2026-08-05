@@ -158,6 +158,7 @@ const schema = z.object({
   uomConversionFactor: z.preprocess(emptyToPositiveNumber(1), z.coerce.number().positive()),
   receivingToleranceId: optionalUuidField,
   receivingTolerancePercentage: z.coerce.number().min(0).max(100).optional(),
+  weightReceivingToleranceId: optionalUuidField,
   receiptEntryMode: z.enum(['UNIT_ONLY', 'WEIGHT_ONLY', 'UNIT_AND_WEIGHT']).optional(),
   standardWeightPerBaseUnit: z.coerce.number().min(0).optional(),
   weightUomId: optionalUuidField,
@@ -278,6 +279,7 @@ function buildItemFormDefaults(
       purchaseQtyPerUom: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
       uomConversionFactor: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
       receivingToleranceId: optionalUuidFormValue(existing.receivingToleranceId),
+      weightReceivingToleranceId: optionalUuidFormValue(existing.weightReceivingToleranceId),
       receivingTolerancePercentage: existing.receivingTolerancePercentage ?? 0,
       receiptEntryMode: existing.receiptEntryMode ?? 'UNIT_ONLY',
       standardWeightPerBaseUnit: existing.standardWeightPerBaseUnit ?? 0,
@@ -314,6 +316,7 @@ function buildItemFormDefaults(
     purchaseQtyPerUom: 1,
     uomConversionFactor: 1,
     receivingToleranceId: '',
+    weightReceivingToleranceId: '',
     receivingTolerancePercentage: 0,
     receiptEntryMode: 'UNIT_ONLY',
     standardWeightPerBaseUnit: 0,
@@ -849,7 +852,7 @@ export function ItemFormPage() {
           <FormField label="Standard Rate">
             <Input type="number" step="0.01" {...register('standardRate')} />
           </FormField>
-          <FormField label="Receiving tolerance" error={errors.receivingToleranceId?.message}>
+          <FormField label="Quantity receiving tolerance" error={errors.receivingToleranceId?.message}>
             <Select
               value={watch('receivingToleranceId') ?? ''}
               onChange={(e) => {
@@ -867,7 +870,26 @@ export function ItemFormPage() {
               ))}
             </Select>
             <p className="mt-1 text-xs text-erp-muted">
-              Excess-only band vs open PO qty on GRN. Leave empty to use Purchase Setup fallback.
+              Excess-only band vs open PO unit qty on GRN. Leave empty to use Purchase Setup fallback.
+            </p>
+          </FormField>
+          <FormField label="Weight receiving tolerance" error={errors.weightReceivingToleranceId?.message}>
+            <Select
+              value={watch('weightReceivingToleranceId') ?? ''}
+              onChange={(e) => {
+                const tolId = e.target.value || null
+                setValue('weightReceivingToleranceId', tolId, { shouldValidate: true })
+              }}
+            >
+              <option value="">— Select —</option>
+              {receivingTolerances.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.code} — {r.name} ({r.percentage}%)
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-erp-muted">
+              Used when receipt entry mode is weight or unit+weight (casting / KG items).
             </p>
           </FormField>
           <FormField label="Receipt entry mode">

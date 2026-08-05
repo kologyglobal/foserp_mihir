@@ -42,11 +42,19 @@ import {
 } from '@/services/purchase'
 import {
   evaluateGrnDocumentTolerance,
-  evaluateGrnLineTolerance,
   GRN_TOLERANCE_STATUS_LABELS,
-  resolveReceivingTolerancePct,
 } from '@/services/purchase/grnTolerance'
-import type { GoodsReceiptNote, GrnInput, PurchaseOrder } from '@/types/purchaseDomain'
+import {
+  buildItemReceiptControls,
+  GRN_RECEIVING_CONDITION_LABELS,
+  linesFromGrn,
+  linesFromPo,
+  recalcGrnLineDraft,
+  type GrnLineDraft,
+  type ItemReceiptControl,
+} from '@/modules/purchase/grnLineDraft'
+import { GRN_SHORT_CLOSE_REASONS } from '@/services/purchase/grnReceivingCondition'
+import type { GrnInput, PurchaseOrder } from '@/types/purchaseDomain'
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
@@ -94,177 +102,8 @@ type BinOption = {
   storageLocationId?: string
 }
 
-type LineDraft = {
-  purchaseOrderLineId: string
-  itemId: string
-  itemCode: string
-  itemName: string
-  description: string
-  uom: string
-  orderedQty: number
-  previouslyReceivedQty: number
-  pendingQty: number
-  receivedQty: number
-  receivedUomQty?: number
-  acceptedQty: number
-  rejectedQty: number
-  shortQty: number
-  excessQty: number
-  damagedQty: number
-  batchNumber: string
-  lotNumber: string
-  serialNumber: string
-  manufacturingDate: string
-  expiryDate: string
-  warehouseId: string
-  warehouseName: string
-  binId: string | null
-  bin: string
-  allowExcess: boolean
-  batchControlled: boolean
-  serialControlled: boolean
-  expiryControlled: boolean
-  tolerancePercentage: number
-  variancePercentage: number | null
-  toleranceStatus: string
-  closeOpenQuantity: boolean
-  receivingTolerancePercentage: number
-  remarks: string
-}
-
 function today() {
   return new Date().toISOString().slice(0, 10)
-}
-
-function traceabilityFromControls(
-  itemId: string,
-  itemControls: Record<
-    string,
-    { batch: boolean; serial: boolean; expiry: boolean; receivingTolerancePercentage: number }
-  >,
-  fallback?: { batchControlled?: boolean; serialControlled?: boolean; expiryControlled?: boolean },
-) {
-  const ctrl = itemId ? itemControls[itemId] : undefined
-  return {
-    batchControlled: ctrl?.batch ?? fallback?.batchControlled ?? false,
-    serialControlled: ctrl?.serial ?? fallback?.serialControlled ?? false,
-    expiryControlled: ctrl?.expiry ?? fallback?.expiryControlled ?? false,
-  }
-}
-
-function linesFromPo(
-  po: PurchaseOrder,
-  itemControls: Record<
-    string,
-    { batch: boolean; serial: boolean; expiry: boolean; receivingTolerancePercentage: number }
-  >,
-  setup: { allowOverReceipt: boolean; overReceiptTolerancePct: number },
-): LineDraft[] {
-  return po.lines
-    .filter((l) => l.pendingQty > 0)
-    .map((l) => {
-      const ctrl = itemControls[l.itemId] ?? {
-        batch: false,
-        serial: false,
-        expiry: false,
-        receivingTolerancePercentage: 0,
-      }
-      const itemTol = ctrl.receivingTolerancePercentage
-      const resolvedTol = resolveReceivingTolerancePct({
-        itemTolerancePct: itemTol,
-        setupTolerancePct: setup.overReceiptTolerancePct,
-        allowOverReceipt: setup.allowOverReceipt,
-      })
-      const preview = evaluateGrnLineTolerance({
-        openQuantity: l.pendingQty,
-        receivedQuantity: l.pendingQty,
-        itemTolerancePct: itemTol,
-        setupTolerancePct: setup.overReceiptTolerancePct,
-        allowOverReceipt: setup.allowOverReceipt,
-        closeOpenQuantity: false,
-      })
-      return {
-        purchaseOrderLineId: l.id,
-        itemId: l.itemId,
-        itemCode: l.itemCode,
-        itemName: l.itemName,
-        description: l.specification || l.itemName,
-        uom: l.uom,
-        orderedQty: l.quantity,
-        previouslyReceivedQty: l.receivedQty,
-        pendingQty: l.pendingQty,
-        receivedQty: l.pendingQty,
-        acceptedQty: 0,
-        rejectedQty: 0,
-        shortQty: preview.shortQuantity,
-        excessQty: preview.excessQuantity,
-        damagedQty: 0,
-        batchNumber: '',
-        lotNumber: '',
-        serialNumber: '',
-        manufacturingDate: '',
-        expiryDate: '',
-        warehouseId: l.locationId || po.deliveryLocation.id,
-        warehouseName: l.locationName || po.deliveryLocation.name,
-        binId: l.binId ?? null,
-        bin: l.binCode ?? '',
-        allowExcess: setup.allowOverReceipt,
-        ...traceabilityFromControls(l.itemId, itemControls),
-        tolerancePercentage: resolvedTol,
-        variancePercentage: preview.variancePercentage,
-        toleranceStatus: preview.toleranceStatus,
-        closeOpenQuantity: false,
-        receivingTolerancePercentage: itemTol,
-        remarks: '',
-      }
-    })
-}
-
-function linesFromGrn(
-  grn: GoodsReceiptNote,
-  itemControls: Record<
-    string,
-    { batch: boolean; serial: boolean; expiry: boolean; receivingTolerancePercentage: number }
-  >,
-): LineDraft[] {
-  return grn.lines.map((l) => ({
-    purchaseOrderLineId: l.purchaseOrderLineId,
-    itemId: l.itemId,
-    itemCode: l.itemCode,
-    itemName: l.itemName,
-    description: l.description,
-    uom: l.uom,
-    orderedQty: l.orderedQty,
-    previouslyReceivedQty: l.previouslyReceivedQty,
-    pendingQty: l.pendingQty,
-    receivedQty: l.receivedQty,
-    acceptedQty: l.acceptedQty,
-    rejectedQty: l.rejectedQty,
-    shortQty: l.shortQty,
-    excessQty: l.excessQty,
-    damagedQty: l.damagedQty,
-    batchNumber: l.batchNumber,
-    lotNumber: l.lotNumber,
-    serialNumber: l.serialNumber,
-    manufacturingDate: l.manufacturingDate ?? '',
-    expiryDate: l.expiryDate ?? '',
-    warehouseId: l.warehouseId,
-    warehouseName: l.warehouseName,
-    binId: l.binId ?? null,
-    bin: l.bin,
-    allowExcess: l.allowExcess,
-    ...traceabilityFromControls(l.itemId, itemControls, {
-      batchControlled: l.batchControlled,
-      serialControlled: l.serialControlled,
-      expiryControlled: l.expiryControlled,
-    }),
-    tolerancePercentage: l.tolerancePercentage ?? 0,
-    variancePercentage: l.variancePercentage ?? null,
-    toleranceStatus: l.toleranceStatus ?? 'EXACT',
-    closeOpenQuantity: Boolean(l.closeOpenQuantity),
-    receivingTolerancePercentage: l.receivingTolerancePercentage ?? l.tolerancePercentage ?? 0,
-    remarks: l.remarks,
-  }))
 }
 
 export function GrnEditorPage() {
@@ -279,13 +118,11 @@ export function GrnEditorPage() {
   const [documentNumber, setDocumentNumber] = useState<string | null>(null)
   const [status, setStatus] = useState('draft')
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
-  const [itemControls, setItemControls] = useState<
-    Record<
-      string,
-      { batch: boolean; serial: boolean; expiry: boolean; receivingTolerancePercentage: number }
-    >
-  >({})
+  const [itemControls, setItemControls] = useState<Record<string, ItemReceiptControl>>({})
   const [setupTolerancePct, setSetupTolerancePct] = useState(0)
+  const [shortCloseLineIndex, setShortCloseLineIndex] = useState<number | null>(null)
+  const [shortCloseReasonDraft, setShortCloseReasonDraft] = useState('')
+  const [shortCloseReasonOther, setShortCloseReasonOther] = useState('')
   const [poId, setPoId] = useState(searchParams.get('poId') ?? '')
   const [vendorId, setVendorId] = useState('')
   const [documentDate, setDocumentDate] = useState(today())
@@ -302,7 +139,7 @@ export function GrnEditorPage() {
   const [inspectionRequired, setInspectionRequired] = useState(true)
   const [allowExcess, setAllowExcess] = useState(false)
   const [remarks, setRemarks] = useState('')
-  const [lines, setLines] = useState<LineDraft[]>([])
+  const [lines, setLines] = useState<GrnLineDraft[]>([])
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(true)
 
@@ -421,6 +258,11 @@ export function GrnEditorPage() {
     [approvedNotReleasedOrders, vendorId],
   )
 
+  const receiptSetup = useMemo(
+    () => ({ allowOverReceipt: allowExcess, overReceiptTolerancePct: setupTolerancePct }),
+    [allowExcess, setupTolerancePct],
+  )
+
   const lineTotals = useMemo(() => {
     const receivedQty = lines.reduce((s, l) => s + (Number(l.receivedQty) || 0), 0)
     const pendingQty = lines.reduce((s, l) => s + (Number(l.pendingQty) || 0), 0)
@@ -431,7 +273,7 @@ export function GrnEditorPage() {
         itemCode: l.itemCode,
         openQuantity: Number(l.pendingQty) || 0,
         receivedQuantity: Number(l.receivedQty) || 0,
-        itemTolerancePct: l.receivingTolerancePercentage,
+        itemTolerancePct: l.quantityTolerancePct,
         setupTolerancePct: setupTolerancePct,
         allowOverReceipt: allowExcess,
         closeOpenQuantity: l.closeOpenQuantity,
@@ -456,6 +298,11 @@ export function GrnEditorPage() {
       remainingOpenQty,
     }
   }, [lines, allowExcess, setupTolerancePct])
+
+  const showWeightCol = useMemo(
+    () => lines.some((l) => l.receiptEntryMode !== 'UNIT_ONLY'),
+    [lines],
+  )
 
   const showBatchSerialCol = useMemo(
     () => lines.some((l) => l.batchControlled || l.serialControlled),
@@ -560,19 +407,33 @@ export function GrnEditorPage() {
         setAllowExcess(Boolean(setup.general.allowOverReceipt))
         setSetupTolerancePct(Number(setup.general.overReceiptTolerancePct ?? 0))
       }
-      const controls: Record<
-        string,
-        { batch: boolean; serial: boolean; expiry: boolean; receivingTolerancePercentage: number }
-      > = {}
+      const masterItems = useMasterStore.getState().items
+      const tolerances = useMasterStore.getState().receivingTolerances
+      const tolerancePctById = new Map(
+        tolerances.map((t) => [t.id, Number(t.percentage ?? 0)]),
+      )
+      const controls = buildItemReceiptControls(masterItems.length ? masterItems : [], tolerancePctById)
       for (const item of items) {
-        controls[item.id] = {
-          batch: item.batchControlled,
-          serial: item.serialControlled,
-          expiry: item.expiryControlled,
-          receivingTolerancePercentage: Number(item.receivingTolerancePercentage ?? 0),
+        if (!controls[item.id]) {
+          controls[item.id] = {
+            batch: item.batchControlled,
+            serial: item.serialControlled,
+            expiry: item.expiryControlled,
+            qcRequired: item.qcRequired,
+            quantityTolerancePct: Number(item.receivingTolerancePercentage ?? 0),
+            weightTolerancePct: Number(item.receivingTolerancePercentage ?? 0),
+            receiptEntryMode: 'UNIT_ONLY',
+            standardWeightPerBaseUnit: 0,
+            weightUomCode: '',
+            requireWeightAtReceipt: false,
+          }
         }
       }
       setItemControls(controls)
+      const setupSnap = {
+        allowOverReceipt: Boolean(setup?.general.allowOverReceipt ?? allowExcess),
+        overReceiptTolerancePct: Number(setup?.general.overReceiptTolerancePct ?? setupTolerancePct),
+      }
       if (!isNew && id) {
         const grn = await getGRNById(id)
         if (!grn) {
@@ -600,7 +461,7 @@ export function GrnEditorPage() {
         setInspectionRequired(grn.inspectionRequired)
         setAllowExcess(grn.allowExcess)
         setRemarks(grn.remarks)
-        setLines(linesFromGrn(grn, controls))
+        setLines(linesFromGrn(grn, controls, setupSnap, grn.inspectionRequired))
         resetDirty()
       } else {
         const initialPoId = searchParams.get('poId') ?? ''
@@ -623,15 +484,15 @@ export function GrnEditorPage() {
             if (effectiveSetup?.receiving.defaultReceivingLocationId) {
               setReceivingLocation(effectiveSetup.receiving.defaultReceivingLocationId)
             }
-            setLines(
-              linesFromPo(po, controls, {
-                allowOverReceipt: Boolean(effectiveSetup?.general.allowOverReceipt),
-                overReceiptTolerancePct: Number(
-                  effectiveSetup?.general.overReceiptTolerancePct ?? 0,
-                ),
-              }),
-            )
-            setInspectionRequired(effectiveSetup?.receiving.autoCreateInspection ?? true)
+            const effectiveSetupSnap = {
+              allowOverReceipt: Boolean(effectiveSetup?.general.allowOverReceipt),
+              overReceiptTolerancePct: Number(
+                effectiveSetup?.general.overReceiptTolerancePct ?? 0,
+              ),
+            }
+            const autoInspect = effectiveSetup?.receiving.autoCreateInspection ?? true
+            setInspectionRequired(autoInspect)
+            setLines(linesFromPo(po, controls, effectiveSetupSnap, autoInspect))
           }
         }
         const nextNumber = await previewNextGoodsReceiptNumber().catch(() => null)
@@ -685,35 +546,49 @@ export function GrnEditorPage() {
         overReceiptTolerancePct: Number(
           setup?.general.overReceiptTolerancePct ?? setupTolerancePct,
         ),
-      }),
+      }, inspectionRequired),
     )
   }
 
-  const updateLine = (index: number, patch: Partial<LineDraft>) => {
+  const updateLine = (index: number, patch: Partial<GrnLineDraft>) => {
     setLines((prev) => {
       const next = [...prev]
-      const row = { ...next[index], ...patch }
-      if ('receivedQty' in patch || 'receivedUomQty' in patch || 'closeOpenQuantity' in patch) {
-        const pending = row.pendingQty
-        const received = Number(row.receivedQty) || 0
-        const tol = evaluateGrnLineTolerance({
-          openQuantity: pending,
-          receivedQuantity: received,
-          itemTolerancePct: row.receivingTolerancePercentage,
-          setupTolerancePct: setupTolerancePct,
-          allowOverReceipt: allowExcess || row.allowExcess,
-          closeOpenQuantity: row.closeOpenQuantity,
-        })
-        row.excessQty = tol.excessQuantity
-        row.shortQty = tol.shortQuantity
-        row.tolerancePercentage = tol.tolerancePercentage
-        row.variancePercentage = tol.variancePercentage
-        row.toleranceStatus = tol.toleranceStatus
+      const recalced = recalcGrnLineDraft(
+        { ...next[index], ...patch },
+        receiptSetup,
+        inspectionRequired,
+      )
+      if ('receivingCondition' in patch && patch.receivingCondition) {
+        recalced.receivingCondition = patch.receivingCondition
       }
-      next[index] = row
+      next[index] = recalced
       return next
     })
     markDirty()
+  }
+
+  const requestShortClose = (index: number, checked: boolean) => {
+    if (!checked) {
+      updateLine(index, { closeOpenQuantity: false, shortCloseReason: '' })
+      return
+    }
+    setShortCloseLineIndex(index)
+    setShortCloseReasonDraft(GRN_SHORT_CLOSE_REASONS[0].value)
+    setShortCloseReasonOther('')
+  }
+
+  const confirmShortClose = () => {
+    if (shortCloseLineIndex == null) return
+    const reason =
+      shortCloseReasonDraft === 'OTHER'
+        ? shortCloseReasonOther.trim()
+        : GRN_SHORT_CLOSE_REASONS.find((r) => r.value === shortCloseReasonDraft)?.label ??
+          shortCloseReasonDraft
+    updateLine(shortCloseLineIndex, {
+      closeOpenQuantity: true,
+      shortCloseReason: reason,
+    })
+    setShortCloseLineIndex(null)
   }
 
   const buildInput = (): GrnInput => ({
@@ -740,6 +615,12 @@ export function GrnEditorPage() {
       shortQty: Number(l.shortQty) || 0,
       excessQty: Number(l.excessQty) || 0,
       damagedQty: Number(l.damagedQty) || 0,
+      receivedWeight: l.receivedWeight,
+      closeOpenQuantity: Boolean(l.closeOpenQuantity),
+      shortCloseRequested: Boolean(l.closeOpenQuantity),
+      shortCloseReason: l.shortCloseReason || null,
+      receivingCondition: l.receivingCondition,
+      receivingConditionReason: l.receivingConditionReason || null,
       batchNumber: l.batchNumber,
       lotNumber: l.lotNumber,
       serialNumber: l.serialNumber,
@@ -750,7 +631,6 @@ export function GrnEditorPage() {
       binId: l.binId ?? null,
       bin: l.bin,
       allowExcess: l.allowExcess || allowExcess,
-      closeOpenQuantity: Boolean(l.closeOpenQuantity),
       remarks: l.remarks,
     })),
   })
@@ -804,14 +684,14 @@ export function GrnEditorPage() {
         const updated = await updateGRN(recordId, input)
         setDocumentNumber(updated.documentNumber)
         setStatus(updated.status)
-        setLines(linesFromGrn(updated, itemControls))
+        setLines(linesFromGrn(updated, itemControls, receiptSetup, inspectionRequired))
         notify.success(`Saved · ${updated.documentNumber}`)
       } else {
         const created = await createGRNFromPo(input)
         setRecordId(created.id)
         setDocumentNumber(created.documentNumber)
         setStatus(created.status)
-        setLines(linesFromGrn(created, itemControls))
+        setLines(linesFromGrn(created, itemControls, receiptSetup, inspectionRequired))
         notify.success(`Saved · ${created.documentNumber}`)
       }
       resetDirty()
@@ -1227,8 +1107,9 @@ export function GrnEditorPage() {
         ) : (
           <div className="mb-2 space-y-1.5 text-[12px] text-erp-muted">
             <p>
-              All open PO lines are listed. Enter 0 for Not Received (stays open). Outside tolerance
-              submits for Purchase Manager approval.
+              Enter received qty (0 = not received). Condition is auto-suggested from qty variance;
+              accepted/rejected split stock vs damage. Weight columns appear for casting / weight-based
+              items. Close open requires a reason and may need approval.
             </p>
             {lineTotals.remainingOpenQty > 0 ||
             lineTotals.notReceivedCount > 0 ||
@@ -1252,15 +1133,20 @@ export function GrnEditorPage() {
             <thead>
               <tr>
                 <th>Item</th>
-                <th className="num">Ordered</th>
+                <th className="num">PO Qty</th>
                 <th className="num">Prev. Recd</th>
                 <th className="num">Pending</th>
                 <th className="num">Received</th>
-                <th className="num">Tol %</th>
+                <th className="num">Accepted</th>
+                <th className="num">Rejected</th>
+                <th>UOM</th>
+                {showWeightCol ? <th className="num">Weight</th> : null}
+                <th className="num">Qty Tol %</th>
+                {showWeightCol ? <th className="num">Wt Tol %</th> : null}
                 <th className="num">Var %</th>
+                <th>Condition</th>
                 <th>Status</th>
-                <th title="Close remaining open qty (short outside → approval)">Close open</th>
-                <th>Short / Excess / Dmg</th>
+                <th title="Close remaining open qty">Close open</th>
                 {showBatchSerialCol ? <th>Batch / Lot / Serial</th> : null}
                 {showExpiryCol ? <th>Mfg / Expiry</th> : null}
                 <th>Bin</th>
@@ -1273,7 +1159,6 @@ export function GrnEditorPage() {
                   <td>
                     <div className="font-mono text-[11px]">{l.itemCode}</div>
                     <div>{l.itemName}</div>
-                    <div className="text-[11px] text-erp-muted">{l.uom}</div>
                   </td>
                   <td className="num">{formatNumber(l.orderedQty)}</td>
                   <td className="num">{formatNumber(l.previouslyReceivedQty)}</td>
@@ -1296,52 +1181,103 @@ export function GrnEditorPage() {
                       </p>
                     ) : null}
                   </td>
-                  <td className="num">{formatNumber(l.tolerancePercentage)}</td>
+                  <td className="num">
+                    <DecimalInput
+                      className="w-20"
+                      min={0}
+                      value={Number(l.acceptedQty) || 0}
+                      disabled={l.qcRequired || inspectionRequired}
+                      onChange={(v) => updateLine(i, { acceptedQty: v })}
+                    />
+                  </td>
+                  <td className="num">
+                    <DecimalInput
+                      className="w-20"
+                      min={0}
+                      value={Number(l.rejectedQty) || 0}
+                      onChange={(v) =>
+                        updateLine(i, {
+                          rejectedQty: v,
+                          damagedQty: v,
+                          receivingCondition: v > 0 ? 'DAMAGE' : l.receivingCondition,
+                        })
+                      }
+                    />
+                  </td>
+                  <td>{l.uom}</td>
+                  {showWeightCol ? (
+                    <td className="num">
+                      {l.receiptEntryMode === 'UNIT_ONLY' ? (
+                        '—'
+                      ) : (
+                        <>
+                          <DecimalInput
+                            className="w-24"
+                            min={0}
+                            value={Number(l.receivedWeight) || 0}
+                            onChange={(v) => updateLine(i, { receivedWeight: v })}
+                          />
+                          {l.expectedWeight != null ? (
+                            <p className="mt-1 text-[10px] text-erp-muted">
+                              Exp {formatNumber(l.expectedWeight)}
+                              {l.weightUomCode ? ` ${l.weightUomCode}` : ''}
+                            </p>
+                          ) : null}
+                        </>
+                      )}
+                    </td>
+                  ) : null}
+                  <td className="num">{formatNumber(l.quantityTolerancePct)}</td>
+                  {showWeightCol ? (
+                    <td className="num">{formatNumber(l.weightTolerancePct)}</td>
+                  ) : null}
                   <td className="num">
                     {l.variancePercentage == null ? '—' : `${formatNumber(l.variancePercentage)}%`}
+                    {l.weightVariancePercentage != null ? (
+                      <p className="text-[10px] text-erp-muted">
+                        Wt {formatNumber(l.weightVariancePercentage)}%
+                      </p>
+                    ) : null}
+                  </td>
+                  <td>
+                    <Select
+                      className="min-w-[7rem] text-[11px]"
+                      value={l.receivingCondition}
+                      onChange={(e) =>
+                        updateLine(i, {
+                          receivingCondition: e.target.value as GrnLineDraft['receivingCondition'],
+                        })
+                      }
+                    >
+                      {Object.entries(GRN_RECEIVING_CONDITION_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </Select>
                   </td>
                   <td>
                     {GRN_TOLERANCE_STATUS_LABELS[
                       l.toleranceStatus as keyof typeof GRN_TOLERANCE_STATUS_LABELS
                     ] ?? l.toleranceStatus}
+                    {l.weightToleranceStatus &&
+                    l.weightToleranceStatus !== 'NOT_APPLICABLE' ? (
+                      <p className="text-[10px] text-erp-muted">Wt: {l.weightToleranceStatus}</p>
+                    ) : null}
                   </td>
                   <td>
                     <label className="inline-flex items-center gap-1.5">
                       <input
                         type="checkbox"
                         checked={l.closeOpenQuantity}
-                        disabled={(Number(l.receivedQty) || 0) <= 0}
-                        onChange={(e) =>
-                          updateLine(i, { closeOpenQuantity: e.target.checked })
-                        }
+                        disabled={(Number(l.receivedQty) || 0) <= 0 && !l.closeOpenQuantity}
+                        onChange={(e) => requestShortClose(i, e.target.checked)}
                       />
                       <span className="text-[11px] text-erp-muted">Close</span>
                     </label>
-                  </td>
-                  <td>
-                    <div className="flex gap-1">
-                      <DecimalInput
-                        className="w-16"
-                        min={0}
-                        title="Short"
-                        value={Number(l.shortQty) || 0}
-                        onChange={(v) => updateLine(i, { shortQty: v })}
-                      />
-                      <DecimalInput
-                        className="w-16"
-                        min={0}
-                        title="Excess"
-                        value={Number(l.excessQty) || 0}
-                        onChange={(v) => updateLine(i, { excessQty: v })}
-                      />
-                      <DecimalInput
-                        className="w-16"
-                        min={0}
-                        title="Damaged"
-                        value={Number(l.damagedQty) || 0}
-                        onChange={(v) => updateLine(i, { damagedQty: v })}
-                      />
-                    </div>
+                    {l.shortCloseReason ? (
+                      <p className="mt-1 text-[10px] text-erp-muted">{l.shortCloseReason}</p>
+                    ) : null}
                   </td>
                   {showBatchSerialCol ? (
                     <td>
@@ -1470,6 +1406,54 @@ export function GrnEditorPage() {
           />
         </ErpFieldRow>
       </ErpCardSection>
+
+      {shortCloseLineIndex != null ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border border-erp-border bg-white p-4 shadow-lg">
+            <h3 className="text-sm font-semibold text-erp-text">Close open quantity</h3>
+            <p className="mt-1 text-[12px] text-erp-muted">
+              Remaining PO quantity will not be expected. Select a reason — may require Purchase
+              Manager approval.
+            </p>
+            <div className="mt-3 space-y-2">
+              <Select
+                value={shortCloseReasonDraft}
+                onChange={(e) => setShortCloseReasonDraft(e.target.value)}
+              >
+                {GRN_SHORT_CLOSE_REASONS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </Select>
+              {shortCloseReasonDraft === 'OTHER' ? (
+                <Input
+                  placeholder="Reason details"
+                  value={shortCloseReasonOther}
+                  onChange={(e) => setShortCloseReasonOther(e.target.value)}
+                />
+              ) : null}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="erp-btn erp-btn--secondary"
+                onClick={() => setShortCloseLineIndex(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="erp-btn erp-btn--primary"
+                onClick={confirmShortClose}
+                disabled={shortCloseReasonDraft === 'OTHER' && !shortCloseReasonOther.trim()}
+              >
+                Confirm close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </PurchaseCardFormShell>
   )
 }

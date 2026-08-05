@@ -16,6 +16,7 @@ import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/
 import {
   evaluateGrnLineTolerance,
 } from '../shared/grn-tolerance.js'
+import { resolveReceivingCondition } from '../shared/grn-receiving-condition.js'
 import {
   lineAmountFromVendor,
   resolveDualQuantities,
@@ -161,12 +162,16 @@ const itemReceiptConfigSelect = {
   serialTracked: true,
   receivingToleranceId: true,
   receivingTolerancePercentage: true,
+  weightReceivingToleranceId: true,
   receiptEntryMode: true,
   standardWeightPerBaseUnit: true,
   weightUomId: true,
   allowManualUnitQuantity: true,
   allowManualWeightQuantity: true,
   receivingTolerance: {
+    select: { id: true, code: true, name: true, percentage: true, status: true },
+  },
+  weightReceivingTolerance: {
     select: { id: true, code: true, name: true, percentage: true, status: true },
   },
   weightUom: { select: { id: true, code: true } },
@@ -177,6 +182,7 @@ type ItemReceiptConfig = {
   batchTracked: boolean
   serialTracked: boolean
   receivingToleranceId: string | null
+  weightReceivingToleranceId: string | null
   receivingTolerancePercentage: unknown
   receiptEntryMode: 'UNIT_ONLY' | 'WEIGHT_ONLY' | 'UNIT_AND_WEIGHT'
   standardWeightPerBaseUnit: unknown
@@ -184,6 +190,13 @@ type ItemReceiptConfig = {
   allowManualUnitQuantity: boolean
   allowManualWeightQuantity: boolean
   receivingTolerance: {
+    id: string
+    code: string
+    name: string
+    percentage: unknown
+    status: string
+  } | null
+  weightReceivingTolerance: {
     id: string
     code: string
     name: string
@@ -227,6 +240,10 @@ function toleranceFieldsFromEvaluation(
   | 'receivingToleranceCodeSnapshot'
   | 'receivingToleranceNameSnapshot'
   | 'receivingTolerancePercentageSnapshot'
+  | 'weightReceivingToleranceIdSnapshot'
+  | 'weightReceivingToleranceCodeSnapshot'
+  | 'weightReceivingToleranceNameSnapshot'
+  | 'weightReceivingTolerancePercentageSnapshot'
   | 'maximumAllowedUnitQuantity'
   | 'unitVariance'
   | 'receivedWeight'
@@ -245,6 +262,8 @@ function toleranceFieldsFromEvaluation(
   | 'shortCloseRequested'
   | 'shortCloseReason'
   | 'closeOpenQuantity'
+  | 'receivingCondition'
+  | 'receivingConditionReason'
 > {
   const shortCloseRequested = Boolean(input.shortCloseRequested ?? input.closeOpenQuantity)
   return {
@@ -255,6 +274,10 @@ function toleranceFieldsFromEvaluation(
     receivingToleranceCodeSnapshot: tol.receivingToleranceCodeSnapshot,
     receivingToleranceNameSnapshot: tol.receivingToleranceNameSnapshot,
     receivingTolerancePercentageSnapshot: tol.receivingTolerancePercentageSnapshot,
+    weightReceivingToleranceIdSnapshot: tol.weightReceivingToleranceIdSnapshot,
+    weightReceivingToleranceCodeSnapshot: tol.weightReceivingToleranceCodeSnapshot,
+    weightReceivingToleranceNameSnapshot: tol.weightReceivingToleranceNameSnapshot,
+    weightReceivingTolerancePercentageSnapshot: tol.weightReceivingTolerancePercentageSnapshot,
     maximumAllowedUnitQuantity: tol.maximumAllowedUnitQuantity,
     unitVariance: tol.unitVariance,
     receivedWeight: tol.receivedWeight,
@@ -361,6 +384,8 @@ async function buildLineCreates(
       receivedQuantity: received,
       receivingToleranceId: itemConfig?.receivingToleranceId,
       masterTolerance: mapItemMasterTolerance(itemConfig?.receivingTolerance ?? null),
+      weightReceivingToleranceId: itemConfig?.weightReceivingToleranceId,
+      weightMasterTolerance: mapItemMasterTolerance(itemConfig?.weightReceivingTolerance ?? null),
       itemTolerancePct: itemConfig ? Number(itemConfig.receivingTolerancePercentage ?? 0) : 0,
       setupTolerancePct: overReceiptTolerancePct,
       allowOverReceipt: allowExcess,
@@ -387,10 +412,33 @@ async function buildLineCreates(
     const short = qty(input.shortQuantity) || tol.shortQuantity
     const excessQty = qty(input.excessQuantity) || tol.excessQuantity
     const qcRequired = input.qcRequired ?? inspectionRequired
+    const rejected =
+      received <= 0
+        ? 0
+        : input.rejectedQuantity != null
+          ? qty(input.rejectedQuantity)
+          : damaged
+    const accepted =
+      received <= 0
+        ? 0
+        : qcRequired
+          ? 0
+          : input.acceptedQuantity != null
+            ? qty(input.acceptedQuantity)
+            : Math.max(0, received - rejected)
     const acceptedForQc =
-      received <= 0 ? 0 : qty(input.acceptedForQcQuantity) || (qcRequired ? Math.max(0, received - damaged) : 0)
-    const accepted = received <= 0 ? 0 : qcRequired ? 0 : Math.max(0, received - damaged)
-    const rejected = received <= 0 ? 0 : damaged
+      received <= 0
+        ? 0
+        : qty(input.acceptedForQcQuantity) || (qcRequired ? Math.max(0, received - rejected) : 0)
+    const receivingCondition = resolveReceivingCondition({
+      openQuantity: open,
+      receivedQuantity: received,
+      damagedQuantity: damaged,
+      rejectedQuantity: rejected,
+      qcRequired,
+      shortCloseRequested,
+      userCondition: input.receivingCondition ?? null,
+    })
     const acceptedUom = toUomQuantity(accepted || acceptedForQc, factor)
     const rejectedUom = toUomQuantity(rejected, factor)
 
@@ -434,6 +482,8 @@ async function buildLineCreates(
       expiryDate: parseDateInput(input.expiryDate ?? undefined) ?? null,
       qcRequired,
       ...toleranceFieldsFromEvaluation(tol, input, itemConfig),
+      receivingCondition,
+      receivingConditionReason: input.receivingConditionReason?.trim() || null,
       remarks: input.remarks?.trim() || null,
     })
   }
@@ -1054,6 +1104,8 @@ export async function submitGoodsReceipt(
       receivedQuantity: received,
       receivingToleranceId: itemConfig?.receivingToleranceId,
       masterTolerance: mapItemMasterTolerance(itemConfig?.receivingTolerance ?? null),
+      weightReceivingToleranceId: itemConfig?.weightReceivingToleranceId,
+      weightMasterTolerance: mapItemMasterTolerance(itemConfig?.weightReceivingTolerance ?? null),
       itemTolerancePct: itemConfig ? Number(itemConfig.receivingTolerancePercentage ?? 0) : 0,
       setupTolerancePct: settings.overReceiptTolerancePct,
       allowOverReceipt: settings.allowOverReceipt,

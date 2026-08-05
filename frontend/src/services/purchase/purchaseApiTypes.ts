@@ -675,6 +675,17 @@ export interface ApiGoodsReceiptLine {
   returnedQuantity?: number
   returnableQuantity?: number
   closeOpenQuantity?: boolean
+  shortCloseRequested?: boolean
+  shortCloseReason?: string | null
+  receivingCondition?: string
+  receivingConditionReason?: string | null
+  receivedWeight?: number | null
+  expectedWeight?: number | null
+  maximumAllowedWeight?: number | null
+  weightVariancePercentage?: number | null
+  weightToleranceStatus?: string
+  weightTolerancePercentage?: number
+  requiresApproval?: boolean
   remarks: string | null
 }
 

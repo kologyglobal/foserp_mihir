@@ -62,6 +62,7 @@ function normalizeNullableIds(input: Record<string, unknown>): Record<string, un
     'purchaseUomId',
     'salesUomId',
     'receivingToleranceId',
+    'weightReceivingToleranceId',
     'weightUomId',
     'productionBomId',
     'qualityTestGroupCode',
@@ -139,6 +140,16 @@ async function assertTenantFk(tenantId: string, input: Record<string, unknown>):
       where: { id: String(input.receivingToleranceId), ...tenantActiveFilter(tenantId), status: 'ACTIVE' },
     })
     if (!tol) throw new ValidationError('Receiving tolerance not found or inactive in tenant')
+  }
+  if (input.weightReceivingToleranceId) {
+    const tol = await prisma.masterReceivingTolerance.findFirst({
+      where: {
+        id: String(input.weightReceivingToleranceId),
+        ...tenantActiveFilter(tenantId),
+        status: 'ACTIVE',
+      },
+    })
+    if (!tol) throw new ValidationError('Weight receiving tolerance not found or inactive in tenant')
   }
   if (input.weightUomId) {
     const uom = await prisma.masterUom.findFirst({

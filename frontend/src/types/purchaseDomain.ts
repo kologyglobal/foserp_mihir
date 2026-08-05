@@ -2164,10 +2164,21 @@ export interface GoodsReceiptLine {
     | 'EXCESS_OUTSIDE_TOLERANCE'
   closeOpenQuantity?: boolean
   shortCloseRequested?: boolean
+  shortCloseReason?: string | null
+  receivingCondition?:
+    | 'NORMAL'
+    | 'SHORT'
+    | 'EXCESS'
+    | 'DAMAGE'
+    | 'REJECTED'
+    | 'QUALITY_HOLD'
+  receivingConditionReason?: string | null
   receivedWeight?: number | null
   expectedWeight?: number | null
   maximumAllowedWeight?: number | null
+  weightVariancePercentage?: number | null
   weightToleranceStatus?: string
+  weightTolerancePercentage?: number
   requiresApproval?: boolean
   approvalReasons?: string[]
   receivingToleranceId?: string | null
@@ -2937,6 +2948,17 @@ export type GrnInput = {
     allowExcess?: boolean
     /** Close remaining open qty (short outside band → approval). */
     closeOpenQuantity?: boolean
+    shortCloseRequested?: boolean
+    shortCloseReason?: string | null
+    receivingCondition?:
+      | 'NORMAL'
+      | 'SHORT'
+      | 'EXCESS'
+      | 'DAMAGE'
+      | 'REJECTED'
+      | 'QUALITY_HOLD'
+    receivingConditionReason?: string | null
+    receivedWeight?: number | null
     remarks?: string
   }>
 }

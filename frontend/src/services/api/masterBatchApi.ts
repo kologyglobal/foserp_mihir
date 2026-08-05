@@ -95,6 +95,7 @@ export interface ItemDto {
   }>
   receivingTolerancePercentage?: number | string
   receivingToleranceId?: string | null
+  weightReceivingToleranceId?: string | null
   receiptEntryMode?: string
   conversionCalculationMode?: string
   allowManualUnitQuantity?: boolean
@@ -330,6 +331,7 @@ export function mapItemDto(row: ItemDto): Item {
     })),
     receivingTolerancePercentage: num(row.receivingTolerancePercentage),
     receivingToleranceId: row.receivingToleranceId ?? null,
+    weightReceivingToleranceId: row.weightReceivingToleranceId ?? null,
     receiptEntryMode: (row.receiptEntryMode ?? 'UNIT_ONLY') as Item['receiptEntryMode'],
     conversionCalculationMode: (row.conversionCalculationMode ?? 'AUTOMATIC') as Item['conversionCalculationMode'],
     allowManualUnitQuantity: row.allowManualUnitQuantity ?? false,
@@ -498,6 +500,7 @@ export function itemToApiPayload(data: Item): Record<string, unknown> {
     uomConversionFactor: data.uomConversionFactor ?? data.purchaseQtyPerUom ?? 1,
     receivingTolerancePercentage: data.receivingTolerancePercentage ?? 0,
     receivingToleranceId: data.receivingToleranceId || null,
+    weightReceivingToleranceId: data.weightReceivingToleranceId || null,
     receiptEntryMode: data.receiptEntryMode ?? 'UNIT_ONLY',
     conversionCalculationMode: data.conversionCalculationMode ?? 'AUTOMATIC',
     allowManualUnitQuantity: data.allowManualUnitQuantity ?? false,

@@ -264,6 +264,7 @@ export interface Item extends MasterRecordAudit {
   /** ±% band for GRN receiving vs open qty (legacy dual-read). */
   receivingTolerancePercentage?: number
   receivingToleranceId?: string | null
+  weightReceivingToleranceId?: string | null
   receiptEntryMode?: 'UNIT_ONLY' | 'WEIGHT_ONLY' | 'UNIT_AND_WEIGHT'
   conversionCalculationMode?: 'AUTOMATIC' | 'MANUAL'
   allowManualUnitQuantity?: boolean

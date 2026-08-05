@@ -70,6 +70,10 @@ export type GrnLineCreateData = {
   receivingToleranceCodeSnapshot: string
   receivingToleranceNameSnapshot: string
   receivingTolerancePercentageSnapshot: number
+  weightReceivingToleranceIdSnapshot: string | null
+  weightReceivingToleranceCodeSnapshot: string
+  weightReceivingToleranceNameSnapshot: string
+  weightReceivingTolerancePercentageSnapshot: number
   maximumAllowedUnitQuantity: number
   unitVariance: number
   receivedWeight: number | null
@@ -88,6 +92,8 @@ export type GrnLineCreateData = {
   shortCloseRequested: boolean
   shortCloseReason: string | null
   closeOpenQuantity: boolean
+  receivingCondition: import('@prisma/client').GrnReceivingCondition
+  receivingConditionReason: string | null
   remarks: string | null
 }
 
