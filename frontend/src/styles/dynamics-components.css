@@ -11966,6 +11966,22 @@ a.crm-companies-table__name:hover {
   flex-direction: column;
   gap: 14px;
   min-width: 0;
+  width: 100%;
+}
+
+/* Line-item tables must span the full card width (not 1/3 of a dense 3-col grid). */
+.so-pricing-section .erp-card-section__body {
+  min-width: 0;
+}
+
+.so-pricing-section .erp-card-section__grid,
+.so-pricing-section .erp-card-section__grid--cols-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.so-pricing-section .erp-card-section__grid > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .so-pricing-panel--pro {
@@ -11991,7 +12007,7 @@ a.crm-companies-table__name:hover {
 }
 
 .so-pricing-col-idx { width: 40px; }
-.so-pricing-col-product { width: 28%; }
+.so-pricing-col-product { width: 32%; min-width: 200px; }
 .so-pricing-col-qty { width: 72px; }
 .so-pricing-col-price { width: 104px; }
 .so-pricing-col-disc { width: 72px; }

@@ -1565,6 +1565,7 @@ export function mapDomainPoInputToApiPayload(
         gstGroupId: uuidOrNull(line.gstGroupId ?? null),
         hsnId: uuidOrNull(line.hsnId ?? null),
         binId: uuidOrNull(line.binId ?? null),
+        qualityTestGroupCode: line.qualityTestGroupCode?.trim() || null,
       }
     }),
   }

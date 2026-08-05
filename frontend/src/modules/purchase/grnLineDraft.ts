@@ -9,11 +9,7 @@ import {
 } from '@/services/purchase/grnReceivingCondition'
 import type { GoodsReceiptNote, PurchaseOrder } from '@/types/purchaseDomain'
 import type { Item } from '@/types/master'
-import {
-  getPurchaseLineBaseUomCode,
-  purchaseLineHasDualUom,
-  purchaseQtyToBaseQty,
-} from '@/utils/purchaseLineUom'
+import { getPurchaseLineBaseUomCode } from '@/utils/purchaseLineUom'
 
 export type ItemReceiptControl = {
   batch: boolean

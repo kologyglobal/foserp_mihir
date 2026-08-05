@@ -270,7 +270,9 @@ async function fillLineMasterSnapshots(
       if (line.hsnId == null && item.hsnId) line.hsnId = item.hsnId
       if (!line.hsnCodeSnapshot && item.hsnCode) line.hsnCodeSnapshot = item.hsnCode
       line.qcRequiredSnapshot = item.qcRequired
-      line.qualityTestGroupCodeSnapshot = item.qualityTestGroupCode ?? null
+      if (!line.qualityTestGroupCodeSnapshot && item.qualityTestGroupCode) {
+        line.qualityTestGroupCodeSnapshot = item.qualityTestGroupCode
+      }
     }
 
     if (line.hsnId) {

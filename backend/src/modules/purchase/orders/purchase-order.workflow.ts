@@ -332,7 +332,7 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
       ...EMPTY_TAX_SNAPSHOT,
       binId: line.binId ?? null,
       qcRequiredSnapshot: false,
-      qualityTestGroupCodeSnapshot: null,
+      qualityTestGroupCodeSnapshot: line.qualityTestGroupCode?.trim() || null,
     }
   })
 }
