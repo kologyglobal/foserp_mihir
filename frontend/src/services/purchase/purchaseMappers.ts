@@ -2400,7 +2400,8 @@ export function mapDomainGrnInputToApiPayload(input: GrnInput): Record<string, u
     lines: input.lines.map((line) => ({
       purchaseOrderLineId: line.purchaseOrderLineId,
       /** Vendor UOM qty — backend converts to primary receivedQuantity. Zero = Not Received. */
-      receivedUomQuantity: Number(line.receivedUomQty ?? line.receivedQty) || 0,
+      receivedUomQuantity:
+        line.receivedUomQty != null ? Number(line.receivedUomQty) : Number(line.receivedQty) || 0,
       damagedQuantity: Number(line.damagedQty) || 0,
       shortQuantity: Number(line.shortQty) || 0,
       excessQuantity: Number(line.excessQty) || 0,

@@ -7123,6 +7123,12 @@ model PurchaseOrderLine {
   hsnId                        String?
   hsnCodeSnapshot              String    @default("") @db.VarChar(16)
   gstGroupCodeSnapshot         String    @default("") @db.VarChar(32)
+  /// Combined GST % snapshot at PO create/edit.
+  gstRatePctSnapshot           Decimal   @default(0) @db.Decimal(5, 2)
+  cgstRateSnapshot             Decimal   @default(0) @db.Decimal(9, 4)
+  sgstRateSnapshot             Decimal   @default(0) @db.Decimal(9, 4)
+  igstRateSnapshot             Decimal   @default(0) @db.Decimal(9, 4)
+  gstSchemeSnapshot            String    @default("cgst_sgst") @db.VarChar(16)
   binId                        String?
   qcRequiredSnapshot           Boolean   @default(false)
   qualityTestGroupCodeSnapshot String?   @db.VarChar(32)
@@ -7432,6 +7438,16 @@ model GoodsReceiptLine {
   /// Vendor unit cost (per uomId).
   rate                       Decimal                @default(0) @db.Decimal(18, 2)
   amount                     Decimal                @default(0) @db.Decimal(18, 2)
+  /// Tax snapshots copied from PO line at receive time.
+  hsnIdSnapshot              String?                @db.VarChar(36)
+  hsnCodeSnapshot            String                 @default("") @db.VarChar(16)
+  gstGroupIdSnapshot         String?                @db.VarChar(36)
+  gstGroupCodeSnapshot       String                 @default("") @db.VarChar(32)
+  gstRatePctSnapshot         Decimal                @default(0) @db.Decimal(5, 2)
+  cgstRateSnapshot           Decimal                @default(0) @db.Decimal(9, 4)
+  sgstRateSnapshot           Decimal                @default(0) @db.Decimal(9, 4)
+  igstRateSnapshot           Decimal                @default(0) @db.Decimal(9, 4)
+  gstSchemeSnapshot          String                 @default("cgst_sgst") @db.VarChar(16)
   warehouseId                String?
   storageLocationId          String?
   binId                      String?
@@ -8044,6 +8060,14 @@ model PurchaseInvoiceLine {
   amount              Decimal  @default(0) @db.Decimal(18, 2)
   taxRatePct          Decimal  @default(0) @db.Decimal(5, 2)
   taxAmount           Decimal  @default(0) @db.Decimal(18, 2)
+  hsnIdSnapshot       String?  @db.VarChar(36)
+  hsnCodeSnapshot     String   @default("") @db.VarChar(16)
+  gstGroupIdSnapshot  String?  @db.VarChar(36)
+  gstGroupCodeSnapshot String  @default("") @db.VarChar(32)
+  cgstRateSnapshot    Decimal  @default(0) @db.Decimal(9, 4)
+  sgstRateSnapshot    Decimal  @default(0) @db.Decimal(9, 4)
+  igstRateSnapshot    Decimal  @default(0) @db.Decimal(9, 4)
+  gstSchemeSnapshot   String   @default("cgst_sgst") @db.VarChar(16)
   lineTotal           Decimal  @default(0) @db.Decimal(18, 2)
   remarks             String?  @db.Text
   createdAt           DateTime @default(now())

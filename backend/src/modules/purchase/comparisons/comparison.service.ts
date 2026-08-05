@@ -14,6 +14,11 @@ import {
   ComparisonNotFoundError,
   ComparisonPurchaseOrderExistsError,
 } from './comparison.errors.js'
+import {
+  computePurchaseOrderTotals,
+  preparePurchaseOrderLinesForCreate,
+} from '../orders/purchase-order.service.js'
+import type { CreatePurchaseOrderInput } from '../orders/purchase-order.validation.js'
 import { mapComparisonToDto, mapPurchaseOrderToDto } from './comparison.mapper.js'
 import * as repo from './comparison.repository.js'
 import type { AwardComparisonInput, ComparisonListQuery, CreateComparisonInput } from './comparison.validation.js'
@@ -186,6 +191,28 @@ export async function createPurchaseOrderFromComparison(tenantId: string, id: st
   if (!quotation) throw new ComparisonInvalidAwardError('Awarded vendor quotation is unavailable')
   const rfq = await prisma.requestForQuotation.findFirst({ where: { id: comparison.requestForQuotationId, ...tenantActiveFilter(tenantId) } })
   if (!rfq) throw new ComparisonNotFoundError('RFQ not found')
+  /** VQ line quantity is commercial/vendor qty; derive base via item UOM mappings (same as manual PO). */
+  const poLineInputs: CreatePurchaseOrderInput['lines'] = quotation.lines.map((line, index) => ({
+    lineNumber: line.lineNumber ?? index + 1,
+    itemId: line.itemId,
+    itemCode: line.itemCodeSnapshot,
+    itemName: line.itemNameSnapshot,
+    description: line.description ?? undefined,
+    uomQuantity: Number(line.quantity),
+    uomId: line.uomId,
+    rate: Number(line.rate),
+    purchaseRequisitionLineId: line.requestForQuotationLine?.purchaseRequisitionLineId ?? undefined,
+    remarks: line.remarks ?? undefined,
+  }))
+  const normalizedLines = await preparePurchaseOrderLinesForCreate(tenantId, poLineInputs, {
+    orderDate: new Date(),
+    vendorId: quotation.vendorId,
+  })
+  const totals = computePurchaseOrderTotals(
+    normalizedLines,
+    Number(quotation.taxAmount),
+    Number(quotation.freightAmount),
+  )
   const orderNumber = await nextPurchaseDocumentNumber(tenantId, 'PURCHASE_ORDER', 'PO')
   const order = await prisma.$transaction(async (tx) => {
     const created = await tx.purchaseOrder.create({
@@ -193,23 +220,10 @@ export async function createPurchaseOrderFromComparison(tenantId: string, id: st
         tenantId, orderNumber, orderDate: new Date(), vendorId: quotation.vendorId, origin: 'RFQ_COMPARISON', status: 'DRAFT',
         purchaseRequisitionId: rfq.purchaseRequisitionId, requestForQuotationId: rfq.id, vendorQuotationId: quotation.id, vendorComparisonId: comparison.id,
         currencyCode: quotation.currencyCode, paymentTerms: quotation.paymentTerms, deliveryTerms: quotation.deliveryTerms,
-        subtotalAmount: quotation.totalAmount, taxAmount: quotation.taxAmount, freightAmount: quotation.freightAmount, totalAmount: quotation.landedCost,
+        ...totals,
         remarks: quotation.remarks, createdById: actorId, updatedById: actorId,
         lines: {
-          create: quotation.lines.map((line) => ({
-            tenantId,
-            lineNumber: line.lineNumber,
-            purchaseRequisitionLineId: line.requestForQuotationLine?.purchaseRequisitionLineId ?? null,
-            itemId: line.itemId,
-            itemCodeSnapshot: line.itemCodeSnapshot,
-            itemNameSnapshot: line.itemNameSnapshot,
-            description: line.description,
-            quantity: line.quantity,
-            uomId: line.uomId,
-            rate: line.rate,
-            amount: line.amount,
-            remarks: line.remarks,
-          })),
+          create: normalizedLines.map((line) => ({ tenantId, ...line })),
         },
       },
       include: { lines: { orderBy: { lineNumber: 'asc' } } },

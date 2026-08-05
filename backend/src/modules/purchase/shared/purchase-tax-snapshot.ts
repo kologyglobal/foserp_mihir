@@ -1,0 +1,167 @@
+import { resolveLineGstFromMasters } from '../../accounting/shared/master-resolvers/accounting-tax-resolver.js'
+import { prisma } from '../../../config/prisma.js'
+
+export type PurchaseLineTaxSnapshot = {
+  gstRatePctSnapshot: number
+  cgstRateSnapshot: number
+  sgstRateSnapshot: number
+  igstRateSnapshot: number
+  gstSchemeSnapshot: string
+}
+
+export const EMPTY_TAX_SNAPSHOT: PurchaseLineTaxSnapshot = {
+  gstRatePctSnapshot: 0,
+  cgstRateSnapshot: 0,
+  sgstRateSnapshot: 0,
+  igstRateSnapshot: 0,
+  gstSchemeSnapshot: 'cgst_sgst',
+}
+
+function num(value: unknown): number {
+  const n = Number(value ?? 0)
+  return Number.isFinite(n) ? n : 0
+}
+
+export function gstSchemeFromRates(cgst: number, sgst: number, igst: number): string {
+  if (igst > 0 && cgst === 0 && sgst === 0) return 'igst'
+  return 'cgst_sgst'
+}
+
+export function taxSnapshotFromRates(input: {
+  cgstRate?: unknown
+  sgstRate?: unknown
+  igstRate?: unknown
+  gstRate?: unknown
+}): PurchaseLineTaxSnapshot {
+  const cgst = num(input.cgstRate)
+  const sgst = num(input.sgstRate)
+  const igst = num(input.igstRate)
+  const combined =
+    input.gstRate != null && String(input.gstRate).trim() !== ''
+      ? num(input.gstRate)
+      : cgst + sgst > 0
+        ? cgst + sgst
+        : igst
+  return {
+    gstRatePctSnapshot: combined,
+    cgstRateSnapshot: cgst,
+    sgstRateSnapshot: sgst,
+    igstRateSnapshot: igst,
+    gstSchemeSnapshot: gstSchemeFromRates(cgst, sgst, igst),
+  }
+}
+
+export async function resolvePurchaseLineTaxSnapshot(input: {
+  tenantId: string
+  itemId?: string | null
+  hsnId?: string | null
+  gstGroupId?: string | null
+  asOfDate?: string | Date | null
+  vendorId?: string | null
+  deliveryWarehouseId?: string | null
+}): Promise<PurchaseLineTaxSnapshot> {
+  const asOfDate =
+    input.asOfDate instanceof Date
+      ? input.asOfDate.toISOString().slice(0, 10)
+      : input.asOfDate ?? new Date().toISOString().slice(0, 10)
+
+  let vendorState: string | null = null
+  if (input.vendorId) {
+    const vendor = await prisma.masterVendor.findFirst({
+      where: { tenantId: input.tenantId, id: input.vendorId, deletedAt: null },
+      select: { state: true },
+    })
+    vendorState = vendor?.state ?? null
+  }
+
+  let plantState: string | null = null
+  if (input.deliveryWarehouseId) {
+    const wh = await prisma.masterWarehouse.findFirst({
+      where: { tenantId: input.tenantId, id: input.deliveryWarehouseId, deletedAt: null },
+      select: { plant: { select: { state: true } } },
+    })
+    plantState = wh?.plant?.state ?? null
+  }
+
+  const resolved = await resolveLineGstFromMasters({
+    tenantId: input.tenantId,
+    applicableFor: 'PURCHASE',
+    asOfDate,
+    fromState: vendorState,
+    toState: plantState,
+    itemId: input.itemId,
+    hsnId: input.hsnId,
+    gstGroupId: input.gstGroupId,
+  })
+
+  if (!resolved) return { ...EMPTY_TAX_SNAPSHOT }
+
+  return taxSnapshotFromRates({
+    cgstRate: resolved.cgstRate,
+    sgstRate: resolved.sgstRate,
+    igstRate: resolved.igstRate,
+    gstRate: resolved.gstRate,
+  })
+}
+
+/** Prefer GRN snapshots (receive-time copy); fall back to PO line. */
+export function taxSnapshotFromGrnOrPoLine(
+  grnLine?: {
+    hsnIdSnapshot?: string | null
+    hsnCodeSnapshot?: string | null
+    gstGroupIdSnapshot?: string | null
+    gstGroupCodeSnapshot?: string | null
+    gstRatePctSnapshot?: unknown
+    cgstRateSnapshot?: unknown
+    sgstRateSnapshot?: unknown
+    igstRateSnapshot?: unknown
+    gstSchemeSnapshot?: string | null
+  } | null,
+  poLine?: Parameters<typeof taxSnapshotFromPoLine>[0] | null,
+) {
+  const fromGrn =
+    grnLine &&
+    (num(grnLine.gstRatePctSnapshot) > 0 ||
+      Boolean(grnLine.hsnCodeSnapshot?.trim()) ||
+      Boolean(grnLine.gstGroupCodeSnapshot?.trim()))
+  if (fromGrn) {
+    return {
+      hsnIdSnapshot: grnLine.hsnIdSnapshot ?? null,
+      hsnCodeSnapshot: grnLine.hsnCodeSnapshot ?? '',
+      gstGroupIdSnapshot: grnLine.gstGroupIdSnapshot ?? null,
+      gstGroupCodeSnapshot: grnLine.gstGroupCodeSnapshot ?? '',
+      gstRatePctSnapshot: num(grnLine.gstRatePctSnapshot),
+      cgstRateSnapshot: num(grnLine.cgstRateSnapshot),
+      sgstRateSnapshot: num(grnLine.sgstRateSnapshot),
+      igstRateSnapshot: num(grnLine.igstRateSnapshot),
+      gstSchemeSnapshot: grnLine.gstSchemeSnapshot ?? 'cgst_sgst',
+    }
+  }
+  if (poLine) return taxSnapshotFromPoLine(poLine)
+  return null
+}
+
+/** Copy immutable tax fields from PO line onto GRN / invoice line payloads. */
+export function taxSnapshotFromPoLine(poLine: {
+  hsnId?: string | null
+  hsnCodeSnapshot?: string | null
+  gstGroupId?: string | null
+  gstGroupCodeSnapshot?: string | null
+  gstRatePctSnapshot?: unknown
+  cgstRateSnapshot?: unknown
+  sgstRateSnapshot?: unknown
+  igstRateSnapshot?: unknown
+  gstSchemeSnapshot?: string | null
+}) {
+  return {
+    hsnIdSnapshot: poLine.hsnId ?? null,
+    hsnCodeSnapshot: poLine.hsnCodeSnapshot ?? '',
+    gstGroupIdSnapshot: poLine.gstGroupId ?? null,
+    gstGroupCodeSnapshot: poLine.gstGroupCodeSnapshot ?? '',
+    gstRatePctSnapshot: num(poLine.gstRatePctSnapshot),
+    cgstRateSnapshot: num(poLine.cgstRateSnapshot),
+    sgstRateSnapshot: num(poLine.sgstRateSnapshot),
+    igstRateSnapshot: num(poLine.igstRateSnapshot),
+    gstSchemeSnapshot: poLine.gstSchemeSnapshot ?? 'cgst_sgst',
+  }
+}

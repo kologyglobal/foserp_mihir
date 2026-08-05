@@ -458,21 +458,27 @@ async function main() {
     push('Approve PO', true, `skipped (status=${poStatus})`)
   }
 
-  const send = await request(app)
-    .post(`${base}/orders/${poId}/send-to-vendor`)
-    .set(auth(makerToken))
-    .send({})
-  if (send.status !== 200) {
-    const send2 = await request(app)
-      .post(`${base}/orders/${poId}/send-to-vendor`)
-      .set(auth(approver.token))
-      .send({})
-    if (send2.status !== 200) {
-      fail(`PO send-to-vendor failed: ${send.status}/${send2.status} ${JSON.stringify(send2.body)}`)
-    }
-    push('Release PO', true, `status=${send2.body.data.status}`)
+  if (poStatus === 'SENT_TO_VENDOR') {
+    push('Release PO', true, `skipped (approve already set ${poStatus})`)
   } else {
-    push('Release PO', true, `status=${send.body.data.status}`)
+    const send = await request(app)
+      .post(`${base}/orders/${poId}/send-to-vendor`)
+      .set(auth(makerToken))
+      .send({})
+    if (send.status !== 200) {
+      const send2 = await request(app)
+        .post(`${base}/orders/${poId}/send-to-vendor`)
+        .set(auth(approver.token))
+        .send({})
+      if (send2.status !== 200) {
+        fail(`PO send-to-vendor failed: ${send.status}/${send2.status} ${JSON.stringify(send2.body)}`)
+      }
+      poStatus = String(send2.body.data.status)
+      push('Release PO', true, `status=${poStatus}`)
+    } else {
+      poStatus = String(send.body.data.status)
+      push('Release PO', true, `status=${poStatus}`)
+    }
   }
 
   const poDb = await prisma.purchaseOrder.findUniqueOrThrow({

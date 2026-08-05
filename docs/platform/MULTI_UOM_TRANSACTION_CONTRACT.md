@@ -63,6 +63,8 @@ Where:
 - `rate` — unit price **per transaction UOM** (e.g. ₹80/KG)
 - `uomConversionFactor` — snapshot at document post time
 
+**Rate UOM rule:** Always display and calculate rate as **per commercial/transaction UOM** (`₹{rate} / {purchaseUomCode}`). Never label vendor rate as per base unit unless factor is 1.
+
 **Single editable quantity rule:** Users enter **transaction quantity** only. Base quantity is always calculated, never independently edited.
 
 ---

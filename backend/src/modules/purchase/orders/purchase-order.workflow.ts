@@ -6,6 +6,7 @@ import {
   toPrimaryUnitCost,
   UomConversionError,
 } from '../shared/uom-conversion.js'
+import { EMPTY_TAX_SNAPSHOT } from '../shared/purchase-tax-snapshot.js'
 import {
   PurchaseOrderValidationError,
   PurchaseOrderWorkflowError,
@@ -258,6 +259,11 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
   hsnId: string | null
   hsnCodeSnapshot: string
   gstGroupCodeSnapshot: string
+  gstRatePctSnapshot: number
+  cgstRateSnapshot: number
+  sgstRateSnapshot: number
+  igstRateSnapshot: number
+  gstSchemeSnapshot: string
   binId: string | null
   qcRequiredSnapshot: boolean
   qualityTestGroupCodeSnapshot: string | null
@@ -323,6 +329,7 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
       hsnId: line.hsnId ?? null,
       hsnCodeSnapshot: '',
       gstGroupCodeSnapshot: '',
+      ...EMPTY_TAX_SNAPSHOT,
       binId: line.binId ?? null,
       qcRequiredSnapshot: false,
       qualityTestGroupCodeSnapshot: null,

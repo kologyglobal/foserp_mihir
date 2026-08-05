@@ -178,6 +178,11 @@ export function mapPurchaseOrderToDto(
         hsnId: (line as { hsnId?: string | null }).hsnId ?? null,
         hsnCode: (line as { hsnCodeSnapshot?: string }).hsnCodeSnapshot ?? '',
         gstGroupCode: (line as { gstGroupCodeSnapshot?: string }).gstGroupCodeSnapshot ?? '',
+        gstRatePct: num((line as { gstRatePctSnapshot?: unknown }).gstRatePctSnapshot),
+        cgstRate: num((line as { cgstRateSnapshot?: unknown }).cgstRateSnapshot),
+        sgstRate: num((line as { sgstRateSnapshot?: unknown }).sgstRateSnapshot),
+        igstRate: num((line as { igstRateSnapshot?: unknown }).igstRateSnapshot),
+        gstScheme: (line as { gstSchemeSnapshot?: string }).gstSchemeSnapshot ?? 'cgst_sgst',
         binId: (line as { binId?: string | null }).binId ?? null,
         binCode:
           (line as { bin?: { code?: string | null } | null }).bin?.code ??

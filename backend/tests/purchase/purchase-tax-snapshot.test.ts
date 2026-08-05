@@ -1,0 +1,71 @@
+import { describe, expect, it } from 'vitest'
+import {
+  EMPTY_TAX_SNAPSHOT,
+  gstSchemeFromRates,
+  taxSnapshotFromGrnOrPoLine,
+  taxSnapshotFromPoLine,
+  taxSnapshotFromRates,
+} from '../../src/modules/purchase/shared/purchase-tax-snapshot.js'
+
+describe('purchase tax snapshot helpers', () => {
+  it('taxSnapshotFromRates combines CGST+SGST', () => {
+    const snap = taxSnapshotFromRates({ cgstRate: 9, sgstRate: 9 })
+    expect(snap.gstRatePctSnapshot).toBe(18)
+    expect(snap.cgstRateSnapshot).toBe(9)
+    expect(snap.sgstRateSnapshot).toBe(9)
+    expect(snap.gstSchemeSnapshot).toBe('cgst_sgst')
+  })
+
+  it('taxSnapshotFromRates uses IGST when interstate', () => {
+    const snap = taxSnapshotFromRates({ igstRate: 18 })
+    expect(snap.gstRatePctSnapshot).toBe(18)
+    expect(snap.igstRateSnapshot).toBe(18)
+    expect(gstSchemeFromRates(0, 0, 18)).toBe('igst')
+    expect(snap.gstSchemeSnapshot).toBe('igst')
+  })
+
+  it('taxSnapshotFromPoLine maps PO FK fields to snapshot columns', () => {
+    const snap = taxSnapshotFromPoLine({
+      hsnId: 'hsn-1',
+      hsnCodeSnapshot: '7306',
+      gstGroupId: 'gst-1',
+      gstGroupCodeSnapshot: 'GST18',
+      gstRatePctSnapshot: 18,
+      cgstRateSnapshot: 9,
+      sgstRateSnapshot: 9,
+      igstRateSnapshot: 0,
+      gstSchemeSnapshot: 'cgst_sgst',
+    })
+    expect(snap.hsnIdSnapshot).toBe('hsn-1')
+    expect(snap.hsnCodeSnapshot).toBe('7306')
+    expect(snap.gstRatePctSnapshot).toBe(18)
+  })
+
+  it('taxSnapshotFromGrnOrPoLine prefers GRN over PO', () => {
+    const po = { hsnCodeSnapshot: 'OLD', gstRatePctSnapshot: 12 }
+    const grn = { hsnCodeSnapshot: '7306', gstRatePctSnapshot: 18, gstSchemeSnapshot: 'cgst_sgst' }
+    const snap = taxSnapshotFromGrnOrPoLine(grn, po)
+    expect(snap?.hsnCodeSnapshot).toBe('7306')
+    expect(snap?.gstRatePctSnapshot).toBe(18)
+  })
+
+  it('taxSnapshotFromGrnOrPoLine falls back to PO when GRN empty', () => {
+    const po = {
+      hsnId: 'hsn-1',
+      hsnCodeSnapshot: '7306',
+      gstGroupId: 'gst-1',
+      gstGroupCodeSnapshot: 'GST18',
+      gstRatePctSnapshot: 18,
+      cgstRateSnapshot: 9,
+      sgstRateSnapshot: 9,
+    }
+    const snap = taxSnapshotFromGrnOrPoLine({}, po)
+    expect(snap?.hsnCodeSnapshot).toBe('7306')
+    expect(snap?.gstRatePctSnapshot).toBe(18)
+  })
+
+  it('EMPTY_TAX_SNAPSHOT defaults to zero cgst_sgst', () => {
+    expect(EMPTY_TAX_SNAPSHOT.gstRatePctSnapshot).toBe(0)
+    expect(EMPTY_TAX_SNAPSHOT.gstSchemeSnapshot).toBe('cgst_sgst')
+  })
+})

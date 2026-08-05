@@ -12,6 +12,8 @@ import type {
 import {
   assertInvoiceLines, assertInvoiceStatus, invoiceMoney, invoiceQty, parseInvoiceDate,
 } from './purchase-invoice.workflow.js'
+import { lineAmountFromVendor } from '../shared/uom-conversion.js'
+import { taxSnapshotFromGrnOrPoLine } from '../shared/purchase-tax-snapshot.js'
 
 type Defaults = Awaited<ReturnType<typeof resolveEffectivePurchaseDefaults>>
 type InvoiceRow = NonNullable<Awaited<ReturnType<typeof repo.findPurchaseInvoiceById>>>
@@ -212,9 +214,17 @@ function buildLines(
     if (poLine && grnLine && grnLine.purchaseOrderLineId !== poLine.id) throw new PurchaseInvoiceValidationError(`Invoice line ${index + 1} PO/GRN references do not match.`)
     const quantity = invoiceQty(input.quantity)
     const rate = invoiceQty(input.rate)
-    const amount = invoiceMoney(quantity * rate)
-    const taxAmount = invoiceMoney(amount * invoiceQty(input.taxRatePct) / 100)
     const dual = dualUomSnapshots(quantity, poLine, grnLine, input.uomCode)
+    const vendorQty = invoiceQty(
+      dual.uomQuantitySnapshot ?? (dual.uomConversionFactorSnapshot === 1 ? quantity : quantity * (dual.uomConversionFactorSnapshot ?? 1)),
+    )
+    const amount = invoiceMoney(lineAmountFromVendor(rate, vendorQty))
+    const taxSnap = taxSnapshotFromGrnOrPoLine(grnLine, poLine)
+    const taxRatePct =
+      taxSnap && taxSnap.gstRatePctSnapshot > 0
+        ? taxSnap.gstRatePctSnapshot
+        : invoiceQty(input.taxRatePct)
+    const taxAmount = invoiceMoney(amount * taxRatePct / 100)
     return {
       lineNumber: index + 1,
       purchaseOrderLineId: poLine?.id ?? null,
@@ -228,8 +238,33 @@ function buildLines(
       uomQuantitySnapshot: dual.uomQuantitySnapshot,
       uomConversionFactorSnapshot: dual.uomConversionFactorSnapshot,
       purchaseUomCodeSnapshot: dual.purchaseUomCodeSnapshot,
-      rate, amount, taxRatePct: invoiceQty(input.taxRatePct), taxAmount,
-      lineTotal: invoiceMoney(amount + taxAmount), remarks: input.remarks?.trim() || null,
+      rate,
+      amount,
+      taxRatePct,
+      taxAmount,
+      ...(taxSnap
+        ? {
+            hsnIdSnapshot: taxSnap.hsnIdSnapshot,
+            hsnCodeSnapshot: taxSnap.hsnCodeSnapshot,
+            gstGroupIdSnapshot: taxSnap.gstGroupIdSnapshot,
+            gstGroupCodeSnapshot: taxSnap.gstGroupCodeSnapshot,
+            cgstRateSnapshot: taxSnap.cgstRateSnapshot,
+            sgstRateSnapshot: taxSnap.sgstRateSnapshot,
+            igstRateSnapshot: taxSnap.igstRateSnapshot,
+            gstSchemeSnapshot: taxSnap.gstSchemeSnapshot,
+          }
+        : {
+            hsnIdSnapshot: null,
+            hsnCodeSnapshot: '',
+            gstGroupIdSnapshot: null,
+            gstGroupCodeSnapshot: '',
+            cgstRateSnapshot: 0,
+            sgstRateSnapshot: 0,
+            igstRateSnapshot: 0,
+            gstSchemeSnapshot: 'cgst_sgst',
+          }),
+      lineTotal: invoiceMoney(amount + taxAmount),
+      remarks: input.remarks?.trim() || null,
     }
   })
 }
@@ -252,16 +287,27 @@ function evaluateMatching(
   for (const line of invoice.lines) {
     const poLine = line.purchaseOrderLineId ? poLines.get(line.purchaseOrderLineId) : undefined
     const grnLine = line.goodsReceiptLineId ? grnLines.get(line.goodsReceiptLineId) : undefined
+    const factor =
+      Number(line.uomConversionFactorSnapshot ?? poLine?.uomConversionFactor ?? grnLine?.uomConversionFactor ?? 1) || 1
     const qtyBase = invoiceQty(grnLine?.receivedQuantity ?? poLine?.quantity)
-    const rateBase = invoiceQty(poLine?.rate)
-    const quantity = invoiceQty(line.quantity)
+    const expectedVendorQty = invoiceQty(
+      grnLine?.receivedUomQuantity ?? poLine?.uomQuantity ?? (factor === 1 ? qtyBase : qtyBase * factor),
+    )
+    const invoiceVendorQty = invoiceQty(
+      line.uomQuantitySnapshot ?? (factor === 1 ? line.quantity : invoiceQty(line.quantity) * factor),
+    )
     const rate = invoiceQty(line.rate)
     const amount = invoiceQty(line.amount)
-    const expectedAmount = qtyBase * rateBase
-    const qtyPct = qtyBase ? Math.abs(quantity - qtyBase) / qtyBase * 100 : (quantity ? Infinity : 0)
-    const ratePct = rateBase ? Math.abs(rate - rateBase) / rateBase * 100 : (rate ? Infinity : 0)
+    const expectedAmount = invoiceMoney(lineAmountFromVendor(invoiceQty(poLine?.rate ?? line.rate), expectedVendorQty))
+    const qtyPct = expectedVendorQty
+      ? Math.abs(invoiceVendorQty - expectedVendorQty) / expectedVendorQty * 100
+      : invoiceVendorQty
+        ? Infinity
+        : 0
+    const rateBase = invoiceQty(poLine?.rate)
+    const ratePct = rateBase ? Math.abs(rate - rateBase) / rateBase * 100 : rate ? Infinity : 0
     const amountDiff = Math.abs(amount - expectedAmount)
-    const amountPct = expectedAmount ? amountDiff / expectedAmount * 100 : (amount ? Infinity : 0)
+    const amountPct = expectedAmount ? amountDiff / expectedAmount * 100 : amount ? Infinity : 0
     if (defaults.requirePoMatch && !poLine) failures.push(`Line ${line.lineNumber}: PO line required`)
     if (defaults.requireGrnMatch && !grnLine) failures.push(`Line ${line.lineNumber}: GRN line required`)
     if (qtyPct > defaults.quantityTolerancePct) failures.push(`Line ${line.lineNumber}: quantity tolerance exceeded`)
