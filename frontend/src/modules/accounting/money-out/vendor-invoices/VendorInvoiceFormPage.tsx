@@ -31,8 +31,13 @@ import {
   type AccountingGrnLookup,
   type AccountingPurchaseOrderLookup,
 } from '@/services/api/accountingLookupsApi'
-import { getGRNById, getPurchaseOrderById } from '@/services/purchase'
-import type { GoodsReceiptLine, PurchaseOrderLine } from '@/types/purchaseDomain'
+import { getGRNById, getGRNs, getPurchaseOrderById, getPurchaseOrders } from '@/services/purchase'
+import type {
+  GoodsReceiptLine,
+  GoodsReceiptNote,
+  PurchaseOrder,
+  PurchaseOrderLine,
+} from '@/types/purchaseDomain'
 import { useActiveVendors } from '@/hooks/useMasterLists'
 import { useMasterStore } from '@/store/masterStore'
 import { useTenantProfileStore } from '@/store/tenantProfileStore'
@@ -210,7 +215,10 @@ function formLineFromPoLine(
   }
 }
 
-function formLineFromGrnLine(line: GoodsReceiptLine): FormValues['lines'][number] {
+function formLineFromGrnLine(
+  line: GoodsReceiptLine,
+  poLine?: PurchaseOrderLine | null,
+): FormValues['lines'][number] {
   const qty =
     Number(line.acceptedQty) > 0
       ? Number(line.acceptedQty)
@@ -219,17 +227,73 @@ function formLineFromGrnLine(line: GoodsReceiptLine): FormValues['lines'][number
         : Number(line.pendingQty) > 0
           ? Number(line.pendingQty)
           : 1
+  const rate = Number(line.rate) > 0 ? Number(line.rate) : Number(poLine?.rate) || 0
+  // GRN lines don't carry tax; prefer linked PO line GST (0 is valid) then default 18.
+  const gstFromPo =
+    poLine && Number.isFinite(Number(poLine.gstRatePct)) ? Number(poLine.gstRatePct) : null
   return {
     lineType: 'ITEM',
-    itemId: line.itemId?.trim() || '',
-    description: (line.description || line.itemName || line.itemCode || 'Item').trim() || 'Item',
-    hsnSacCode: (line.hsnCode || '').trim(),
+    itemId: line.itemId?.trim() || poLine?.itemId?.trim() || '',
+    description: (line.description || line.itemName || line.itemCode || poLine?.itemName || 'Item').trim() || 'Item',
+    hsnSacCode: (line.hsnCode || poLine?.hsnCode || poLine?.sacCode || '').trim(),
     quantity: qtyString(qty),
-    unitPrice: moneyString(line.rate),
-    gstRate: '18',
+    unitPrice: moneyString(rate),
+    gstRate: gstFromPo != null ? rateString(gstFromPo, '0') : '18',
     debitAccountId: '',
     costCentreId: '',
     projectReference: '',
+  }
+}
+
+/** Align with backend `PURCHASE_ORDER_INVOICE_ELIGIBLE_STATUSES` (API + demo domain slugs). */
+const PO_INVOICE_ELIGIBLE_STATUS = new Set([
+  'APPROVED',
+  'SENT_TO_VENDOR',
+  'PARTIALLY_RECEIVED',
+  'FULLY_RECEIVED',
+  'PARTIALLY_INVOICED',
+  'approved',
+  'released',
+  'partially_received',
+  'fully_received',
+])
+
+/** Align with backend `GRN_INVOICE_ELIGIBLE_STATUSES` (API + demo domain slugs). */
+const GRN_INVOICE_ELIGIBLE_STATUS = new Set([
+  'SUBMITTED',
+  'RECEIVING_COMPLETED',
+  'QC_PENDING',
+  'PARTIALLY_ACCEPTED',
+  'FULLY_ACCEPTED',
+  'INVENTORY_POSTED',
+  'CLOSED',
+  'pending_inspection',
+  'accepted',
+  'partially_accepted',
+  'posted',
+])
+
+function toPoLookup(po: PurchaseOrder): AccountingPurchaseOrderLookup {
+  return {
+    id: po.id,
+    orderNumber: po.documentNumber,
+    vendorId: po.vendor.id,
+    status: String(po.status),
+    orderDate: po.documentDate,
+    currencyCode: po.currency || 'INR',
+    totalAmount: String(po.totalAmount ?? 0),
+  }
+}
+
+function toGrnLookup(grn: GoodsReceiptNote): AccountingGrnLookup {
+  return {
+    id: grn.id,
+    grnNumber: grn.documentNumber,
+    vendorId: grn.vendor.id,
+    purchaseOrderId: grn.purchaseOrderId || '',
+    purchaseOrderNumber: grn.purchaseOrderNumber || '',
+    status: String(grn.status),
+    receiptDate: grn.documentDate,
   }
 }
 
@@ -349,6 +413,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [purchaseOrders, setPurchaseOrders] = useState<AccountingPurchaseOrderLookup[]>([])
   const [goodsReceipts, setGoodsReceipts] = useState<AccountingGrnLookup[]>([])
   const [sourcesLoading, setSourcesLoading] = useState(false)
+  const [sourcesError, setSourcesError] = useState<string | null>(null)
   const [sourceHydrating, setSourceHydrating] = useState(false)
   /** Existing source links loaded on edit — resent unchanged (never re-fabricated). */
   const [existingSourceLinks, setExistingSourceLinks] = useState<VendorInvoiceSourceLinkInput[]>([])
@@ -479,54 +544,66 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     form.setValue('placeOfSupply', pos, { shouldDirty: true, shouldValidate: true })
   }, [watched.vendorId, mode, resolveVendorPlaceOfSupply, form])
 
-  // Invoice-eligible PO / GRN for the selected vendor only (invoice-pending / eligible).
+  // Invoice-eligible PO / GRN for create source modes (vendor optional — like money-in SO pick).
   useEffect(() => {
-    if (mode !== 'create' || !isApiMode() || createSource === 'DIRECT') {
+    if (mode !== 'create' || createSource === 'DIRECT') {
       setPurchaseOrders([])
       setGoodsReceipts([])
       setSourcesLoading(false)
-      return
-    }
-    if (!watched.vendorId) {
-      setPurchaseOrders([])
-      setGoodsReceipts([])
-      setSelectedPoId('')
-      setSelectedGrnId('')
-      setSourcesLoading(false)
+      setSourcesError(null)
       return
     }
 
     let cancelled = false
     setSourcesLoading(true)
+    setSourcesError(null)
     const load = async () => {
       try {
         if (createSource === 'PURCHASE_ORDER') {
-          const res = await listPurchaseOrderLookups({
-            eligibleOnly: true,
-            limit: 100,
-            vendorId: watched.vendorId,
-          })
+          let rows: AccountingPurchaseOrderLookup[] = []
+          if (isApiMode()) {
+            const res = await listPurchaseOrderLookups({
+              eligibleOnly: true,
+              limit: 100,
+            })
+            rows = res.data ?? []
+          } else {
+            const orders = await getPurchaseOrders()
+            rows = orders
+              .filter((o) => PO_INVOICE_ELIGIBLE_STATUS.has(String(o.status)))
+              .map(toPoLookup)
+          }
           if (!cancelled) {
-            const rows = res.data ?? []
             setPurchaseOrders(rows)
-            // Drop selection if no longer in the vendor list
+            setGoodsReceipts([])
             setSelectedPoId((id) => (id && rows.some((r) => r.id === id) ? id : ''))
           }
         } else {
-          const res = await listGrnLookups({
-            eligibleOnly: true,
-            limit: 100,
-            vendorId: watched.vendorId,
-          })
+          let rows: AccountingGrnLookup[] = []
+          if (isApiMode()) {
+            const res = await listGrnLookups({
+              eligibleOnly: true,
+              limit: 100,
+            })
+            rows = res.data ?? []
+          } else {
+            const grns = await getGRNs()
+            rows = grns
+              .filter((g) => GRN_INVOICE_ELIGIBLE_STATUS.has(String(g.status)))
+              .map(toGrnLookup)
+          }
           if (!cancelled) {
-            const rows = res.data ?? []
             setGoodsReceipts(rows)
+            setPurchaseOrders([])
             setSelectedGrnId((id) => (id && rows.some((r) => r.id === id) ? id : ''))
           }
         }
       } catch (e) {
         if (!cancelled) {
-          notify.error(e instanceof Error ? e.message : 'Failed to load purchase documents')
+          const message =
+            e instanceof Error ? e.message : 'Failed to load purchase documents for invoicing'
+          setSourcesError(message)
+          notify.error(message)
           setPurchaseOrders([])
           setGoodsReceipts([])
         }
@@ -538,37 +615,66 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     return () => {
       cancelled = true
     }
-  }, [createSource, mode, watched.vendorId])
+  }, [createSource, mode])
+
+  const vendorNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const v of vendors) map.set(v.id, v.vendorName)
+    return map
+  }, [vendors])
+
+  /** When a vendor is already chosen, narrow the document list; otherwise show all open docs. */
+  const visiblePurchaseOrders = useMemo(() => {
+    if (!watched.vendorId) return purchaseOrders
+    return purchaseOrders.filter((p) => p.vendorId === watched.vendorId)
+  }, [purchaseOrders, watched.vendorId])
+
+  const visibleGoodsReceipts = useMemo(() => {
+    if (!watched.vendorId) return goodsReceipts
+    return goodsReceipts.filter((g) => g.vendorId === watched.vendorId)
+  }, [goodsReceipts, watched.vendorId])
 
   const poOptions: ErpSmartSelectOption<string>[] = useMemo(
     () =>
-      purchaseOrders.map((po) => ({
-        value: po.id,
-        label: po.orderNumber,
-        subtitle: [
-          String(po.status).replace(/_/g, ' '),
-          po.totalAmount ? `₹ ${po.totalAmount}` : null,
-          po.orderDate || null,
-        ]
-          .filter(Boolean)
-          .join(' · '),
-        searchText: `${po.orderNumber} ${po.status}`.toLowerCase(),
-        trailing: po.currencyCode || undefined,
-      })),
-    [purchaseOrders],
+      visiblePurchaseOrders.map((po) => {
+        const vendorName = vendorNameById.get(po.vendorId)
+        return {
+          value: po.id,
+          label: po.orderNumber,
+          subtitle: [
+            vendorName || null,
+            String(po.status).replace(/_/g, ' '),
+            po.totalAmount ? `₹ ${po.totalAmount}` : null,
+            po.orderDate || null,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+          searchText: `${po.orderNumber} ${vendorName ?? ''} ${po.status}`.toLowerCase(),
+          trailing: po.currencyCode || undefined,
+        }
+      }),
+    [visiblePurchaseOrders, vendorNameById],
   )
 
   const grnOptions: ErpSmartSelectOption<string>[] = useMemo(
     () =>
-      goodsReceipts.map((g) => ({
-        value: g.id,
-        label: g.grnNumber,
-        subtitle: [g.purchaseOrderNumber ? `PO ${g.purchaseOrderNumber}` : null, g.receiptDate, String(g.status).replace(/_/g, ' ')]
-          .filter(Boolean)
-          .join(' · '),
-        searchText: `${g.grnNumber} ${g.purchaseOrderNumber ?? ''} ${g.status}`.toLowerCase(),
-      })),
-    [goodsReceipts],
+      visibleGoodsReceipts.map((g) => {
+        const vendorName = vendorNameById.get(g.vendorId)
+        return {
+          value: g.id,
+          label: g.grnNumber,
+          subtitle: [
+            vendorName || null,
+            g.purchaseOrderNumber ? `PO ${g.purchaseOrderNumber}` : null,
+            g.receiptDate,
+            String(g.status).replace(/_/g, ' '),
+          ]
+            .filter(Boolean)
+            .join(' · '),
+          searchText: `${g.grnNumber} ${vendorName ?? ''} ${g.purchaseOrderNumber ?? ''} ${g.status}`.toLowerCase(),
+        }
+      }),
+    [visibleGoodsReceipts, vendorNameById],
   )
 
   const itemOptions: ErpSmartSelectOption<string>[] = useMemo(
@@ -581,6 +687,15 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
           searchText: `${i.itemCode} ${i.itemName} ${i.hsnCode ?? ''}`.toLowerCase(),
         })),
     [items],
+  )
+
+  const applyVendorFromSource = useCallback(
+    (vendorId: string | null | undefined) => {
+      if (!vendorId) return
+      if (form.getValues('vendorId') === vendorId) return
+      form.setValue('vendorId', vendorId, { shouldDirty: true, shouldValidate: true })
+    },
+    [form],
   )
 
   const onPickVendor = (vendorId: string) => {
@@ -603,14 +718,9 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       return
     }
 
-    if (!form.getValues('vendorId')) {
-      notify.info('Select a vendor first.')
-      setSelectedPoId('')
-      return
-    }
-
     const lookup = purchaseOrders.find((p) => p.id === poId)
     if (lookup) {
+      applyVendorFromSource(lookup.vendorId)
       form.setValue('invoiceType', 'GOODS', { shouldDirty: true })
       if (lookup.currencyCode) {
         form.setValue('currencyCode', lookup.currencyCode, { shouldDirty: true })
@@ -623,13 +733,10 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       const po = await getPurchaseOrderById(poId)
       if (!po) {
         notify.error('Purchase order not found')
-        return
-      }
-      if (po.vendor.id && po.vendor.id !== form.getValues('vendorId')) {
-        notify.error('This purchase order belongs to a different vendor.')
         setSelectedPoId('')
         return
       }
+      applyVendorFromSource(po.vendor?.id || lookup?.vendorId)
       form.setValue('invoiceType', 'GOODS', { shouldDirty: true })
       if (po.currency) form.setValue('currencyCode', po.currency, { shouldDirty: true })
 
@@ -664,14 +771,9 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       return
     }
 
-    if (!form.getValues('vendorId')) {
-      notify.info('Select a vendor first.')
-      setSelectedGrnId('')
-      return
-    }
-
     const lookup = goodsReceipts.find((g) => g.id === grnId)
     if (lookup) {
+      applyVendorFromSource(lookup.vendorId)
       form.setValue('invoiceType', 'GOODS', { shouldDirty: true })
     }
 
@@ -681,15 +783,26 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       const grn = await getGRNById(grnId)
       if (!grn) {
         notify.error('Goods receipt not found')
-        return
-      }
-      if (grn.vendor.id && grn.vendor.id !== form.getValues('vendorId')) {
-        notify.error('This goods receipt belongs to a different vendor.')
         setSelectedGrnId('')
         return
       }
+      applyVendorFromSource(grn.vendor?.id || lookup?.vendorId)
       form.setValue('invoiceType', 'GOODS', { shouldDirty: true })
       if (grn.currency) form.setValue('currencyCode', grn.currency, { shouldDirty: true })
+
+      // Enrich GST/HSN/rate from linked PO lines when present (GRN payload omits tax).
+      const poLineById = new Map<string, PurchaseOrderLine>()
+      const poId = grn.purchaseOrderId || lookup?.purchaseOrderId
+      if (poId) {
+        try {
+          const po = await getPurchaseOrderById(poId)
+          for (const pl of po?.lines ?? []) {
+            if (pl.id) poLineById.set(pl.id, pl)
+          }
+        } catch {
+          /* PO enrichment optional */
+        }
+      }
 
       const mapable = (grn.lines ?? []).filter((l) => {
         const qty = Number(l.acceptedQty) || Number(l.receivedQty) || 0
@@ -709,7 +822,12 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
         return
       }
 
-      const mapped = linesForForm.map((l) => formLineFromGrnLine(l))
+      const mapped = linesForForm.map((l) =>
+        formLineFromGrnLine(
+          l,
+          l.purchaseOrderLineId ? poLineById.get(l.purchaseOrderLineId) : undefined,
+        ),
+      )
       replace(mapped)
       notify.success(
         `Loaded ${linesForForm.length} line${linesForForm.length === 1 ? '' : 's'} from ${grn.documentNumber}`,
@@ -1181,9 +1299,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                       hint={
                         sourceHydrating
                           ? 'Loading document lines…'
-                          : !hasVendor
-                            ? 'Select a vendor first, then choose an invoice-pending document.'
-                            : 'Load product lines from the selected document.'
+                          : 'Pick a document to fill vendor and product lines (vendor optional first).'
                       }
                     >
                       <ErpSmartSelect
@@ -1194,27 +1310,51 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                           else void onPickGoodsReceipt(v || '')
                         }}
                         placeholder={
-                          !hasVendor
-                            ? 'Select vendor first…'
-                            : createSource === 'PURCHASE_ORDER'
-                              ? 'Select purchase order…'
-                              : 'Select GRN…'
+                          createSource === 'PURCHASE_ORDER'
+                            ? 'Select purchase order…'
+                            : 'Select GRN…'
                         }
                         emptyMessage={
                           sourcesLoading || sourceHydrating
                             ? 'Loading…'
-                            : !hasVendor
-                              ? 'Select a vendor first'
-                              : createSource === 'PURCHASE_ORDER'
-                                ? 'No invoice-pending purchase orders for this vendor'
-                                : 'No invoice-pending goods receipts for this vendor'
+                            : sourcesError
+                              ? 'Could not load documents — see error below'
+                              : hasVendor
+                                ? createSource === 'PURCHASE_ORDER'
+                                  ? 'No open purchase orders for this vendor'
+                                  : 'No open goods receipts for this vendor'
+                                : createSource === 'PURCHASE_ORDER'
+                                  ? 'No open purchase orders to invoice'
+                                  : 'No open goods receipts to invoice'
                         }
-                        disabled={!hasVendor}
                         allowEmpty
                       />
                     </FormField>
                   </div>
                 </div>
+                {sourcesError ? (
+                  <p className="mi-create-banner mi-create-banner--warn mt-2 text-[12px]" role="alert">
+                    {sourcesError}
+                  </p>
+                ) : null}
+                {!sourcesLoading &&
+                !sourcesError &&
+                createSource === 'PURCHASE_ORDER' &&
+                visiblePurchaseOrders.length === 0 ? (
+                  <p className="mt-2 text-[12px] text-erp-muted">
+                    No invoice-eligible purchase orders
+                    {hasVendor ? ' for this vendor' : ''}. Release/approve a PO first, or bill via Direct.
+                  </p>
+                ) : null}
+                {!sourcesLoading &&
+                !sourcesError &&
+                createSource === 'GOODS_RECEIPT' &&
+                visibleGoodsReceipts.length === 0 ? (
+                  <p className="mt-2 text-[12px] text-erp-muted">
+                    No invoice-eligible goods receipts
+                    {hasVendor ? ' for this vendor' : ''}. Post a GRN first, or bill via Direct.
+                  </p>
+                ) : null}
                 {createSource === 'PURCHASE_ORDER' && selectedPo ? (
                   <div className="mi-create-source-row">
                     <FormField label="PO status">
