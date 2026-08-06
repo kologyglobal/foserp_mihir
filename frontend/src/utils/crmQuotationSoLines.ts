@@ -178,6 +178,8 @@ export function buildSalesOrderLinesFromQuotationDocument(input: {
       description: l.description || matchedItem?.itemName || matchedProduct?.productName || '',
       productId: null,
       itemId: lineItemId,
+      itemCodeSnapshot: matchedItem?.itemCode ?? null,
+      itemNameSnapshot: matchedItem?.itemName ?? null,
       qty: l.qty,
       uom: l.uom || 'Nos',
       unitPrice: l.unitPrice,
@@ -187,6 +189,18 @@ export function buildSalesOrderLinesFromQuotationDocument(input: {
       gstAmount: Math.round(gst * 100) / 100,
       lineTotal: l.lineTotal,
       technicalScopeRef: technicalScope,
+      // Prefer quotation line tax snapshot; do not re-resolve item master tax here.
+      hsnCode: l.hsnCode ?? l.sacCode ?? matchedItem?.hsnCode ?? null,
+      hsnId: l.hsnId ?? null,
+      taxScheme: l.taxScheme ?? null,
+      cgstRate: l.cgstRate ?? l.cgstPct ?? null,
+      sgstRate: l.sgstRate ?? l.sgstPct ?? null,
+      utgstRate: l.utgstRate ?? l.utgstPct ?? null,
+      igstRate: l.igstRate ?? l.igstPct ?? null,
+      cgstAmount: l.cgstAmount ?? null,
+      sgstAmount: l.sgstAmount ?? null,
+      utgstAmount: l.utgstAmount ?? null,
+      igstAmount: l.igstAmount ?? null,
     }
   })
 }

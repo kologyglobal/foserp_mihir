@@ -28,6 +28,30 @@ export interface QuotationPriceLineDto {
   taxPct: number
   lineTotal: number
   isOptional: boolean
+  /** HSN / SAC tax snapshot (immutable at save when present). */
+  hsnId?: string | null
+  hsnCode?: string | null
+  sacCode?: string | null
+  uomCode?: string | null
+  taxGroupId?: string | null
+  taxGroupCode?: string | null
+  gstPct?: number | null
+  cgstPct?: number | null
+  sgstPct?: number | null
+  utgstPct?: number | null
+  igstPct?: number | null
+  cessPct?: number | null
+  taxScheme?: string | null
+  taxableAmount?: number | null
+  taxAmount?: number | null
+  cgstRate?: number | null
+  sgstRate?: number | null
+  utgstRate?: number | null
+  igstRate?: number | null
+  cgstAmount?: number | null
+  sgstAmount?: number | null
+  utgstAmount?: number | null
+  igstAmount?: number | null
 }
 
 export interface QuotationSectionDto {

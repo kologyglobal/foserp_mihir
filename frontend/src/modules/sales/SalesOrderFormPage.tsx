@@ -63,8 +63,7 @@ import {
   CommercialGstSupplyPanel,
   type CommercialGstSupplyValue,
 } from '../../components/sales/CommercialGstSupplyPanel'
-import { COMPANY_STATE } from '../../types/invoice'
-import { resolveGstStateCode } from '../../utils/gstStateCode'
+import { loadSellerStateCode } from '../../utils/sellerGstState'
 
 export { SalesOrderNewPage } from './SalesOrderCreatePage'
 
@@ -101,8 +100,24 @@ export function SalesOrderEditPage() {
     placeOfSupply: '',
     placeOfSupplyOverride: false,
     placeOfSupplyOverrideReason: '',
-    supplierStateCode: resolveGstStateCode(COMPANY_STATE) ?? '27',
+    supplierStateCode: '',
   })
+
+  useEffect(() => {
+    let cancelled = false
+    void loadSellerStateCode().then((code) => {
+      if (cancelled || !code) return
+      setGstSupply((prev) => {
+        // Prefer document snapshot; fill from LE only when missing
+        if (prev.supplierStateCode) return prev
+        return { ...prev, supplierStateCode: code }
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const deliveryTimeOptions = useDeliveryTimeOptions()
   const { locationId, setLocationId } = useDocumentLocation('sales', so?.locationId)
   const showLocationField = !useTenantProfileStore((s) => s.isServices())
@@ -138,12 +153,15 @@ export function SalesOrderEditPage() {
     setDeliveryTime(so.deliveryTime?.trim() ?? '')
     setInternalRemarks(so.internalRemarks ?? '')
     if (so.locationId) setLocationId(so.locationId)
-    setGstSupply({
+    setGstSupply((prev) => ({
       placeOfSupply: so.placeOfSupplyStateCode ?? so.placeOfSupply ?? '',
       placeOfSupplyOverride: Boolean(so.placeOfSupplyOverride),
       placeOfSupplyOverrideReason: so.placeOfSupplyOverrideReason ?? '',
-      supplierStateCode: so.supplierStateCode ?? resolveGstStateCode(COMPANY_STATE) ?? '27',
-    })
+      // Prefer SO snapshot; keep LE-seeded value when SO never stored supplier (no silent '27').
+      supplierStateCode: so.supplierStateCode?.trim()
+        ? so.supplierStateCode
+        : prev.supplierStateCode,
+    }))
   }, [so, setLocationId])
 
   // Seed product lines once per order; re-seed when API detail upgrades list stub ΓåÆ multi-lines.

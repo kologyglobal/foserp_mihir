@@ -15,6 +15,8 @@ type Props = {
   rows: ItemUomConversionRow[]
   onChange: (rows: ItemUomConversionRow[]) => void
   uomCodeOf: (uomId: string) => string
+  /** Default factor for newly added alternate UOMs (synced from General → Quantity). */
+  defaultConversionFactor?: number
 }
 
 function ensureBaseRow(baseUomId: string, rows: ItemUomConversionRow[]): ItemUomConversionRow[] {
@@ -34,6 +36,45 @@ function ensureBaseRow(baseUomId: string, rows: ItemUomConversionRow[]): ItemUom
   ]
 }
 
+function positiveFactor(value: number | undefined): number {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? n : 1
+}
+
+/**
+ * Keep purchase conversion factor aligned with General → Quantity (vendor units per 1 base).
+ * Base UOM stays at 1. Only the default purchase alternate is updated so multi-UOM rows
+ * (e.g. BOX=12 and PACK=6) are not wiped to a single factor.
+ * If there is no default alternate, the single non-base purchase-allowed row is updated.
+ */
+export function applyGeneralQuantityToPurchaseUoms(
+  rows: ItemUomConversionRow[],
+  baseUomId: string,
+  quantityPerUom: number,
+): ItemUomConversionRow[] {
+  if (!baseUomId) return rows
+  const factor = positiveFactor(quantityPerUom)
+  const list = ensureBaseRow(baseUomId, rows)
+  const defaultAlt = list.find(
+    (r) =>
+      r.uomId &&
+      r.uomId !== baseUomId &&
+      r.isDefaultPurchase &&
+      r.isPurchaseAllowed !== false,
+  )
+  const alternates = list.filter(
+    (r) => r.uomId && r.uomId !== baseUomId && r.isPurchaseAllowed !== false,
+  )
+  const targetUomId =
+    defaultAlt?.uomId ?? (alternates.length === 1 ? alternates[0]!.uomId : null)
+
+  return list.map((r) => {
+    if (r.uomId === baseUomId) return { ...r, conversionFactor: 1 }
+    if (targetUomId && r.uomId === targetUomId) return { ...r, conversionFactor: factor }
+    return r
+  })
+}
+
 /** Item Master — multiple purchase UOM mappings per item (base UOM + alternates). */
 export function ItemUomConversionEditor({
   baseUomId,
@@ -41,8 +82,10 @@ export function ItemUomConversionEditor({
   rows,
   onChange,
   uomCodeOf,
+  defaultConversionFactor = 1,
 }: Props) {
   const list = ensureBaseRow(baseUomId, rows)
+  const newRowFactor = positiveFactor(defaultConversionFactor)
 
   const patch = (index: number, patchRow: Partial<ItemUomConversionRow>) => {
     const next = list.map((row, i) => (i === index ? { ...row, ...patchRow } : row))
@@ -63,7 +106,7 @@ export function ItemUomConversionEditor({
       ...list,
       {
         uomId: '',
-        conversionFactor: 1,
+        conversionFactor: newRowFactor,
         isPurchaseAllowed: true,
         isDefaultPurchase: false,
       },
@@ -100,7 +143,9 @@ export function ItemUomConversionEditor({
           <thead>
             <tr className="border-b border-erp-border text-[11px] uppercase tracking-wide text-erp-muted">
               <th className="px-2 py-2 font-medium">UOM</th>
-              <th className="px-2 py-2 font-medium">Factor (per 1 {baseUomCode})</th>
+              <th className="px-2 py-2 font-medium" title={`Vendor / purchase units in 1 ${baseUomCode}`}>
+                Factor (1 {baseUomCode} = N …)
+              </th>
               <th className="px-2 py-2 font-medium">Purchase</th>
               <th className="px-2 py-2 font-medium">Default</th>
               <th className="px-2 py-2 w-10" />
@@ -184,7 +229,10 @@ export function ItemUomConversionEditor({
       </div>
 
       <p className="mt-3 text-[11px] text-erp-muted">
-        Example: factor 3 on MTR with base NOS means 30 MTR received → 10 NOS in inventory. FIFO/costing uses base qty.
+        Contract: 1 {baseUomCode} ={' '}
+        <span className="font-medium">factor</span> purchase units (stock qty = purchase qty ÷ factor). Example:
+        base NOS, MTR factor 50 → 1 NOS = 50 MTR; receive 5000 MTR → 100 NOS stock. Not “units per pack” unless pack
+        is smaller than base.
       </p>
     </div>
   )

@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware'
 import type { ProformaInvoice, ProformaInvoiceLine, ProformaInvoiceSource, ProformaInvoiceStatus } from '../types/proformaInvoice'
 import { DEFAULT_GST_RATE } from '../types/invoice'
 import { computeGst } from '../utils/gstEngine'
-import { DEFAULT_PURCHASE_SETUP } from '../data/purchase/purchaseSetupSeed'
 import { nextDocumentNo } from '../utils/documentNumbers'
 import { buildProformaLinesFromSalesOrder, computeProformaLineTotals, sumProformaTaxable } from '../utils/proformaInvoiceLines'
 import { useMasterStore } from './masterStore'
@@ -12,6 +11,11 @@ import { isApiMode } from '../config/apiConfig'
 import { erpStorage, ERP_PERSIST_VERSION, ERP_STORAGE_KEYS } from './persistConfig'
 import { assertPermission } from '../utils/permissions'
 import { resolveCustomerShippingAddress } from '../utils/customerUtils'
+import {
+  placeOfSupplyFromSalesOrder,
+  resolveSellerStateForBreakdown,
+  taxHeaderPayloadFromSalesOrder,
+} from '../utils/commercialSupplySnapshot'
 
 function genId(prefix: string) {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
@@ -47,16 +51,16 @@ function normalizeLines(lines: ProformaInvoiceLine[]): ProformaInvoiceLine[] {
   })
 }
 
-function buildGst(lines: ProformaInvoiceLine[], customerState: string) {
+function buildGst(lines: ProformaInvoiceLine[], placeOfSupply: string, sellerStateCode?: string | null) {
   const taxable = sumProformaTaxable(lines)
   const avgRate = lines.length
     ? lines.reduce((s, l) => s + l.taxPct, 0) / lines.length
     : DEFAULT_GST_RATE
   return computeGst(
     taxable,
-    customerState,
+    placeOfSupply,
     avgRate,
-    DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyStateCode || DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyState,
+    resolveSellerStateForBreakdown(sellerStateCode),
   )
 }
 
@@ -74,6 +78,11 @@ export interface ProformaInvoiceInput {
   lines: ProformaInvoiceLine[]
   salesOrderId?: string | null
   source?: ProformaInvoiceSource
+  placeOfSupply?: string | null
+  placeOfSupplyStateCode?: string | null
+  supplierStateCode?: string | null
+  supplyType?: string | null
+  gstScheme?: string | null
 }
 
 interface ProformaInvoiceState {
@@ -114,6 +123,14 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
         const lines = normalizeLines(input.lines)
         const ts = nowIso()
         const proformaDate = input.proformaDate ?? ts.slice(0, 10)
+        const so = input.salesOrderId
+          ? useMrpStore.getState().getSalesOrder(input.salesOrderId)
+          : undefined
+        const placeOfSupply =
+          input.placeOfSupplyStateCode ||
+          input.placeOfSupply ||
+          placeOfSupplyFromSalesOrder(so, customer.state)
+        const sellerState = input.supplierStateCode || so?.supplierStateCode
         const record: ProformaInvoice = {
           id: genId('pi'),
           proformaNo: nextDocumentNo('PI-', get().proformaInvoices.map((p) => p.proformaNo)),
@@ -123,14 +140,14 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
           source: input.source ?? 'direct',
           salesOrderId: input.salesOrderId ?? null,
           salesOrderNo: input.salesOrderId ? useMrpStore.getState().getSalesOrder(input.salesOrderId)?.salesOrderNo ?? null : null,
-          quotationId: null,
-          quotationNo: null,
+          quotationId: so?.quotationId ?? null,
+          quotationNo: so?.quotationNo ?? null,
           customerId: customer.id,
           customerName: customer.customerName,
           customerGstin: customer.gstin,
           customerState: customer.state,
           customerAddress: formatCustomerAddress(customer),
-          placeOfSupply: customer.state,
+          placeOfSupply,
           customerPoNumber: input.customerPoNumber ?? null,
           paymentTerms: input.paymentTerms,
           deliveryTerms: input.deliveryTerms,
@@ -139,7 +156,7 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
           remarks: input.remarks ?? '',
           locationId: input.locationId ?? null,
           lines,
-          gst: buildGst(lines, customer.state),
+          gst: buildGst(lines, placeOfSupply, sellerState),
           issuedAt: null,
           createdAt: ts,
           updatedAt: ts,
@@ -171,6 +188,13 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
               salesOrderId: so.id,
               salesOrderNo: so.salesOrderNo,
               source: 'sales_order',
+              ...taxHeaderPayloadFromSalesOrder(so),
+              placeOfSupply: patch?.placeOfSupply ?? so.placeOfSupply ?? so.placeOfSupplyStateCode,
+              placeOfSupplyStateCode:
+                patch?.placeOfSupplyStateCode ?? so.placeOfSupplyStateCode ?? null,
+              supplierStateCode: patch?.supplierStateCode ?? so.supplierStateCode ?? null,
+              supplyType: patch?.supplyType ?? so.supplyType ?? null,
+              gstScheme: patch?.gstScheme ?? so.gstScheme ?? null,
             }),
           )
         }
@@ -197,6 +221,11 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
         const lines = normalizeLines(patch?.lines ?? buildProformaLinesFromSalesOrder(so, master.items))
         const ts = nowIso()
         const proformaDate = patch?.proformaDate ?? ts.slice(0, 10)
+        const placeOfSupply =
+          patch?.placeOfSupplyStateCode ||
+          patch?.placeOfSupply ||
+          placeOfSupplyFromSalesOrder(so, customer.state)
+        const sellerState = patch?.supplierStateCode || so.supplierStateCode
 
         const record: ProformaInvoice = {
           id: genId('pi'),
@@ -214,7 +243,7 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
           customerGstin: customer.gstin,
           customerState: customer.state,
           customerAddress: formatCustomerAddress(customer),
-          placeOfSupply: customer.state,
+          placeOfSupply,
           customerPoNumber: patch?.customerPoNumber ?? so.customerPoNumber ?? null,
           paymentTerms: patch?.paymentTerms ?? so.paymentTerms ?? '',
           deliveryTerms: patch?.deliveryTerms ?? so.deliveryTerms ?? '',
@@ -223,7 +252,7 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
           remarks: patch?.remarks ?? so.internalRemarks ?? '',
           locationId: patch?.locationId ?? so.locationId ?? null,
           lines,
-          gst: buildGst(lines, customer.state),
+          gst: buildGst(lines, placeOfSupply, sellerState),
           issuedAt: null,
           createdAt: ts,
           updatedAt: ts,
@@ -250,6 +279,15 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
 
         const lines = normalizeLines(patch.lines ?? existing.lines)
         const proformaDate = patch.proformaDate ?? existing.proformaDate
+        const so = existing.salesOrderId
+          ? useMrpStore.getState().getSalesOrder(existing.salesOrderId)
+          : undefined
+        const placeOfSupply =
+          patch.placeOfSupplyStateCode ||
+          patch.placeOfSupply ||
+          existing.placeOfSupply ||
+          placeOfSupplyFromSalesOrder(so, customer.state)
+        const sellerState = patch.supplierStateCode || so?.supplierStateCode
 
         set((s) => ({
           proformaInvoices: s.proformaInvoices.map((p) =>
@@ -261,7 +299,7 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
                   customerGstin: customer.gstin,
                   customerState: customer.state,
                   customerAddress: formatCustomerAddress(customer),
-                  placeOfSupply: customer.state,
+                  placeOfSupply,
                   proformaDate,
                   validUntil: patch.validUntil ?? p.validUntil,
                   paymentTerms: patch.paymentTerms ?? p.paymentTerms,
@@ -272,7 +310,7 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
                   remarks: patch.remarks ?? p.remarks,
                   locationId: patch.locationId !== undefined ? patch.locationId : p.locationId,
                   lines,
-                  gst: buildGst(lines, customer.state),
+                  gst: buildGst(lines, placeOfSupply, sellerState),
                   updatedAt: nowIso(),
                 }
               : p,

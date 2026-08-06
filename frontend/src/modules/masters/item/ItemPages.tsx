@@ -33,6 +33,7 @@ import { notify, notifyMasterSaved } from '../../../store/toastStore'
 import { useBomStore } from '../../../store/bomStore'
 import { useRoutingStore } from '../../../store/routingStore'
 import { useLeafCategories, useActiveUoms, useEnrichedItems } from '../../../hooks/useMasterLists'
+import { useBinOptions } from '../../../hooks/useBinOptions'
 import { enrichItemWithDefaults } from '../../../utils/itemMasterDefaults'
 import { buildMasterBreadcrumbs } from '../../../utils/masterNavigation'
 import { formatCurrency, formatNumber } from '../../../utils/formatters/currency'
@@ -49,6 +50,7 @@ import { EnterpriseMasterWorkspace, MasterStickyFooter } from '../shared/Enterpr
 import { MasterCodeField } from '../../../components/masters/MasterCodeField'
 import { MasterItemImageField } from '../../../components/masters/MasterItemImageField'
 import {
+  applyGeneralQuantityToPurchaseUoms,
   ItemUomConversionEditor,
   itemToUomConversionRows,
   type ItemUomConversionRow,
@@ -194,6 +196,11 @@ const schema = z.object({
     emptyStringToNull,
     z.enum(['phantom', 'manufactured', 'purchased', 'subcontracted']).nullable().optional(),
   ),
+  /** Demo BIN ids are not always UUID; API mode uses UUID Bin Master ids. */
+  defaultBinId: z.preprocess(
+    (value) => (value === '' || value == null ? null : String(value)),
+    z.string().nullable().optional(),
+  ),
 }).superRefine((data, ctx) => {
   const mappedType = mapProductTypeToItemType(data.productType)
   if (mappedType === 'sub_assembly' && !data.subAssemblyRule) {
@@ -294,6 +301,7 @@ function buildItemFormDefaults(
         existing.defaultFulfilmentMethod ?? defaultFulfilmentForProductType(productType),
       productionAllowed:
         existing.productionAllowed ?? defaultProductionAllowedForProductType(productType),
+      defaultBinId: existing.defaultBinId ?? '',
     }
   }
   return {
@@ -341,6 +349,7 @@ function buildItemFormDefaults(
     productionBomId: '',
     routingNo: '',
     drawingNo: '',
+    defaultBinId: '',
   }
 }
 
@@ -451,6 +460,7 @@ export function ItemFormPage() {
   const items = useMasterStore((s) => s.items)
   const leafCategories = useLeafCategories()
   const uoms = useActiveUoms()
+  const binOptions = useBinOptions()
   const getHsn = useMasterStore((s) => s.getHsn)
   const getHsnByCode = useMasterStore((s) => s.getHsnByCode)
   const hsnMasters = useMasterStore((s) => s.hsnMasters)
@@ -550,6 +560,19 @@ export function ItemFormPage() {
   const baseUomId = watch('baseUomId')
 
   const baseUomCode = uoms.find((u) => u.id === baseUomId)?.uomCode ?? '—'
+  const quantityPerUom = watch('quantityPerUom')
+
+  /** General → Quantity drives purchase conversion factor (PO/GRN multi-unit). */
+  function syncPurchaseQtyFromGeneral(raw: number) {
+    const factor = Number.isFinite(raw) && raw > 0 ? raw : 1
+    setValue('uomConversionFactor', factor, { shouldValidate: true, shouldDirty: true })
+    setValue('purchaseQtyPerUom', factor, { shouldValidate: true, shouldDirty: true })
+    const baseId = getValues('baseUomId')
+    if (!baseId) return
+    setUomConversionRows((rows) => applyGeneralQuantityToPurchaseUoms(rows, baseId, factor))
+  }
+
+  const quantityPerUomRegister = register('quantityPerUom')
 
   const categoryOptions = useMemo(
     () => leafCategories.map((c) => ({ value: c.id, label: `${c.categoryCode} — ${c.categoryName}`, searchText: c.categoryName.toLowerCase() })),
@@ -650,6 +673,7 @@ export function ItemFormPage() {
         productionBomId: data.productionBomId || null,
         routingNo: data.routingNo || null,
         drawingNo: data.drawingNo || null,
+        defaultBinId: data.defaultBinId || null,
         isStockable: data.inventoryType === 'inventory',
       }
       try {
@@ -802,7 +826,19 @@ export function ItemFormPage() {
             <UomMasterSelect value={baseUomId} onChange={(v) => setValue('baseUomId', v, { shouldValidate: true })} />
           </FormField>
           <FormField label="Quantity" error={errors.quantityPerUom?.message}>
-            <Input type="number" step="0.001" {...register('quantityPerUom')} />
+            <Input
+              type="number"
+              step="0.001"
+              min={0}
+              {...quantityPerUomRegister}
+              onChange={(e) => {
+                void quantityPerUomRegister.onChange(e)
+                syncPurchaseQtyFromGeneral(Number(e.target.value))
+              }}
+            />
+            <p className="mt-1 text-xs text-erp-muted">
+              Also sets purchase UOM conversion factor (vendor units per 1 stock unit).
+            </p>
           </FormField>
           <FormField label="Material Grade">
             <Input {...register('materialGrade')} />
@@ -848,6 +884,7 @@ export function ItemFormPage() {
             rows={uomConversionRows}
             onChange={setUomConversionRows}
             uomCodeOf={(uomId) => uoms.find((u) => u.id === uomId)?.uomCode ?? '—'}
+            defaultConversionFactor={Number(quantityPerUom) > 0 ? Number(quantityPerUom) : 1}
           />
           <FormField label="Standard Rate">
             <Input type="number" step="0.01" {...register('standardRate')} />
@@ -907,6 +944,24 @@ export function ItemFormPage() {
           </FormField>
           <FormField label="Require weight at receipt">
             <Checkbox {...register('requireWeightAtReceipt')} label="Weight mandatory on GRN" />
+          </FormField>
+          <FormField label="Default Bin Code" error={errors.defaultBinId?.message}>
+            <Select
+              value={watch('defaultBinId') ?? ''}
+              onChange={(e) =>
+                setValue('defaultBinId', e.target.value || null, { shouldValidate: true, shouldDirty: true })
+              }
+            >
+              <option value="">— Select —</option>
+              {binOptions.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.code} — {b.name}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-erp-muted">
+              Auto-fills BIN on purchase lines (PR, PO, GRN) when this item is selected.
+            </p>
           </FormField>
         </ErpCardSection>
 
@@ -1141,7 +1196,15 @@ export function ItemDetailPage() {
   const getUomName = useMasterStore((s) => s.getUomName)
   const getHsn = useMasterStore((s) => s.getHsn)
   const getGstGroup = useMasterStore((s) => s.getGstGroup)
+  const bins = useBinOptions()
   if (!item) return <MasterNotFound message="Item not found." />
+
+  const defaultBinLabel = (() => {
+    if (item.defaultBinCode) return item.defaultBinCode
+    if (!item.defaultBinId) return '—'
+    const hit = bins.find((b) => b.id === item.defaultBinId)
+    return hit ? `${hit.code} — ${hit.name}` : item.defaultBinId
+  })()
 
   return (
     <DetailLayout backTo="/masters/items" backLabel="Item Master" title={`${item.itemCode} — ${item.itemName}`} editTo={`/masters/items/${item.id}/edit`}>
@@ -1171,6 +1234,7 @@ export function ItemDetailPage() {
           <DetailField label="On PO" value={formatNumber(item.qtyOnPurchaseOrder ?? 0)} />
           <DetailField label="On Production" value={formatNumber(item.qtyOnProductionOrder ?? 0)} />
           <DetailField label="On SO" value={formatNumber(item.qtyOnSalesOrder ?? 0)} />
+          <DetailField label="Default Bin" value={defaultBinLabel} />
         </DetailGrid>
       </DetailSection>
       <DetailSection title="Quality & Manufacturing">

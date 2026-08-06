@@ -160,6 +160,8 @@ export interface PurchaseOrdersTableProps {
   hasActiveFilters?: boolean
   onClearFilters?: () => void
   onExport?: () => void
+  /** Current page-level Sort key — clears header column sort when it changes */
+  sortBy?: string
 }
 
 export function PurchaseOrdersTable({
@@ -172,6 +174,7 @@ export function PurchaseOrdersTable({
   hasActiveFilters,
   onClearFilters,
   onExport,
+  sortBy,
 }: PurchaseOrdersTableProps) {
   const densityClass = useDensityClass()
 
@@ -344,6 +347,7 @@ export function PurchaseOrdersTable({
       stickyFirstColumn
       showCompactSearch={false}
       enableColumnSorting={false}
+      sortResetToken={sortBy}
       exportFileName="purchase-orders"
       onExport={onExport}
       getRowId={(r) => r.id}

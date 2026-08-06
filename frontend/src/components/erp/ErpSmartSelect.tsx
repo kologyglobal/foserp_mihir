@@ -348,11 +348,14 @@ export function ErpSmartSelect<T extends string = string>({
     el?.scrollIntoView({ block: 'nearest' })
   }, [highlightIndex, open])
 
-  function selectOption(opt: ErpSmartSelectOption<T>) {
+  function selectOption(opt: ErpSmartSelectOption<T>, options?: { keepFocus?: boolean }) {
     onChange(opt.value)
     setFilterQuery('')
     setOpen(false)
-    inputRef.current?.blur()
+    // Tab must keep focus so the browser can move to the next control.
+    if (!options?.keepFocus) {
+      inputRef.current?.blur()
+    }
   }
 
   function clearValue(e: React.MouseEvent) {
@@ -410,8 +413,14 @@ export function ErpSmartSelect<T extends string = string>({
       setOpen(false)
       return
     }
+    // Commit the highlighted row on Tab so keyboard users update form state
+    // (UOM / ERP smart selects / long Selects). Do not preventDefault — focus moves on.
     if (e.key === 'Tab') {
-      setOpen(false)
+      if (open && filtered[highlightIndex]) {
+        selectOption(filtered[highlightIndex], { keepFocus: true })
+      } else {
+        setOpen(false)
+      }
     }
   }
 

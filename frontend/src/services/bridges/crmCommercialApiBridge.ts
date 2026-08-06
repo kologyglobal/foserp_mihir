@@ -39,7 +39,16 @@ function upsertProforma(proforma: ProformaInvoice) {
   }))
 }
 
-function mapProformaPayload(input: ProformaInvoiceInput & { salesOrderId?: string | null; salesOrderNo?: string | null; source?: string }) {
+function mapProformaPayload(input: ProformaInvoiceInput & {
+  salesOrderId?: string | null
+  salesOrderNo?: string | null
+  source?: string
+  placeOfSupply?: string | null
+  placeOfSupplyStateCode?: string | null
+  supplierStateCode?: string | null
+  supplyType?: string | null
+  gstScheme?: string | null
+}) {
   return {
     companyId: input.customerId,
     // Backend defaults proformaDate/validUntil server-side when omitted; an empty
@@ -56,6 +65,11 @@ function mapProformaPayload(input: ProformaInvoiceInput & { salesOrderId?: strin
     shippingAddress: input.shippingAddress,
     remarks: input.remarks,
     locationId: input.locationId ?? null,
+    placeOfSupply: input.placeOfSupply ?? null,
+    placeOfSupplyStateCode: input.placeOfSupplyStateCode ?? null,
+    supplierStateCode: input.supplierStateCode ?? null,
+    supplyType: input.supplyType ?? null,
+    gstScheme: input.gstScheme ?? null,
     lines: input.lines.map((l: ProformaInvoiceLine) => ({
       itemId: l.itemId,
       itemCode: l.itemCode,
@@ -66,6 +80,15 @@ function mapProformaPayload(input: ProformaInvoiceInput & { salesOrderId?: strin
       unitPrice: l.unitPrice,
       discountPct: l.discountPct,
       taxPct: l.taxPct,
+      taxScheme: l.taxScheme ?? null,
+      cgstRate: l.cgstRate ?? null,
+      sgstRate: l.sgstRate ?? null,
+      utgstRate: l.utgstRate ?? null,
+      igstRate: l.igstRate ?? null,
+      cgstAmount: l.cgstAmount ?? null,
+      sgstAmount: l.sgstAmount ?? null,
+      utgstAmount: l.utgstAmount ?? null,
+      igstAmount: l.igstAmount ?? null,
       sourceLineId: l.id,
       maxQty: null,
     })),
@@ -119,7 +142,16 @@ export async function apiFetchProforma(id: string): Promise<{ ok: boolean; error
 }
 
 export async function apiCreateProforma(
-  input: ProformaInvoiceInput & { salesOrderId?: string | null; salesOrderNo?: string | null; source?: string },
+  input: ProformaInvoiceInput & {
+    salesOrderId?: string | null
+    salesOrderNo?: string | null
+    source?: string
+    placeOfSupply?: string | null
+    placeOfSupplyStateCode?: string | null
+    supplierStateCode?: string | null
+    supplyType?: string | null
+    gstScheme?: string | null
+  },
 ): Promise<{ ok: boolean; error?: string; id?: string }> {
   try {
     const res = await api.createCommercialProforma(mapProformaPayload(input))
@@ -146,6 +178,11 @@ export async function apiUpdateProforma(
     if (patch.shippingAddress !== undefined) body.shippingAddress = patch.shippingAddress
     if (patch.remarks !== undefined) body.remarks = patch.remarks
     if (patch.locationId !== undefined) body.locationId = patch.locationId
+    if (patch.placeOfSupply !== undefined) body.placeOfSupply = patch.placeOfSupply
+    if (patch.placeOfSupplyStateCode !== undefined) body.placeOfSupplyStateCode = patch.placeOfSupplyStateCode
+    if (patch.supplierStateCode !== undefined) body.supplierStateCode = patch.supplierStateCode
+    if (patch.supplyType !== undefined) body.supplyType = patch.supplyType
+    if (patch.gstScheme !== undefined) body.gstScheme = patch.gstScheme
     if (patch.lines) {
       body.lines = patch.lines.map((l) => ({
         itemId: l.itemId,
@@ -157,6 +194,15 @@ export async function apiUpdateProforma(
         unitPrice: l.unitPrice,
         discountPct: l.discountPct,
         taxPct: l.taxPct,
+        taxScheme: l.taxScheme ?? null,
+        cgstRate: l.cgstRate ?? null,
+        sgstRate: l.sgstRate ?? null,
+        utgstRate: l.utgstRate ?? null,
+        igstRate: l.igstRate ?? null,
+        cgstAmount: l.cgstAmount ?? null,
+        sgstAmount: l.sgstAmount ?? null,
+        utgstAmount: l.utgstAmount ?? null,
+        igstAmount: l.igstAmount ?? null,
         sourceLineId: l.id,
       }))
     }
@@ -212,7 +258,16 @@ export async function apiReceiveProformaPayment(
 }
 
 function invoiceWriteBody(
-  input: CreateCrmInvoiceInput & { customerState?: string; salesOrderNo?: string | null; proformaNo?: string | null },
+  input: CreateCrmInvoiceInput & {
+    customerState?: string
+    salesOrderNo?: string | null
+    proformaNo?: string | null
+    placeOfSupply?: string | null
+    placeOfSupplyStateCode?: string | null
+    supplierStateCode?: string | null
+    supplyType?: string | null
+    gstScheme?: string | null
+  },
 ) {
   return {
     companyId: input.customerId,
@@ -232,6 +287,11 @@ function invoiceWriteBody(
     shippingAddress: input.shippingAddress,
     remarks: input.remarks,
     customerState: input.customerState,
+    placeOfSupply: input.placeOfSupply ?? null,
+    placeOfSupplyStateCode: input.placeOfSupplyStateCode ?? null,
+    supplierStateCode: input.supplierStateCode ?? null,
+    supplyType: input.supplyType ?? null,
+    gstScheme: input.gstScheme ?? null,
     lines: input.lines.map((l) => ({
       itemId: l.itemId,
       itemCode: l.itemCode,
@@ -242,6 +302,15 @@ function invoiceWriteBody(
       unitPrice: l.unitPrice,
       discountPct: l.discountPct,
       taxPct: l.taxPct,
+      taxScheme: l.taxScheme ?? null,
+      cgstRate: l.cgstRate ?? null,
+      sgstRate: l.sgstRate ?? null,
+      utgstRate: l.utgstRate ?? null,
+      igstRate: l.igstRate ?? null,
+      cgstAmount: l.cgstAmount ?? null,
+      sgstAmount: l.sgstAmount ?? null,
+      utgstAmount: l.utgstAmount ?? null,
+      igstAmount: l.igstAmount ?? null,
       sourceLineId: l.sourceLineId,
       maxQty: l.maxQty,
     })),
@@ -249,7 +318,16 @@ function invoiceWriteBody(
 }
 
 export async function apiCreateInvoice(
-  input: CreateCrmInvoiceInput & { customerState?: string; salesOrderNo?: string | null; proformaNo?: string | null },
+  input: CreateCrmInvoiceInput & {
+    customerState?: string
+    salesOrderNo?: string | null
+    proformaNo?: string | null
+    placeOfSupply?: string | null
+    placeOfSupplyStateCode?: string | null
+    supplierStateCode?: string | null
+    supplyType?: string | null
+    gstScheme?: string | null
+  },
 ): Promise<{ ok: boolean; error?: string; id?: string }> {
   try {
     const res = await api.createCommercialInvoice(invoiceWriteBody(input))
@@ -262,7 +340,16 @@ export async function apiCreateInvoice(
 
 export async function apiUpdateInvoice(
   id: string,
-  input: CreateCrmInvoiceInput & { customerState?: string; salesOrderNo?: string | null; proformaNo?: string | null },
+  input: CreateCrmInvoiceInput & {
+    customerState?: string
+    salesOrderNo?: string | null
+    proformaNo?: string | null
+    placeOfSupply?: string | null
+    placeOfSupplyStateCode?: string | null
+    supplierStateCode?: string | null
+    supplyType?: string | null
+    gstScheme?: string | null
+  },
 ): Promise<{ ok: boolean; error?: string; id?: string }> {
   try {
     const res = await api.updateCommercialInvoice(id, invoiceWriteBody(input))

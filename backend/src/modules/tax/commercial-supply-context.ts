@@ -1,6 +1,14 @@
 /**
  * Commercial document Place of Supply + Supply Type resolution (authoritative pure functions).
- * Frontend may preview; backend must recompute on write where possible.
+ * Frontend mirrors this in commercialSupplyContext.ts for preview; backend recompute on write.
+ *
+ * Priority (goods, subject to service flag reverse for address):
+ * 1. Authorised Place of Supply override
+ * 2. Ship-to / delivery state
+ * 3. Customer GST registration (GSTIN state)
+ * 4. Bill-to state
+ * 5. Customer master state
+ * 6. Unresolved
  */
 import { resolveGstStateCode } from '../accounting/receivables/validation/state-code.validator.js'
 import { isUnionTerritoryStateCode } from './union-territory.js'
@@ -8,9 +16,11 @@ import { isUnionTerritoryStateCode } from './union-territory.js'
 export type CommercialPlaceOfSupplySource =
   | 'AUTO'
   | 'CUSTOMER'
+  | 'CUSTOMER_GSTIN'
   | 'SHIP_TO'
   | 'BILL_TO'
   | 'OVERRIDE'
+  | 'UNRESOLVED'
 
 export type CommercialSupplyType = 'INTRA_STATE' | 'INTER_STATE' | 'UNRESOLVED'
 
@@ -25,7 +35,13 @@ export interface ResolveCommercialPlaceOfSupplyInput {
   billToState?: string | null
   billToStateCode?: string | null
   customerState?: string | null
+  /** Prefer GSTIN state before bare customer master state. */
   customerGstin?: string | null
+  /**
+   * Optional sticky value — only used when placeOfSupplyOverride is true.
+   * Auto resolution must never treat prior saved PoS as authoritative.
+   * @deprecated Prefer placeOfSupplyOverrideValue for overrides.
+   */
   explicitPlaceOfSupply?: string | null
   isServiceDocument?: boolean
 }
@@ -58,8 +74,18 @@ function code(v?: string | null): string | null {
   return resolveGstStateCode(v) ?? null
 }
 
+function labelledCode(
+  raw: string | null | undefined,
+  fallbackLabel?: string | null,
+): { c: string; label: string } | null {
+  const c = code(raw)
+  if (!c) return null
+  return { c, label: (raw?.trim() || fallbackLabel || c) as string }
+}
+
 /**
  * Prefer ship-to for goods, bill-to for services; override wins when flagged.
+ * Never uses a previously saved non-override PoS as auto priority.
  */
 export function resolveCommercialPlaceOfSupply(
   input: ResolveCommercialPlaceOfSupplyInput,
@@ -68,10 +94,11 @@ export function resolveCommercialPlaceOfSupply(
 
   if (input.placeOfSupplyOverride) {
     const overrideCode =
-      code(input.placeOfSupplyOverrideValue) ??
-      code(input.explicitPlaceOfSupply)
+      code(input.placeOfSupplyOverrideValue) ?? code(input.explicitPlaceOfSupply)
     if (!overrideCode) {
-      warnings.push('Place of Supply override flag set but value could not be resolved to a GST state code')
+      warnings.push(
+        'Place of Supply override flag set but value could not be resolved to a GST state code',
+      )
       return {
         placeOfSupplyStateCode: null,
         placeOfSupplyLabel: input.placeOfSupplyOverrideValue?.trim() || null,
@@ -87,56 +114,84 @@ export function resolveCommercialPlaceOfSupply(
     }
   }
 
-  if (input.explicitPlaceOfSupply?.trim()) {
-    const c = code(input.explicitPlaceOfSupply)
-    if (c) {
-      return {
-        placeOfSupplyStateCode: c,
-        placeOfSupplyLabel: input.explicitPlaceOfSupply.trim(),
-        source: 'AUTO',
-        warnings,
-      }
-    }
-  }
-
   // Goods: ship-to first; services: bill-to first
-  const primary = input.isServiceDocument
-    ? [input.billToStateCode, input.billToState, input.shipToStateCode, input.shipToState]
-    : [input.shipToStateCode, input.shipToState, input.billToStateCode, input.billToState]
-  for (const p of primary) {
-    const c = code(p)
-    if (c) {
-      const source: CommercialPlaceOfSupplySource = input.isServiceDocument
-        ? code(input.billToStateCode) || code(input.billToState)
-          ? 'BILL_TO'
-          : 'SHIP_TO'
-        : code(input.shipToStateCode) || code(input.shipToState)
-          ? 'SHIP_TO'
-          : 'BILL_TO'
+  if (!input.isServiceDocument) {
+    const ship =
+      labelledCode(input.shipToStateCode) ??
+      labelledCode(input.shipToState)
+    if (ship) {
       return {
-        placeOfSupplyStateCode: c,
-        placeOfSupplyLabel: p ?? c,
-        source,
+        placeOfSupplyStateCode: ship.c,
+        placeOfSupplyLabel: ship.label,
+        source: 'SHIP_TO',
+        warnings,
+      }
+    }
+  } else {
+    const bill =
+      labelledCode(input.billToStateCode) ?? labelledCode(input.billToState)
+    if (bill) {
+      return {
+        placeOfSupplyStateCode: bill.c,
+        placeOfSupplyLabel: bill.label,
+        source: 'BILL_TO',
         warnings,
       }
     }
   }
 
-  const customerCode = code(input.customerState) ?? code(input.customerGstin)
-  if (customerCode) {
+  // Customer GST registration (GSTIN prefix) before bare master state
+  const fromGstin = code(input.customerGstin)
+  if (fromGstin) {
     return {
-      placeOfSupplyStateCode: customerCode,
-      placeOfSupplyLabel: input.customerState ?? customerCode,
+      placeOfSupplyStateCode: fromGstin,
+      placeOfSupplyLabel: fromGstin,
+      source: 'CUSTOMER_GSTIN',
+      warnings,
+    }
+  }
+
+  if (!input.isServiceDocument) {
+    const bill =
+      labelledCode(input.billToStateCode) ?? labelledCode(input.billToState)
+    if (bill) {
+      return {
+        placeOfSupplyStateCode: bill.c,
+        placeOfSupplyLabel: bill.label,
+        source: 'BILL_TO',
+        warnings,
+      }
+    }
+  } else {
+    const ship =
+      labelledCode(input.shipToStateCode) ?? labelledCode(input.shipToState)
+    if (ship) {
+      return {
+        placeOfSupplyStateCode: ship.c,
+        placeOfSupplyLabel: ship.label,
+        source: 'SHIP_TO',
+        warnings,
+      }
+    }
+  }
+
+  const customerMaster = labelledCode(input.customerState)
+  if (customerMaster) {
+    return {
+      placeOfSupplyStateCode: customerMaster.c,
+      placeOfSupplyLabel: customerMaster.label,
       source: 'CUSTOMER',
       warnings,
     }
   }
 
-  warnings.push('Place of Supply could not be determined from ship-to, bill-to, or customer GST registration')
+  warnings.push(
+    'Place of Supply could not be determined. Complete customer or delivery tax details before posting.',
+  )
   return {
     placeOfSupplyStateCode: null,
     placeOfSupplyLabel: null,
-    source: 'AUTO',
+    source: 'UNRESOLVED',
     warnings,
   }
 }
@@ -199,9 +254,28 @@ export function formatSupplyTypeLabel(t: CommercialSupplyType): string {
   return 'Unresolved'
 }
 
-export function formatTaxSchemeLabel(s: CommercialGstScheme): string {
+export function formatTaxSchemeLabel(s: CommercialGstScheme | string): string {
   if (s === 'igst') return 'IGST'
-  if (s === 'utgst_pair') return 'CGST + UTGST'
+  if (s === 'utgst_pair' || s === 'cgst_utgst') return 'CGST + UTGST'
   if (s === 'cgst_sgst') return 'CGST + SGST'
   return 'Unresolved'
+}
+
+export function formatPlaceOfSupplySourceLabel(source: CommercialPlaceOfSupplySource): string {
+  switch (source) {
+    case 'OVERRIDE':
+      return 'Authorised override'
+    case 'SHIP_TO':
+      return 'Delivery / ship-to address'
+    case 'BILL_TO':
+      return 'Bill-to address'
+    case 'CUSTOMER_GSTIN':
+      return 'Customer GST registration'
+    case 'CUSTOMER':
+      return 'Customer master state'
+    case 'UNRESOLVED':
+      return 'Not resolved'
+    default:
+      return 'Auto'
+  }
 }

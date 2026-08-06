@@ -45,6 +45,7 @@ import {
   summarizeGrnReceipt,
 } from '@/services/purchase/grnReceiptSummary'
 import type { GoodsReceiptNote } from '@/types/purchaseDomain'
+import { isIncludedGrnLine } from '@/modules/purchase/grnLineDraft'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { purchaseActionGate, usePurchasePermissions } from '@/utils/permissions'
@@ -67,6 +68,10 @@ export function GrnDetailPage() {
   const [busy, setBusy] = useState(false)
   const [postConfirmOpen, setPostConfirmOpen] = useState(false)
   const [inventoryMsgOpen, setInventoryMsgOpen] = useState(false)
+  const [reverseOpen, setReverseOpen] = useState(false)
+  const [reverseSelectedIds, setReverseSelectedIds] = useState<string[]>([])
+  const [reverseReason, setReverseReason] = useState('')
+  const [reverseBusy, setReverseBusy] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -111,9 +116,30 @@ export function GrnDetailPage() {
   }
 
   const receiptSummary = useMemo(
-    () => (grn ? summarizeGrnReceipt(grn.lines) : null),
+    () => (grn ? summarizeGrnReceipt(grn.lines.filter(isIncludedGrnLine)) : null),
     [grn],
   )
+
+  /** Saved GRN lines only (legacy idle zero-qty / not-received clutter excluded). */
+  const documentLines = useMemo(
+    () => (grn ? grn.lines.filter(isIncludedGrnLine) : []),
+    [grn],
+  )
+
+  const reversibleLines = useMemo(() => {
+    return documentLines.filter((l) => {
+      const remaining =
+        l.remainingReversibleQty ??
+        Math.max(0, (Number(l.receivedQty) || 0) - (Number(l.reversedQty) || 0))
+      return remaining > 0 && (Number(l.receivedQty) || 0) > 0
+    })
+  }, [documentLines])
+
+  const openReverseModal = () => {
+    setReverseSelectedIds(reversibleLines.map((l) => l.id))
+    setReverseReason('')
+    setReverseOpen(true)
+  }
 
   const headerFacts = useMemo(() => {
     if (!grn) return []
@@ -150,7 +176,7 @@ export function GrnDetailPage() {
     )
   }
 
-  const statusLabel = formatGrnStatusLabel(grn.status, grn.lines)
+  const statusLabel = formatGrnStatusLabel(grn.status, documentLines)
   const actions = grn.allowedActions
   const canEdit = actions?.canEdit ?? (grn.status === 'draft' || grn.status === 'pending_inspection')
   const canSubmit = actions?.canSubmit ?? grn.status === 'draft'
@@ -177,15 +203,15 @@ export function GrnDetailPage() {
     permission: 'purchase.grn.create',
     statusAllowed: canCancel,
   })
-  const hasReturnableQty = grn.lines.some(
+  const hasReturnableQty = documentLines.some(
     (l) =>
       (l.returnableQty ?? 0) > 0 ||
       l.rejectedQty > 0 ||
       l.acceptedQty > 0 ||
       l.receivedQty > 0,
   )
-  const totalReturned = grn.totalReturnedQty ?? grn.lines.reduce((s, l) => s + (l.returnedQty ?? 0), 0)
-  const totalReturnable = grn.totalReturnableQty ?? grn.lines.reduce((s, l) => s + (l.returnableQty ?? 0), 0)
+  const totalReturned = grn.totalReturnedQty ?? documentLines.reduce((s, l) => s + (l.returnedQty ?? 0), 0)
+  const totalReturnable = grn.totalReturnableQty ?? documentLines.reduce((s, l) => s + (l.returnableQty ?? 0), 0)
   const returnGate = purchaseActionGate({
     permission: 'purchase.return.create',
     statusAllowed:
@@ -388,31 +414,12 @@ export function GrnDetailPage() {
               id: 'reverse-grn',
               label: 'Reverse GRN',
               icon: RotateCcw,
-              onClick: async () => {
-                const ok = await appConfirm({
-                  title: 'Reverse entire GRN?',
-                  description:
-                    'This creates a full reversal: stock is compensated, PO receipt quantities are restored, and this GRN becomes Reversed. Use Material Return for partial vendor returns.',
-                  confirmLabel: 'Continue',
-                  tone: 'danger',
-                })
-                if (!ok) return
-                const reason = await appPromptNote({
-                  title: 'Reversal reason',
-                  description: 'Enter a reason for reversing this goods receipt.',
-                  confirmLabel: 'Reverse GRN',
-                  note: {
-                    required: true,
-                    label: 'Reason',
-                    placeholder: 'e.g. Wrong challan, duplicate receipt…',
-                  },
-                })
-                if (!reason?.trim()) return
-                await run(() => reverseGRN(grn.id, reason.trim()), 'GRN reversed')
-              },
+              onClick: () => openReverseModal(),
               hidden: reverseGate.hidden,
-              disabled: busy || reverseGate.disabled,
-              disabledReason: reverseGate.disabledReason,
+              disabled: busy || reverseGate.disabled || reversibleLines.length === 0,
+              disabledReason:
+                reverseGate.disabledReason ??
+                (reversibleLines.length === 0 ? 'No received lines remain to reverse' : undefined),
             },
             {
               id: 'cancel-grn',
@@ -449,8 +456,24 @@ export function GrnDetailPage() {
         {grn.status === 'reversed' ? (
           <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-950">
             This GRN was fully reversed
-            {grn.reversedAt ? ` on ${formatDate(grn.reversedAt.slice(0, 10))}` : ''}. The original
-            document is immutable — use Material Return documents for partial vendor returns.
+            {grn.reversedAt ? ` on ${formatDate(grn.reversedAt.slice(0, 10))}` : ''}. Stock and PO
+            receipt quantities for all lines have been restored.
+          </div>
+        ) : grn.partiallyReversed || (receiptSummary?.reversedLineCount ?? 0) > 0 ? (
+          <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
+            <strong>Partial reverse</strong>
+            {receiptSummary ? (
+              <>
+                {' '}
+                — {receiptSummary.reversedLineCount} line
+                {receiptSummary.reversedLineCount === 1 ? '' : 's'} reversed;{' '}
+                {receiptSummary.receivedLineCount} line
+                {receiptSummary.receivedLineCount === 1 ? '' : 's'} still received. Use Reverse GRN
+                again to reverse remaining lines, or Material Return for vendor returns.
+              </>
+            ) : (
+              <> — some received lines have been reversed. Remaining lines can still be reversed.</>
+            )}
           </div>
         ) : null}
         {grn.status === 'pending_tolerance_approval' ? (
@@ -610,8 +633,8 @@ export function GrnDetailPage() {
           title="Item Lines"
           subtitle={
             receiptSummary
-              ? `${grn.lines.length} line${grn.lines.length === 1 ? '' : 's'} · received on this GRN: ${receiptSummary.receivedLineCount} · not received: ${receiptSummary.notReceivedLineCount}`
-              : `${grn.lines.length} line${grn.lines.length === 1 ? '' : 's'}`
+              ? `${documentLines.length} line${documentLines.length === 1 ? '' : 's'} · received on this GRN: ${receiptSummary.receivedLineCount}`
+              : `${documentLines.length} line${documentLines.length === 1 ? '' : 's'}`
           }
           collapsible
           defaultOpen
@@ -620,9 +643,9 @@ export function GrnDetailPage() {
           {grn.status === 'posted' && receiptSummary && (receiptSummary.partialReceipt || receiptSummary.stillOpenOnPoTotal > 0) ? (
             <p className="mb-3 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-950">
               <strong>Posted</strong> means inventory was updated for quantities received on{' '}
-              <em>this</em> GRN only ({formatNumber(grn.lines.reduce((s, l) => s + l.receivedQty, 0))} total).
-              {receiptSummary.notReceivedLineCount > 0
-                ? ` ${receiptSummary.notReceivedLineCount} line${receiptSummary.notReceivedLineCount === 1 ? '' : 's'} marked Not received (0 qty) — PO open quantity remains. Create another GRN to receive the balance.`
+              <em>this</em> GRN only ({formatNumber(documentLines.reduce((s, l) => s + l.receivedQty, 0))} total).
+              {receiptSummary.stillOpenOnPoTotal > 0
+                ? ' Remaining open quantity stays on the purchase order — create another GRN to receive the balance.'
                 : null}
             </p>
           ) : null}
@@ -654,13 +677,14 @@ export function GrnDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {grn.lines.flatMap((l) => {
+                {documentLines.flatMap((l) => {
                   const returnRows = (grn.materialReturnLines ?? []).filter(
                     (r) => r.goodsReceiptLineId === l.id,
                   )
                   const returnedTotal = l.returnedQty ?? returnRows.reduce((s, r) => s + r.returnQuantity, 0)
-                  const netReceived = l.receivedQty - returnedTotal
-                  const netAccepted = l.acceptedQty - returnedTotal
+                  const reversedQty = Number(l.reversedQty) || 0
+                  const netReceived = l.receivedQty - returnedTotal - reversedQty
+                  const netAccepted = l.acceptedQty - returnedTotal - (Number(l.reversedAcceptedQty) || 0)
                   const lineUom = l.uom?.trim() || '—'
                   const baseUom = getPurchaseLineBaseUomCode(l.itemId) || lineUom
                   const dualReceived = purchaseLineHasDualUom({
@@ -668,15 +692,23 @@ export function GrnDetailPage() {
                     uomConversionFactor: l.uomConversionFactor,
                   })
                   const dash = <td className="num text-erp-muted">—</td>
+                  const fullyReversed = Boolean(l.lineFullyReversed) || (reversedQty > 0 && netReceived <= 0)
 
                   const receiptRow = (
-                    <tr key={l.id}>
+                    <tr key={l.id} className={fullyReversed ? 'bg-red-50/40' : undefined}>
                       <td className="tabular-nums text-erp-muted">{l.lineNo}</td>
                       <td className="min-w-[10rem]">
                         <div className="font-mono text-[11px] text-erp-muted whitespace-nowrap">
                           {l.itemCode}
                         </div>
                         <div className="font-medium text-erp-text">{l.itemName}</div>
+                        {fullyReversed ? (
+                          <div className="mt-0.5 text-[11px] font-semibold text-red-800">Reversed</div>
+                        ) : reversedQty > 0 ? (
+                          <div className="mt-0.5 text-[11px] font-semibold text-amber-800">
+                            Partially reversed
+                          </div>
+                        ) : null}
                       </td>
                       <td className="whitespace-nowrap font-mono text-[11px] text-erp-muted">{lineUom}</td>
                       <td className="num tabular-nums">{formatNumber(l.orderedQty)}</td>
@@ -712,6 +744,44 @@ export function GrnDetailPage() {
                     </tr>
                   )
 
+                  const reverseRow =
+                    reversedQty > 0 ? (
+                      <tr key={`${l.id}-reverse`} className="bg-red-50/70">
+                        <td />
+                        <td className="min-w-[10rem] pl-6">
+                          <div className="font-semibold text-red-900">↳ Reverse</div>
+                          <div className="text-[11px] text-red-800">
+                            Inventory / PO receipt restored
+                            {l.reversedAt
+                              ? ` · ${formatDate(l.reversedAt.slice(0, 10))}`
+                              : ''}
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap font-mono text-[11px] text-red-800">{lineUom}</td>
+                        {dash}
+                        {dash}
+                        {dash}
+                        <td className="num tabular-nums font-medium text-red-700">
+                          −{formatNumber(reversedQty)}
+                        </td>
+                        {dash}
+                        {dash}
+                        {dash}
+                        {dash}
+                        <td className="num tabular-nums font-medium text-red-700">
+                          −{formatNumber(Number(l.reversedAcceptedQty) || reversedQty)}
+                        </td>
+                        <td className="num tabular-nums font-medium text-red-700">
+                          {(Number(l.reversedRejectedQty) || 0) > 0
+                            ? `−${formatNumber(Number(l.reversedRejectedQty) || 0)}`
+                            : '—'}
+                        </td>
+                        {dash}
+                        {dash}
+                        <td className="text-erp-muted">GRN reverse</td>
+                      </tr>
+                    ) : null
+
                   const materialReturnRows = returnRows.map((r) => (
                     <tr key={`${l.id}-return-${r.purchaseReturnId}`} className="bg-violet-50/60">
                       <td />
@@ -746,10 +816,12 @@ export function GrnDetailPage() {
                   ))
 
                   const netRow =
-                    returnRows.length > 0 ? (
+                    returnRows.length > 0 || reversedQty > 0 ? (
                       <tr key={`${l.id}-net`} className="border-t border-erp-border bg-slate-50/90 font-semibold">
                         <td />
-                        <td className="pl-6 text-[12px] text-erp-text">Net after returns</td>
+                        <td className="pl-6 text-[12px] text-erp-text">
+                          Net after reverse{returnRows.length > 0 ? ' / returns' : ''}
+                        </td>
                         <td className="whitespace-nowrap font-mono text-[11px] text-erp-text">{lineUom}</td>
                         {dash}
                         {dash}
@@ -764,14 +836,18 @@ export function GrnDetailPage() {
                         {dash}
                         {dash}
                         <td className="text-[11px] text-erp-muted">
-                          {(l.returnableQty ?? 0) > 0
-                            ? `${formatNumber(l.returnableQty ?? 0)} still returnable`
-                            : 'Fully returned'}
+                          {fullyReversed
+                            ? 'Fully reversed'
+                            : (l.returnableQty ?? 0) > 0
+                              ? `${formatNumber(l.returnableQty ?? 0)} still returnable`
+                              : returnRows.length > 0
+                                ? 'Fully returned'
+                                : '—'}
                         </td>
                       </tr>
                     ) : null
 
-                  return [receiptRow, ...materialReturnRows, netRow].filter(Boolean)
+                  return [receiptRow, reverseRow, ...materialReturnRows, netRow].filter(Boolean)
                 })}
               </tbody>
             </table>
@@ -844,6 +920,159 @@ export function GrnDetailPage() {
             ? 'GRN posted. Inventory posting is waiting on quality inspection or warehouse setup — check Stock after QI accept / Post inventory completes.'
             : 'GRN posted and stock is now available in Inventory.'}
         </p>
+      </Modal>
+
+      <Modal
+        open={reverseOpen}
+        onClose={() => !reverseBusy && setReverseOpen(false)}
+        title="Reverse goods receipt"
+        size="lg"
+        closeDisabled={reverseBusy}
+        footer={
+          <>
+            <ErpButton
+              variant="secondary"
+              disabled={reverseBusy}
+              onClick={() => setReverseOpen(false)}
+            >
+              Cancel
+            </ErpButton>
+            <ErpButton
+              variant="danger"
+              disabled={
+                reverseBusy || reverseSelectedIds.length === 0 || !reverseReason.trim()
+              }
+              onClick={async () => {
+                if (!reverseReason.trim() || reverseSelectedIds.length === 0) return
+                const allSelected =
+                  reversibleLines.length > 0 &&
+                  reverseSelectedIds.length === reversibleLines.length
+                const ok = await appConfirm({
+                  title: allSelected ? 'Reverse entire GRN?' : 'Reverse selected lines?',
+                  description: allSelected
+                    ? 'Stock will be compensated for all remaining received lines, PO open quantities restored, and this GRN will become Reversed.'
+                    : `Only ${reverseSelectedIds.length} selected line${
+                        reverseSelectedIds.length === 1 ? '' : 's'
+                      } will reverse. Unselected lines stay received.`,
+                  confirmLabel: allSelected ? 'Reverse all' : 'Reverse selected',
+                  tone: 'danger',
+                })
+                if (!ok) return
+                setReverseBusy(true)
+                try {
+                  const updated = await reverseGRN(grn.id, reverseReason.trim(), {
+                    lineIds: reverseSelectedIds,
+                  })
+                  setGrn(updated)
+                  setReverseOpen(false)
+                  notify.success(
+                    allSelected || updated.status === 'reversed'
+                      ? 'GRN fully reversed'
+                      : 'Selected GRN line(s) reversed',
+                  )
+                } catch (err) {
+                  notify.error(
+                    err instanceof PurchaseServiceError ? err.message : 'Reverse failed',
+                  )
+                } finally {
+                  setReverseBusy(false)
+                }
+              }}
+            >
+              {reverseBusy ? 'Reversing…' : 'Reverse'}
+            </ErpButton>
+          </>
+        }
+      >
+        <div className="space-y-3 text-sm">
+          <p className="text-erp-muted">
+            Select received lines to reverse. Inventory and PO open quantities are restored only for
+            selected lines. Use Material Return when returning goods to the vendor without undoing the
+            GRN receipt.
+          </p>
+          {reversibleLines.length === 0 ? (
+            <p className="rounded border border-erp-border bg-erp-surface-muted px-3 py-2 text-[13px]">
+              No remaining received lines to reverse.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border border-erp-border">
+              <table className="erp-table w-full text-left text-[12px]">
+                <thead>
+                  <tr>
+                    <th className="w-10">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all reverseable lines"
+                        checked={
+                          reversibleLines.length > 0 &&
+                          reverseSelectedIds.length === reversibleLines.length
+                        }
+                        onChange={(e) => {
+                          setReverseSelectedIds(
+                            e.target.checked ? reversibleLines.map((l) => l.id) : [],
+                          )
+                        }}
+                      />
+                    </th>
+                    <th>#</th>
+                    <th>Item</th>
+                    <th className="num">Received</th>
+                    <th className="num">Already reversed</th>
+                    <th className="num">Will reverse</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reversibleLines.map((l) => {
+                    const remaining =
+                      l.remainingReversibleQty ??
+                      Math.max(0, (Number(l.receivedQty) || 0) - (Number(l.reversedQty) || 0))
+                    const checked = reverseSelectedIds.includes(l.id)
+                    return (
+                      <tr key={l.id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`Reverse line ${l.lineNo} ${l.itemCode}`}
+                            checked={checked}
+                            onChange={(e) => {
+                              setReverseSelectedIds((prev) =>
+                                e.target.checked
+                                  ? [...prev, l.id]
+                                  : prev.filter((id) => id !== l.id),
+                              )
+                            }}
+                          />
+                        </td>
+                        <td className="tabular-nums text-erp-muted">{l.lineNo}</td>
+                        <td>
+                          <div className="font-mono text-[11px] text-erp-muted">{l.itemCode}</div>
+                          <div className="font-medium">{l.itemName}</div>
+                        </td>
+                        <td className="num tabular-nums">{formatNumber(l.receivedQty)}</td>
+                        <td className="num tabular-nums">
+                          {formatNumber(Number(l.reversedQty) || 0)}
+                        </td>
+                        <td className="num tabular-nums font-semibold">{formatNumber(remaining)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <label className="block">
+            <span className="mb-1 block text-[12px] font-semibold text-erp-text">
+              Reason <span className="text-red-600">*</span>
+            </span>
+            <textarea
+              className="w-full min-h-[72px] rounded border border-erp-border px-2 py-1.5 text-[13px]"
+              value={reverseReason}
+              onChange={(e) => setReverseReason(e.target.value)}
+              placeholder="e.g. Wrong item received, duplicate challan…"
+              disabled={reverseBusy}
+            />
+          </label>
+        </div>
       </Modal>
     </PurchaseCardFormShell>
   )

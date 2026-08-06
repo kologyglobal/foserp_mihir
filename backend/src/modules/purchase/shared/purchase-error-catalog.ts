@@ -92,6 +92,9 @@ export const PURCHASE_ERROR_CODE = {
   GRN_NOT_REVERSIBLE: 'GRN_NOT_REVERSIBLE',
   GRN_REVERSE_BLOCKED_OPEN_RETURN: 'GRN_REVERSE_BLOCKED_OPEN_RETURN',
   GRN_REVERSE_BLOCKED_INVOICE: 'GRN_REVERSE_BLOCKED_INVOICE',
+  GRN_REVERSE_NO_LINES: 'GRN_REVERSE_NO_LINES',
+  GRN_REVERSE_LINE_INVALID: 'GRN_REVERSE_LINE_INVALID',
+  GRN_REVERSE_LINE_EMPTY: 'GRN_REVERSE_LINE_EMPTY',
   GRN_PO_NOT_RECEIVABLE: 'GRN_PO_NOT_RECEIVABLE',
   GRN_WAREHOUSE_REQUIRED: 'GRN_WAREHOUSE_REQUIRED',
   GRN_NO_LINES: 'GRN_NO_LINES',
@@ -230,11 +233,19 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
     'Cannot reverse this GRN while a purchase return is still open. Complete or cancel the return first.',
   [PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_INVOICE]:
     'Cannot reverse this GRN — a purchase invoice is already posted or approved against it.',
+  [PURCHASE_ERROR_CODE.GRN_REVERSE_NO_LINES]:
+    'No received lines remain to reverse on this goods receipt.',
+  [PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_INVALID]:
+    'One or more selected lines are not part of this goods receipt.',
+  [PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_EMPTY]:
+    'Selected line(s) have no remaining receivable quantity to reverse (not received or already reversed).',
   [PURCHASE_ERROR_CODE.GRN_PO_NOT_RECEIVABLE]: 'Purchase order is not open for receipt.',
   [PURCHASE_ERROR_CODE.GRN_WAREHOUSE_REQUIRED]: 'Warehouse is required.',
-  [PURCHASE_ERROR_CODE.GRN_NO_LINES]: 'Add at least one receipt line (zero qty marks Not Received).',
+  [PURCHASE_ERROR_CODE.GRN_NO_LINES]:
+    'Enter received quantity on at least one line (or short-close a line). Unused PO lines stay open for a later GRN.',
   [PURCHASE_ERROR_CODE.GRN_QTY_INVALID]: 'Received quantity cannot be negative.',
-  [PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS]: 'Received quantity exceeds open PO quantity. Excess beyond tolerance requires approval.',
+  [PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS]:
+    'Received quantity exceeds the maximum allowed (open PO quantity plus over-receipt tolerance). Reduce the received quantity and try again.',
   [PURCHASE_ERROR_CODE.GRN_TOLERANCE_APPROVAL_REQUIRED]:
     'One or more lines are outside receiving tolerance and require Purchase Manager approval.',
   [PURCHASE_ERROR_CODE.GRN_TOLERANCE_NOT_PENDING]:

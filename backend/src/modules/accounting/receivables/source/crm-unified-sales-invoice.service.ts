@@ -23,6 +23,7 @@ import type {
   UpdateInvoiceInput,
 } from '../../../crm/commercial/commercial.validation.js'
 import { computePaymentStatus } from '../../../crm/commercial/commercial.types.js'
+import { resolveGstStateCode } from '../validation/state-code.validator.js'
 
 type AuditBits = { ipAddress?: string | null; userAgent?: string | null }
 
@@ -79,6 +80,52 @@ function mapSource(row: SalesInvoice): 'sales_order' | 'proforma' | 'direct' | '
   if (row.sourceType === 'SALES_ORDER' || row.salesOrderId) return 'sales_order'
   if (row.sourceType === 'PROFORMA_INVOICE' || row.proformaInvoiceId) return 'proforma'
   return 'direct'
+}
+
+/** Prefer upstream commercial PoS (input → SO → PI) over party billing state alone. */
+async function resolveUnifiedPlaceOfSupply(
+  tenantId: string,
+  input: {
+    placeOfSupply?: string | null
+    placeOfSupplyStateCode?: string | null
+    customerState?: string | null
+    salesOrderId?: string | null
+    proformaInvoiceId?: string | null
+  },
+  partyStateCode: string | null | undefined,
+  existingPlaceOfSupply?: string | null,
+): Promise<string | null> {
+  const fromInput =
+    resolveGstStateCode(input.placeOfSupplyStateCode) ?? resolveGstStateCode(input.placeOfSupply)
+  if (fromInput) return fromInput
+
+  if (input.salesOrderId) {
+    const so = await prisma.crmSalesOrder.findFirst({
+      where: { id: input.salesOrderId, tenantId, deletedAt: null },
+      select: { placeOfSupplyStateCode: true, placeOfSupply: true },
+    })
+    const fromSo =
+      resolveGstStateCode(so?.placeOfSupplyStateCode) ?? resolveGstStateCode(so?.placeOfSupply)
+    if (fromSo) return fromSo
+  }
+
+  if (input.proformaInvoiceId) {
+    const pi = await prisma.crmProformaInvoice.findFirst({
+      where: { id: input.proformaInvoiceId, tenantId, deletedAt: null },
+      select: { placeOfSupply: true },
+    })
+    const fromPi = resolveGstStateCode(pi?.placeOfSupply)
+    if (fromPi) return fromPi
+  }
+
+  return (
+    resolveGstStateCode(input.customerState) ??
+    resolveGstStateCode(partyStateCode) ??
+    resolveGstStateCode(existingPlaceOfSupply) ??
+    partyStateCode ??
+    existingPlaceOfSupply ??
+    null
+  )
 }
 
 async function loadOpenItemAmounts(tenantId: string, salesInvoiceId: string) {
@@ -331,6 +378,18 @@ export async function createUnifiedInvoice(
     sourceLineId: l.sourceLineId ?? null,
   }))
 
+  const placeOfSupply = await resolveUnifiedPlaceOfSupply(
+    tenantId,
+    {
+      placeOfSupply: input.placeOfSupply,
+      placeOfSupplyStateCode: input.placeOfSupplyStateCode,
+      customerState: input.customerState,
+      salesOrderId: input.salesOrderId,
+      proformaInvoiceId: input.proformaInvoiceId,
+    },
+    party.stateCode,
+  )
+
   const draftInput = {
     legalEntityId,
     branchId: null as string | null,
@@ -340,7 +399,7 @@ export async function createUnifiedInvoice(
     invoiceDate,
     postingDate: invoiceDate,
     dueDate,
-    placeOfSupply: party.stateCode,
+    placeOfSupply,
     taxTreatment: (party.gstin ? 'REGISTERED' : 'UNREGISTERED') as 'REGISTERED' | 'UNREGISTERED',
     currencyCode: 'INR',
     exchangeRate: '1',
@@ -502,6 +561,23 @@ export async function updateUnifiedInvoice(
     sourceLineId: l.sourceLineId ?? null,
   }))
 
+  const placeOfSupply = await resolveUnifiedPlaceOfSupply(
+    tenantId,
+    {
+      placeOfSupply: input.placeOfSupply,
+      placeOfSupplyStateCode: input.placeOfSupplyStateCode,
+      customerState: input.customerState,
+      salesOrderId:
+        input.salesOrderId !== undefined ? input.salesOrderId : existing.salesOrderId,
+      proformaInvoiceId:
+        input.proformaInvoiceId !== undefined
+          ? input.proformaInvoiceId
+          : existing.proformaInvoiceId,
+    },
+    party.stateCode,
+    existing.placeOfSupply,
+  )
+
   const draftInput = {
     legalEntityId: existing.legalEntityId,
     branchId: existing.branchId,
@@ -511,7 +587,7 @@ export async function updateUnifiedInvoice(
     invoiceDate,
     postingDate: invoiceDate,
     dueDate,
-    placeOfSupply: input.customerState ?? party.stateCode ?? existing.placeOfSupply,
+    placeOfSupply,
     taxTreatment: existing.taxTreatment,
     currencyCode: existing.currencyCode,
     exchangeRate: String(dec(existing.exchangeRate) || 1),

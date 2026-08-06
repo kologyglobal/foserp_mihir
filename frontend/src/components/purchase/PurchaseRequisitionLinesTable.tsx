@@ -276,10 +276,9 @@ export function PurchaseRequisitionLinesTable({
                 <th className="purchase-doc-lines-grid__sticky-item">Item</th>
                 <th className="min-w-[11rem]">Description</th>
                 <th className="min-w-[9rem]">Specification</th>
-                <th className="num min-w-[11rem] purchase-doc-lines-grid__qty-col">Qty</th>
                 <th className="purchase-doc-lines-grid__uom-col">UOM</th>
+                <th className="num min-w-[11rem] purchase-doc-lines-grid__qty-col">Qty</th>
                 <th className="min-w-[5rem] font-mono">HSN</th>
-                <th className="num min-w-[4rem]">GST %</th>
                 <th className="num">Est. Rate</th>
                 <th className="num">Est. Amount</th>
                 <th className="min-w-[9rem]">Preferred Vendor</th>
@@ -399,6 +398,52 @@ export function PurchaseRequisitionLinesTable({
                       )}
                     </td>
                     <td
+                      className="purchase-doc-lines-grid__uom-col"
+                      onKeyDown={rowEditable ? onCellKeyDown : undefined}
+                    >
+                      {(() => {
+                        const uomOptions = getPurchaseLineUomOptions(line.itemId)
+                        const multi = uomOptions.length > 1
+                        const uomCode =
+                          uomOptions.find((o) => o.id === line.uomId)?.code || line.uom || '—'
+                        if (!rowEditable || !line.itemId) {
+                          return (
+                            <span className="purchase-pr-lines-grid__uom-text">
+                              {line.uom || '—'}
+                            </span>
+                          )
+                        }
+                        if (multi) {
+                          // Native select only — shared Select/ErpSmartSelect chrome is too wide for this cell.
+                          return (
+                            <select
+                              className="erp-input purchase-pr-lines-grid__uom-select h-8 w-full text-center text-[11px] font-semibold uppercase"
+                              value={line.uomId || uomOptions[0]?.id || ''}
+                              title="Select purchase unit from Item Master"
+                              onChange={(e) => {
+                                const opt = uomOptions.find((o) => o.id === e.target.value)
+                                if (!opt) return
+                                patch(line.key, {
+                                  uomId: opt.id,
+                                  uom: opt.code,
+                                  uomConversionFactor: opt.factor,
+                                })
+                              }}
+                            >
+                              {uomOptions.map((o) => (
+                                <option key={o.id} value={o.id}>
+                                  {o.code}
+                                </option>
+                              ))}
+                            </select>
+                          )
+                        }
+                        return (
+                          <span className="purchase-pr-lines-grid__uom-text">{uomCode}</span>
+                        )
+                      })()}
+                    </td>
+                    <td
                       className={cn(
                         'num purchase-doc-lines-grid__qty-col min-w-[11rem]',
                         (miss.missingQty || qtyError) && rowEditable && 'ring-1 ring-inset ring-amber-400/70',
@@ -436,60 +481,8 @@ export function PurchaseRequisitionLinesTable({
                         />
                       )}
                     </td>
-                    <td
-                      className="purchase-doc-lines-grid__uom-col"
-                      onKeyDown={rowEditable ? onCellKeyDown : undefined}
-                    >
-                      {(() => {
-                        const uomOptions = getPurchaseLineUomOptions(line.itemId)
-                        const multi = uomOptions.length > 1
-                        const uomCode =
-                          uomOptions.find((o) => o.id === line.uomId)?.code || line.uom || '—'
-                        if (!rowEditable || !line.itemId) {
-                          return (
-                            <span className="block text-center text-[11px] font-medium uppercase text-erp-text">
-                              {line.uom || '—'}
-                            </span>
-                          )
-                        }
-                        if (multi) {
-                          return (
-                            <Select
-                              className="h-8 w-full px-0.5 text-center text-[10px]"
-                              value={line.uomId || uomOptions[0]?.id || ''}
-                              title="Select purchase unit from Item Master"
-                              onChange={(e) => {
-                                const opt = uomOptions.find((o) => o.id === e.target.value)
-                                if (!opt) return
-                                patch(line.key, {
-                                  uomId: opt.id,
-                                  uom: opt.code,
-                                  uomConversionFactor: opt.factor,
-                                })
-                              }}
-                            >
-                              {uomOptions.map((o) => (
-                                <option key={o.id} value={o.id}>
-                                  {o.code}
-                                </option>
-                              ))}
-                            </Select>
-                          )
-                        }
-                        return (
-                          <span className="block text-center text-[11px] font-medium uppercase text-erp-text">
-                            {uomCode}
-                          </span>
-                        )
-                      })()}
-                    </td>
                     <td className="font-mono text-[11px] text-erp-muted">
                       {line.hsnCode || '—'}
-                    </td>
-                    <td className="num tabular-nums text-[11px] text-erp-muted">
-                      {line.gstRatePct != null && line.gstRatePct > 0
-                        ? `${line.gstRatePct}%`
-                        : '—'}
                     </td>
                     <td className="num" onKeyDown={rowEditable ? onCellKeyDown : undefined}>
                       {rowEditable ? (
@@ -621,9 +614,8 @@ export function PurchaseRequisitionLinesTable({
                 <td className="purchase-doc-lines-grid__sticky-type" />
                 <td className="purchase-doc-lines-grid__sticky-item" />
                 <td colSpan={2} />
+                <td />
                 <td className="num tabular-nums">{totals.qty}</td>
-                <td />
-                <td />
                 <td />
                 <td className="num" />
                 <td className="num tabular-nums">{formatCurrency(totals.amount)}</td>
@@ -646,6 +638,26 @@ export function PurchaseRequisitionLinesTable({
           z-index: 20;
           background: var(--erp-surface-alt, #f8fafc);
           white-space: nowrap;
+        }
+        .purchase-pr-lines-grid .purchase-doc-lines-grid__uom-col {
+          width: 4.25rem !important;
+          min-width: 4.25rem !important;
+          max-width: 4.75rem !important;
+        }
+        .purchase-pr-lines-grid__uom-text {
+          display: block;
+          text-align: center;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+          color: var(--erp-text, #242424);
+          line-height: 2rem;
+        }
+        .purchase-pr-lines-grid__uom-select {
+          max-width: 100% !important;
+          min-width: 0 !important;
+          padding: 0 2px !important;
         }
         .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-line {
           position: sticky;

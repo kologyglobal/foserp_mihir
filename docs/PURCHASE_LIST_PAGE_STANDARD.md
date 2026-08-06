@@ -77,7 +77,8 @@ Use `useSavedViews({ pageId, filters, onApply, systemPresets })` + `SaveViewDial
 | `pageId` | Stable route key, e.g. `/purchase/orders` |
 | Persist | localStorage via `savedViewsStore` |
 | Presets | At least `My View` (empty / default filters) |
-| Save | Captures **current filter snapshot** (not column order yet — column layout is session UI) |
+| Save | Captures **current filter snapshot** |
+| Columns | **Column show/hide and order** persist per route in localStorage (`DataGrid` / `ErpDataGrid`) across refresh |
 
 ---
 
@@ -87,8 +88,11 @@ Use `useSavedViews({ pageId, filters, onApply, systemPresets })` + `SaveViewDial
 
 1. Toggle visibility (checkbox)
 2. **Drag-and-drop** reorder (grip handle) — not up/down arrows
+3. **Persistence** — layout is stored under `vasant-erp-grid-column-layouts` keyed by route path (or `columnLayoutKey`)
 
 Pin row-actions columns with `enableHiding: false` so they stay at the end.
+
+Document / register number columns support **header click A→Z / Z→A** even when page-level Sort is used. Sort dropdowns also offer explicit **(A→Z)** and **(Z→A)** options for document numbers.
 
 ---
 

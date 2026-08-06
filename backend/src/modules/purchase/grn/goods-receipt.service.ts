@@ -55,9 +55,14 @@ import {
   assertReversible,
   assertSubmittable,
   assertToleranceApprovable,
+  isGrnLineFullyReversed,
+  isGrnLineReversible,
   money,
   parseDateInput,
   qty,
+  remainingReversibleAccepted,
+  remainingReversibleReceived,
+  remainingReversibleRejected,
 } from './goods-receipt.workflow.js'
 
 async function loadOrThrow(tenantId: string, id: string) {
@@ -379,6 +384,11 @@ async function buildLineCreates(
     const previously = qty(poLine.receivedQuantity)
     const open = Math.max(0, ordered - previously)
     const shortCloseRequested = Boolean(input.shortCloseRequested ?? input.closeOpenQuantity)
+    // Create entry shows all open PO lines; only persist received or short-closed rows.
+    // Idle zero-qty lines remain open on the PO for a later GRN — not clutter on this receipt.
+    if (received <= 0 && !shortCloseRequested) {
+      continue
+    }
     const itemConfig = poLine.itemId ? itemConfigById.get(poLine.itemId) : undefined
     const tol = evaluateGrnLineTolerance({
       openQuantity: open,
@@ -400,6 +410,31 @@ async function buildLineCreates(
       manualWeightEntry: input.manualWeightEntry,
       weightUomCode: itemConfig?.weightUom?.code ?? null,
     })
+
+    // Hard block: never save more than open PO qty + resolved over-receipt tolerance.
+    const maxAllowed = Number(tol.maximumAllowedUnitQuantity)
+    if (received > maxAllowed + 1e-9) {
+      const itemLabel =
+        (poLine.itemCodeSnapshot || poLine.itemNameSnapshot || `line ${i + 1}`).trim()
+      const maxLabel = Number.isFinite(maxAllowed) ? maxAllowed : open
+      throw new GoodsReceiptValidationError(
+        `Received quantity (${received}) for ${itemLabel} exceeds maximum allowed (${maxLabel}). ` +
+          `Open PO quantity is ${open}` +
+          (tol.tolerancePercentage > 0
+            ? ` with over-receipt tolerance ${tol.tolerancePercentage}%.`
+            : ' (no over-receipt tolerance).'),
+        PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS,
+        [
+          {
+            field: `lines[${i}].receivedUomQuantity`,
+            message:
+              `Max ${maxLabel} (open ${open}` +
+              (tol.tolerancePercentage > 0 ? ` + ${tol.tolerancePercentage}%` : '') +
+              ')',
+          },
+        ],
+      )
+    }
 
     const lineWarehouseId = input.warehouseId ?? headerWarehouseId
     const lineStorageId = input.storageLocationId ?? headerStorageLocationId ?? null
@@ -444,7 +479,7 @@ async function buildLineCreates(
     const rejectedUom = toUomQuantity(rejected, factor)
 
     result.push({
-      lineNumber: i + 1,
+      lineNumber: result.length + 1,
       purchaseOrderLineId: poLine.id,
       itemId: poLine.itemId,
       itemCodeSnapshot: poLine.itemCodeSnapshot,
@@ -488,6 +523,13 @@ async function buildLineCreates(
       receivingConditionReason: input.receivingConditionReason?.trim() || null,
       remarks: input.remarks?.trim() || null,
     })
+  }
+  if (result.length === 0) {
+    throw new GoodsReceiptValidationError(
+      purchaseMessage(PURCHASE_ERROR_CODE.GRN_NO_LINES),
+      PURCHASE_ERROR_CODE.GRN_NO_LINES,
+      [{ field: 'lines', message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_NO_LINES) }],
+    )
   }
   return result
 }
@@ -1592,18 +1634,85 @@ export async function reverseGoodsReceipt(
   tenantId: string,
   id: string,
   actorId: string,
-  body: { remarks?: string } = {},
+  body: { remarks?: string; lineIds?: string[] } = {},
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertReversible(existing)
   await assertReverseNotBlocked(tenantId, id)
 
-  const deltas = existing.lines.map((l) => ({
+  const selectedIds = body.lineIds?.length ? [...new Set(body.lineIds)] : null
+  let targetLines = existing.lines.filter((l) => isGrnLineReversible(l))
+
+  if (selectedIds) {
+    const byId = new Map(existing.lines.map((l) => [l.id, l]))
+    const missing = selectedIds.filter((lid) => !byId.has(lid))
+    if (missing.length > 0) {
+      throw new GoodsReceiptValidationError(
+        purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_INVALID),
+        PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_INVALID,
+        missing.map((lid) => ({
+          field: 'lineIds',
+          message: `Line ${lid} is not on this goods receipt`,
+        })),
+      )
+    }
+    targetLines = selectedIds.map((lid) => byId.get(lid)!).filter((l) => isGrnLineReversible(l))
+    if (targetLines.length === 0) {
+      throw new GoodsReceiptValidationError(
+        purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_EMPTY),
+        PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_EMPTY,
+        [{ field: 'lineIds', message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_EMPTY) }],
+      )
+    }
+  } else if (targetLines.length === 0) {
+    throw new GoodsReceiptWorkflowError(
+      purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_NO_LINES),
+      PURCHASE_ERROR_CODE.GRN_REVERSE_NO_LINES,
+    )
+  }
+
+  const targetIdSet = new Set(targetLines.map((l) => l.id))
+  const willFullyReverse = existing.lines.every((l) => {
+    if (qty(l.receivedQuantity) <= 0 && qty(l.acceptedQuantity) <= 0 && qty(l.rejectedQuantity) <= 0) {
+      return true
+    }
+    if (targetIdSet.has(l.id)) return true
+    return isGrnLineFullyReversed(l) || !isGrnLineReversible(l)
+  })
+
+  const deltas = targetLines.map((l) => ({
     purchaseOrderLineId: l.purchaseOrderLineId,
-    receivedDelta: -qty(l.receivedQuantity),
-    acceptedDelta: -qty(l.acceptedQuantity),
-    rejectedDelta: -qty(l.rejectedQuantity),
+    receivedDelta: -remainingReversibleReceived(l),
+    acceptedDelta: -remainingReversibleAccepted(l),
+    rejectedDelta: -remainingReversibleRejected(l),
   }))
+
+  // Stock reverse must use remaining (not yet reversed) quantities only.
+  const stockLines = targetLines.map((l) => ({
+    ...l,
+    receivedQuantity: remainingReversibleReceived(l),
+    acceptedQuantity: remainingReversibleAccepted(l),
+    rejectedQuantity: remainingReversibleRejected(l),
+    acceptedForQcQuantity: Math.max(
+      0,
+      qty(l.acceptedForQcQuantity) - qty((l as { reversedAcceptedQuantity?: unknown }).reversedAcceptedQuantity),
+    ),
+  }))
+
+  const reverseNow = new Date()
+  const lineSummary = targetLines
+    .map(
+      (l) =>
+        `${l.itemCodeSnapshot || l.lineNumber}: ${remainingReversibleReceived(l) || remainingReversibleAccepted(l)}`,
+    )
+    .join(', ')
+  const historyRemarks = [
+    body.remarks?.trim(),
+    willFullyReverse ? 'Full reverse' : `Partial reverse (${targetLines.length} line${targetLines.length === 1 ? '' : 's'})`,
+    lineSummary ? `Lines: ${lineSummary}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   const reversalMovements = await prisma.$transaction(async (tx) => {
     let movements: Awaited<ReturnType<typeof reverseGrnStockInward>> = []
@@ -1614,7 +1723,7 @@ export async function reverseGoodsReceipt(
           grnId: existing.id,
           grnNumber: existing.grnNumber,
           warehouseId: existing.warehouseId,
-          lines: existing.lines,
+          lines: stockLines,
           useAcceptedQuantity: existing.inspectionRequired,
           actorId,
           tx,
@@ -1625,18 +1734,35 @@ export async function reverseGoodsReceipt(
           grnId: existing.id,
           grnNumber: existing.grnNumber,
           warehouseId: existing.warehouseId,
-          lines: existing.lines,
+          lines: stockLines,
           actorId,
           tx,
         })
       }
     }
+
+    for (const line of targetLines) {
+      await tx.goodsReceiptLine.updateMany({
+        where: { id: line.id, tenantId, goodsReceiptId: id },
+        data: {
+          reversedQuantity: qty(line.receivedQuantity),
+          reversedAcceptedQuantity: qty(line.acceptedQuantity),
+          reversedRejectedQuantity: qty(line.rejectedQuantity),
+          reversedAt: reverseNow,
+        },
+      })
+    }
+
     await repo.updateGoodsReceipt(
       tenantId,
       id,
       {
-        status: 'REVERSED',
-        reversedAt: new Date(),
+        ...(willFullyReverse
+          ? {
+              status: 'REVERSED' as const,
+              reversedAt: reverseNow,
+            }
+          : {}),
         updatedById: actorId,
         remarks: body.remarks?.trim() || existing.remarks,
       },
@@ -1650,9 +1776,9 @@ export async function reverseGoodsReceipt(
         documentNumber: existing.grnNumber,
         action: PURCHASE_AUDIT_ACTION.GRN_REVERSED,
         fromStatus: existing.status,
-        toStatus: 'REVERSED',
+        toStatus: willFullyReverse ? 'REVERSED' : existing.status,
         actorId,
-        remarks: body.remarks,
+        remarks: historyRemarks || body.remarks,
       },
       tx,
     )
@@ -1673,7 +1799,11 @@ export async function reverseGoodsReceipt(
     entityId: id,
     action: PURCHASE_AUDIT_ACTION.GRN_REVERSED,
     previousValue: { status: existing.status },
-    newValue: { status: 'REVERSED' },
+    newValue: {
+      status: willFullyReverse ? 'REVERSED' : existing.status,
+      partial: !willFullyReverse,
+      reversedLineIds: targetLines.map((l) => l.id),
+    },
   })
 
   return mapGoodsReceiptToDto(await loadOrThrow(tenantId, id))

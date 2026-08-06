@@ -86,16 +86,8 @@ export async function createSalesOrder(
 
   const lineBundle = buildLinesFromInput(input)
   const lines = await Promise.all(lineBundle.lines.map((line) => normalizeSalesLineForWrite(tenantId, line)))
-  const headerItemId = lines[0]?.itemId
-  if (!headerItemId) throw new ValidationError('Sales order requires at least one line with an Item')
-  const summary = {
-    qty: lines.reduce((s, l) => s + l.qty, 0),
-    unitPrice: lines[0]?.unitPrice ?? 0,
-    discountPct: lines[0]?.discountPct ?? 0,
-    basicAmount: Math.round(lines.reduce((s, l) => s + l.taxableValue, 0) * 100) / 100,
-    gstAmount: Math.round(lines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100,
-    grandTotal: Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100,
-  }
+  if (!lines[0]?.itemId) throw new ValidationError('Sales order requires at least one line with an Item')
+
   const salesOrderNo = await nextCode(tenantId, 'SALES_ORDER')
   const orderDate = parseDateInput(input.orderDate) ?? new Date()
   const expectedDeliveryDate = parseDateInput(input.expectedDeliveryDate) ?? null
@@ -128,6 +120,17 @@ export async function createSalesOrder(
     },
     permissions: ctx?.permissions,
   })
+  const alignedLines = taxHeader.lines
+  const summary = {
+    qty: alignedLines.reduce((s, l) => s + l.qty, 0),
+    unitPrice: alignedLines[0]?.unitPrice ?? 0,
+    discountPct: alignedLines[0]?.discountPct ?? 0,
+    basicAmount: Math.round(alignedLines.reduce((s, l) => s + l.taxableValue, 0) * 100) / 100,
+    gstAmount: Math.round(alignedLines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100,
+    grandTotal: Math.round(alignedLines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100,
+  }
+  const headerItemId = alignedLines[0]?.itemId
+  if (!headerItemId) throw new ValidationError('Sales order requires at least one line with an Item')
 
   const created = await repo.createSalesOrder({
     tenant: { connect: { id: tenantId } },
@@ -171,7 +174,7 @@ export async function createSalesOrder(
     locationId: input.locationId ?? null,
     legalEntityId: org.legalEntityId ?? null,
     branchId: org.branchId ?? null,
-    lines: lines as unknown as Prisma.InputJsonValue,
+    lines: alignedLines as unknown as Prisma.InputJsonValue,
     ...taxHeaderToPrismaCreate(taxHeader),
     createdBy: userId,
     updatedBy: userId,
@@ -189,6 +192,8 @@ export async function createSalesOrder(
         placeOfSupply: taxHeader.placeOfSupply,
         placeOfSupplyStateCode: taxHeader.placeOfSupplyStateCode,
         placeOfSupplyOverrideReason: taxHeader.placeOfSupplyOverrideReason,
+        overriddenBy: userId,
+        overriddenAt: new Date().toISOString(),
         supplyType: taxHeader.supplyType,
         gstScheme: taxHeader.gstScheme,
         salesOrderNo: created.salesOrderNo,
@@ -304,6 +309,13 @@ export async function updateSalesOrder(
       permissions: ctx?.permissions,
     })
     Object.assign(data, taxHeaderToPrismaCreate(taxHeader))
+    data.lines = taxHeader.lines as unknown as Prisma.InputJsonValue
+    data.basicAmount =
+      Math.round(taxHeader.lines.reduce((s, l) => s + l.taxableValue, 0) * 100) / 100
+    data.gstAmount = Math.round(taxHeader.lines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100
+    data.grandTotal =
+      Math.round(taxHeader.lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100
+    data.qty = taxHeader.lines.reduce((s, l) => s + l.qty, 0)
 
     const wasOverride = Boolean(existing.placeOfSupplyOverride)
     if (taxHeader.placeOfSupplyOverride) {
@@ -329,6 +341,8 @@ export async function updateSalesOrder(
             placeOfSupply: taxHeader.placeOfSupply,
             placeOfSupplyStateCode: taxHeader.placeOfSupplyStateCode,
             placeOfSupplyOverrideReason: taxHeader.placeOfSupplyOverrideReason,
+            overriddenBy: userId,
+            overriddenAt: new Date().toISOString(),
             supplyType: taxHeader.supplyType,
             gstScheme: taxHeader.gstScheme,
           },

@@ -455,6 +455,7 @@ export function PurchaseOrderLinesTable({
                               onChange={(e) => {
                                 const opt = uomOptions.find((o) => o.id === e.target.value)
                                 if (!opt) return
+                                // Keep entered purchase qty; recompute base via patchLine → computeLine.
                                 onPatchLine(line.key, {
                                   uomId: opt.id,
                                   uom: opt.code,
@@ -684,26 +685,64 @@ export function PurchaseOrderLinesTable({
                       </select>
                     </td>
                     <td onKeyDown={onCellKeyDown}>
-                      <select
-                        className="erp-input h-8 min-w-[7rem] text-[11px]"
-                        disabled={!editable}
-                        value={line.binId ?? ''}
-                        onChange={(e) => {
-                          const nextBinId = e.target.value || null
-                          const bin = binOptions.find((b) => b.id === nextBinId)
-                          onPatchLine(line.key, {
-                            binId: nextBinId,
-                            binCode: bin?.code ?? '',
-                          })
-                        }}
-                      >
-                        <option value="">{SELECT_PLACEHOLDER}</option>
-                        {binOptions.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.code}
-                          </option>
-                        ))}
-                      </select>
+                      {(() => {
+                        const resolvedBinId =
+                          line.binId ||
+                          (line.binCode
+                            ? binOptions.find(
+                                (b) =>
+                                  b.code.localeCompare(line.binCode, undefined, {
+                                    sensitivity: 'accent',
+                                  }) === 0,
+                              )?.id
+                            : undefined) ||
+                          ''
+                        const hasOption = Boolean(
+                          resolvedBinId && binOptions.some((b) => b.id === resolvedBinId),
+                        )
+                        const displayLabel =
+                          binOptions.find((b) => b.id === resolvedBinId)?.code ||
+                          line.binCode ||
+                          resolvedBinId
+                        return (
+                          <>
+                            <select
+                              className="erp-input h-8 min-w-[7rem] text-[11px]"
+                              disabled={!editable}
+                              value={resolvedBinId}
+                              onChange={(e) => {
+                                const nextBinId = e.target.value || null
+                                const bin = binOptions.find((b) => b.id === nextBinId)
+                                onPatchLine(line.key, {
+                                  binId: nextBinId,
+                                  binCode: bin?.code ?? '',
+                                })
+                              }}
+                              title={
+                                !binOptions.length
+                                  ? 'No bins loaded — configure Master → Bins, then refresh'
+                                  : displayLabel || undefined
+                              }
+                            >
+                              <option value="">{SELECT_PLACEHOLDER}</option>
+                              {binOptions.map((b) => (
+                                <option key={b.id} value={b.id}>
+                                  {b.code}
+                                  {b.name && b.name !== b.code ? ` — ${b.name}` : ''}
+                                </option>
+                              ))}
+                              {resolvedBinId && !hasOption ? (
+                                <option value={resolvedBinId}>
+                                  {line.binCode || resolvedBinId}
+                                </option>
+                              ) : null}
+                            </select>
+                            {!binOptions.length ? (
+                              <p className="mt-0.5 text-[10px] text-erp-muted">No bins</p>
+                            ) : null}
+                          </>
+                        )
+                      })()}
                     </td>
                     <td className="purchase-doc-lines-grid__sticky-actions">
                       <div className="flex items-center justify-center gap-0.5">

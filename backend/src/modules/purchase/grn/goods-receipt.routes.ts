@@ -11,6 +11,7 @@ import {
   evaluateGrnLinesSchema,
   grnLifecycleRemarksSchema,
   listGoodsReceiptsQuerySchema,
+  reverseGoodsReceiptSchema,
   updateGoodsReceiptSchema,
 } from './goods-receipt.validation.js'
 
@@ -78,7 +79,7 @@ router.post(
   '/:id/reverse',
   requirePermission('purchase.grn.post'),
   validateParams(uuidParamSchema),
-  validateBody(grnLifecycleRemarksSchema),
+  validateBody(reverseGoodsReceiptSchema),
   controller.reverseGoodsReceipt,
 )
 

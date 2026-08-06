@@ -16,11 +16,19 @@ export const DEFAULT_VQ_LIST_FILTERS: VqListFilters = {
   vendorName: '',
 }
 
-export type VqSortKey = 'documentDate' | 'documentNumber' | 'vendorName' | 'totalAmount' | 'status'
+export type VqSortKey =
+  | 'documentDate'
+  | 'documentNumber'
+  | 'documentNumberAsc'
+  | 'documentNumberDesc'
+  | 'vendorName'
+  | 'totalAmount'
+  | 'status'
 
 export const VQ_SORT_OPTIONS: { value: VqSortKey; label: string }[] = [
   { value: 'documentDate', label: 'Sort: Date' },
-  { value: 'documentNumber', label: 'Sort: VQ Number' },
+  { value: 'documentNumberAsc', label: 'Sort: VQ Number (A→Z)' },
+  { value: 'documentNumberDesc', label: 'Sort: VQ Number (Z→A)' },
   { value: 'vendorName', label: 'Sort: Vendor' },
   { value: 'totalAmount', label: 'Sort: Amount' },
   { value: 'status', label: 'Sort: Status' },
@@ -97,7 +105,10 @@ export function sortVqRows(rows: VendorQuotationListRow[], sortBy: VqSortKey): V
   list.sort((a, b) => {
     switch (sortBy) {
       case 'documentNumber':
-        return a.documentNumber.localeCompare(b.documentNumber)
+      case 'documentNumberAsc':
+        return a.documentNumber.localeCompare(b.documentNumber, undefined, { numeric: true })
+      case 'documentNumberDesc':
+        return b.documentNumber.localeCompare(a.documentNumber, undefined, { numeric: true })
       case 'vendorName':
         return a.vendorName.localeCompare(b.vendorName)
       case 'totalAmount':

@@ -335,6 +335,7 @@ export function PurchaseApprovalsPage() {
                 handlers={rowHandlers}
                 hasActiveFilters={activeFilters}
                 onClearFilters={clearFilters}
+                sortBy={sortBy}
                 registerFilter={{
                   search: filters.search,
                   onSearchChange: (search) => setFilters((f) => ({ ...f, search })),

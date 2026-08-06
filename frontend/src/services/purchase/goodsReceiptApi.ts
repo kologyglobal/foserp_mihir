@@ -56,7 +56,10 @@ export async function cancelGoodsReceiptApi(id: string, payload: Record<string, 
   })
 }
 
-export async function reverseGoodsReceiptApi(id: string, payload: Record<string, unknown> = {}) {
+export async function reverseGoodsReceiptApi(
+  id: string,
+  payload: { remarks?: string; lineIds?: string[] } | Record<string, unknown> = {},
+) {
   return apiRequest<ApiGoodsReceipt>(`${base()}/${id}/reverse`, {
     method: 'POST',
     body: JSON.stringify(payload),

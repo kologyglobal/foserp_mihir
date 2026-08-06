@@ -10,6 +10,7 @@
  * unchanged until explicitly wired.
  */
 import { isApiMode } from '../../config/apiConfig'
+import { evaluateGrnLineTolerance } from './grnTolerance'
 import type {
   GoodsReceiptLine,
   GoodsReceiptNote,
@@ -4302,9 +4303,17 @@ export async function revisePurchaseOrder(
   return structuredClone(po)
 }
 
+export type CreatePurchaseOrderFromPrOptions = {
+  /** Subset of PR line ids. Omit/empty = all open lines on the PR. */
+  lineIds?: string[]
+  /** Order qty keyed by PR line id (partial line qty). */
+  orderQuantities?: Record<string, number>
+}
+
 export async function createPurchaseOrderFromPr(
   prId: string,
   vendorId?: string,
+  options?: CreatePurchaseOrderFromPrOptions,
 ): Promise<PurchaseOrder> {
   await delay()
   const pr = state.requisitions.find((r) => r.id === prId)
@@ -4318,8 +4327,26 @@ export async function createPurchaseOrderFromPr(
   if (pr.status !== 'approved' && pr.status !== 'converted_to_rfq') {
     throw new PurchaseServiceError('PR_NOT_APPROVED', 'Only approved PRs can create a PO')
   }
+  const lineIdSet = options?.lineIds?.length ? new Set(options.lineIds) : null
+  const prLines = pr.lines.filter((l) => {
+    if (lineIdSet && !lineIdSet.has(l.id)) return false
+    const ordered = Number(l.orderedQuantity ?? 0)
+    const remaining =
+      typeof l.remainingQuantity === 'number'
+        ? l.remainingQuantity
+        : Number(l.quantity) - ordered
+    // When converting a specific selection, allow explicit qty overrides even if remaining metadata is stale.
+    if (lineIdSet) return true
+    return remaining > 0
+  })
+  if (prLines.length === 0) {
+    throw new PurchaseServiceError('PR_LINES_EMPTY', 'Select at least one open purchase requisition line')
+  }
   const preferred =
     vendorId ??
+    prLines
+      .map((l) => l.preferredVendorId)
+      .find((v): v is string => Boolean(v)) ??
     pr.lines
       .map((l) => state.items.find((i) => i.id === l.itemId)?.preferredVendorId)
       .find((v): v is string => Boolean(v)) ??
@@ -4337,20 +4364,31 @@ export async function createPurchaseOrderFromPr(
     purchaseLocation: pr.location,
     deliveryLocation: pr.location,
     department: pr.department,
-    remarks: `Created from ${pr.documentNumber}`,
-    lines: pr.lines.map((l) => ({
-      itemId: l.itemId,
-      quantity: l.quantity,
-      rate: l.estimatedRate,
-      requiredDate: l.requiredDate,
-      expectedDeliveryDate: l.requiredDate,
-      warehouseId: l.locationId,
-      warehouseName: l.locationName,
-      prLineId: l.id,
-      remarks: l.remarks,
-      description: l.itemName,
-      specification: l.specification ?? '',
-    })),
+    remarks: options?.lineIds?.length
+      ? `Created from ${pr.documentNumber} (partial · ${prLines.length} line${prLines.length === 1 ? '' : 's'})`
+      : `Created from ${pr.documentNumber}`,
+    lines: prLines.map((l) => {
+      const override = options?.orderQuantities?.[l.id]
+      const qty =
+        override != null && Number.isFinite(override) && override > 0
+          ? override
+          : typeof l.remainingQuantity === 'number' && l.remainingQuantity > 0
+            ? l.remainingQuantity
+            : l.quantity
+      return {
+        itemId: l.itemId,
+        quantity: qty,
+        rate: l.estimatedRate,
+        requiredDate: l.requiredDate,
+        expectedDeliveryDate: l.requiredDate,
+        warehouseId: l.locationId,
+        warehouseName: l.locationName,
+        prLineId: l.id,
+        remarks: l.remarks,
+        description: l.itemName,
+        specification: l.specification ?? '',
+      }
+    }),
   })
 }
 
@@ -4526,10 +4564,26 @@ function buildGrnLineFromPo(
     throw new PurchaseServiceError('INVALID_RECEIVED_QTY', `Received qty must be > 0 for ${poLine.itemCode}`)
   }
   const allowExcess = row.allowExcess ?? headerAllowExcess
-  if (receivedQty > pendingQty && !allowExcess) {
+  const itemTolerancePct = Number(
+    (item as { receivingTolerancePercentage?: number }).receivingTolerancePercentage ?? 0,
+  )
+  const setupTolerancePct = Number(state.setup?.general?.overReceiptTolerancePct ?? 0)
+  const setupAllowOver = Boolean(state.setup?.general?.allowOverReceipt)
+  const tol = evaluateGrnLineTolerance({
+    openQuantity: pendingQty,
+    receivedQuantity: receivedQty,
+    itemTolerancePct,
+    setupTolerancePct,
+    allowOverReceipt: allowExcess || setupAllowOver,
+  })
+  if (receivedQty > tol.upperBound + 1e-9) {
     throw new PurchaseServiceError(
-      'EXCESS_QTY_REQUIRES_PERMISSION',
-      `Received qty (${receivedQty}) exceeds pending qty (${pendingQty}) for ${poLine.itemCode}. Confirm allow excess to proceed.`,
+      'GRN_QTY_EXCEEDS',
+      `Received qty (${receivedQty}) for ${poLine.itemCode} exceeds maximum allowed (${Number(tol.upperBound.toFixed(4))}). ` +
+        `Open PO quantity is ${pendingQty}` +
+        (tol.tolerancePercentage > 0
+          ? ` with over-receipt tolerance ${tol.tolerancePercentage}%.`
+          : ' (no over-receipt tolerance).'),
     )
   }
   const excessQty =
@@ -4623,10 +4677,22 @@ function validateGrnDocument(grn: GoodsReceiptNote, options?: { forPost?: boolea
     if (line.receivedQty <= 0) {
       throw new PurchaseServiceError('INVALID_RECEIVED_QTY', `Received qty must be > 0 for ${line.itemCode}`)
     }
-    if (line.receivedQty > line.pendingQty && !line.allowExcess && !grn.allowExcess) {
+    const itemTol = Number(
+      (requireItem(line.itemId) as { receivingTolerancePercentage?: number }).receivingTolerancePercentage ?? 0,
+    )
+    const setupTol = Number(state.setup?.general?.overReceiptTolerancePct ?? 0)
+    const setupAllow = Boolean(state.setup?.general?.allowOverReceipt)
+    const lineTol = evaluateGrnLineTolerance({
+      openQuantity: line.pendingQty,
+      receivedQuantity: line.receivedQty,
+      itemTolerancePct: itemTol,
+      setupTolerancePct: setupTol,
+      allowOverReceipt: Boolean(line.allowExcess || grn.allowExcess || setupAllow),
+    })
+    if (line.receivedQty > lineTol.upperBound + 1e-9) {
       throw new PurchaseServiceError(
-        'EXCESS_QTY_REQUIRES_PERMISSION',
-        `Received qty exceeds pending for ${line.itemCode}. Set allow excess to confirm.`,
+        'GRN_QTY_EXCEEDS',
+        `Received qty (${line.receivedQty}) for ${line.itemCode} exceeds maximum allowed (${Number(lineTol.upperBound.toFixed(4))}).`,
       )
     }
   }
@@ -4790,7 +4856,16 @@ export async function createGRNFromPo(input: GrnInput): Promise<GoodsReceiptNote
     throw new PurchaseServiceError('GRN_LINES_REQUIRED', 'Select at least one PO line to receive.')
   }
 
-  const lines = input.lines.map((row, index) =>
+  // Create may list all open PO lines; only received qty > 0 becomes GRN lines.
+  const receiptRows = input.lines.filter((row) => (Number(row.receivedQty) || 0) > 0)
+  if (!receiptRows.length) {
+    throw new PurchaseServiceError(
+      'GRN_LINES_REQUIRED',
+      'Enter received quantity on at least one line (unused PO lines stay open for a later GRN).',
+    )
+  }
+
+  const lines = receiptRows.map((row, index) =>
     buildGrnLineFromPo(po, row, index, headerAllowExcess, warehouseId, warehouseName),
   )
   const inspectionRequired =
@@ -4898,7 +4973,14 @@ export async function updateGRN(id: string, input: Partial<GrnInput>): Promise<G
     const headerAllowExcess = input.allowExcess ?? grn.allowExcess
     const warehouseId = input.warehouseId ?? grn.warehouseId
     const warehouseName = input.warehouseName ?? grn.warehouseName
-    grn.lines = input.lines.map((row, index) =>
+    const receiptRows = input.lines.filter((row) => (Number(row.receivedQty) || 0) > 0)
+    if (!receiptRows.length) {
+      throw new PurchaseServiceError(
+        'GRN_LINES_REQUIRED',
+        'Enter received quantity on at least one line (unused PO lines stay open for a later GRN).',
+      )
+    }
+    grn.lines = receiptRows.map((row, index) =>
       buildGrnLineFromPo(po, row, index, headerAllowExcess, warehouseId, warehouseName),
     )
     const taxable = grn.lines.reduce((s, l) => s + l.taxableAmount, 0)
@@ -6098,7 +6180,13 @@ function buildReturnLines(
       row.availableReturnQty ??
       (row.goodsReceiptLineId && input.goodsReceiptId
         ? availableReturnQtyForGrnLine(input.goodsReceiptId, row.goodsReceiptLineId, excludeReturnId)
-        : returnQty)
+        : 0)
+    if (!row.goodsReceiptLineId || availableReturnQty <= 0) {
+      throw new PurchaseServiceError(
+        'RETURN_NO_GRN_LINE',
+        'Return lines must be received GRN lines with remaining returnable quantity.',
+      )
+    }
     return {
       id: genId('prd-retl'),
       lineNo: index + 1,
@@ -6168,6 +6256,39 @@ export async function createPurchaseReturn(
   await delay()
   if (!input.lines?.length) {
     throw new PurchaseServiceError('RETURN_NO_LINES', 'Add at least one return line')
+  }
+  if (!input.goodsReceiptId && !input.qualityInspectionId) {
+    throw new PurchaseServiceError(
+      'RETURN_NO_SOURCE',
+      'Select a goods receipt or quality inspection. Only GRN-received items can be returned.',
+    )
+  }
+  for (const line of input.lines) {
+    if (!line.goodsReceiptLineId) {
+      throw new PurchaseServiceError(
+        'RETURN_NO_GRN_LINE',
+        'Every return line must reference a goods receipt line. Unreceived items cannot be returned.',
+      )
+    }
+    if (input.goodsReceiptId) {
+      const avail = availableReturnQtyForGrnLine(
+        input.goodsReceiptId,
+        line.goodsReceiptLineId,
+      )
+      const qty = Number(line.returnQty || 0)
+      if (qty > avail + 1e-9) {
+        throw new PurchaseServiceError(
+          'RETURN_QTY',
+          `Return quantity exceeds remaining returnable on GRN line (available ${avail}).`,
+        )
+      }
+      if (avail <= 0) {
+        throw new PurchaseServiceError(
+          'RETURN_NO_QTY',
+          'No remaining returnable quantity on one or more GRN lines.',
+        )
+      }
+    }
   }
   const vendor = requireVendor(input.vendorId)
   const origin = input.origin ?? 'grn_rejected_quantity'

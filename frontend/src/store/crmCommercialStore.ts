@@ -18,7 +18,6 @@ import {
 } from '../types/crmCommercial'
 import { DEFAULT_GST_RATE } from '../types/invoice'
 import { computeGst } from '../utils/gstEngine'
-import { DEFAULT_PURCHASE_SETUP } from '../data/purchase/purchaseSetupSeed'
 import { nextDocumentNo } from '../utils/documentNumbers'
 import { useMasterStore } from './masterStore'
 import { useMrpStore } from './mrpStore'
@@ -28,6 +27,12 @@ import { canCrmPermission } from '../utils/permissions/crm'
 import { resolveCustomerShippingAddress } from '../utils/customerUtils'
 import { buildProformaLinesFromSalesOrder, computeProformaLineTotals, sumProformaTaxable } from '../utils/proformaInvoiceLines'
 import type { ProformaInvoiceLine } from '../types/proformaInvoice'
+import {
+  placeOfSupplyFromProforma,
+  placeOfSupplyFromSalesOrder,
+  resolveSellerStateForBreakdown,
+  taxHeaderPayloadFromSalesOrder,
+} from '../utils/commercialSupplySnapshot'
 
 function genId(prefix: string) {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
@@ -70,16 +75,16 @@ function normalizeLines(lines: CrmCommercialLine[]): CrmCommercialLine[] {
   })
 }
 
-function buildGst(lines: CrmCommercialLine[], customerState: string) {
+function buildGst(lines: CrmCommercialLine[], placeOfSupply: string, sellerStateCode?: string | null) {
   const taxable = sumProformaTaxable(lines as unknown as ProformaInvoiceLine[])
   const avgRate = lines.length
     ? lines.reduce((s, l) => s + l.taxPct, 0) / lines.length
     : DEFAULT_GST_RATE
   return computeGst(
     taxable,
-    customerState,
+    placeOfSupply,
     avgRate,
-    DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyStateCode || DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyState,
+    resolveSellerStateForBreakdown(sellerStateCode),
   )
 }
 
@@ -99,6 +104,15 @@ function toCommercialLinesFromProforma(lines: ProformaInvoiceLine[]): CrmCommerc
     taxableValue: l.taxableValue,
     gstAmount: l.gstAmount,
     lineTotal: l.lineTotal,
+    taxScheme: l.taxScheme ?? null,
+    cgstRate: l.cgstRate ?? null,
+    sgstRate: l.sgstRate ?? null,
+    utgstRate: l.utgstRate ?? null,
+    igstRate: l.igstRate ?? null,
+    cgstAmount: l.cgstAmount ?? null,
+    sgstAmount: l.sgstAmount ?? null,
+    utgstAmount: l.utgstAmount ?? null,
+    igstAmount: l.igstAmount ?? null,
     sourceLineId: l.id,
     maxQty: l.qty,
   }))
@@ -135,6 +149,11 @@ export interface CreateCrmInvoiceInput {
   billingAddress?: string | null
   shippingAddress?: string | null
   remarks?: string
+  placeOfSupply?: string | null
+  placeOfSupplyStateCode?: string | null
+  supplierStateCode?: string | null
+  supplyType?: string | null
+  gstScheme?: string | null
   lines: CrmCommercialLine[]
 }
 
@@ -413,7 +432,13 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
           ? useProformaInvoiceStore.getState().getProforma(input.proformaInvoiceId)
           : undefined
 
-        const gst = buildGst(lines, customer.state)
+        const placeOfSupply =
+          input.placeOfSupplyStateCode ||
+          input.placeOfSupply ||
+          placeOfSupplyFromSalesOrder(so, customer.state) ||
+          placeOfSupplyFromProforma(pi, customer.state)
+        const sellerState = input.supplierStateCode || so?.supplierStateCode
+        const gst = buildGst(lines, placeOfSupply, sellerState)
         const record: CrmTaxInvoice = {
           id: genId('inv'),
           invoiceNo: nextDocumentNo('INV-', get().invoices.map((i) => i.invoiceNo)),
@@ -427,7 +452,7 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
           customerGstin: customer.gstin,
           customerState: customer.state,
           customerAddress: formatCustomerAddress(customer),
-          placeOfSupply: customer.state,
+          placeOfSupply,
           billingAddress: input.billingAddress ?? formatCustomerAddress(customer),
           shippingAddress: input.shippingAddress ?? resolveCustomerShippingAddress(customer),
           deliveryTerms: input.deliveryTerms ?? so?.deliveryTerms ?? pi?.deliveryTerms ?? '',
@@ -493,7 +518,20 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
         if (!customer) return { ok: false, error: 'Customer not found.' }
 
         const lines = normalizeLines(input.lines)
-        const gst = buildGst(lines, customer.state)
+        const so = input.salesOrderId ? useMrpStore.getState().getSalesOrder(input.salesOrderId) : undefined
+        const pi = input.proformaInvoiceId
+          ? useProformaInvoiceStore.getState().getProforma(input.proformaInvoiceId)
+          : existing.proformaInvoiceId
+            ? useProformaInvoiceStore.getState().getProforma(existing.proformaInvoiceId)
+            : undefined
+        const placeOfSupply =
+          input.placeOfSupplyStateCode ||
+          input.placeOfSupply ||
+          existing.placeOfSupply ||
+          placeOfSupplyFromSalesOrder(so, customer.state) ||
+          placeOfSupplyFromProforma(pi, customer.state)
+        const sellerState = input.supplierStateCode || so?.supplierStateCode
+        const gst = buildGst(lines, placeOfSupply, sellerState)
         const ts = nowIso()
         const invoiceDate = (input.invoiceDate ?? existing.invoiceDate).slice(0, 10)
         const dueDate = (input.dueDate ?? existing.dueDate).slice(0, 10)
@@ -511,7 +549,7 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
                   customerGstin: customer.gstin,
                   customerState: customer.state,
                   customerAddress: formatCustomerAddress(customer),
-                  placeOfSupply: customer.state,
+                  placeOfSupply,
                   billingAddress: input.billingAddress ?? inv.billingAddress,
                   shippingAddress: input.shippingAddress ?? inv.shippingAddress,
                   deliveryTerms: input.deliveryTerms ?? inv.deliveryTerms,
@@ -519,12 +557,12 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
                   customerPoNumber:
                     input.customerPoNumber !== undefined ? input.customerPoNumber : inv.customerPoNumber,
                   salesOrderId: input.salesOrderId !== undefined ? input.salesOrderId : inv.salesOrderId,
-                  salesOrderNo: inv.salesOrderNo,
+                  salesOrderNo: so?.salesOrderNo ?? inv.salesOrderNo,
                   quotationId: input.quotationId !== undefined ? input.quotationId : inv.quotationId,
                   quotationNo: input.quotationNo !== undefined ? input.quotationNo : inv.quotationNo,
                   proformaInvoiceId:
                     input.proformaInvoiceId !== undefined ? input.proformaInvoiceId : inv.proformaInvoiceId,
-                  proformaNo: inv.proformaNo,
+                  proformaNo: pi?.proformaNo ?? inv.proformaNo,
                   remarks: input.remarks ?? inv.remarks,
                   source: input.source ?? inv.source,
                   lines,
@@ -586,6 +624,15 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
             taxableValue: totals.taxableValue,
             gstAmount: totals.gstAmount,
             lineTotal: totals.lineTotal,
+            taxScheme: bl.taxScheme ?? null,
+            cgstRate: bl.cgstRate ?? null,
+            sgstRate: bl.sgstRate ?? null,
+            utgstRate: bl.utgstRate ?? null,
+            igstRate: bl.igstRate ?? null,
+            cgstAmount: totals.cgstAmount ?? bl.cgstAmount ?? null,
+            sgstAmount: totals.sgstAmount ?? bl.sgstAmount ?? null,
+            utgstAmount: totals.utgstAmount ?? bl.utgstAmount ?? null,
+            igstAmount: totals.igstAmount ?? bl.igstAmount ?? null,
             sourceLineId: bl.id,
             maxQty: remaining,
           })
@@ -604,6 +651,7 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
           billingAddress: so.billingAddress ?? null,
           shippingAddress: so.shippingAddress ?? null,
           remarks: so.internalRemarks ?? '',
+          ...taxHeaderPayloadFromSalesOrder(so),
           lines,
         })
       },
@@ -629,9 +677,17 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
             taxableValue: totals.taxableValue,
             gstAmount: totals.gstAmount,
             lineTotal: totals.lineTotal,
+            cgstAmount: totals.cgstAmount ?? bl.cgstAmount ?? null,
+            sgstAmount: totals.sgstAmount ?? bl.sgstAmount ?? null,
+            utgstAmount: totals.utgstAmount ?? bl.utgstAmount ?? null,
+            igstAmount: totals.igstAmount ?? bl.igstAmount ?? null,
           })
         }
         if (!lines.length) return { ok: false, error: 'Select at least one line quantity.' }
+
+        const so = pi.salesOrderId
+          ? useMrpStore.getState().getSalesOrder(pi.salesOrderId)
+          : undefined
 
         return get().createInvoice({
           customerId: pi.customerId,
@@ -646,6 +702,11 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
           billingAddress: pi.billingAddress,
           shippingAddress: pi.shippingAddress,
           remarks: pi.remarks,
+          placeOfSupply: pi.placeOfSupply,
+          placeOfSupplyStateCode: so?.placeOfSupplyStateCode ?? null,
+          supplierStateCode: so?.supplierStateCode ?? null,
+          supplyType: so?.supplyType ?? null,
+          gstScheme: so?.gstScheme ?? pi.gst?.scheme ?? null,
           lines,
         })
       },

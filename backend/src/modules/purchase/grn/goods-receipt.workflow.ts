@@ -118,7 +118,58 @@ export function qty(value: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
-export function allowedActions(grn: Pick<GoodsReceipt, 'status' | 'deletedAt' | 'inspectionRequired'>): {
+/** Remaining primary received qty that can still be reversed on a GRN line. */
+export function remainingReversibleReceived(
+  line: Pick<GoodsReceiptLine, 'receivedQuantity'> & { reversedQuantity?: unknown },
+): number {
+  return Math.max(0, qty(line.receivedQuantity) - qty(line.reversedQuantity))
+}
+
+export function remainingReversibleAccepted(
+  line: Pick<GoodsReceiptLine, 'acceptedQuantity'> & { reversedAcceptedQuantity?: unknown },
+): number {
+  return Math.max(0, qty(line.acceptedQuantity) - qty(line.reversedAcceptedQuantity))
+}
+
+export function remainingReversibleRejected(
+  line: Pick<GoodsReceiptLine, 'rejectedQuantity'> & { reversedRejectedQuantity?: unknown },
+): number {
+  return Math.max(0, qty(line.rejectedQuantity) - qty(line.reversedRejectedQuantity))
+}
+
+/** Line has net received/accepted/rejected stock that can still be reversed. */
+export function isGrnLineReversible(
+  line: Pick<GoodsReceiptLine, 'receivedQuantity' | 'acceptedQuantity' | 'rejectedQuantity'> & {
+    reversedQuantity?: unknown
+    reversedAcceptedQuantity?: unknown
+    reversedRejectedQuantity?: unknown
+  },
+): boolean {
+  return (
+    remainingReversibleReceived(line) > 0 ||
+    remainingReversibleAccepted(line) > 0 ||
+    remainingReversibleRejected(line) > 0
+  )
+}
+
+export function isGrnLineFullyReversed(
+  line: Pick<GoodsReceiptLine, 'receivedQuantity'> & { reversedQuantity?: unknown },
+): boolean {
+  const received = qty(line.receivedQuantity)
+  return received > 0 && remainingReversibleReceived(line) <= 0
+}
+
+export function allowedActions(
+  grn: Pick<GoodsReceipt, 'status' | 'deletedAt' | 'inspectionRequired'> & {
+    lines?: Array<
+      Pick<GoodsReceiptLine, 'receivedQuantity' | 'acceptedQuantity' | 'rejectedQuantity'> & {
+        reversedQuantity?: unknown
+        reversedAcceptedQuantity?: unknown
+        reversedRejectedQuantity?: unknown
+      }
+    >
+  },
+): {
   canEdit: boolean
   canSubmit: boolean
   canCancel: boolean
@@ -135,6 +186,20 @@ export function allowedActions(grn: Pick<GoodsReceipt, 'status' | 'deletedAt' | 
       ? ['PARTIALLY_ACCEPTED', 'FULLY_ACCEPTED'].includes(grn.status)
       : ['SUBMITTED', 'RECEIVING_COMPLETED', 'PARTIALLY_ACCEPTED', 'FULLY_ACCEPTED'].includes(grn.status))
   const pendingTol = active && grn.status === 'PENDING_TOLERANCE_APPROVAL'
+  const statusReversible =
+    active &&
+    [
+      'SUBMITTED',
+      'RECEIVING_COMPLETED',
+      'QC_PENDING',
+      'PARTIALLY_ACCEPTED',
+      'FULLY_ACCEPTED',
+      'INVENTORY_POSTED',
+    ].includes(grn.status)
+  const hasReversibleLines =
+    !grn.lines || grn.lines.length === 0
+      ? statusReversible
+      : grn.lines.some((l) => isGrnLineReversible(l))
   return {
     canEdit: active && grn.status === 'DRAFT',
     canSubmit: active && grn.status === 'DRAFT',
@@ -142,16 +207,7 @@ export function allowedActions(grn: Pick<GoodsReceipt, 'status' | 'deletedAt' | 
       ['DRAFT', 'PENDING_TOLERANCE_APPROVAL', 'SUBMITTED', 'RECEIVING_COMPLETED', 'QC_PENDING'].includes(
         grn.status,
       ),
-    canReverse:
-      active &&
-      [
-        'SUBMITTED',
-        'RECEIVING_COMPLETED',
-        'QC_PENDING',
-        'PARTIALLY_ACCEPTED',
-        'FULLY_ACCEPTED',
-        'INVENTORY_POSTED',
-      ].includes(grn.status),
+    canReverse: statusReversible && hasReversibleLines,
     canPostInventory,
     canApproveTolerance: pendingTol,
     canRejectTolerance: pendingTol,

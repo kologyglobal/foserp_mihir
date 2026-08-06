@@ -62,7 +62,10 @@ function sortPrRows(rows: PurchaseRequisitionListRow[], sortBy: PrSortKey): Purc
   }
   switch (sortBy) {
     case 'documentNumber':
+    case 'documentNumberAsc':
       return list.sort((a, b) => cmp(a.documentNumber, b.documentNumber))
+    case 'documentNumberDesc':
+      return list.sort((a, b) => cmp(b.documentNumber, a.documentNumber))
     case 'estimatedValue':
       return list.sort((a, b) => b.estimatedValue - a.estimatedValue)
     case 'requiredBy':
@@ -503,6 +506,7 @@ export function PurchaseRequisitionListPage() {
               hasActiveFilters={activeFilters}
               onClearFilters={clearFilters}
               onExport={exportList}
+              sortBy={sortBy}
               registerFilter={{
                 search: filters.search,
                 onSearchChange: (search) => setFilters((f) => ({ ...f, search })),

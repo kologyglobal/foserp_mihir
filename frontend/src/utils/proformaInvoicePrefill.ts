@@ -21,6 +21,11 @@ export interface ProformaSalesOrderPrefill {
   quotationNo: string | null
   locationId: string | null
   remarks: string
+  placeOfSupply: string | null
+  placeOfSupplyStateCode: string | null
+  supplierStateCode: string | null
+  supplyType: string | null
+  gstScheme: string | null
   lines: ProformaInvoiceLine[]
   so: SalesOrder
 }
@@ -56,6 +61,11 @@ function mapSalesOrderToPrefill(so: SalesOrder): ProformaSalesOrderPrefill | nul
     quotationNo: so.quotationNo ?? null,
     locationId: so.locationId ?? null,
     remarks,
+    placeOfSupply: so.placeOfSupply ?? so.placeOfSupplyStateCode ?? null,
+    placeOfSupplyStateCode: so.placeOfSupplyStateCode ?? null,
+    supplierStateCode: so.supplierStateCode ?? null,
+    supplyType: so.supplyType ?? null,
+    gstScheme: so.gstScheme ?? null,
     lines,
     so,
   }

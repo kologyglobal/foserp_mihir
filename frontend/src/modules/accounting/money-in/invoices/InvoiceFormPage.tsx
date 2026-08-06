@@ -438,6 +438,13 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
         const data = result.data
         setProformaSource(data)
         applyCustomerDefaults(data.customerId)
+        // Prefer commercial PoS snapshot from PI/SO over customer-master default.
+        const snapPos =
+          resolveGstStateCode(data.placeOfSupplyStateCode) ??
+          resolveGstStateCode(data.placeOfSupply)
+        if (snapPos) {
+          form.setValue('placeOfSupply', snapPos, { shouldDirty: true, shouldValidate: true })
+        }
         if (data.customerPoNumber) form.setValue('customerPoNumber', data.customerPoNumber, { shouldDirty: true })
         if (data.remarks) form.setValue('narration', data.remarks, { shouldDirty: true })
         form.setValue(

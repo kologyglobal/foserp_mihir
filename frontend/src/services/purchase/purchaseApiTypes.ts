@@ -492,6 +492,12 @@ export interface ApiPurchaseOrderLine {
   hsnId?: string | null
   hsnCode?: string
   gstGroupCode?: string
+  /** Combined GST % snapshot from master resolve */
+  gstRatePct?: number
+  cgstRate?: number
+  sgstRate?: number
+  igstRate?: number
+  gstScheme?: string
   binId?: string | null
   binCode?: string | null
   qcRequired?: boolean
@@ -702,6 +708,12 @@ export interface ApiGoodsReceiptLine {
   toleranceStatus?: string
   returnedQuantity?: number
   returnableQuantity?: number
+  reversedQuantity?: number
+  reversedAcceptedQuantity?: number
+  reversedRejectedQuantity?: number
+  reversedAt?: string | null
+  remainingReversibleQuantity?: number
+  lineFullyReversed?: boolean
   closeOpenQuantity?: boolean
   shortCloseRequested?: boolean
   shortCloseReason?: string | null
@@ -755,6 +767,7 @@ export interface ApiGoodsReceipt {
   submittedAt: string | null
   cancelledAt: string | null
   reversedAt: string | null
+  partiallyReversed?: boolean
   closedAt: string | null
   createdAt: string | null
   updatedAt: string | null

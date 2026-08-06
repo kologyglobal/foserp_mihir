@@ -107,6 +107,7 @@ export interface PurchaseInvoicesTableProps {
   hasActiveFilters?: boolean
   onClearFilters?: () => void
   onExport?: () => void
+  sortBy?: string
 }
 
 export function PurchaseInvoicesTable({
@@ -118,6 +119,7 @@ export function PurchaseInvoicesTable({
   hasActiveFilters,
   onClearFilters,
   onExport,
+  sortBy,
 }: PurchaseInvoicesTableProps) {
   const densityClass = useDensityClass()
 
@@ -287,6 +289,7 @@ export function PurchaseInvoicesTable({
       stickyFirstColumn
       showCompactSearch={false}
       enableColumnSorting={false}
+      sortResetToken={sortBy}
       exportFileName="purchase-invoices"
       onExport={onExport}
       getRowId={(r) => r.id}

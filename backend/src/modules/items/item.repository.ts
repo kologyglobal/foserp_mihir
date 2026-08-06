@@ -18,6 +18,7 @@ const itemConversionInclude = {
     include: { uom: { select: { id: true, code: true, name: true } } },
     orderBy: [{ isDefaultPurchase: 'desc' as const }, { uom: { code: 'asc' as const } }],
   },
+  defaultBin: { select: { id: true, code: true, name: true } },
 } as const
 
 function stripUomConversions(input: Record<string, unknown>): {
@@ -44,12 +45,19 @@ function stripUomConversions(input: Record<string, unknown>): {
   }
 }
 
-function attachUomConversions<T extends { uomConversions?: Array<Parameters<typeof mapConversionRow>[0]> }>(
-  item: T,
-) {
-  const { uomConversions, ...rest } = item
+function attachUomConversions<
+  T extends {
+    uomConversions?: Array<Parameters<typeof mapConversionRow>[0]>
+    defaultBin?: { id: string; code: string; name: string } | null
+    defaultBinId?: string | null
+  },
+>(item: T) {
+  const { uomConversions, defaultBin, ...rest } = item
   return {
     ...rest,
+    defaultBinId: rest.defaultBinId ?? defaultBin?.id ?? null,
+    defaultBinCode: defaultBin?.code ?? null,
+    defaultBinName: defaultBin?.name ?? null,
     uomConversions: (uomConversions ?? []).map(mapConversionRow),
   }
 }
@@ -70,6 +78,7 @@ function normalizeNullableIds(input: Record<string, unknown>): Record<string, un
     'drawingNo',
     'subAssemblyRule',
     'salesDescription',
+    'defaultBinId',
   ] as const) {
     if (data[key] === '') data[key] = null
   }
@@ -157,6 +166,12 @@ async function assertTenantFk(tenantId: string, input: Record<string, unknown>):
     })
     if (!uom) throw new ValidationError('Weight UOM not found in tenant')
   }
+  if (input.defaultBinId) {
+    const bin = await prisma.masterBin.findFirst({
+      where: { id: String(input.defaultBinId), ...tenantActiveFilter(tenantId) },
+    })
+    if (!bin) throw new ValidationError('Default bin not found in tenant')
+  }
 }
 
 async function syncReceivingToleranceLegacyPct(
@@ -240,13 +255,23 @@ export async function listItemLookups(tenantId: string, query: ItemLookupQuery) 
         defaultFulfilmentMethod: true,
         salesUomId: true,
         salesLeadDays: true,
+        defaultBinId: true,
         status: true,
+        defaultBin: { select: { code: true } },
       },
     }),
     prisma.masterItem.count({ where }),
   ])
 
-  return { items, total, page: query.page, limit: query.limit }
+  return {
+    items: items.map(({ defaultBin, ...row }) => ({
+      ...row,
+      defaultBinCode: defaultBin?.code ?? null,
+    })),
+    total,
+    page: query.page,
+    limit: query.limit,
+  }
 }
 
 export async function getItem(tenantId: string, id: string) {
@@ -347,7 +372,7 @@ export async function createItem(
   )
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const record = await tx.masterItem.create({
         data: {
           tenantId,
@@ -371,8 +396,9 @@ export async function createItem(
         seedConversions,
         tx,
       )
-      return { ...record, uomConversions: conversions }
+      return { id: record.id, conversions }
     })
+    return getItem(tenantId, result.id)
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       throw new ConflictError('Duplicate item code in tenant')
@@ -408,25 +434,19 @@ export async function updateItem(
   )
 
   try {
-    return await prisma.$transaction(async (tx) => {
-      const record = await tx.masterItem.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.masterItem.update({
         where: { id, tenantId },
         data: {
           ...(data as Prisma.MasterItemUncheckedUpdateInput),
           updatedBy: userId,
         },
       })
-      const conversions = hasUomConversions
-        ? await syncItemUomConversions(tenantId, id, baseUomId, uomConversions, tx)
-        : (
-            await tx.masterItemUomConversion.findMany({
-              where: { tenantId, itemId: id },
-              include: { uom: { select: { id: true, code: true, name: true } } },
-              orderBy: [{ isDefaultPurchase: 'desc' }, { uom: { code: 'asc' } }],
-            })
-          ).map(mapConversionRow)
-      return { ...record, uomConversions: conversions }
+      if (hasUomConversions) {
+        await syncItemUomConversions(tenantId, id, baseUomId, uomConversions, tx)
+      }
     })
+    return getItem(tenantId, id)
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       throw new ConflictError('Duplicate item code in tenant')

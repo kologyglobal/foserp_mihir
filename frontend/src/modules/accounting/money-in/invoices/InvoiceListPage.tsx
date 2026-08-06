@@ -77,6 +77,8 @@ type InvoiceSortKey =
   | 'balance'
   | 'status'
   | 'invoiceNo'
+  | 'invoiceNoAsc'
+  | 'invoiceNoDesc'
   | 'overdue'
 
 /** Legacy `?status=` deep links (from the old status dropdown) map onto view tabs. */
@@ -150,7 +152,8 @@ const INVOICE_SORT_OPTIONS: { value: InvoiceSortKey; label: string }[] = [
   { value: 'balance', label: 'Sort: Balance Due' },
   { value: 'overdue', label: 'Sort: Overdue Days' },
   { value: 'status', label: 'Sort: Status' },
-  { value: 'invoiceNo', label: 'Sort: Invoice No.' },
+  { value: 'invoiceNoAsc', label: 'Sort: Invoice No. (A→Z)' },
+  { value: 'invoiceNoDesc', label: 'Sort: Invoice No. (Z→A)' },
 ]
 
 interface InvoiceRegisterRow {
@@ -258,7 +261,10 @@ function sortRows(list: InvoiceRegisterRow[], sortBy: InvoiceSortKey): InvoiceRe
       case 'status':
         return a.statusLabel.localeCompare(b.statusLabel) || b.invoice.invoiceDate.localeCompare(a.invoice.invoiceDate)
       case 'invoiceNo':
-        return b.displayNo.localeCompare(a.displayNo)
+      case 'invoiceNoAsc':
+        return a.displayNo.localeCompare(b.displayNo, undefined, { numeric: true })
+      case 'invoiceNoDesc':
+        return b.displayNo.localeCompare(a.displayNo, undefined, { numeric: true })
       case 'dueDate':
         return (a.invoice.dueDate ?? '').localeCompare(b.invoice.dueDate ?? '') || b.displayNo.localeCompare(a.displayNo)
       case 'invoiceDate':
@@ -828,6 +834,7 @@ export function InvoiceListPage() {
               showCompactSearch={false}
               showToolbarExport={false}
               enableColumnSorting={false}
+              sortResetToken={sortBy}
               emptyMessage={
                 hasActiveFilters
                   ? 'No invoices match the current filters.'

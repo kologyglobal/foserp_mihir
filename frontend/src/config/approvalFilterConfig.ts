@@ -49,6 +49,8 @@ export const DEFAULT_APPROVAL_LIST_FILTERS: ApprovalListFilters = {
 export type ApprovalSortKey =
   | 'submittedDate'
   | 'documentNumber'
+  | 'documentNumberAsc'
+  | 'documentNumberDesc'
   | 'amount'
   | 'pendingSinceDays'
   | 'priority'
@@ -56,7 +58,8 @@ export type ApprovalSortKey =
 
 export const APPROVAL_SORT_OPTIONS: { value: ApprovalSortKey; label: string }[] = [
   { value: 'submittedDate', label: 'Sort: Submitted' },
-  { value: 'documentNumber', label: 'Sort: Document No.' },
+  { value: 'documentNumberAsc', label: 'Sort: Document No. (A→Z)' },
+  { value: 'documentNumberDesc', label: 'Sort: Document No. (Z→A)' },
   { value: 'amount', label: 'Sort: Amount' },
   { value: 'pendingSinceDays', label: 'Sort: Pending Age' },
   { value: 'priority', label: 'Sort: Priority' },
@@ -277,7 +280,10 @@ export function sortApprovalRows(
   }
   switch (sortBy) {
     case 'documentNumber':
+    case 'documentNumberAsc':
       return list.sort((a, b) => cmp(a.documentNumber, b.documentNumber))
+    case 'documentNumberDesc':
+      return list.sort((a, b) => cmp(b.documentNumber, a.documentNumber))
     case 'amount':
       return list.sort((a, b) => b.amount - a.amount)
     case 'pendingSinceDays':

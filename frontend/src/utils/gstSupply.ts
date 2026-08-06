@@ -1,5 +1,4 @@
 import type { GstScheme } from '../types/invoice'
-import { COMPANY_GSTIN, COMPANY_STATE } from '../types/invoice'
 import {
   formatPlaceOfSupplyLabel,
   resolveGstStateCode,
@@ -91,12 +90,12 @@ export function determineSalesGstSupply(opts: {
   customerState?: string | null
   customerGstin?: string | null
 }): GstSupplyContext {
-  const companyCode =
-    resolvePartyStateCode({
-      state: opts.companyState,
-      stateCode: opts.companyStateCode,
-      gstin: opts.companyGstin ?? COMPANY_GSTIN,
-    }) ?? resolveGstStateCode(COMPANY_STATE)
+  // Do not invent COMPANY_STATE / "27" when seller state is missing — leave unresolved.
+  const companyCode = resolvePartyStateCode({
+    state: opts.companyState,
+    stateCode: opts.companyStateCode,
+    gstin: opts.companyGstin,
+  })
 
   const customerPosCode = resolvePlaceOfSupplyFromBilling({
     explicitPlaceOfSupply: opts.customerPlaceOfSupply,

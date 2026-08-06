@@ -31,7 +31,8 @@ export const GRN_LINES_RECEIVING_GUIDE = {
   columns: [
     {
       term: 'Received',
-      meaning: 'Physical qty on the vendor challan / at gate now (0 = not received this time).',
+      meaning:
+        'Type the physical qty received now (starts empty). Ordered / Prev / Pending stay on the PO for reference. 0 or blank = not received this GRN.',
     },
     {
       term: 'Accepted',

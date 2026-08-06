@@ -96,6 +96,14 @@ export function purchaseQtyToBaseQty(purchaseQty: number, factor: number): numbe
   return Number((q / f).toFixed(4))
 }
 
+/** Purchase/vendor qty from primary/base qty (mirror of purchaseQtyToBaseQty). */
+export function toUomQuantityFromBase(baseQty: number, factor: number): number {
+  const f = Number(factor) > 0 ? Number(factor) : 1
+  const q = Number(baseQty) || 0
+  if (f === 1) return q
+  return Number((q * f).toFixed(4))
+}
+
 export function resolveUomCode(uomId: string | null | undefined, fallback = ''): string {
   if (!uomId) return fallback
   const u = useMasterStore.getState().uoms.find((row) => row.id === uomId)

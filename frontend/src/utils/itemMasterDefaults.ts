@@ -42,6 +42,8 @@ export function enrichItemWithDefaults(item: Item): Item {
     salesAllowed: item.salesAllowed ?? false,
     defaultFulfilmentMethod: item.defaultFulfilmentMethod ?? 'MANUAL',
     productionAllowed: item.productionAllowed ?? false,
+    defaultBinId: item.defaultBinId ?? null,
+    defaultBinCode: item.defaultBinCode ?? null,
   }
 }
 

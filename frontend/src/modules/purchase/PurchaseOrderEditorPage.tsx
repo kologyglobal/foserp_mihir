@@ -9,6 +9,7 @@ import {
   Package,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { PoCreateFromPrPanel } from '@/components/purchase/PoCreateFromPrPanel'
 import {
   purchaseSectionId,
   scrollToPurchaseValidationTarget,
@@ -112,6 +113,8 @@ import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 import { useOptionalAuth } from '@/context/AuthProvider'
 import { useMasterStore } from '@/store/masterStore'
 import { useBinOptions } from '@/hooks/useBinOptions'
+import { resolveBinSelection, resolveItemDefaultBin } from '@/utils/itemDefaultBin'
+import { resolveDefaultPurchaseUom } from '@/utils/purchaseLineUom'
 import { loadQualityTestGroupOptions, type QualityTestGroupOption } from '@/utils/qualityTestGroupOptions'
 
 type LocationOption = {
@@ -339,6 +342,9 @@ interface PoEditorHeader {
   documentDate: string
   orderType: PurchaseOrderType
   vendorId: string
+  /** Display snapshots so the vendor select still shows PR/API parties not in the active list. */
+  vendorCode: string
+  vendorName: string
   vendorGstin: string
   vendorState: string
   vendorAddress: string
@@ -373,11 +379,53 @@ interface PoEditorHeader {
   tcsAmount: number
 }
 
+/** Minimal vendor row for select/options when document vendor is missing from active masters. */
+function vendorStubFromHeader(header: Pick<
+  PoEditorHeader,
+  'vendorId' | 'vendorCode' | 'vendorName' | 'vendorGstin' | 'vendorState' | 'vendorAddress' | 'isInterstate' | 'paymentTerms' | 'deliveryTerms'
+>): Vendor | null {
+  const id = header.vendorId?.trim()
+  if (!id) return null
+  const name = header.vendorName?.trim() || 'Selected vendor'
+  return {
+    id,
+    vendorCode: header.vendorCode?.trim() || '',
+    vendorName: name,
+    vendorType: 'manufacturer',
+    contactPerson: '',
+    contactPhone: '',
+    contactEmail: '',
+    address: header.vendorAddress || '',
+    city: '',
+    state: header.vendorState || '',
+    stateCode: '',
+    pincode: '',
+    gstin: header.vendorGstin || '',
+    pan: '',
+    isInterstate: header.isInterstate,
+    paymentTerms: header.paymentTerms || '',
+    deliveryTerms: header.deliveryTerms || '',
+    currency: 'INR',
+    leadTimeDays: 0,
+    rating: 0,
+    qualityScore: 0,
+    deliveryScore: 0,
+    isActive: true,
+    remarks: '',
+    createdBy: '',
+    createdAt: '',
+    updatedBy: null,
+    updatedAt: null,
+  }
+}
+
 function defaultHeader(): PoEditorHeader {
   return {
     documentDate: today(),
     orderType: 'standard',
     vendorId: '',
+    vendorCode: '',
+    vendorName: '',
     vendorGstin: '',
     vendorState: '',
     vendorAddress: '',
@@ -417,7 +465,9 @@ function headerFromPo(po: PurchaseOrder): PoEditorHeader {
   return {
     documentDate: po.documentDate,
     orderType: po.orderType,
-    vendorId: po.vendor.id,
+    vendorId: (po.vendor.id ?? '').trim(),
+    vendorCode: (po.vendor.code ?? '').trim(),
+    vendorName: (po.vendor.name ?? '').trim(),
     vendorGstin: po.vendor.gstin,
     vendorState: po.vendor.state,
     vendorAddress: formatVendorAddress({
@@ -522,12 +572,20 @@ export function PurchaseOrderEditorPage() {
   const [catalogItems, setCatalogItems] = useState<PurchaseItem[]>([])
   const [purchaseSetup, setPurchaseSetup] = useState<PurchaseSetup | null>(null)
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>([])
+  /** All active bins (warehouse filter applied client-side so empty warehouses don't blank the field). */
   const binOptions = useBinOptions()
   const [qualityTestGroupOptions, setQualityTestGroupOptions] = useState<QualityTestGroupOption[]>([])
 
   const originParam = (searchParams.get('origin') ?? '') as string
+  const modeParam = searchParams.get('mode') ?? ''
+  const prIdFromQuery = searchParams.get('prId') ?? ''
+  /** Interactive PR → PO with line selection (partial). Replaces silent full convert. */
+  const showPrLineSelector =
+    isNew &&
+    !id &&
+    (modeParam === 'pr' || originParam === 'pr' || Boolean(prIdFromQuery))
   const originModeFromParam: PurchaseOrderOrigin =
-    originParam === 'pr'
+    originParam === 'pr' || modeParam === 'pr' || Boolean(prIdFromQuery)
       ? 'purchase_requisition'
       : originParam === 'vq'
         ? 'vendor_quotation'
@@ -540,10 +598,11 @@ export function PurchaseOrderEditorPage() {
   const [originMode, setOriginMode] = useState<PurchaseOrderOrigin>(originModeFromParam)
   /**
    * Blank `/purchase/orders/new` opens the manual PO form immediately (no origin chooser).
-   * Deep links (`?origin=…`, `?prId=…`, etc.) auto-create then navigate to edit.
+   * PR deep links (`?mode=pr`, `?origin=pr`, `?prId=`) open line selection — not auto-create.
+   * Comparison / VQ with an id still auto-create.
    */
-  const [selectedPrId] = useState(searchParams.get('prId') ?? '')
-  const [selectedPrVendorId] = useState('')
+  const [selectedPrId] = useState(prIdFromQuery)
+  const [selectedPrVendorId] = useState(searchParams.get('vendorId') ?? '')
   const [selectedComparisonId] = useState(searchParams.get('comparisonId') ?? '')
   const [selectedVqId] = useState(searchParams.get('vqId') ?? '')
 
@@ -554,7 +613,20 @@ export function PurchaseOrderEditorPage() {
   const editable = EDITABLE_STATUSES.includes(status)
   const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(editable)
 
-  const selectedVendor = useMemo(() => vendors.find((v) => v.id === header.vendorId), [vendors, header.vendorId])
+  const selectedVendor = useMemo(() => {
+    const fromList = vendors.find((v) => v.id === header.vendorId)
+    if (fromList) return fromList
+    return vendorStubFromHeader(header)
+  }, [vendors, header])
+
+  /** Active masters + current document vendor so Select/SmartSelect always shows the chosen party. */
+  const vendorSelectList = useMemo(() => {
+    if (!header.vendorId) return vendors
+    if (vendors.some((v) => v.id === header.vendorId)) return vendors
+    const stub = vendorStubFromHeader(header)
+    return stub ? [stub, ...vendors] : vendors
+  }, [vendors, header])
+
   const selectedPurchaseLocation = useMemo(
     () => locationOptions.find((location) => location.id === header.purchaseLocationId),
     [header.purchaseLocationId, locationOptions],
@@ -563,13 +635,29 @@ export function PurchaseOrderEditorPage() {
     () => locationOptions.find((location) => location.id === header.deliveryLocationId),
     [header.deliveryLocationId, locationOptions],
   )
-  const warehouseBinOptions = useMemo(
-    () =>
-      binOptions.filter(
-        (b) => !header.deliveryLocationId || !b.warehouseId || b.warehouseId === header.deliveryLocationId,
-      ),
-    [binOptions, header.deliveryLocationId],
-  )
+  /** Prefer bins for delivery warehouse; keep line-selected bins; never blank the list when scoped empty. */
+  const warehouseBinOptions = useMemo(() => {
+    const selectedIds = new Set(lines.map((l) => l.binId).filter(Boolean) as string[])
+    const selectedCodes = new Set(
+      lines.map((l) => l.binCode?.trim()).filter((c): c is string => Boolean(c)),
+    )
+    const keepSelected = (b: (typeof binOptions)[number]) =>
+      selectedIds.has(b.id) ||
+      selectedCodes.has(b.code) ||
+      [...selectedIds].some(
+        (id) => b.code.localeCompare(id, undefined, { sensitivity: 'accent' }) === 0,
+      )
+
+    if (!header.deliveryLocationId) return binOptions
+    const forWarehouse = binOptions.filter(
+      (b) =>
+        !b.warehouseId ||
+        b.warehouseId === header.deliveryLocationId ||
+        b.storageLocationId === header.deliveryLocationId ||
+        keepSelected(b),
+    )
+    return forWarehouse.length > 0 ? forWarehouse : binOptions
+  }, [binOptions, header.deliveryLocationId, lines])
   const catalogItemsForPicker = useMemo(
     () =>
       catalogItems.map((item) => ({
@@ -783,7 +871,11 @@ export function PurchaseOrderEditorPage() {
   )
 
   const documentTitle = isNew ? 'New Purchase Order' : (documentNumber ?? 'Purchase Order')
-  const vendorFact = selectedVendor?.vendorName || 'Not selected'
+  const vendorFact =
+    selectedVendor?.vendorName ||
+    header.vendorName?.trim() ||
+    (header.vendorId && header.vendorGstin ? header.vendorGstin : '') ||
+    'Not selected'
 
   const recordHeaderFacts = useMemo(
     () => [
@@ -810,6 +902,49 @@ export function PurchaseOrderEditorPage() {
     markDirty()
   }
 
+  /** When bins load after an item was chosen, resolve id/code so the Bin drop-down shows a value. */
+  useEffect(() => {
+    if (!binOptions.length || !editable) return
+    setLines((prev) => {
+      let changed = false
+      const next = prev.map((line) => {
+        if (!line.itemId && !line.binId && !line.binCode) return line
+
+        if (line.binId || line.binCode) {
+          const resolved = resolveBinSelection(line.binId, line.binCode, binOptions)
+          if (resolved.binId !== line.binId || resolved.binCode !== (line.binCode || '')) {
+            changed = true
+            return { ...line, binId: resolved.binId, binCode: resolved.binCode }
+          }
+          return line
+        }
+
+        if (line.itemId) {
+          const store = useMasterStore.getState()
+          const master = store.items.find((i) => i.id === line.itemId)
+          const catalog = catalogItems.find((i) => i.id === line.itemId)
+          const resolved = resolveItemDefaultBin(
+            {
+              defaultBinId: master?.defaultBinId ?? catalog?.defaultBinId,
+              defaultBinCode: master?.defaultBinCode ?? catalog?.defaultBinCode,
+            },
+            binOptions,
+          )
+          if (resolved.binId || resolved.binCode) {
+            changed = true
+            return {
+              ...line,
+              binId: resolved.binId,
+              binCode: resolved.binCode,
+            }
+          }
+        }
+        return line
+      })
+      return changed ? next : prev
+    })
+  }, [binOptions, catalogItems, editable])
+
   const patchLine = (key: string, patch: Partial<PurchaseOrderLine>) => {
     const nextPatch =
       'uomQuantity' in patch
@@ -825,9 +960,17 @@ export function PurchaseOrderEditorPage() {
   }
 
   const applyVendor = (vendorId: string) => {
-    const vendor = vendors.find((v) => v.id === vendorId)
+    const vendor = vendors.find((v) => v.id === vendorId) ?? vendorSelectList.find((v) => v.id === vendorId)
     if (!vendor) {
-      patchHeader({ vendorId: '', vendorGstin: '', vendorState: '', vendorAddress: '', isInterstate: false })
+      patchHeader({
+        vendorId: '',
+        vendorCode: '',
+        vendorName: '',
+        vendorGstin: '',
+        vendorState: '',
+        vendorAddress: '',
+        isInterstate: false,
+      })
       return
     }
     const gst = resolvePoGstFromLocations(
@@ -838,6 +981,8 @@ export function PurchaseOrderEditorPage() {
     )
     patchHeader({
       vendorId: vendor.id,
+      vendorCode: vendor.vendorCode,
+      vendorName: vendor.vendorName,
       vendorGstin: vendor.gstin,
       vendorState: vendor.state,
       vendorAddress: formatVendorAddress(vendor),
@@ -865,12 +1010,16 @@ export function PurchaseOrderEditorPage() {
     if (master && (master.isBlocked === true || master.isActive === false)) {
       return
     }
-    const factor =
+    // Prefer Item Master UOM conversion mappings (same path as PR/RFQ); legacy columns are fallback.
+    const defaultUom = resolveDefaultPurchaseUom(itemId)
+    const purchaseUomId = defaultUom?.id ?? master?.purchaseUomId ?? master?.baseUomId ?? null
+    const factor = defaultUom?.factor ?? (
       master?.purchaseUomId && master.purchaseUomId !== master.baseUomId
         ? Number(master.uomConversionFactor ?? master.purchaseQtyPerUom ?? 1) || 1
         : 1
-    const purchaseUomId = master?.purchaseUomId ?? master?.baseUomId ?? null
+    )
     const purchaseUomCode =
+      defaultUom?.code ||
       (purchaseUomId && useMasterStore.getState().uoms.find((u) => u.id === purchaseUomId)?.uomCode) ||
       item.uom
     // Prefer Item Master product type; if master has none, keep the filter the user already chose.
@@ -897,6 +1046,9 @@ export function PurchaseOrderEditorPage() {
         hsnId,
         gstGroupId,
       } as import('../../types/master').Item)
+    const vendorForTax =
+      vendors.find((v) => v.id === header.vendorId) ??
+      vendorSelectList.find((v) => v.id === header.vendorId)
     const taxSnap = resolveLineTaxFromLocalMasters({
       direction: 'PURCHASE',
       item: masterItem,
@@ -904,8 +1056,26 @@ export function PurchaseOrderEditorPage() {
       hsnByCode: (code) => store.getHsnByCode(code),
       gstRates: store.gstRates,
       placeOfSupply: header.placeOfSupply,
-      partyState: vendors.find((v) => v.id === header.vendorId)?.state,
+      partyState: vendorForTax?.state ?? header.vendorState,
+      partyGstin: vendorForTax?.gstin ?? header.vendorGstin,
+      companyState:
+        selectedDeliveryLocation?.state ||
+        purchaseSetup?.tax.placeOfSupplyState ||
+        undefined,
+      companyStateCode: purchaseSetup?.tax.placeOfSupplyStateCode || undefined,
     })
+    const defaultBin = resolveItemDefaultBin(
+      {
+        defaultBinId: master?.defaultBinId ?? item.defaultBinId,
+        defaultBinCode: master?.defaultBinCode ?? item.defaultBinCode,
+      },
+      warehouseBinOptions.length ? warehouseBinOptions : binOptions,
+    )
+    // Prefer item default; keep existing line bin when item has no default.
+    const nextBin =
+      defaultBin.binId || defaultBin.binCode
+        ? defaultBin
+        : resolveBinSelection(line?.binId, line?.binCode, warehouseBinOptions.length ? warehouseBinOptions : binOptions)
     patchLine(key, {
       itemId: item.id,
       itemCode: item.itemCode,
@@ -933,6 +1103,8 @@ export function PurchaseOrderEditorPage() {
       cgst: taxSnap.cgstRate,
       sgst: taxSnap.sgstRate,
       igst: taxSnap.igstRate,
+      binId: nextBin.binId,
+      binCode: nextBin.binCode,
     })
   }
 
@@ -991,6 +1163,62 @@ export function PurchaseOrderEditorPage() {
       setActiveBlankets(blankets.filter((b) => b.status === 'active'))
     })
   }, [isNew])
+
+  /** When active master list loads, backfill vendor labels for the document vendor id. */
+  useEffect(() => {
+    if (!header.vendorId) return
+    const master = vendors.find((v) => v.id === header.vendorId)
+    if (!master) return
+    if (header.vendorName.trim() && header.vendorCode.trim()) return
+    setHeader((h) => ({
+      ...h,
+      vendorCode: h.vendorCode.trim() || master.vendorCode,
+      vendorName: h.vendorName.trim() || master.vendorName,
+      vendorGstin: h.vendorGstin.trim() || master.gstin,
+      vendorState: h.vendorState.trim() || master.state,
+      vendorAddress: h.vendorAddress.trim() || formatVendorAddress(master),
+    }))
+  }, [vendors, header.vendorId, header.vendorName, header.vendorCode])
+
+  /**
+   * Reconcile place of supply + IGST/CGST scheme when vendor, delivery, or setup is ready.
+   * Does not mark dirty — hydrate / master load only.
+   */
+  useEffect(() => {
+    if (!editable) return
+    if (!header.vendorId && !header.vendorGstin && !header.vendorState) return
+    if (!selectedDeliveryLocation && !purchaseSetup) return
+    const vendor =
+      selectedVendor ??
+      ({
+        state: header.vendorState,
+        gstin: header.vendorGstin,
+      } as { state?: string; gstin?: string })
+    const gst = resolvePoGstFromLocations(
+      vendor,
+      selectedDeliveryLocation,
+      purchaseSetup,
+      header.placeOfSupply || undefined,
+    )
+    setHeader((h) => {
+      const nextPos = h.placeOfSupply.trim() || gst.placeOfSupplyLabel
+      if (h.isInterstate === gst.isInterstate && h.placeOfSupply === nextPos) return h
+      return {
+        ...h,
+        placeOfSupply: nextPos,
+        isInterstate: gst.isInterstate,
+      }
+    })
+  }, [
+    editable,
+    header.vendorId,
+    header.vendorGstin,
+    header.vendorState,
+    header.placeOfSupply,
+    selectedVendor,
+    selectedDeliveryLocation,
+    purchaseSetup,
+  ])
 
   useEffect(() => {
     if (isNew || !id) return
@@ -1208,17 +1436,26 @@ export function PurchaseOrderEditorPage() {
 
   useEffect(() => {
     if (!isNew || recordId) return
+    // PR uses interactive line selector — never silent full convert.
+    if (showPrLineSelector) return
     if (originMode === 'quotation_comparison' && selectedComparisonId) {
       void createFromOrigin()
     }
     if (originMode === 'vendor_quotation' && selectedVqId) {
       void createFromOrigin()
     }
-    if (originMode === 'purchase_requisition' && selectedPrId) {
-      void createFromOrigin()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only deep-link auto-create
   }, [])
+
+  if (showPrLineSelector) {
+    return (
+      <PoCreateFromPrPanel
+        initialPrId={selectedPrId}
+        initialVendorId={selectedPrVendorId}
+        onCancel={() => navigate(PURCHASE_FORM_ROUTES.purchaseOrder.list)}
+      />
+    )
+  }
 
   if (loading) {
     return (
@@ -1402,9 +1639,9 @@ export function PurchaseOrderEditorPage() {
             >
               <Select value={header.vendorId} disabled={!editable} onChange={(e) => applyVendor(e.target.value)}>
                 <option value="">Select vendor…</option>
-                {vendors.map((v) => (
+                {vendorSelectList.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.vendorCode} — {v.vendorName}
+                    {v.vendorCode ? `${v.vendorCode} — ${v.vendorName}` : v.vendorName}
                   </option>
                 ))}
               </Select>

@@ -12,7 +12,11 @@ export const listPurchaseReturnsQuerySchema = paginationSchema.extend({
   search: z.string().trim().max(200).optional(),
 })
 export const purchaseReturnLineSchema = z.object({
-  goodsReceiptLineId: z.string().uuid().optional().nullable(),
+  goodsReceiptLineId: z
+    .string({
+      required_error: 'Goods receipt line is required — only items received on a GRN can be returned.',
+    })
+    .uuid('Goods receipt line is required — only items received on a GRN can be returned.'),
   purchaseOrderLineId: z.string().uuid().optional().nullable(),
   itemId: z.string().uuid().optional().nullable(),
   itemCode: z.string().trim().max(64).optional(),
@@ -21,7 +25,7 @@ export const purchaseReturnLineSchema = z.object({
   rate: z.coerce.number().min(0).optional(),
   remarks: z.string().trim().max(2000).optional().nullable(),
 })
-export const createPurchaseReturnSchema = z.object({
+const createPurchaseReturnBodySchema = z.object({
   returnDate: z.string().trim().optional(),
   vendorId: z.string().uuid(),
   purchaseOrderId: z.string().uuid().optional().nullable(),
@@ -37,7 +41,17 @@ export const createPurchaseReturnSchema = z.object({
   remarks: z.string().trim().max(5000).optional().nullable(),
   lines: z.array(purchaseReturnLineSchema).min(1),
 })
-export const updatePurchaseReturnSchema = createPurchaseReturnSchema.partial().extend({
+export const createPurchaseReturnSchema = createPurchaseReturnBodySchema.superRefine((data, ctx) => {
+  if (!data.goodsReceiptId && !data.qualityInspectionId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        'Goods receipt or quality inspection is required. Purchase returns only use received GRN / QI quantities.',
+      path: ['goodsReceiptId'],
+    })
+  }
+})
+export const updatePurchaseReturnSchema = createPurchaseReturnBodySchema.partial().extend({
   lines: z.array(purchaseReturnLineSchema).min(1).optional(),
   reason: z.string().trim().min(1).max(5000).optional(),
 })

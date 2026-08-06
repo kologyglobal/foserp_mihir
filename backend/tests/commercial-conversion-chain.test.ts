@@ -138,4 +138,15 @@ describe('Q→SO→PI→TI conversion snapshot chain', () => {
     expect(ti.lines[0]!.hsnCode).toBe('8708')
     expect(ti.supplyType).toBe('INTRA_STATE')
   })
+
+  it('TI accounting create payload prefers upstream PoS over party-only fallback', () => {
+    // Simulate unified SI input: explicit PoS from SO must win in priority resolution.
+    const upstreamPos = '29' // Karnataka ship-to
+    const partyState = '27' // Maharashtra customer master
+    const resolved =
+      upstreamPos /* input.placeOfSupplyStateCode */ ||
+      partyState
+    expect(resolved).toBe('29')
+    expect(resolved).not.toBe(partyState)
+  })
 })

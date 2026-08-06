@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
@@ -87,8 +87,7 @@ import {
   CommercialGstSupplyPanel,
   type CommercialGstSupplyValue,
 } from '../../components/sales/CommercialGstSupplyPanel'
-import { COMPANY_STATE } from '../../types/invoice'
-import { resolveGstStateCode } from '../../utils/gstStateCode'
+import { loadSellerStateCode } from '../../utils/sellerGstState'
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
 
@@ -273,8 +272,21 @@ export function SalesOrderNewPage() {
     placeOfSupply: '',
     placeOfSupplyOverride: false,
     placeOfSupplyOverrideReason: '',
-    supplierStateCode: resolveGstStateCode(COMPANY_STATE) ?? '27',
+    supplierStateCode: '',
   }))
+
+  useEffect(() => {
+    let cancelled = false
+    void loadSellerStateCode().then((code) => {
+      if (cancelled || !code) return
+      setGstSupply((prev) =>
+        prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const customer = customerId ? getCustomer(customerId) : undefined
   const fromOpportunity = Boolean(opportunityPrefill)

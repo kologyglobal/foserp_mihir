@@ -2,13 +2,18 @@ import { isApiMode } from '../config/apiConfig'
 import type { CrmCommercialLine, CrmCommercialSource, CrmTaxInvoice } from '../types/crmCommercial'
 import type { GstBreakdown } from '../types/invoice'
 import { DEFAULT_GST_RATE } from '../types/invoice'
-import { DEFAULT_PURCHASE_SETUP } from '../data/purchase/purchaseSetupSeed'
 import { useCrmCommercialStore } from '../store/crmCommercialStore'
 import { useMasterStore } from '../store/masterStore'
 import { useMrpStore } from '../store/mrpStore'
 import { useProformaInvoiceStore } from '../store/proformaInvoiceStore'
 import { formatCustomerBillingAddress, resolveCustomerShippingAddress } from './customerUtils'
 import { computeGst } from './gstEngine'
+import {
+  placeOfSupplyFromProforma,
+  placeOfSupplyFromSalesOrder,
+  resolveSellerStateForBreakdown,
+  taxHeaderPayloadFromSalesOrder,
+} from './commercialSupplySnapshot'
 import { buildProformaLinesFromSalesOrder, computeProformaLineTotals, sumProformaTaxable } from './proformaInvoiceLines'
 import type { ProformaInvoiceLine } from '../types/proformaInvoice'
 
@@ -31,6 +36,11 @@ export interface TaxInvoicePrefill {
   quotationNo: string | null
   proformaInvoiceId: string | null
   proformaNo: string | null
+  placeOfSupply?: string | null
+  placeOfSupplyStateCode?: string | null
+  supplierStateCode?: string | null
+  supplyType?: string | null
+  gstScheme?: string | null
   lines: CrmCommercialLine[]
   gst: GstBreakdown
 }
@@ -48,16 +58,20 @@ function withTotals(line: Omit<CrmCommercialLine, 'taxableValue' | 'gstAmount' |
   return { ...line, lineNo, ...totals }
 }
 
-function buildGst(lines: CrmCommercialLine[], customerState: string): GstBreakdown {
+function buildGst(
+  lines: CrmCommercialLine[],
+  placeOfSupply: string,
+  sellerStateCode?: string | null,
+): GstBreakdown {
   const taxable = sumProformaTaxable(lines as unknown as ProformaInvoiceLine[])
   const avgRate = lines.length
     ? lines.reduce((s, l) => s + l.taxPct, 0) / lines.length
     : DEFAULT_GST_RATE
   return computeGst(
     taxable,
-    customerState,
+    placeOfSupply,
     avgRate,
-    DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyStateCode || DEFAULT_PURCHASE_SETUP.tax.placeOfSupplyState,
+    resolveSellerStateForBreakdown(sellerStateCode) ?? undefined,
   )
 }
 
@@ -137,6 +151,8 @@ export function resolveTaxInvoiceFromSalesOrder(
   }
 
   const customerState = customer.state || 'Maharashtra'
+  const placeOfSupply = placeOfSupplyFromSalesOrder(so, customerState)
+  const taxHeader = taxHeaderPayloadFromSalesOrder(so)
   return {
     ok: true,
     data: {
@@ -158,8 +174,10 @@ export function resolveTaxInvoiceFromSalesOrder(
       quotationNo: so.quotationNo ?? null,
       proformaInvoiceId: null,
       proformaNo: null,
+      ...taxHeader,
+      placeOfSupply,
       lines,
-      gst: buildGst(lines, customerState),
+      gst: buildGst(lines, placeOfSupply, so.supplierStateCode),
     },
   }
 }
@@ -222,8 +240,12 @@ export function prefillFromExistingTaxInvoice(invoice: CrmTaxInvoice): TaxInvoic
       quotationNo: invoice.quotationNo,
       proformaInvoiceId: invoice.proformaInvoiceId,
       proformaNo: invoice.proformaNo,
+      placeOfSupply: invoice.placeOfSupply,
       lines,
-      gst: invoice.gst.taxableAmount != null ? buildGst(lines, invoice.customerState) : invoice.gst,
+      gst:
+        invoice.gst.taxableAmount != null
+          ? buildGst(lines, invoice.placeOfSupply || invoice.customerState)
+          : invoice.gst,
     },
   }
 }
@@ -281,6 +303,7 @@ export function resolveTaxInvoiceFromCustomer(customerId: string): TaxInvoicePre
       quotationNo: null,
       proformaInvoiceId: null,
       proformaNo: null,
+      placeOfSupply: customerState,
       lines,
       gst: buildGst(lines, customerState),
     },
@@ -325,6 +348,12 @@ export function resolveTaxInvoiceFromProforma(
   const lines = applyLineQtys(base, lineQtys)
   if (!lines.length) return { ok: false, error: 'Select at least one line quantity.' }
 
+  const so = pi.salesOrderId
+    ? useMrpStore.getState().getSalesOrder(pi.salesOrderId)
+    : undefined
+  const placeOfSupply = placeOfSupplyFromProforma(pi, pi.customerState)
+  const taxHeader = taxHeaderPayloadFromSalesOrder(so)
+
   return {
     ok: true,
     data: {
@@ -346,8 +375,10 @@ export function resolveTaxInvoiceFromProforma(
       quotationNo: pi.quotationNo,
       proformaInvoiceId: pi.id,
       proformaNo: pi.proformaNo,
+      ...taxHeader,
+      placeOfSupply,
       lines,
-      gst: buildGst(lines, pi.customerState),
+      gst: buildGst(lines, placeOfSupply, so?.supplierStateCode),
     },
   }
 }

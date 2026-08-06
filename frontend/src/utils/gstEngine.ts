@@ -1,5 +1,5 @@
 import type { GstBreakdown, GstScheme } from '../types/invoice'
-import { COMPANY_GSTIN, COMPANY_STATE, DEFAULT_GST_RATE } from '../types/invoice'
+import { DEFAULT_GST_RATE } from '../types/invoice'
 import { isApiMode } from '../config/apiConfig'
 import {
   resolveGstTaxFromMasters,
@@ -17,8 +17,7 @@ export function resolveGstScheme(
   companyStateOrCode?: string | null,
 ): GstScheme {
   return determineSalesGstSupply({
-    companyState: companyStateOrCode ?? COMPANY_STATE,
-    companyGstin: COMPANY_GSTIN,
+    companyState: companyStateOrCode,
     customerState,
   }).gstScheme
 }

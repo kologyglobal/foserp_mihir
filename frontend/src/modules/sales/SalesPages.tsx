@@ -776,7 +776,8 @@ const SALES_ORDER_SORT_OPTIONS: { value: SalesOrderSortKey; label: string }[] = 
   { value: 'value', label: 'Sort: Order Value' },
   { value: 'customer', label: 'Sort: Customer' },
   { value: 'status', label: 'Sort: Status' },
-  { value: 'soNo', label: 'Sort: SO Number' },
+  { value: 'soNoAsc', label: 'Sort: SO Number (A→Z)' },
+  { value: 'soNoDesc', label: 'Sort: SO Number (Z→A)' },
 ]
 
 export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = {}) {

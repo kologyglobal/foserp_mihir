@@ -223,9 +223,16 @@ export async function computeRemainingReturnable(
   if (grn && !hardBlock) {
     for (const gl of grn.lines) {
       if (seenGrnLineIds.has(gl.id)) continue
-      const rejected = returnQty(gl.rejectedQuantity)
-      const accepted = returnQty(gl.acceptedQuantity)
-      const received = returnQty(gl.receivedQuantity)
+      const reversedReceived = returnQty((gl as { reversedQuantity?: unknown }).reversedQuantity)
+      const reversedAccepted = returnQty(
+        (gl as { reversedAcceptedQuantity?: unknown }).reversedAcceptedQuantity,
+      )
+      const reversedRejected = returnQty(
+        (gl as { reversedRejectedQuantity?: unknown }).reversedRejectedQuantity,
+      )
+      const rejected = Math.max(0, returnQty(gl.rejectedQuantity) - reversedRejected)
+      const accepted = Math.max(0, returnQty(gl.acceptedQuantity) - reversedAccepted)
+      const received = Math.max(0, returnQty(gl.receivedQuantity) - reversedReceived)
       const { cap, source } = lineReturnCap(
         grn.status,
         grn.inspectionRequired,

@@ -140,6 +140,23 @@ export interface QuotationPriceLine {
   taxPct: number
   lineTotal: number
   isOptional: boolean
+  /** GST line snapshot (carried into SO → PI → TI). */
+  hsnCode?: string | null
+  hsnId?: string | null
+  sacCode?: string | null
+  taxScheme?: string | null
+  cgstRate?: number | null
+  sgstRate?: number | null
+  utgstRate?: number | null
+  igstRate?: number | null
+  cgstPct?: number | null
+  sgstPct?: number | null
+  utgstPct?: number | null
+  igstPct?: number | null
+  cgstAmount?: number | null
+  sgstAmount?: number | null
+  utgstAmount?: number | null
+  igstAmount?: number | null
 }
 
 export interface QuotationSection {

@@ -9,7 +9,9 @@ import {
 } from '@/services/purchase/grnReceivingCondition'
 import type { GoodsReceiptNote, PurchaseOrder } from '@/types/purchaseDomain'
 import type { Item } from '@/types/master'
-import { getPurchaseLineBaseUomCode } from '@/utils/purchaseLineUom'
+import { getPurchaseLineBaseUomCode, purchaseQtyToBaseQty, toUomQuantityFromBase } from '@/utils/purchaseLineUom'
+import { resolveItemDefaultBin } from '@/utils/itemDefaultBin'
+import { useMasterStore } from '@/store/masterStore'
 
 export type ItemReceiptControl = {
   batch: boolean
@@ -79,6 +81,31 @@ export type GrnLineDraft = {
 }
 
 export { GRN_RECEIVING_CONDITION_LABELS }
+
+/** Lines that belong on a saved GRN: received qty > 0, or explicitly short-closed. */
+export function isIncludedGrnLine(line: {
+  receivedQty?: number | null
+  receivedUomQty?: number | null
+  reversedQty?: number | null
+  closeOpenQuantity?: boolean | null
+  shortCloseRequested?: boolean | null
+}): boolean {
+  const received =
+    Number(line.receivedUomQty ?? line.receivedQty) || Number(line.receivedQty) || 0
+  if (received > 0) return true
+  // Keep reversed lines visible after net qty display falls to zero.
+  if ((Number(line.reversedQty) || 0) > 0) return true
+  return Boolean(line.closeOpenQuantity || line.shortCloseRequested)
+}
+
+export function filterIncludedGrnLines<T extends {
+  receivedQty?: number | null
+  receivedUomQty?: number | null
+  closeOpenQuantity?: boolean | null
+  shortCloseRequested?: boolean | null
+}>(lines: T[]): T[] {
+  return lines.filter(isIncludedGrnLine)
+}
 
 export function buildItemReceiptControls(
   items: Item[],
@@ -238,13 +265,29 @@ export function linesFromPo(
       const factor = Number(l.uomConversionFactor) || 1
       const pendingBase = Number(l.pendingQty) || 0
       const pendingUom =
-        Number(l.outstandingQty) || (factor === 1 ? pendingBase : Number((pendingBase * factor).toFixed(4)))
+        Number(l.outstandingQty) ||
+        (factor === 1 ? pendingBase : toUomQuantityFromBase(pendingBase, factor))
+      // PO line: receivedQtyBase = stock; receivedQty = purchase UOM (after API map).
+      const prevBase =
+        l.receivedQtyBase != null
+          ? Number(l.receivedQtyBase) || 0
+          : factor === 1
+            ? Number(l.receivedQty) || 0
+            : purchaseQtyToBaseQty(Number(l.receivedQty) || 0, factor)
       const baseUom = getPurchaseLineBaseUomCode(l.itemId)
       const resolvedTol = resolveReceivingTolerancePct({
         itemTolerancePct: qtyTol,
         setupTolerancePct: setup.overReceiptTolerancePct,
         allowOverReceipt: setup.allowOverReceipt,
       })
+      let binId = l.binId ?? null
+      let bin = l.binCode ?? ''
+      if (!binId && !bin) {
+        const master = useMasterStore.getState().items.find((i) => i.id === l.itemId)
+        const def = resolveItemDefaultBin(master)
+        binId = def.binId
+        bin = def.binCode
+      }
       const draft: GrnLineDraft = {
         purchaseOrderLineId: l.id,
         itemId: l.itemId,
@@ -255,12 +298,13 @@ export function linesFromPo(
         baseUom,
         uomConversionFactor: factor,
         orderedQty: l.quantity,
-        orderedUomQty: Number(l.uomQuantity) || l.quantity,
-        previouslyReceivedQty: l.receivedQtyBase ?? l.receivedQty,
+        orderedUomQty: Number(l.uomQuantity) || toUomQuantityFromBase(l.quantity, factor),
+        previouslyReceivedQty: prevBase,
         pendingQty: pendingBase,
         pendingUomQty: pendingUom,
-        receivedQty: pendingBase,
-        receivedUomQty: pendingUom,
+        // Leave received blank for the user to enter actual receipt qty per line.
+        receivedQty: 0,
+        receivedUomQty: 0,
         acceptedQty: 0,
         rejectedQty: 0,
         shortQty: 0,
@@ -282,8 +326,8 @@ export function linesFromPo(
         expiryDate: '',
         warehouseId: l.locationId || po.deliveryLocation.id,
         warehouseName: l.locationName || po.deliveryLocation.name,
-        binId: l.binId ?? null,
-        bin: l.binCode ?? '',
+        binId,
+        bin,
         allowExcess: setup.allowOverReceipt,
         ...traceabilityFromControls(l.itemId, itemControls),
         tolerancePercentage: resolvedTol,
@@ -305,9 +349,11 @@ export function linesFromGrn(
   setup: { allowOverReceipt: boolean; overReceiptTolerancePct: number },
   inspectionRequired: boolean,
 ): GrnLineDraft[] {
-  return grn.lines.map((l) => {
+  // Ignore legacy idle zero-qty rows that were previously persisted for open PO lines.
+  return filterIncludedGrnLines(grn.lines).map((l) => {
     const ctrl = itemControls[l.itemId]
     const factor = Number(l.uomConversionFactor) || 1
+    const pendingBase = Number(l.pendingQty) || 0
     const draft: GrnLineDraft = {
       purchaseOrderLineId: l.purchaseOrderLineId,
       itemId: l.itemId,
@@ -318,13 +364,13 @@ export function linesFromGrn(
       baseUom: getPurchaseLineBaseUomCode(l.itemId) || l.uom,
       uomConversionFactor: factor,
       orderedQty: l.orderedQty,
-      orderedUomQty: Number(l.orderedUomQty) || l.orderedQty,
+      orderedUomQty: Number(l.orderedUomQty) || toUomQuantityFromBase(l.orderedQty, factor),
       previouslyReceivedQty: l.previouslyReceivedQty,
-      pendingQty: l.pendingQty,
-      pendingUomQty:
-        factor === 1 ? l.pendingQty : Number((l.pendingQty * factor).toFixed(4)),
+      pendingQty: pendingBase,
+      pendingUomQty: toUomQuantityFromBase(pendingBase, factor),
       receivedQty: l.receivedQty,
-      receivedUomQty: l.receivedUomQty ?? (factor === 1 ? l.receivedQty : l.receivedQty * factor),
+      receivedUomQty:
+        l.receivedUomQty ?? toUomQuantityFromBase(Number(l.receivedQty) || 0, factor),
       acceptedQty: l.acceptedQty,
       rejectedQty: l.rejectedQty,
       shortQty: l.shortQty,

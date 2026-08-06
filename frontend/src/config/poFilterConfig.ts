@@ -41,6 +41,8 @@ export const DEFAULT_PO_LIST_FILTERS: PoListFilters = {
 export type PoSortKey =
   | 'documentDate'
   | 'documentNumber'
+  | 'documentNumberAsc'
+  | 'documentNumberDesc'
   | 'vendorName'
   | 'totalAmount'
   | 'expectedDeliveryDate'
@@ -49,7 +51,8 @@ export type PoSortKey =
 
 export const PO_SORT_OPTIONS: { value: PoSortKey; label: string }[] = [
   { value: 'documentDate', label: 'Sort: PO Date' },
-  { value: 'documentNumber', label: 'Sort: PO Number' },
+  { value: 'documentNumberAsc', label: 'Sort: PO Number (A→Z)' },
+  { value: 'documentNumberDesc', label: 'Sort: PO Number (Z→A)' },
   { value: 'vendorName', label: 'Sort: Vendor' },
   { value: 'totalAmount', label: 'Sort: Total Amount' },
   { value: 'expectedDeliveryDate', label: 'Sort: Expected Delivery' },
