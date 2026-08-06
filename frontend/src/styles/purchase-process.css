@@ -661,19 +661,45 @@ a.purchase-process-map__step:hover {
 }
 
 .purchase-doc-lines-grid__qtg-col {
-  width: 5.5rem !important;
-  min-width: 5.5rem !important;
-  max-width: 5.5rem !important;
-  padding: 6px 4px !important;
+  width: 10rem !important;
+  min-width: 10rem !important;
+  max-width: 11rem !important;
+  padding: 6px 8px !important;
   vertical-align: middle;
+}
+
+.purchase-doc-lines-grid thead .purchase-doc-lines-grid__qtg-col {
+  white-space: normal;
+  line-height: 1.25;
+  font-size: 10px;
 }
 
 .purchase-doc-lines-grid__qtg-col .erp-input,
 .purchase-doc-lines-grid__qtg-col select {
   width: 100% !important;
-  max-width: 5.5rem !important;
+  max-width: 100% !important;
   min-width: 0 !important;
-  font-size: 10px;
+  font-size: 11px;
+}
+
+.purchase-doc-lines-grid__bin-col {
+  width: 9rem !important;
+  min-width: 9rem !important;
+  max-width: 10.5rem !important;
+  padding: 6px 8px !important;
+  vertical-align: middle;
+}
+
+.purchase-doc-lines-grid thead .purchase-doc-lines-grid__bin-col {
+  white-space: nowrap;
+}
+
+.purchase-doc-lines-grid__bin-col .erp-input,
+.purchase-doc-lines-grid__bin-col select {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  font-size: 11px;
 }
 
 /* GRN new — vendor + PO on one row */

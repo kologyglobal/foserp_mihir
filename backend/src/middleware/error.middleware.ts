@@ -97,11 +97,17 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
             ? meta.table_name
             : null
       const tableFromMessage =
-        typeof err.message === 'string' ? (/table `([^`]+)`/i.exec(err.message)?.[1] ?? null) : null
+        typeof err.message === 'string'
+          ? (/table `([^`]+)`/i.exec(err.message)?.[1] ??
+            err.message.match(/table [`'"]?(\w+)[`'"]? does not exist/i)?.[1] ??
+            null)
+          : null
       const table = tableFromMeta ?? tableFromMessage
       const devHint =
-        !env.isProd && column
-          ? `Database schema mismatch: missing column \`${column}\`${table ? ` on \`${table}\`` : ''}. Run prisma migrate deploy or live-deploy purchase SQL scripts.`
+        !env.isProd && (column || table)
+          ? `Database schema mismatch: missing ${column ? `column \`${column}\`` : 'object'}${
+              table ? ` on \`${table}\`` : ''
+            }. Run prisma migrate deploy or live-deploy purchase SQL scripts.`
           : 'Database operation failed'
       sendError(res, 500, devHint, undefined, err.code, {
         prismaCode: err.code,

@@ -8,6 +8,10 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url))
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // Avoid lightningcss "Unknown at rule: @tailwind" on leftover HMR shims in theme CSS.
+    cssMinify: 'esbuild',
+  },
   resolve: {
     alias: {
       '@': path.resolve(rootDir, './src'),
