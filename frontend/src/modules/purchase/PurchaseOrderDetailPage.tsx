@@ -370,6 +370,11 @@ export function PurchaseOrderDetailPage() {
     ]
   }, [po])
 
+  const lineTaxCols = useMemo(
+    () => resolvePurchaseGstColumnVisibility(po?.lines ?? []),
+    [po?.lines],
+  )
+
   if (loading || !po) {
     return (
       <PurchaseCardFormShell
@@ -461,10 +466,6 @@ export function PurchaseOrderDetailPage() {
   })
 
   const gstTotal = po.cgst + po.sgst + po.igst
-  const lineTaxCols = useMemo(
-    () => resolvePurchaseGstColumnVisibility(po.lines),
-    [po.lines],
-  )
   const taxTotalsDefaultOpen = hasMeaningfulTaxTotals(po.subtotal, gstTotal, po.totalAmount)
   const taxPeek = taxTotalsSummary({
     subtotal: po.subtotal,
