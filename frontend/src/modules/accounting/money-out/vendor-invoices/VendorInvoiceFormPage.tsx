@@ -31,6 +31,8 @@ import {
   type AccountingGrnLookup,
   type AccountingPurchaseOrderLookup,
 } from '@/services/api/accountingLookupsApi'
+import { getGRNById, getPurchaseOrderById } from '@/services/purchase'
+import type { GoodsReceiptLine, PurchaseOrderLine } from '@/types/purchaseDomain'
 import { useActiveVendors } from '@/hooks/useMasterLists'
 import { useMasterStore } from '@/store/masterStore'
 import { useTenantProfileStore } from '@/store/tenantProfileStore'
@@ -57,6 +59,7 @@ import {
 } from '@/utils/gstStateCode'
 import { gstStateCodeFromGstin } from '@/utils/customerUtils'
 import { cn } from '@/utils/cn'
+import { formatCurrency } from '@/utils/formatters/currency'
 import { VendorInvoiceTotalsPanel } from '../components/VendorInvoiceTotalsPanel'
 import { addDaysIso, todayIsoDate } from '../moneyOutUi'
 import { MoneyOutWorkspaceShell } from '../MoneyOutWorkspaceShell'
@@ -144,6 +147,92 @@ function emptyLine(invoiceType: VendorInvoiceType): FormValues['lines'][number] 
   }
 }
 
+function qtyString(value: number | null | undefined, fallback = '1'): string {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return fallback
+  // Keep clean decimals for form regex validation
+  return String(Math.round(n * 1e6) / 1e6)
+}
+
+function moneyString(value: number | null | undefined, fallback = '0'): string {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return fallback
+  return String(Math.round(n * 1e4) / 1e4)
+}
+
+/** GST % and similar rates — zero is valid (unlike qty). */
+function rateString(value: number | null | undefined, fallback = '0'): string {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < 0) return fallback
+  return String(Math.round(n * 1e4) / 1e4)
+}
+
+function viLineTypeFromPoLine(
+  line: PurchaseOrderLine,
+  invoiceType: VendorInvoiceType,
+): VendorInvoiceLineType {
+  if (line.lineType === 'SERVICE' || line.itemType === 'service') {
+    return 'SERVICE'
+  }
+  if (line.itemType === 'asset') return 'ASSET'
+  if (invoiceType === 'SERVICE') return 'SERVICE'
+  if (invoiceType === 'EXPENSE') return 'EXPENSE'
+  if (invoiceType === 'ASSET') return 'ASSET'
+  return 'ITEM'
+}
+
+/** Prefer remaining open qty for PO → vendor invoice; fall back to order qty. */
+function poLineInvoiceQty(line: PurchaseOrderLine): number {
+  const outstanding = Number(line.outstandingQty)
+  if (Number.isFinite(outstanding) && outstanding > 0) return outstanding
+  const uomQty = Number(line.uomQuantity)
+  if (Number.isFinite(uomQty) && uomQty > 0) return uomQty
+  const qty = Number(line.quantity)
+  if (Number.isFinite(qty) && qty > 0) return qty
+  return 1
+}
+
+function formLineFromPoLine(
+  line: PurchaseOrderLine,
+  invoiceType: VendorInvoiceType,
+): FormValues['lines'][number] {
+  return {
+    lineType: viLineTypeFromPoLine(line, invoiceType),
+    itemId: line.itemId?.trim() || '',
+    description: (line.description || line.itemName || line.itemCode || 'Item').trim() || 'Item',
+    hsnSacCode: (line.hsnCode || line.sacCode || '').trim(),
+    quantity: qtyString(poLineInvoiceQty(line)),
+    unitPrice: moneyString(line.rate),
+    gstRate: rateString(line.gstRatePct, '18'),
+    debitAccountId: '',
+    costCentreId: '',
+    projectReference: '',
+  }
+}
+
+function formLineFromGrnLine(line: GoodsReceiptLine): FormValues['lines'][number] {
+  const qty =
+    Number(line.acceptedQty) > 0
+      ? Number(line.acceptedQty)
+      : Number(line.receivedQty) > 0
+        ? Number(line.receivedQty)
+        : Number(line.pendingQty) > 0
+          ? Number(line.pendingQty)
+          : 1
+  return {
+    lineType: 'ITEM',
+    itemId: line.itemId?.trim() || '',
+    description: (line.description || line.itemName || line.itemCode || 'Item').trim() || 'Item',
+    hsnSacCode: (line.hsnCode || '').trim(),
+    quantity: qtyString(qty),
+    unitPrice: moneyString(line.rate),
+    gstRate: '18',
+    debitAccountId: '',
+    costCentreId: '',
+    projectReference: '',
+  }
+}
+
 const VENDOR_INVOICE_TYPES: readonly VendorInvoiceType[] = ['GOODS', 'SERVICE', 'EXPENSE', 'ASSET', 'MIXED']
 
 function isVendorInvoiceType(value: string | null): value is VendorInvoiceType {
@@ -169,31 +258,35 @@ const INVOICE_TYPE_BADGE_COLOR: Record<VendorInvoiceType, 'blue' | 'green' | 'or
 /** VI create source mode (Wave 3) — Direct entry, or sourced from a real PO / GRN. */
 type VendorInvoiceCreateSource = 'DIRECT' | 'PURCHASE_ORDER' | 'GOODS_RECEIPT'
 
-/** Zoho-flat document card — dense header + tight body (mirrors Money In invoice create). */
+/** Document card — dense header + body for Money Out vendor invoice create/edit. */
 function FormSection({
   title,
   subtitle,
   actions,
   children,
   className,
+  accent = 'blue',
 }: {
   title: string
   subtitle?: string
   actions?: React.ReactNode
   children: React.ReactNode
   className?: string
+  accent?: 'blue' | 'teal' | 'slate'
 }) {
   return (
     <section
       className={cn(
-        'sales-invoice-zoho-form__section mi-create-section rounded-md border border-erp-border bg-white',
+        'sales-invoice-zoho-form__section mi-create-section vi-create-section rounded-md border border-erp-border bg-white',
+        accent === 'teal' && 'vi-create-section--teal',
+        accent === 'slate' && 'vi-create-section--slate',
         className,
       )}
     >
       <header className="sales-invoice-zoho-form__section-header mi-create-section__header flex flex-wrap items-center justify-between gap-2 border-b border-erp-border">
-        <div>
+        <div className="min-w-0">
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-erp-text">{title}</h3>
-          {subtitle ? <p className="text-[11px] text-erp-muted">{subtitle}</p> : null}
+          {subtitle ? <p className="mt-0.5 text-[11px] leading-snug text-erp-muted">{subtitle}</p> : null}
         </div>
         {actions}
       </header>
@@ -213,9 +306,9 @@ function vendorInitials(name: string): string {
 }
 
 const LINE_GRID_QUICK =
-  'md:grid-cols-[minmax(0,2.6fr)_minmax(0,0.75fr)_minmax(0,1fr)_minmax(0,0.75fr)_minmax(0,2fr)_minmax(0,0.4fr)]'
+  'md:grid-cols-[minmax(0,2.4fr)_minmax(0,0.7fr)_minmax(0,0.95fr)_minmax(0,0.65fr)_minmax(0,0.95fr)_minmax(0,1.8fr)_minmax(0,0.4fr)]'
 const LINE_GRID_FULL =
-  'md:grid-cols-[minmax(0,0.95fr)_minmax(0,2.2fr)_minmax(0,0.7fr)_minmax(0,0.95fr)_minmax(0,0.7fr)_minmax(0,0.85fr)_minmax(0,1.6fr)_minmax(0,0.4fr)]'
+  'md:grid-cols-[minmax(0,0.85fr)_minmax(0,2fr)_minmax(0,0.65fr)_minmax(0,0.85fr)_minmax(0,0.6fr)_minmax(0,0.75fr)_minmax(0,0.9fr)_minmax(0,1.4fr)_minmax(0,0.4fr)]'
 
 export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { id } = useParams()
@@ -256,6 +349,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [purchaseOrders, setPurchaseOrders] = useState<AccountingPurchaseOrderLookup[]>([])
   const [goodsReceipts, setGoodsReceipts] = useState<AccountingGrnLookup[]>([])
   const [sourcesLoading, setSourcesLoading] = useState(false)
+  const [sourceHydrating, setSourceHydrating] = useState(false)
   /** Existing source links loaded on edit — resent unchanged (never re-fabricated). */
   const [existingSourceLinks, setExistingSourceLinks] = useState<VendorInvoiceSourceLinkInput[]>([])
   const [legalEntity, setLegalEntity] = useState<LegalEntity | null>(null)
@@ -289,7 +383,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     },
   })
 
-  const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' })
+  const { fields, append, remove, replace } = useFieldArray({ control: form.control, name: 'lines' })
   const watched = form.watch()
   const isDirty = form.formState.isDirty
 
@@ -385,24 +479,56 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     form.setValue('placeOfSupply', pos, { shouldDirty: true, shouldValidate: true })
   }, [watched.vendorId, mode, resolveVendorPlaceOfSupply, form])
 
-  // Invoice-eligible PO / GRN candidates from the accounting lookup endpoints
-  // (server-side eligibility whitelist + tenant scope — no frontend status filter).
+  // Invoice-eligible PO / GRN for the selected vendor only (invoice-pending / eligible).
   useEffect(() => {
-    if (mode !== 'create' || !isApiMode() || createSource === 'DIRECT') return
+    if (mode !== 'create' || !isApiMode() || createSource === 'DIRECT') {
+      setPurchaseOrders([])
+      setGoodsReceipts([])
+      setSourcesLoading(false)
+      return
+    }
+    if (!watched.vendorId) {
+      setPurchaseOrders([])
+      setGoodsReceipts([])
+      setSelectedPoId('')
+      setSelectedGrnId('')
+      setSourcesLoading(false)
+      return
+    }
+
     let cancelled = false
     setSourcesLoading(true)
     const load = async () => {
       try {
         if (createSource === 'PURCHASE_ORDER') {
-          const res = await listPurchaseOrderLookups({ eligibleOnly: true, limit: 100 })
-          if (!cancelled) setPurchaseOrders(res.data ?? [])
+          const res = await listPurchaseOrderLookups({
+            eligibleOnly: true,
+            limit: 100,
+            vendorId: watched.vendorId,
+          })
+          if (!cancelled) {
+            const rows = res.data ?? []
+            setPurchaseOrders(rows)
+            // Drop selection if no longer in the vendor list
+            setSelectedPoId((id) => (id && rows.some((r) => r.id === id) ? id : ''))
+          }
         } else {
-          const res = await listGrnLookups({ eligibleOnly: true, limit: 100 })
-          if (!cancelled) setGoodsReceipts(res.data ?? [])
+          const res = await listGrnLookups({
+            eligibleOnly: true,
+            limit: 100,
+            vendorId: watched.vendorId,
+          })
+          if (!cancelled) {
+            const rows = res.data ?? []
+            setGoodsReceipts(rows)
+            setSelectedGrnId((id) => (id && rows.some((r) => r.id === id) ? id : ''))
+          }
         }
       } catch (e) {
         if (!cancelled) {
           notify.error(e instanceof Error ? e.message : 'Failed to load purchase documents')
+          setPurchaseOrders([])
+          setGoodsReceipts([])
         }
       } finally {
         if (!cancelled) setSourcesLoading(false)
@@ -412,7 +538,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     return () => {
       cancelled = true
     }
-  }, [createSource, mode])
+  }, [createSource, mode, watched.vendorId])
 
   const vendorNameById = useMemo(() => {
     const map = new Map<string, string>()
@@ -422,30 +548,33 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   const poOptions: ErpSmartSelectOption<string>[] = useMemo(
     () =>
-      purchaseOrders.map((po) => {
-        const vendorName = vendorNameById.get(po.vendorId)
-        return {
-          value: po.id,
-          label: po.orderNumber,
-          subtitle: [vendorName, String(po.status).replace(/_/g, ' ')].filter(Boolean).join(' · ') || undefined,
-          searchText: `${po.orderNumber} ${vendorName ?? ''}`.toLowerCase(),
-        }
-      }),
-    [purchaseOrders, vendorNameById],
+      purchaseOrders.map((po) => ({
+        value: po.id,
+        label: po.orderNumber,
+        subtitle: [
+          String(po.status).replace(/_/g, ' '),
+          po.totalAmount ? `₹ ${po.totalAmount}` : null,
+          po.orderDate || null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        searchText: `${po.orderNumber} ${po.status}`.toLowerCase(),
+        trailing: po.currencyCode || undefined,
+      })),
+    [purchaseOrders],
   )
 
   const grnOptions: ErpSmartSelectOption<string>[] = useMemo(
     () =>
-      goodsReceipts.map((g) => {
-        const vendorName = vendorNameById.get(g.vendorId)
-        return {
-          value: g.id,
-          label: g.grnNumber,
-          subtitle: [vendorName, g.purchaseOrderNumber].filter(Boolean).join(' · ') || undefined,
-          searchText: `${g.grnNumber} ${vendorName ?? ''} ${g.purchaseOrderNumber ?? ''}`.toLowerCase(),
-        }
-      }),
-    [goodsReceipts, vendorNameById],
+      goodsReceipts.map((g) => ({
+        value: g.id,
+        label: g.grnNumber,
+        subtitle: [g.purchaseOrderNumber ? `PO ${g.purchaseOrderNumber}` : null, g.receiptDate, String(g.status).replace(/_/g, ' ')]
+          .filter(Boolean)
+          .join(' · '),
+        searchText: `${g.grnNumber} ${g.purchaseOrderNumber ?? ''} ${g.status}`.toLowerCase(),
+      })),
+    [goodsReceipts],
   )
 
   const itemOptions: ErpSmartSelectOption<string>[] = useMemo(
@@ -460,23 +589,142 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     [items],
   )
 
-  const onPickPurchaseOrder = (poId: string) => {
-    setSelectedPoId(poId)
-    const po = purchaseOrders.find((p) => p.id === poId)
-    if (!po) return
-    form.setValue('vendorId', po.vendorId, { shouldDirty: true, shouldValidate: true })
-    form.setValue('invoiceType', 'GOODS', { shouldDirty: true })
-    if (po.currencyCode) form.setValue('currencyCode', po.currencyCode, { shouldDirty: true })
-    setQuickMode(false)
+  const onPickVendor = (vendorId: string) => {
+    const prev = form.getValues('vendorId')
+    form.setValue('vendorId', vendorId, { shouldDirty: true, shouldValidate: true })
+    // Changing vendor invalidates a previously picked PO/GRN and its lines.
+    if (prev !== vendorId) {
+      setSelectedPoId('')
+      setSelectedGrnId('')
+      if (createSource !== 'DIRECT') {
+        replace([emptyLine(form.getValues('invoiceType') || 'GOODS')])
+      }
+    }
   }
 
-  const onPickGoodsReceipt = (grnId: string) => {
-    setSelectedGrnId(grnId)
-    const grn = goodsReceipts.find((g) => g.id === grnId)
-    if (!grn) return
-    form.setValue('vendorId', grn.vendorId, { shouldDirty: true, shouldValidate: true })
-    form.setValue('invoiceType', 'GOODS', { shouldDirty: true })
+  const onPickPurchaseOrder = async (poId: string) => {
+    setSelectedPoId(poId)
+    if (!poId) {
+      replace([emptyLine(form.getValues('invoiceType') || 'GOODS')])
+      return
+    }
+
+    if (!form.getValues('vendorId')) {
+      notify.info('Select a vendor first.')
+      setSelectedPoId('')
+      return
+    }
+
+    const lookup = purchaseOrders.find((p) => p.id === poId)
+    if (lookup) {
+      form.setValue('invoiceType', 'GOODS', { shouldDirty: true })
+      if (lookup.currencyCode) {
+        form.setValue('currencyCode', lookup.currencyCode, { shouldDirty: true })
+      }
+    }
+
     setQuickMode(false)
+    setSourceHydrating(true)
+    try {
+      const po = await getPurchaseOrderById(poId)
+      if (!po) {
+        notify.error('Purchase order not found')
+        return
+      }
+      if (po.vendor.id && po.vendor.id !== form.getValues('vendorId')) {
+        notify.error('This purchase order belongs to a different vendor.')
+        setSelectedPoId('')
+        return
+      }
+      form.setValue('invoiceType', 'GOODS', { shouldDirty: true })
+      if (po.currency) form.setValue('currencyCode', po.currency, { shouldDirty: true })
+
+      const mapable = (po.lines ?? []).filter(
+        (l) =>
+          l.itemId ||
+          l.itemCode?.trim() ||
+          l.itemName?.trim() ||
+          l.description?.trim() ||
+          Number(l.quantity) > 0 ||
+          Number(l.uomQuantity) > 0,
+      )
+      if (mapable.length === 0) {
+        replace([emptyLine('GOODS')])
+        notify.info('This PO has no product lines to invoice. Add lines manually.')
+        return
+      }
+
+      replace(mapable.map((l) => formLineFromPoLine(l, 'GOODS')))
+      notify.success(`Loaded ${mapable.length} line${mapable.length === 1 ? '' : 's'} from ${po.documentNumber}`)
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Failed to load purchase order lines')
+    } finally {
+      setSourceHydrating(false)
+    }
+  }
+
+  const onPickGoodsReceipt = async (grnId: string) => {
+    setSelectedGrnId(grnId)
+    if (!grnId) {
+      replace([emptyLine(form.getValues('invoiceType') || 'GOODS')])
+      return
+    }
+
+    if (!form.getValues('vendorId')) {
+      notify.info('Select a vendor first.')
+      setSelectedGrnId('')
+      return
+    }
+
+    const lookup = goodsReceipts.find((g) => g.id === grnId)
+    if (lookup) {
+      form.setValue('invoiceType', 'GOODS', { shouldDirty: true })
+    }
+
+    setQuickMode(false)
+    setSourceHydrating(true)
+    try {
+      const grn = await getGRNById(grnId)
+      if (!grn) {
+        notify.error('Goods receipt not found')
+        return
+      }
+      if (grn.vendor.id && grn.vendor.id !== form.getValues('vendorId')) {
+        notify.error('This goods receipt belongs to a different vendor.')
+        setSelectedGrnId('')
+        return
+      }
+      form.setValue('invoiceType', 'GOODS', { shouldDirty: true })
+      if (grn.currency) form.setValue('currencyCode', grn.currency, { shouldDirty: true })
+
+      const mapable = (grn.lines ?? []).filter((l) => {
+        const qty = Number(l.acceptedQty) || Number(l.receivedQty) || 0
+        return (
+          qty > 0 ||
+          Boolean(l.itemId || l.itemCode?.trim() || l.itemName?.trim() || l.description?.trim())
+        )
+      })
+      const withQty = mapable.filter(
+        (l) => (Number(l.acceptedQty) || Number(l.receivedQty) || 0) > 0,
+      )
+      const linesForForm = withQty.length > 0 ? withQty : mapable
+
+      if (linesForForm.length === 0) {
+        replace([emptyLine('GOODS')])
+        notify.info('This GRN has no receivable lines to invoice. Add lines manually.')
+        return
+      }
+
+      const mapped = linesForForm.map((l) => formLineFromGrnLine(l))
+      replace(mapped)
+      notify.success(
+        `Loaded ${linesForForm.length} line${linesForForm.length === 1 ? '' : 's'} from ${grn.documentNumber}`,
+      )
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Failed to load goods receipt lines')
+    } finally {
+      setSourceHydrating(false)
+    }
   }
 
   const onPickLineItem = (index: number, itemId: string) => {
@@ -763,6 +1011,29 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   const canEdit = mode === 'create' ? perms.canCreateInvoice : perms.canEditInvoice
 
+  const clientPreview = useMemo(() => {
+    const lineRows = watched.lines ?? []
+    let lineAmount = 0
+    let estimatedTax = 0
+    for (const l of lineRows) {
+      const qty = Number(l.quantity) || 0
+      const rate = Number(l.unitPrice) || 0
+      const gst = Number(l.gstRate) || 0
+      const taxable = qty * rate
+      lineAmount += taxable
+      estimatedTax += taxable * (gst / 100)
+    }
+    const freight = Number(watched.freightAmount) || 0
+    const other = Number(watched.otherChargeAmount) || 0
+    return {
+      lineAmount,
+      estimatedTax,
+      freight,
+      other,
+      estimatedTotal: lineAmount + estimatedTax + freight + other,
+    }
+  }, [watched.lines, watched.freightAmount, watched.otherChargeAmount])
+
   if (!isApiMode()) {
     return (
       <MoneyOutWorkspaceShell title="Vendor Invoice">
@@ -792,17 +1063,30 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const invoiceTypeLabel = INVOICE_TYPE_LABELS[watched.invoiceType] ?? watched.invoiceType
   const invoiceTypeBadgeColor = INVOICE_TYPE_BADGE_COLOR[watched.invoiceType] ?? 'gray'
   const lineCount = fields.length
-  const vendorLocked = mode === 'create' && createSource !== 'DIRECT' && Boolean(selectedPoId || selectedGrnId)
   const canQuickCreateVendor = canQuickCreateEntity('vendor')
+  const hasVendor = Boolean(watched.vendorId)
   const vendorDisplayName = selectedVendor?.vendorName || 'Vendor'
   const lineGrid = quickMode ? LINE_GRID_QUICK : LINE_GRID_FULL
   const selectedPo = purchaseOrders.find((p) => p.id === selectedPoId)
   const selectedGrn = goodsReceipts.find((g) => g.id === selectedGrnId)
 
+  const lineAmountAt = (index: number) => {
+    const l = watched.lines?.[index]
+    if (!l) return 0
+    return (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0)
+  }
+
   return (
-    <MoneyOutWorkspaceShell title={mode === 'create' ? 'New Vendor Invoice' : 'Edit Vendor Invoice'}>
+    <MoneyOutWorkspaceShell
+      title={mode === 'create' ? 'New Vendor Invoice' : 'Edit Vendor Invoice'}
+      description={
+        mode === 'create'
+          ? 'Record a supplier invoice against a vendor — optionally source product lines from a released PO or GRN.'
+          : 'Update draft details. Server totals refresh on save.'
+      }
+    >
       {mode === 'create' && (
-        <div className="mi-create-toolbar mb-2">
+        <div className="vi-create-toolbar mi-create-toolbar mb-3">
           <div className="mi-create-toolbar__group">
             <span className="mi-create-toolbar__label">Source</span>
             <ErpSegmentedControl<VendorInvoiceCreateSource>
@@ -814,12 +1098,15 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   setCreateSource('DIRECT')
                   setSelectedPoId('')
                   setSelectedGrnId('')
+                  replace([emptyLine(form.getValues('invoiceType') || initialInvoiceType)])
                 } else if (next === 'PURCHASE_ORDER') {
                   setCreateSource('PURCHASE_ORDER')
                   setSelectedGrnId('')
+                  replace([emptyLine('GOODS')])
                 } else {
                   setCreateSource('GOODS_RECEIPT')
                   setSelectedPoId('')
+                  replace([emptyLine('GOODS')])
                 }
               }}
               options={[
@@ -846,7 +1133,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       )}
 
       {draftReference ? (
-        <p className="mi-create-banner mi-create-banner--info mb-2">
+        <p className="mi-create-banner mi-create-banner--info mb-3">
           Editing draft <strong>{draftReference}</strong>
           <span className="ml-2 inline-flex align-middle">
             <Badge color={invoiceTypeBadgeColor} dot>
@@ -856,10 +1143,13 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
         </p>
       ) : null}
 
-      <form onSubmit={onSave} className="sales-invoice-zoho-form mi-create-form vendor-invoice-zoho-form">
+      <form onSubmit={onSave} className="sales-invoice-zoho-form mi-create-form vendor-invoice-zoho-form vi-create-form">
+        <div className="vi-create-layout">
+          <div className="vi-create-layout__main space-y-2.5">
         <FormSection
           title="Vendor & Invoice Details"
           subtitle="Party, supplier reference, type, and key dates."
+          accent="slate"
           actions={
             mode === 'create' ? (
               <Badge color={invoiceTypeBadgeColor} dot>
@@ -869,31 +1159,70 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
           }
         >
           <div className="mi-create-commercial__body">
-            {mode === 'create' && createSource !== 'DIRECT' && (
-              <div className="mi-create-source-row">
-                <FormField
-                  label={createSource === 'PURCHASE_ORDER' ? 'Purchase order' : 'Goods receipt (GRN)'}
-                  hint="Locks vendor and records a real Purchase source link."
-                >
-                  <ErpSmartSelect
-                    options={createSource === 'PURCHASE_ORDER' ? poOptions : grnOptions}
-                    value={createSource === 'PURCHASE_ORDER' ? selectedPoId : selectedGrnId}
-                    onChange={createSource === 'PURCHASE_ORDER' ? onPickPurchaseOrder : onPickGoodsReceipt}
-                    placeholder={
-                      createSource === 'PURCHASE_ORDER' ? 'Select purchase order…' : 'Select GRN…'
-                    }
-                    emptyMessage={
-                      sourcesLoading
-                        ? 'Loading…'
-                        : createSource === 'PURCHASE_ORDER'
-                          ? 'No invoiceable purchase orders found'
-                          : 'No invoiceable goods receipts found'
-                    }
-                    allowEmpty
-                  />
-                </FormField>
+            {mode === 'create' && createSource !== 'DIRECT' ? (
+              <>
+                <div className="vi-create-vendor-document-row">
+                  <div className="mi-create-customer-row vi-create-vendor-document-row__vendor">
+                    <FormField label="Vendor" required error={form.formState.errors.vendorId?.message}>
+                      <VendorMasterSelect
+                        value={watched.vendorId}
+                        onChange={onPickVendor}
+                        source="accounting"
+                        allowEmpty
+                      />
+                    </FormField>
+                    {canQuickCreateVendor ? (
+                      <Link
+                        to={partyMasterCreateRoute('purchase')}
+                        className="inline-flex h-[34px] items-center gap-1 self-end rounded-md border border-erp-border bg-white px-2.5 text-[12px] font-semibold text-erp-primary hover:bg-erp-surface-alt"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" aria-hidden />
+                        New
+                      </Link>
+                    ) : null}
+                  </div>
+                  <div className="vi-create-vendor-document-row__document">
+                    <FormField
+                      label={createSource === 'PURCHASE_ORDER' ? 'Purchase order' : 'Goods receipt (GRN)'}
+                      hint={
+                        sourceHydrating
+                          ? 'Loading document lines…'
+                          : !hasVendor
+                            ? 'Select a vendor first, then choose an invoice-pending document.'
+                            : 'Load product lines from the selected document.'
+                      }
+                    >
+                      <ErpSmartSelect
+                        options={createSource === 'PURCHASE_ORDER' ? poOptions : grnOptions}
+                        value={createSource === 'PURCHASE_ORDER' ? selectedPoId : selectedGrnId}
+                        onChange={(v) => {
+                          if (createSource === 'PURCHASE_ORDER') void onPickPurchaseOrder(v || '')
+                          else void onPickGoodsReceipt(v || '')
+                        }}
+                        placeholder={
+                          !hasVendor
+                            ? 'Select vendor first…'
+                            : createSource === 'PURCHASE_ORDER'
+                              ? 'Select purchase order…'
+                              : 'Select GRN…'
+                        }
+                        emptyMessage={
+                          sourcesLoading || sourceHydrating
+                            ? 'Loading…'
+                            : !hasVendor
+                              ? 'Select a vendor first'
+                              : createSource === 'PURCHASE_ORDER'
+                                ? 'No invoice-pending purchase orders for this vendor'
+                                : 'No invoice-pending goods receipts for this vendor'
+                        }
+                        disabled={!hasVendor}
+                        allowEmpty
+                      />
+                    </FormField>
+                  </div>
+                </div>
                 {createSource === 'PURCHASE_ORDER' && selectedPo ? (
-                  <>
+                  <div className="mi-create-source-row">
                     <FormField label="PO status">
                       <div className="erp-input flex min-h-[34px] items-center bg-erp-surface-alt/70 text-erp-text">
                         {String(selectedPo.status).replace(/_/g, ' ')}
@@ -904,10 +1233,10 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                         {selectedPo.currencyCode || '—'}
                       </div>
                     </FormField>
-                  </>
+                  </div>
                 ) : null}
                 {createSource === 'GOODS_RECEIPT' && selectedGrn ? (
-                  <>
+                  <div className="mi-create-source-row">
                     <FormField label="GRN date">
                       <div className="erp-input flex min-h-[34px] items-center bg-erp-surface-alt/70 text-erp-text">
                         {selectedGrn.receiptDate || '—'}
@@ -918,7 +1247,27 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                         {selectedGrn.purchaseOrderNumber || '—'}
                       </div>
                     </FormField>
-                  </>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="mi-create-customer-row">
+                <FormField label="Vendor" required error={form.formState.errors.vendorId?.message}>
+                  <VendorMasterSelect
+                    value={watched.vendorId}
+                    onChange={onPickVendor}
+                    source="accounting"
+                    allowEmpty
+                  />
+                </FormField>
+                {mode === 'create' && canQuickCreateVendor ? (
+                  <Link
+                    to={partyMasterCreateRoute('purchase')}
+                    className="inline-flex h-[34px] items-center gap-1 self-end rounded-md border border-erp-border bg-white px-2.5 text-[12px] font-semibold text-erp-primary hover:bg-erp-surface-alt"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" aria-hidden />
+                    New
+                  </Link>
                 ) : null}
               </div>
             )}
@@ -939,32 +1288,6 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 ) : null}
               </div>
             ) : null}
-
-            <div className="mi-create-customer-row">
-              <FormField label="Vendor" required error={form.formState.errors.vendorId?.message}>
-                <VendorMasterSelect
-                  value={watched.vendorId}
-                  onChange={(vendorId) =>
-                    form.setValue('vendorId', vendorId, { shouldDirty: true, shouldValidate: true })
-                  }
-                  disabled={vendorLocked}
-                  source="accounting"
-                  allowEmpty
-                />
-                {vendorLocked ? (
-                  <p className="mt-0.5 text-[11px] text-erp-muted">Vendor locked from source document.</p>
-                ) : null}
-              </FormField>
-              {mode === 'create' && !vendorLocked && canQuickCreateVendor ? (
-                <Link
-                  to={partyMasterCreateRoute('purchase')}
-                  className="inline-flex h-[34px] items-center gap-1 self-end rounded-md border border-erp-border bg-white px-2.5 text-[12px] font-semibold text-erp-primary hover:bg-erp-surface-alt"
-                >
-                  <UserPlus className="h-3.5 w-3.5" aria-hidden />
-                  New
-                </Link>
-              ) : null}
-            </div>
 
             {watched.vendorId && selectedVendor ? (
               <aside className="mi-create-party" aria-label="Selected vendor">
@@ -1050,27 +1373,35 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
         </FormSection>
 
         <FormSection
-          title="Invoice Lines"
-          subtitle="Qty × rate preview on client; GST, TDS and payable totals calculated by the server on save."
+          title="Invoice lines"
+          subtitle="Product and expense lines — estimated tax is client-side until save."
+          accent="teal"
           actions={
-            <span className="text-[11px] font-semibold tabular-nums text-erp-muted">
+            <span className="vi-create-lines-count tabular-nums">
               {lineCount} line{lineCount === 1 ? '' : 's'}
+              {clientPreview.lineAmount > 0 ? (
+                <span className="vi-create-lines-count__amt">
+                  · {formatCurrency(clientPreview.lineAmount)}
+                </span>
+              ) : null}
             </span>
           }
         >
+          <div className="vi-create-lines">
           {/* Column headers (md+) */}
           <div
             className={cn(
-              'sales-invoice-zoho-form__lines-head mb-1 hidden gap-2 border-b border-erp-border px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-erp-muted md:grid',
+              'sales-invoice-zoho-form__lines-head vi-create-lines__head mb-0 hidden gap-2 border-b border-erp-border px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-erp-muted md:grid',
               lineGrid,
             )}
           >
             {!quickMode ? <span>Type</span> : null}
             <span>Description *</span>
             <span className="text-right">Qty</span>
-            <span className="text-right">Rate (₹)</span>
+            <span className="text-right">Rate</span>
             <span className="text-right">GST %</span>
             {!quickMode ? <span>HSN/SAC</span> : null}
+            <span className="text-right">Amount</span>
             <span>Account</span>
             <span />
           </div>
@@ -1104,7 +1435,12 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                       {...form.register(`lines.${index}.gstRate`)}
                     />
                   </FormField>
-                  <FormField label="Account">
+                  <FormField label="Amount">
+                    <div className="erp-input flex min-h-[34px] items-center justify-end bg-erp-surface-alt/60 tabular-nums text-[12px] font-semibold">
+                      {formatCurrency(lineAmountAt(index))}
+                    </div>
+                  </FormField>
+                  <FormField label="Account" className="col-span-2">
                     <Select {...form.register(`lines.${index}.debitAccountId`)}>
                       <option value="">{SELECT_PLACEHOLDER}</option>
                       {expenseAccounts.map((a) => (
@@ -1195,6 +1531,12 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                     {...form.register(`lines.${index}.hsnSacCode`)}
                   />
                 ) : null}
+                <div
+                  className="vi-create-line-amount flex min-h-[34px] items-center justify-end tabular-nums text-[12px] font-semibold text-erp-text"
+                  aria-label={`Line ${index + 1} amount`}
+                >
+                  {formatCurrency(lineAmountAt(index))}
+                </div>
                 <Select
                   {...form.register(`lines.${index}.debitAccountId`)}
                   aria-label={`Line ${index + 1} account`}
@@ -1226,185 +1568,244 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
           {!quickMode ? (
             <button
               type="button"
-              className="sales-invoice-zoho-form__add-line mt-2 inline-flex items-center gap-1"
+              className="sales-invoice-zoho-form__add-line vi-create-add-line mt-2 inline-flex items-center gap-1"
               onClick={() => append(emptyLine(watched.invoiceType))}
             >
               <Plus className="h-3.5 w-3.5" aria-hidden />
               Add another line
             </button>
           ) : null}
+          </div>
         </FormSection>
 
-        <div className="sales-invoice-zoho-form__footer-grid grid gap-2.5 lg:grid-cols-[1.4fr_1fr]">
-          <div className="space-y-2.5">
-            <section className="sales-invoice-zoho-form__section mi-create-section rounded-md border border-erp-border bg-white">
-              <button
-                type="button"
-                className="mi-create-section__header flex w-full flex-wrap items-center justify-between gap-2 border-b border-erp-border text-left"
-                onClick={() => setAdvancedOpen((v) => !v)}
-                aria-expanded={advancedOpen}
-              >
-                <div>
-                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-erp-text">
-                    Charges &amp; Tax
-                  </h3>
-                  <p className="text-[11px] text-erp-muted">
-                    Tax treatment, place of supply, ITC, TDS, freight and other charges.
-                  </p>
-                </div>
-                <ChevronDown
-                  className={cn(
-                    'h-4 w-4 shrink-0 text-erp-muted transition-transform',
-                    advancedOpen && 'rotate-180',
-                  )}
-                  aria-hidden
-                />
-              </button>
-              {advancedOpen ? (
-                <div className="mi-create-section__body">
-                  <div className="mi-create-commercial__grid">
-                    <FormField label="Tax treatment">
-                      <Select {...form.register('taxTreatment')}>
-                        <option value="REGULAR">Regular</option>
-                        <option value="REVERSE_CHARGE">Reverse charge</option>
-                        <option value="NON_GST">Non-GST</option>
-                        <option value="EXEMPT">Exempt</option>
-                        <option value="NIL_RATED">Nil rated</option>
-                        <option value="IMPORT_GOODS">Import goods</option>
-                        <option value="IMPORT_SERVICE">Import service</option>
-                        <option value="SEZ">SEZ</option>
-                      </Select>
-                    </FormField>
-                    <FormField
-                      label="Company state"
-                      required
-                      error={!validateStateCode(companyStateCode) ? 'Required for supply type' : undefined}
-                      hint={
-                        legalEntity
-                          ? `Legal entity: ${legalEntity.displayName}`
-                          : 'From Accounting → Setup → Legal Entities'
-                      }
-                    >
-                      <Select
-                        value={companyStateCode}
-                        onChange={(e) => setCompanyStateCode(e.target.value)}
-                      >
-                        <option value="">{SELECT_PLACEHOLDER}</option>
-                        {GST_STATE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </Select>
-                    </FormField>
-                    <FormField
-                      label="Place of supply"
-                      required
-                      error={form.formState.errors.placeOfSupply?.message}
-                      hint={
-                        selectedVendor
-                          ? 'Suggested from vendor state / GSTIN when available'
-                          : 'Vendor state when registered — or enter manually'
-                      }
-                    >
-                      <Select {...form.register('placeOfSupply')}>
-                        <option value="">{SELECT_PLACEHOLDER}</option>
-                        {GST_STATE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </Select>
-                    </FormField>
-                    <FormField
-                      label="Supply type"
-                      hint="Auto from company state vs place of supply"
-                    >
-                      <Select {...form.register('supplyType')}>
-                        <option value="INTRA_STATE">Intra-state (CGST + SGST)</option>
-                        <option value="INTER_STATE">Inter-state (IGST)</option>
-                      </Select>
-                    </FormField>
-                    <FormField label="ITC eligibility">
-                      <Select {...form.register('itcEligibility')}>
-                        <option value="PENDING_REVIEW">Pending review</option>
-                        <option value="ELIGIBLE">Eligible</option>
-                        <option value="PARTIALLY_ELIGIBLE">Partially eligible</option>
-                        <option value="INELIGIBLE">Ineligible</option>
-                      </Select>
-                    </FormField>
-                    {watched.itcEligibility === 'PARTIALLY_ELIGIBLE' ? (
-                      <FormField label="Eligible ITC %">
-                        <Input {...form.register('itcEligiblePercent')} />
-                      </FormField>
-                    ) : null}
-                    <FormField label="TDS recognition">
-                      <Select {...form.register('tdsRecognitionMode')}>
-                        <option value="NOT_APPLICABLE">Not applicable</option>
-                        <option value="AT_INVOICE">At invoice</option>
-                        <option value="AT_PAYMENT">At payment</option>
-                      </Select>
-                    </FormField>
-                    <FormField label="TDS section">
-                      <Input {...form.register('tdsSectionCode')} placeholder="e.g. 194C" />
-                    </FormField>
-                    <FormField label="TDS rate %">
-                      <Input {...form.register('tdsRate')} />
-                    </FormField>
-                    {!hideFreightField ? (
-                      <FormField label="Freight amount">
-                        <Input {...form.register('freightAmount')} />
-                      </FormField>
-                    ) : null}
-                    <FormField label="Other charges">
-                      <Input {...form.register('otherChargeAmount')} />
-                    </FormField>
-                  </div>
-                  {watched.tdsRecognitionMode === 'AT_INVOICE' ? (
-                    <p className="mt-2 text-[11px] text-erp-muted">
-                      TDS liability is recognised when the vendor invoice is posted.
-                    </p>
-                  ) : null}
-                  {watched.tdsRecognitionMode === 'AT_PAYMENT' ? (
-                    <p className="mt-2 text-[11px] text-erp-muted">
-                      TDS is handled during vendor payment. The invoice posts the full vendor liability.
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-            </section>
-
-            <details className="rounded-md border border-erp-border bg-white px-3 py-2">
-              <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
-                Purchase references
-              </summary>
-              <div className="mt-2 text-[11px] text-erp-muted">
-                {mode === 'edit' && existingSourceLinks.length > 0 ? (
-                  <ul className="space-y-1">
-                    {existingSourceLinks.map((s, i) => (
-                      <li key={`${s.sourceType}-${i}`}>
-                        {s.sourceType.replace(/_/g, ' ')} —{' '}
-                        {s.sourceDocumentNumberSnapshot ?? s.sourceDocumentId}
-                      </li>
+        <section className="sales-invoice-zoho-form__section mi-create-section vi-create-section vi-create-section--slate rounded-md border border-erp-border bg-white">
+          <button
+            type="button"
+            className="mi-create-section__header flex w-full flex-wrap items-center justify-between gap-2 border-b border-erp-border text-left"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            aria-expanded={advancedOpen}
+          >
+            <div className="min-w-0">
+              <h3 className="text-[12px] font-semibold uppercase tracking-wide text-erp-text">
+                Charges &amp; tax
+              </h3>
+              <p className="mt-0.5 text-[11px] leading-snug text-erp-muted">
+                Tax treatment, place of supply, ITC, TDS, freight and other charges.
+              </p>
+            </div>
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 shrink-0 text-erp-muted transition-transform',
+                advancedOpen && 'rotate-180',
+              )}
+              aria-hidden
+            />
+          </button>
+          {advancedOpen ? (
+            <div className="mi-create-section__body">
+              <div className="mi-create-commercial__grid">
+                <FormField label="Tax treatment">
+                  <Select {...form.register('taxTreatment')}>
+                    <option value="REGULAR">Regular</option>
+                    <option value="REVERSE_CHARGE">Reverse charge</option>
+                    <option value="NON_GST">Non-GST</option>
+                    <option value="EXEMPT">Exempt</option>
+                    <option value="NIL_RATED">Nil rated</option>
+                    <option value="IMPORT_GOODS">Import goods</option>
+                    <option value="IMPORT_SERVICE">Import service</option>
+                    <option value="SEZ">SEZ</option>
+                  </Select>
+                </FormField>
+                <FormField
+                  label="Company state"
+                  required
+                  error={!validateStateCode(companyStateCode) ? 'Required for supply type' : undefined}
+                  hint={
+                    legalEntity
+                      ? `Legal entity: ${legalEntity.displayName}`
+                      : 'From Accounting → Setup → Legal Entities'
+                  }
+                >
+                  <Select
+                    value={companyStateCode}
+                    onChange={(e) => setCompanyStateCode(e.target.value)}
+                  >
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {GST_STATE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
                     ))}
-                  </ul>
-                ) : (
-                  <p>
-                    {mode === 'create'
-                      ? 'Source documents are linked from From PO / From GRN create modes above.'
-                      : 'This invoice was entered directly without a Purchase reference.'}
-                  </p>
-                )}
-                <p className="mt-1.5">
-                  Direct invoices require no Purchase link. ITC classification controls accounting treatment — it does
-                  not file GST returns.
-                </p>
+                  </Select>
+                </FormField>
+                <FormField
+                  label="Place of supply"
+                  required
+                  error={form.formState.errors.placeOfSupply?.message}
+                  hint={
+                    selectedVendor
+                      ? 'Suggested from vendor state / GSTIN when available'
+                      : 'Vendor state when registered — or enter manually'
+                  }
+                >
+                  <Select {...form.register('placeOfSupply')}>
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {GST_STATE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+                <FormField
+                  label="Supply type"
+                  hint="Auto from company state vs place of supply"
+                >
+                  <Select {...form.register('supplyType')}>
+                    <option value="INTRA_STATE">Intra-state (CGST + SGST)</option>
+                    <option value="INTER_STATE">Inter-state (IGST)</option>
+                  </Select>
+                </FormField>
+                <FormField label="ITC eligibility">
+                  <Select {...form.register('itcEligibility')}>
+                    <option value="PENDING_REVIEW">Pending review</option>
+                    <option value="ELIGIBLE">Eligible</option>
+                    <option value="PARTIALLY_ELIGIBLE">Partially eligible</option>
+                    <option value="INELIGIBLE">Ineligible</option>
+                  </Select>
+                </FormField>
+                {watched.itcEligibility === 'PARTIALLY_ELIGIBLE' ? (
+                  <FormField label="Eligible ITC %">
+                    <Input {...form.register('itcEligiblePercent')} />
+                  </FormField>
+                ) : null}
+                <FormField label="TDS recognition">
+                  <Select {...form.register('tdsRecognitionMode')}>
+                    <option value="NOT_APPLICABLE">Not applicable</option>
+                    <option value="AT_INVOICE">At invoice</option>
+                    <option value="AT_PAYMENT">At payment</option>
+                  </Select>
+                </FormField>
+                <FormField label="TDS section">
+                  <Input {...form.register('tdsSectionCode')} placeholder="e.g. 194C" />
+                </FormField>
+                <FormField label="TDS rate %">
+                  <Input {...form.register('tdsRate')} />
+                </FormField>
+                {!hideFreightField ? (
+                  <FormField label="Freight amount">
+                    <Input {...form.register('freightAmount')} />
+                  </FormField>
+                ) : null}
+                <FormField label="Other charges">
+                  <Input {...form.register('otherChargeAmount')} />
+                </FormField>
               </div>
-            </details>
+              {watched.tdsRecognitionMode === 'AT_INVOICE' ? (
+                <p className="mt-2 text-[11px] text-erp-muted">
+                  TDS liability is recognised when the vendor invoice is posted.
+                </p>
+              ) : null}
+              {watched.tdsRecognitionMode === 'AT_PAYMENT' ? (
+                <p className="mt-2 text-[11px] text-erp-muted">
+                  TDS is handled during vendor payment. The invoice posts the full vendor liability.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+
+        <details className="vi-create-refs rounded-md border border-erp-border bg-white px-3 py-2">
+          <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
+            Purchase references
+          </summary>
+          <div className="mt-2 text-[11px] text-erp-muted">
+            {mode === 'edit' && existingSourceLinks.length > 0 ? (
+              <ul className="space-y-1">
+                {existingSourceLinks.map((s, i) => (
+                  <li key={`${s.sourceType}-${i}`}>
+                    {s.sourceType.replace(/_/g, ' ')} —{' '}
+                    {s.sourceDocumentNumberSnapshot ?? s.sourceDocumentId}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>
+                {mode === 'create'
+                  ? 'Source documents are linked from From PO / From GRN create modes above.'
+                  : 'This invoice was entered directly without a Purchase reference.'}
+              </p>
+            )}
+            <p className="mt-1.5">
+              Direct invoices require no Purchase link. ITC classification controls accounting treatment — it does
+              not file GST returns.
+            </p>
+          </div>
+        </details>
           </div>
 
-          <div className="space-y-2">
-            <div className="mi-create-totals">
+          <aside className="vi-create-layout__rail" aria-label="Invoice summary">
+            {(selectedPo || selectedGrn) && (
+              <div className="vi-create-source-card">
+                <p className="vi-create-source-card__label">Sourced from</p>
+                {selectedPo ? (
+                  <>
+                    <p className="vi-create-source-card__title">{selectedPo.orderNumber}</p>
+                    <p className="vi-create-source-card__meta">
+                      {String(selectedPo.status).replace(/_/g, ' ')}
+                      {selectedPo.currencyCode ? ` · ${selectedPo.currencyCode}` : ''}
+                    </p>
+                  </>
+                ) : null}
+                {selectedGrn ? (
+                  <>
+                    <p className="vi-create-source-card__title">{selectedGrn.grnNumber}</p>
+                    <p className="vi-create-source-card__meta">
+                      {selectedGrn.receiptDate || '—'}
+                      {selectedGrn.purchaseOrderNumber
+                        ? ` · PO ${selectedGrn.purchaseOrderNumber}`
+                        : ''}
+                    </p>
+                  </>
+                ) : null}
+                {sourceHydrating ? (
+                  <p className="vi-create-source-card__loading">Loading product lines…</p>
+                ) : null}
+              </div>
+            )}
+
+            <div className="vi-create-preview">
+              <h3 className="vi-create-preview__title">Estimate</h3>
+              <dl className="vi-create-preview__list">
+                <div>
+                  <dt>Line amount</dt>
+                  <dd>{formatCurrency(clientPreview.lineAmount)}</dd>
+                </div>
+                <div>
+                  <dt>Est. GST</dt>
+                  <dd>{formatCurrency(clientPreview.estimatedTax)}</dd>
+                </div>
+                {clientPreview.freight > 0 ? (
+                  <div>
+                    <dt>Freight</dt>
+                    <dd>{formatCurrency(clientPreview.freight)}</dd>
+                  </div>
+                ) : null}
+                {clientPreview.other > 0 ? (
+                  <div>
+                    <dt>Other</dt>
+                    <dd>{formatCurrency(clientPreview.other)}</dd>
+                  </div>
+                ) : null}
+                <div className="vi-create-preview__total">
+                  <dt>Approx. total</dt>
+                  <dd>{formatCurrency(clientPreview.estimatedTotal)}</dd>
+                </div>
+              </dl>
+              <p className="vi-create-preview__note">Indicative only — save for server GST / TDS / payable.</p>
+            </div>
+
+            <div className="vi-create-totals mi-create-totals">
               {serverTotals ? (
                 <VendorInvoiceTotalsPanel
                   taxable={serverTotals.taxable}
@@ -1421,17 +1822,20 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   vendorPayable={serverTotals.vendorPayable}
                 />
               ) : (
-                <div className="rounded-md border border-erp-border bg-white px-3 py-3 text-[12px] text-erp-muted">
-                  Totals appear after the first save — taxable, GST, TDS and rounding are calculated by the server.
+                <div className="vi-create-totals-empty rounded-md border border-dashed border-erp-border bg-white px-3 py-3 text-[12px] text-erp-muted">
+                  Server totals appear after the first save (GST splits, TDS, rounding).
                 </div>
               )}
             </div>
-          </div>
+          </aside>
         </div>
 
-        <div className="sales-invoice-zoho-form__sticky-footer vendor-invoice-zoho-form__sticky-footer flex flex-wrap items-center justify-between gap-2 rounded-md border border-erp-border">
+        <div className="sales-invoice-zoho-form__sticky-footer vendor-invoice-zoho-form__sticky-footer vi-create-footer flex flex-wrap items-center justify-between gap-2 rounded-md border border-erp-border">
           <span className="text-[12px] text-erp-muted">
             {lineCount} line{lineCount === 1 ? '' : 's'}
+            {clientPreview.estimatedTotal > 0
+              ? ` · Est. ${formatCurrency(clientPreview.estimatedTotal)}`
+              : ''}
             {' · '}
             {mode === 'create'
               ? 'Saving opens the invoice detail page.'
@@ -1441,7 +1845,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
             <ErpButton type="button" variant="secondary" onClick={() => navigate(-1)}>
               Cancel
             </ErpButton>
-            <ErpButton type="submit" variant="primary" disabled={saving}>
+            <ErpButton type="submit" variant="primary" disabled={saving || sourceHydrating}>
               {saving ? 'Saving…' : 'Save Draft'}
             </ErpButton>
           </div>

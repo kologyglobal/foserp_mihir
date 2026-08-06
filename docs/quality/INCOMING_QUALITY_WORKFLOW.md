@@ -9,8 +9,9 @@ See [INCOMING_QUALITY_UNIFICATION.md](./INCOMING_QUALITY_UNIFICATION.md) for the
 Incoming material QC is **not** a manufacturing `INCOMING` category inspection on `mfg_quality_inspections`. It uses:
 
 1. `GoodsReceipt` with `status = QC_PENDING` (inspection required) → stock often `QC_HOLD`
-2. `PurchaseQualityInspection` under `/purchase/quality-inspections` (optional `inspectionPlanId` snapshot)
-3. Quality workspace `/quality/incoming` as the **primary operational screen** (aggregates GRN + QI line work)
+2. `PurchaseQualityInspection` under `/purchase/quality-inspections` (optional `inspectionPlanId` snapshot; auto-resolve ACTIVE INCOMING plan by item/category when omitted)
+3. Create UI `/purchase/quality-inspections/new?grnId=` picks plan from Quality → Inspection Plans
+4. Quality workspace `/quality/incoming` as the **primary operational screen** (aggregates GRN + QI line work)
 
 ## Flow
 

@@ -177,6 +177,7 @@ export {
   createPurchaseInvoiceFromPo,
   createPurchaseInvoiceFromGrn,
   createPurchaseInvoiceFromServicePo,
+  listPostedGrnsForPurchaseOrder,
   createDirectPurchaseInvoice,
   updatePurchaseInvoice,
   getPurchaseInvoices,

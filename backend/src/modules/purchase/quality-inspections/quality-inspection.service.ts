@@ -4,6 +4,7 @@ import { logger } from '../../../config/logger.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { InventoryPostingService } from '../../inventory/shared/stock-posting.service.js'
+import { resolveInspectionPlan } from '../../quality/shared/plan-resolve.service.js'
 import { resolveEffectivePurchaseDefaults } from '../shared/purchase-defaults.js'
 import { postGrnStockInward } from '../shared/purchase-inventory-posting.js'
 import { syncGrnAcceptedRejectedUomFromBase } from '../shared/uom-conversion.js'
@@ -100,8 +101,10 @@ async function snapshotInspectionPlan(
     },
   })
   if (!plan) throw new QualityInspectionValidationError('Inspection plan not found.')
-  if (plan.status !== 'ACTIVE' && plan.category !== 'INCOMING') {
-    // Allow ACTIVE or INCOMING-category plans; still allow ACTIVE only preferred
+  if (plan.status !== 'ACTIVE') {
+    throw new QualityInspectionValidationError(
+      'Inspection plan must be ACTIVE to snapshot onto a quality inspection.',
+    )
   }
   const rev = plan.revisions[0] ?? null
   const paramInputs: QualityInspectionParameterInput[] = plan.lines
@@ -336,6 +339,29 @@ export async function createQualityInspection(tenantId: string, actorId: string,
   let planSnap: Awaited<ReturnType<typeof snapshotInspectionPlan>> | null = null
   if (input.inspectionPlanId) {
     planSnap = await snapshotInspectionPlan(tenantId, input.inspectionPlanId)
+  } else if (!input.parameters?.length) {
+    // Auto-resolve ACTIVE INCOMING plan: item → item category → generic category plan
+    const itemIds = [
+      ...new Set(lines.map((l) => l.itemId).filter((id): id is string => Boolean(id))),
+    ]
+    let resolvedPlanId: string | null = null
+    for (const itemId of itemIds) {
+      const resolved = await resolveInspectionPlan(tenantId, {
+        category: 'INCOMING',
+        itemId,
+      })
+      if (resolved?.plan.id) {
+        resolvedPlanId = resolved.plan.id
+        break
+      }
+    }
+    if (!resolvedPlanId) {
+      const generic = await resolveInspectionPlan(tenantId, { category: 'INCOMING' })
+      resolvedPlanId = generic?.plan.id ?? null
+    }
+    if (resolvedPlanId) {
+      planSnap = await snapshotInspectionPlan(tenantId, resolvedPlanId)
+    }
   }
 
   const parameterInputs = input.parameters?.length

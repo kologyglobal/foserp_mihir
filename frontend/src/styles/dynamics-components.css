@@ -20621,6 +20621,45 @@ div.erp-smart-select__dropdown {
   backdrop-filter: blur(6px);
 }
 
+/* Quality inspection plan — Zoho dense form (reuses mi-create section chrome) */
+.qc-plan-zoho.sales-invoice-zoho-form.mi-create-form {
+  max-width: 1120px;
+}
+
+.qc-plan-zoho .qc-plan-field__label {
+  letter-spacing: 0.02em;
+}
+
+.qc-plan-zoho .qc-plan-lines .erp-table th {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--erp-muted, #64748b);
+  padding: 8px 10px;
+}
+
+.qc-plan-zoho .qc-plan-lines .erp-table td {
+  padding: 8px 10px;
+  vertical-align: middle;
+}
+
+.qc-plan-zoho__rail {
+  position: sticky;
+  top: 12px;
+  align-self: start;
+}
+
+@media (max-width: 1024px) {
+  .qc-plan-zoho__grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .qc-plan-zoho__rail {
+    position: static;
+  }
+}
+
 .mi-create-totals > div {
   border-radius: 8px;
   padding: 10px 12px;
@@ -20637,12 +20676,271 @@ div.erp-smart-select__dropdown {
   .mi-create-commercial__grid,
   .mi-create-addresses,
   .mi-create-source-row,
-  .mi-create-customer-row {
+  .mi-create-customer-row,
+  .vi-create-vendor-document-row {
     grid-template-columns: 1fr;
   }
 
   .mi-create-party__360 {
     margin-left: 0;
+  }
+}
+
+/* ── Money-Out vendor invoice create (vi-create-*) ─────────────────────── */
+.vi-create-vendor-document-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: start;
+}
+
+.vi-create-vendor-document-row__vendor,
+.vi-create-vendor-document-row__document {
+  min-width: 0;
+}
+
+.vendor-invoice-zoho-form.vi-create-form,
+.sales-invoice-zoho-form.vi-create-form {
+  max-width: 1280px;
+  gap: 12px;
+}
+
+.vi-create-toolbar {
+  background: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--erp-surface-alt, #f8fafc) 55%, #fff) 100%);
+}
+
+.vi-create-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
+  gap: 12px 16px;
+  align-items: start;
+}
+
+.vi-create-layout__main {
+  min-width: 0;
+}
+
+.vi-create-layout__rail {
+  position: sticky;
+  top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vi-create-section--teal .mi-create-section__header {
+  background: color-mix(in srgb, #0f766e 5%, #fff);
+  border-left-color: #0f766e;
+}
+
+.vi-create-section--slate .mi-create-section__header {
+  background: color-mix(in srgb, #475569 5%, #fff);
+  border-left-color: #64748b;
+}
+
+.vi-create-lines {
+  border: 1px solid var(--erp-border, #e2e8f0);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.vi-create-lines__head {
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid var(--erp-border, #e2e8f0) !important;
+  background: color-mix(in srgb, #0f766e 4%, var(--erp-surface-alt, #f8fafc)) !important;
+}
+
+.vi-create-lines .sales-invoice-zoho-form__line-row {
+  border-bottom: 1px solid var(--erp-border, #f1f5f9) !important;
+}
+
+.vi-create-lines .sales-invoice-zoho-form__line-row:last-child {
+  border-bottom: none !important;
+}
+
+.vi-create-lines .sales-invoice-zoho-form__line-row:hover {
+  background: color-mix(in srgb, var(--erp-surface-alt, #f8fafc) 70%, #fff);
+}
+
+.vi-create-line-amount {
+  font-variant-numeric: tabular-nums;
+  color: var(--erp-text, #0f172a);
+}
+
+.vi-create-lines-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--erp-muted, #64748b);
+}
+
+.vi-create-lines-count__amt {
+  margin-left: 0.25rem;
+  color: #0f766e;
+}
+
+.vi-create-add-line {
+  margin: 0 !important;
+  padding: 8px 12px !important;
+  width: 100%;
+  justify-content: center;
+  border-top: 1px solid var(--erp-border, #e2e8f0);
+  background: var(--erp-surface-alt, #f8fafc);
+  text-decoration: none !important;
+}
+
+.vi-create-add-line:hover {
+  background: color-mix(in srgb, #0f766e 6%, #fff);
+  color: #0f766e;
+}
+
+.vi-create-source-card {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #0f766e 22%, var(--erp-border, #e2e8f0));
+  background: linear-gradient(145deg, color-mix(in srgb, #0f766e 6%, #fff) 0%, #fff 70%);
+}
+
+.vi-create-source-card__label {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--erp-muted, #64748b);
+}
+
+.vi-create-source-card__title {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--erp-text, #0f172a);
+}
+
+.vi-create-source-card__meta {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--erp-muted, #64748b);
+  text-transform: capitalize;
+}
+
+.vi-create-source-card__loading {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0f766e;
+}
+
+.vi-create-preview {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--erp-border, #e2e8f0);
+  background: #fff;
+  box-shadow: 0 1px 0 color-mix(in srgb, #0f172a 3%, transparent);
+}
+
+.vi-create-preview__title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--erp-muted, #64748b);
+}
+
+.vi-create-preview__list {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.vi-create-preview__list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vi-create-preview__list dt {
+  color: var(--erp-muted, #64748b);
+  font-weight: 500;
+}
+
+.vi-create-preview__list dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--erp-text, #0f172a);
+}
+
+.vi-create-preview__total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--erp-border, #e2e8f0);
+}
+
+.vi-create-preview__total dt,
+.vi-create-preview__total dd {
+  font-weight: 700 !important;
+  color: var(--erp-text, #0f172a) !important;
+  font-size: 13px;
+}
+
+.vi-create-preview__note {
+  margin: 8px 0 0;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--erp-muted, #64748b);
+}
+
+.vi-create-totals .ml-auto {
+  max-width: none !important;
+  width: 100%;
+  border-radius: 8px !important;
+  border-color: var(--erp-border, #e2e8f0) !important;
+  background: #fff !important;
+  box-shadow: 0 1px 0 color-mix(in srgb, #0f172a 3%, transparent);
+}
+
+.vi-create-totals-empty {
+  line-height: 1.4;
+}
+
+.vi-create-footer {
+  box-shadow: 0 -4px 16px color-mix(in srgb, #0f172a 5%, transparent);
+}
+
+.vi-create-refs summary {
+  list-style: none;
+}
+
+.vi-create-refs summary::-webkit-details-marker {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .vi-create-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .vi-create-layout__rail {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .vi-create-layout__rail > .vi-create-totals,
+  .vi-create-layout__rail > .vi-create-source-card {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .vi-create-layout__rail {
+    grid-template-columns: 1fr;
   }
 }
 

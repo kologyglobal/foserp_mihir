@@ -2208,6 +2208,7 @@ export function mapApiQualityInspectionToDomain(api: ApiQualityInspection): Qual
     acceptedQty: Number(api.totals?.accepted) || 0,
     rejectedQty: Number(api.totals?.rejected) || 0,
     inspectionPlan: api.inspectionPlan || '',
+    inspectionPlanId: uuidOrNull(api.inspectionPlanId ?? null),
     inspector: { id: api.inspectedById || '', code: '', name: api.inspectedByName || '' },
     inspectedAt: api.completedAt,
     deviationRequested: Boolean(api.deviationRemarks),
@@ -2281,6 +2282,8 @@ export function mapDomainQualityInspectionInputToApiPayload(
     inspectionDate: input.documentDate ?? undefined,
     inspectedById: input.inspectorId || null,
     inspectedByName: input.inspectorName || null,
+    inspectionPlanId: uuidOrNull(input.inspectionPlanId ?? null),
+    inspectionPlan: input.inspectionPlan?.trim() || null,
     remarks: input.remarks || null,
     lines,
   }

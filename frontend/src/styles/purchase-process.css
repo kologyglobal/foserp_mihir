@@ -857,6 +857,20 @@ a.purchase-process-map__step:hover {
   min-width: 5.5rem;
 }
 
+/* PI lines: sticky # then Item (no Product Type column like PO) */
+.purchase-invoice-lines-grid .purchase-doc-lines-grid__sticky-item {
+  left: 2.5rem;
+  width: 14rem;
+  min-width: 14rem;
+  max-width: 16rem;
+}
+
+.purchase-invoice-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-line,
+.purchase-invoice-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item,
+.purchase-invoice-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-actions {
+  background: var(--erp-surface-alt, #f8fafc);
+}
+
 .purchase-doc-lines-grid-scroll {
   width: 100%;
   min-width: 0;

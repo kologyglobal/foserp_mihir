@@ -66,6 +66,7 @@ export async function resolveInspectionPlan(
     category: QualityInspectionCategory
     inspectionPlanId?: string | null
     itemId?: string | null
+    itemCategoryId?: string | null
     planCodeHint?: string | null
   },
 ) {
@@ -81,8 +82,19 @@ export async function resolveInspectionPlan(
     return { plan, snapshot: buildSnapshotFromPlan(plan.lines) }
   }
 
+  let itemCategoryId = opts.itemCategoryId ?? null
+  if (opts.itemId && !itemCategoryId) {
+    const { prisma } = await import('../../../config/prisma.js')
+    const item = await prisma.masterItem.findFirst({
+      where: { id: opts.itemId, tenantId, deletedAt: null },
+      select: { categoryId: true },
+    })
+    itemCategoryId = item?.categoryId ?? null
+  }
+
   const plan = await findActivePlanForResolve(tenantId, opts.category, {
     itemId: opts.itemId,
+    itemCategoryId,
     planCode: opts.planCodeHint,
   })
   if (!plan) return null
