@@ -97,3 +97,34 @@ export function aggregatePurchasePoGstTotals(
     isInterstate === true || (igst > 0 && cgst === 0 && sgst === 0) ? 'igst' : 'cgst_sgst'
   return { cgst, sgst, igst, taxAmount, gstScheme: scheme }
 }
+
+export type PurchaseGstColumnVisibility = {
+  showCgst: boolean
+  showSgst: boolean
+  showIgst: boolean
+}
+
+type PurchaseGstColumnLine = {
+  cgst?: number | null
+  sgst?: number | null
+  igst?: number | null
+}
+
+/** Show CGST/SGST/IGST columns only when that component has a non-zero amount on the document. */
+export function resolvePurchaseGstColumnVisibility(
+  lines: PurchaseGstColumnLine[],
+  header?: PurchaseGstColumnLine,
+): PurchaseGstColumnVisibility {
+  const sum = (key: 'cgst' | 'sgst' | 'igst') =>
+    r2(
+      lines.reduce((s, l) => s + (Number(l[key]) || 0), 0) + (Number(header?.[key]) || 0),
+    )
+  const cgst = sum('cgst')
+  const sgst = sum('sgst')
+  const igst = sum('igst')
+  return {
+    showCgst: cgst > 0,
+    showSgst: sgst > 0,
+    showIgst: igst > 0,
+  }
+}

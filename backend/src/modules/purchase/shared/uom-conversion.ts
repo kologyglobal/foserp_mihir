@@ -131,3 +131,13 @@ export function resolveDualQuantities(input: {
 
   return { uomQuantity: 0, quantity: 0, uomConversionFactor: factor }
 }
+
+/** Plan alias: vendor UOM qty → primary/stock qty. */
+export function calculateGRNLineConversion(input: {
+  receivedUomQuantity: number
+  conversionFactor: number
+}): { receivedQuantity: number } {
+  return {
+    receivedQuantity: toPrimaryQty(input.receivedUomQuantity, input.conversionFactor),
+  }
+}

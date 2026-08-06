@@ -463,7 +463,7 @@ export function PurchaseOrderLinesTable({
                 <th className="num min-w-[7.5rem]">Invoiced</th>
                 <th className="min-w-[4rem]">QC Required</th>
                 <th className="purchase-doc-lines-grid__qtg-col">Quality Test Group</th>
-                <th className="min-w-[7rem]">Bin Code</th>
+                <th className="purchase-doc-lines-grid__bin-col">Bin Code</th>
                 <th className="purchase-doc-lines-grid__sticky-actions">Actions</th>
               </tr>
             </thead>
@@ -910,7 +910,7 @@ export function PurchaseOrderLinesTable({
                     </td>
                     <td className="purchase-doc-lines-grid__qtg-col">
                       <select
-                        className="erp-input h-8 w-full text-[10px]"
+                        className="erp-input h-8 w-full text-[11px]"
                         disabled={!editable}
                         value={line.qualityTestGroupCode ?? ''}
                         onChange={(e) =>
@@ -931,7 +931,7 @@ export function PurchaseOrderLinesTable({
                         ) : null}
                       </select>
                     </td>
-                    <td onKeyDown={onCellKeyDown}>
+                    <td className="purchase-doc-lines-grid__bin-col" onKeyDown={onCellKeyDown}>
                       {(() => {
                         const resolvedBinId =
                           line.binId ||
@@ -954,7 +954,7 @@ export function PurchaseOrderLinesTable({
                         return (
                           <>
                             <select
-                              className="erp-input h-8 min-w-[7rem] text-[11px]"
+                              className="erp-input h-8 w-full text-[11px]"
                               disabled={!editable}
                               value={resolvedBinId}
                               onChange={(e) => {

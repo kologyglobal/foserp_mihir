@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   aggregatePurchasePoGstTotals,
   computePurchasePoLineTax,
+  resolvePurchaseGstColumnVisibility,
 } from './purchasePoGst'
 import { determinePurchaseGstSupply } from './gstSupply'
 
@@ -100,5 +101,26 @@ describe('determinePurchaseGstSupply for PO', () => {
     })
     expect(gst.isInterstate).toBe(true)
     expect(gst.gstScheme).toBe('igst')
+  })
+})
+
+describe('resolvePurchaseGstColumnVisibility', () => {
+  it('hides IGST column when all line IGST amounts are zero', () => {
+    const cols = resolvePurchaseGstColumnVisibility([
+      { cgst: 56700, sgst: 56700, igst: 0 },
+      { cgst: 19845, sgst: 19845, igst: 0 },
+    ])
+    expect(cols.showCgst).toBe(true)
+    expect(cols.showSgst).toBe(true)
+    expect(cols.showIgst).toBe(false)
+  })
+
+  it('shows IGST only for inter-state lines', () => {
+    const cols = resolvePurchaseGstColumnVisibility([
+      { cgst: 0, sgst: 0, igst: 18000 },
+    ])
+    expect(cols.showCgst).toBe(false)
+    expect(cols.showSgst).toBe(false)
+    expect(cols.showIgst).toBe(true)
   })
 })

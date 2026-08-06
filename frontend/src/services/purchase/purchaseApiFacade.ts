@@ -13,6 +13,7 @@ import type { Item as MasterItem, Vendor as MasterVendor } from '../../types/mas
 import { deriveEngineeringProductTypeFromMaster, normalizeEngineeringProductType } from '../../utils/purchaseProductType'
 import { resolveGstStateCode } from '../../utils/gstStateCode'
 import { determinePurchaseGstSupply } from '../../utils/gstSupply'
+import { purchaseSetupGstDefaults } from '../../utils/purchasePlaceOfSupply'
 import { resolveLineTaxFromLocalMasters } from '../../utils/commercialLineTax'
 import { purchaseSetupPlaceState } from '../../utils/purchasePlaceOfSupply'
 import type {
@@ -2253,12 +2254,13 @@ function mapMasterVendorToPurchaseVendor(
   const vendorType =
     v.vendorType === 'service' ? 'service' : v.vendorType === 'trader' ? 'trader' : 'manufacturer'
   const stateCode = resolveGstStateCode(v.gstin) ?? resolveGstStateCode(v.state) ?? ''
+  const gstDefaults = purchaseSetupGstDefaults(setup)
   const gst = determinePurchaseGstSupply({
     supplierState: v.state ?? '',
     supplierStateCode: stateCode,
     supplierGstin: v.gstin ?? '',
-    defaultPlaceOfSupplyState: setup?.tax.placeOfSupplyState,
-    defaultPlaceOfSupplyStateCode: setup?.tax.placeOfSupplyStateCode,
+    defaultPlaceOfSupplyState: gstDefaults.placeOfSupplyState,
+    defaultPlaceOfSupplyStateCode: gstDefaults.placeOfSupplyStateCode,
   })
   return {
     id: v.id,

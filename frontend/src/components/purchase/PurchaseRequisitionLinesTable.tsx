@@ -269,12 +269,19 @@ export function PurchaseRequisitionLinesTable({
         />
       ) : (
         <div className="purchase-doc-lines-grid-scroll relative rounded-[10px] border border-erp-border bg-white">
-          <table className="erp-table purchase-doc-lines-grid w-max min-w-full text-[12.5px]">
+          <table className="erp-table purchase-doc-lines-grid purchase-pr-lines-grid w-max min-w-full text-[12.5px]">
+            <colgroup>
+              <col className="purchase-doc-lines-grid__sticky-line" />
+              <col className="purchase-doc-lines-grid__col-product-type" />
+              <col className="purchase-doc-lines-grid__col-item" />
+            </colgroup>
             <thead>
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-line">#</th>
-                <th className="purchase-doc-lines-grid__sticky-type">Product Type</th>
-                <th className="purchase-doc-lines-grid__sticky-item">Item</th>
+                <th className="purchase-doc-lines-grid__sticky-type purchase-doc-lines-grid__col-product-type">
+                  Product Type
+                </th>
+                <th className="purchase-doc-lines-grid__sticky-item purchase-doc-lines-grid__col-item">Item</th>
                 <th className="min-w-[11rem]">Description</th>
                 <th className="min-w-[9rem]">Specification</th>
                 <th className="purchase-doc-lines-grid__uom-col">UOM</th>
@@ -308,7 +315,7 @@ export function PurchaseRequisitionLinesTable({
                     <td className="purchase-doc-lines-grid__sticky-line tabular-nums">{line.lineNo}</td>
                     <td
                       className={cn(
-                        'purchase-doc-lines-grid__sticky-type',
+                        'purchase-doc-lines-grid__sticky-type purchase-doc-lines-grid__col-product-type',
                         typeError && rowEditable && 'ring-1 ring-inset ring-amber-400/70',
                       )}
                       onKeyDown={rowEditable ? onCellKeyDown : undefined}
@@ -336,7 +343,7 @@ export function PurchaseRequisitionLinesTable({
                     </td>
                     <td
                       className={cn(
-                        'purchase-doc-lines-grid__sticky-item',
+                        'purchase-doc-lines-grid__sticky-item purchase-doc-lines-grid__col-item',
                         miss.missingItem &&
                           rowEditable &&
                           'ring-1 ring-inset ring-amber-400/70',
@@ -616,8 +623,8 @@ export function PurchaseRequisitionLinesTable({
             <tfoot>
               <tr className="bg-erp-surface-alt font-semibold">
                 <td className="purchase-doc-lines-grid__sticky-line">Total</td>
-                <td className="purchase-doc-lines-grid__sticky-type" />
-                <td className="purchase-doc-lines-grid__sticky-item" />
+                <td className="purchase-doc-lines-grid__sticky-type purchase-doc-lines-grid__col-product-type" />
+                <td className="purchase-doc-lines-grid__sticky-item purchase-doc-lines-grid__col-item" />
                 <td colSpan={2} />
                 <td />
                 <td className="num tabular-nums">{totals.qty}</td>

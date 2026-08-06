@@ -51,11 +51,11 @@ const skipFrontend =
 
 function frontendInstallEnv() {
   // Hostinger often sets NODE_ENV=production during npm ci — vite lives in devDependencies.
-  return {
-    ...process.env,
-    NPM_CONFIG_PRODUCTION: 'false',
-    NODE_ENV: 'development',
-  }
+  // Use `--include=dev` on install; strip legacy production flags (npm warns: use --omit=dev).
+  const env = { ...process.env, NODE_ENV: 'development' }
+  delete env.NPM_CONFIG_PRODUCTION
+  delete env.npm_config_production
+  return env
 }
 
 const prismaSchema = join(backend, 'prisma', 'schema.prisma')

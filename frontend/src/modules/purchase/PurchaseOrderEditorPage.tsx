@@ -1254,7 +1254,6 @@ export function PurchaseOrderEditorPage() {
   useEffect(() => {
     if (!editable) return
     if (!header.vendorId && !header.vendorGstin && !header.vendorState) return
-    if (!selectedDeliveryLocation && !purchaseSetup) return
     const vendor =
       selectedVendor ??
       ({

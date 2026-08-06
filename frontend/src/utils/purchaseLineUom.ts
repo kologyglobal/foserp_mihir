@@ -133,6 +133,33 @@ export function purchaseLineHasDualUom(line: {
   return Boolean(master.purchaseUomId && master.purchaseUomId !== master.baseUomId)
 }
 
+/** GRN conversion hint — e.g. "1 NOS = 3 MTR". */
+export function formatGrnUomConversionLabel(
+  factor: number,
+  baseUom: string,
+  purchaseUom: string,
+): string {
+  const f = Number(factor) || 1
+  if (f === 1 || !baseUom || !purchaseUom || baseUom === purchaseUom) return '—'
+  return `1 ${baseUom} = ${formatPurchaseQty(f)} ${purchaseUom}`
+}
+
+/** Plan alias: vendor qty → stock/base qty (uses existing conversion architecture). */
+export function calculateGRNLineConversion(input: {
+  receivedUomQuantity: number
+  conversionFactor: number
+  baseUom?: string | null
+}): { receivedQuantity: number; baseUom: string } {
+  const receivedQuantity = purchaseQtyToBaseQty(
+    input.receivedUomQuantity,
+    input.conversionFactor,
+  )
+  return {
+    receivedQuantity,
+    baseUom: input.baseUom?.trim() || '',
+  }
+}
+
 export function formatPurchaseQty(n: number): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 })
 }

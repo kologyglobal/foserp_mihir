@@ -615,6 +615,88 @@ a.purchase-process-map__step:hover {
   max-width: 100%;
 }
 
+/* PR form cards use overflow:hidden for rounded corners — disable on line grid section so sticky columns work. */
+.enterprise-workspace--purchase.purchase-pr-form-page .erp-card-section.purchase-doc-lines-section,
+.enterprise-workspace--purchase.purchase-pr-form-page .erp-card-section.purchase-pr-lines-section {
+  overflow: visible;
+}
+
+.enterprise-workspace--purchase.purchase-pr-form-page .purchase-doc-lines-section .erp-card-section__body {
+  overflow: visible;
+}
+
+/* PR line grid — sticky #, Product Type, Item by named column classes */
+.purchase-pr-lines-grid .purchase-doc-lines-grid__col-product-type,
+.purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-type {
+  position: sticky;
+  left: 2.5rem;
+  z-index: 12;
+  width: 9.5rem;
+  min-width: 9.5rem;
+  max-width: 9.5rem;
+  box-sizing: border-box;
+  background: #fff;
+  background-clip: padding-box;
+  border-right: 1px solid var(--erp-border, #e2e8f0);
+}
+
+.purchase-pr-lines-grid .purchase-doc-lines-grid__col-item,
+.purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-item {
+  position: sticky;
+  left: 12rem;
+  z-index: 11;
+  width: 20rem;
+  min-width: 20rem;
+  max-width: 20rem;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  background: #fff;
+  background-clip: padding-box;
+  border-right: 1px solid var(--erp-border, #e2e8f0);
+  box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
+  overflow: visible;
+}
+
+.purchase-pr-lines-grid thead .purchase-doc-lines-grid__col-product-type,
+.purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-type,
+.purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__col-product-type,
+.purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-type {
+  top: 0;
+  z-index: 24;
+  background: var(--erp-surface-alt, #f8fafc);
+  white-space: nowrap;
+}
+
+.purchase-pr-lines-grid thead .purchase-doc-lines-grid__col-item,
+.purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-item,
+.purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__col-item,
+.purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-item {
+  top: 0;
+  z-index: 23;
+  background: var(--erp-surface-alt, #f8fafc);
+  white-space: nowrap;
+}
+
+.purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-line,
+.purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-line {
+  z-index: 25;
+}
+
+.purchase-pr-lines-grid .purchase-doc-lines-grid__col-item > *,
+.purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-item > * {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0 !important;
+}
+
+.purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__col-product-type,
+.purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-type,
+.purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__col-item,
+.purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item,
+.purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-line {
+  background: #f0f7ff;
+}
+
 /* Shared purchase document line grid — compact UOM + QC test group columns */
 .purchase-doc-lines-grid__uom-col {
   width: 3.25rem !important;
@@ -661,19 +743,45 @@ a.purchase-process-map__step:hover {
 }
 
 .purchase-doc-lines-grid__qtg-col {
-  width: 5.5rem !important;
-  min-width: 5.5rem !important;
-  max-width: 5.5rem !important;
-  padding: 6px 4px !important;
+  width: 10rem !important;
+  min-width: 10rem !important;
+  max-width: 11rem !important;
+  padding: 6px 8px !important;
   vertical-align: middle;
+}
+
+.purchase-doc-lines-grid thead .purchase-doc-lines-grid__qtg-col {
+  white-space: normal;
+  line-height: 1.25;
+  font-size: 10px;
 }
 
 .purchase-doc-lines-grid__qtg-col .erp-input,
 .purchase-doc-lines-grid__qtg-col select {
   width: 100% !important;
-  max-width: 5.5rem !important;
+  max-width: 100% !important;
   min-width: 0 !important;
-  font-size: 10px;
+  font-size: 11px;
+}
+
+.purchase-doc-lines-grid__bin-col {
+  width: 9rem !important;
+  min-width: 9rem !important;
+  max-width: 10.5rem !important;
+  padding: 6px 8px !important;
+  vertical-align: middle;
+}
+
+.purchase-doc-lines-grid thead .purchase-doc-lines-grid__bin-col {
+  white-space: nowrap;
+}
+
+.purchase-doc-lines-grid__bin-col .erp-input,
+.purchase-doc-lines-grid__bin-col select {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  font-size: 11px;
 }
 
 /* GRN new — vendor + PO on one row */
@@ -714,6 +822,39 @@ a.purchase-process-map__step:hover {
 
 .grn-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item {
   background: var(--erp-surface-alt, #f8fafc);
+}
+
+/* GRN Received cell — qty input with validation hint below. */
+.grn-lines-grid__received-col {
+  min-width: 7.5rem;
+}
+
+.grn-received-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.grn-received-cell__input {
+  width: 6rem;
+  min-width: 6rem;
+}
+
+.grn-received-cell__error {
+  margin: 0;
+  width: 100%;
+  text-align: right;
+  font-size: 12px;
+  color: var(--erp-danger-fg, #b91c1c);
+}
+
+.grn-lines-grid__receive-qty-col {
+  min-width: 11.5rem;
+}
+
+.grn-lines-grid__accepted-col {
+  min-width: 5.5rem;
 }
 
 /* PI lines: sticky # then Item (no Product Type column like PO) */
