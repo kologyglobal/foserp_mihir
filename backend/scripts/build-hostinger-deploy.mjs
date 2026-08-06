@@ -1,6 +1,6 @@
 /**
  * Hostinger Git deploy build (backend hPanel "npm run build").
- * Backend: prisma generate + esbuild compile. Frontend: optional Vite SPA → public/.
+ * Backend: conditional prisma generate + esbuild compile. Frontend: optional Vite SPA → public/.
  * Migrations are NOT run here — use build:with-migrate or RUN_MIGRATE_ON_START when ready.
  */
 import { execFileSync } from 'node:child_process'
@@ -66,7 +66,7 @@ if (!existsSync(prismaSchema)) {
 }
 
 // Hostinger hPanel already ran Install — do not npm ci again (breaks when install used legacy-peer-deps).
-console.log('[build-hostinger] Backend compile (prisma generate + esbuild, no migrations)…')
+console.log('[build-hostinger] Backend compile (ensure prisma client + esbuild, no migrations)…')
 runNpm(['run', 'build:app'], backend)
 
 for (const entry of ['hostinger-start.mjs', 'start.sh']) {

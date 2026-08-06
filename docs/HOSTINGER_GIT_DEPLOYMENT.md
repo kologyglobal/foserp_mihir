@@ -185,8 +185,8 @@ Use your **real** hPanel database name and user — not placeholder values.
 
 Hostinger backend `npm run build` (`build-hostinger-deploy.mjs`):
 
-1. `npm ci` in `backend/`
-2. `prisma generate` + esbuild compile → `backend/dist/`
+1. `npm ci` in `backend/` (postinstall runs conditional `prisma generate` if schema changed)
+2. Conditional prisma generate + esbuild compile → `backend/dist/` (skips generate when client is up to date)
 3. Optional Vite frontend → `backend/public/` (skipped when `SKIP_FRONTEND=1` or stage API host)
 4. Sets execute bit on `start.sh` / `hostinger-start.mjs`
 

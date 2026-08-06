@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolvePurchaseOrderGstSupply } from './purchasePlaceOfSupply'
+import { resolvePurchaseOrderGstSupply, formatVendorStateLabel } from './purchasePlaceOfSupply'
 import type { PurchaseSetup } from '../types/purchaseDomain'
 
 const setup = {
@@ -93,5 +93,11 @@ describe('resolvePurchaseOrderGstSupply', () => {
       setup,
     )
     expect(gst.isInterstate).toBe(true)
+  })
+
+  it('formatVendorStateLabel resolves from GSTIN when state name missing', () => {
+    expect(
+      formatVendorStateLabel({ state: '', gstin: '08AABCR7788J1Z0' }),
+    ).toBe('Rajasthan (08)')
   })
 })

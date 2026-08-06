@@ -55,6 +55,7 @@ coverage/
 # Hostinger deployment output (generated from frontend/dist)
 backend/public/
 backend/.public-next/
+backend/.cache/
 
 # Nested-repo backups (never commit)
 frontend/.git.bak-nested-*/

@@ -39,6 +39,7 @@ function collectEntryPoints(dir, base = dir) {
 }
 
 const entryPoints = collectEntryPoints(srcDir)
+const compileStarted = Date.now()
 console.log(`[compile-dist] Transpiling ${entryPoints.length} files with esbuild…`)
 
 const buildOptions = {
@@ -63,4 +64,4 @@ for (let i = 0; i < entryPoints.length; i += BATCH_SIZE) {
   }
 }
 
-console.log('[compile-dist] Done.')
+console.log(`[compile-dist] Done in ${((Date.now() - compileStarted) / 1000).toFixed(1)}s.`)

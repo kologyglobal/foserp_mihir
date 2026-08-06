@@ -57,29 +57,20 @@ const skipPrismaGenerate =
 
 if (skipPrismaGenerate) {
   console.log('[hostinger-start] Skipping prisma generate (RUN_PRISMA_GENERATE_ON_START=false).')
+} else if (!existsSync(join(backend, 'prisma', 'schema.prisma'))) {
+  console.warn(`[hostinger-start] Missing prisma/schema.prisma — skipping prisma generate.`)
 } else {
-  const prismaSchema = join(backend, 'prisma', 'schema.prisma')
-  if (!existsSync(prismaSchema)) {
-    console.warn(`[hostinger-start] Missing ${prismaSchema} — skipping prisma generate.`)
-  } else {
-    console.log('[hostinger-start] Running prisma generate so runtime client matches schema.prisma…')
-    const isWin = process.platform === 'win32'
-    const generate = isWin
-      ? spawnSync(
-          process.env.ComSpec ?? 'cmd.exe',
-          ['/d', '/s', '/c', `npx prisma generate --schema="${prismaSchema}"`],
-          { cwd: backend, env: process.env, stdio: 'inherit' },
-        )
-      : spawnSync('npx', ['prisma', 'generate', '--schema', prismaSchema], {
-          cwd: backend,
-          env: process.env,
-          stdio: 'inherit',
-        })
-    if (generate.status !== 0) {
-      throw new Error(
-        'Prisma generate failed on startup. Fix schema or set RUN_PRISMA_GENERATE_ON_START=false and regenerate manually.',
-      )
-    }
+  console.log('[hostinger-start] Ensuring Prisma client matches schema.prisma…')
+  const ensureScript = join(backend, 'scripts', 'ensure-prisma-client.mjs')
+  const ensure = spawnSync(process.execPath, [ensureScript], {
+    cwd: backend,
+    env: process.env,
+    stdio: 'inherit',
+  })
+  if (ensure.status !== 0) {
+    throw new Error(
+      'Prisma client ensure failed on startup. Fix schema or set RUN_PRISMA_GENERATE_ON_START=false and regenerate manually.',
+    )
   }
 }
 

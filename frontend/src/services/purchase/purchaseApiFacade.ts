@@ -11,7 +11,7 @@ import { apiRequest, tenantPath } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
 import type { Item as MasterItem, Vendor as MasterVendor } from '../../types/master'
 import { deriveEngineeringProductTypeFromMaster, normalizeEngineeringProductType } from '../../utils/purchaseProductType'
-import { resolveGstStateCode } from '../../utils/gstStateCode'
+import { coalesceGstStateCode, resolveGstStateCode } from '../../utils/gstStateCode'
 import { determinePurchaseGstSupply } from '../../utils/gstSupply'
 import { purchaseSetupGstDefaults } from '../../utils/purchasePlaceOfSupply'
 import { resolveLineTaxFromLocalMasters } from '../../utils/commercialLineTax'
@@ -2253,7 +2253,7 @@ function mapMasterVendorToPurchaseVendor(
 ): Vendor {
   const vendorType =
     v.vendorType === 'service' ? 'service' : v.vendorType === 'trader' ? 'trader' : 'manufacturer'
-  const stateCode = resolveGstStateCode(v.gstin) ?? resolveGstStateCode(v.state) ?? ''
+  const stateCode = coalesceGstStateCode(v.gstin, v.state) ?? ''
   const gstDefaults = purchaseSetupGstDefaults(setup)
   const gst = determinePurchaseGstSupply({
     supplierState: v.state ?? '',

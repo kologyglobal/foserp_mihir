@@ -1,5 +1,6 @@
 import type { GstScheme } from '../types/invoice'
 import {
+  coalesceGstStateCode,
   formatPlaceOfSupplyLabel,
   resolveGstStateCode,
 } from './gstStateCode'
@@ -16,11 +17,7 @@ export function resolvePartyStateCode(opts: {
   stateCode?: string | null
   gstin?: string | null
 }): string | null {
-  return (
-    resolveGstStateCode(opts.stateCode) ??
-    resolveGstStateCode(opts.state) ??
-    resolveGstStateCode(opts.gstin)
-  )
+  return coalesceGstStateCode(opts.stateCode, opts.state, opts.gstin)
 }
 
 /** Place of supply from billing address / explicit POS / GSTIN. */

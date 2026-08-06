@@ -10,6 +10,7 @@
     "build": "node scripts/build-hostinger.mjs",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "npm --prefix backend run build:app",
+    "build:backend:force-prisma": "npm --prefix backend run build:app:force-prisma",
     "start": "node backend/hostinger-start.mjs",
     "verify:deployment": "node scripts/verify-hostinger-build.mjs",
     "dev:frontend": "npm --prefix frontend run dev",

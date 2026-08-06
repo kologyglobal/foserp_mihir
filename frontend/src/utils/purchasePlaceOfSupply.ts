@@ -1,10 +1,34 @@
 import type { PurchaseSetup } from '../types/purchaseDomain'
 import { DEFAULT_PURCHASE_SETUP } from '../data/purchase/purchaseSetupSeed'
-import { formatPlaceOfSupplyLabel, resolveGstStateCode } from './gstStateCode'
+import { coalesceGstStateCode, formatPlaceOfSupplyLabel, resolveGstStateCode } from './gstStateCode'
 import { determinePurchaseGstSupply, type GstSupplyContext } from './gstSupply'
+
 export type PurchaseLocationGstRef = {
   state?: string | null
   city?: string | null
+}
+
+export type PurchaseVendorGstRef = {
+  state?: string | null
+  stateCode?: string | null
+  gstin?: string | null
+}
+
+/** Resolve supplier state name + code for PO/AP GST (GSTIN prefix wins over blank stateCode). */
+export function resolveVendorGstParty(
+  vendor: PurchaseVendorGstRef | null | undefined,
+): { state: string; stateCode: string | null } {
+  const state = vendor?.state?.trim() || ''
+  const stateCode = coalesceGstStateCode(vendor?.stateCode, vendor?.gstin, vendor?.state)
+  return { state, stateCode }
+}
+
+export function formatVendorStateLabel(vendor: PurchaseVendorGstRef | null | undefined): string {
+  const { state, stateCode } = resolveVendorGstParty(vendor)
+  if (state && stateCode) return formatPlaceOfSupplyLabel(stateCode, state)
+  if (state) return state
+  if (stateCode) return formatPlaceOfSupplyLabel(stateCode)
+  return '—'
 }
 
 /** Delivery warehouse POS label — warehouse state, else Purchase Setup tax POS. */
@@ -53,9 +77,10 @@ export function resolvePurchaseOrderGstSupply(
 ): GstSupplyContext {
   const deliveryState = delivery?.state?.trim() || ''
   const gstDefaults = purchaseSetupGstDefaults(setup)
+  const supplier = resolveVendorGstParty(vendor)
   const gst = determinePurchaseGstSupply({
-    supplierState: vendor?.state,
-    supplierStateCode: vendor?.stateCode ?? resolveGstStateCode(vendor?.gstin),
+    supplierState: supplier.state,
+    supplierStateCode: supplier.stateCode,
     supplierGstin: vendor?.gstin,
     placeOfSupply: explicitPlaceOfSupply?.trim() || undefined,
     defaultPlaceOfSupplyState: deliveryState || gstDefaults.placeOfSupplyState,

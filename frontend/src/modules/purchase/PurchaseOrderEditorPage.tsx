@@ -156,7 +156,11 @@ function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
-import { resolvePurchaseOrderGstSupply } from '../../utils/purchasePlaceOfSupply'
+import {
+  formatVendorStateLabel,
+  resolvePurchaseOrderGstSupply,
+} from '../../utils/purchasePlaceOfSupply'
+import { coalesceGstStateCode } from '../../utils/gstStateCode'
 import { resolveLineTaxFromLocalMasters } from '../../utils/commercialLineTax'
 
 
@@ -379,7 +383,7 @@ function vendorStubFromHeader(header: Pick<
     address: header.vendorAddress || '',
     city: '',
     state: header.vendorState || '',
-    stateCode: '',
+    stateCode: coalesceGstStateCode(header.vendorGstin, header.vendorState) ?? '',
     pincode: '',
     gstin: header.vendorGstin || '',
     pan: '',
@@ -1258,8 +1262,9 @@ export function PurchaseOrderEditorPage() {
       selectedVendor ??
       ({
         state: header.vendorState,
+        stateCode: coalesceGstStateCode(header.vendorGstin, header.vendorState),
         gstin: header.vendorGstin,
-      } as { state?: string; gstin?: string })
+      } as { state?: string; stateCode?: string | null; gstin?: string })
     const gst = resolvePurchaseOrderGstSupply(
       vendor,
       selectedDeliveryLocation,
@@ -1831,31 +1836,33 @@ export function PurchaseOrderEditorPage() {
                         className="bg-erp-surface-alt font-mono"
                       />
                     </ErpFieldRow>
+                    <ErpFieldRow label="Vendor State" readOnly>
+                      <Input
+                        value={
+                          header.vendorId
+                            ? formatVendorStateLabel(selectedVendor)
+                            : '—'
+                        }
+                        readOnly
+                        className="bg-erp-surface-alt"
+                      />
+                    </ErpFieldRow>
                     <ErpFieldRow
                       label="Place of Supply"
                       hint={
                         header.vendorId
-                          ? header.isInterstate
-                            ? 'Inter-state supply → IGST on lines and totals'
-                            : 'Intra-state supply → CGST + SGST on lines and totals'
-                          : 'Set vendor and delivery location to derive GST split'
+                          ? selectedDeliveryLocation?.state?.trim()
+                            ? `From delivery location (${selectedDeliveryLocation.name}) — where goods are received. Vendor state above drives IGST vs CGST+SGST.`
+                            : purchaseSetup?.tax.placeOfSupplyState
+                              ? `From purchase setup (${purchaseSetup.tax.placeOfSupplyState}) until delivery location is set. Vendor state above drives IGST vs CGST+SGST.`
+                              : 'Set delivery location or purchase setup tax POS. Vendor state drives IGST vs CGST+SGST.'
+                          : 'Select vendor and delivery location to derive GST split'
                       }
                     >
                       <Input
                         value={header.placeOfSupply}
-                        disabled={!editable}
-                        onChange={(e) => {
-                          const gst = resolvePurchaseOrderGstSupply(
-                            selectedVendor,
-                            selectedDeliveryLocation,
-                            purchaseSetup,
-                            e.target.value,
-                          )
-                          patchHeader({
-                            placeOfSupply: gst.placeOfSupplyLabel,
-                            isInterstate: gst.isInterstate,
-                          })
-                        }}
+                        readOnly
+                        className="bg-erp-surface-alt"
                       />
                     </ErpFieldRow>
                     <ErpFieldRow label="GST Scheme" readOnly>
@@ -1866,8 +1873,8 @@ export function PurchaseOrderEditorPage() {
                           !header.vendorId
                             ? '—'
                             : header.isInterstate
-                              ? 'IGST (inter-state)'
-                              : 'CGST + SGST (intra-state)'
+                              ? 'IGST (inter-state — vendor ≠ place of supply)'
+                              : 'CGST + SGST (intra-state — vendor matches place of supply)'
                         }
                       />
                     </ErpFieldRow>

@@ -90,6 +90,17 @@ export function resolveGstStateCode(value: string | null | undefined): string | 
   return null
 }
 
+/** First resolvable GST state code from code, name, GSTIN, etc. (skips blanks). */
+export function coalesceGstStateCode(
+  ...values: Array<string | null | undefined>
+): string | null {
+  for (const value of values) {
+    const code = resolveGstStateCode(value)
+    if (code) return code
+  }
+  return null
+}
+
 export function formatPlaceOfSupplyLabel(
   stateCode: string | null | undefined,
   stateName?: string | null,
