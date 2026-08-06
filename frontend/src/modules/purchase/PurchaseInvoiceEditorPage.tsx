@@ -20,9 +20,13 @@ import {
   buildPurchaseRelatedLinks,
   purchaseDocumentApprovalFact,
 } from '@/components/purchase/PurchaseDocumentFactBox'
-import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
+import {
+  purchaseStatusTone,
+  PurchaseTableToolbar,
+} from '@/components/purchase/purchaseCardFormShared'
 import { PurchaseTermSelect } from '@/components/purchase/PurchaseTermSelect'
 import { PurchaseTaxTotalsPanel } from '@/components/purchase/PurchaseTaxTotalsPanel'
+import { PurchaseItemCodeCell } from '@/components/purchase/PurchaseItemCodeCell'
 import {
   ErpCardSection,
   ErpFieldRow,
@@ -32,6 +36,7 @@ import { ErpButton } from '@/components/erp/ErpButton'
 import { FormActionBar } from '@/components/erp/FormActionBar'
 import { DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { Badge } from '@/components/ui/Badge'
+import { EmptyState } from '@/components/ui/EmptyState'
 import {
   commercialTermsSummary,
   hasMeaningfulTaxTotals,
@@ -54,6 +59,7 @@ import {
   getPurchaseSetup,
   getGRNById,
   getVendors,
+  listPostedGrnsForPurchaseOrder,
   previewNextPurchaseInvoiceNumber,
   PurchaseServiceError,
   PURCHASE_INVOICE_ORIGIN_LABELS,
@@ -130,6 +136,24 @@ function fromInvoiceLines(lines: PurchaseInvoiceLine[]): EditorLine[] {
   return lines.map((l) => ({ ...l, key: l.id || crypto.randomUUID() }))
 }
 
+/** Recalculate taxable / GST split / line total — matches PO interstate rules. */
+function applyLineAmounts(line: EditorLine, isInterstate: boolean): EditorLine {
+  const gross = Number(line.quantity) * Number(line.rate)
+  const taxableAmount = Number(Math.max(0, gross - Number(line.discountAmount || 0)).toFixed(2))
+  const tax = Number(((taxableAmount * Number(line.gstRatePct || 0)) / 100).toFixed(2))
+  const half = Number((tax / 2).toFixed(2))
+  return {
+    ...line,
+    taxableAmount,
+    cgst: isInterstate ? 0 : half,
+    sgst: isInterstate ? 0 : half,
+    igst: isInterstate ? tax : 0,
+    lineTotal: Number(
+      (taxableAmount + tax + Number(line.tcsAmount || 0) - Number(line.tdsAmount || 0)).toFixed(2),
+    ),
+  }
+}
+
 export function PurchaseInvoiceEditorPage() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
@@ -161,6 +185,8 @@ export function PurchaseInvoiceEditorPage() {
   const [remarks, setRemarks] = useState('')
   const [purchaseOrderId, setPurchaseOrderId] = useState('')
   const [goodsReceiptId, setGoodsReceiptId] = useState('')
+  /** When set, Posted GRN dropdown is scoped to this PO (after multi-GRN PO pick). */
+  const [grnSelectPoId, setGrnSelectPoId] = useState('')
   const [lines, setLines] = useState<EditorLine[]>([emptyLine()])
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
@@ -181,6 +207,9 @@ export function PurchaseInvoiceEditorPage() {
     () => vendors.find((v) => v.id === vendorId) ?? null,
     [vendors, vendorId],
   )
+
+  const isInterstate =
+    selectedVendor?.isInterstate ?? invoice?.vendor?.isInterstate ?? false
 
   const poNumber =
     orders.find((o) => o.id === purchaseOrderId)?.documentNumber ??
@@ -277,29 +306,47 @@ export function PurchaseInvoiceEditorPage() {
     setLines((prev) =>
       prev.map((l) => {
         if (l.key !== key) return l
-        const next = { ...l, ...patch }
+        let next: EditorLine = { ...l, ...patch }
         if (patch.itemId) {
           const item = items.find((i) => i.id === patch.itemId)
           if (item) {
-            next.itemCode = item.itemCode
-            next.itemName = item.itemName
-            next.description = item.itemName
-            next.uom = item.uom
-            next.hsnCode = item.hsnCode
-            next.sacCode = item.sacCode
-            next.gstRatePct = item.gstRatePct
-            next.rate = item.standardRate || next.rate
+            next = {
+              ...next,
+              itemCode: item.itemCode,
+              itemName: item.itemName,
+              description: patch.description ?? item.itemName,
+              uom: item.uom,
+              hsnCode: item.hsnCode,
+              sacCode: item.sacCode,
+              gstRatePct: item.gstRatePct,
+              rate: item.standardRate || next.rate,
+            }
           }
         }
-        const gross = next.quantity * next.rate
-        next.taxableAmount = Number(Math.max(0, gross - next.discountAmount).toFixed(2))
-        const tax = Number(((next.taxableAmount * next.gstRatePct) / 100).toFixed(2))
-        next.lineTotal = Number((next.taxableAmount + tax + next.tcsAmount - next.tdsAmount).toFixed(2))
-        return next
+        return applyLineAmounts(next, isInterstate)
       }),
     )
     setDirty(true)
   }
+
+  /** Vendor GST scheme flip — re-split CGST/SGST vs IGST without marking dirty alone. */
+  useEffect(() => {
+    setLines((prev) => {
+      let changed = false
+      const next = prev.map((l) => {
+        const recomputed = applyLineAmounts(l, isInterstate)
+        if (
+          recomputed.cgst !== l.cgst ||
+          recomputed.sgst !== l.sgst ||
+          recomputed.igst !== l.igst
+        ) {
+          changed = true
+        }
+        return recomputed
+      })
+      return changed ? next : prev
+    })
+  }, [isInterstate])
 
   const buildInput = () => ({
     vendorId,
@@ -365,7 +412,8 @@ export function PurchaseInvoiceEditorPage() {
       errs.origin = 'Direct invoices are disabled in Purchase Setup'
     }
     if (setup?.invoiceMatchTolerances.requireGrnMatch && !goodsReceiptId) {
-      errs.goodsReceiptId = 'Purchase Setup requires a posted GRN — link a GRN on this invoice'
+      errs.goodsReceiptId =
+        'Purchase Setup requires a posted GRN. Use origin “Posted GRN” (or pick a PO that already has a posted receipt).'
     }
     if (setup?.invoiceMatchTolerances.requirePoMatch && !purchaseOrderId) {
       errs.purchaseOrderId = 'Purchase Setup requires a PO — link a purchase order on this invoice'
@@ -418,16 +466,156 @@ export function PurchaseInvoiceEditorPage() {
 
   const totals = useMemo(() => {
     const taxableAmount = lines.reduce((s, l) => s + (Number(l.taxableAmount) || 0), 0)
-    const tax = lines.reduce(
-      (s, l) => s + Number((((Number(l.taxableAmount) || 0) * (Number(l.gstRatePct) || 0)) / 100).toFixed(2)),
-      0,
-    )
+    const cgst = lines.reduce((s, l) => s + (Number(l.cgst) || 0), 0)
+    const sgst = lines.reduce((s, l) => s + (Number(l.sgst) || 0), 0)
+    const igst = lines.reduce((s, l) => s + (Number(l.igst) || 0), 0)
+    const tax = Number((cgst + sgst + igst).toFixed(2))
     const tdsAmount = lines.reduce((s, l) => s + (Number(l.tdsAmount) || 0), 0)
     const tcsAmount = lines.reduce((s, l) => s + (Number(l.tcsAmount) || 0), 0)
     const totalAmount = lines.reduce((s, l) => s + (Number(l.lineTotal) || 0), 0)
     const filledLines = lines.filter((l) => l.itemId).length
-    return { taxableAmount, tax, tdsAmount, tcsAmount, totalAmount, filledLines, lineCount: lines.length }
+    return {
+      taxableAmount,
+      tax,
+      cgst,
+      sgst,
+      igst,
+      tdsAmount,
+      tcsAmount,
+      totalAmount,
+      filledLines,
+      lineCount: lines.length,
+    }
   }, [lines])
+
+  const requireGrnMatch = Boolean(setup?.invoiceMatchTolerances.requireGrnMatch)
+
+  const grnsForSelect = useMemo(() => {
+    if (!grnSelectPoId) return grns
+    return grns.filter((g) => g.purchaseOrderId === grnSelectPoId)
+  }, [grns, grnSelectPoId])
+
+  const applySourcePurchaseOrder = async (poId: string) => {
+    if (!poId) {
+      setPurchaseOrderId('')
+      setGrnSelectPoId('')
+      setFieldErrors((prev) => {
+        const next = { ...prev }
+        delete next.goodsReceiptId
+        delete next.purchaseOrderId
+        return next
+      })
+      return
+    }
+
+    setPurchaseOrderId(poId)
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next.goodsReceiptId
+      delete next.purchaseOrderId
+      return next
+    })
+
+    try {
+      let po = orders.find((o) => o.id === poId)
+      if (!po?.lines?.length) {
+        po = (await getPurchaseOrderById(poId)) ?? po
+      }
+      const isServicePo =
+        po?.orderType === 'service' ||
+        Boolean(po?.lines?.length && po.lines.every((l) => l.itemType === 'service'))
+
+      let postedForPo = await listPostedGrnsForPurchaseOrder(poId)
+      if (postedForPo.length) {
+        setGrns((prev) => {
+          const byId = new Map(prev.map((g) => [g.id, g]))
+          for (const g of postedForPo) byId.set(g.id, g)
+          return [...byId.values()]
+        })
+      }
+
+      // Service POs never require receipt matching — use Service PO origin.
+      if (isServicePo) {
+        setOrigin('service_po')
+        setGrnSelectPoId('')
+        setGoodsReceiptId('')
+        if (po) {
+          setVendorId(po.vendor.id)
+          setPaymentTerms(po.paymentTerms || paymentTerms)
+          setPlaceOfSupply(po.placeOfSupply || po.vendor.state || '')
+        }
+        const created = await createPurchaseInvoiceFromServicePo(poId)
+        setDirty(false)
+        resetDirty()
+        navigate(`/purchase/invoices/${created.id}/edit`, { replace: true })
+        return
+      }
+
+      if (requireGrnMatch) {
+        if (postedForPo.length === 0) {
+          // Early blocker: do not prefill lines as if the invoice is ready.
+          setGoodsReceiptId('')
+          setGrnSelectPoId('')
+          setLines([emptyLine()])
+          if (po) {
+            setVendorId(po.vendor.id)
+            setPaymentTerms(po.paymentTerms || paymentTerms)
+            setPlaceOfSupply(po.placeOfSupply || po.vendor.state || '')
+          }
+          const msg =
+            'No posted GRN for this PO. Create and post a goods receipt first, then use origin “Posted GRN”. (Purchase → Goods receipts)'
+          setFieldErrors((prev) => ({ ...prev, goodsReceiptId: msg }))
+          notify.error(msg)
+          setDirty(false)
+          return
+        }
+
+        if (postedForPo.length > 1) {
+          setOrigin('goods_receipt')
+          setGrnSelectPoId(poId)
+          setGoodsReceiptId('')
+          setLines([emptyLine()])
+          if (po) {
+            setVendorId(po.vendor.id)
+            setPaymentTerms(po.paymentTerms || paymentTerms)
+            setPlaceOfSupply(po.placeOfSupply || po.vendor.state || '')
+          }
+          notify.info(
+            `This PO has ${postedForPo.length} posted GRNs — select the GRN to invoice under origin “Posted GRN”.`,
+          )
+          setDirty(true)
+          return
+        }
+
+        // Exactly one posted GRN — auto-link via GRN path.
+        const created = await createPurchaseInvoiceFromGrn(postedForPo[0].id)
+        setDirty(false)
+        resetDirty()
+        navigate(`/purchase/invoices/${created.id}/edit`, { replace: true })
+        return
+      }
+
+      // 2-way allowed: create from PO (facade still auto-uses GRN when one exists).
+      if (po) {
+        setVendorId(po.vendor.id)
+        setPaymentTerms(po.paymentTerms || paymentTerms)
+        setPlaceOfSupply(po.placeOfSupply || po.vendor.state || '')
+      }
+      const created = await createPurchaseInvoiceFromPo(poId)
+      setDirty(false)
+      resetDirty()
+      navigate(`/purchase/invoices/${created.id}/edit`, { replace: true })
+    } catch (err) {
+      setDirty(true)
+      const message = err instanceof PurchaseServiceError ? err.message : 'Failed to create from PO'
+      if (err instanceof PurchaseServiceError && err.code === 'GRN_REQUIRED') {
+        setFieldErrors((prev) => ({ ...prev, goodsReceiptId: message }))
+        setLines([emptyLine()])
+        setGoodsReceiptId('')
+      }
+      notify.error(message)
+    }
+  }
 
   const showTcs =
     Boolean(setup?.tax.tcsEnabled) || totals.tcsAmount > 0 || lines.some((l) => Number(l.tcsAmount) > 0)
@@ -614,10 +802,16 @@ export function PurchaseInvoiceEditorPage() {
             <p className="mb-2 text-[12px] text-erp-muted">
               PO / GRN / Service PO create a draft from the selected source, then open the editor. Vendor Invoice and
               Direct let you enter lines manually.
-              {setup?.invoiceMatchTolerances.requireGrnMatch
-                ? ' Purchase Setup requires GRN match — prefer origin “Posted GRN”, or pick a PO that already has a posted GRN.'
+              {requireGrnMatch
+                ? ' Purchase Setup requires GRN match for goods — pick a PO with a posted GRN (auto-links), or use origin “Posted GRN”. Service-only bills use “Service PO”.'
                 : ''}
             </p>
+            {requireGrnMatch && isNew && origin === 'purchase_order' ? (
+              <p className="mb-2 rounded border border-erp-border bg-erp-surface-alt px-2.5 py-1.5 text-[12px] text-erp-text">
+                Three-way match is on: selecting a goods PO will auto-link its posted GRN, prompt you to choose if
+                there are several, or stop with next steps if none is posted yet.
+              </p>
+            ) : null}
             <div
               className="mb-3 flex flex-wrap gap-1.5"
               role="tablist"
@@ -635,6 +829,7 @@ export function PurchaseInvoiceEditorPage() {
                     disabled={Boolean(disabled) && isNew}
                     onClick={() => {
                       setOrigin(o.id)
+                      if (o.id !== 'goods_receipt') setGrnSelectPoId('')
                       setDirty(true)
                     }}
                     className={cn(
@@ -654,66 +849,21 @@ export function PurchaseInvoiceEditorPage() {
             {fieldErrors.origin ? (
               <p className="mb-2 text-[12px] text-erp-danger-fg">{fieldErrors.origin}</p>
             ) : null}
+            {fieldErrors.goodsReceiptId && isNew ? (
+              <p className="mb-2 text-[12px] text-erp-danger-fg">{fieldErrors.goodsReceiptId}</p>
+            ) : null}
           </ErpFormSpan>
 
           {origin === 'purchase_order' ? (
             <ErpFieldRow label="Source PO">
               <Select
                 value={purchaseOrderId}
-                onChange={async (e) => {
-                  const poId = e.target.value
-                  setPurchaseOrderId(poId)
-                  if (!poId) return
-                  try {
-                    let po = orders.find((o) => o.id === poId)
-                    if (!po?.lines?.length) {
-                      po = (await getPurchaseOrderById(poId)) ?? po
-                    }
-                    if (po) {
-                      setVendorId(po.vendor.id)
-                      setPaymentTerms(po.paymentTerms || paymentTerms)
-                      setPlaceOfSupply(po.placeOfSupply || po.vendor.state || '')
-                      const nextLines = po.lines
-                        .filter((l) => l.lineStatus !== 'cancelled')
-                        .map((l) =>
-                          emptyLine({
-                            id: '',
-                            lineNo: l.lineNo,
-                            purchaseOrderLineId: l.id,
-                            goodsReceiptLineId: null,
-                            itemId: l.itemId,
-                            itemCode: l.itemCode,
-                            itemName: l.itemName,
-                            description: l.description || l.itemName,
-                            uom: l.uom,
-                            hsnCode: l.hsnCode,
-                            quantity: l.quantity,
-                            rate: l.rate,
-                            gstRatePct: l.gstRatePct,
-                            taxableAmount: Number((l.quantity * l.rate).toFixed(2)),
-                            lineTotal: Number(
-                              (
-                                l.quantity * l.rate +
-                                (l.quantity * l.rate * l.gstRatePct) / 100
-                              ).toFixed(2),
-                            ),
-                          }),
-                        )
-                      setLines(nextLines.length ? nextLines : [emptyLine()])
-                    }
-                    const created = await createPurchaseInvoiceFromPo(poId)
-                    // Source create navigates to a new draft — don't treat hydrate as unsaved leave.
-                    setDirty(false)
-                    resetDirty()
-                    navigate(`/purchase/invoices/${created.id}/edit`, { replace: true })
-                  } catch (err) {
-                    setDirty(true)
-                    notify.error(err instanceof PurchaseServiceError ? err.message : 'Failed')
-                  }
+                onChange={(e) => {
+                  void applySourcePurchaseOrder(e.target.value)
                 }}
                 className="max-w-md"
               >
-                <option value="">Select released / receivable PO…</option>
+                <option value="">— Select —</option>
                 {orders.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.documentNumber} — {o.vendor.name}
@@ -724,7 +874,15 @@ export function PurchaseInvoiceEditorPage() {
           ) : null}
 
           {origin === 'goods_receipt' ? (
-            <ErpFieldRow label="Posted GRN">
+            <ErpFieldRow
+              label="Posted GRN"
+              fieldError={fieldErrors.goodsReceiptId}
+              hint={
+                grnSelectPoId
+                  ? 'Filtered to the purchase order you selected — pick the receipt to invoice.'
+                  : undefined
+              }
+            >
               <Select
                 value={goodsReceiptId}
                 onChange={async (e) => {
@@ -775,13 +933,18 @@ export function PurchaseInvoiceEditorPage() {
                 }}
                 className="max-w-md"
               >
-                <option value="">Select posted GRN…</option>
-                {grns.map((g) => (
+                <option value="">— Select —</option>
+                {grnsForSelect.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.documentNumber} — {g.vendor.name} ({g.purchaseOrderNumber})
                   </option>
                 ))}
               </Select>
+              {grnSelectPoId && !grnsForSelect.length ? (
+                <p className="mt-1 text-[12px] text-erp-danger-fg">
+                  No posted GRNs found for this PO. Open Goods receipts, post inventory, then try again.
+                </p>
+              ) : null}
             </ErpFieldRow>
           ) : null}
 
@@ -999,150 +1162,298 @@ export function PurchaseInvoiceEditorPage() {
 
       <ErpCardSection
         title="Invoice Lines"
-        subtitle="Item quantities, rates, GST, TDS/TCS — table scrolls horizontally on smaller screens"
+        subtitle="Wide item grid — same layout language as PO lines; scrolls horizontally on smaller screens"
         icon={Package}
         accent="green"
         collapsible
         defaultOpen
         dense
         columns={1}
+        className="purchase-doc-lines-section"
       >
         <ErpFormSpan span={1}>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="erp-field-group__label mb-0">Lines</p>
+          <PurchaseTableToolbar>
             <ErpButton
               type="button"
               size="sm"
               variant="secondary"
               icon={Plus}
               onClick={() => {
-                setLines((prev) => [...prev, emptyLine({ lineNo: prev.length + 1 })])
+                setLines((prev) => [
+                  ...prev,
+                  applyLineAmounts(emptyLine({ lineNo: prev.length + 1 }), isInterstate),
+                ])
                 setDirty(true)
               }}
             >
-              Add line
+              Add Line
             </ErpButton>
-          </div>
+            <span className="ml-auto text-[12px] tabular-nums text-erp-muted">
+              {totals.filledLines}/{totals.lineCount} line(s) · Total {formatCurrency(totals.totalAmount)}
+              {dirty ? ' · Unsaved' : ''}
+            </span>
+          </PurchaseTableToolbar>
           {fieldErrors.lines ? (
             <p className="mb-2 text-[12px] text-erp-danger-fg">{fieldErrors.lines}</p>
           ) : null}
-          <div className="overflow-x-auto rounded-md border border-erp-border">
-            <table className="w-full min-w-[1100px] text-left text-[12px]">
-              <thead className="border-b border-erp-border bg-erp-surface-alt text-erp-muted">
-                <tr>
-                  <th className="p-2">Item</th>
-                  <th className="p-2">Qty</th>
-                  <th className="p-2">Rate</th>
-                  <th className="p-2">Disc</th>
-                  <th className="p-2">GST%</th>
-                  {showTds ? <th className="p-2">TDS</th> : null}
-                  {showTcs ? <th className="p-2">TCS</th> : null}
-                  <th className="p-2">Line Total</th>
-                  <th className="p-2">Cost / Project</th>
-                  <th className="p-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line) => (
-                  <tr key={line.key} className="border-b border-erp-border/60">
-                    <td className="p-2">
-                      <Select
-                        value={line.itemId}
-                        onChange={(e) => patchLine(line.key, { itemId: e.target.value })}
-                      >
-                        <option value="">Item…</option>
-                        {items.map((it) => (
-                          <option key={it.id} value={it.id}>
-                            {it.itemCode} — {it.itemName}
-                          </option>
-                        ))}
-                      </Select>
-                      <Input
-                        className="mt-1"
-                        placeholder="Description"
-                        value={line.description}
-                        onChange={(e) => patchLine(line.key, { description: e.target.value })}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <DecimalInput
-                        min={0}
-                        value={line.quantity}
-                        onChange={(v) => patchLine(line.key, { quantity: v })}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        value={line.rate}
-                        onChange={(e) => patchLine(line.key, { rate: Number(e.target.value) || 0 })}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        value={line.discountAmount}
-                        onChange={(e) =>
-                          patchLine(line.key, { discountAmount: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        value={line.gstRatePct}
-                        onChange={(e) => patchLine(line.key, { gstRatePct: Number(e.target.value) || 0 })}
-                      />
-                    </td>
-                    {showTds ? (
-                      <td className="p-2">
-                        <Input
-                          type="number"
-                          value={line.tdsAmount}
-                          onChange={(e) => patchLine(line.key, { tdsAmount: Number(e.target.value) || 0 })}
+          {lines.length === 0 ? (
+            <EmptyState
+              icon={Package}
+              title="No invoice lines yet"
+              description="Add catalog item lines with qty, rate, discount, and GST."
+              className="rounded-md border border-dashed border-erp-border bg-erp-surface-alt/40 py-12"
+              action={
+                <ErpButton
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  icon={Plus}
+                  onClick={() => {
+                    setLines([applyLineAmounts(emptyLine({ lineNo: 1 }), isInterstate)])
+                    setDirty(true)
+                  }}
+                >
+                  Add Line
+                </ErpButton>
+              }
+            />
+          ) : (
+            <div className="purchase-doc-lines-grid-scroll relative rounded-md border border-erp-border">
+              <table className="erp-table purchase-doc-lines-grid purchase-invoice-lines-grid w-max min-w-full text-left text-[11px]">
+                <thead>
+                  <tr>
+                    <th className="purchase-doc-lines-grid__sticky-line">#</th>
+                    <th className="purchase-doc-lines-grid__sticky-item">Item</th>
+                    <th className="min-w-[11rem]">Description</th>
+                    <th className="purchase-doc-lines-grid__uom-col">UOM</th>
+                    <th className="num min-w-[5.5rem]">Qty</th>
+                    <th className="num min-w-[5.75rem]">Rate</th>
+                    <th className="num min-w-[5rem]">Discount</th>
+                    <th className="num min-w-[4rem]">Tax %</th>
+                    <th className="num min-w-[5.75rem]">Taxable</th>
+                    {isInterstate ? (
+                      <th className="num min-w-[4.5rem]">IGST</th>
+                    ) : (
+                      <>
+                        <th className="num min-w-[4.5rem]">CGST</th>
+                        <th className="num min-w-[4.5rem]">SGST</th>
+                      </>
+                    )}
+                    {showTds ? <th className="num min-w-[4.5rem]">TDS</th> : null}
+                    {showTcs ? <th className="num min-w-[4.5rem]">TCS</th> : null}
+                    <th className="num min-w-[5.75rem]">Line Total</th>
+                    <th className="min-w-[7.5rem]">Cost Centre</th>
+                    <th className="min-w-[7.5rem]">Project</th>
+                    <th className="purchase-doc-lines-grid__sticky-actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((line, idx) => (
+                    <tr key={line.key}>
+                      <td className="purchase-doc-lines-grid__sticky-line tabular-nums">
+                        {line.lineNo || idx + 1}
+                      </td>
+                      <td className="purchase-doc-lines-grid__sticky-item">
+                        <PurchaseItemCodeCell
+                          itemId={line.itemId}
+                          itemCode={line.itemCode}
+                          itemName={line.itemName}
+                          catalogItems={items}
+                          allowManual={false}
+                          textClassName="text-[11px]"
+                          className="w-full min-w-0 max-w-none"
+                          emptyCatalogHint="No purchasable items from Item Master"
+                          onSelectItem={(itemId) => patchLine(line.key, { itemId })}
+                          onClearCatalog={() =>
+                            patchLine(line.key, {
+                              itemId: '',
+                              itemCode: '',
+                              itemName: '',
+                            })
+                          }
+                          onManualCodeChange={() => undefined}
                         />
                       </td>
+                      <td>
+                        <input
+                          className="erp-input h-8 min-w-[11rem] text-[11px]"
+                          value={line.description}
+                          placeholder="Description"
+                          onChange={(e) => patchLine(line.key, { description: e.target.value })}
+                        />
+                      </td>
+                      <td className="purchase-doc-lines-grid__uom-col">
+                        <span className="block text-center text-[11px] font-medium uppercase text-erp-text">
+                          {line.uom || '—'}
+                        </span>
+                      </td>
+                      <td className="num">
+                        <DecimalInput
+                          min={0}
+                          className="h-8 w-[5rem] text-right text-[11px]"
+                          value={line.quantity}
+                          onChange={(v) => patchLine(line.key, { quantity: v })}
+                        />
+                      </td>
+                      <td className="num">
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          className="erp-input h-8 w-24 text-right text-[11px]"
+                          value={line.rate}
+                          onChange={(e) =>
+                            patchLine(line.key, { rate: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </td>
+                      <td className="num">
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          className="erp-input h-8 w-16 text-right text-[11px]"
+                          value={line.discountAmount}
+                          title="Discount amount"
+                          onChange={(e) =>
+                            patchLine(line.key, {
+                              discountAmount: Number(e.target.value) || 0,
+                            })
+                          }
+                        />
+                      </td>
+                      <td className="num">
+                        <input
+                          type="number"
+                          min={0}
+                          className="erp-input h-8 w-14 text-right text-[11px]"
+                          value={line.gstRatePct}
+                          onChange={(e) =>
+                            patchLine(line.key, { gstRatePct: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </td>
+                      <td className="num tabular-nums text-erp-muted">
+                        {formatCurrency(line.taxableAmount)}
+                      </td>
+                      {isInterstate ? (
+                        <td className="num tabular-nums text-erp-muted">
+                          {formatCurrency(line.igst)}
+                        </td>
+                      ) : (
+                        <>
+                          <td className="num tabular-nums text-erp-muted">
+                            {formatCurrency(line.cgst)}
+                          </td>
+                          <td className="num tabular-nums text-erp-muted">
+                            {formatCurrency(line.sgst)}
+                          </td>
+                        </>
+                      )}
+                      {showTds ? (
+                        <td className="num">
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            className="erp-input h-8 w-16 text-right text-[11px]"
+                            value={line.tdsAmount}
+                            onChange={(e) =>
+                              patchLine(line.key, { tdsAmount: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </td>
+                      ) : null}
+                      {showTcs ? (
+                        <td className="num">
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            className="erp-input h-8 w-16 text-right text-[11px]"
+                            value={line.tcsAmount}
+                            onChange={(e) =>
+                              patchLine(line.key, { tcsAmount: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </td>
+                      ) : null}
+                      <td className="num tabular-nums font-medium">
+                        {formatCurrency(line.lineTotal)}
+                      </td>
+                      <td>
+                        <input
+                          className="erp-input h-8 min-w-[7rem] text-[11px]"
+                          placeholder="Cost centre"
+                          value={line.costCentre}
+                          onChange={(e) => patchLine(line.key, { costCentre: e.target.value })}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="erp-input h-8 min-w-[7rem] text-[11px]"
+                          placeholder="Project"
+                          value={line.project}
+                          onChange={(e) => patchLine(line.key, { project: e.target.value })}
+                        />
+                      </td>
+                      <td className="purchase-doc-lines-grid__sticky-actions">
+                        <button
+                          type="button"
+                          className="rounded p-1.5 text-erp-muted transition-colors hover:bg-rose-50 hover:text-rose-600"
+                          title="Remove line"
+                          aria-label={`Remove line ${line.lineNo || idx + 1}`}
+                          onClick={() => {
+                            setLines((prev) =>
+                              prev
+                                .filter((l) => l.key !== line.key)
+                                .map((l, i) => ({ ...l, lineNo: i + 1 })),
+                            )
+                            setDirty(true)
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-medium">
+                    <td className="purchase-doc-lines-grid__sticky-line">Total</td>
+                    <td className="purchase-doc-lines-grid__sticky-item" />
+                    <td />
+                    <td className="purchase-doc-lines-grid__uom-col" />
+                    <td className="num tabular-nums">
+                      {lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0)}
+                    </td>
+                    <td />
+                    <td />
+                    <td />
+                    <td className="num tabular-nums">{formatCurrency(totals.taxableAmount)}</td>
+                    {isInterstate ? (
+                      <td className="num tabular-nums">{formatCurrency(totals.igst)}</td>
+                    ) : (
+                      <>
+                        <td className="num tabular-nums">{formatCurrency(totals.cgst)}</td>
+                        <td className="num tabular-nums">{formatCurrency(totals.sgst)}</td>
+                      </>
+                    )}
+                    {showTds ? (
+                      <td className="num tabular-nums">{formatCurrency(totals.tdsAmount)}</td>
                     ) : null}
                     {showTcs ? (
-                      <td className="p-2">
-                        <Input
-                          type="number"
-                          value={line.tcsAmount}
-                          onChange={(e) => patchLine(line.key, { tcsAmount: Number(e.target.value) || 0 })}
-                        />
-                      </td>
+                      <td className="num tabular-nums">{formatCurrency(totals.tcsAmount)}</td>
                     ) : null}
-                    <td className="p-2 tabular-nums">{formatCurrency(line.lineTotal)}</td>
-                    <td className="p-2">
-                      <Input
-                        placeholder="Cost centre"
-                        value={line.costCentre}
-                        onChange={(e) => patchLine(line.key, { costCentre: e.target.value })}
-                      />
-                      <Input
-                        className="mt-1"
-                        placeholder="Project"
-                        value={line.project}
-                        onChange={(e) => patchLine(line.key, { project: e.target.value })}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <button
-                        type="button"
-                        className="rounded p-1 text-erp-danger-fg hover:bg-red-50"
-                        onClick={() => {
-                          setLines((prev) => prev.filter((l) => l.key !== line.key))
-                          setDirty(true)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
+                    <td className="num tabular-nums">{formatCurrency(totals.totalAmount)}</td>
+                    <td />
+                    <td />
+                    <td className="purchase-doc-lines-grid__sticky-actions" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </tfoot>
+              </table>
+            </div>
+          )}
         </ErpFormSpan>
       </ErpCardSection>
 
@@ -1180,13 +1491,14 @@ export function PurchaseInvoiceEditorPage() {
               hidden: !showTcs,
             },
           ]}
-          calcRows={[
-            {
-              id: 'tax',
-              label: 'Tax (GST)',
-              value: formatCurrency(totals.tax),
-            },
-          ]}
+          calcRows={
+            isInterstate
+              ? [{ id: 'igst', label: 'IGST', value: formatCurrency(totals.igst) }]
+              : [
+                  { id: 'cgst', label: 'CGST', value: formatCurrency(totals.cgst) },
+                  { id: 'sgst', label: 'SGST', value: formatCurrency(totals.sgst) },
+                ]
+          }
           grandTotalValue={formatCurrency(totals.totalAmount)}
         />
       </ErpCardSection>

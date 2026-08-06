@@ -54,7 +54,23 @@ async function main() {
   console.log('verified', verified.status, verified.matchingResultStatus)
 
   const fromPo = await createPurchaseInvoiceFromPo('prd-po-5001')
-  console.log('from PO', fromPo.documentNumber, fromPo.origin)
+  console.log('from PO', fromPo.documentNumber, fromPo.origin, fromPo.goodsReceiptId)
+  if (!fromPo.goodsReceiptId || fromPo.origin !== 'goods_receipt') {
+    console.error('FAIL: PO with posted GRN should create goods_receipt origin invoice')
+    process.exit(1)
+  }
+
+  // requireGrnMatch (seed default true): goods PO without posted GRN must not create a draft
+  try {
+    await createPurchaseInvoiceFromPo('prd-po-5003')
+    console.error('FAIL: expected GRN_REQUIRED for PO without posted GRN')
+    process.exit(1)
+  } catch (err) {
+    if (!(err instanceof PurchaseServiceError) || err.code !== 'GRN_REQUIRED') {
+      throw err
+    }
+    console.log('grn required blocked', err.code)
+  }
 
   const direct = await createDirectPurchaseInvoice({
     vendorId: 'pv-skf',

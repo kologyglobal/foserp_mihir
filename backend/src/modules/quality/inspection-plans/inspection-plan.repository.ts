@@ -59,7 +59,7 @@ export async function findByCode(tenantId: string, planCode: string, excludeId?:
 export async function findActivePlanForResolve(
   tenantId: string,
   category: QualityInspectionCategory,
-  opts: { itemId?: string | null; planCode?: string | null },
+  opts: { itemId?: string | null; planCode?: string | null; itemCategoryId?: string | null },
 ) {
   const now = new Date()
   if (opts.planCode) {
@@ -95,10 +95,28 @@ export async function findActivePlanForResolve(
     if (byItem) return byItem
   }
 
+  if (opts.itemCategoryId) {
+    const byCategory = await prisma.qualityInspectionPlan.findFirst({
+      where: {
+        tenantId,
+        itemCategoryId: opts.itemCategoryId,
+        status: 'ACTIVE',
+        deletedAt: null,
+        category,
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
+        effectiveFrom: { lte: now },
+      },
+      include: planInclude,
+      orderBy: { updatedAt: 'desc' },
+    })
+    if (byCategory) return byCategory
+  }
+
   return prisma.qualityInspectionPlan.findFirst({
     where: {
       tenantId,
       itemId: null,
+      itemCategoryId: null,
       status: 'ACTIVE',
       deletedAt: null,
       category,

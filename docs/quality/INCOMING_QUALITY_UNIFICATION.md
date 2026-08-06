@@ -27,7 +27,8 @@ GRN (inspection required)
 | Assign / Start | `POST /quality/incoming/assign`, `POST /quality/incoming/start` |
 | Stock panel | `GET /quality/incoming/stock-status/grn/:id`, `…/qi/:id`, `…/item/:itemId` |
 | Purchase QI | `/purchase/quality-inspections` + assign/start/complete/ncr/return-prefill/stock-status |
-| Plan snapshot | `POST` create QI with `inspectionPlanId` (copies plan lines into QI parameters once) |
+| Plan snapshot | `POST` create QI with `inspectionPlanId` (copies plan lines into QI parameters once). Without id: auto-resolve ACTIVE `INCOMING` plan (item → item category → generic). |
+| Plan picker UI | `/purchase/quality-inspections/new?grnId=` — lists ACTIVE INCOMING plans; suggests item-specific plan |
 
 ## Permissions
 
