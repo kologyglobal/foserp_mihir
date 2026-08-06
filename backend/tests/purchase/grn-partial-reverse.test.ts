@@ -3,6 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
+  allocatePartialReverseQuantities,
   isGrnLineFullyReversed,
   isGrnLineReversible,
   remainingReversibleReceived,
@@ -29,5 +30,26 @@ describe('GRN partial reverse helpers', () => {
     expect(isGrnLineFullyReversed(open)).toBe(false)
     expect(isGrnLineReversible(done)).toBe(false)
     expect(isGrnLineFullyReversed(done)).toBe(true)
+  })
+
+  it('splits partial reverse qty across accepted/rejected', () => {
+    const line = {
+      receivedQuantity: 10,
+      acceptedQuantity: 8,
+      rejectedQuantity: 2,
+      reversedQuantity: 0,
+      reversedAcceptedQuantity: 0,
+      reversedRejectedQuantity: 0,
+    }
+    expect(allocatePartialReverseQuantities(line, 5)).toEqual({
+      received: 5,
+      accepted: 4,
+      rejected: 1,
+    })
+    expect(allocatePartialReverseQuantities(line, 10)).toEqual({
+      received: 10,
+      accepted: 8,
+      rejected: 2,
+    })
   })
 })

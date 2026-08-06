@@ -6,6 +6,11 @@ import { AuthenticationError, ValidationError } from '../../utils/errors.js'
 import * as service from './knowledge.service.js'
 import * as chatService from './chat/chat.service.js'
 import * as copilotService from './copilot/copilot.service.js'
+import {
+  hasKnowledgeGenerativeLlm,
+  resolveKnowledgeChatLlmConfig,
+  resolveKnowledgeEmbeddingLlmConfig,
+} from './llm-config.js'
 import type {
   CreateKnowledgeDocumentJson,
   TransitionKnowledgeDocumentInput,
@@ -351,9 +356,10 @@ export const getAdminSettings = asyncHandler(async (_req: Request, res: Response
     chunkOverlap: process.env.KB_CHUNK_OVERLAP ? Number(process.env.KB_CHUNK_OVERLAP) : 200,
     indexingEnabled: process.env.KB_INDEXING_ENABLED !== 'false',
     ocrEnabled: process.env.KB_OCR_ENABLED === 'true',
-    embeddingMode: process.env.OPENAI_API_KEY ? 'openai-compatible' : 'local-hash',
-    chatMode: process.env.OPENAI_API_KEY ? 'openai-compatible' : 'local-extractive',
-    copilotMode: process.env.OPENAI_API_KEY ? 'openai-compatible' : 'local-extractive',
+    embeddingMode: resolveKnowledgeEmbeddingLlmConfig() ? 'openai-compatible' : 'local-hash',
+    chatMode: hasKnowledgeGenerativeLlm() ? 'generative' : 'local-extractive',
+    copilotMode: hasKnowledgeGenerativeLlm() ? 'generative' : 'local-extractive',
+    llmProvider: resolveKnowledgeChatLlmConfig()?.provider ?? null,
     note: 'Copilot is stream-first with ERP context + RAG. Insights/admin settings ships in Wave 6.',
   })
 })

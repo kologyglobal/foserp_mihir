@@ -14,6 +14,7 @@ import { deriveEngineeringProductTypeFromMaster, normalizeEngineeringProductType
 import { resolveGstStateCode } from '../../utils/gstStateCode'
 import { determinePurchaseGstSupply } from '../../utils/gstSupply'
 import { resolveLineTaxFromLocalMasters } from '../../utils/commercialLineTax'
+import { purchaseSetupPlaceState } from '../../utils/purchasePlaceOfSupply'
 import type {
   PurchaseApprovalDocumentType,
   PurchaseApprovalQueueFilters,
@@ -761,8 +762,15 @@ export async function createPurchaseOrderFromPr(
     )
   }
 
-  if (pr.status !== 'approved') {
+  if (pr.status !== 'approved' && pr.status !== 'partially_converted') {
     throw new PurchaseServiceError('PR_NOT_APPROVED', 'Only approved PRs can create a PO')
+  }
+
+  const prLineById = new Map((pr.lines ?? []).map((l) => [l.id, l]))
+  const rateForPlanningRow = (row: PurchasePlanningSheetRow) => {
+    if (row.expectedRate > 0) return row.expectedRate
+    const prLine = prLineById.get(row.purchaseRequisitionLineId)
+    return Number(prLine?.estimatedRate ?? 0)
   }
 
   let sheet = await getPurchasePlanningSheet()
@@ -781,15 +789,26 @@ export async function createPurchaseOrderFromPr(
     throw new PurchaseServiceError(
       'PPS_PO_NOT_READY',
       options?.lineIds?.length
-        ? 'No Planning Sheet rows for the selected PR lines. Open Planning Sheet, set vendor/rate, then create PO.'
-        : 'No Planning Sheet rows for this PR. Open Planning Sheet after approval, set vendor/rate, then create PO.',
+        ? 'No Planning Sheet rows for the selected PR lines. Re-approve the PR or open Planning Sheet.'
+        : 'No Planning Sheet rows for this PR. Re-approve the PR or open Planning Sheet.',
     )
+  }
+
+  // Ensure planning rows have rate from PR line estimates (direct PO path).
+  for (const row of rows) {
+    const rate = rateForPlanningRow(row)
+    if (rate > 0 && !(row.expectedRate > 0)) {
+      await updatePurchasePlanningSheetRow(row.id, { expectedRate: rate })
+    }
   }
 
   if (vendorId) {
     for (const row of rows) {
+      const rate = rateForPlanningRow(row)
       if (row.preferredVendorId !== vendorId) {
-        await selectPurchasePlanningVendor(row.id, vendorId, row.expectedRate || undefined)
+        await selectPurchasePlanningVendor(row.id, vendorId, rate > 0 ? rate : undefined)
+      } else if (rate > 0 && !(row.expectedRate > 0)) {
+        await updatePurchasePlanningSheetRow(row.id, { expectedRate: rate })
       }
     }
     sheet = await getPurchasePlanningSheet()
@@ -1116,15 +1135,24 @@ async function enrichGrnWithQualityInspectionId(
     const res = await qiApi.listQualityInspectionsApi({
       goodsReceiptId: grn.id,
       page: 1,
-      limit: 1,
+      limit: 20,
       sortOrder: 'desc',
     })
-    const linked = res.data[0]
+    const rows = res.data ?? []
+    const openStatuses = new Set(['DRAFT', 'PENDING', 'IN_PROGRESS', 'DEVIATION_PENDING'])
+    const open = rows.find((qi) => openStatuses.has(String(qi.status).toUpperCase()))
+    const linked = open ?? rows[0]
     if (linked) return { ...grn, qualityInspectionId: linked.id }
   } catch {
     // Non-fatal — GRN detail can still link via grnId filter on the QI register.
   }
   return grn
+}
+
+function isDuplicateQiForGrnError(err: unknown): boolean {
+  if (err instanceof PurchaseServiceError) return err.code === 'QI_DUPLICATE_FOR_GRN'
+  const { code } = formatPurchaseApiError(err)
+  return code === 'QI_DUPLICATE_FOR_GRN'
 }
 
 export async function getGRNById(id: string): Promise<GoodsReceiptNote | null> {
@@ -1181,23 +1209,16 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
       return grn
     }
     if (grn.inspectionRequired && !grn.qualityInspectionId) {
-      const qcLine =
-        grn.lines.find((l) => l.inspectionStatus === 'pending' || l.pendingInspectionQty > 0)
-        ?? grn.lines[0]
-      if (qcLine) {
-        try {
-          const qi = await createQualityInspection({
-            goodsReceiptId: grn.id,
-            goodsReceiptLineId: qcLine.id,
-            sampleQty: Math.min(5, qcLine.receivedQty || qcLine.pendingInspectionQty || 1),
-          })
-          grn = { ...grn, qualityInspectionId: qi.id }
-        } catch (err) {
-          grn = await enrichGrnWithQualityInspectionId(grn)
-          if (!grn.qualityInspectionId) {
-            // GRN submit already succeeded — do not fail the whole action on QI bootstrap.
-            console.warn('[submitGRN] QI auto-create failed after submit', err)
-          }
+      grn = await enrichGrnWithQualityInspectionId(grn)
+    }
+    if (grn.inspectionRequired && !grn.qualityInspectionId) {
+      try {
+        const qi = await createQualityInspection({ goodsReceiptId: grn.id })
+        grn = { ...grn, qualityInspectionId: qi.id }
+      } catch (err) {
+        grn = await enrichGrnWithQualityInspectionId(grn)
+        if (!grn.qualityInspectionId && !isDuplicateQiForGrnError(err)) {
+          console.warn('[submitGRN] QI auto-create failed after submit', err)
         }
       }
     }
@@ -1263,7 +1284,10 @@ export async function cancelGRN(id: string, remarks = ''): Promise<GoodsReceiptN
 export async function reverseGRN(
   id: string,
   remarks = '',
-  options?: { lineIds?: string[] },
+  options?: {
+    lineIds?: string[]
+    lineQuantities?: Array<{ lineId: string; quantity: number }>
+  },
 ): Promise<GoodsReceiptNote> {
   if (!isApiMode()) {
     throw new PurchaseServiceError('NOT_SUPPORTED', 'Reverse GRN is only available in API mode.')
@@ -1272,6 +1296,7 @@ export async function reverseGRN(
     const payload: Record<string, unknown> = {}
     if (remarks.trim()) payload.remarks = remarks.trim()
     if (options?.lineIds?.length) payload.lineIds = options.lineIds
+    if (options?.lineQuantities?.length) payload.lineQuantities = options.lineQuantities
     const res = await grnApi.reverseGoodsReceiptApi(id, payload)
     return mapApiGoodsReceiptToDomain(res.data)
   } catch (err) {
@@ -2221,7 +2246,10 @@ function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
   }
 }
 
-function mapMasterVendorToPurchaseVendor(v: MasterVendor): Vendor {
+function mapMasterVendorToPurchaseVendor(
+  v: MasterVendor,
+  setup?: Awaited<ReturnType<typeof getPurchaseSetup>> | null,
+): Vendor {
   const vendorType =
     v.vendorType === 'service' ? 'service' : v.vendorType === 'trader' ? 'trader' : 'manufacturer'
   const stateCode = resolveGstStateCode(v.gstin) ?? resolveGstStateCode(v.state) ?? ''
@@ -2229,8 +2257,8 @@ function mapMasterVendorToPurchaseVendor(v: MasterVendor): Vendor {
     supplierState: v.state ?? '',
     supplierStateCode: stateCode,
     supplierGstin: v.gstin ?? '',
-    defaultPlaceOfSupplyState: 'Maharashtra',
-    defaultPlaceOfSupplyStateCode: '27',
+    defaultPlaceOfSupplyState: setup?.tax.placeOfSupplyState,
+    defaultPlaceOfSupplyStateCode: setup?.tax.placeOfSupplyStateCode,
   })
   return {
     id: v.id,
@@ -2334,9 +2362,10 @@ export async function getVendors(): Promise<Vendor[]> {
       /* keep empty */
     }
   }
+  const setup = await getPurchaseSetup().catch(() => null)
   return vendors
     .filter((v) => v.isActive !== false && v.isBlocked !== true)
-    .map(mapMasterVendorToPurchaseVendor)
+    .map((v) => mapMasterVendorToPurchaseVendor(v, setup))
 }
 
 export type PurchaseWarehouseOption = {
@@ -2391,6 +2420,8 @@ export async function getPurchaseWarehouses(): Promise<PurchaseWarehouseOption[]
       /* keep empty */
     }
   }
+  const setup = await getPurchaseSetup().catch(() => null)
+  const pos = purchaseSetupPlaceState(setup)
   return warehouses
     .filter((w) => w.isActive !== false)
     .map((w) => ({
@@ -2398,8 +2429,8 @@ export async function getPurchaseWarehouses(): Promise<PurchaseWarehouseOption[]
       code: w.warehouseCode,
       name: w.warehouseName,
       address: w.address || '',
-      state: '',
-      city: '',
+      state: pos.state,
+      city: pos.city,
     }))
 }
 
@@ -2670,12 +2701,23 @@ function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseS
   }
 }
 
+let cachedPurchaseSetupForMappers: PurchaseSetup | null = null
+
+/** Sync read of last fetched setup (API mode mappers / warehouse resolution). */
+export function getCachedPurchaseSetup(): PurchaseSetup | null {
+  return cachedPurchaseSetupForMappers
+}
+
 /** Load tenant Purchase Setup — API is source of truth in API mode (no memory fallback). */
 export async function getPurchaseSetup(): Promise<PurchaseSetup> {
-  if (!isApiMode()) return demo.getPurchaseSetup()
+  if (!isApiMode()) {
+    cachedPurchaseSetupForMappers = await demo.getPurchaseSetup()
+    return cachedPurchaseSetupForMappers
+  }
   try {
     const res = await setupApi.getPurchaseSetupApi()
-    return mapApiSetupToDomain(res.data)
+    cachedPurchaseSetupForMappers = mapApiSetupToDomain(res.data)
+    return cachedPurchaseSetupForMappers
   } catch (err) {
     throwApi(err)
   }
@@ -3512,23 +3554,30 @@ async function buildDemoReturnWizardPrefill(params: {
   if (params.goodsReceiptId) {
     const grn = await demo.getGRNById(params.goodsReceiptId)
     if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', 'GRN not found')
+    if (['draft', 'cancelled', 'reversed', 'pending_tolerance_approval'].includes(grn.status)) {
+      throw new PurchaseServiceError(
+        'RETURN_NO_QTY',
+        'Goods receipt must be submitted and posted before creating a return.',
+      )
+    }
     const lines = grn.lines
-      .filter((l) => (l.rejectedQty || 0) > 0 || (l.damagedQty || 0) > 0 || (l.excessQty || 0) > 0)
       .map((l) => {
-        const qty = Math.max(l.rejectedQty || 0, l.damagedQty || 0, l.excessQty || 0)
+        const availableReturnQty = demo.availableReturnQtyForGrnLine(grn.id, l.id)
+        if (availableReturnQty <= 0) return null
         return {
           goodsReceiptLineId: l.id,
           purchaseOrderLineId: l.purchaseOrderLineId ?? null,
           itemId: l.itemId,
           itemCode: l.itemCode,
           itemName: l.itemName,
-          returnQty: qty,
+          returnQty: availableReturnQty,
           unitCost: l.rate,
           batchLotNo: l.batchNumber || '',
           serialNumber: l.serialNumber || '',
-          availableReturnQty: qty,
+          availableReturnQty,
         }
       })
+      .filter((l): l is NonNullable<typeof l> => l != null)
     if (!lines.length) {
       throw new PurchaseServiceError('RETURN_NO_QTY', 'No returnable quantity on this GRN')
     }
@@ -3759,79 +3808,37 @@ export async function createPurchaseReturnFromGrn(
             ? 'wrong_item'
             : 'quality_rejection')
 
-  // Quality / rejected qty: use live remaining-returnable wizard (QI-aware).
-  if (origin === 'quality_rejection' || origin === 'grn_rejected_quantity') {
-    try {
-      const prefill = await getReturnWizardPrefill({ goodsReceiptId: grnId })
-      if (prefill.lines.length) {
-        return createPurchaseReturn({
-          vendorId: prefill.vendorId,
-          origin,
-          goodsReceiptId: prefill.goodsReceiptId,
-          purchaseOrderId: prefill.purchaseOrderId,
-          qualityInspectionId: prefill.qualityInspectionId,
-          returnReason,
-          returnType: prefill.suggestedReturnType,
-          warehouseId: prefill.warehouseId ?? undefined,
-          replacementRequired: prefill.replacementRequired,
-          debitNoteRequired: true,
-          remarks: prefill.reason,
-          lines: prefill.lines.map((l) => ({
-            itemId: l.itemId,
-            itemCode: l.itemCode,
-            itemName: l.itemName,
-            returnQty: l.returnQty,
-            unitCost: l.unitCost,
-            goodsReceiptLineId: l.goodsReceiptLineId,
-            purchaseOrderLineId: l.purchaseOrderLineId,
-            description: l.itemName,
-            batchLotNo: l.batchLotNo,
-            serialNumber: l.serialNumber,
-            availableReturnQty: l.availableReturnQty,
-            reason: returnReason,
-            remarks: prefill.reason,
-          })),
-        })
-      }
-    } catch {
-      // Fall through to GRN line mapping.
-    }
-  }
-
-  const grn = await getGRNById(grnId)
-  if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${grnId}`)
-  const lines = grn.lines
-    .map((l) => {
-      const qty =
-        origin === 'excess_receipt'
-          ? l.excessQty
-          : origin === 'damaged_material'
-            ? l.damagedQty || l.rejectedQty
-            : l.rejectedQty
-      return {
-        itemId: l.itemId,
-        returnQty: Math.max(0, qty),
-        unitCost: l.rate,
-        goodsReceiptLineId: l.id,
-        description: l.description || l.itemName,
-        batchLotNo: l.batchNumber || '',
-        serialNumber: l.serialNumber || '',
-        reason: returnReason,
-      }
-    })
-    .filter((l) => l.returnQty > 0)
-  if (!lines.length) {
+  const prefill = await getReturnWizardPrefill({ goodsReceiptId: grnId })
+  if (!prefill.lines.length) {
     throw new PurchaseServiceError('RETURN_NO_QTY', 'No returnable quantity on this GRN')
   }
   return createPurchaseReturn({
-    vendorId: grn.vendor.id,
+    vendorId: prefill.vendorId,
     origin,
-    goodsReceiptId: grn.id,
-    purchaseOrderId: grn.purchaseOrderId,
+    goodsReceiptId: prefill.goodsReceiptId,
+    purchaseOrderId: prefill.purchaseOrderId,
+    qualityInspectionId: prefill.qualityInspectionId,
     returnReason,
-    warehouseId: grn.warehouseId,
-    remarks: `Created from ${grn.documentNumber}`,
-    lines,
+    returnType: prefill.suggestedReturnType,
+    warehouseId: prefill.warehouseId ?? undefined,
+    replacementRequired: prefill.replacementRequired,
+    debitNoteRequired: true,
+    remarks: prefill.reason,
+    lines: prefill.lines.map((l) => ({
+      itemId: l.itemId,
+      itemCode: l.itemCode,
+      itemName: l.itemName,
+      returnQty: l.returnQty,
+      unitCost: l.unitCost,
+      goodsReceiptLineId: l.goodsReceiptLineId,
+      purchaseOrderLineId: l.purchaseOrderLineId,
+      description: l.itemName,
+      batchLotNo: l.batchLotNo,
+      serialNumber: l.serialNumber,
+      availableReturnQty: l.availableReturnQty,
+      reason: returnReason,
+      remarks: prefill.reason,
+    })),
   })
 }
 

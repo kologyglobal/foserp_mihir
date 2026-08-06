@@ -58,7 +58,11 @@ export async function cancelGoodsReceiptApi(id: string, payload: Record<string, 
 
 export async function reverseGoodsReceiptApi(
   id: string,
-  payload: { remarks?: string; lineIds?: string[] } | Record<string, unknown> = {},
+  payload: {
+    remarks?: string
+    lineIds?: string[]
+    lineQuantities?: Array<{ lineId: string; quantity: number }>
+  } | Record<string, unknown> = {},
 ) {
   return apiRequest<ApiGoodsReceipt>(`${base()}/${id}/reverse`, {
     method: 'POST',

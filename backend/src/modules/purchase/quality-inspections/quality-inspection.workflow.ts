@@ -1,5 +1,14 @@
 import type { QualityInspectionStatus } from '@prisma/client'
 import { QualityInspectionValidationError, QualityInspectionWorkflowError } from './quality-inspection.errors.js'
+
+/** Statuses that block creating another QI for the same GRN. */
+export const OPEN_QUALITY_INSPECTION_STATUSES = [
+  'DRAFT',
+  'PENDING',
+  'IN_PROGRESS',
+  'DEVIATION_PENDING',
+] as const satisfies readonly QualityInspectionStatus[]
+
 export const qiQty = (value: unknown) => Number(value ?? 0)
 export const qiDate = (value?: string | null) => value ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00.000Z` : value) : null
 export function assertQiEditable(status: QualityInspectionStatus) {

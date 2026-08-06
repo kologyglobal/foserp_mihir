@@ -26,6 +26,7 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/design-system/components/Modal'
 import { ErpButton } from '@/components/erp/ErpButton'
+import { DecimalInput } from '@/components/forms/Inputs'
 import {
   approveToleranceGRN,
   cancelGRN,
@@ -70,6 +71,7 @@ export function GrnDetailPage() {
   const [inventoryMsgOpen, setInventoryMsgOpen] = useState(false)
   const [reverseOpen, setReverseOpen] = useState(false)
   const [reverseSelectedIds, setReverseSelectedIds] = useState<string[]>([])
+  const [reverseQtyByLineId, setReverseQtyByLineId] = useState<Record<string, number>>({})
   const [reverseReason, setReverseReason] = useState('')
   const [reverseBusy, setReverseBusy] = useState(false)
 
@@ -135,11 +137,31 @@ export function GrnDetailPage() {
     })
   }, [documentLines])
 
+  const remainingReversibleQty = (l: (typeof reversibleLines)[number]) =>
+    l.remainingReversibleQty ??
+    Math.max(0, (Number(l.receivedQty) || 0) - (Number(l.reversedQty) || 0))
+
   const openReverseModal = () => {
+    const qtyMap: Record<string, number> = {}
+    for (const l of reversibleLines) {
+      qtyMap[l.id] = remainingReversibleQty(l)
+    }
+    setReverseQtyByLineId(qtyMap)
     setReverseSelectedIds(reversibleLines.map((l) => l.id))
     setReverseReason('')
     setReverseOpen(true)
   }
+
+  const reverseQtyValid = useMemo(() => {
+    if (reverseSelectedIds.length === 0) return false
+    return reverseSelectedIds.every((id) => {
+      const line = reversibleLines.find((l) => l.id === id)
+      if (!line) return false
+      const remaining = remainingReversibleQty(line)
+      const q = reverseQtyByLineId[id] ?? remaining
+      return q > 0 && q <= remaining + 1e-9
+    })
+  }, [reverseSelectedIds, reverseQtyByLineId, reversibleLines])
 
   const headerFacts = useMemo(() => {
     if (!grn) return []
@@ -203,13 +225,9 @@ export function GrnDetailPage() {
     permission: 'purchase.grn.create',
     statusAllowed: canCancel,
   })
-  const hasReturnableQty = documentLines.some(
-    (l) =>
-      (l.returnableQty ?? 0) > 0 ||
-      l.rejectedQty > 0 ||
-      l.acceptedQty > 0 ||
-      l.receivedQty > 0,
-  )
+  const hasReturnableQty =
+    (grn.totalReturnableQty ?? 0) > 0 ||
+    documentLines.some((l) => (l.returnableQty ?? 0) > 0)
   const totalReturned = grn.totalReturnedQty ?? documentLines.reduce((s, l) => s + (l.returnedQty ?? 0), 0)
   const totalReturnable = grn.totalReturnableQty ?? documentLines.reduce((s, l) => s + (l.returnableQty ?? 0), 0)
   const returnGate = purchaseActionGate({
@@ -219,6 +237,7 @@ export function GrnDetailPage() {
       grn.status !== 'cancelled' &&
       grn.status !== 'reversed' &&
       hasReturnableQty,
+    statusBlockedReason: 'No returnable quantity on this GRN (complete QC / posting first)',
   })
 
   const documentFactBox = (
@@ -408,7 +427,7 @@ export function GrnDetailPage() {
               },
               hidden: returnGate.hidden,
               disabled: busy || returnGate.disabled,
-              disabledReason: returnGate.disabledReason ?? 'No returnable quantity on this GRN',
+              disabledReason: returnGate.disabledReason ?? 'No returnable quantity on this GRN (complete QC / posting first)',
             },
             {
               id: 'reverse-grn',
@@ -940,21 +959,51 @@ export function GrnDetailPage() {
             <ErpButton
               variant="danger"
               disabled={
-                reverseBusy || reverseSelectedIds.length === 0 || !reverseReason.trim()
+                reverseBusy ||
+                reverseSelectedIds.length === 0 ||
+                !reverseReason.trim() ||
+                !reverseQtyValid
               }
               onClick={async () => {
-                if (!reverseReason.trim() || reverseSelectedIds.length === 0) return
+                if (!reverseReason.trim() || reverseSelectedIds.length === 0 || !reverseQtyValid) {
+                  return
+                }
+                const lineQuantities = reverseSelectedIds
+                  .map((lineId) => {
+                    const line = reversibleLines.find((l) => l.id === lineId)
+                    const remaining = line ? remainingReversibleQty(line) : 0
+                    return {
+                      lineId,
+                      quantity: reverseQtyByLineId[lineId] ?? remaining,
+                    }
+                  })
+                  .filter((row) => row.quantity > 0)
                 const allSelected =
                   reversibleLines.length > 0 &&
                   reverseSelectedIds.length === reversibleLines.length
+                const allFullQty = reverseSelectedIds.every((id) => {
+                  const line = reversibleLines.find((l) => l.id === id)
+                  if (!line) return false
+                  const remaining = remainingReversibleQty(line)
+                  const q = reverseQtyByLineId[id] ?? remaining
+                  return Math.abs(q - remaining) < 1e-9
+                })
+                const fullReverse = allSelected && allFullQty
+                const partialQty = lineQuantities.some((row) => {
+                  const line = reversibleLines.find((l) => l.id === row.lineId)
+                  if (!line) return false
+                  return Math.abs(row.quantity - remainingReversibleQty(line)) > 1e-9
+                })
                 const ok = await appConfirm({
-                  title: allSelected ? 'Reverse entire GRN?' : 'Reverse selected lines?',
-                  description: allSelected
+                  title: fullReverse ? 'Reverse entire GRN?' : 'Reverse selected quantities?',
+                  description: fullReverse
                     ? 'Stock will be compensated for all remaining received lines, PO open quantities restored, and this GRN will become Reversed.'
-                    : `Only ${reverseSelectedIds.length} selected line${
-                        reverseSelectedIds.length === 1 ? '' : 's'
-                      } will reverse. Unselected lines stay received.`,
-                  confirmLabel: allSelected ? 'Reverse all' : 'Reverse selected',
+                    : partialQty
+                      ? `Selected lines will reverse the entered quantities only (partial reverse). Unselected lines stay received.`
+                      : `Only ${reverseSelectedIds.length} selected line${
+                          reverseSelectedIds.length === 1 ? '' : 's'
+                        } will reverse. Unselected lines stay received.`,
+                  confirmLabel: fullReverse ? 'Reverse all' : 'Reverse selected',
                   tone: 'danger',
                 })
                 if (!ok) return
@@ -962,13 +1011,16 @@ export function GrnDetailPage() {
                 try {
                   const updated = await reverseGRN(grn.id, reverseReason.trim(), {
                     lineIds: reverseSelectedIds,
+                    lineQuantities,
                   })
                   setGrn(updated)
                   setReverseOpen(false)
                   notify.success(
-                    allSelected || updated.status === 'reversed'
+                    fullReverse || updated.status === 'reversed'
                       ? 'GRN fully reversed'
-                      : 'Selected GRN line(s) reversed',
+                      : partialQty
+                        ? 'Partial quantity reversed on selected line(s)'
+                        : 'Selected GRN line(s) reversed',
                   )
                 } catch (err) {
                   notify.error(
@@ -986,9 +1038,10 @@ export function GrnDetailPage() {
       >
         <div className="space-y-3 text-sm">
           <p className="text-erp-muted">
-            Select received lines to reverse. Inventory and PO open quantities are restored only for
-            selected lines. Use Material Return when returning goods to the vendor without undoing the
-            GRN receipt.
+            Select received lines and enter how much to reverse on each line (full remaining or a
+            partial quantity). Inventory and PO open quantities are restored only for the reversed
+            qty. Use Material Return when returning goods to the vendor without undoing the GRN
+            receipt.
           </p>
           {reversibleLines.length === 0 ? (
             <p className="rounded border border-erp-border bg-erp-surface-muted px-3 py-2 text-[13px]">
@@ -1008,9 +1061,20 @@ export function GrnDetailPage() {
                           reverseSelectedIds.length === reversibleLines.length
                         }
                         onChange={(e) => {
-                          setReverseSelectedIds(
-                            e.target.checked ? reversibleLines.map((l) => l.id) : [],
-                          )
+                          if (e.target.checked) {
+                            setReverseSelectedIds(reversibleLines.map((l) => l.id))
+                            setReverseQtyByLineId((prev) => {
+                              const next = { ...prev }
+                              for (const l of reversibleLines) {
+                                if (next[l.id] == null || next[l.id] <= 0) {
+                                  next[l.id] = remainingReversibleQty(l)
+                                }
+                              }
+                              return next
+                            })
+                          } else {
+                            setReverseSelectedIds([])
+                          }
                         }}
                       />
                     </th>
@@ -1023,10 +1087,11 @@ export function GrnDetailPage() {
                 </thead>
                 <tbody>
                   {reversibleLines.map((l) => {
-                    const remaining =
-                      l.remainingReversibleQty ??
-                      Math.max(0, (Number(l.receivedQty) || 0) - (Number(l.reversedQty) || 0))
+                    const remaining = remainingReversibleQty(l)
                     const checked = reverseSelectedIds.includes(l.id)
+                    const reverseQty = reverseQtyByLineId[l.id] ?? remaining
+                    const qtyInvalid =
+                      checked && (reverseQty <= 0 || reverseQty > remaining + 1e-9)
                     return (
                       <tr key={l.id}>
                         <td>
@@ -1035,11 +1100,17 @@ export function GrnDetailPage() {
                             aria-label={`Reverse line ${l.lineNo} ${l.itemCode}`}
                             checked={checked}
                             onChange={(e) => {
-                              setReverseSelectedIds((prev) =>
-                                e.target.checked
-                                  ? [...prev, l.id]
-                                  : prev.filter((id) => id !== l.id),
-                              )
+                              if (e.target.checked) {
+                                setReverseSelectedIds((prev) =>
+                                  prev.includes(l.id) ? prev : [...prev, l.id],
+                                )
+                                setReverseQtyByLineId((prev) => ({
+                                  ...prev,
+                                  [l.id]: prev[l.id] > 0 ? prev[l.id] : remaining,
+                                }))
+                              } else {
+                                setReverseSelectedIds((prev) => prev.filter((id) => id !== l.id))
+                              }
                             }}
                           />
                         </td>
@@ -1052,7 +1123,27 @@ export function GrnDetailPage() {
                         <td className="num tabular-nums">
                           {formatNumber(Number(l.reversedQty) || 0)}
                         </td>
-                        <td className="num tabular-nums font-semibold">{formatNumber(remaining)}</td>
+                        <td className="num">
+                          <DecimalInput
+                            className="w-24"
+                            min={0}
+                            max={remaining}
+                            blankZero
+                            disabled={!checked || reverseBusy}
+                            value={checked ? reverseQty : 0}
+                            onChange={(v) => {
+                              setReverseQtyByLineId((prev) => ({ ...prev, [l.id]: v }))
+                            }}
+                          />
+                          <div className="mt-0.5 text-[10px] text-erp-muted">
+                            max {formatNumber(remaining)}
+                          </div>
+                          {qtyInvalid ? (
+                            <div className="mt-0.5 text-[10px] text-red-600">
+                              Enter 1–{formatNumber(remaining)}
+                            </div>
+                          ) : null}
+                        </td>
                       </tr>
                     )
                   })}

@@ -4,7 +4,8 @@ import type { PurchaseRequisition, PurchaseRequisitionListRow } from '@/types/pu
 export function isPrPendingPo(
   pr: Pick<PurchaseRequisition, 'status' | 'rfqRequired' | 'convertedPoId'>,
 ): boolean {
-  return pr.status === 'approved' && !pr.rfqRequired && !pr.convertedPoId
+  if (pr.rfqRequired || pr.convertedPoId) return false
+  return pr.status === 'approved' || pr.status === 'partially_converted'
 }
 
 /** Approved and waiting for RFQ creation. */
@@ -24,7 +25,9 @@ export function canConvertPrToPo(
   pr: Pick<PurchaseRequisition, 'status' | 'rfqRequired' | 'convertedPoId' | 'convertedRfqId'>,
 ): boolean {
   if (pr.convertedPoId) return false
-  if (pr.status === 'approved' && !pr.rfqRequired) return true
+  if (!pr.rfqRequired && (pr.status === 'approved' || pr.status === 'partially_converted')) {
+    return true
+  }
   if (pr.status === 'converted_to_rfq') return true
   return false
 }
@@ -40,9 +43,16 @@ export function prProcurementPathLabel(
 }
 
 export function prNextActionHint(pr: PurchaseRequisitionListRow | PurchaseRequisition): string | null {
-  if (isPrPendingPo(pr)) return 'Ready for Purchase Planning Sheet'
+  if (isPrPendingPo(pr)) return 'Create PO — select lines and vendor'
   if (isPrPendingRfq(pr)) return 'Ready for RFQ'
   return null
+}
+
+/** Open PO create wizard with PR line selection (partial conversion). */
+export function purchaseOrderFromPrHref(prId: string, vendorId?: string): string {
+  const params = new URLSearchParams({ mode: 'pr', prId })
+  if (vendorId?.trim()) params.set('vendorId', vendorId.trim())
+  return `/purchase/orders/new?${params.toString()}`
 }
 
 /** Deep-link to planning sheet filtered by PR document number. */

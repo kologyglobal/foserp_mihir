@@ -1,6 +1,7 @@
 import type { PurchaseOrder, PurchaseOrderLine, PurchasePlanningRow } from '@prisma/client'
 import { prisma } from '../../../config/prisma.js'
-import { mapPurchaseOrderToDto } from '../comparisons/comparison.mapper.js'
+import { findPurchaseOrderById } from '../orders/purchase-order.repository.js'
+import { mapPurchaseOrderToDto as mapPoDetailDto } from '../orders/purchase-order.mapper.js'
 import {
   assertPoOrderDateAllowed,
   toPoBackdatePolicy,
@@ -12,15 +13,14 @@ import {
   writePurchaseAudit,
 } from '../shared/purchase-audit.js'
 import { nextPurchaseDocumentNumber } from '../shared/purchase-document-number.js'
-import { enrichPoLinesWithItemUomMappings } from '../shared/item-uom-resolution.js'
+import {
+  preparePurchaseOrderLinesForCreate,
+  taxAmountFromLineSnapshots,
+} from '../orders/purchase-order.service.js'
+import type { CreatePurchaseOrderInput } from '../orders/purchase-order.validation.js'
 import { linkPurchaseRequisitionLinesToOrder } from '../shared/purchase-pr-line-po-link.js'
 import { resolveEffectivePurchaseDefaults } from '../shared/purchase-defaults.js'
 import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
-import {
-  lineAmountFromVendor,
-  resolveDualQuantities,
-  toPrimaryUnitCost,
-} from '../shared/uom-conversion.js'
 import {
   PlanningNoSelectionError,
   PlanningRfqRequiredError,
@@ -108,6 +108,105 @@ async function isMasterActive(
   return Boolean(row && row.status === 'ACTIVE')
 }
 
+async function mapCreatedOrdersToDetailDto(
+  tenantId: string,
+  orders: Array<{ id: string }>,
+) {
+  const loaded = await Promise.all(
+    orders.map(async (order) => {
+      const full = await findPurchaseOrderById(tenantId, order.id)
+      if (!full) {
+        throw new PurchaseOrderCreationError(
+          purchaseMessage(PURCHASE_ERROR_CODE.PO_NOT_FOUND),
+          PURCHASE_ERROR_CODE.PO_NOT_FOUND,
+        )
+      }
+      return mapPoDetailDto(full)
+    }),
+  )
+  return loaded
+}
+
+type PrLineForPoContext = {
+  id: string
+  binId: string | null
+  hsnId: string | null
+  gstGroupId: string | null
+  itemId: string | null
+}
+
+async function loadPlanningPoPrLineContext(tenantId: string, prLineIds: string[]) {
+  if (!prLineIds.length) {
+    return {
+      prLineById: new Map<string, PrLineForPoContext>(),
+      defaultBinByItemId: new Map<string, string | null>(),
+    }
+  }
+  const prLines = await prisma.purchaseRequisitionLine.findMany({
+    where: { tenantId, id: { in: prLineIds } },
+    select: {
+      id: true,
+      binId: true,
+      hsnId: true,
+      gstGroupId: true,
+      itemId: true,
+    },
+  })
+  const prLineById = new Map(prLines.map((l) => [l.id, l]))
+  const itemIds = [
+    ...new Set(prLines.map((l) => l.itemId).filter((id): id is string => Boolean(id))),
+  ]
+  const items = itemIds.length
+    ? await prisma.masterItem.findMany({
+        where: { tenantId, id: { in: itemIds }, deletedAt: null },
+        select: { id: true, defaultBinId: true },
+      })
+    : []
+  return {
+    prLineById,
+    defaultBinByItemId: new Map(items.map((i) => [i.id, i.defaultBinId ?? null])),
+  }
+}
+
+async function resolvePlanningPoBinId(
+  tenantId: string,
+  prLine: PrLineForPoContext | undefined,
+  itemId: string | null,
+  defaultBinByItemId: Map<string, string | null>,
+): Promise<string | null> {
+  const candidates: string[] = []
+  if (prLine?.binId?.trim()) candidates.push(prLine.binId.trim())
+  if (itemId) {
+    const def = defaultBinByItemId.get(itemId)
+    if (def?.trim()) candidates.push(def.trim())
+  }
+  for (const raw of candidates) {
+    const bin = await prisma.masterBin.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        OR: [{ id: raw }, { code: raw }],
+      },
+      select: { id: true },
+    })
+    if (bin) return bin.id
+  }
+  return null
+}
+
+type VendorPoBundle = {
+  vendorId: string
+  vendorRows: PurchasePlanningRow[]
+  preparedLines: Awaited<ReturnType<typeof preparePurchaseOrderLinesForCreate>>
+  prLineLinks: Array<{ purchaseRequisitionLineId: string; orderedQuantity: number }>
+  deliveryWarehouseId: string | null
+  remarks: string
+  first: PurchasePlanningRow
+  subtotal: number
+  taxAmount: number
+  totalAmount: number
+}
+
 /**
  * Create one draft PO per vendor from selected Planning Sheet rows.
  * Single transaction — failed mid-flight leaves no partial POs or status updates.
@@ -182,14 +281,103 @@ export async function createPurchaseOrdersFromPlanning(
     reservedNumbers.push(await reservePurchaseOrderNumber(tenantId))
   }
 
+  const prLineIds = [...new Set(rows.map((r) => r.purchaseRequisitionLineId))]
+  const { prLineById, defaultBinByItemId } = await loadPlanningPoPrLineContext(tenantId, prLineIds)
+
+  const vendorPoBundles: VendorPoBundle[] = []
+  for (const [vendorId, vendorRows] of vendorGroups) {
+    const first = vendorRows[0]
+    const deliveryWarehouseId =
+      input.deliveryWarehouseId ?? first.purchaseRequisition?.warehouseId ?? null
+    const remarksBase = `Created from planning (${vendorRows.map((r) => r.planningNumber).join(', ')})`
+    const addressNote = input.deliveryAddress?.trim()
+    const remarksExtra = input.remarks?.trim()
+    const remarks = [remarksBase, addressNote ? `Delivery: ${addressNote}` : '', remarksExtra]
+      .filter(Boolean)
+      .join('. ')
+
+    const lineInputs: CreatePurchaseOrderInput['lines'] = []
+    const prLineLinks: Array<{ purchaseRequisitionLineId: string; orderedQuantity: number }> = []
+
+    for (const [index, row] of vendorRows.entries()) {
+      const remaining = planningRemainingQuantity(row)
+      const requested = input.orderQuantities?.[row.id]
+      const orderQty =
+        requested != null && Number(requested) > 0
+          ? Math.min(Number(requested), remaining)
+          : remaining
+      if (!(orderQty > 0)) {
+        throw new PurchaseOrderCreationError(
+          purchaseMessage(PURCHASE_ERROR_CODE.PPS_NET_QTY_INVALID),
+          PURCHASE_ERROR_CODE.PPS_NET_QTY_INVALID,
+        )
+      }
+      const rate = Number(row.negotiatedRate ?? row.expectedRate)
+      const prLine = prLineById.get(row.purchaseRequisitionLineId)
+      const binId = await resolvePlanningPoBinId(
+        tenantId,
+        prLine,
+        row.itemId,
+        defaultBinByItemId,
+      )
+
+      lineInputs.push({
+        lineNumber: index + 1,
+        itemId: row.itemId,
+        itemCode: row.itemCodeSnapshot,
+        itemName: row.itemNameSnapshot,
+        description: row.itemDescriptionSnapshot,
+        uomQuantity: orderQty,
+        uomId: row.uomId,
+        rate,
+        requiredDate: row.requiredDate ? row.requiredDate.toISOString().slice(0, 10) : null,
+        purchaseRequisitionLineId: row.purchaseRequisitionLineId,
+        purchasePlanningRowId: row.id,
+        requisitionNumber: row.purchaseRequisitionNumberSnapshot,
+        binId,
+        hsnId: prLine?.hsnId ?? null,
+        gstGroupId: prLine?.gstGroupId ?? null,
+      })
+      prLineLinks.push({
+        purchaseRequisitionLineId: row.purchaseRequisitionLineId,
+        orderedQuantity: orderQty,
+      })
+    }
+
+    const preparedLines = await preparePurchaseOrderLinesForCreate(tenantId, lineInputs, {
+      orderDate,
+      vendorId,
+      deliveryWarehouseId,
+    })
+    const subtotal = Number(
+      preparedLines.reduce((sum, line) => sum + Number(line.amount ?? 0), 0).toFixed(2),
+    )
+    const taxAmount = taxAmountFromLineSnapshots(preparedLines)
+    const totalAmount = Number((subtotal + taxAmount).toFixed(2))
+
+    vendorPoBundles.push({
+      vendorId,
+      vendorRows,
+      preparedLines,
+      prLineLinks,
+      deliveryWarehouseId,
+      remarks,
+      first,
+      subtotal,
+      taxAmount,
+      totalAmount,
+    })
+  }
+
   let createdOrders: Array<PurchaseOrder & { lines: PurchaseOrderLine[] }>
   try {
     createdOrders = await prisma.$transaction(async (tx) => {
     const orders: Array<PurchaseOrder & { lines: PurchaseOrderLine[] }> = []
 
-    for (let i = 0; i < vendorGroups.length; i++) {
-      const [vendorId, vendorRows] = vendorGroups[i]
-      const orderNumber = reservedNumbers[i]
+    for (let i = 0; i < vendorPoBundles.length; i++) {
+      const bundle = vendorPoBundles[i]!
+      const { vendorId, vendorRows, preparedLines, prLineLinks, deliveryWarehouseId, remarks, first, subtotal, taxAmount, totalAmount } = bundle
+      const orderNumber = reservedNumbers[i]!
 
       // Concurrent guard: row must still have remaining alloc qty
       for (const row of vendorRows) {
@@ -209,126 +397,6 @@ export async function createPurchaseOrdersFromPlanning(
         }
       }
 
-      const first = vendorRows[0]
-      let subtotal = 0
-      const rawLineCreates: Array<{
-        tenantId: string
-        lineNumber: number
-        purchaseRequisitionLineId: string
-        purchasePlanningRowId: string
-        itemId: string | null
-        itemCodeSnapshot: string
-        itemNameSnapshot: string
-        description: string | null
-        uomQuantity: number
-        uomId: string | null
-        rate: number
-        requiredDate: Date | null
-        rowId: string
-      }> = []
-      const prLineLinks: Array<{ purchaseRequisitionLineId: string; orderedQuantity: number }> = []
-
-      vendorRows.forEach((row, index) => {
-        const remaining = planningRemainingQuantity(row)
-        const requested = input.orderQuantities?.[row.id]
-        const orderQty =
-          requested != null && Number(requested) > 0
-            ? Math.min(Number(requested), remaining)
-            : remaining
-        if (!(orderQty > 0)) {
-          throw new PurchaseOrderCreationError(
-            purchaseMessage(PURCHASE_ERROR_CODE.PPS_NET_QTY_INVALID),
-            PURCHASE_ERROR_CODE.PPS_NET_QTY_INVALID,
-          )
-        }
-        const rate = Number(row.negotiatedRate ?? row.expectedRate)
-        rawLineCreates.push({
-          tenantId,
-          lineNumber: index + 1,
-          purchaseRequisitionLineId: row.purchaseRequisitionLineId,
-          purchasePlanningRowId: row.id,
-          itemId: row.itemId,
-          itemCodeSnapshot: row.itemCodeSnapshot,
-          itemNameSnapshot: row.itemNameSnapshot,
-          description: row.itemDescriptionSnapshot,
-          uomQuantity: orderQty,
-          uomId: row.uomId,
-          rate,
-          requiredDate: row.requiredDate,
-        })
-        prLineLinks.push({
-          purchaseRequisitionLineId: row.purchaseRequisitionLineId,
-          orderedQuantity: orderQty,
-        })
-      })
-
-      const enriched = await enrichPoLinesWithItemUomMappings(
-        tenantId,
-        rawLineCreates.map((l) => ({
-          itemId: l.itemId,
-          uomId: l.uomId,
-          uomQuantity: l.uomQuantity,
-        })),
-      )
-
-      const lineCreates: Array<{
-        tenantId: string
-        lineNumber: number
-        purchaseRequisitionLineId: string
-        purchasePlanningRowId: string
-        itemId: string | null
-        itemCodeSnapshot: string
-        itemNameSnapshot: string
-        description: string | null
-        quantity: number
-        uomQuantity: number
-        uomConversionFactor: number
-        unitCostPrimary: number
-        uomId: string | null
-        rate: number
-        amount: number
-        requiredDate: Date | null
-      }> = []
-
-      rawLineCreates.forEach((raw, index) => {
-        const uomMeta = enriched[index]
-        const dual = resolveDualQuantities({
-          uomQuantity: raw.uomQuantity,
-          uomConversionFactor: uomMeta?.uomConversionFactor ?? 1,
-        })
-        const factor = dual.uomConversionFactor
-        const unitCostPrimary = toPrimaryUnitCost(raw.rate, factor)
-        const amount = Number(lineAmountFromVendor(raw.rate, dual.uomQuantity).toFixed(2))
-        subtotal += amount
-        lineCreates.push({
-          tenantId: raw.tenantId,
-          lineNumber: raw.lineNumber,
-          purchaseRequisitionLineId: raw.purchaseRequisitionLineId,
-          purchasePlanningRowId: raw.purchasePlanningRowId,
-          itemId: raw.itemId,
-          itemCodeSnapshot: raw.itemCodeSnapshot,
-          itemNameSnapshot: raw.itemNameSnapshot,
-          description: raw.description,
-          quantity: dual.quantity,
-          uomQuantity: dual.uomQuantity,
-          uomConversionFactor: factor,
-          unitCostPrimary,
-          uomId: uomMeta?.uomId ?? raw.uomId,
-          rate: raw.rate,
-          amount,
-          requiredDate: raw.requiredDate,
-        })
-      })
-
-      const deliveryWarehouseId =
-        input.deliveryWarehouseId ?? first.purchaseRequisition?.warehouseId ?? null
-      const remarksBase = `Created from planning (${vendorRows.map((r) => r.planningNumber).join(', ')})`
-      const addressNote = input.deliveryAddress?.trim()
-      const remarksExtra = input.remarks?.trim()
-      const remarks = [remarksBase, addressNote ? `Delivery: ${addressNote}` : '', remarksExtra]
-        .filter(Boolean)
-        .join('. ')
-
       const order = await tx.purchaseOrder.create({
         data: {
           tenantId,
@@ -342,20 +410,25 @@ export async function createPurchaseOrdersFromPlanning(
           currencyCode: 'INR',
           expectedDeliveryDate: first.requiredDate,
           subtotalAmount: subtotal,
-          taxAmount: 0,
+          taxAmount,
           freightAmount: 0,
-          totalAmount: subtotal,
+          totalAmount,
           remarks,
           createdById: actorId,
           updatedById: actorId,
-          lines: { create: lineCreates },
+          lines: {
+            create: preparedLines.map((line) => ({
+              ...line,
+              tenantId,
+            })),
+          },
         },
         include: { lines: { orderBy: { lineNumber: 'asc' } } },
       })
 
       for (const row of vendorRows) {
         const orderQty =
-          lineCreates.find((l) => l.purchasePlanningRowId === row.id)?.uomQuantity ?? 0
+          preparedLines.find((l) => l.purchasePlanningRowId === row.id)?.uomQuantity ?? 0
         const nextOrdered = (Number(row.orderedQuantity) || 0) + orderQty
         const allocated = planningAllocatedQuantity(row)
         const fullyOrdered = nextOrdered >= allocated - 1e-6
@@ -475,7 +548,7 @@ export async function createPurchaseOrdersFromPlanning(
   }
 
   return {
-    orders: createdOrders.map((o) => mapPurchaseOrderToDto(o)),
+    orders: await mapCreatedOrdersToDetailDto(tenantId, createdOrders),
     orderCount: createdOrders.length,
     vendorCount: byVendor.size,
   }
@@ -790,7 +863,7 @@ export async function createPurchaseOrdersFromConsolidation(
   }
 
   return {
-    orders: createdOrders.map((o) => mapPurchaseOrderToDto(o)),
+    orders: await mapCreatedOrdersToDetailDto(tenantId, createdOrders),
     orderCount: createdOrders.length,
     vendorCount: vendorPlans.length,
   }

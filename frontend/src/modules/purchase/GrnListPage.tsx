@@ -40,6 +40,7 @@ import {
   type GrnListFilters,
   type GrnSortKey,
 } from '@/config/grnFilterConfig'
+import { loadListPagePreference, saveListPagePreference } from '@/utils/listPagePreferences'
 import { useCrmFilterDrawer } from '@/hooks/useCrmFilterDrawer'
 import {
   approveToleranceGRN,
@@ -66,7 +67,12 @@ export function GrnListPage() {
     ...DEFAULT_GRN_LIST_FILTERS,
     status: searchParams.get('status') ?? '',
   }))
-  const [sortBy, setSortBy] = useState<GrnSortKey>('documentDate')
+  const [sortBy, setSortBy] = useState<GrnSortKey>(() => {
+    const pref = loadListPagePreference('/purchase/grn')
+    const sb = pref?.sortBy as GrnSortKey | undefined
+    if (sb && GRN_SORT_OPTIONS.some((o) => o.value === sb)) return sb
+    return 'documentDate'
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -90,6 +96,10 @@ export function GrnListPage() {
     if (!status) return
     setFilters((f) => ({ ...f, status }))
   }, [searchParams])
+
+  useEffect(() => {
+    saveListPagePreference('/purchase/grn', { sortBy })
+  }, [sortBy])
 
   const vendorOptions = useMemo(
     () => [...new Set(rows.map((r) => r.vendorName).filter(Boolean))].sort(),

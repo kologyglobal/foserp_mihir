@@ -43,9 +43,11 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
 import {
+  canConvertPrToPo,
   canConvertPrToRfq,
   isPrPendingPo,
   prProcurementPathLabel,
+  purchaseOrderFromPrHref,
   purchasePlanningSheetHrefForPr,
 } from '@/utils/purchaseRequisitionNextStep'
 import {
@@ -78,6 +80,7 @@ export function PurchaseRequisitionDomainDetailPage({
   const [revisions, setRevisions] = useState<PurchaseRequisitionRevisionSnapshot[]>([])
 
   const canEdit = pr && (pr.status === 'draft' || pr.status === 'rejected')
+  const showCreatePo = pr ? canConvertPrToPo(pr) && !pr.rfqRequired && perms.canCreateOrder : false
   const showCreateRfq = pr ? canConvertPrToRfq(pr) && perms.canCreateRfq : false
   const showViewRfq = Boolean(pr?.convertedRfqId)
   const showViewPlanning = pr ? isPrPendingPo(pr) : false
@@ -314,7 +317,14 @@ export function PurchaseRequisitionDomainDetailPage({
           onClick: () => void save(),
           disabled: saving,
         }
-      : showCreateRfq
+      : showCreatePo
+        ? {
+            id: 'create-po',
+            label: 'Create PO',
+            icon: ShoppingCart,
+            onClick: () => navigate(purchaseOrderFromPrHref(pr!.id)),
+          }
+        : showCreateRfq
         ? {
             id: 'rfq',
             label: converting ? 'Creating…' : 'Create RFQ',
@@ -376,6 +386,13 @@ export function PurchaseRequisitionDomainDetailPage({
               pin: true,
               onClick: () => navigate(`/purchase/requisitions/${pr.id}/edit`),
               hidden: !(canEdit && mode === 'view' && perms.canEditRequisition),
+            },
+            {
+              id: 'create-po-sec',
+              label: 'Create PO',
+              icon: ShoppingCart,
+              onClick: () => navigate(purchaseOrderFromPrHref(pr.id)),
+              hidden: !showCreatePo || Boolean(primaryAction && primaryAction.id === 'create-po'),
             },
             {
               id: 'rfq-sec',

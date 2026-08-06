@@ -919,6 +919,7 @@ export function PurchaseRequisitionEditorPage() {
       vendorNumber: vendor?.vendorCode ?? '',
       currentStock: Math.max(0, Math.round(item.reorderLevel * 1.4)),
       openPoQty: Math.max(0, Math.round(item.reorderLevel * 0.3)),
+      binId: defaultBin.binId,
       binCode: defaultBin.binCode || line.binCode || '',
     })
   }
@@ -1512,6 +1513,7 @@ export function PurchaseRequisitionEditorPage() {
               value={orderAdjustments}
               readOnly={!editable}
               taxPct={0}
+              showGstSummary={false}
               onChange={(next) => {
                 setOrderAdjustments(next)
                 markDirty()

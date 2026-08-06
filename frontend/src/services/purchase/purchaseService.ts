@@ -5051,7 +5051,6 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
         const qi = await createQualityInspectionInternal({
           goodsReceiptId: grn.id,
           goodsReceiptLineId: qcLine.id,
-          sampleQty: Math.min(5, qcLine.receivedQty),
         })
         grn.qualityInspectionId = qi.id
       }
@@ -5104,9 +5103,22 @@ export async function postGRN(id: string): Promise<GoodsReceiptNote> {
 function createQualityInspectionInternal(input: QualityInspectionInput): QualityInspection {
   const grn = state.grns.find((g) => g.id === input.goodsReceiptId)
   if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${input.goodsReceiptId}`)
-  const grnLine = grn.lines.find((l) => l.id === input.goodsReceiptLineId)
+
+  const existingOpen = state.qualityInspections.find(
+    (q) =>
+      q.goodsReceiptId === grn.id
+      && (q.status === 'pending' || q.status === 'in_progress' || q.status === 'hold'),
+  )
+  if (existingOpen) {
+    throw new PurchaseServiceError(
+      'QI_DUPLICATE_FOR_GRN',
+      `Quality inspection ${existingOpen.documentNumber} already exists for this goods receipt.`,
+    )
+  }
+
+  const grnLine = grn.lines.find((l) => l.id === input.goodsReceiptLineId) ?? grn.lines[0]
   if (!grnLine) {
-    throw new PurchaseServiceError('GRN_LINE_NOT_FOUND', `GRN line not found: ${input.goodsReceiptLineId}`)
+    throw new PurchaseServiceError('GRN_LINE_NOT_FOUND', 'GRN has no lines to inspect.')
   }
 
   const parameters =
@@ -5145,7 +5157,7 @@ function createQualityInspectionInternal(input: QualityInspectionInput): Quality
     itemName: grnLine.itemName,
     batchLotNo: grnLine.batchNumber || grnLine.lotNumber,
     receivedQty: grnLine.receivedQty,
-    sampleQty: input.sampleQty ?? Math.min(5, grnLine.receivedQty),
+    sampleQty: input.sampleQty ?? grnLine.receivedQty,
     acceptedQty: input.acceptedQty ?? 0,
     rejectedQty: input.rejectedQty ?? 0,
     inspectionPlan: input.inspectionPlan ?? `Incoming inspection — ${grnLine.itemCode}`,
@@ -6182,15 +6194,21 @@ function grnLineBatch(line: GoodsReceiptNote['lines'][number]): string {
   return line.batchNumber || line.lotNumber || ''
 }
 
-function availableReturnQtyForGrnLine(
+export function availableReturnQtyForGrnLine(
   grnId: string,
   grnLineId: string,
   excludeReturnId?: string,
 ): number {
   const grn = state.grns.find((g) => g.id === grnId)
   const line = grn?.lines.find((l) => l.id === grnLineId)
-  if (!line) return 0
-  const base = Math.max(line.rejectedQty, line.damagedQty, line.excessQty, 0)
+  if (!line || !grn) return 0
+  if (['draft', 'cancelled', 'reversed', 'pending_tolerance_approval'].includes(grn.status)) return 0
+  const received = Math.max(0, Number(line.receivedQty) || 0)
+  if (received <= 0) return 0
+  let base = Math.max(line.rejectedQty, line.damagedQty, line.excessQty, 0)
+  if (base <= 0 && ['posted', 'accepted', 'partially_accepted'].includes(grn.status)) {
+    base = Math.max(line.acceptedQty, received)
+  }
   const alreadyReturned = state.returns
     .filter((r) => r.id !== excludeReturnId && r.goodsReceiptId === grnId && r.status !== 'cancelled')
     .flatMap((r) => r.lines)
@@ -6524,33 +6542,40 @@ export async function createPurchaseReturnFromGrn(
   if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${grnId}`)
   const origin = options?.origin ?? 'grn_rejected_quantity'
   const returnReason = options?.returnReason ?? defaultReturnReasonForOrigin(origin)
-  const candidateLines = grn.lines.filter(
-    (l) => l.rejectedQty > 0 || l.damagedQty > 0 || l.excessQty > 0,
-  )
-  const lines = (candidateLines.length ? candidateLines : grn.lines).map((l) => {
-    const available = availableReturnQtyForGrnLine(grn.id, l.id)
-    const desired =
-      origin === 'excess_receipt'
-        ? l.excessQty
-        : origin === 'damaged_material'
-          ? l.damagedQty || l.rejectedQty
-          : l.rejectedQty
-    const qty = Math.min(Math.max(desired, 0), available)
-    return {
-      itemId: l.itemId,
-      returnQty: qty,
-      unitCost: l.rate,
-      goodsReceiptLineId: l.id,
-      description: l.description || l.itemName,
-      batchLotNo: grnLineBatch(l),
-      serialNumber: l.serialNumber || '',
-      receivedQty: l.receivedQty,
-      availableReturnQty: available,
-      reason: returnReason,
-      replacementQty: 0,
-      remarks: l.remarks || '',
-    }
-  }).filter((l) => l.availableReturnQty > 0)
+  if (['draft', 'cancelled', 'reversed', 'pending_tolerance_approval'].includes(grn.status)) {
+    throw new PurchaseServiceError(
+      'RETURN_NO_QTY',
+      'Goods receipt must be submitted and posted before creating a return.',
+    )
+  }
+  const lines = grn.lines
+    .map((l) => {
+      const available = availableReturnQtyForGrnLine(grn.id, l.id)
+      if (available <= 0) return null
+      const desired =
+        origin === 'excess_receipt'
+          ? Math.min(l.excessQty, available)
+          : origin === 'damaged_material'
+            ? Math.min(l.damagedQty || l.rejectedQty, available)
+            : available
+      const qty = Math.min(Math.max(desired, 0), available)
+      if (qty <= 0) return null
+      return {
+        itemId: l.itemId,
+        returnQty: qty,
+        unitCost: l.rate,
+        goodsReceiptLineId: l.id,
+        description: l.description || l.itemName,
+        batchLotNo: grnLineBatch(l),
+        serialNumber: l.serialNumber || '',
+        receivedQty: l.receivedQty,
+        availableReturnQty: available,
+        reason: returnReason,
+        replacementQty: 0,
+        remarks: l.remarks || '',
+      }
+    })
+    .filter((l): l is NonNullable<typeof l> => l != null)
   if (!lines.length) {
     throw new PurchaseServiceError('RETURN_NO_QTY', 'No returnable quantity on this GRN')
   }

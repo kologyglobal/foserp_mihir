@@ -159,6 +159,36 @@ export function isGrnLineFullyReversed(
   return received > 0 && remainingReversibleReceived(line) <= 0
 }
 
+/** Split a partial reverse qty across remaining accepted/rejected on the line. */
+export function allocatePartialReverseQuantities(
+  line: Pick<GoodsReceiptLine, 'receivedQuantity' | 'acceptedQuantity' | 'rejectedQuantity'> & {
+    reversedQuantity?: unknown
+    reversedAcceptedQuantity?: unknown
+    reversedRejectedQuantity?: unknown
+  },
+  reverseReceivedQty: number,
+): { received: number; accepted: number; rejected: number } {
+  const remaining = remainingReversibleReceived(line)
+  const reverseReceived = Math.min(remaining, Math.max(0, qty(reverseReceivedQty)))
+  if (reverseReceived <= 0) return { received: 0, accepted: 0, rejected: 0 }
+
+  const remAccepted = remainingReversibleAccepted(line)
+  const remRejected = remainingReversibleRejected(line)
+  const remTotal = remAccepted + remRejected
+  if (remTotal <= 0) {
+    return { received: reverseReceived, accepted: reverseReceived, rejected: 0 }
+  }
+
+  let accepted = Number(((reverseReceived * remAccepted) / remTotal).toFixed(6))
+  if (accepted > remAccepted) accepted = remAccepted
+  let rejected = Number((reverseReceived - accepted).toFixed(6))
+  if (rejected > remRejected) {
+    rejected = remRejected
+    accepted = Number((reverseReceived - rejected).toFixed(6))
+  }
+  return { received: reverseReceived, accepted, rejected }
+}
+
 export function allowedActions(
   grn: Pick<GoodsReceipt, 'status' | 'deletedAt' | 'inspectionRequired'> & {
     lines?: Array<
