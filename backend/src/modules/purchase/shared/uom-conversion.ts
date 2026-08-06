@@ -60,6 +60,25 @@ export function toUomQuantity(primaryQuantity: unknown, factor: unknown): number
   return asNumber(primaryQuantity) * f
 }
 
+/** Mirror GRN accepted/rejected base qty into commercial UOM using line factor snapshot. */
+export function syncGrnAcceptedRejectedUomFromBase(
+  acceptedBase: unknown,
+  rejectedBase: unknown,
+  factor: unknown,
+): { acceptedUomQuantity: number; rejectedUomQuantity: number } {
+  const f = asNumber(factor, 1)
+  if (!(f > 0)) {
+    return {
+      acceptedUomQuantity: asNumber(acceptedBase),
+      rejectedUomQuantity: asNumber(rejectedBase),
+    }
+  }
+  return {
+    acceptedUomQuantity: toUomQuantity(acceptedBase, f),
+    rejectedUomQuantity: toUomQuantity(rejectedBase, f),
+  }
+}
+
 /** Cost per primary unit from vendor unit cost. */
 export function toPrimaryUnitCost(vendorUnitCost: unknown, factor: unknown): number {
   const f = assertValidFactor(factor)

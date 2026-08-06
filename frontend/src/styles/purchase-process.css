@@ -643,6 +643,23 @@ a.purchase-process-map__step:hover {
   font-size: 10px;
 }
 
+.purchase-pr-lines-grid__uom-text {
+  display: block;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--erp-text, #242424);
+  line-height: 2rem;
+}
+
+.purchase-pr-lines-grid__uom-select {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 2px !important;
+}
+
 .purchase-doc-lines-grid__qtg-col {
   width: 5.5rem !important;
   min-width: 5.5rem !important;
@@ -681,15 +698,21 @@ a.purchase-process-map__step:hover {
   width: 100%;
 }
 
-/* GRN lines: first column is Item (no # / type stickies) */
-.purchase-grn-lines-grid .purchase-doc-lines-grid__sticky-item {
+/* GRN receiving grid — item column sticky at left (no line # / product type). */
+.grn-lines-grid .purchase-doc-lines-grid__sticky-item {
   left: 0;
-  width: 12rem;
-  min-width: 12rem;
+  width: 14rem;
+  min-width: 14rem;
   max-width: 14rem;
+  z-index: 12;
 }
 
-.purchase-grn-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item {
+.grn-lines-grid thead .purchase-doc-lines-grid__sticky-item {
+  top: 0;
+  z-index: 22;
+}
+
+.grn-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item {
   background: var(--erp-surface-alt, #f8fafc);
 }
 
@@ -724,6 +747,11 @@ a.purchase-process-map__step:hover {
   width: 11rem;
 }
 
+.purchase-doc-lines-grid {
+  border-collapse: separate !important;
+  border-spacing: 0;
+}
+
 .purchase-doc-lines-grid thead th {
   position: sticky;
   top: 0;
@@ -738,11 +766,13 @@ a.purchase-process-map__step:hover {
   min-width: 2.5rem;
   width: 2.5rem;
   background: #fff;
+  background-clip: padding-box;
   box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
 }
 
 .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-line,
 .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-line {
+  top: 0;
   z-index: 22;
   background: var(--erp-surface-alt, #f8fafc);
 }
@@ -756,11 +786,13 @@ a.purchase-process-map__step:hover {
   max-width: 9.5rem;
   box-sizing: border-box;
   background: #fff;
+  background-clip: padding-box;
   border-right: 1px solid var(--erp-border, #e2e8f0);
 }
 
 .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-type,
 .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-type {
+  top: 0;
   z-index: 21;
   background: var(--erp-surface-alt, #f8fafc);
 }
@@ -775,13 +807,21 @@ a.purchase-process-map__step:hover {
   padding-left: 8px !important;
   padding-right: 8px !important;
   background: #fff;
+  background-clip: padding-box;
   border-right: 1px solid var(--erp-border, #e2e8f0);
   box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
   overflow: visible;
 }
 
+.purchase-doc-lines-grid .purchase-doc-lines-grid__sticky-item > * {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0 !important;
+}
+
 .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-item,
 .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-item {
+  top: 0;
   z-index: 21;
   background: var(--erp-surface-alt, #f8fafc);
 }
@@ -794,14 +834,27 @@ a.purchase-process-map__step:hover {
   width: 2.75rem;
   text-align: center;
   background: #fff;
+  background-clip: padding-box;
   border-left: 1px solid var(--erp-border, #e2e8f0);
   box-shadow: -4px 0 8px rgb(15 23 42 / 0.06);
 }
 
 .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-actions,
 .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-actions {
+  top: 0;
   z-index: 22;
   background: var(--erp-surface-alt, #f8fafc);
+}
+
+.purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-line,
+.purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-type,
+.purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item,
+.purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-actions {
+  background: #f0f7ff;
+}
+
+.purchase-doc-lines-grid tfoot td {
+  border-top: 1px solid var(--erp-border-strong, #cbd5e1);
 }
 
 /* Purchase Setup uses one consistent 32px dropdown across every tab. */

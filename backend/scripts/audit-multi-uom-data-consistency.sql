@@ -55,7 +55,30 @@ WHERE mi.deletedAt IS NULL
   )
 LIMIT 100;
 
--- 4) Summary counts (certification gate: all should be 0)
+-- 4) GRN lines after QC: accepted/rejected commercial UOM vs base × factor
+SELECT
+  grl.id,
+  gr.grnNumber,
+  grl.lineNumber,
+  grl.acceptedQuantity,
+  grl.acceptedUomQuantity,
+  grl.rejectedQuantity,
+  grl.rejectedUomQuantity,
+  grl.uomConversionFactor,
+  ROUND(grl.acceptedQuantity * grl.uomConversionFactor, 4) AS expectedAcceptedUom,
+  ROUND(ABS(grl.acceptedUomQuantity - (grl.acceptedQuantity * grl.uomConversionFactor)), 4) AS acceptedUomDrift
+FROM goods_receipt_lines grl
+JOIN goods_receipts gr ON gr.id = grl.goodsReceiptId AND gr.tenantId = grl.tenantId
+WHERE grl.uomConversionFactor > 1
+  AND (grl.acceptedQuantity > 0 OR grl.rejectedQuantity > 0)
+  AND (
+    ABS(grl.acceptedUomQuantity - (grl.acceptedQuantity * grl.uomConversionFactor)) > 0.01
+    OR ABS(grl.rejectedUomQuantity - (grl.rejectedQuantity * grl.uomConversionFactor)) > 0.01
+  )
+ORDER BY acceptedUomDrift DESC
+LIMIT 100;
+
+-- 5) Summary counts (certification gate: all should be 0)
 SELECT 'po_line_drift' AS checkName, COUNT(*) AS issueCount
 FROM purchase_order_lines pol
 WHERE pol.uomConversionFactor > 0
@@ -75,4 +98,13 @@ WHERE mi.deletedAt IS NULL
   AND NOT EXISTS (
     SELECT 1 FROM master_item_uom_conversions c
     WHERE c.itemId = mi.id AND c.tenantId = mi.tenantId
+  )
+UNION ALL
+SELECT 'grn_qc_uom_drift', COUNT(*)
+FROM goods_receipt_lines grl
+WHERE grl.uomConversionFactor > 1
+  AND (grl.acceptedQuantity > 0 OR grl.rejectedQuantity > 0)
+  AND (
+    ABS(grl.acceptedUomQuantity - (grl.acceptedQuantity * grl.uomConversionFactor)) > 0.01
+    OR ABS(grl.rejectedUomQuantity - (grl.rejectedQuantity * grl.uomConversionFactor)) > 0.01
   );

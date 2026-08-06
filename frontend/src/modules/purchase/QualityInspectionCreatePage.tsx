@@ -35,24 +35,28 @@ export function QualityInspectionCreatePage() {
           if (!cancelled) setError('This GRN does not require quality inspection.')
           return
         }
-        const qcLine =
-          grn.lines.find((l) => l.inspectionStatus === 'pending' || l.pendingInspectionQty > 0)
-          ?? grn.lines[0]
-        if (!qcLine) {
-          if (!cancelled) setError('GRN has no lines to inspect.')
+        if (grn.qualityInspectionId) {
+          if (!cancelled) {
+            notify.info('Opening existing quality inspection for this GRN')
+            navigate(`/purchase/quality-inspections/${grn.qualityInspectionId}`, { replace: true })
+          }
           return
         }
-        const qi = await createQualityInspection({
-          goodsReceiptId: grn.id,
-          goodsReceiptLineId: qcLine.id,
-          sampleQty: Math.min(5, qcLine.receivedQty || qcLine.pendingInspectionQty || 1),
-        })
+        const qi = await createQualityInspection({ goodsReceiptId: grn.id })
         if (!cancelled) {
           notify.success(`Inspection ${qi.documentNumber} created`)
           navigate(`/purchase/quality-inspections/${qi.id}`, { replace: true })
         }
       } catch (err) {
         if (!cancelled) {
+          if (err instanceof PurchaseServiceError && err.code === 'QI_DUPLICATE_FOR_GRN') {
+            const grn = await getGRNById(grnId)
+            if (grn?.qualityInspectionId) {
+              notify.info(err.message)
+              navigate(`/purchase/quality-inspections/${grn.qualityInspectionId}`, { replace: true })
+              return
+            }
+          }
           setError(err instanceof PurchaseServiceError ? err.message : 'Failed to create inspection')
         }
       }

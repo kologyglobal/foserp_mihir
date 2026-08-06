@@ -548,15 +548,15 @@
   margin-bottom: 10px;
 }
 
-/* Line grid — sticky header polish, keep purchase table behavior */
-.enterprise-workspace--purchase.purchase-pr-form-page .purchase-pr-lines-scroll {
+/* Line grid — sticky header polish (scroll wrapper: purchase-doc-lines-grid-scroll) */
+.enterprise-workspace--purchase.purchase-pr-form-page .purchase-doc-lines-grid-scroll {
   max-height: min(36rem, 62vh);
   border-radius: 10px;
   border: 1px solid var(--dyn-border, #e1e5ea);
   background: #fff;
 }
 
-.enterprise-workspace--purchase.purchase-pr-form-page .purchase-pr-lines-grid thead th {
+.enterprise-workspace--purchase.purchase-pr-form-page .purchase-doc-lines-grid thead th {
   position: sticky;
   top: 0;
   z-index: 3;
@@ -571,7 +571,7 @@
   box-shadow: 0 1px 0 var(--dyn-border, #e1e5ea);
 }
 
-.enterprise-workspace--purchase.purchase-pr-form-page .purchase-pr-lines-grid tbody td {
+.enterprise-workspace--purchase.purchase-pr-form-page .purchase-doc-lines-grid tbody td {
   padding-top: 8px !important;
   padding-bottom: 8px !important;
   font-size: 12.5px;

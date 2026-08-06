@@ -358,6 +358,38 @@ export function ErpSmartSelect<T extends string = string>({
     }
   }
 
+  /** Commit highlighted / typed filter match on blur or Tab (keyboard + mouse-away). */
+  function commitPendingSelection(options?: { keepFocus?: boolean }) {
+    if (disabled) return false
+    const q = filterQuery.trim().toLowerCase()
+    if (open && filtered[highlightIndex]) {
+      selectOption(filtered[highlightIndex], options)
+      return true
+    }
+    if (q.length > 0) {
+      const exact = filtered.find(
+        (o) =>
+          o.label.toLowerCase() === q ||
+          String(o.value).toLowerCase() === q ||
+          (o.searchText ?? '').toLowerCase() === q,
+      )
+      if (exact) {
+        selectOption(exact, options)
+        return true
+      }
+      const prefixMatches = filtered.filter(
+        (o) =>
+          o.label.toLowerCase().startsWith(q) ||
+          (o.searchText ?? '').toLowerCase().startsWith(q),
+      )
+      if (prefixMatches.length === 1) {
+        selectOption(prefixMatches[0]!, options)
+        return true
+      }
+    }
+    return false
+  }
+
   function clearValue(e: React.MouseEvent) {
     e.stopPropagation()
     onChange('' as T | '')
@@ -416,10 +448,9 @@ export function ErpSmartSelect<T extends string = string>({
     // Commit the highlighted row on Tab so keyboard users update form state
     // (UOM / ERP smart selects / long Selects). Do not preventDefault — focus moves on.
     if (e.key === 'Tab') {
-      if (open && filtered[highlightIndex]) {
-        selectOption(filtered[highlightIndex], { keepFocus: true })
-      } else {
+      if (!commitPendingSelection({ keepFocus: true })) {
         setOpen(false)
+        setFilterQuery('')
       }
     }
   }
@@ -675,7 +706,9 @@ export function ErpSmartSelect<T extends string = string>({
               const active = document.activeElement
               if (anchorRef.current?.contains(active)) return
               if (dropdownRef.current?.contains(active)) return
+              commitPendingSelection()
               setOpen(false)
+              setFilterQuery('')
               onBlur?.()
             }, 0)
           }}

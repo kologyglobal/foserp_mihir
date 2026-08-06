@@ -113,6 +113,40 @@ function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
+/** Resolve storage location id from id, code, or name (GRN editor stores id in state). */
+function resolveStorageLocationId(
+  raw: string,
+  locations: ReturnType<typeof useMasterStore.getState>['locations'],
+): string {
+  const v = raw.trim()
+  if (!v) return ''
+  if (locations.some((l) => l.id === v)) return v
+  const hit = locations.find((l) => l.locationName === v || l.locationCode === v)
+  return hit?.id ?? v
+}
+
+/** Human label for receiving location — never show a bare UUID in UI chrome. */
+function storageLocationLabel(
+  raw: string,
+  locations: ReturnType<typeof useMasterStore.getState>['locations'],
+): string {
+  const v = raw.trim()
+  if (!v) return ''
+  const hit = locations.find(
+    (l) => l.id === v || l.locationName === v || l.locationCode === v,
+  )
+  if (hit) {
+    const code = hit.locationCode?.trim()
+    const name = hit.locationName?.trim()
+    if (code && name && code !== name) return `${code} — ${name}`
+    return name || code || ''
+  }
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)) {
+    return ''
+  }
+  return v
+}
+
 export function GrnEditorPage() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
@@ -158,6 +192,10 @@ export function GrnEditorPage() {
   const warehouseLocations = useMemo(
     () => storageLocations.filter((l) => !warehouseId || l.warehouseId === warehouseId),
     [storageLocations, warehouseId],
+  )
+  const receivingLocationLabel = useMemo(
+    () => storageLocationLabel(receivingLocation, storageLocations),
+    [receivingLocation, storageLocations],
   )
   const receivableOrders = useMemo(
     () =>
@@ -433,7 +471,10 @@ export function GrnEditorPage() {
         setGateEntryNo(grn.gateEntryNo ?? '')
         setWarehouseId(grn.warehouseId)
         setWarehouseName(grn.warehouseName)
-        setReceivingLocation(grn.receivingLocation)
+        setReceivingLocation(
+          grn.storageLocationId ||
+            resolveStorageLocationId(grn.receivingLocation, useMasterStore.getState().locations),
+        )
         setReceivedByName(grn.receivedBy.name)
         setInspectionRequired(grn.inspectionRequired)
         setAllowExcess(grn.allowExcess)
@@ -543,6 +584,44 @@ export function GrnEditorPage() {
     })
     markDirty()
   }
+
+  const fillLinePending = (index: number) => {
+    const row = lines[index]
+    if (!row) return
+    const pendingUom = Number(row.pendingUomQty) || Number(row.pendingQty) || 0
+    if (pendingUom <= 0) return
+    const factor = Number(row.uomConversionFactor) || 1
+    updateLine(index, {
+      receivedUomQty: pendingUom,
+      receivedQty: purchaseQtyToBaseQty(pendingUom, factor),
+    })
+  }
+
+  const fillAllPending = () => {
+    setLines((prev) =>
+      prev.map((row) => {
+        const pendingUom = Number(row.pendingUomQty) || Number(row.pendingQty) || 0
+        if (pendingUom <= 0) return row
+        const factor = Number(row.uomConversionFactor) || 1
+        return recalcGrnLineDraft(
+          {
+            ...row,
+            receivedUomQty: pendingUom,
+            receivedQty: purchaseQtyToBaseQty(pendingUom, factor),
+          },
+          receiptSetup,
+          inspectionRequired,
+        )
+      }),
+    )
+    markDirty()
+  }
+
+  const hasFillablePending = lines.some((l) => {
+    const pendingUom = Number(l.pendingUomQty) || Number(l.pendingQty) || 0
+    const received = Number(l.receivedUomQty ?? l.receivedQty) || 0
+    return pendingUom > 0 && received < pendingUom - 1e-9
+  })
 
   const requestShortClose = (index: number, checked: boolean) => {
     if (!checked) {
@@ -752,12 +831,6 @@ export function GrnEditorPage() {
       })),
     [validationErrorList],
   )
-
-  const receivingLocationLabel = useMemo(() => {
-    if (!receivingLocation) return ''
-    const loc = storageLocations.find((l) => l.id === receivingLocation)
-    return loc ? `${loc.locationCode} — ${loc.locationName}` : receivingLocation
-  }, [receivingLocation, storageLocations])
 
   if (loading) {
     return (
@@ -1221,8 +1294,18 @@ export function GrnEditorPage() {
             ) : null}
           </div>
         )}
+        <div className="mb-2 flex justify-end">
+          <button
+            type="button"
+            className="erp-btn erp-btn--secondary text-[12px]"
+            disabled={!hasFillablePending}
+            onClick={fillAllPending}
+          >
+            Fill all pending
+          </button>
+        </div>
         <div className="purchase-doc-lines-grid-scroll relative rounded-md border border-erp-border">
-          <table className="erp-table purchase-doc-lines-grid purchase-grn-lines-grid w-max min-w-full text-left text-[11px]">
+          <table className="erp-table purchase-doc-lines-grid grn-lines-grid w-max min-w-full text-left text-[12px]">
             <thead>
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-item">Item</th>
@@ -1354,6 +1437,21 @@ export function GrnEditorPage() {
                         {formatPurchaseQty(Number(l.receivedQty) || 0)} {l.baseUom}
                       </p>
                     ) : null}
+                    {(() => {
+                      const pendingUom =
+                        Number(l.pendingUomQty) || Number(l.pendingQty) || 0
+                      const received = Number(l.receivedUomQty ?? l.receivedQty) || 0
+                      if (pendingUom <= 0 || received >= pendingUom - 1e-9) return null
+                      return (
+                        <button
+                          type="button"
+                          className="mt-1 text-[11px] font-medium text-erp-primary hover:underline"
+                          onClick={() => fillLinePending(i)}
+                        >
+                          Fill pending
+                        </button>
+                      )
+                    })()}
                     {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`] ? (
                       <p className="mt-1 text-xs text-erp-danger-fg">
                         {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`]}

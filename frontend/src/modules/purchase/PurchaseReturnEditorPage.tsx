@@ -64,6 +64,7 @@ import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
+import { filterGrnsForPurchaseReturn } from '@/utils/purchaseReturnEligibility'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -578,6 +579,20 @@ export function PurchaseReturnEditorPage() {
     }
   }
 
+  const loadPrefillFromGrn = (grnId: string) => {
+    if (!grnId) {
+      setReturnableCatalog([])
+      setLines([])
+      setPrefillBanner(null)
+      return
+    }
+    void getReturnWizardPrefill({ goodsReceiptId: grnId })
+      .then((prefill) => applyWizardPrefill(prefill, items))
+      .catch((err) =>
+        notify.error(purchaseUserMessage(err, 'Could not load returnable GRN lines')),
+      )
+  }
+
   const saveDraft = async () => {
     if (saving) return
     if (!vendorId) {
@@ -654,7 +669,11 @@ export function PurchaseReturnEditorPage() {
   const editable = status === 'draft' || status === 'pending_approval'
   const showOriginPicker = isNew || !recordId
   const vendorOrders = orders.filter((o) => !vendorId || o.vendor.id === vendorId)
-  const vendorGrns = grns.filter((g) => !vendorId || g.vendor.id === vendorId)
+  const returnableGrns = filterGrnsForPurchaseReturn(grns, {
+    vendorId: vendorId || undefined,
+    purchaseOrderId: purchaseOrderId || undefined,
+  })
+  const vendorGrns = returnableGrns
   const vendorInvoices = invoices.filter((i) => !vendorId || i.vendor.id === vendorId)
 
   return (
@@ -740,23 +759,13 @@ export function PurchaseReturnEditorPage() {
                 const next = e.target.value
                 setGoodsReceiptId(next)
                 markDirty()
-                if (next) {
-                  void getReturnWizardPrefill({ goodsReceiptId: next })
-                    .then((prefill) => applyWizardPrefill(prefill, items))
-                    .catch((err) =>
-                      notify.error(purchaseUserMessage(err, 'Could not load returnable GRN lines')),
-                    )
-                } else {
-                  setReturnableCatalog([])
-                  setLines([])
-                  setPrefillBanner(null)
-                }
+                loadPrefillFromGrn(next)
               }}
               className="max-w-md"
               aria-label="Source GRN"
             >
               <option value="">{SELECT_PLACEHOLDER}</option>
-              {grns.map((g) => (
+              {returnableGrns.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.documentNumber} · {g.vendor.name}
                 </option>
@@ -934,7 +943,20 @@ export function PurchaseReturnEditorPage() {
           <Select
             value={purchaseOrderId}
             onChange={(e) => {
-              setPurchaseOrderId(e.target.value)
+              const next = e.target.value
+              setPurchaseOrderId(next)
+              if (goodsReceiptId) {
+                const stillValid = filterGrnsForPurchaseReturn(grns, {
+                  vendorId: vendorId || undefined,
+                  purchaseOrderId: next || undefined,
+                }).some((g) => g.id === goodsReceiptId)
+                if (!stillValid) {
+                  setGoodsReceiptId('')
+                  setReturnableCatalog([])
+                  setLines([])
+                  setPrefillBanner(null)
+                }
+              }
               markDirty()
             }}
             disabled={!editable}
@@ -951,8 +973,10 @@ export function PurchaseReturnEditorPage() {
           <Select
             value={goodsReceiptId}
             onChange={(e) => {
-              setGoodsReceiptId(e.target.value)
+              const next = e.target.value
+              setGoodsReceiptId(next)
               markDirty()
+              loadPrefillFromGrn(next)
             }}
             disabled={!editable}
           >
@@ -1064,7 +1088,7 @@ export function PurchaseReturnEditorPage() {
         }
       >
         <PurchaseTableToolbar>
-          {editable && returnableCatalog.length > 0 ? (
+          {editable && returnableCatalog.length > 0 && goodsReceiptId ? (
             <ErpButton
               type="button"
               size="sm"

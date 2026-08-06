@@ -366,7 +366,7 @@ function computeTotals(
 }
 
 /** Header tax from line amount × GST % snapshot (exclusive tax). */
-function taxAmountFromLineSnapshots(
+export function taxAmountFromLineSnapshots(
   lines: Array<{ amount: number; gstRatePctSnapshot?: number }>,
 ): number {
   return money(

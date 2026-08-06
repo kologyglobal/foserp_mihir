@@ -649,6 +649,11 @@ export async function getReturnWizardPrefill(
   query: { qualityInspectionId?: string; goodsReceiptId?: string },
 ) {
   const returnable = await computeRemainingReturnable(tenantId, query)
+  if (returnable.closedForReturn) {
+    throw new PurchaseReturnValidationError(
+      'Goods receipt is not open for returns. Submit the GRN and complete inspection / posting first.',
+    )
+  }
   if (!returnable.vendorId) throw new PurchaseReturnValidationError('Cannot prefill — no vendor resolved from QI/GRN.')
   const qi = returnable.qualityInspectionId
     ? await prisma.purchaseQualityInspection.findFirst({

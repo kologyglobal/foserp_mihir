@@ -1,5 +1,5 @@
-import { env } from '../../../config/env.js'
 import { logger } from '../../../config/logger.js'
+import { resolveKnowledgeChatLlmConfig } from '../llm-config.js'
 
 export type ChatMessage = {
   role: 'system' | 'user' | 'assistant'
@@ -19,21 +19,23 @@ export type ChatCompletionResult = {
   tokenOut: number | null
 }
 
-function chatConfig(): { apiKey: string; baseUrl: string; model: string } | null {
-  const apiKey = env.OPENAI_API_KEY?.trim()
-  if (!apiKey) return null
-  const baseUrl = (env.OPENAI_BASE_URL?.trim() || 'https://api.openai.com/v1').replace(/\/$/, '')
-  const model = env.KB_CHAT_MODEL?.trim() || 'gpt-4o-mini'
-  return { apiKey, baseUrl, model }
+function chatConfig() {
+  const cfg = resolveKnowledgeChatLlmConfig()
+  if (!cfg) return null
+  return { apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, model: cfg.model, provider: cfg.provider }
 }
 
-function friendlyChatApiError(status: number, body: string): string {
+function friendlyChatApiError(status: number, body: string, provider: 'gemini' | 'openai'): string {
   const lower = body.toLowerCase()
   if (status === 429 || lower.includes('insufficient_quota') || lower.includes('exceeded your current quota')) {
-    return 'OpenAI quota exceeded (billing/plan). Top up at platform.openai.com or remove OPENAI_API_KEY for local answers.'
+    return provider === 'gemini'
+      ? 'Gemini quota/rate limit hit. Check Google AI Studio billing or remove GEMINI_API_KEY for local answers.'
+      : 'OpenAI quota exceeded (billing/plan). Top up at platform.openai.com or remove OPENAI_API_KEY for local answers.'
   }
   if (status === 401 || status === 403 || lower.includes('invalid_api_key')) {
-    return 'OpenAI API key rejected. Check OPENAI_API_KEY in backend/.env and restart.'
+    return provider === 'gemini'
+      ? 'Gemini API key rejected. Check GEMINI_API_KEY in backend/.env and restart the backend.'
+      : 'OpenAI API key rejected. Check OPENAI_API_KEY in backend/.env and restart.'
   }
   return `Chat API ${status}: ${body.slice(0, 280)}`
 }
@@ -66,7 +68,7 @@ export async function streamChatCompletion(
 
     if (!res.ok || !res.body) {
       const body = await res.text().catch(() => '')
-      throw new Error(friendlyChatApiError(res.status, body))
+      throw new Error(friendlyChatApiError(res.status, body, cfg.provider))
     }
 
     const reader = res.body.getReader()
@@ -130,7 +132,7 @@ export async function streamChatCompletion(
       }
     }
     const message = err instanceof Error ? err.message : String(err)
-    logger.warn('OpenAI chat unavailable; using local extractive answer', {
+    logger.warn('Generative chat unavailable; using local extractive answer', {
       message: message.slice(0, 280),
     })
     return streamLocalExtractive(messages, handlers)
@@ -161,7 +163,7 @@ export function buildLocalExtractiveAnswer(messages: ChatMessage[]): string {
     return 'I could not find relevant knowledge documents for that question. Upload and reindex documents, then try again.'
   }
   return [
-    'Based on the retrieved knowledge sources (local answer mode — set `OPENAI_API_KEY` for generative chat):',
+    'Based on the retrieved knowledge sources (local answer mode — set `GEMINI_API_KEY` or `OPENAI_API_KEY` in backend/.env for generative Copilot):',
     '',
     sourcesBlock,
     '',

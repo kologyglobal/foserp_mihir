@@ -103,11 +103,18 @@ export const grnLifecycleRemarksSchema = z
   })
   .default({})
 
+const reverseLineQuantitySchema = z.object({
+  lineId: z.string().uuid(),
+  quantity: z.number().positive(),
+})
+
 /** Full reverse when lineIds omitted/empty; otherwise reverse only those GRN line ids. */
 export const reverseGoodsReceiptSchema = z
   .object({
     remarks: z.string().trim().max(2000).optional(),
     lineIds: z.array(z.string().uuid()).max(500).optional(),
+    /** Partial qty reverse per line (base received qty). Omitted lines reverse full remaining. */
+    lineQuantities: z.array(reverseLineQuantitySchema).max(500).optional(),
   })
   .default({})
 

@@ -3,6 +3,10 @@ import type { Request } from 'express'
 import type { KnowledgeDocumentKind, KnowledgeDocumentStatus } from '@prisma/client'
 import { env } from '../../config/env.js'
 import {
+  hasKnowledgeGenerativeLlm,
+  resolveKnowledgeChatLlmConfig,
+} from './llm-config.js'
+import {
   getAttachmentExtension,
   readKnowledgeDocumentFile,
   saveKnowledgeDocumentFile,
@@ -188,8 +192,9 @@ export async function getWaveStatus(tenantId: string) {
     features: { ...KNOWLEDGE_FEATURES },
     indexingEnabled: isIndexingEnabled(),
     embeddingMode: env.OPENAI_API_KEY ? 'openai-compatible' : 'local-hash',
-    chatMode: env.OPENAI_API_KEY ? 'openai-compatible' : 'local-extractive',
-    copilotMode: env.OPENAI_API_KEY ? 'openai-compatible' : 'local-extractive',
+    chatMode: hasKnowledgeGenerativeLlm() ? 'generative' : 'local-extractive',
+    copilotMode: hasKnowledgeGenerativeLlm() ? 'generative' : 'local-extractive',
+    llmProvider: resolveKnowledgeChatLlmConfig()?.provider ?? null,
     counts: { documents, categories, tags, sessions, embeddings },
   }
 }

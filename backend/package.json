@@ -28,6 +28,7 @@
     "test:supplier-quality-closure-live": "vitest run tests/supplier-quality-closure-live.test.ts --hookTimeout=180000",
     "test:purchase-coverage-live": "vitest run tests/purchase-module-coverage.test.ts --hookTimeout=120000",
     "test:purchase-multi-unit-uom-live": "tsx scripts/test-purchase-multi-unit-uom-flow.ts",
+    "test:pr-to-grn-stock-e2e": "tsx scripts/test-pr-to-grn-stock-e2e.ts",
     "test:grn-tolerance": "vitest run tests/purchase/grn-tolerance.test.ts",
     "test:grn-tolerance-live": "tsx scripts/test-grn-tolerance-flow.ts",
     "test:fin-close-1-live": "tsx scripts/test-fin-close-1-grir-ppv-return-ap.ts",

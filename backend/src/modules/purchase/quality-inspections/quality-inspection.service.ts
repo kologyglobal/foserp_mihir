@@ -6,8 +6,14 @@ import { nextCode } from '../../../services/codeSeries.service.js'
 import { InventoryPostingService } from '../../inventory/shared/stock-posting.service.js'
 import { resolveEffectivePurchaseDefaults } from '../shared/purchase-defaults.js'
 import { postGrnStockInward } from '../shared/purchase-inventory-posting.js'
+import { syncGrnAcceptedRejectedUomFromBase } from '../shared/uom-conversion.js'
 import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/accounting/inventory-accounting-event.service.js'
-import { QualityInspectionNotFoundError, QualityInspectionValidationError, QualityInspectionWorkflowError } from './quality-inspection.errors.js'
+import {
+  QualityInspectionDuplicateForGrnError,
+  QualityInspectionNotFoundError,
+  QualityInspectionValidationError,
+  QualityInspectionWorkflowError,
+} from './quality-inspection.errors.js'
 import { mapQualityInspection, type QiEnrichment } from './quality-inspection.mapper.js'
 import * as repo from './quality-inspection.repository.js'
 import type {
@@ -17,7 +23,13 @@ import type {
   QualityInspectionParameterInput,
   UpdateQualityInspectionInput,
 } from './quality-inspection.validation.js'
-import { assertQiEditable, qiDate, qiQty, validateQiLines } from './quality-inspection.workflow.js'
+import {
+  assertQiEditable,
+  OPEN_QUALITY_INSPECTION_STATUSES,
+  qiDate,
+  qiQty,
+  validateQiLines,
+} from './quality-inspection.workflow.js'
 
 function defaultQiParameters(itemCode: string): QualityInspectionParameterInput[] {
   const code = itemCode.trim() || 'item'
@@ -210,17 +222,36 @@ async function toQiDto(
   return dto
 }
 
-async function loadGrn(tenantId: string, id?: string | null) {
+async function loadGrnLinked(tenantId: string, id?: string | null) {
   if (!id) return null
   const grn = await prisma.goodsReceipt.findFirst({
     where: { id, ...tenantActiveFilter(tenantId) },
     include: { lines: true },
   })
   if (!grn) throw new QualityInspectionValidationError('Goods receipt not found.')
+  return grn
+}
+
+async function loadGrn(tenantId: string, id?: string | null) {
+  const grn = await loadGrnLinked(tenantId, id)
+  if (!grn) return null
   if (!['QC_PENDING', 'SUBMITTED', 'RECEIVING_COMPLETED'].includes(grn.status)) {
     throw new QualityInspectionWorkflowError('Goods receipt is not available for quality inspection.')
   }
   return grn
+}
+
+async function findOpenQualityInspectionForGrn(tenantId: string, goodsReceiptId: string) {
+  return prisma.purchaseQualityInspection.findFirst({
+    where: {
+      tenantId,
+      goodsReceiptId,
+      deletedAt: null,
+      status: { in: [...OPEN_QUALITY_INSPECTION_STATUSES] },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, inspectionNumber: true },
+  })
 }
 
 function buildQiLines(
@@ -282,6 +313,12 @@ export async function getQualityInspection(tenantId: string, id: string) {
 export async function createQualityInspection(tenantId: string, actorId: string, input: CreateQualityInspectionInput) {
   const defaults = await resolveEffectivePurchaseDefaults(tenantId, input.plantId)
   const grn = await loadGrn(tenantId, input.goodsReceiptId)
+  if (grn) {
+    const existing = await findOpenQualityInspectionForGrn(tenantId, grn.id)
+    if (existing) {
+      throw new QualityInspectionDuplicateForGrnError(existing.inspectionNumber, existing.id)
+    }
+  }
   if (input.purchaseOrderId && grn && input.purchaseOrderId !== grn.purchaseOrderId) throw new QualityInspectionValidationError('Purchase order does not match the goods receipt.')
   const lines = input.lines
     ? buildQiLines(input.lines, grn?.lines)
@@ -348,7 +385,7 @@ export async function updateQualityInspection(tenantId: string, id: string, acto
   const existing = await loadOrThrow(tenantId, id); assertQiEditable(existing.status)
   const lines = input.lines ? buildQiLines(input.lines) : undefined
   if (lines && existing.goodsReceiptId) {
-    const grn = await loadGrn(tenantId, existing.goodsReceiptId)
+    const grn = await loadGrnLinked(tenantId, existing.goodsReceiptId)
     const ids = new Set(grn!.lines.map((line) => line.id))
     if (lines.some((line) => line.goodsReceiptLineId && !ids.has(line.goodsReceiptLineId))) throw new QualityInspectionValidationError('Inspection line does not belong to its goods receipt.')
   }
@@ -485,10 +522,25 @@ export async function completeQualityInspection(
         deviationRemarks: body.deviationRemarks?.trim() || existing.deviationRemarks,
       }, tx)
       for (const line of linesForPersist.filter((item) => item.goodsReceiptLineId)) {
-        await tx.goodsReceiptLine.updateMany({ where: { id: line.goodsReceiptLineId!, tenantId }, data: {
-          acceptedQuantity: line.acceptedQuantity + (defaults.allowAcceptanceUnderDeviation ? line.deviationQuantity : 0),
-          rejectedQuantity: line.rejectedQuantity,
-        } })
+        const grnLine = grnLineById.get(line.goodsReceiptLineId!)
+        const acceptedBase =
+          line.acceptedQuantity +
+          (defaults.allowAcceptanceUnderDeviation ? line.deviationQuantity : 0)
+        const rejectedBase = line.rejectedQuantity
+        const uomQty = syncGrnAcceptedRejectedUomFromBase(
+          acceptedBase,
+          rejectedBase,
+          grnLine?.uomConversionFactor ?? 1,
+        )
+        await tx.goodsReceiptLine.updateMany({
+          where: { id: line.goodsReceiptLineId!, tenantId },
+          data: {
+            acceptedQuantity: acceptedBase,
+            rejectedQuantity: rejectedBase,
+            acceptedUomQuantity: uomQty.acceptedUomQuantity,
+            rejectedUomQuantity: uomQty.rejectedUomQuantity,
+          },
+        })
       }
 
       const inwardLines = grn.lines.map((gl) => {

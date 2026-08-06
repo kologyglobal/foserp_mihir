@@ -156,33 +156,9 @@ function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
-import { formatPlaceOfSupplyLabel } from '../../utils/gstStateCode'
-import { determinePurchaseGstSupply } from '../../utils/gstSupply'
+import { resolvePurchaseOrderGstSupply } from '../../utils/purchasePlaceOfSupply'
 import { resolveLineTaxFromLocalMasters } from '../../utils/commercialLineTax'
 
-/** Place of supply follows delivery warehouse state; IGST when vendor state ≠ delivery state. */
-function resolvePoGstFromLocations(
-  vendor: { state?: string; gstin?: string } | null | undefined,
-  deliveryLocation: LocationOption | undefined,
-  purchaseSetup: PurchaseSetup | null | undefined,
-  explicitPlaceOfSupply?: string,
-) {
-  const deliveryState = deliveryLocation?.state?.trim() || ''
-  const placeOfSupply =
-    explicitPlaceOfSupply?.trim() ||
-    (deliveryState ? formatPlaceOfSupplyLabel(null, deliveryState) : '') ||
-    formatPlaceOfSupplyLabel(
-      purchaseSetup?.tax.placeOfSupplyStateCode,
-      purchaseSetup?.tax.placeOfSupplyState,
-    )
-  return determinePurchaseGstSupply({
-    supplierState: vendor?.state,
-    supplierGstin: vendor?.gstin,
-    placeOfSupply,
-    defaultPlaceOfSupplyState: deliveryState || purchaseSetup?.tax.placeOfSupplyState,
-    defaultPlaceOfSupplyStateCode: purchaseSetup?.tax.placeOfSupplyStateCode,
-  })
-}
 
 function mentionsInsurance(...values: Array<string | null | undefined>) {
   return values.some((v) => Boolean(v && /insurance/i.test(v)))
@@ -467,10 +443,11 @@ function defaultHeader(): PoEditorHeader {
 }
 
 function headerFromPo(po: PurchaseOrder): PoEditorHeader {
+  const vendorId = (po.vendor.id ?? (po as { vendorId?: string }).vendorId ?? '').trim()
   return {
     documentDate: po.documentDate,
     orderType: po.orderType,
-    vendorId: (po.vendor.id ?? '').trim(),
+    vendorId,
     vendorCode: (po.vendor.code ?? '').trim(),
     vendorName: (po.vendor.name ?? '').trim(),
     vendorGstin: po.vendor.gstin,
@@ -1009,11 +986,10 @@ export function PurchaseOrderEditorPage() {
       })
       return
     }
-    const gst = resolvePoGstFromLocations(
+    const gst = resolvePurchaseOrderGstSupply(
       vendor,
       selectedDeliveryLocation,
       purchaseSetup,
-      header.placeOfSupply,
     )
     patchHeader({
       vendorId: vendor.id,
@@ -1233,15 +1209,15 @@ export function PurchaseOrderEditorPage() {
             locs.find((l) => l.id === setup.general.defaultWarehouseId)?.id) ||
           ''
         const defaultDelivery = preferred ? locs.find((l) => l.id === preferred) : locs[0]
-        const gst = resolvePoGstFromLocations(null, defaultDelivery, setup)
+        const gst = resolvePurchaseOrderGstSupply(null, defaultDelivery, setup)
         setHeader((prev) => ({
           ...prev,
           purchaseLocationId: prev.purchaseLocationId || preferred,
           deliveryLocationId: prev.deliveryLocationId || preferred,
           paymentTerms: prev.paymentTerms || setup.general.defaultPaymentTerms || prev.paymentTerms,
           deliveryTerms: prev.deliveryTerms || setup.general.defaultDeliveryTerms || prev.deliveryTerms,
-          placeOfSupply: prev.placeOfSupply || gst.placeOfSupplyLabel,
-          isInterstate: prev.vendorId ? prev.isInterstate : gst.isInterstate,
+          placeOfSupply: gst.placeOfSupplyLabel,
+          isInterstate: gst.isInterstate,
         }))
         void previewNextPurchaseOrderNumber()
           .then((next) => {
@@ -1285,18 +1261,16 @@ export function PurchaseOrderEditorPage() {
         state: header.vendorState,
         gstin: header.vendorGstin,
       } as { state?: string; gstin?: string })
-    const gst = resolvePoGstFromLocations(
+    const gst = resolvePurchaseOrderGstSupply(
       vendor,
       selectedDeliveryLocation,
       purchaseSetup,
-      header.placeOfSupply || undefined,
     )
     setHeader((h) => {
-      const nextPos = h.placeOfSupply.trim() || gst.placeOfSupplyLabel
-      if (h.isInterstate === gst.isInterstate && h.placeOfSupply === nextPos) return h
+      if (h.isInterstate === gst.isInterstate && h.placeOfSupply === gst.placeOfSupplyLabel) return h
       return {
         ...h,
-        placeOfSupply: nextPos,
+        placeOfSupply: gst.placeOfSupplyLabel,
         isInterstate: gst.isInterstate,
       }
     })
@@ -1305,7 +1279,6 @@ export function PurchaseOrderEditorPage() {
     header.vendorId,
     header.vendorGstin,
     header.vendorState,
-    header.placeOfSupply,
     selectedVendor,
     selectedDeliveryLocation,
     purchaseSetup,
@@ -1736,7 +1709,7 @@ export function PurchaseOrderEditorPage() {
                 onChange={(e) => {
                   const deliveryLocationId = e.target.value
                   const loc = locationOptions.find((l) => l.id === deliveryLocationId)
-                  const gst = resolvePoGstFromLocations(
+                  const gst = resolvePurchaseOrderGstSupply(
                     selectedVendor,
                     loc,
                     purchaseSetup,
@@ -1873,7 +1846,7 @@ export function PurchaseOrderEditorPage() {
                         value={header.placeOfSupply}
                         disabled={!editable}
                         onChange={(e) => {
-                          const gst = resolvePoGstFromLocations(
+                          const gst = resolvePurchaseOrderGstSupply(
                             selectedVendor,
                             selectedDeliveryLocation,
                             purchaseSetup,
@@ -2065,6 +2038,7 @@ export function PurchaseOrderEditorPage() {
               lines={computedLines}
               value={orderAdjustments}
               readOnly={!editable}
+              isInterstate={header.vendorId ? isInterstate : undefined}
               computeTotals={(lines, adj) =>
                 computePoOrderDocumentTotals(lines as PoLineForOrderAdjust[], adj)
               }

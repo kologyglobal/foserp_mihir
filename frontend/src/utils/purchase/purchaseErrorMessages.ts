@@ -67,6 +67,8 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   VALIDATION_ERROR: 'Please correct the highlighted fields and try again.',
   PURCHASE_RETURN_NOT_FOUND: 'Purchase return not found.',
   PURCHASE_RETURN_INVALID_STATE: 'This action is not allowed for the current return status.',
+  QI_DUPLICATE_FOR_GRN:
+    'A quality inspection is already open for this goods receipt. Open the existing inspection instead of creating a new one.',
   SERVER_TYPE_ERROR: 'Server configuration error while saving. Please retry or contact support.',
   P2021: 'Database schema is out of date (missing table). Run: npx tsx scripts/prisma-cli.ts migrate deploy',
   P2022: 'Database schema is out of date (missing column). Run: npx tsx scripts/prisma-cli.ts migrate deploy',
