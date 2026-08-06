@@ -708,7 +708,8 @@ export function Lead360Workspace() {
                     productOptions={productOptions}
                     productPickMap={pickMap}
                     readOnly
-                    showAdjustments={false}
+                    showAdjustments
+                    showExtendedCharges
                   />
                   <div className="erp-form-grid erp-form-grid--dense erp-form-grid--cols-3">
                     <ErpViewField label="Industry" value={lead.industry} />

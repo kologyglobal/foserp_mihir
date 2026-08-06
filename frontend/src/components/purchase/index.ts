@@ -23,7 +23,17 @@ export type {
   PoLinesEditorLine,
   PurchaseOrderLinesTableProps,
   PurchaseOrderLinesToolbarAction,
+  LinePatch,
 } from './PurchaseOrderLinesTable'
+export { CompactPurchaseLineEditor } from './CompactPurchaseLineEditor'
+export type {
+  CompactPoLinesEditorLine,
+  CompactPurchaseLineEditorProps,
+  CompactPurchaseLineToolbarAction,
+} from './CompactPurchaseLineEditor'
+export { QuickManualLineDrawer } from './QuickManualLineDrawer'
+export type { QuickManualLineDrawerProps, QuickManualLineDraft } from './QuickManualLineDrawer'
+export { PoLineLifecycleStrip } from './PoLineLifecycleStrip'
 export {
   PurchaseDocumentWorkspaceTabs,
 } from './PurchaseDocumentWorkspaceTabs'

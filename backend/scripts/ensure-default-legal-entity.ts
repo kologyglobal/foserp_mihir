@@ -3,11 +3,32 @@
  * (and a current FY + open periods) so Receivables / Money In-Out stop 404ing
  * on the demo UUID persisted in fos-finance-setup-demo.
  *
+ * Company tax SoT for this product: Vasant Trailers Pune — Maharashtra (27).
+ *
  * Usage: npx tsx scripts/ensure-default-legal-entity.ts
  */
 import { prisma } from '../src/config/prisma.js'
 
 const TENANT_SLUG = process.env.TENANT_SLUG ?? 'vasant-trailers'
+
+/** Pune plant — matches frontend COMPANY_STATE / seed-default-legal-entity. */
+const LE_SEED = {
+  code: 'VT-HO',
+  legalName: 'Vasant Trailers Private Limited',
+  displayName: 'Vasant Trailers',
+  pan: 'AABCV1234E',
+  gstin: '27AABCV1234E1Z9',
+  stateCode: '27',
+  registeredAddressJson: {
+    line1: 'Plot 12, MIDC Chakan, Phase II',
+    city: 'Pune',
+    state: 'Maharashtra',
+    postalCode: '410501',
+    country: 'India',
+    countryCode: 'IN',
+    stateCode: '27',
+  },
+} as const
 
 async function main() {
   const tenant = await prisma.tenant.findFirst({
@@ -24,13 +45,16 @@ async function main() {
     le = await prisma.legalEntity.create({
       data: {
         tenantId: tenant.id,
-        code: 'VT-HO',
-        legalName: 'Vasant Trailers Private Limited',
-        displayName: 'Vasant Trailers',
+        code: LE_SEED.code,
+        legalName: LE_SEED.legalName,
+        displayName: LE_SEED.displayName,
         entityType: 'PRIVATE_LIMITED',
+        pan: LE_SEED.pan,
+        gstin: LE_SEED.gstin,
         baseCurrency: 'INR',
         countryCode: 'IN',
-        stateCode: '24',
+        stateCode: LE_SEED.stateCode,
+        registeredAddressJson: LE_SEED.registeredAddressJson,
         fiscalYearStartMonth: 4,
         isDefault: true,
         isActive: true,
@@ -38,16 +62,55 @@ async function main() {
           create: {
             tenantId: tenant.id,
             code: 'HO',
-            name: 'Head Office',
+            name: 'Pune Head Office',
             branchType: 'HEAD_OFFICE',
+            gstin: LE_SEED.gstin,
+            stateCode: LE_SEED.stateCode,
             isDefault: true,
             isActive: true,
+            isHeadOffice: true,
           },
         },
       },
     })
-    console.log(`Created legal entity ${le.id} (${le.code})`)
+    console.log(`Created legal entity ${le.id} (${le.code}) state=${le.stateCode} gstin=${le.gstin}`)
   } else {
+    // Heal mis-seeded seller state for vasant-trailers product SoT (Pune / MH).
+    // Legacy scripts seeded Veer Gujarat (24) on this tenant; user tax identity is Maharashtra (27).
+    const isProductTenant = TENANT_SLUG === 'vasant-trailers' || TENANT_SLUG === 'trailer-erp'
+    const needsHeal =
+      isProductTenant &&
+      (le.stateCode === '24' ||
+        !le.gstin?.trim() ||
+        le.gstin.startsWith('24') ||
+        (le.stateCode ?? '').trim() === '')
+
+    if (needsHeal) {
+      le = await prisma.legalEntity.update({
+        where: { id: le.id },
+        data: {
+          pan: LE_SEED.pan,
+          gstin: LE_SEED.gstin,
+          stateCode: LE_SEED.stateCode,
+          registeredAddressJson: LE_SEED.registeredAddressJson,
+          legalName: LE_SEED.legalName,
+          displayName: LE_SEED.displayName,
+          tradeName: LE_SEED.displayName,
+          isDefault: true,
+          isActive: true,
+        },
+      })
+      // Align default branch GST registration with LE.
+      await prisma.branch.updateMany({
+        where: { tenantId: tenant.id, legalEntityId: le.id, isDefault: true },
+        data: {
+          gstin: LE_SEED.gstin,
+          stateCode: LE_SEED.stateCode,
+        },
+      })
+      console.log(`Healed legal entity ${le.id} → Maharashtra (27) gstin=${le.gstin}`)
+    }
+
     if (!le.isDefault) {
       await prisma.legalEntity.updateMany({
         where: { tenantId: tenant.id, isDefault: true },
@@ -58,7 +121,7 @@ async function main() {
         data: { isDefault: true },
       })
     }
-    console.log(`Using existing legal entity ${le.id} (${le.code})`)
+    console.log(`Using legal entity ${le.id} (${le.code}) state=${le.stateCode} gstin=${le.gstin ?? '—'}`)
   }
 
   const now = new Date()
@@ -113,8 +176,8 @@ async function main() {
     console.log(`Periods already present: ${existingPeriods}`)
   }
 
-  console.log('\nDone. Refresh Receivables after clearing stale LE selection (or hard-refresh).')
-  console.log(`legalEntityId=${le.id}`)
+  console.log('\nDone. Hard-refresh the app so Tax Invoice reloads seller state from LE.')
+  console.log(`legalEntityId=${le.id} supplierStateCode=${le.stateCode}`)
 }
 
 main()

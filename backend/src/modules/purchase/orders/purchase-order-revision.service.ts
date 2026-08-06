@@ -168,6 +168,7 @@ export async function revisePurchaseOrder(
     expectedDeliveryDate?: Date | null
     paymentTerms?: string | null
     deliveryTerms?: string | null
+    termsAndConditions?: string | null
     freightAmount?: number
     remarks?: string | null
   } = {}
@@ -190,6 +191,16 @@ export async function revisePurchaseOrder(
   if (input.deliveryTerms !== undefined) {
     track(changes, 'deliveryTerms', 'Delivery Terms', str(existing.deliveryTerms), str(input.deliveryTerms))
     headerUpdate.deliveryTerms = input.deliveryTerms
+  }
+  if (input.termsAndConditions !== undefined) {
+    track(
+      changes,
+      'termsAndConditions',
+      'Custom Terms and Conditions',
+      str((existing as { termsAndConditions?: string | null }).termsAndConditions),
+      str(input.termsAndConditions),
+    )
+    headerUpdate.termsAndConditions = input.termsAndConditions?.trim() || null
   }
   if (input.freightAmount !== undefined) {
     track(

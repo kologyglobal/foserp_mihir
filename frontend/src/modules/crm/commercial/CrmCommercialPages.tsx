@@ -75,6 +75,14 @@ import {
   CommercialGstSupplyPanel,
   type CommercialGstSupplyValue,
 } from '../../../components/sales/CommercialGstSupplyPanel'
+import { CommercialOrderAdjustmentsBlock } from '../../../components/erp/CommercialOrderAdjustmentsBlock'
+import {
+  chargesToAdjustments,
+  emptySoOrderCharges,
+  type SoOrderCharges,
+} from '../../../components/sales/SalesOrderLinesEditor'
+import { calcProductPricingSummary } from '../../../utils/opportunityLineCalc'
+import { useTenantProfileStore } from '../../../store/tenantProfileStore'
 import {
   formatTaxSchemeLabel,
   resolveHsnSacDisplay,
@@ -91,27 +99,114 @@ export function CrmInvoiceListPage() {
 
 export { CrmInvoiceDetailPage, CrmInvoicePrintPage } from './CrmTaxInvoiceDetailPage'
 
-function recomputePrefill(prefill: TaxInvoicePrefill, lines: CrmCommercialLine[]): TaxInvoicePrefill {
+type GstSupplySnapshot = {
+  placeOfSupply?: string | null
+  supplierStateCode?: string | null
+}
+
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+/**
+ * Rebuild tax header from lines + live GST supply (LE seller + PoS).
+ * Prefer line CGST/SGST/IGST components when present so Tax & totals matches the product grid.
+ */
+function recomputePrefill(
+  prefill: TaxInvoicePrefill,
+  lines: CrmCommercialLine[],
+  supply?: GstSupplySnapshot,
+): TaxInvoicePrefill {
   const withNos = lines.map((line, idx) => ({ ...line, lineNo: idx + 1 }))
   const taxable = withNos.reduce((s, l) => s + l.taxableValue, 0)
   const avgRate = withNos.length
     ? withNos.reduce((s, l) => s + l.taxPct, 0) / withNos.length
     : 0
-  const placeOfSupply =
-    prefill.placeOfSupplyStateCode || prefill.placeOfSupply || prefill.customerState
+
+  const supplierStateCode =
+    resolveGstStateCode(supply?.supplierStateCode) ??
+    resolveGstStateCode(prefill.supplierStateCode) ??
+    null
+
+  const placeOfSupplyCode =
+    resolveGstStateCode(supply?.placeOfSupply) ??
+    resolveGstStateCode(prefill.placeOfSupplyStateCode) ??
+    resolveGstStateCode(prefill.placeOfSupply) ??
+    resolveGstStateCode(prefill.customerState)
+
+  const placeOfSupplyLabel =
+    placeOfSupplyCode ||
+    supply?.placeOfSupply ||
+    prefill.placeOfSupplyStateCode ||
+    prefill.placeOfSupply ||
+    prefill.customerState ||
+    ''
+
+  const lineCgst = withNos.reduce((s, l) => s + (Number(l.cgstAmount) || 0), 0)
+  const lineSgst = withNos.reduce((s, l) => s + (Number(l.sgstAmount) || 0), 0)
+  const lineIgst = withNos.reduce((s, l) => s + (Number(l.igstAmount) || 0), 0)
+  const lineComponentTax = lineCgst + lineSgst + lineIgst
+
+  let gst = computeGst(
+    taxable,
+    placeOfSupplyLabel,
+    avgRate,
+    supplierStateCode ?? undefined,
+  )
+
+  if (lineComponentTax > 0) {
+    const scheme =
+      lineIgst > 0 && lineCgst + lineSgst === 0
+        ? ('igst' as const)
+        : ('cgst_sgst' as const)
+    const totalTax = roundMoney(lineComponentTax)
+    gst = {
+      scheme,
+      taxableAmount: roundMoney(taxable),
+      cgstRate: scheme === 'cgst_sgst' ? avgRate / 2 : 0,
+      cgstAmount: roundMoney(lineCgst),
+      sgstRate: scheme === 'cgst_sgst' ? avgRate / 2 : 0,
+      sgstAmount: roundMoney(lineSgst),
+      igstRate: scheme === 'igst' ? avgRate : 0,
+      igstAmount: roundMoney(lineIgst),
+      totalTax,
+      grandTotal: roundMoney(taxable + totalTax),
+    }
+  } else if (withNos.some((l) => (l.taxScheme ?? '').toLowerCase() === 'igst')) {
+    // Line scheme is IGST but component columns empty — still honor line scheme.
+    const totalTax = withNos.reduce((s, l) => s + (Number(l.gstAmount) || 0), 0)
+    gst = {
+      scheme: 'igst',
+      taxableAmount: roundMoney(taxable),
+      cgstRate: 0,
+      cgstAmount: 0,
+      sgstRate: 0,
+      sgstAmount: 0,
+      igstRate: avgRate,
+      igstAmount: roundMoney(totalTax),
+      totalTax: roundMoney(totalTax),
+      grandTotal: roundMoney(taxable + totalTax),
+    }
+  }
+
   return {
     ...prefill,
     lines: withNos,
-    gst: computeGst(
-      taxable,
-      placeOfSupply,
-      avgRate,
-      prefill.supplierStateCode || undefined,
-    ),
+    placeOfSupply: placeOfSupplyLabel || prefill.placeOfSupply,
+    placeOfSupplyStateCode: placeOfSupplyCode || prefill.placeOfSupplyStateCode,
+    supplierStateCode: supplierStateCode || prefill.supplierStateCode,
+    gstScheme: gst.scheme,
+    supplyType: gst.scheme === 'igst' ? 'INTER_STATE' : 'INTRA_STATE',
+    gst,
   }
 }
 
-function patchPrefillLineQty(prefill: TaxInvoicePrefill, lineId: string, qtyRaw: string): TaxInvoicePrefill {
+function patchPrefillLineQty(
+  prefill: TaxInvoicePrefill,
+  lineId: string,
+  qtyRaw: string,
+  supply?: GstSupplySnapshot,
+): TaxInvoicePrefill {
   const qty = Number(qtyRaw)
   const lines = prefill.lines.map((line) => {
     if (line.id !== lineId) return line
@@ -121,13 +216,14 @@ function patchPrefillLineQty(prefill: TaxInvoicePrefill, lineId: string, qtyRaw:
     const totals = computeProformaLineTotals({ ...line, qty: nextQty })
     return { ...line, qty: nextQty, ...totals }
   })
-  return recomputePrefill(prefill, lines)
+  return recomputePrefill(prefill, lines, supply)
 }
 
 function patchPrefillLine(
   prefill: TaxInvoicePrefill,
   lineId: string,
   patch: Partial<CrmCommercialLine>,
+  supply?: GstSupplySnapshot,
 ): TaxInvoicePrefill {
   const lines = prefill.lines.map((line) => {
     if (line.id !== lineId) return line
@@ -135,7 +231,7 @@ function patchPrefillLine(
     const totals = computeProformaLineTotals(next)
     return { ...next, ...totals }
   })
-  return recomputePrefill(prefill, lines)
+  return recomputePrefill(prefill, lines, supply)
 }
 
 export function CrmInvoiceEditPage() {
@@ -187,6 +283,8 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
     /** Filled from default Legal Entity; do not seed from customer. */
     supplierStateCode: '',
   }))
+  const [charges, setCharges] = useState<SoOrderCharges>(() => emptySoOrderCharges())
+  const showFreight = !useTenantProfileStore((s) => s.isServices())
 
   useEffect(() => {
     let cancelled = false
@@ -201,18 +299,9 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
     }
   }, [])
 
-  // Seed supplier from SO/PI snapshot when present; LE seed effect fills when missing.
-  useEffect(() => {
-    const code = prefill?.supplierStateCode?.trim()
-    if (!code) return
-    setGstSupply((prev) =>
-      prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
-    )
-  }, [prefill?.supplierStateCode, prefill?.salesOrderId, prefill?.proformaInvoiceId])
-
-  const isDirect = sourceType === 'direct' || prefill?.source === 'direct'
-
-  // Prefer upstream SO/PI snapshot for Place of Supply; fallback to customer state.
+  // Place of supply from document / customer only — never treat POS as seller state.
+  // Supplier state is always the live Legal Entity (above), not SO/PI historical snapshots
+  // (legacy SOs may have carried a wrong Gujarat seed).
   useEffect(() => {
     if (!prefill) return
     setGstSupply((prev) => {
@@ -222,13 +311,10 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
         resolveGstStateCode(prefill.placeOfSupply) ??
         resolveGstStateCode(prefill.customerState) ??
         ''
-      const seller =
-        resolveGstStateCode(prefill.supplierStateCode) ?? prev.supplierStateCode
-      if (fromUpstream === prev.placeOfSupply && seller === prev.supplierStateCode) return prev
+      if (fromUpstream === prev.placeOfSupply) return prev
       return {
         ...prev,
         placeOfSupply: fromUpstream || prev.placeOfSupply,
-        supplierStateCode: seller || prev.supplierStateCode,
       }
     })
   }, [
@@ -236,8 +322,55 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
     prefill?.customerState,
     prefill?.placeOfSupply,
     prefill?.placeOfSupplyStateCode,
-    prefill?.supplierStateCode,
   ])
+
+  // Keep Tax & totals aligned with GST supply panel (LE seller + place of supply).
+  // Line qty/tax edits already recompute with supplyForTotals; this only applies supply changes (LE load, PoS seed, override).
+  useEffect(() => {
+    if (!prefill) return
+    if (!gstSupply.supplierStateCode && !gstSupply.placeOfSupply) return
+    setPrefill((prev) => {
+      if (!prev) return prev
+      const next = recomputePrefill(prev, prev.lines, {
+        placeOfSupply: gstSupply.placeOfSupply,
+        supplierStateCode: gstSupply.supplierStateCode,
+      })
+      if (
+        next.gst.scheme === prev.gst.scheme &&
+        next.gst.cgstAmount === prev.gst.cgstAmount &&
+        next.gst.sgstAmount === prev.gst.sgstAmount &&
+        next.gst.igstAmount === prev.gst.igstAmount &&
+        next.supplierStateCode === prev.supplierStateCode &&
+        (next.placeOfSupplyStateCode || '') === (prev.placeOfSupplyStateCode || '')
+      ) {
+        return prev
+      }
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- supply-driven only
+  }, [gstSupply.supplierStateCode, gstSupply.placeOfSupply, gstSupply.placeOfSupplyOverride, prefill?.customerId])
+
+  const isDirect = sourceType === 'direct' || prefill?.source === 'direct'
+
+  const supplyForTotals = useMemo(
+    () => ({
+      placeOfSupply: gstSupply.placeOfSupply,
+      supplierStateCode: gstSupply.supplierStateCode,
+    }),
+    [gstSupply.placeOfSupply, gstSupply.supplierStateCode],
+  )
+
+  const onGstSupplyChange = (next: CommercialGstSupplyValue) => {
+    setGstSupply(next)
+    setPrefill((prev) =>
+      prev
+        ? recomputePrefill(prev, prev.lines, {
+            placeOfSupply: next.placeOfSupply,
+            supplierStateCode: next.supplierStateCode,
+          })
+        : prev,
+    )
+  }
 
   const confirmedSos = useMemo(
     () => salesOrders.filter((s) => s.status !== 'open' && s.status !== 'closed'),
@@ -291,6 +424,56 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
         : [],
     [prefill],
   )
+
+  /** Order adjustments + order summary (PO-style) driven by live lines + charge options. */
+  const orderPricing = useMemo(() => {
+    if (!prefill) return null
+    const asOppLines = prefill.lines.map((line) => ({
+      id: line.id,
+      lineNo: line.lineNo,
+      productId: null as string | null,
+      itemId: line.itemId || null,
+      itemCode: line.itemCode,
+      productOrItem: line.description,
+      description: line.description,
+      productFamily: '',
+      itemType: '',
+      qty: line.qty,
+      uom: line.uom,
+      unitPrice: line.unitPrice,
+      discountPct: line.discountPct,
+      discountAmount: 0,
+      taxableValue: line.taxableValue,
+      taxPct: line.taxPct,
+      gstAmount: line.gstAmount,
+      lineTotal: line.lineTotal,
+      expectedDeliveryDate: null as string | null,
+      remarks: '',
+    }))
+    const summary = calcProductPricingSummary(
+      asOppLines,
+      chargesToAdjustments(charges, showFreight),
+    )
+    const scheme = prefill.gst.scheme
+    const totalGst = summary.totalGst
+    const half = roundMoney(totalGst / 2)
+    const gstExtras =
+      scheme === 'igst'
+        ? {
+            schemeLabel: gstSchemeLabel('igst'),
+            cgstAmount: 0,
+            sgstAmount: 0,
+            igstAmount: totalGst,
+          }
+        : {
+            schemeLabel: gstSchemeLabel('cgst_sgst'),
+            cgstAmount: half,
+            sgstAmount: roundMoney(totalGst - half),
+            igstAmount: 0,
+          }
+    return { summary, gstExtras }
+  }, [prefill, charges, showFreight])
+
   const canSave = Boolean(
     canMutate &&
       prefill &&
@@ -324,6 +507,7 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
 
   function clearLoaded() {
     setPrefill(null)
+    setCharges(emptySoOrderCharges())
   }
 
   async function loadFromSalesOrder(soId: string, opts?: { announceSuccess?: boolean }) {
@@ -469,12 +653,12 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
 
   function addDirectLine() {
     if (!prefill) return
-    setPrefill(recomputePrefill(prefill, [...prefill.lines, blankTaxInvoiceLine(prefill.lines.length + 1)]))
+    setPrefill(recomputePrefill(prefill, [...prefill.lines, blankTaxInvoiceLine(prefill.lines.length + 1)], supplyForTotals))
   }
 
   function removeDirectLine(lineId: string) {
     if (!prefill || prefill.lines.length <= 1) return
-    setPrefill(recomputePrefill(prefill, prefill.lines.filter((l) => l.id !== lineId)))
+    setPrefill(recomputePrefill(prefill, prefill.lines.filter((l) => l.id !== lineId), supplyForTotals))
   }
 
   function selectDirectItem(lineId: string, itemId: string) {
@@ -496,9 +680,7 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
         companyStateCode: gstSupply.supplierStateCode || undefined,
         partyState: prefill.customerState,
         partyGstin: prefill.customerGstin,
-        placeOfSupply: gstSupply.placeOfSupplyOverride
-          ? gstSupply.placeOfSupply
-          : prefill.customerState,
+        placeOfSupply: gstSupply.placeOfSupply || prefill.customerState,
         hsnById: (hid) => store.getHsn(hid),
         hsnByCode: (code) => store.getHsnByCode(code),
         gstRates: store.gstRates,
@@ -508,19 +690,24 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
         notify.warning(snap.blockers[0] ?? 'GST could not be resolved from masters')
       }
       setPrefill(
-        patchPrefillLine(prefill, lineId, {
-          itemId,
-          itemCode: item?.itemCode ?? '',
-          description: item?.itemName ?? '',
-          hsnCode: snap.hsnSacCode || item?.hsnCode || '',
-          uom: 'Nos',
-          unitPrice: item?.defaultSalesRate ?? item?.standardRate ?? 0,
-          taxPct,
-          taxScheme: snap.taxScheme,
-          cgstRate: snap.cgstRate,
-          sgstRate: snap.sgstRate,
-          igstRate: snap.igstRate,
-        }),
+        patchPrefillLine(
+          prefill,
+          lineId,
+          {
+            itemId,
+            itemCode: item?.itemCode ?? '',
+            description: item?.itemName ?? '',
+            hsnCode: snap.hsnSacCode || item?.hsnCode || '',
+            uom: 'Nos',
+            unitPrice: item?.defaultSalesRate ?? item?.standardRate ?? 0,
+            taxPct,
+            taxScheme: snap.taxScheme,
+            cgstRate: snap.cgstRate,
+            sgstRate: snap.sgstRate,
+            igstRate: snap.igstRate,
+          },
+          supplyForTotals,
+        ),
       )
     })()
   }
@@ -722,7 +909,9 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
           { label: 'Active lines', value: String(activeLines.length) },
           {
             label: 'Grand total',
-            value: prefill ? formatCurrency(prefill.gst.grandTotal) : '—',
+            value: prefill
+              ? formatCurrency(orderPricing?.summary.grandTotal ?? prefill.gst.grandTotal)
+              : '—',
             highlight: true,
           },
           {
@@ -841,7 +1030,7 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
             <span className="text-[12px] text-erp-muted">
               {completionPercent}% complete
               {prefill
-                ? ` · ${formatCurrency(prefill.gst.grandTotal)} grand total`
+                ? ` · ${formatCurrency(orderPricing?.summary.grandTotal ?? prefill.gst.grandTotal)} grand total`
                 : isEdit
                   ? ' · Loading draft…'
                   : ' · Select a source to continue'}
@@ -1171,7 +1360,7 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
               <div className="mt-4 col-span-full">
                 <CommercialGstSupplyPanel
                   value={gstSupply}
-                  onChange={setGstSupply}
+                  onChange={onGstSupplyChange}
                   customerState={prefill.customerState}
                   customerGstin={prefill.customerGstin}
                   shipToState={prefill.shippingAddress || prefill.customerState}
@@ -1269,7 +1458,7 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                               className="so-pricing-input so-pricing-input--num"
                               value={String(line.qty)}
                               onChange={(e) =>
-                                setPrefill(patchPrefillLineQty(prefill, line.id, e.target.value))
+                                setPrefill(patchPrefillLineQty(prefill, line.id, e.target.value, supplyForTotals))
                               }
                             />
                           </td>
@@ -1282,9 +1471,14 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                               value={String(line.unitPrice)}
                               onChange={(e) =>
                                 setPrefill(
-                                  patchPrefillLine(prefill, line.id, {
-                                    unitPrice: Number(e.target.value) || 0,
-                                  }),
+                                  patchPrefillLine(
+                                    prefill,
+                                    line.id,
+                                    {
+                                      unitPrice: Number(e.target.value) || 0,
+                                    },
+                                    supplyForTotals,
+                                  ),
                                 )
                               }
                             />
@@ -1298,9 +1492,14 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                               value={String(line.discountPct)}
                               onChange={(e) =>
                                 setPrefill(
-                                  patchPrefillLine(prefill, line.id, {
-                                    discountPct: Number(e.target.value) || 0,
-                                  }),
+                                  patchPrefillLine(
+                                    prefill,
+                                    line.id,
+                                    {
+                                      discountPct: Number(e.target.value) || 0,
+                                    },
+                                    supplyForTotals,
+                                  ),
                                 )
                               }
                             />
@@ -1311,9 +1510,14 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                               value={line.taxPct}
                               onChange={(e) =>
                                 setPrefill(
-                                  patchPrefillLine(prefill, line.id, {
-                                    taxPct: Number(e.target.value) || 0,
-                                  }),
+                                  patchPrefillLine(
+                                    prefill,
+                                    line.id,
+                                    {
+                                      taxPct: Number(e.target.value) || 0,
+                                    },
+                                    supplyForTotals,
+                                  ),
                                 )
                               }
                             >
@@ -1406,7 +1610,11 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                             step="1"
                             className="ml-auto w-24 text-right"
                             value={String(line.qty)}
-                            onChange={(e) => setPrefill(patchPrefillLineQty(prefill, line.id, e.target.value))}
+                            onChange={(e) =>
+                              setPrefill(
+                                patchPrefillLineQty(prefill, line.id, e.target.value, supplyForTotals),
+                              )
+                            }
                           />
                         </td>
                         <td className="py-2 px-2 text-right tabular-nums text-erp-muted">
@@ -1429,33 +1637,30 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
 
           <div id="ti-section-totals">
           <ErpCardSection
-            title="Tax & totals"
-            subtitle="GST breakdown and grand total for the quantities above."
+            title="Order adjustments & summary"
+            subtitle="Same charge options and GST scheme as sales orders — discount, freight, installation, other charges, and CGST/SGST or IGST."
             icon={Banknote}
             accent="amber"
             collapsible
             defaultOpen
-            columns={4}
+            columns={1}
+            className="!max-w-none"
           >
-            <ErpFieldRow label="Taxable" readOnly>{formatCurrency(prefill.gst.taxableAmount)}</ErpFieldRow>
-            <ErpFieldRow label="Scheme" readOnly>{gstSchemeLabel(prefill.gst.scheme)}</ErpFieldRow>
-            {prefill.gst.scheme === 'cgst_sgst' ? (
-              <>
-                <ErpFieldRow label="CGST" readOnly>{formatCurrency(prefill.gst.cgstAmount)}</ErpFieldRow>
-                <ErpFieldRow label="SGST" readOnly>{formatCurrency(prefill.gst.sgstAmount)}</ErpFieldRow>
-              </>
-            ) : (
-              <ErpFieldRow label="IGST" readOnly>{formatCurrency(prefill.gst.igstAmount)}</ErpFieldRow>
-            )}
-            <ErpFieldRow label="Grand total" readOnly>
-              <span className="text-base font-semibold text-erp-primary">
-                {formatCurrency(prefill.gst.grandTotal)}
-              </span>
-            </ErpFieldRow>
+            {orderPricing ? (
+              <CommercialOrderAdjustmentsBlock
+                value={charges}
+                onChange={setCharges}
+                summary={orderPricing.summary}
+                showFreight={showFreight}
+                showExtendedCharges
+                gstExtras={orderPricing.gstExtras}
+              />
+            ) : null}
             {prefill.remarks ? (
-              <ErpFieldRow label="Remarks" readOnly colSpan={2} horizontal={false}>
-                <p className="text-[13px] text-erp-text whitespace-pre-wrap">{prefill.remarks}</p>
-              </ErpFieldRow>
+              <div className="mt-3 rounded-lg border border-erp-border bg-erp-surface-alt/40 px-3 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Remarks</p>
+                <p className="mt-1 text-[13px] text-erp-text whitespace-pre-wrap">{prefill.remarks}</p>
+              </div>
             ) : null}
           </ErpCardSection>
           </div>

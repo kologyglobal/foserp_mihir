@@ -9,7 +9,14 @@ import {
 } from 'lucide-react'
 import { ErpCardSection, ErpFieldGroup, ErpFieldRow, ErpViewField } from '../../components/erp/card-form'
 import { ErpProductPricingSection } from '../../components/erp/ErpProductPricingSection'
+import {
+  CommercialGstSupplyPanel,
+  type CommercialGstSupplyValue,
+} from '../../components/sales/CommercialGstSupplyPanel'
 import { FormActionBar } from '../../components/erp/FormActionBar'
+import { loadSellerStateCode } from '../../utils/sellerGstState'
+import { resolveCommercialPlaceOfSupply } from '../../utils/commercialSupplyContext'
+import { resolveGstStateCode } from '../../utils/gstStateCode'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
 import { Input, Select, Textarea } from '../../components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '../../components/forms/selectStandards'
@@ -176,6 +183,26 @@ export function OpportunityNewPage() {
   const { locationId, setLocationId } = useDocumentLocation('sales', lead?.locationId)
   /** Location/branch is manufacturing-oriented; hide for SERVICES packaging (e.g. Kology). */
   const showLocationSection = !useTenantProfileStore((s) => s.isServices())
+  const isServicesTenant = useTenantProfileStore((s) => s.isServices())
+  const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>(() => ({
+    placeOfSupply: '',
+    placeOfSupplyOverride: false,
+    placeOfSupplyOverrideReason: '',
+    supplierStateCode: '',
+  }))
+
+  useEffect(() => {
+    let cancelled = false
+    void loadSellerStateCode().then((code) => {
+      if (cancelled || !code) return
+      setGstSupply((prev) =>
+        prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const attachmentScopeId = 'draft:new-opp'
   const setOpportunityAttachments = useOpportunityAttachmentStore((s) => s.setForOpportunity)
@@ -210,6 +237,36 @@ export function OpportunityNewPage() {
   )
   const customer = customers.find((c) => c.id === customerId)
   const customerContacts = contacts.filter((c) => c.customerId === customerId)
+  const customerState = customer?.state?.trim() || null
+  const customerGstin = customer?.gstin?.trim() || null
+  const customerShipState =
+    customer?.shippingState?.trim() ||
+    customer?.deliveryState?.trim() ||
+    customerState
+  const effectivePlaceOfSupply = useMemo(() => {
+    if (gstSupply.placeOfSupplyOverride && gstSupply.placeOfSupply.trim()) {
+      return (
+        resolveGstStateCode(gstSupply.placeOfSupply) ||
+        gstSupply.placeOfSupply.trim()
+      )
+    }
+    return (
+      resolveCommercialPlaceOfSupply({
+        shipToState: customerShipState,
+        billToState: customerState,
+        customerState,
+        customerGstin,
+        isServiceDocument: isServicesTenant,
+      }).placeOfSupplyStateCode ?? ''
+    )
+  }, [
+    gstSupply.placeOfSupply,
+    gstSupply.placeOfSupplyOverride,
+    customerShipState,
+    customerState,
+    customerGstin,
+    isServicesTenant,
+  ])
   const primaryProductName = useMemo(() => {
     const synced = syncOpportunityLines(lines)
     const first = synced.find((l) => l.productOrItem?.trim())
@@ -777,6 +834,17 @@ export function OpportunityNewPage() {
       ) : null}
 
       <div id="opp-section-products">
+      <div className="mb-3">
+        <CommercialGstSupplyPanel
+          value={gstSupply}
+          onChange={setGstSupply}
+          customerState={customerState}
+          customerGstin={customerGstin}
+          shipToState={customerShipState}
+          billToState={customerState}
+          isServiceDocument={isServicesTenant}
+        />
+      </div>
       <ErpProductPricingSection
         sectionId="opp-section-products-pricing"
         nbaTarget="products"
@@ -789,6 +857,10 @@ export function OpportunityNewPage() {
         productOptions={productOptions}
         productPickMap={pickMap}
         rowErrors={rowErrors}
+        companyStateCode={gstSupply.supplierStateCode || null}
+        partyState={customerState}
+        partyGstin={customerGstin}
+        placeOfSupply={effectivePlaceOfSupply || null}
       >
         <div className="opp-scope-notes mt-4">
           <ErpFieldRow label="Scope Notes" colSpan={3} horizontal={false}>

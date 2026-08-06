@@ -20,7 +20,21 @@ import {
   isLikelyUuid,
   resolveCatalogProductLabel,
 } from './catalogProductLabel'
-import { resolveLineTaxFromLocalMasters } from './commercialLineTax'
+import {
+  resolveLineTaxFromLocalMasters,
+  type ResolveLineTaxInput,
+} from './commercialLineTax'
+
+/** Optional seller/party/POS for line tax scheme (IGST vs CGST+SGST). */
+export type OpportunityLineTaxSupply = Pick<
+  ResolveLineTaxInput,
+  | 'companyState'
+  | 'companyStateCode'
+  | 'companyGstin'
+  | 'partyState'
+  | 'partyGstin'
+  | 'placeOfSupply'
+>
 
 export function taxCategoryToPct(tax: TaxCategory | string | undefined): number {
   if (tax === 'gst_12') return 12
@@ -484,11 +498,22 @@ export function buildOpportunityLineFromProduct(
 }
 
 /** Primary CRM path — build opportunity line from MasterItem (salesAllowed). */
-export function buildOpportunityLineFromItem(item: Item, uomName: string, lineNo: number): OpportunityLine {
+export function buildOpportunityLineFromItem(
+  item: Item,
+  uomName: string,
+  lineNo: number,
+  taxSupply?: OpportunityLineTaxSupply | null,
+): OpportunityLine {
   const ms = useMasterStore.getState()
   const snap = resolveLineTaxFromLocalMasters({
     direction: 'SALES',
     item,
+    companyState: taxSupply?.companyState,
+    companyStateCode: taxSupply?.companyStateCode,
+    companyGstin: taxSupply?.companyGstin,
+    partyState: taxSupply?.partyState,
+    partyGstin: taxSupply?.partyGstin,
+    placeOfSupply: taxSupply?.placeOfSupply,
     hsnById: (id) => ms.getHsn(id),
     hsnByCode: (code) => ms.getHsnByCode(code),
     gstRates: ms.gstRates,
@@ -682,6 +707,14 @@ export function opportunityLinesToQuotationPriceLines(lines: OpportunityLine[]) 
     taxPct: l.taxPct,
     lineTotal: l.lineTotal,
     isOptional: false,
+    hsnCode: l.hsnCode ?? null,
+    taxScheme: l.taxScheme ?? null,
+    cgstRate: l.cgstRate ?? null,
+    sgstRate: l.sgstRate ?? null,
+    igstRate: l.igstRate ?? null,
+    cgstPct: l.cgstRate ?? null,
+    sgstPct: l.sgstRate ?? null,
+    igstPct: l.igstRate ?? null,
   }))
 }
 
@@ -709,6 +742,11 @@ export function quotationPriceLinesToOpportunityLines(priceLines: QuotationPrice
       lineTotal: l.lineTotal,
       expectedDeliveryDate: null,
       remarks: '',
+      hsnCode: l.hsnCode ?? undefined,
+      taxScheme: (l.taxScheme as OpportunityLine['taxScheme']) ?? undefined,
+      cgstRate: l.cgstRate ?? l.cgstPct ?? undefined,
+      sgstRate: l.sgstRate ?? l.sgstPct ?? undefined,
+      igstRate: l.igstRate ?? l.igstPct ?? undefined,
     })),
   )
 }

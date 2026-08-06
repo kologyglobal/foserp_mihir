@@ -48,7 +48,11 @@ function getQuickCreatePermission(entityType: QuickCreateEntityType): {
       }
       return { allowed: false, module: 'masters', action: 'create' }
     case 'vendor':
-      if (canPermission('purchase', 'create') || canPermission('masters', 'create')) {
+      if (
+        hasApiPermission('master.vendor.create')
+        || canPermission('purchase', 'create')
+        || canPermission('masters', 'create')
+      ) {
         return { allowed: true }
       }
       return { allowed: false, module: 'purchase', action: 'create' }

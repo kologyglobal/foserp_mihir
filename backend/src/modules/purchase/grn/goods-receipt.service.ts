@@ -12,6 +12,7 @@ import {
   reverseGrnStockInward,
   reverseGrnQcHold,
 } from '../shared/purchase-inventory-posting.js'
+import { isPoLineStockPostable } from '../shared/po-line-stockable.js'
 import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/accounting/inventory-accounting-event.service.js'
 import {
   evaluateGrnLineTolerance,
@@ -167,6 +168,8 @@ const itemReceiptConfigSelect = {
   id: true,
   batchTracked: true,
   serialTracked: true,
+  isStockable: true,
+  itemType: true,
   receivingToleranceId: true,
   receivingTolerancePercentage: true,
   weightReceivingToleranceId: true,
@@ -188,6 +191,8 @@ type ItemReceiptConfig = {
   id: string
   batchTracked: boolean
   serialTracked: boolean
+  isStockable: boolean
+  itemType: string | null
   receivingToleranceId: string | null
   weightReceivingToleranceId: string | null
   receivingTolerancePercentage: unknown
@@ -722,6 +727,16 @@ export async function getReceivableLines(tenantId: string, purchaseOrderId: stri
     vendorCode: po.vendor.code,
     vendorName: po.vendor.name,
     lines: po.lines
+      .filter((line) => {
+        const itemConfig = line.itemId ? itemConfigById.get(line.itemId) : undefined
+        return isPoLineStockPostable({
+          itemId: line.itemId,
+          lineType: (line as { lineType?: string | null }).lineType,
+          item: itemConfig
+            ? { isStockable: itemConfig.isStockable, itemType: itemConfig.itemType }
+            : null,
+        })
+      })
       .map((line) => {
         const itemConfig = line.itemId ? itemConfigById.get(line.itemId) : undefined
         return mapReceivableLineDto({
@@ -1317,6 +1332,18 @@ async function finalizeGoodsReceiptSubmit(
 
   if (!existing.inspectionRequired && nextStatus === 'SUBMITTED') {
     return postInventoryGoodsReceipt(tenantId, id, actorId, body)
+  }
+
+  if (existing.inspectionRequired) {
+    const { notifyGrnPendingInspection } = await import(
+      '../notifications/purchase-notification.emitters.js'
+    )
+    notifyGrnPendingInspection({
+      tenantId,
+      actorUserId: actorId,
+      grnId: id,
+      grnNumber: existing.grnNumber,
+    })
   }
 
   return mapGoodsReceiptToDto(await loadOrThrow(tenantId, id))

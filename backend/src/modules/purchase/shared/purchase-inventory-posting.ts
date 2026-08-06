@@ -3,10 +3,13 @@ import {
   InventoryPostingService,
   postStockMovement,
 } from '../../inventory/shared/stock-posting.service.js'
+import { isPoLineStockPostable } from './po-line-stockable.js'
+import { prisma } from '../../../config/prisma.js'
 
 type QtyLine = {
   id: string
   itemId: string | null
+  lineType?: string | null
   receivedQuantity?: unknown
   acceptedQuantity?: unknown
   rejectedQuantity?: unknown
@@ -31,6 +34,33 @@ function qty(value: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
+async function loadItemStockMeta(
+  tenantId: string,
+  itemIds: string[],
+): Promise<Map<string, { isStockable: boolean; itemType: string | null }>> {
+  const unique = [...new Set(itemIds.filter(Boolean))]
+  if (!unique.length) return new Map()
+  const rows = await prisma.masterItem.findMany({
+    where: { tenantId, id: { in: unique }, deletedAt: null },
+    select: { id: true, isStockable: true, itemType: true },
+  })
+  return new Map(
+    rows.map((r) => [r.id, { isStockable: r.isStockable, itemType: r.itemType ?? null }]),
+  )
+}
+
+function canPostLine(
+  line: QtyLine,
+  itemMeta: Map<string, { isStockable: boolean; itemType: string | null }>,
+): boolean {
+  const item = line.itemId ? itemMeta.get(line.itemId) : null
+  return isPoLineStockPostable({
+    itemId: line.itemId,
+    lineType: line.lineType,
+    item,
+  })
+}
+
 /** Post GRN accepted (or received when QC not required) stock inward. Idempotent per line. */
 export async function postGrnStockInward(input: {
   tenantId: string
@@ -42,9 +72,13 @@ export async function postGrnStockInward(input: {
   actorId: string
   tx?: Prisma.TransactionClient
 }): Promise<InventoryStockMovement[]> {
+  const itemMeta = await loadItemStockMeta(
+    input.tenantId,
+    input.lines.map((l) => l.itemId).filter((id): id is string => Boolean(id)),
+  )
   const movements: InventoryStockMovement[] = []
   for (const line of input.lines) {
-    if (!line.itemId) continue
+    if (!canPostLine(line, itemMeta)) continue
     const quantity = input.useAcceptedQuantity
       ? qty(line.acceptedForQcQuantity ?? line.acceptedQuantity)
       : qty(line.receivedQuantity)
@@ -57,7 +91,7 @@ export async function postGrnStockInward(input: {
     const movement = await postStockMovement(
       {
         tenantId: input.tenantId,
-        itemId: line.itemId,
+        itemId: line.itemId!,
         warehouseId: input.warehouseId,
         movementType: 'INWARD',
         referenceType: 'GRN',
@@ -84,7 +118,7 @@ export async function postGrnStockInward(input: {
       const lot = await input.tx.inventoryLot.findFirst({
         where: {
           tenantId: input.tenantId,
-          itemId: line.itemId,
+          itemId: line.itemId!,
           lotNumber: line.lotNumber.trim(),
           deletedAt: null,
         },
@@ -113,9 +147,13 @@ export async function reverseGrnStockInward(input: {
   actorId: string
   tx?: Prisma.TransactionClient
 }): Promise<InventoryStockMovement[]> {
+  const itemMeta = await loadItemStockMeta(
+    input.tenantId,
+    input.lines.map((l) => l.itemId).filter((id): id is string => Boolean(id)),
+  )
   const movements: InventoryStockMovement[] = []
   for (const line of input.lines) {
-    if (!line.itemId) continue
+    if (!canPostLine(line, itemMeta)) continue
     if (input.useAcceptedQuantity) {
       const quantities = [
         { quantity: qty(line.acceptedQuantity), stockStatus: 'UNRESTRICTED' as const, suffix: 'accepted' },
@@ -125,7 +163,7 @@ export async function reverseGrnStockInward(input: {
         if (part.quantity <= 0) continue
         const movement = await postStockMovement({
           tenantId: input.tenantId,
-          itemId: line.itemId,
+          itemId: line.itemId!,
           warehouseId: input.warehouseId,
           movementType: 'ISSUE',
           referenceType: 'GRN',
@@ -143,14 +181,12 @@ export async function reverseGrnStockInward(input: {
       }
       continue
     }
-    const quantity = input.useAcceptedQuantity
-      ? qty(line.acceptedForQcQuantity ?? line.acceptedQuantity)
-      : qty(line.receivedQuantity)
+    const quantity = qty(line.receivedQuantity)
     if (quantity <= 0) continue
     const movement = await postStockMovement(
       {
         tenantId: input.tenantId,
-        itemId: line.itemId,
+        itemId: line.itemId!,
         warehouseId: input.warehouseId,
         movementType: 'ISSUE',
         referenceType: 'GRN',
@@ -181,14 +217,18 @@ export async function reverseGrnQcHold(input: {
   actorId: string
   tx?: Prisma.TransactionClient
 }): Promise<InventoryStockMovement[]> {
+  const itemMeta = await loadItemStockMeta(
+    input.tenantId,
+    input.lines.map((l) => l.itemId).filter((id): id is string => Boolean(id)),
+  )
   const movements: InventoryStockMovement[] = []
   for (const line of input.lines) {
-    if (!line.itemId) continue
+    if (!canPostLine(line, itemMeta)) continue
     const quantity = qty(line.acceptedForQcQuantity)
     if (quantity <= 0) continue
     const movement = await postStockMovement({
       tenantId: input.tenantId,
-      itemId: line.itemId,
+      itemId: line.itemId!,
       warehouseId: input.warehouseId,
       movementType: 'ISSUE',
       referenceType: 'GRN',
@@ -219,20 +259,23 @@ export async function postPurchaseReturnStockIssue(input: {
   phase?: 'SHIP' | 'COMPLETE'
   tx?: Prisma.TransactionClient
 }): Promise<InventoryStockMovement[]> {
+  const itemMeta = await loadItemStockMeta(
+    input.tenantId,
+    input.lines.map((l) => l.itemId).filter((id): id is string => Boolean(id)),
+  )
   const movements: InventoryStockMovement[] = []
   const phase = input.phase ?? 'COMPLETE'
   for (const line of input.lines) {
-    if (!line.itemId) continue
+    if (!canPostLine(line, itemMeta)) continue
     const quantity = qty(line.returnQuantity)
     if (quantity <= 0) continue
 
     if (phase === 'SHIP') {
-      // Operational RETURN_IN_TRANSIT: move REJECTED → BLOCKED (still on books until vendor confirms).
       try {
         const movement = await InventoryPostingService.transferStatus(
           {
             tenantId: input.tenantId,
-            itemId: line.itemId,
+            itemId: line.itemId!,
             warehouseId: input.warehouseId,
             fromStockStatus: 'REJECTED',
             stockStatus: 'BLOCKED',
@@ -252,7 +295,6 @@ export async function postPurchaseReturnStockIssue(input: {
       continue
     }
 
-    // RETURNED_TO_VENDOR: issue out rejected (or blocked-in-transit) stock; fall back to unrestricted accepted stock.
     let movement: InventoryStockMovement | null = null
     const issueBuckets: Array<'BLOCKED' | 'REJECTED' | 'UNRESTRICTED'> = ['BLOCKED', 'REJECTED', 'UNRESTRICTED']
     for (const stockStatus of issueBuckets) {
@@ -260,7 +302,7 @@ export async function postPurchaseReturnStockIssue(input: {
         movement = await postStockMovement(
           {
             tenantId: input.tenantId,
-            itemId: line.itemId,
+            itemId: line.itemId!,
             warehouseId: input.warehouseId,
             movementType: 'ISSUE',
             referenceType: 'ISS',

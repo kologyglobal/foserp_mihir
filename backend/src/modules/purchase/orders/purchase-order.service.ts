@@ -215,10 +215,20 @@ async function fillLineMasterSnapshots(
           gstGroupId: true,
           qcRequired: true,
           qualityTestGroupCode: true,
+          itemType: true,
+          isStockable: true,
         },
       })
     : []
   const itemsById = new Map(items.map((i) => [i.id, i]))
+
+  const freeHsnCodes = [
+    ...new Set(
+      lines
+        .filter((l) => !l.hsnId && l.hsnCodeSnapshot?.trim())
+        .map((l) => l.hsnCodeSnapshot.trim()),
+    ),
+  ]
 
   const gstGroupIds = [
     ...new Set(
@@ -236,7 +246,7 @@ async function fillLineMasterSnapshots(
   ]
   const binIds = [...new Set(lines.map((l) => l.binId).filter((v): v is string => Boolean(v)))]
 
-  const [gstGroups, hsns, bins] = await Promise.all([
+  const [gstGroups, hsns, hsnsByCode, bins] = await Promise.all([
     gstGroupIds.length
       ? prisma.masterGstGroup.findMany({
           where: { tenantId, id: { in: gstGroupIds }, deletedAt: null },
@@ -249,6 +259,12 @@ async function fillLineMasterSnapshots(
           select: { id: true, code: true, gstGroupId: true },
         })
       : [],
+    freeHsnCodes.length
+      ? prisma.masterHsnCode.findMany({
+          where: { tenantId, code: { in: freeHsnCodes }, deletedAt: null },
+          select: { id: true, code: true, gstGroupId: true },
+        })
+      : [],
     binIds.length
       ? prisma.masterBin.findMany({
           where: { tenantId, id: { in: binIds }, deletedAt: null },
@@ -258,7 +274,8 @@ async function fillLineMasterSnapshots(
   ])
 
   const gstById = new Map(gstGroups.map((g) => [g.id, g]))
-  const hsnById = new Map(hsns.map((h) => [h.id, h]))
+  const hsnById = new Map([...hsns, ...hsnsByCode].map((h) => [h.id, h]))
+  const hsnByCode = new Map(hsnsByCode.map((h) => [h.code, h]))
   const binById = new Map(bins.map((b) => [b.id, b]))
 
   for (const line of lines) {
@@ -273,6 +290,17 @@ async function fillLineMasterSnapshots(
       if (!line.qualityTestGroupCodeSnapshot && item.qualityTestGroupCode) {
         line.qualityTestGroupCodeSnapshot = item.qualityTestGroupCode
       }
+      const masterIsService =
+        item.isStockable === false || (item.itemType ?? '').toLowerCase() === 'service'
+      if (masterIsService) line.lineType = 'SERVICE'
+      else if (!line.lineType || line.lineType === 'GOODS') line.lineType = 'GOODS'
+    } else if (!line.itemId) {
+      if (line.lineType !== 'SERVICE') line.lineType = 'GOODS'
+    }
+
+    if (!line.hsnId && line.hsnCodeSnapshot?.trim()) {
+      const byCode = hsnByCode.get(line.hsnCodeSnapshot.trim())
+      if (byCode) line.hsnId = byCode.id
     }
 
     if (line.hsnId) {
@@ -283,6 +311,8 @@ async function fillLineMasterSnapshots(
         throw new ValidationError('HSN code does not belong to the selected GST group')
       }
       if (!line.gstGroupId) line.gstGroupId = hsn.gstGroupId
+    } else if (!line.hsnCodeSnapshot?.trim() && !line.itemId) {
+      throw new ValidationError('HSN/SAC is required for free-text lines')
     }
 
     if (line.gstGroupId) {
@@ -295,6 +325,7 @@ async function fillLineMasterSnapshots(
       throw new ValidationError('Bin code not found in tenant')
     }
 
+    // Tax from master resolution only — no silent default % when unresolved.
     const tax: PurchaseLineTaxSnapshot = await resolvePurchaseLineTaxSnapshot({
       tenantId,
       itemId: line.itemId,
@@ -495,8 +526,11 @@ export async function createPurchaseOrder(
           null,
         deliveryTerms:
           input.deliveryTerms?.trim() || settings.defaultDeliveryTerms || null,
+        paymentTermId: input.paymentTermId ?? null,
+        deliveryTermId: input.deliveryTermId ?? null,
         deliveryWarehouseId,
         ...totals,
+        termsAndConditions: input.termsAndConditions?.trim() || null,
         remarks: input.remarks?.trim() || null,
         createdById: actorId,
         updatedById: actorId,
@@ -615,6 +649,11 @@ export async function updatePurchaseOrder(
   if (input.currencyCode !== undefined) data.currencyCode = input.currencyCode
   if (input.paymentTerms !== undefined) data.paymentTerms = input.paymentTerms?.trim() || null
   if (input.deliveryTerms !== undefined) data.deliveryTerms = input.deliveryTerms?.trim() || null
+  if (input.paymentTermId !== undefined) data.paymentTermId = input.paymentTermId
+  if (input.deliveryTermId !== undefined) data.deliveryTermId = input.deliveryTermId
+  if (input.termsAndConditions !== undefined) {
+    data.termsAndConditions = input.termsAndConditions?.trim() || null
+  }
   if (input.deliveryWarehouseId !== undefined) {
     if (input.deliveryWarehouseId) {
       await assertWarehouseActive(tenantId, input.deliveryWarehouseId)
@@ -829,6 +868,24 @@ async function applyLifecycleTransition(
       ...(transition.auditExtra ?? {}),
     },
   })
+
+  // Submit→pending, re-submit after return, and multi-level re-queue (same status, new level).
+  if (
+    transition.createApproval ||
+    (updated.status === 'PENDING_APPROVAL' &&
+      (existing.status !== 'PENDING_APPROVAL' || transition.approvalResolution === 'APPROVED'))
+  ) {
+    const { notifyPoPendingApproval } = await import(
+      '../notifications/purchase-notification.emitters.js'
+    )
+    notifyPoPendingApproval({
+      tenantId,
+      actorUserId: actorId,
+      poId: updated.id,
+      poNumber: updated.orderNumber,
+      amount: Number(updated.totalAmount),
+    })
+  }
 
   return toPurchaseOrderDto(tenantId, updated)
 }

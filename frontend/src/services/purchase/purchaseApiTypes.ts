@@ -464,6 +464,7 @@ export interface ApiPurchaseOrderLine {
   id: string
   lineNumber: number
   itemId: string | null
+  lineType?: 'GOODS' | 'SERVICE' | string
   itemCode: string
   itemName: string
   description: string | null
@@ -542,6 +543,8 @@ export interface ApiPurchaseOrder {
   expectedDeliveryDate?: string | null
   paymentTerms?: string | null
   deliveryTerms?: string | null
+  paymentTermId?: string | null
+  deliveryTermId?: string | null
   deliveryWarehouseId?: string | null
   deliveryWarehouseCode?: string
   deliveryWarehouseName?: string
@@ -552,6 +555,7 @@ export interface ApiPurchaseOrder {
   taxAmount?: number
   freightAmount?: number
   totalAmount: number
+  termsAndConditions?: string | null
   remarks?: string | null
   submittedAt?: string | null
   approvedAt?: string | null
@@ -600,6 +604,7 @@ export interface ApiPurchaseOrderLineInput {
   id?: string
   lineNumber?: number
   itemId?: string | null
+  lineType?: 'GOODS' | 'SERVICE'
   itemCode?: string | null
   itemName?: string | null
   description?: string | null
@@ -618,6 +623,7 @@ export interface ApiPurchaseOrderLineInput {
   requisitionNumber?: string | null
   gstGroupId?: string | null
   hsnId?: string | null
+  hsnCode?: string | null
   binId?: string | null
   qualityTestGroupCode?: string | null
 }
@@ -630,9 +636,12 @@ export interface ApiPurchaseOrderInput {
   currencyCode?: string
   paymentTerms?: string | null
   deliveryTerms?: string | null
+  paymentTermId?: string | null
+  deliveryTermId?: string | null
   deliveryWarehouseId?: string | null
   freightAmount?: number
   taxAmount?: number
+  termsAndConditions?: string | null
   remarks?: string | null
   lines: ApiPurchaseOrderLineInput[]
 }

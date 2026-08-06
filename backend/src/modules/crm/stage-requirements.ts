@@ -78,7 +78,8 @@ export const LEAD_STAGE_REQUIREMENTS: Record<string, readonly string[]> = {
 export const OPPORTUNITY_STAGE_REQUIREMENTS: Record<string, readonly string[]> = {
   new_lead: ['opportunityName', 'customerId', 'ownerId'],
   qualified: ['priority'],
-  requirement_discussion: ['productRequirement', 'contactId', 'value', 'expectedCloseDate'],
+  // Expected close date deferred to quotation_sent / negotiation / won
+  requirement_discussion: ['productRequirement', 'contactId', 'value'],
   technical_review: ['productRequirement', 'lines'],
   quotation_prepared: ['lines', 'value'],
   quotation_sent: ['value', 'expectedCloseDate'],

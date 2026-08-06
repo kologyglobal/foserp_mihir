@@ -471,6 +471,17 @@ function requireVendor(vendorId: string): Vendor {
   return vendor
 }
 
+/** Register a master/quick-created vendor into demo purchase state so PO create can resolve it. */
+export function ensurePurchaseVendorKnown(vendor: Vendor): void {
+  if (!vendor.id) return
+  const idx = state.vendors.findIndex((v) => v.id === vendor.id)
+  if (idx >= 0) {
+    state.vendors[idx] = structuredClone(vendor)
+    return
+  }
+  state.vendors.push(structuredClone(vendor))
+}
+
 function requireItem(itemId: string): PurchaseItem {
   const item = state.items.find((i) => i.id === itemId)
   if (!item) throw new PurchaseServiceError('ITEM_NOT_FOUND', `Purchase item not found: ${itemId}`)
@@ -797,7 +808,10 @@ function buildOrderLines(
   isInterstate: boolean,
 ): PurchaseOrderLine[] {
   return rows.map((row, index) => {
-    const item = requireItem(row.itemId)
+    const item = row.itemId ? state.items.find((i) => i.id === row.itemId) : undefined
+    if (row.itemId && !item) {
+      throw new PurchaseServiceError('ITEM_NOT_FOUND', `Purchase item not found: ${row.itemId}`)
+    }
     const quantity = row.quantity
     const rate = row.rate
     const discountPct = row.discountPct ?? 0
@@ -807,7 +821,17 @@ function buildOrderLines(
         ? Number(row.discountAmount)
         : Number(((gross * discountPct) / 100).toFixed(2))
     const taxableAmount = Number((gross - discountAmount).toFixed(2))
-    const gstRatePct = row.gstRatePct ?? item.gstRatePct
+    const lineType: 'GOODS' | 'SERVICE' =
+      row.lineType === 'SERVICE' ||
+      row.itemType === 'service' ||
+      row.productType === 'service' ||
+      item?.masterItemType === 'service' ||
+      item?.productType === 'service' ||
+      item?.isStockable === false ||
+      item?.category === 'job_work'
+        ? 'SERVICE'
+        : 'GOODS'
+    const gstRatePct = row.gstRatePct ?? item?.gstRatePct ?? 0
     const tax = Number(((taxableAmount * gstRatePct) / 100).toFixed(2))
     const half = Number((tax / 2).toFixed(2))
     const cgst = isInterstate ? 0 : half
@@ -818,19 +842,32 @@ function buildOrderLines(
     const warehouseId = row.warehouseId ?? row.locationId ?? PURCHASE_DEMO_LOCATION.id
     const warehouseName = row.warehouseName ?? row.locationName ?? PURCHASE_DEMO_LOCATION.name
     const requiredDate = row.requiredDate ?? row.expectedDeliveryDate ?? todayDate()
+    const itemName = (row.itemName ?? item?.itemName ?? '').trim()
+    if (!item && !itemName) {
+      throw new PurchaseServiceError('PO_LINE_NAME_REQUIRED', 'Free-text PO line requires an item name')
+    }
     return {
       id: row.id ?? genId('prd-pol'),
       lineNo: row.lineNo ?? index + 1,
-      itemType: row.itemType ?? itemTypeFromCategory(item.category),
-      itemId: item.id,
-      itemCode: item.itemCode,
-      itemName: item.itemName,
-      description: row.description ?? item.description ?? item.itemName,
+      itemType: row.itemType ?? (lineType === 'SERVICE' ? 'service' : itemTypeFromCategory(item?.category ?? 'raw_material')),
+      lineType,
+      itemId: item?.id ?? row.itemId ?? '',
+      itemCode: row.itemCode ?? item?.itemCode ?? '',
+      itemName: itemName || (item?.itemName ?? ''),
+      description: row.description ?? item?.description ?? itemName,
       specification: row.specification ?? '',
-      category: item.category,
-      uom: row.uom ?? item.uom,
-      hsnCode: row.hsnCode ?? item.hsnCode,
-      sacCode: row.sacCode !== undefined ? row.sacCode : item.sacCode,
+      category: item?.category ?? (lineType === 'SERVICE' ? 'job_work' : 'raw_material'),
+      productType: row.productType ?? (lineType === 'SERVICE' ? 'service' : undefined),
+      uom: row.uom ?? item?.uom ?? 'NOS',
+      hsnCode: row.hsnCode ?? item?.hsnCode ?? '',
+      sacCode:
+        row.sacCode !== undefined
+          ? row.sacCode
+          : lineType === 'SERVICE'
+            ? row.hsnCode ?? item?.sacCode ?? null
+            : item?.sacCode ?? null,
+      hsnId: row.hsnId ?? null,
+      gstGroupId: row.gstGroupId ?? null,
       quantity,
       uomQuantity: Number(row.uomQuantity ?? quantity) || quantity,
       uomConversionFactor: Number(row.uomConversionFactor ?? 1) || 1,

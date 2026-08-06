@@ -222,6 +222,7 @@ export async function replacePurchaseOrderLines(
   lines: Array<{
     lineNumber: number
     itemId: string | null
+    lineType?: string
     itemCodeSnapshot: string
     itemNameSnapshot: string
     description: string | null
@@ -241,6 +242,11 @@ export async function replacePurchaseOrderLines(
     hsnId?: string | null
     hsnCodeSnapshot?: string
     gstGroupCodeSnapshot?: string
+    gstRatePctSnapshot?: number
+    cgstRateSnapshot?: number
+    sgstRateSnapshot?: number
+    igstRateSnapshot?: number
+    gstSchemeSnapshot?: string
     binId?: string | null
     qcRequiredSnapshot?: boolean
     qualityTestGroupCodeSnapshot?: string | null

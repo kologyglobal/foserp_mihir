@@ -2294,6 +2294,20 @@ function mapMasterVendorToPurchaseVendor(
   }
 }
 
+/** Map master vendor → purchase domain vendor (quick-create / PO select). */
+export function mapMasterVendorToDomainVendor(v: MasterVendor): Vendor {
+  return mapMasterVendorToPurchaseVendor(v)
+}
+
+/**
+ * Ensure a quick-created / master vendor is selectable on purchase docs.
+ * Demo: inject into in-memory purchase vendor list. API: already on master store.
+ */
+export function ensurePurchaseVendorKnown(vendor: Vendor): void {
+  if (isApiMode()) return
+  demo.ensurePurchaseVendorKnown(vendor)
+}
+
 /** Items for PR/PO pickers — Item Master via API in API mode, demo seed otherwise. */
 export async function getPurchaseItems(options?: {
   forceRefresh?: boolean
