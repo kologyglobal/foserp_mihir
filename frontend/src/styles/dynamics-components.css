@@ -20312,7 +20312,9 @@ div.erp-smart-select__dropdown {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 1120px;
+  /* Full workspace width — avoid left-biased “narrow column” on wide monitors */
+  width: 100%;
+  max-width: none;
 }
 
 .mi-create-toolbar {
@@ -20701,7 +20703,8 @@ div.erp-smart-select__dropdown {
 
 .vendor-invoice-zoho-form.vi-create-form,
 .sales-invoice-zoho-form.vi-create-form {
-  max-width: 1280px;
+  width: 100%;
+  max-width: none;
   gap: 12px;
 }
 
