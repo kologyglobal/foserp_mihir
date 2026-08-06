@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ClipboardList, Plus, ShieldAlert, Trash2 } from 'lucide-react'
 import type { OpportunityLine } from '../../types/crm'
 import { ErpSmartSelect, type ErpSmartSelectOption } from './ErpSmartSelect'
@@ -14,12 +14,14 @@ import {
   shouldShowTaxUnresolvedWarning,
   syncOpportunityLines,
   UNIT_PRICE_REQUIRED_MESSAGE,
+  type OpportunityLineTaxSupply,
   type OrderDiscountMode,
   type ProductPricingAdjustments,
 } from '../../utils/opportunityLineCalc'
 import type { ProductMasterPick } from '../../utils/opportunityProductOptions'
 import { isItemSellable, itemNotSellableForSalesMessage } from '../../utils/opportunityItemOptions'
 import { notify } from '../../store/toastStore'
+import { useMasterStore } from '../../store/masterStore'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { cn } from '../../utils/cn'
 import { resolveCommercialLineTax } from '../../utils/commercialLineTax'
@@ -52,6 +54,16 @@ export interface ErpProductPricingPanelProps {
   showAdjustments?: boolean
   /** When false, hide installation / other (default true for full quotation). */
   showExtendedCharges?: boolean
+  /**
+   * Seller LE + customer/POS — drives IGST vs CGST+SGST on item tax resolve.
+   * When omitted, scheme defaults to intra-state (same as missing-state resolve).
+   */
+  companyState?: string | null
+  companyStateCode?: string | null
+  companyGstin?: string | null
+  partyState?: string | null
+  partyGstin?: string | null
+  placeOfSupply?: string | null
 
   freightAmount?: number
   onFreightChange?: (amount: number) => void
@@ -116,6 +128,12 @@ export function ErpProductPricingPanel({
   readOnly,
   showAdjustments = true,
   showExtendedCharges = true,
+  companyState,
+  companyStateCode,
+  companyGstin,
+  partyState,
+  partyGstin,
+  placeOfSupply,
   freightAmount: freightAmountProp,
   onFreightChange,
   freightMode: freightModeProp,
@@ -231,6 +249,25 @@ export function ErpProductPricingPanel({
   const linesRef = useRef(synced)
   linesRef.current = synced
 
+  const taxSupply: OpportunityLineTaxSupply = {
+    companyState,
+    companyStateCode,
+    companyGstin,
+    partyState,
+    partyGstin,
+    placeOfSupply,
+  }
+  const taxSupplyKey = [
+    companyState ?? '',
+    companyStateCode ?? '',
+    companyGstin ?? '',
+    partyState ?? '',
+    partyGstin ?? '',
+    placeOfSupply ?? '',
+  ].join('|')
+  const taxSupplyRef = useRef(taxSupply)
+  taxSupplyRef.current = taxSupply
+
   function commit(next: OpportunityLine[]) {
     const normalized = syncOpportunityLines(next)
     linesRef.current = normalized
@@ -256,6 +293,15 @@ export function ErpProductPricingPanel({
     commit(base.filter((l) => l.id !== id))
   }
 
+  function masterTaxHelpers() {
+    const store = useMasterStore.getState()
+    return {
+      hsnById: (hid: string) => store.getHsn(hid),
+      hsnByCode: (code: string) => store.getHsnByCode(code),
+      gstRates: store.gstRates,
+    }
+  }
+
   function selectItem(lineId: string, itemId: string) {
     const base = syncOpportunityLines(linesRef.current)
     // Clear product → blank draft (must not show “Tax unresolved”).
@@ -271,7 +317,8 @@ export function ErpProductPricingPanel({
       return
     }
     const idx = base.findIndex((l) => l.id === lineId)
-    const built = buildOpportunityLineFromItem(pick.item, pick.uomName, idx + 1)
+    const supply = taxSupplyRef.current
+    const built = buildOpportunityLineFromItem(pick.item, pick.uomName, idx + 1, supply)
     // Keep stable row id so async tax resolve can still patch this line.
     updateLine(lineId, { ...built, id: lineId })
     if (built.taxUnresolved) {
@@ -281,8 +328,13 @@ export function ErpProductPricingPanel({
           : 'GST unresolved — set HSN and GST group on Item master',
       )
     }
-    // API mode: re-resolve via central tax API (masters may not be in local store).
-    void resolveCommercialLineTax({ direction: 'SALES', item: pick.item }).then((snap) => {
+    // Dual-mode: re-resolve via API/local masters with full seller+party+POS context.
+    void resolveCommercialLineTax({
+      direction: 'SALES',
+      item: pick.item,
+      ...supply,
+      ...masterTaxHelpers(),
+    }).then((snap) => {
       if (snap.resolved) {
         updateLine(lineId, {
           taxPct: snap.taxPct,
@@ -303,6 +355,75 @@ export function ErpProductPricingPanel({
       }
     })
   }
+
+  // Re-resolve line schemes when seller LE, customer state/GSTIN, or POS changes.
+  useEffect(() => {
+    if (readOnly) return
+    let cancelled = false
+    const base = syncOpportunityLines(linesRef.current)
+    const targets = base.filter((l) => l.itemId)
+    if (!targets.length) return
+
+    void (async () => {
+      const supply = taxSupplyRef.current
+      const helpers = masterTaxHelpers()
+      const nextMap = new Map<string, Partial<OpportunityLine>>()
+      await Promise.all(
+        targets.map(async (line) => {
+          const pick = productPickMap.get(line.itemId!)
+          if (!pick?.item) return
+          const snap = await resolveCommercialLineTax({
+            direction: 'SALES',
+            item: pick.item,
+            ...supply,
+            ...helpers,
+          })
+          if (!snap.resolved) {
+            nextMap.set(line.id, {
+              taxUnresolved: true,
+              taxSource: 'UNRESOLVED',
+              hsnCode: snap.hsnSacCode || line.hsnCode,
+            })
+            return
+          }
+          if (
+            line.taxPct === snap.taxPct &&
+            line.taxScheme === snap.taxScheme &&
+            line.cgstRate === snap.cgstRate &&
+            line.sgstRate === snap.sgstRate &&
+            line.igstRate === snap.igstRate &&
+            !line.taxUnresolved
+          ) {
+            return
+          }
+          nextMap.set(line.id, {
+            taxPct: snap.taxPct,
+            hsnCode: snap.hsnSacCode || line.hsnCode,
+            taxScheme: snap.taxScheme,
+            taxSource: snap.source,
+            taxUnresolved: false,
+            cgstRate: snap.cgstRate,
+            sgstRate: snap.sgstRate,
+            igstRate: snap.igstRate,
+          })
+        }),
+      )
+      if (cancelled || nextMap.size === 0) return
+      const latest = syncOpportunityLines(linesRef.current)
+      commit(
+        latest.map((l) => {
+          const patch = nextMap.get(l.id)
+          return patch ? { ...l, ...patch } : l
+        }),
+      )
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // productPickMap identity is stable enough when items already selected; supply drives re-resolve.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional supply fingerprint only
+  }, [taxSupplyKey])
 
   const showCharges = showExtendedCharges
 
@@ -560,7 +681,7 @@ export function ErpProductPricingPanel({
       )}
 
       {showAdjustments ? (
-        <div className="so-pricing-totals">
+        <div className="so-pricing-totals so-direct-order-summary">
           <OrderAdjustmentsPanel>
               <ChargeEditor
                 label="Order discount"

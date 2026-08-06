@@ -38,11 +38,11 @@ export function useQuickCreate() {
   }, [closeDrawerStore])
 
   const saveEntity = useCallback(
-    (data: Record<string, unknown>) => {
+    async (data: Record<string, unknown>) => {
       if (!drawer) {
         return { ok: false as const, error: 'No quick-create drawer open' }
       }
-      const result = saveQuickCreateEntity(drawer.entityType, data, {
+      const result = await saveQuickCreateEntity(drawer.entityType, data, {
         ...drawer.defaultValues,
         customerId: drawer.defaultValues?.customerId,
       })

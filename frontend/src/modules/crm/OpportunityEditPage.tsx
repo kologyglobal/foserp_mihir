@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Activity,
@@ -21,6 +21,10 @@ import {
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpViewField } from '../../components/erp/card-form'
 import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
 import { ErpProductPricingSection } from '../../components/erp/ErpProductPricingSection'
+import {
+  CommercialGstSupplyPanel,
+  type CommercialGstSupplyValue,
+} from '../../components/sales/CommercialGstSupplyPanel'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
 import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttachmentsPanel'
 import { LostDealFields } from '../../components/crm'
@@ -52,6 +56,9 @@ import {
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { AppLink } from '../../components/ui/AppLink'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
+import { loadSellerStateCode } from '../../utils/sellerGstState'
+import { resolveCommercialPlaceOfSupply } from '../../utils/commercialSupplyContext'
+import { resolveGstStateCode } from '../../utils/gstStateCode'
 import { useOpportunityEditor } from './hooks/useOpportunityEditor'
 
 export function OpportunityEditPage() {
@@ -59,7 +66,28 @@ export function OpportunityEditPage() {
   const navigate = useNavigate()
   const apiMode = useApiMode()
   const showLocationField = !useTenantProfileStore((s) => s.isServices())
+  const isServicesTenant = useTenantProfileStore((s) => s.isServices())
   const editor = useOpportunityEditor(id)
+  const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>(() => ({
+    placeOfSupply: '',
+    placeOfSupplyOverride: false,
+    placeOfSupplyOverrideReason: '',
+    supplierStateCode: '',
+  }))
+
+  useEffect(() => {
+    let cancelled = false
+    void loadSellerStateCode().then((code) => {
+      if (cancelled || !code) return
+      setGstSupply((prev) =>
+        prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const {
     opportunity,
     customer,
@@ -135,6 +163,37 @@ export function OpportunityEditPage() {
   ], [opportunityName, hasValidLine, dealValue, expectedCloseDate, attachments.length])
 
   const completionPercent = Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
+
+  const customerState = customer?.state?.trim() || null
+  const customerGstin = customer?.gstin?.trim() || null
+  const customerShipState =
+    customer?.shippingState?.trim() ||
+    customer?.deliveryState?.trim() ||
+    customerState
+  const effectivePlaceOfSupply = useMemo(() => {
+    if (gstSupply.placeOfSupplyOverride && gstSupply.placeOfSupply.trim()) {
+      return (
+        resolveGstStateCode(gstSupply.placeOfSupply) ||
+        gstSupply.placeOfSupply.trim()
+      )
+    }
+    return (
+      resolveCommercialPlaceOfSupply({
+        shipToState: customerShipState,
+        billToState: customerState,
+        customerState,
+        customerGstin,
+        isServiceDocument: isServicesTenant,
+      }).placeOfSupplyStateCode ?? ''
+    )
+  }, [
+    gstSupply.placeOfSupply,
+    gstSupply.placeOfSupplyOverride,
+    customerShipState,
+    customerState,
+    customerGstin,
+    isServicesTenant,
+  ])
 
   if (!id || !opportunity) {
     return (
@@ -419,6 +478,18 @@ export function OpportunityEditPage() {
           ) : null}
         </ErpCardSection>
 
+        <div className="mb-3">
+          <CommercialGstSupplyPanel
+            value={gstSupply}
+            onChange={setGstSupply}
+            customerState={customerState}
+            customerGstin={customerGstin}
+            shipToState={customerShipState}
+            billToState={customerState}
+            isServiceDocument={isServicesTenant}
+          />
+        </div>
+
         <ErpProductPricingSection
           sectionId="opp-section-products"
           nbaTarget="products"
@@ -431,6 +502,10 @@ export function OpportunityEditPage() {
           productOptions={productOptions}
           productPickMap={productPickMap}
           rowErrors={rowErrors}
+          companyStateCode={gstSupply.supplierStateCode || null}
+          partyState={customerState}
+          partyGstin={customerGstin}
+          placeOfSupply={effectivePlaceOfSupply || null}
         >
           <div className="opp-scope-notes mt-4">
             <ErpFieldRow label="Scope Notes" colSpan={3} horizontal={false}>

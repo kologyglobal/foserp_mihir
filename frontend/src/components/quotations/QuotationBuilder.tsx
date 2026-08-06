@@ -22,6 +22,14 @@ import { QuotationLineItemsEditor } from './QuotationLineItemsEditor'
 import { QuotationApprovalPanel } from './QuotationApprovalPanel'
 import { QuotationRevisionHistory } from './QuotationRevisionHistory'
 import { QuotationDataSourcePanel } from './QuotationDataSourcePanel'
+import {
+  CommercialGstSupplyPanel,
+  type CommercialGstSupplyValue,
+} from '../sales/CommercialGstSupplyPanel'
+import { loadSellerStateCode } from '../../utils/sellerGstState'
+import { resolveCommercialPlaceOfSupply } from '../../utils/commercialSupplyContext'
+import { resolveGstStateCode } from '../../utils/gstStateCode'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { quotationStatusLabel, quotationStatusTone } from './QuotationCrmCard'
 import { quotationRevisionLabel, quotationNoWithRevision } from './Quotation360Sections'
 import { resolveQuotationRevisionPolicy } from '../../utils/quotationRevisionPolicy'
@@ -75,9 +83,64 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
   const customers = useMasterStore((s) => s.customers)
   const allDocs = useCrmStore((s) => s.quotationDocuments)
   const deliveryTimeOptions = useDeliveryTimeOptions()
+  const isServicesTenant = useTenantProfileStore((s) => s.isServices())
+  const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>(() => ({
+    placeOfSupply: '',
+    placeOfSupplyOverride: false,
+    placeOfSupplyOverrideReason: '',
+    supplierStateCode: '',
+  }))
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
+
+  const customer = useMemo(
+    () => (quotation ? customers.find((c) => c.id === quotation.customerId) : undefined),
+    [quotation, customers],
+  )
+  const customerState = customer?.state?.trim() || null
+  const customerGstin = customer?.gstin?.trim() || null
+  const customerShipState =
+    customer?.shippingState?.trim() ||
+    customer?.deliveryState?.trim() ||
+    customerState
+  const effectivePlaceOfSupply = useMemo(() => {
+    if (gstSupply.placeOfSupplyOverride && gstSupply.placeOfSupply.trim()) {
+      return (
+        resolveGstStateCode(gstSupply.placeOfSupply) ||
+        gstSupply.placeOfSupply.trim()
+      )
+    }
+    return (
+      resolveCommercialPlaceOfSupply({
+        shipToState: customerShipState,
+        billToState: customerState,
+        customerState,
+        customerGstin,
+        isServiceDocument: isServicesTenant,
+      }).placeOfSupplyStateCode ?? ''
+    )
+  }, [
+    gstSupply.placeOfSupply,
+    gstSupply.placeOfSupplyOverride,
+    customerShipState,
+    customerState,
+    customerGstin,
+    isServicesTenant,
+  ])
+
+  useEffect(() => {
+    let cancelled = false
+    void loadSellerStateCode().then((code) => {
+      if (cancelled || !code) return
+      setGstSupply((prev) =>
+        prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const quotationIdForAttachments = doc?.quotationId ?? 'draft:quotation-editor'
   const setQuotationAttachments = useQuotationAttachmentStore((s) => s.setForQuotation)
@@ -186,7 +249,6 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
     )
   }
 
-  const customer = customers.find((c) => c.id === quotation.customerId)
   const opportunity = doc.opportunityId ? opportunities.find((o) => o.id === doc.opportunityId) : undefined
   const contact = doc.contactId ? useCrmStore.getState().getContact(doc.contactId) : null
   const latestDoc = useCrmStore.getState().getLatestQuotationDocument(doc.quotationId)
@@ -509,6 +571,19 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
               </ErpFormGrid>
             </section>
 
+            <div className="mb-3">
+              <CommercialGstSupplyPanel
+                value={gstSupply}
+                onChange={setGstSupply}
+                customerState={customerState}
+                customerGstin={customerGstin}
+                shipToState={customerShipState}
+                billToState={customerState}
+                isServiceDocument={isServicesTenant}
+                readOnly={!canEdit}
+              />
+            </div>
+
             <QuotationSectionEditor
               sections={doc.sections}
               locked={locked}
@@ -527,6 +602,10 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                   showFreightExtras
                   scopeNotes={opportunityRequirementDisplay(doc.commercialNotes)}
                   onChange={canEdit ? handlePrice : undefined}
+                  companyStateCode={gstSupply.supplierStateCode || null}
+                  partyState={customerState}
+                  partyGstin={customerGstin}
+                  placeOfSupply={effectivePlaceOfSupply || null}
                 />
               )}
             />

@@ -40,6 +40,17 @@ async function scanTenant(tenantId: string, tenantTimezone: string): Promise<voi
   await scanUnattendedLeads(tenantId, settings, tz, now)
   await scanOpportunities(tenantId, settings, now, todayKey)
   await scanQuotations(tenantId, settings, now, todayKey)
+  try {
+    const { scanPurchaseDueNotifications } = await import(
+      '../purchase/notifications/purchase-notification.emitters.js'
+    )
+    await scanPurchaseDueNotifications(tenantId)
+  } catch (err) {
+    logger.warn('purchase notification scan failed', {
+      tenantId,
+      message: (err as Error).message,
+    })
+  }
 }
 
 function humanizeToken(value: string | null | undefined): string {

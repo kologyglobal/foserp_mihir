@@ -161,6 +161,16 @@ interface QuotationLineItemsEditorProps {
   onScopeNotesChange?: (value: string) => void
   showFreightExtras?: boolean
   rowErrors?: Record<string, string[]>
+  /**
+   * Seller LE + customer/POS — drives IGST vs CGST+SGST on item tax resolve.
+   * When omitted, scheme defaults to intra-state (same as missing-state resolve).
+   */
+  companyState?: string | null
+  companyStateCode?: string | null
+  companyGstin?: string | null
+  partyState?: string | null
+  partyGstin?: string | null
+  placeOfSupply?: string | null
 }
 
 export function QuotationLineItemsEditor({
@@ -175,6 +185,12 @@ export function QuotationLineItemsEditor({
   onScopeNotesChange,
   showFreightExtras = true,
   rowErrors,
+  companyState,
+  companyStateCode,
+  companyGstin,
+  partyState,
+  partyGstin,
+  placeOfSupply,
 }: QuotationLineItemsEditorProps) {
   const products = useMasterStore((s) => s.products)
   const items = useMasterStore((s) => s.items)
@@ -272,6 +288,12 @@ export function QuotationLineItemsEditor({
         readOnly={readOnly}
         showAdjustments
         showExtendedCharges={showFreightExtras}
+        companyState={companyState}
+        companyStateCode={companyStateCode}
+        companyGstin={companyGstin}
+        partyState={partyState}
+        partyGstin={partyGstin}
+        placeOfSupply={placeOfSupply}
         orderDiscountMode={orderDiscountMode}
         onOrderDiscountModeChange={
           readOnly

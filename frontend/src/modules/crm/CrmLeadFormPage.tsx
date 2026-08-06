@@ -20,7 +20,14 @@ import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { Input, MobileInput, Select, Textarea } from '../../components/forms/Inputs'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
 import { ErpProductPricingSection } from '../../components/erp/ErpProductPricingSection'
+import {
+  CommercialGstSupplyPanel,
+  type CommercialGstSupplyValue,
+} from '../../components/sales/CommercialGstSupplyPanel'
 import { LeadSaveNextActionsPanel } from '../../components/crm/LeadSaveNextActionsPanel'
+import { loadSellerStateCode } from '../../utils/sellerGstState'
+import { resolveCommercialPlaceOfSupply } from '../../utils/commercialSupplyContext'
+import { resolveGstStateCode } from '../../utils/gstStateCode'
 import { CrmLeadPriorityChips } from '../../components/crm/CrmLeadPriorityChips'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
 import { CompanyProspectSelect } from '../../components/crm/CompanyProspectSelect'
@@ -216,6 +223,12 @@ export function CrmLeadFormPage() {
       existing?.remarks,
     ).lines,
   )
+  const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>(() => ({
+    placeOfSupply: '',
+    placeOfSupplyOverride: false,
+    placeOfSupplyOverrideReason: '',
+    supplierStateCode: '',
+  }))
   const [expectedValue, setExpectedValue] = useState(existing?.expectedValue ?? 0)
   const [probability, setProbability] = useState(existing?.probability ?? 30)
   const [expectedCloseDate, setExpectedCloseDate] = useState(existing?.expectedCloseDate ?? '')
@@ -408,6 +421,53 @@ export function CrmLeadFormPage() {
 
   const customer = company.customerId ? useMasterStore.getState().getCustomer(company.customerId) : undefined
   const territory = customer?.salesTerritory ?? companyInfo?.salesTerritory ?? '—'
+  const customerState = customer?.state?.trim() || null
+  const customerGstin = customer?.gstin?.trim() || null
+  const customerShipState =
+    customer?.shippingState?.trim() ||
+    customer?.deliveryState?.trim() ||
+    customerState
+  const isServicesTenant = useTenantProfileStore((s) => s.isServices())
+
+  // Seller state from default Legal Entity (never invent COMPANY_STATE here).
+  useEffect(() => {
+    let cancelled = false
+    void loadSellerStateCode().then((code) => {
+      if (cancelled || !code) return
+      setGstSupply((prev) =>
+        prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  /** Effective POS code/label for line tax (override or auto from customer GSTIN/address). */
+  const effectivePlaceOfSupply = useMemo(() => {
+    if (gstSupply.placeOfSupplyOverride && gstSupply.placeOfSupply.trim()) {
+      return (
+        resolveGstStateCode(gstSupply.placeOfSupply) ||
+        gstSupply.placeOfSupply.trim()
+      )
+    }
+    return (
+      resolveCommercialPlaceOfSupply({
+        shipToState: customerShipState,
+        billToState: customerState,
+        customerState,
+        customerGstin,
+        isServiceDocument: isServicesTenant,
+      }).placeOfSupplyStateCode ?? ''
+    )
+  }, [
+    gstSupply.placeOfSupply,
+    gstSupply.placeOfSupplyOverride,
+    customerShipState,
+    customerState,
+    customerGstin,
+    isServicesTenant,
+  ])
 
   // New Lead policy: the form always opens blank — drafts are never persisted or restored.
   // clearDraft stays wired so any legacy stale draft key is purged on mount / cancel / save.
@@ -433,6 +493,12 @@ export function CrmLeadFormPage() {
     setSource('other')
     setIndustry('')
     setRequirementLines([createEmptyOpportunityLine(1)])
+    setGstSupply((prev) => ({
+      placeOfSupply: '',
+      placeOfSupplyOverride: false,
+      placeOfSupplyOverrideReason: '',
+      supplierStateCode: prev.supplierStateCode,
+    }))
     setExpectedValue(0)
     setProbability(30)
     setExpectedCloseDate('')
@@ -1677,6 +1743,19 @@ export function CrmLeadFormPage() {
         {/* Secondary sections default collapsed — compact FastTabs so the primary
             create path (above) fits one viewport. Expand on click, rail chip, or
             when a validation error lands inside them. */}
+        <div id="lead-section-gst" className="crm-lead-zoho-section">
+          <CommercialGstSupplyPanel
+            value={gstSupply}
+            onChange={setGstSupply}
+            customerState={customerState}
+            customerGstin={customerGstin}
+            shipToState={customerShipState}
+            billToState={customerState}
+            isServiceDocument={isServicesTenant}
+            columns={3}
+          />
+        </div>
+
         <div id="lead-section-requirement">
           <ErpProductPricingSection
             sectionId="lead-section-requirement-pricing"
@@ -1690,6 +1769,10 @@ export function CrmLeadFormPage() {
             }}
             productOptions={productOptions}
             productPickMap={pickMap}
+            companyStateCode={gstSupply.supplierStateCode || null}
+            partyState={customerState}
+            partyGstin={customerGstin}
+            placeOfSupply={effectivePlaceOfSupply || null}
             defaultOpen={hasLeadRequirementLines(requirementLines)}
             forceOpenKey={sectionForceOpen['lead-section-requirement']}
           >

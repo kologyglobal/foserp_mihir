@@ -43,11 +43,13 @@ import { salesChildBreadcrumbs } from '../../utils/salesNavigation'
 import { isApiMode } from '../../config/apiConfig'
 import { apiCreateProforma } from '../../services/bridges/crmCommercialApiBridge'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
+import { calcProductPricingSummary } from '../../utils/opportunityLineCalc'
+import { CommercialOrderAdjustmentsBlock } from '../../components/erp/CommercialOrderAdjustmentsBlock'
 import {
-  calcProductPricingSummary,
-  type OrderDiscountMode,
-} from '../../utils/opportunityLineCalc'
-import { ChargeEditor, OrderAdjustmentsPanel } from '../../components/erp/OrderAdjustmentsGrid'
+  chargesToAdjustments,
+  emptySoOrderCharges,
+  type SoOrderCharges,
+} from '../../components/sales/SalesOrderLinesEditor'
 import {
   CommercialGstSupplyPanel,
   type CommercialGstSupplyValue,
@@ -70,10 +72,6 @@ type PiLineRow = {
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
 const DEFAULT_VALIDITY_DAYS = 30
-
-function round2(n: number) {
-  return Math.round(n * 100) / 100
-}
 
 function addDays(isoDate: string, days: number): string {
   const d = new Date(isoDate.slice(0, 10))
@@ -149,13 +147,11 @@ export function ProformaInvoiceFormPage() {
   const [billingAddress, setBillingAddress] = useState<string | null>(null)
   const [shippingAddress, setShippingAddress] = useState<string | null>(null)
   const [remarks, setRemarks] = useState('')
-  const [freightMode, setFreightMode] = useState<OrderDiscountMode>('flat')
-  const [freightAmount, setFreightAmount] = useState(0)
-  const [orderDiscountMode, setOrderDiscountMode] = useState<OrderDiscountMode>('flat')
-  const [orderDiscountInput, setOrderDiscountInput] = useState(0)
+  const [charges, setCharges] = useState<SoOrderCharges>(() => emptySoOrderCharges())
   const { locationId, setLocationId } = useDocumentLocation('sales', null)
   const showLocationField = !useTenantProfileStore((s) => s.isServices())
   const isServices = useTenantProfileStore((s) => s.isServices())
+  const showFreight = !isServices
   const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>(() => ({
     placeOfSupply: '',
     placeOfSupplyOverride: false,
@@ -215,13 +211,9 @@ export function ProformaInvoiceFormPage() {
     setShippingAddress(prefill.shippingAddress)
     setRemarks(prefill.remarks)
     if (prefill.locationId) setLocationId(prefill.locationId)
-    // Carry SO GST supply snapshot (supplier + place of supply); LE async seed only fills empty seller.
+    // Carry SO place of supply only. Supplier state always stays Legal Entity (LE seed).
     setGstSupply((prev) => ({
       ...prev,
-      supplierStateCode:
-        prefill.so.supplierStateCode?.trim() ||
-        prefill.supplierStateCode?.trim() ||
-        prev.supplierStateCode,
       placeOfSupply:
         prefill.so.placeOfSupplyStateCode?.trim() ||
         prefill.placeOfSupplyStateCode?.trim() ||
@@ -229,11 +221,8 @@ export function ProformaInvoiceFormPage() {
         resolveGstStateCode(prefill.placeOfSupply) ||
         prev.placeOfSupply,
     }))
-    // Do not invent SO-level freight / order discount — SO header has no charge fields.
-    setFreightMode('flat')
-    setFreightAmount(0)
-    setOrderDiscountMode('flat')
-    setOrderDiscountInput(0)
+    // Prefer empty adjustments — SO commercial charge JSON is not always on prefill.
+    setCharges(emptySoOrderCharges())
     setLineRows(
       prefill.lines.length
         ? toLineRows(prefill.lines)
@@ -314,12 +303,8 @@ export function ProformaInvoiceFormPage() {
 
   const customer = customerId ? getCustomer(customerId) : undefined
   const lines = useMemo(() => buildLinesFromRows(lineRows, items), [lineRows, items])
-  const taxable = useMemo(() => lines.reduce((s, l) => s + l.taxableValue, 0), [lines])
 
   const pricingSummary = useMemo(() => {
-    const totalQty = lines.reduce((s, l) => s + l.qty, 0)
-    const basicAmount = round2(lines.reduce((s, l) => s + l.qty * l.unitPrice, 0))
-    const totalLineDiscount = round2(basicAmount - taxable)
     const asOppLines = lines.map((line) => ({
       id: line.id,
       lineNo: line.lineNo,
@@ -342,39 +327,33 @@ export function ProformaInvoiceFormPage() {
       expectedDeliveryDate: null as string | null,
       remarks: '',
     }))
-    const pricing = calcProductPricingSummary(asOppLines, {
-      freight: {
-        calculationType: freightMode,
-        value: freightAmount,
-      },
-      orderDiscountMode,
-      orderDiscountInput,
-    })
-    return {
-      totalQty,
-      basicAmount,
-      subtotal: pricing.taxableBeforeOverallDiscount,
-      totalLineDiscount,
-      gstByRate: pricing.gstByRate,
-      lineGst: pricing.totalGst,
-      orderDiscountAmount: pricing.orderDiscountAmount,
-      freightAmount: pricing.freightAmount,
-      taxableAfterDiscount: pricing.taxableAfterOverallDiscount,
-      grandTotal: pricing.grandTotal,
-    }
-  }, [lines, taxable, freightAmount, freightMode, orderDiscountInput, orderDiscountMode])
+    return calcProductPricingSummary(asOppLines, chargesToAdjustments(charges, showFreight))
+  }, [lines, charges, showFreight])
 
   const gstPreview = useMemo(
     () =>
       customer
         ? computeGst(
-            pricingSummary.taxableAfterDiscount,
+            pricingSummary.taxableAfterOverallDiscount,
             customer.state,
             undefined,
             gstSupply.supplierStateCode || null,
           )
         : null,
-    [pricingSummary.taxableAfterDiscount, customer, gstSupply.supplierStateCode],
+    [pricingSummary.taxableAfterOverallDiscount, customer, gstSupply.supplierStateCode],
+  )
+
+  const gstExtras = useMemo(
+    () =>
+      gstPreview
+        ? {
+            schemeLabel: gstSchemeLabel(gstPreview.scheme),
+            cgstAmount: gstPreview.cgstAmount,
+            sgstAmount: gstPreview.sgstAmount,
+            igstAmount: gstPreview.igstAmount,
+          }
+        : null,
+    [gstPreview],
   )
 
   const hasValidLines = lines.length > 0 && lines.every((l) => l.itemId && l.qty > 0 && l.unitPrice > 0)
@@ -556,7 +535,7 @@ export function ProformaInvoiceFormPage() {
           { label: 'Customer', value: customer?.customerName ?? '—' },
           { label: 'Mode', value: mode === 'sales_order' ? 'From SO' : 'Direct' },
           { label: 'Lines', value: String(lines.length) },
-          { label: 'Taxable', value: formatCurrency(pricingSummary.subtotal) },
+          { label: 'Taxable', value: formatCurrency(pricingSummary.taxableBeforeOverallDiscount) },
           ...(gstPreview ? [
             { label: 'GST Scheme', value: gstSchemeLabel(gstPreview.scheme) },
             ...(gstPreview.scheme === 'cgst_sgst'
@@ -974,111 +953,14 @@ export function ProformaInvoiceFormPage() {
           columns={1}
         >
           {lineGrid}
-          <div className="so-pricing-totals so-direct-order-summary">
-            <OrderAdjustmentsPanel>
-              <ChargeEditor
-                label="Order discount"
-                mode={orderDiscountMode}
-                value={orderDiscountInput}
-                calculatedAmount={pricingSummary.orderDiscountAmount}
-                modePctLabel="% Disc."
-                amountHint={
-                  pricingSummary.orderDiscountAmount > 0
-                    ? 'off taxable (before GST)'
-                    : undefined
-                }
-                onModeChange={(m) => {
-                  setOrderDiscountMode(m)
-                  setOrderDiscountInput(0)
-                }}
-                onValueChange={setOrderDiscountInput}
-              />
-              <ChargeEditor
-                label="Freight"
-                mode={freightMode}
-                value={freightAmount}
-                calculatedAmount={pricingSummary.freightAmount}
-                onModeChange={(m) => {
-                  setFreightMode(m)
-                  setFreightAmount(0)
-                }}
-                onValueChange={setFreightAmount}
-              />
-            </OrderAdjustmentsPanel>
-
-            <aside className="so-pricing-summary" aria-label="Order summary">
-              <p className="so-pricing-summary__title">Order summary</p>
-              <div className="so-pricing-summary__rows">
-                <div className="so-pricing-summary__row">
-                  <span>Total quantity</span>
-                  <span className="tabular-nums">{pricingSummary.totalQty}</span>
-                </div>
-                <div className="so-pricing-summary__row">
-                  <span>Basic amount</span>
-                  <span className="tabular-nums">{formatCurrency(pricingSummary.basicAmount)}</span>
-                </div>
-                {pricingSummary.totalLineDiscount > 0 ? (
-                  <div className="so-pricing-summary__row">
-                    <span>Line discount</span>
-                    <span className="tabular-nums">−{formatCurrency(pricingSummary.totalLineDiscount)}</span>
-                  </div>
-                ) : null}
-                <div className="so-pricing-summary__row">
-                  <span>Taxable amount</span>
-                  <span className="tabular-nums">{formatCurrency(pricingSummary.subtotal)}</span>
-                </div>
-                <div className="so-pricing-summary__row">
-                  <span>
-                    Overall discount
-                    {orderDiscountMode === 'percent' && orderDiscountInput > 0
-                      ? ` (${orderDiscountInput}%)`
-                      : ''}
-                  </span>
-                  <span className="tabular-nums">
-                    {pricingSummary.orderDiscountAmount > 0
-                      ? `−${formatCurrency(pricingSummary.orderDiscountAmount)}`
-                      : formatCurrency(0)}
-                  </span>
-                </div>
-                {pricingSummary.orderDiscountAmount > 0 ? (
-                  <div className="so-pricing-summary__row">
-                    <span>Taxable after discount</span>
-                    <span className="tabular-nums">{formatCurrency(pricingSummary.taxableAfterDiscount)}</span>
-                  </div>
-                ) : null}
-                {[...pricingSummary.gstByRate.entries()]
-                  .sort(([a], [b]) => a - b)
-                  .map(([rate, amount]) => (
-                    <div key={rate} className="so-pricing-summary__row">
-                      <span>GST @ {rate}%</span>
-                      <span className="tabular-nums">{formatCurrency(amount)}</span>
-                    </div>
-                  ))}
-                {gstPreview ? (
-                  <>
-                    <div className="so-pricing-summary__row">
-                      <span>GST scheme</span>
-                      <span>{gstSchemeLabel(gstPreview.scheme)}</span>
-                    </div>
-                  </>
-                ) : null}
-                <div className="so-pricing-summary__row">
-                  <span>Total GST</span>
-                  <span className="tabular-nums">{formatCurrency(pricingSummary.lineGst)}</span>
-                </div>
-                {pricingSummary.freightAmount > 0 ? (
-                  <div className="so-pricing-summary__row">
-                    <span>Freight</span>
-                    <span className="tabular-nums">{formatCurrency(pricingSummary.freightAmount)}</span>
-                  </div>
-                ) : null}
-              </div>
-              <div className="so-pricing-summary__grand">
-                <span>Grand total</span>
-                <strong className="tabular-nums">{formatCurrency(pricingSummary.grandTotal)}</strong>
-              </div>
-            </aside>
-          </div>
+          <CommercialOrderAdjustmentsBlock
+            value={charges}
+            onChange={setCharges}
+            summary={pricingSummary}
+            showFreight={showFreight}
+            showExtendedCharges
+            gstExtras={gstExtras}
+          />
         </ErpCardSection>
         </div>
 

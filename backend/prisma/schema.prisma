@@ -7162,11 +7162,16 @@ model PurchaseOrder {
   expectedDeliveryDate  DateTime?           @db.Date
   paymentTerms          String?             @db.VarChar(200)
   deliveryTerms         String?             @db.VarChar(200)
+  /// Optional commercial master refs — display text is snapshotted in paymentTerms / deliveryTerms.
+  paymentTermId         String?             @db.VarChar(36)
+  deliveryTermId        String?             @db.VarChar(36)
   deliveryWarehouseId   String?
   subtotalAmount        Decimal             @default(0) @db.Decimal(18, 2)
   taxAmount             Decimal             @default(0) @db.Decimal(18, 2)
   freightAmount         Decimal             @default(0) @db.Decimal(18, 2)
   totalAmount           Decimal             @default(0) @db.Decimal(18, 2)
+  /// Free-text custom terms & conditions (preserve line breaks on print).
+  termsAndConditions    String?             @db.Text
   remarks               String?             @db.Text
   /// Amendment counter — Rev 0 = original; increments on each POST /revise.
   revisionNo            Int                 @default(0)
@@ -7221,6 +7226,8 @@ model PurchaseOrderLine {
   purchaseRequisitionLineId    String?
   purchasePlanningRowId        String?
   itemId                       String?
+  /// GOODS | SERVICE — required for free-text (null itemId) lines; catalog lines defaulted from item master.
+  lineType                     String    @default("GOODS") @db.VarChar(16)
   itemCodeSnapshot             String    @default("") @db.VarChar(64)
   itemNameSnapshot             String    @default("") @db.VarChar(300)
   description                  String?   @db.Text

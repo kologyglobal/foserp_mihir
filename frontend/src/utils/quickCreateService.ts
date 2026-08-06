@@ -8,6 +8,7 @@ import type { CustomerType, ItemType, SalesTerritory, VendorType } from '../type
 import { panFromGstin } from './customerUtils'
 import { reserveCode, confirmCode } from '../services/codeSeriesService'
 import { isApiMode } from '../config/apiConfig'
+import { formatApiError } from '../services/api/apiErrors'
 import { sanitizePhoneDigits } from './phoneValidation'
 import { crmKindForCommercialTermType, getCommercialTermById } from './commercialTermsAdapter'
 
@@ -95,16 +96,17 @@ function bool(v: unknown, fallback = true) {
   return fallback
 }
 
-export function saveQuickCreateEntity(
+export async function saveQuickCreateEntity(
   entityType: QuickCreateEntityType,
   data: Record<string, unknown>,
   context?: Record<string, unknown>,
-): { ok: true; result: QuickCreateResult } | { ok: false; error: string } {
+): Promise<{ ok: true; result: QuickCreateResult } | { ok: false; error: string }> {
   if (!canQuickCreateEntity(entityType)) {
     return { ok: false, error: 'You do not have permission to create this record' }
   }
-  if (isApiMode()) {
-    return { ok: false, error: 'Quick create is unavailable in API mode. Use the full CRM form.' }
+  // Vendor uses master bridge (demo store or API). Other entities stay demo-only for now.
+  if (isApiMode() && entityType !== 'vendor') {
+    return { ok: false, error: 'Quick create is unavailable in API mode. Use the full master form.' }
   }
 
   const master = useMasterStore.getState()
@@ -185,33 +187,43 @@ export function saveQuickCreateEntity(
       const vendorName = str(data.vendorName)
       if (!vendorName) return { ok: false, error: 'Vendor name is required' }
       const vendorCode = str(data.vendorCode) || genCode('VEND')
-      const gstin = str(data.gstin)
+      const gstin = str(data.gstin).toUpperCase()
       const dup = duplicateVendor({ vendorCode, vendorName, gstin })
       if (dup) return { ok: false, error: dup }
       const pending = quickCreateStartsPendingApproval('vendor')
-      const id = master.addVendor({
-        vendorCode,
-        vendorName,
-        vendorType: (str(data.vendorType) || 'trader') as VendorType,
-        city: str(data.city) || '—',
-        state: str(data.state) || 'Maharashtra',
-        gstin: gstin || '00BBBBB0000B1Z5',
-        contactPerson: str(data.contactPerson),
-        contactPhone: phone(data, 'mobile', 'contactPhone'),
-        paymentTermsDays: num(data.paymentTermsDays, num(data.paymentTerms, 30)),
-        defaultLeadTimeDays: num(data.defaultLeadTimeDays, num(data.leadTime, 14)),
-        suppliedCategories: [],
-        rating: 4,
-        isActive: pending ? false : bool(data.isActive, true),
-      }) as string
-      return {
-        ok: true,
-        result: {
-          entityType,
-          id,
-          label: vendorName,
-          record: master.getVendor(id),
-        },
+      const contactPerson = str(data.contactPerson) || vendorName
+      try {
+        const id = await Promise.resolve(
+          master.addVendor({
+            vendorCode,
+            vendorName,
+            vendorType: (str(data.vendorType) || 'trader') as VendorType,
+            city: str(data.city) || (isApiMode() ? '' : '—'),
+            state: str(data.state) || 'Maharashtra',
+            // Demo tolerates a placeholder GSTIN; API accepts empty for unregistered.
+            gstin: gstin || (isApiMode() ? '' : '00BBBBB0000B1Z5'),
+            contactPerson,
+            contactPhone: phone(data, 'mobile', 'contactPhone'),
+            email: str(data.email) || undefined,
+            paymentTermsDays: num(data.paymentTermsDays, num(data.paymentTerms, 30)),
+            defaultLeadTimeDays: num(data.defaultLeadTimeDays, num(data.leadTime, 14)),
+            suppliedCategories: [],
+            rating: 4,
+            isActive: pending ? false : bool(data.isActive, true),
+          }) as string | Promise<string>,
+        )
+        const record = useMasterStore.getState().getVendor(id)
+        return {
+          ok: true,
+          result: {
+            entityType,
+            id,
+            label: vendorName,
+            record,
+          },
+        }
+      } catch (err) {
+        return { ok: false, error: formatApiError(err) }
       }
     }
     case 'item': {

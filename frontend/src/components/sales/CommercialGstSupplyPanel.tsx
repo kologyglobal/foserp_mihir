@@ -5,8 +5,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ShieldAlert } from 'lucide-react'
-import { ErpFieldGroup, ErpFieldRow } from '../erp/card-form'
-import { Input, Select, Textarea } from '../forms/Inputs'
+import { Select, Textarea } from '../forms/Inputs'
 import { SELECT_PLACEHOLDER } from '../forms/selectStandards'
 import {
   formatPlaceOfSupplyLabel,
@@ -20,6 +19,8 @@ import {
   resolveCommercialPlaceOfSupply,
   resolveCommercialSupplyType,
   type CommercialPlaceOfSupplySource,
+  type CommercialSupplyType,
+  type CommercialGstScheme,
 } from '../../utils/commercialSupplyContext'
 import { canCrmPermission } from '../../utils/permissions/crm'
 import { cn } from '../../utils/cn'
@@ -46,8 +47,54 @@ export type CommercialGstSupplyPanelProps = {
   isServiceDocument?: boolean
   allowOverrideUi?: boolean
   className?: string
+  /** @deprecated Layout is fixed 3 tiles; kept for call-site compatibility. */
   columns?: 2 | 3 | 4
   readOnly?: boolean
+}
+
+/** Compact helper under Place of Supply tile. */
+function shortPosSourceHint(source: CommercialPlaceOfSupplySource): string {
+  switch (source) {
+    case 'SHIP_TO':
+      return 'From ship-to'
+    case 'BILL_TO':
+      return 'From bill-to'
+    case 'CUSTOMER':
+      return 'From customer state'
+    case 'CUSTOMER_GSTIN':
+      return 'From customer GSTIN'
+    case 'OVERRIDE':
+      return 'Authorised override'
+    case 'UNRESOLVED':
+      return 'Not resolved'
+    default:
+      return 'Auto'
+  }
+}
+
+function supplyTypeChipClass(supplyType: CommercialSupplyType): string {
+  if (supplyType === 'INTRA_STATE') return 'commercial-gst-supply__chip--intra'
+  if (supplyType === 'INTER_STATE') return 'commercial-gst-supply__chip--inter'
+  return 'commercial-gst-supply__chip--unresolved'
+}
+
+function supplyTypeDisplay(
+  supplyType: CommercialSupplyType,
+  taxScheme: CommercialGstScheme | string,
+): { primary: string; scheme: string } {
+  if (supplyType === 'INTRA_STATE') {
+    return {
+      primary: 'Intra-state',
+      scheme:
+        taxScheme === 'utgst_pair' || taxScheme === 'cgst_utgst'
+          ? 'CGST + UTGST'
+          : 'CGST + SGST',
+    }
+  }
+  if (supplyType === 'INTER_STATE') {
+    return { primary: 'Inter-state', scheme: 'IGST' }
+  }
+  return { primary: 'Unresolved', scheme: '—' }
 }
 
 export function CommercialGstSupplyPanel({
@@ -60,7 +107,7 @@ export function CommercialGstSupplyPanel({
   isServiceDocument,
   allowOverrideUi = true,
   className,
-  columns = 3,
+  columns: _columns = 3,
   readOnly = false,
 }: CommercialGstSupplyPanelProps) {
   const canOverride = allowOverrideUi && canCrmPermission('crm.commercial.tax_place_override')
@@ -122,108 +169,149 @@ export function CommercialGstSupplyPanel({
     ? formatPlaceOfSupplyLabel(value.supplierStateCode) || value.supplierStateCode
     : 'Not set on Legal Entity'
 
+  const posEditable = !readOnly && value.placeOfSupplyOverride && canOverride
+  const supplyDisplay = supplyTypeDisplay(supply.supplyType, supply.taxScheme)
+  const posHint =
+    !effective.placeOfSupplyStateCode && !value.placeOfSupplyOverride
+      ? 'Not resolved'
+      : shortPosSourceHint(posSource)
+
   return (
-    <ErpFieldGroup
-      label="GST supply"
+    <section
       className={cn('commercial-gst-supply', className)}
-      columns={columns}
+      aria-label="GST supply"
     >
-      <ErpFieldRow
-        label="Supplier state"
-        hint={
-          hasSupplierState
-            ? 'From your default Legal Entity GST registration — not the customer.'
-            : undefined
-        }
-        readOnly
-      >
-        <Input
-          value={supplierLabel}
-          readOnly
-          tabIndex={-1}
-          aria-readonly="true"
-          title="Set under Accounting → Legal Entities"
-        />
-      </ErpFieldRow>
+      <header className="commercial-gst-supply__head">
+        <h3 className="commercial-gst-supply__title">GST supply</h3>
+      </header>
 
-      <ErpFieldRow
-        label="Place of supply"
-        hint={
-          !effective.placeOfSupplyStateCode && !value.placeOfSupplyOverride
-            ? 'Not resolved'
-            : `Derived from: ${formatPlaceOfSupplySourceLabel(posSource)}`
-        }
-        readOnly={readOnly || (!canOverride && !value.placeOfSupplyOverride)}
-      >
-        {readOnly || (!canOverride && value.placeOfSupplyOverride) ? (
-          <Input value={posDisplay} readOnly />
-        ) : value.placeOfSupplyOverride && canOverride ? (
-          <Select
-            value={resolveGstStateCode(value.placeOfSupply) ?? value.placeOfSupply}
-            onChange={(e) => patch({ placeOfSupply: e.target.value })}
+      <div className="commercial-gst-supply__tiles" role="group" aria-label="GST supply summary">
+        {/* Supplier state — LE only */}
+        <div className="commercial-gst-supply__tile">
+          <div className="commercial-gst-supply__tile-label">Supplier state</div>
+          <div
+            className={cn(
+              'commercial-gst-supply__tile-value',
+              !hasSupplierState && 'commercial-gst-supply__tile-value--warn',
+            )}
+            title="Set under Accounting → Legal Entities"
           >
-            <option value="">{SELECT_PLACEHOLDER}</option>
-            {GST_STATE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <Input value={posDisplay} readOnly />
-        )}
-      </ErpFieldRow>
+            {supplierLabel}
+          </div>
+          <div className="commercial-gst-supply__tile-hint">From default Legal Entity</div>
+        </div>
 
-      <ErpFieldRow label="Supply type" hint={formatTaxSchemeLabel(supply.taxScheme)} readOnly>
-        <Input
-          value={
-            supply.supplyType === 'INTRA_STATE'
-              ? supply.taxScheme === 'utgst_pair'
-                ? 'Intra-state — CGST + UTGST'
-                : 'Intra-state — CGST + SGST'
-              : supply.supplyType === 'INTER_STATE'
-                ? 'Inter-state — IGST'
-                : 'Unresolved'
-          }
-          readOnly
-          className="font-medium"
-        />
-      </ErpFieldRow>
+        {/* Place of supply */}
+        <div className="commercial-gst-supply__tile">
+          <div className="commercial-gst-supply__tile-label">Place of supply</div>
+          {posEditable ? (
+            <div className="commercial-gst-supply__tile-control">
+              <Select
+                value={resolveGstStateCode(value.placeOfSupply) ?? value.placeOfSupply}
+                onChange={(e) => patch({ placeOfSupply: e.target.value })}
+                aria-label="Place of supply"
+              >
+                <option value="">{SELECT_PLACEHOLDER}</option>
+                {GST_STATE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : (
+            <div
+              className={cn(
+                'commercial-gst-supply__tile-value',
+                !effective.placeOfSupplyStateCode && 'commercial-gst-supply__tile-value--warn',
+              )}
+              aria-readonly="true"
+            >
+              {posDisplay}
+            </div>
+          )}
+          <div className="commercial-gst-supply__tile-hint">{posHint}</div>
+        </div>
 
-      <div className="col-span-full rounded-md border border-erp-border bg-erp-surface-alt/50 px-3 py-2 text-[12px] text-erp-text">
-        <div className="font-semibold text-erp-muted">Tax determination</div>
-        <ul className="mt-1 space-y-0.5">
-          <li>Supplier state: {supplierLabel}</li>
-          <li>Place of Supply: {posDisplay}</li>
-          <li>Supply type: {formatSupplyTypeLabel(supply.supplyType)}</li>
-          <li>Tax applied: {formatTaxSchemeLabel(supply.taxScheme)}</li>
-        </ul>
-        {!hasSupplierState ? (
-          <p className="mt-2 text-amber-800">
-            Supplier state is missing. Set the Legal Entity GSTIN / state code under{' '}
-            <Link className="font-medium underline" to={LEGAL_ENTITIES_PATH}>
-              Accounting → Legal Entities
-            </Link>
-            , then reload this form. It cannot be typed here.
-          </p>
-        ) : null}
-        {supply.unresolved ? (
-          <p className="mt-2 text-amber-800">
-            Place of Supply could not be determined. Complete the customer or delivery tax
-            details before posting.
-          </p>
+        {/* Supply type — display only */}
+        <div className="commercial-gst-supply__tile commercial-gst-supply__tile--type">
+          <div className="commercial-gst-supply__tile-label">Supply type</div>
+          <div
+            className="commercial-gst-supply__type-row"
+            aria-readonly="true"
+            title={formatTaxSchemeLabel(supply.taxScheme)}
+          >
+            <span
+              className={cn(
+                'commercial-gst-supply__chip',
+                supplyTypeChipClass(supply.supplyType),
+              )}
+            >
+              {supplyDisplay.primary}
+            </span>
+            {supply.supplyType !== 'UNRESOLVED' ? (
+              <span className="commercial-gst-supply__scheme">{supplyDisplay.scheme}</span>
+            ) : null}
+          </div>
+          <div className="commercial-gst-supply__tile-hint">
+            {supply.supplyType === 'UNRESOLVED'
+              ? 'Needs supplier & place of supply'
+              : 'Tax scheme from state match'}
+          </div>
+        </div>
+      </div>
+
+      {/* Single determination strip — does not re-list the three fields */}
+      <div className="commercial-gst-supply__strip" aria-label="Tax determination">
+        <span className="commercial-gst-supply__strip-label">Tax applied</span>
+        <span
+          className={cn(
+            'commercial-gst-supply__chip commercial-gst-supply__chip--sm',
+            supplyTypeChipClass(supply.supplyType),
+          )}
+        >
+          {formatTaxSchemeLabel(supply.taxScheme)}
+        </span>
+        <span className="commercial-gst-supply__strip-sep" aria-hidden="true">
+          ·
+        </span>
+        <span className="commercial-gst-supply__strip-meta">
+          {formatSupplyTypeLabel(supply.supplyType)}
+        </span>
+        {value.placeOfSupplyOverride ? (
+          <>
+            <span className="commercial-gst-supply__strip-sep" aria-hidden="true">
+              ·
+            </span>
+            <span className="commercial-gst-supply__strip-meta commercial-gst-supply__strip-meta--override">
+              PoS override on
+            </span>
+          </>
         ) : null}
       </div>
 
+      {!hasSupplierState ? (
+        <p className="commercial-gst-supply__alert" role="status">
+          Supplier state is missing. Set the Legal Entity GSTIN / state code under{' '}
+          <Link className="commercial-gst-supply__link" to={LEGAL_ENTITIES_PATH}>
+            Accounting → Legal Entities
+          </Link>
+          , then reload this form. It cannot be typed here.
+        </p>
+      ) : null}
+      {supply.unresolved ? (
+        <p className="commercial-gst-supply__alert" role="status">
+          Place of Supply could not be determined. Complete the customer or delivery tax details
+          before posting.
+        </p>
+      ) : null}
+
       {canOverride && !readOnly ? (
-        <ErpFieldRow
-          label="Override place of supply"
-          className={columns >= 3 ? 'col-span-full' : undefined}
-          hint="Requires permission crm.commercial.tax_place_override"
-        >
-          <label className="flex items-center gap-2 text-[13px] text-erp-text">
+        <div className="commercial-gst-supply__override">
+          <label className="commercial-gst-supply__override-label">
             <input
               type="checkbox"
+              className="commercial-gst-supply__override-check"
               checked={value.placeOfSupplyOverride}
               onChange={(e) => {
                 const on = e.target.checked
@@ -238,35 +326,39 @@ export function CommercialGstSupplyPanel({
                 })
               }}
             />
-            <span className="inline-flex items-center gap-1">
-              <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
-              Authorised override
+            <span className="commercial-gst-supply__override-text">
+              <ShieldAlert className="commercial-gst-supply__override-icon" aria-hidden />
+              Override place of supply
             </span>
           </label>
-        </ErpFieldRow>
+          <span className="commercial-gst-supply__override-note">
+            Requires permission crm.commercial.tax_place_override
+          </span>
+        </div>
       ) : null}
 
       {value.placeOfSupplyOverride && !readOnly ? (
-        <ErpFieldRow
-          label="Override reason"
-          className="col-span-full"
-          hint="Required for audit trail"
-        >
+        <div className="commercial-gst-supply__reason">
+          <label className="commercial-gst-supply__reason-label" htmlFor="gst-pos-override-reason">
+            Override reason
+            <span className="commercial-gst-supply__reason-req">Required for audit trail</span>
+          </label>
           <Textarea
+            id="gst-pos-override-reason"
             rows={2}
             value={value.placeOfSupplyOverrideReason}
             onChange={(e) => patch({ placeOfSupplyOverrideReason: e.target.value })}
             placeholder="Why is Place of Supply different from auto resolution?"
           />
-        </ErpFieldRow>
+        </div>
       ) : null}
 
       {!supply.unresolved && (supply.warnings.length > 0 || effective.warnings.length > 0) ? (
-        <p className="col-span-full text-[12px] text-amber-700">
+        <p className="commercial-gst-supply__warnings">
           {[...supply.warnings, ...effective.warnings].join(' · ')}
         </p>
       ) : null}
-    </ErpFieldGroup>
+    </section>
   )
 }
 
@@ -292,42 +384,63 @@ export function CommercialGstSupplyReadOnly({
 }) {
   const posLabel =
     placeOfSupply || formatPlaceOfSupplyLabel(placeOfSupplyStateCode) || 'Not resolved'
+  const normalisedType: CommercialSupplyType =
+    supplyType === 'INTRA_STATE' || supplyType === 'INTER_STATE' ? supplyType : 'UNRESOLVED'
+  const display = supplyTypeDisplay(
+    normalisedType,
+    (gstScheme as CommercialGstScheme) || 'UNRESOLVED',
+  )
+
   return (
-    <div className="commercial-gst-supply-readonly grid gap-2 rounded-md border border-erp-border bg-erp-surface-alt/40 px-3 py-2 text-[12px] sm:grid-cols-3">
-      <div>
-        <div className="text-erp-muted">Supplier state</div>
-        <div className="font-medium text-erp-text">
-          {formatPlaceOfSupplyLabel(supplierStateCode) || supplierStateCode || '—'}
+    <div
+      className="commercial-gst-supply commercial-gst-supply--readonly"
+      aria-label="GST supply"
+    >
+      <div className="commercial-gst-supply__tiles">
+        <div className="commercial-gst-supply__tile">
+          <div className="commercial-gst-supply__tile-label">Supplier state</div>
+          <div className="commercial-gst-supply__tile-value">
+            {formatPlaceOfSupplyLabel(supplierStateCode) || supplierStateCode || '—'}
+          </div>
         </div>
-      </div>
-      <div>
-        <div className="text-erp-muted">
-          Place of supply
-          {placeOfSupplyOverride ? ' (override)' : ''}
+        <div className="commercial-gst-supply__tile">
+          <div className="commercial-gst-supply__tile-label">
+            Place of supply
+            {placeOfSupplyOverride ? ' (override)' : ''}
+          </div>
+          <div className="commercial-gst-supply__tile-value">{posLabel}</div>
+          {placeOfSupplySource ? (
+            <div className="commercial-gst-supply__tile-hint">
+              {formatPlaceOfSupplySourceLabel(
+                placeOfSupplySource as CommercialPlaceOfSupplySource,
+              )}
+            </div>
+          ) : null}
+          {placeOfSupplyOverride && placeOfSupplyOverrideReason ? (
+            <div className="commercial-gst-supply__tile-hint">{placeOfSupplyOverrideReason}</div>
+          ) : null}
         </div>
-        <div className="font-medium text-erp-text">{posLabel}</div>
-        {placeOfSupplySource ? (
-          <div className="mt-0.5 text-[11px] text-erp-muted">
-            Derived from:{' '}
-            {formatPlaceOfSupplySourceLabel(
-              placeOfSupplySource as CommercialPlaceOfSupplySource,
+        <div className="commercial-gst-supply__tile commercial-gst-supply__tile--type">
+          <div className="commercial-gst-supply__tile-label">Supply type</div>
+          <div className="commercial-gst-supply__type-row" aria-readonly="true">
+            {normalisedType !== 'UNRESOLVED' ? (
+              <>
+                <span
+                  className={cn(
+                    'commercial-gst-supply__chip',
+                    supplyTypeChipClass(normalisedType),
+                  )}
+                >
+                  {display.primary}
+                </span>
+                <span className="commercial-gst-supply__scheme">{display.scheme}</span>
+              </>
+            ) : (
+              <div className="commercial-gst-supply__tile-value">
+                {supplyType || 'Unresolved'}
+              </div>
             )}
           </div>
-        ) : null}
-        {placeOfSupplyOverride && placeOfSupplyOverrideReason ? (
-          <div className="mt-0.5 text-[11px] text-erp-muted">{placeOfSupplyOverrideReason}</div>
-        ) : null}
-      </div>
-      <div>
-        <div className="text-erp-muted">Supply type</div>
-        <div className="font-medium text-erp-text">
-          {supplyType === 'INTRA_STATE'
-            ? gstScheme === 'utgst_pair'
-              ? 'Intra-state — CGST + UTGST'
-              : 'Intra-state — CGST + SGST'
-            : supplyType === 'INTER_STATE'
-              ? 'Inter-state — IGST'
-              : supplyType || 'Unresolved'}
         </div>
       </div>
     </div>

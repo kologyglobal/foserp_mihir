@@ -1879,6 +1879,8 @@ export interface PurchaseOrderLine {
   id: string
   lineNo: number
   itemType: PurchaseOrderLineItemType
+  /** GOODS | SERVICE — persists on PO; free-text lines require this. */
+  lineType?: 'GOODS' | 'SERVICE'
   itemId: string
   itemCode: string
   itemName: string
@@ -2029,6 +2031,9 @@ export interface PurchaseOrder extends PurchaseMoneyTotals, PurchaseAuditFields 
   currency: IndianCurrencyCode
   paymentTerms: string
   deliveryTerms: string
+  /** Commercial master id when selected (API mode). */
+  paymentTermId?: string | null
+  deliveryTermId?: string | null
   freightTerms: string
   packingTerms: string
   insuranceTerms: string
@@ -2862,7 +2867,15 @@ export type PurchaseOrderInput = Partial<
   insuranceCharges?: number
   tradeDiscount?: number
   tcsAmount?: number
-  lines: Array<Partial<PurchaseOrderLine> & Pick<PurchaseOrderLine, 'itemId' | 'quantity' | 'rate'>>
+  termsAndConditions?: string
+  lines: Array<
+    Partial<PurchaseOrderLine> & {
+      quantity: number
+      rate: number
+      /** Catalog id when from Item Master; empty for quick free-text lines. */
+      itemId?: string
+    }
+  >
 }
 
 export type PurchaseOrderReviseInput = {

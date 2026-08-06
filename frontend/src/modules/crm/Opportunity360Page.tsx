@@ -852,7 +852,8 @@ export function Opportunity360Page() {
                     productOptions={productOptions}
                     productPickMap={pickMap}
                     readOnly
-                    showAdjustments={false}
+                    showAdjustments
+                    showExtendedCharges
                   />
                 ),
                 activities: (

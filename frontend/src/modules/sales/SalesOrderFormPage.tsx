@@ -107,11 +107,10 @@ export function SalesOrderEditPage() {
     let cancelled = false
     void loadSellerStateCode().then((code) => {
       if (cancelled || !code) return
-      setGstSupply((prev) => {
-        // Prefer document snapshot; fill from LE only when missing
-        if (prev.supplierStateCode) return prev
-        return { ...prev, supplierStateCode: code }
-      })
+      // Seller registration SoT is always the current LE (not historical SO snapshot).
+      setGstSupply((prev) =>
+        prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
+      )
     })
     return () => {
       cancelled = true
@@ -157,10 +156,8 @@ export function SalesOrderEditPage() {
       placeOfSupply: so.placeOfSupplyStateCode ?? so.placeOfSupply ?? '',
       placeOfSupplyOverride: Boolean(so.placeOfSupplyOverride),
       placeOfSupplyOverrideReason: so.placeOfSupplyOverrideReason ?? '',
-      // Prefer SO snapshot; keep LE-seeded value when SO never stored supplier (no silent '27').
-      supplierStateCode: so.supplierStateCode?.trim()
-        ? so.supplierStateCode
-        : prev.supplierStateCode,
+      // Keep LE-seeded seller (prev); do not rehydrate wrong historical SO supplier.
+      supplierStateCode: prev.supplierStateCode,
     }))
   }, [so, setLocationId])
 

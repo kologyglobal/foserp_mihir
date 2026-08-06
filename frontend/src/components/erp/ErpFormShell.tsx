@@ -87,7 +87,7 @@ export function ErpFormShell({
   )
 }
 
-/** Drawer form — scrollable body + always-visible footer */
+/** Quick-create form — scrollable body + sticky footer (modal or constrained panel). */
 export function ErpDrawerFormShell({
   onSubmit,
   isSubmitting,
@@ -106,9 +106,9 @@ export function ErpDrawerFormShell({
   footerLink?: { href: string; label: string; onClick?: () => void }
 }) {
   return (
-    <form onSubmit={onSubmit} className="erp-drawer-form flex h-full min-h-0 flex-col">
+    <form onSubmit={onSubmit} className="erp-drawer-form flex min-h-0 flex-1 flex-col">
       <ErpValidationSummary errors={validationErrors} className="mb-3 shrink-0" />
-      <div className="erp-drawer-form-content min-h-0 flex-1 overflow-y-auto">{children}</div>
+      <div className="erp-drawer-form-content min-h-0 flex-1 overflow-y-auto pr-0.5">{children}</div>
       <div className="erp-drawer-form-footer mt-3 shrink-0 space-y-2 border-t border-erp-border bg-erp-surface pt-3">
         {footerLink ? (
           <a

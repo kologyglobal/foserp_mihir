@@ -78,16 +78,19 @@ import {
 } from '../../components/sales/SalesOrderCreateModeChooser'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { cn } from '../../utils/cn'
+import { calcProductPricingSummary } from '../../utils/opportunityLineCalc'
+import { CommercialOrderAdjustmentsBlock } from '../../components/erp/CommercialOrderAdjustmentsBlock'
 import {
-  calcProductPricingSummary,
-  type OrderDiscountMode,
-} from '../../utils/opportunityLineCalc'
-import { ChargeEditor, OrderAdjustmentsPanel } from '../../components/erp/OrderAdjustmentsGrid'
+  chargesToAdjustments,
+  emptySoOrderCharges,
+  type SoOrderCharges,
+} from '../../components/sales/SalesOrderLinesEditor'
 import {
   CommercialGstSupplyPanel,
   type CommercialGstSupplyValue,
 } from '../../components/sales/CommercialGstSupplyPanel'
 import { loadSellerStateCode } from '../../utils/sellerGstState'
+import { computeGst, gstSchemeLabel } from '../../utils/gstEngine'
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
 
@@ -263,10 +266,7 @@ export function SalesOrderNewPage() {
   const showLocationSection = !isServices
   const showFreight = !isServices
   const [internalRemarks, setInternalRemarks] = useState(opportunityPrefill?.internalRemarks ?? '')
-  const [freightAmount, setFreightAmount] = useState(0)
-  const [freightMode, setFreightMode] = useState<OrderDiscountMode>('flat')
-  const [orderDiscountMode, setOrderDiscountMode] = useState<OrderDiscountMode>('flat')
-  const [orderDiscountInput, setOrderDiscountInput] = useState(0)
+  const [charges, setCharges] = useState<SoOrderCharges>(() => emptySoOrderCharges())
   const [attachments, setAttachments] = useState<SoAttachment[]>([])
   const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>(() => ({
     placeOfSupply: '',
@@ -398,30 +398,37 @@ export function SalesOrderNewPage() {
       expectedDeliveryDate: null as string | null,
       remarks: '',
     }))
-    const pricing = calcProductPricingSummary(asOppLines, {
-      freight: showFreight
-        ? {
-            calculationType: freightMode,
-            value: freightAmount,
-          }
-        : undefined,
-      orderDiscountMode,
-      orderDiscountInput,
-    })
+    return calcProductPricingSummary(
+      asOppLines,
+      chargesToAdjustments(charges, showFreight),
+    )
+  }, [computedLines, charges, showFreight])
+
+  const gstExtras = useMemo(() => {
+    const pos =
+      gstSupply.placeOfSupply ||
+      customer?.state ||
+      ''
+    const supplier = gstSupply.supplierStateCode || null
+    if (!pos && !supplier) return null
+    const gst = computeGst(
+      orderSummary.taxableAfterOverallDiscount,
+      pos || customer?.state || '',
+      undefined,
+      supplier,
+    )
     return {
-      totalQty: pricing.totalQty,
-      basicAmount: pricing.basicAmount,
-      subtotal: pricing.subtotal,
-      taxableBeforeOverallDiscount: pricing.taxableBeforeOverallDiscount,
-      taxableAfterOverallDiscount: pricing.taxableAfterOverallDiscount,
-      totalLineDiscount: pricing.totalLineDiscount,
-      gstByRate: pricing.gstByRate,
-      totalGst: pricing.totalGst,
-      orderDiscountAmount: pricing.orderDiscountAmount,
-      grandTotal: pricing.grandTotal,
-      freightAmount: pricing.freightAmount,
+      schemeLabel: gstSchemeLabel(gst.scheme),
+      cgstAmount: gst.cgstAmount,
+      sgstAmount: gst.sgstAmount,
+      igstAmount: gst.igstAmount,
     }
-  }, [computedLines, freightAmount, freightMode, orderDiscountInput, orderDiscountMode, showFreight])
+  }, [
+    orderSummary.taxableAfterOverallDiscount,
+    gstSupply.placeOfSupply,
+    gstSupply.supplierStateCode,
+    customer?.state,
+  ])
 
   function applyQuotation(docId: string) {
     if (!docId) return
@@ -433,7 +440,30 @@ export function SalesOrderNewPage() {
     setPaymentTerms(salesQuo?.paymentTerms ?? paymentTerms)
     setDeliveryTerms(salesQuo?.deliveryTerms ?? deliveryTerms)
     setDeliveryTime(salesQuo?.deliveryTime?.trim() || deliveryTime || resolveDefaultDeliveryTime())
-    setFreightAmount(doc.freightAmount ?? 0)
+    setCharges({
+      ...emptySoOrderCharges(),
+      orderDiscountMode: doc.orderDiscountCalcType === 'PERCENTAGE' ? 'percent' : 'flat',
+      orderDiscountInput:
+        doc.orderDiscountValue ?? doc.orderDiscountAmount ?? 0,
+      freightMode: doc.freightCalcType === 'PERCENTAGE' ? 'percent' : 'flat',
+      freightValue: doc.freightValue ?? doc.freightAmount ?? 0,
+      freightIsTaxable: Boolean(doc.freightIsTaxable),
+      freightTaxRate: doc.freightIsTaxable
+        ? Number(doc.freightTaxRate) || 18
+        : 0,
+      installationMode: doc.installationCalcType === 'PERCENTAGE' ? 'percent' : 'flat',
+      installationValue: doc.installationValue ?? doc.installationAmount ?? 0,
+      installationIsTaxable: Boolean(doc.installationIsTaxable),
+      installationTaxRate: doc.installationIsTaxable
+        ? Number(doc.installationTaxRate) || 18
+        : 18,
+      customChargesMode: doc.customChargesCalcType === 'PERCENTAGE' ? 'percent' : 'flat',
+      customChargesValue: doc.customChargesValue ?? doc.customCharges ?? 0,
+      customChargesIsTaxable: Boolean(doc.customChargesIsTaxable),
+      customChargesTaxRate: doc.customChargesIsTaxable
+        ? Number(doc.customChargesTaxRate) || 18
+        : 18,
+    })
     const built = buildSalesOrderLinesFromQuotationDocument({
       document: doc,
       opportunity: opp,
@@ -470,7 +500,7 @@ export function SalesOrderNewPage() {
     if (!nextCustomerId || !q || q.customerId !== nextCustomerId) {
       setQuotationDocumentId('')
       if (directSoReason.startsWith('Approved quotation handover')) setDirectSoReason('')
-      setFreightAmount(0)
+      setCharges(emptySoOrderCharges())
     }
   }
 
@@ -699,6 +729,9 @@ export function SalesOrderNewPage() {
           customerPoDate: customerPoDate || undefined,
           freightAmount: showFreight ? orderSummary.freightAmount : 0,
           orderDiscountAmount: orderSummary.orderDiscountAmount,
+          installationAmount: orderSummary.installationAmount,
+          otherCharges: orderSummary.customCharges,
+          grandTotalOverride: orderSummary.grandTotal,
           placeOfSupply: gstSupply.placeOfSupplyOverride
             ? gstSupply.placeOfSupply
             : customer?.state ?? gstSupply.placeOfSupply,
@@ -1170,105 +1203,14 @@ export function SalesOrderNewPage() {
         </p>
       </div>
 
-      <div className="so-pricing-totals">
-        <OrderAdjustmentsPanel>
-          {showFreight ? (
-            <ChargeEditor
-              label="Freight"
-              mode={freightMode}
-              value={freightAmount}
-              calculatedAmount={orderSummary.freightAmount}
-              onModeChange={(m) => {
-                setFreightMode(m)
-                setFreightAmount(0)
-              }}
-              onValueChange={setFreightAmount}
-            />
-          ) : null}
-          <ChargeEditor
-            label="Order discount"
-            mode={orderDiscountMode}
-            value={orderDiscountInput}
-            calculatedAmount={orderSummary.orderDiscountAmount}
-            modePctLabel="% Disc."
-            amountHint={
-              orderSummary.orderDiscountAmount > 0
-                ? 'off taxable (before GST)'
-                : undefined
-            }
-            onModeChange={(m) => {
-              setOrderDiscountMode(m)
-              setOrderDiscountInput(0)
-            }}
-            onValueChange={setOrderDiscountInput}
-          />
-        </OrderAdjustmentsPanel>
-
-        <aside className="so-pricing-summary" aria-label="Order summary">
-          <p className="so-pricing-summary__title">Order summary</p>
-          <div className="so-pricing-summary__rows">
-            <div className="so-pricing-summary__row">
-              <span>Total quantity</span>
-              <span className="tabular-nums">{orderSummary.totalQty}</span>
-            </div>
-            <div className="so-pricing-summary__row">
-              <span>Basic amount</span>
-              <span className="tabular-nums">{formatCurrency(orderSummary.basicAmount)}</span>
-            </div>
-            {orderSummary.totalLineDiscount > 0 ? (
-              <div className="so-pricing-summary__row">
-                <span>Line discount</span>
-                <span className="tabular-nums">−{formatCurrency(orderSummary.totalLineDiscount)}</span>
-              </div>
-            ) : null}
-            <div className="so-pricing-summary__row">
-              <span>Taxable amount</span>
-              <span className="tabular-nums">{formatCurrency(orderSummary.taxableBeforeOverallDiscount)}</span>
-            </div>
-            <div className="so-pricing-summary__row">
-              <span>
-                Overall discount
-                {orderDiscountMode === 'percent' && orderDiscountInput > 0
-                  ? ` (${orderDiscountInput}%)`
-                  : ''}
-              </span>
-              <span className="tabular-nums">
-                {orderSummary.orderDiscountAmount > 0
-                  ? `−${formatCurrency(orderSummary.orderDiscountAmount)}`
-                  : formatCurrency(0)}
-              </span>
-            </div>
-            {orderSummary.orderDiscountAmount > 0 ? (
-              <div className="so-pricing-summary__row">
-                <span>Taxable after discount</span>
-                <span className="tabular-nums">{formatCurrency(orderSummary.taxableAfterOverallDiscount)}</span>
-              </div>
-            ) : null}
-            {[...orderSummary.gstByRate.entries()]
-              .sort(([a], [b]) => a - b)
-              .map(([rate, amount]) => (
-                <div key={rate} className="so-pricing-summary__row">
-                  <span>GST @ {rate}%</span>
-                  <span className="tabular-nums">{formatCurrency(amount)}</span>
-                </div>
-              ))}
-            <div className="so-pricing-summary__row">
-              <span>Total GST</span>
-              <span className="tabular-nums">{formatCurrency(orderSummary.totalGst)}</span>
-            </div>
-            {showFreight ? (
-              <div className="so-pricing-summary__row">
-                <span>Freight</span>
-                <span className="tabular-nums">{formatCurrency(orderSummary.freightAmount)}</span>
-              </div>
-            ) : null}
-          </div>
-          <div className="so-pricing-summary__grand">
-            <span>Grand total</span>
-            <strong className="tabular-nums">{formatCurrency(orderSummary.grandTotal)}</strong>
-          </div>
-        </aside>
-      </div>
+      <CommercialOrderAdjustmentsBlock
+        value={charges}
+        onChange={setCharges}
+        summary={orderSummary}
+        showFreight={showFreight}
+        showExtendedCharges
+        gstExtras={gstExtras}
+      />
     </div>
   )
 

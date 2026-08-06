@@ -67,6 +67,28 @@ function buildGst(
   const avgRate = lines.length
     ? lines.reduce((s, l) => s + l.taxPct, 0) / lines.length
     : DEFAULT_GST_RATE
+
+  const lineCgst = lines.reduce((s, l) => s + (Number(l.cgstAmount) || 0), 0)
+  const lineSgst = lines.reduce((s, l) => s + (Number(l.sgstAmount) || 0), 0)
+  const lineIgst = lines.reduce((s, l) => s + (Number(l.igstAmount) || 0), 0)
+  const componentTax = lineCgst + lineSgst + lineIgst
+  if (componentTax > 0) {
+    const scheme = lineIgst > 0 && lineCgst + lineSgst === 0 ? 'igst' : 'cgst_sgst'
+    const totalTax = Math.round(componentTax * 100) / 100
+    return {
+      scheme,
+      taxableAmount: Math.round(taxable * 100) / 100,
+      cgstRate: scheme === 'cgst_sgst' ? avgRate / 2 : 0,
+      cgstAmount: Math.round(lineCgst * 100) / 100,
+      sgstRate: scheme === 'cgst_sgst' ? avgRate / 2 : 0,
+      sgstAmount: Math.round(lineSgst * 100) / 100,
+      igstRate: scheme === 'igst' ? avgRate : 0,
+      igstAmount: Math.round(lineIgst * 100) / 100,
+      totalTax,
+      grandTotal: Math.round((taxable + totalTax) * 100) / 100,
+    }
+  }
+
   return computeGst(
     taxable,
     placeOfSupply,

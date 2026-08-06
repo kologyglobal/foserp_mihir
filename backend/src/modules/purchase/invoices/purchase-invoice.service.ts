@@ -421,6 +421,18 @@ export async function submitPurchaseInvoice(
     overrideAuthorized: failures.length ? true : false,
     overrideRemarks: failures.length ? body.overrideRemarks!.trim() : null,
   })
+  const { notifyInvoicePendingApproval } = await import(
+    '../notifications/purchase-notification.emitters.js'
+  )
+  notifyInvoicePendingApproval({
+    tenantId,
+    actorUserId: actorId,
+    invoiceId: id,
+    invoiceNumber: existing.invoiceNumber,
+    amount: Number(existing.totalAmount ?? 0),
+    mismatch: failures.length > 0,
+    mismatchRemarks: failures.join('; ') || null,
+  })
   return toInvoiceDto(tenantId, await loadOrThrow(tenantId, id))
 }
 

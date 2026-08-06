@@ -14,12 +14,19 @@ import { OpportunitySelectPicker } from '../../components/crm/OpportunitySelectP
 import { QuotationTemplateSelector } from '@/components/quotations/QuotationTemplateSelector'
 import { QuotationLineItemsEditor } from '@/components/quotations/QuotationLineItemsEditor'
 import {
+  CommercialGstSupplyPanel,
+  type CommercialGstSupplyValue,
+} from '../../components/sales/CommercialGstSupplyPanel'
+import {
   ErpCardSection,
   ErpFieldGroup,
   ErpFieldRow,
 } from '../../components/erp/card-form'
 import { FormActionBar } from '../../components/erp/FormActionBar'
 import { Input, Select } from '../../components/forms/Inputs'
+import { loadSellerStateCode } from '../../utils/sellerGstState'
+import { resolveCommercialPlaceOfSupply } from '../../utils/commercialSupplyContext'
+import { resolveGstStateCode } from '../../utils/gstStateCode'
 import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSelect'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { QuotationCreateModeChooser } from '../../components/quotations/QuotationCreateModeChooser'
@@ -199,6 +206,26 @@ export function CrmQuotationNewPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [saveAttempted, setSaveAttempted] = useState(false)
   const [freightAmount, setFreightAmount] = useState(0)
+  const isServicesTenant = useTenantProfileStore((s) => s.isServices())
+  const [gstSupply, setGstSupply] = useState<CommercialGstSupplyValue>(() => ({
+    placeOfSupply: '',
+    placeOfSupplyOverride: false,
+    placeOfSupplyOverrideReason: '',
+    supplierStateCode: '',
+  }))
+
+  useEffect(() => {
+    let cancelled = false
+    void loadSellerStateCode().then((code) => {
+      if (cancelled || !code) return
+      setGstSupply((prev) =>
+        prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function handleQuotationDateChange(value: string) {
     setQuotationDate(value)
@@ -264,11 +291,42 @@ export function CrmQuotationNewPage() {
     ? (customerId || selectedOpp?.customerId || '')
     : customerId
   const { locationId, setLocationId } = useDocumentLocation('sales', selectedOpp?.locationId)
-  const showLocationField = !useTenantProfileStore((s) => s.isServices())
+  const showLocationField = !isServicesTenant
   const selectedCustomer = effectiveCustomerId
     ? customers.find((c) => c.id === effectiveCustomerId)
     : undefined
   const selectedTemplate = templates.find((t) => t.id === templateId)
+
+  const customerState = selectedCustomer?.state?.trim() || null
+  const customerGstin = selectedCustomer?.gstin?.trim() || null
+  const customerShipState =
+    selectedCustomer?.shippingState?.trim() ||
+    selectedCustomer?.deliveryState?.trim() ||
+    customerState
+  const effectivePlaceOfSupply = useMemo(() => {
+    if (gstSupply.placeOfSupplyOverride && gstSupply.placeOfSupply.trim()) {
+      return (
+        resolveGstStateCode(gstSupply.placeOfSupply) ||
+        gstSupply.placeOfSupply.trim()
+      )
+    }
+    return (
+      resolveCommercialPlaceOfSupply({
+        shipToState: customerShipState,
+        billToState: customerState,
+        customerState,
+        customerGstin,
+        isServiceDocument: isServicesTenant,
+      }).placeOfSupplyStateCode ?? ''
+    )
+  }, [
+    gstSupply.placeOfSupply,
+    gstSupply.placeOfSupplyOverride,
+    customerShipState,
+    customerState,
+    customerGstin,
+    isServicesTenant,
+  ])
 
   const syncedLines = syncOpportunityLines(lines)
   const lineSummary = calcOpportunityLinesSummary(syncedLines)
@@ -975,6 +1033,17 @@ export function CrmQuotationNewPage() {
       ) : null}
 
       <div id="quote-section-products">
+      <div className="mb-3">
+        <CommercialGstSupplyPanel
+          value={gstSupply}
+          onChange={setGstSupply}
+          customerState={customerState}
+          customerGstin={customerGstin}
+          shipToState={customerShipState}
+          billToState={customerState}
+          isServiceDocument={isServicesTenant}
+        />
+      </div>
       <ErpCardSection
         nbaTarget="products"
         forceOpenKey={forceOpenProductsKey || undefined}
@@ -1000,6 +1069,10 @@ export function CrmQuotationNewPage() {
               scopeNotes={scopeNotes}
               onScopeNotesChange={setScopeNotes}
               rowErrors={rowErrors}
+              companyStateCode={gstSupply.supplierStateCode || null}
+              partyState={customerState}
+              partyGstin={customerGstin}
+              placeOfSupply={effectivePlaceOfSupply || null}
             />
           </div>
         </div>

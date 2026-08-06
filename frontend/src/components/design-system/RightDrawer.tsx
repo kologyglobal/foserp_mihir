@@ -1,3 +1,5 @@
+import { useEffect, useId, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUIStore } from '../../store/uiStore'
@@ -9,9 +11,34 @@ const legacyDrawerLinks: Record<string, { href: string; label: string }> = {
   wo: { href: '/manufacturing/work-orders', label: 'Go to work orders →' },
 }
 
+/**
+ * Global quick-create host (vendor, item, etc.).
+ * Renders a centered modal dialog — not a right-side drawer.
+ */
 export function RightDrawer() {
   const drawer = useUIStore((s) => s.drawer)
   const closeDrawer = useUIStore((s) => s.closeDrawer)
+  const titleId = useId()
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!drawer) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeDrawer()
+    }
+    window.addEventListener('keydown', onKey)
+    requestAnimationFrame(() => {
+      panelRef.current?.querySelector<HTMLElement>(
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([aria-label="Close"]):not([disabled])',
+      )?.focus()
+    })
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [drawer, closeDrawer])
 
   if (!drawer) return null
 
@@ -19,20 +46,41 @@ export function RightDrawer() {
   const legacyType = isLegacy ? drawer.legacyType : null
   const link = legacyType ? legacyDrawerLinks[legacyType] : null
 
-  return (
-    <>
-      <div className="erp-right-drawer saas-right-drawer fixed inset-0 z-40 bg-black/30" onClick={closeDrawer} />
-      <aside className="erp-right-drawer saas-right-drawer fixed right-0 top-0 z-50 flex h-full w-full max-w-lg flex-col overflow-hidden border-l border-erp-border bg-erp-surface shadow-erp-md">
-        <div className="saas-drawer-header flex shrink-0 items-center justify-between border-b border-erp-border px-5 py-4">
-          <div>
-            <h2 className="text-base font-semibold text-[var(--saas-text)]">{drawer.title}</h2>
-            <p className="mt-0.5 text-xs text-[var(--saas-muted)]">Quick create · unsaved changes will be lost on close</p>
+  return createPortal(
+    <div
+      className="erp-modal-backdrop erp-quick-create-modal"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) closeDrawer()
+      }}
+    >
+      <div
+        ref={panelRef}
+        className="erp-modal-panel erp-quick-create-modal__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="erp-quick-create-modal__header">
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-base font-semibold text-erp-text">
+              {drawer.title}
+            </h2>
+            <p className="mt-0.5 text-xs text-erp-muted">
+              Quick create · unsaved changes will be lost on close
+            </p>
           </div>
-          <button type="button" onClick={closeDrawer} className="rounded-lg p-1.5 hover:bg-[var(--saas-bg-subtle)]" aria-label="Close drawer">
+          <button
+            type="button"
+            onClick={closeDrawer}
+            className="shrink-0 rounded-lg p-1.5 text-erp-muted hover:bg-erp-surface-alt hover:text-erp-text"
+            aria-label="Close"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-5 pt-4">
+        <div className="erp-quick-create-modal__body">
           {isLegacy ? (
             <>
               <p className="text-[13px] text-erp-muted">
@@ -50,8 +98,9 @@ export function RightDrawer() {
             <QuickCreateDrawerForm />
           )}
         </div>
-      </aside>
-    </>
+      </div>
+    </div>,
+    document.body,
   )
 }
 

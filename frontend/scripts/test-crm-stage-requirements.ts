@@ -37,7 +37,7 @@ check(3, 'lead qualified has no mandatory fields', getLeadStageRequirements('qua
 check(4, 'lead not_qualified has no mandatory reason', getLeadStageRequirements('not_qualified').length === 0)
 check(5, 'lead closed has no mandatory reason', getLeadStageRequirements('closed').length === 0)
 check(6, 'convert still requires linked company', getLeadStageRequirements('converted_to_opportunity').includes('customerId'))
-check(7, 'opp requirement_discussion matches funnel', getOpportunityStageRequirements('requirement_discussion').includes('expectedCloseDate'))
+check(7, 'opp requirement_discussion does not require expectedCloseDate', !getOpportunityStageRequirements('requirement_discussion').includes('expectedCloseDate'))
 check(8, 'all lead stages keyed', Object.keys(LEAD_STAGE_REQUIREMENTS).length === 7)
 check(9, 'all opp stages keyed', Object.keys(OPPORTUNITY_STAGE_REQUIREMENTS).length === 10)
 

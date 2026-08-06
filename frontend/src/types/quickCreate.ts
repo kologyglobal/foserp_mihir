@@ -54,7 +54,7 @@ export const QUICK_CREATE_EMPTY_LABELS: Record<QuickCreateEntityType, string> = 
 export const QUICK_CREATE_ADD_LABELS: Record<QuickCreateEntityType, string> = {
   customer: 'Add Company',
   contact: 'Add Contact',
-  vendor: 'Add Vendor',
+  vendor: 'Quick add vendor',
   item: 'Add Item',
   product: 'Add Product',
   paymentTerms: 'Add Payment Terms',

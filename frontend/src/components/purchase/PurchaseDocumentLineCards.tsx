@@ -16,14 +16,18 @@ import {
 } from '@/types/taxMaster'
 import type { PurchaseOrderLine } from '@/types/purchaseDomain'
 
-export type PurchaseDocumentLineCardRow = PurchaseOrderLine & { key: string }
+export type PurchaseDocumentLineCardRow = PurchaseOrderLine & {
+  key: string
+  /** Client-only free-text / Quick New Item flag from PO editor. */
+  manualEntry?: boolean
+}
 
 export type PurchaseDocumentLineCardsProps = {
   lines: PurchaseDocumentLineCardRow[]
   catalogItems: PurchaseItemCodeCatalogOption[]
   editable: boolean
   formatCurrency: (n: number) => string
-  onPatchLine: (key: string, patch: Partial<PurchaseOrderLine>) => void
+  onPatchLine: (key: string, patch: Partial<PurchaseOrderLine> & { manualEntry?: boolean }) => void
   onRemoveLine: (key: string) => void
   onSelectCatalogItem: (key: string, itemId: string) => void
   /** When set, shows Product Type and filters the item picker to Item Master matches only. */
@@ -31,6 +35,18 @@ export type PurchaseDocumentLineCardsProps = {
   onOpenDetails?: (key: string) => void
   /** When true, require at least one line (PO starts with a blank row). */
   requireOneLine?: boolean
+}
+
+function isCardFreeTextLine(line: PurchaseDocumentLineCardRow) {
+  if (line.itemId) return false
+  if (line.manualEntry) return true
+  return Boolean(
+    line.itemName?.trim() ||
+      line.itemCode?.trim() ||
+      line.hsnCode?.trim() ||
+      line.hsnId ||
+      line.sacCode?.trim(),
+  )
 }
 
 /**
@@ -59,6 +75,9 @@ export function PurchaseDocumentLineCards({
     <ul className="flex flex-col gap-2" aria-label="Item lines">
       {lines.map((line) => {
         const open = Boolean(expanded[line.key])
+        const freeText = isCardFreeTextLine(line)
+        const lineType: 'GOODS' | 'SERVICE' =
+          line.lineType === 'SERVICE' || line.itemType === 'service' ? 'SERVICE' : 'GOODS'
         const title = line.itemName || line.itemCode || `Line ${line.lineNo}`
         const rowCatalog = (() => {
           const filtered = filterPurchaseCatalogByProductType(catalogItems, line.productType)
@@ -87,6 +106,11 @@ export function PurchaseDocumentLineCards({
                     <span className="tabular-nums text-erp-muted">#{line.lineNo}</span>
                     <span className="mx-1.5 text-erp-border">·</span>
                     {title}
+                    {freeText ? (
+                      <span className="ml-1.5 text-[10px] font-normal uppercase tracking-wide text-erp-muted">
+                        Quick
+                      </span>
+                    ) : null}
                   </p>
                   <p className="text-[12px] font-semibold tabular-nums text-erp-text">
                     {formatCurrency(line.lineTotal)}
@@ -124,7 +148,31 @@ export function PurchaseDocumentLineCards({
 
             {open ? (
               <div className="space-y-2 border-t border-erp-border px-3 py-3">
-                {onSetProductType ? (
+                {freeText ? (
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-medium text-erp-muted">Type</span>
+                    <select
+                      className="erp-input h-9 w-full text-[13px]"
+                      disabled={!editable}
+                      value={lineType}
+                      onChange={(e) => {
+                        const next = e.target.value === 'SERVICE' ? 'SERVICE' : 'GOODS'
+                        const service = next === 'SERVICE'
+                        onPatchLine(line.key, {
+                          manualEntry: true,
+                          lineType: next,
+                          itemType: service ? 'service' : 'raw_material',
+                          category: service ? 'job_work' : 'raw_material',
+                          productType: service ? 'service' : '',
+                          sacCode: service ? line.hsnCode || line.sacCode || null : null,
+                        })
+                      }}
+                    >
+                      <option value="GOODS">Goods</option>
+                      <option value="SERVICE">Service</option>
+                    </select>
+                  </label>
+                ) : onSetProductType ? (
                   <label className="block">
                     <span className="mb-1 block text-[11px] font-medium text-erp-muted">Product Type</span>
                     <select
@@ -145,34 +193,83 @@ export function PurchaseDocumentLineCards({
                   </label>
                 ) : null}
                 <label className="block">
-                  <span className="mb-1 block text-[11px] font-medium text-erp-muted">Item</span>
-                  <PurchaseItemCodeCell
-                    itemId={line.itemId}
-                    itemCode={line.itemCode}
-                    catalogItems={rowCatalog}
-                    disabled={!editable}
-                    textClassName="text-[12px]"
-                    emptyCatalogHint={
-                      line.productType
-                        ? 'No Item Master rows for this product type'
-                        : 'No purchasable items from Item Master'
-                    }
-                    onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
-                    onClearCatalog={() => onPatchLine(line.key, { itemId: '', itemCode: '' })}
-                    onManualCodeChange={(code) => onPatchLine(line.key, { itemCode: code })}
-                  />
+                  <span className="mb-1 block text-[11px] font-medium text-erp-muted">
+                    {freeText ? 'Item / service name' : 'Item'}
+                  </span>
+                  {freeText ? (
+                    <input
+                      className="erp-input h-9 w-full text-[13px]"
+                      disabled={!editable}
+                      value={line.itemName}
+                      placeholder="Free-text name"
+                      onChange={(e) =>
+                        onPatchLine(line.key, {
+                          manualEntry: true,
+                          itemId: '',
+                          itemName: e.target.value,
+                          description: e.target.value,
+                        })
+                      }
+                    />
+                  ) : (
+                    <PurchaseItemCodeCell
+                      itemId={line.itemId}
+                      itemCode={line.itemCode}
+                      catalogItems={rowCatalog}
+                      disabled={!editable}
+                      textClassName="text-[12px]"
+                      emptyCatalogHint={
+                        line.productType
+                          ? 'No Item Master rows for this product type'
+                          : 'No purchasable items from Item Master'
+                      }
+                      onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
+                      onClearCatalog={() => onPatchLine(line.key, { itemId: '', itemCode: '' })}
+                      onManualCodeChange={(code) => onPatchLine(line.key, { itemCode: code })}
+                    />
+                  )}
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-medium text-erp-muted">Description</span>
                   <input
                     className="erp-input h-9 w-full text-[13px]"
                     disabled={!editable}
-                    value={line.itemName}
+                    value={line.description || line.itemName}
                     onChange={(e) =>
-                      onPatchLine(line.key, { itemName: e.target.value, description: e.target.value })
+                      onPatchLine(line.key, {
+                        description: e.target.value,
+                        ...(freeText
+                          ? {
+                              manualEntry: true,
+                              itemName: line.itemName.trim() ? line.itemName : e.target.value,
+                            }
+                          : { itemName: e.target.value }),
+                      })
                     }
                   />
                 </label>
+                {!line.itemId ? (
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-medium text-erp-muted">
+                      {lineType === 'SERVICE' ? 'SAC code' : 'HSN code'}
+                    </span>
+                    <input
+                      className="erp-input h-9 w-full font-mono text-[13px]"
+                      disabled={!editable}
+                      value={line.hsnCode || line.sacCode || ''}
+                      placeholder={lineType === 'SERVICE' ? 'e.g. 998314' : 'e.g. 7208'}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        onPatchLine(line.key, {
+                          manualEntry: true,
+                          hsnId: null,
+                          hsnCode: raw,
+                          sacCode: lineType === 'SERVICE' ? raw : null,
+                        })
+                      }}
+                    />
+                  </label>
+                ) : null}
                 <div className="grid grid-cols-2 gap-2">
                   {(() => {
                     const uomOptions = getPurchaseLineUomOptions(line.itemId)

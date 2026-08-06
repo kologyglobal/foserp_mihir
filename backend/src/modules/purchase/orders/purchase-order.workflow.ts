@@ -240,6 +240,7 @@ export function money(value: number): number {
 export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
   lineNumber: number
   itemId: string | null
+  lineType: 'GOODS' | 'SERVICE'
   itemCodeSnapshot: string
   itemNameSnapshot: string
   description: string | null
@@ -307,9 +308,16 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
         ? Number(line.unitCostPrimary)
         : toPrimaryUnitCost(rate, dual.uomConversionFactor)
 
+    const itemId = line.itemId ?? null
+    const lineType =
+      line.lineType === 'SERVICE' || line.lineType === 'GOODS'
+        ? line.lineType
+        : 'GOODS'
+
     return {
       lineNumber: line.lineNumber ?? index + 1,
-      itemId: line.itemId ?? null,
+      itemId,
+      lineType,
       itemCodeSnapshot: (line.itemCode ?? '').trim(),
       itemNameSnapshot: (line.itemName ?? '').trim(),
       description: line.description?.trim() || null,
@@ -327,7 +335,7 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
       requisitionNumber: line.requisitionNumber?.trim() || null,
       gstGroupId: line.gstGroupId ?? null,
       hsnId: line.hsnId ?? null,
-      hsnCodeSnapshot: '',
+      hsnCodeSnapshot: (line.hsnCode ?? '').trim(),
       gstGroupCodeSnapshot: '',
       ...EMPTY_TAX_SNAPSHOT,
       binId: line.binId ?? null,

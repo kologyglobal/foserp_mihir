@@ -239,6 +239,10 @@ interface SalesState {
     customerPoDate?: string
     freightAmount?: number
     orderDiscountAmount?: number
+    installationAmount?: number
+    otherCharges?: number
+    /** Prefer full pricing engine result (taxable charges GST included). */
+    grandTotalOverride?: number
     placeOfSupply?: string
     placeOfSupplyOverride?: boolean
     placeOfSupplyOverrideReason?: string
@@ -1114,6 +1118,8 @@ export const useSalesStore = create<SalesState>()(
         const taxableBefore = Math.round(builtLines.reduce((s, l) => s + l.taxableValue, 0) * 100) / 100
         const gstBefore = Math.round(builtLines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100
         const freight = input.freightAmount ?? 0
+        const install = input.installationAmount ?? 0
+        const other = input.otherCharges ?? 0
         // Overall discount applies to taxable only; GST is recomputed on revised taxable.
         const orderDisc = Math.min(Math.max(0, input.orderDiscountAmount ?? 0), taxableBefore)
         const taxableAfter = Math.round((taxableBefore - orderDisc) * 100) / 100
@@ -1121,7 +1127,10 @@ export const useSalesStore = create<SalesState>()(
           taxableBefore > 0
             ? Math.round(gstBefore * (taxableAfter / taxableBefore) * 100) / 100
             : 0
-        const grandTotal = Math.round((taxableAfter + gstAmount + freight) * 100) / 100
+        const grandTotal =
+          input.grandTotalOverride != null && Number.isFinite(input.grandTotalOverride)
+            ? Math.round(input.grandTotalOverride * 100) / 100
+            : Math.round((taxableAfter + gstAmount + freight + install + other) * 100) / 100
         const totalQty = builtLines.reduce((s, l) => s + l.qty, 0)
 
         const mrp = useMrpStore.getState()
