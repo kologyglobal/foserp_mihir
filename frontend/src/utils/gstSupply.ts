@@ -56,19 +56,21 @@ export function determinePurchaseGstSupply(opts: {
     gstin: opts.supplierGstin,
   })
 
-  const posCode =
-    resolvePlaceOfSupplyFromBilling({
-      explicitPlaceOfSupply: opts.placeOfSupply,
-      billingState: opts.defaultPlaceOfSupplyState,
-      billingStateCode: opts.defaultPlaceOfSupplyStateCode,
-    }) ?? supplierCode
+  const posCode = resolvePlaceOfSupplyFromBilling({
+    explicitPlaceOfSupply: opts.placeOfSupply,
+    billingState: opts.defaultPlaceOfSupplyState,
+    billingStateCode: opts.defaultPlaceOfSupplyStateCode,
+  })
 
+  // Never treat supplier state as POS — that forces CGST+SGST for every vendor when delivery/setup POS is unset.
   const isInterstate =
     supplierCode != null && posCode != null ? supplierCode !== posCode : false
 
   const placeOfSupplyLabel =
     opts.placeOfSupply?.trim() ||
-    formatPlaceOfSupplyLabel(posCode, opts.defaultPlaceOfSupplyState)
+    formatPlaceOfSupplyLabel(posCode, opts.defaultPlaceOfSupplyState) ||
+    formatPlaceOfSupplyLabel(null, opts.defaultPlaceOfSupplyState) ||
+    ''
 
   return {
     isInterstate,

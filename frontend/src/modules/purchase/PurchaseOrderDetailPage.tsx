@@ -79,6 +79,7 @@ import { PurchaseLineTrackingQtyCell } from '@/components/purchase/PurchaseLineT
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { appPromptNote } from '@/store/confirmDialogStore'
+import { resolvePurchaseGstColumnVisibility } from '@/utils/purchasePoGst'
 import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
 import { PoReceiptRollupPanel } from '@/components/purchase/PoReceiptRollupPanel'
 
@@ -460,6 +461,10 @@ export function PurchaseOrderDetailPage() {
   })
 
   const gstTotal = po.cgst + po.sgst + po.igst
+  const lineTaxCols = useMemo(
+    () => resolvePurchaseGstColumnVisibility(po.lines),
+    [po.lines],
+  )
   const taxTotalsDefaultOpen = hasMeaningfulTaxTotals(po.subtotal, gstTotal, po.totalAmount)
   const taxPeek = taxTotalsSummary({
     subtotal: po.subtotal,
@@ -763,9 +768,15 @@ export function PurchaseOrderDetailPage() {
                   <col className="purchase-order-detail-lines__col-qty" />
                   <col className="purchase-order-detail-lines__col-money" />
                   <col className="purchase-order-detail-lines__col-money" />
-                  <col className="purchase-order-detail-lines__col-money" />
-                  <col className="purchase-order-detail-lines__col-money" />
-                  <col className="purchase-order-detail-lines__col-money" />
+                  {lineTaxCols.showCgst ? (
+                    <col className="purchase-order-detail-lines__col-money" />
+                  ) : null}
+                  {lineTaxCols.showSgst ? (
+                    <col className="purchase-order-detail-lines__col-money" />
+                  ) : null}
+                  {lineTaxCols.showIgst ? (
+                    <col className="purchase-order-detail-lines__col-money" />
+                  ) : null}
                   <col className="purchase-order-detail-lines__col-money-wide" />
                   <col className="purchase-order-detail-lines__col-tracking" />
                   <col className="purchase-order-detail-lines__col-tracking" />
@@ -785,9 +796,15 @@ export function PurchaseOrderDetailPage() {
                     <th className="num purchase-order-detail-lines__col-qty">Qty</th>
                     <th className="num purchase-order-detail-lines__col-money">Rate</th>
                     <th className="num purchase-order-detail-lines__col-money">Taxable</th>
-                    <th className="num purchase-order-detail-lines__col-money">CGST</th>
-                    <th className="num purchase-order-detail-lines__col-money">SGST</th>
-                    <th className="num purchase-order-detail-lines__col-money">IGST</th>
+                    {lineTaxCols.showCgst ? (
+                      <th className="num purchase-order-detail-lines__col-money">CGST</th>
+                    ) : null}
+                    {lineTaxCols.showSgst ? (
+                      <th className="num purchase-order-detail-lines__col-money">SGST</th>
+                    ) : null}
+                    {lineTaxCols.showIgst ? (
+                      <th className="num purchase-order-detail-lines__col-money">IGST</th>
+                    ) : null}
                     <th className="num purchase-order-detail-lines__col-money-wide">Line Total</th>
                     <th className="num purchase-order-detail-lines__col-tracking">Outstanding</th>
                     <th className="num purchase-order-detail-lines__col-tracking">Received</th>
@@ -842,15 +859,21 @@ export function PurchaseOrderDetailPage() {
                       <td className="num tabular-nums purchase-order-detail-lines__col-money">
                         {formatCurrency(l.taxableAmount)}
                       </td>
-                      <td className="num tabular-nums purchase-order-detail-lines__col-money">
-                        {formatCurrency(l.cgst)}
-                      </td>
-                      <td className="num tabular-nums purchase-order-detail-lines__col-money">
-                        {formatCurrency(l.sgst)}
-                      </td>
-                      <td className="num tabular-nums purchase-order-detail-lines__col-money">
-                        {formatCurrency(l.igst)}
-                      </td>
+                      {lineTaxCols.showCgst ? (
+                        <td className="num tabular-nums purchase-order-detail-lines__col-money">
+                          {formatCurrency(l.cgst)}
+                        </td>
+                      ) : null}
+                      {lineTaxCols.showSgst ? (
+                        <td className="num tabular-nums purchase-order-detail-lines__col-money">
+                          {formatCurrency(l.sgst)}
+                        </td>
+                      ) : null}
+                      {lineTaxCols.showIgst ? (
+                        <td className="num tabular-nums purchase-order-detail-lines__col-money">
+                          {formatCurrency(l.igst)}
+                        </td>
+                      ) : null}
                       <td className="num tabular-nums font-medium purchase-order-detail-lines__col-money-wide">
                         {formatCurrency(l.lineTotal)}
                       </td>

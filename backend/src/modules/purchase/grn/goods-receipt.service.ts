@@ -178,6 +178,7 @@ const itemReceiptConfigSelect = {
   weightUomId: true,
   allowManualUnitQuantity: true,
   allowManualWeightQuantity: true,
+  requireWeightAtReceipt: true,
   receivingTolerance: {
     select: { id: true, code: true, name: true, percentage: true, status: true },
   },
@@ -201,6 +202,7 @@ type ItemReceiptConfig = {
   weightUomId: string | null
   allowManualUnitQuantity: boolean
   allowManualWeightQuantity: boolean
+  requireWeightAtReceipt: boolean
   receivingTolerance: {
     id: string
     code: string
@@ -311,6 +313,64 @@ function toleranceFieldsFromEvaluation(
   }
 }
 
+function grnLineToleranceSnapshotData(
+  tol: ReturnType<typeof evaluateGrnLineTolerance>,
+  input: GoodsReceiptLineInput,
+  itemConfig?: ItemReceiptConfig | null,
+): Prisma.GoodsReceiptLineUpdateManyMutationInput {
+  const f = toleranceFieldsFromEvaluation(tol, input, itemConfig)
+  return {
+    tolerancePercentage: f.tolerancePercentage,
+    variancePercentage: f.variancePercentage,
+    toleranceStatus: f.toleranceStatus,
+    receivingToleranceIdSnapshot: f.receivingToleranceIdSnapshot,
+    receivingToleranceCodeSnapshot: f.receivingToleranceCodeSnapshot,
+    receivingToleranceNameSnapshot: f.receivingToleranceNameSnapshot,
+    receivingTolerancePercentageSnapshot: f.receivingTolerancePercentageSnapshot,
+    weightReceivingToleranceIdSnapshot: f.weightReceivingToleranceIdSnapshot,
+    weightReceivingToleranceCodeSnapshot: f.weightReceivingToleranceCodeSnapshot,
+    weightReceivingToleranceNameSnapshot: f.weightReceivingToleranceNameSnapshot,
+    weightReceivingTolerancePercentageSnapshot: f.weightReceivingTolerancePercentageSnapshot,
+    maximumAllowedUnitQuantity: f.maximumAllowedUnitQuantity,
+    unitVariance: f.unitVariance,
+    receivedWeight: f.receivedWeight,
+    expectedWeight: f.expectedWeight,
+    maximumAllowedWeight: f.maximumAllowedWeight,
+    weightVariance: f.weightVariance,
+    weightVariancePercentage: f.weightVariancePercentage,
+    weightConversionRateSnapshot: f.weightConversionRateSnapshot,
+    weightUomIdSnapshot: f.weightUomIdSnapshot,
+    weightUomCodeSnapshot: f.weightUomCodeSnapshot,
+    manualUnitEntry: f.manualUnitEntry,
+    manualWeightEntry: f.manualWeightEntry,
+    weightToleranceStatus: f.weightToleranceStatus,
+    requiresApproval: f.requiresApproval,
+    approvalReasons: f.approvalReasons,
+    shortCloseRequested: f.shortCloseRequested,
+    shortCloseReason: f.shortCloseReason,
+    closeOpenQuantity: f.closeOpenQuantity,
+  }
+}
+
+async function persistGrnLineToleranceSnapshots(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  grnId: string,
+  evaluations: Array<{
+    lineId: string
+    tol: ReturnType<typeof evaluateGrnLineTolerance>
+    input: GoodsReceiptLineInput
+    itemConfig?: ItemReceiptConfig | null
+  }>,
+) {
+  for (const ev of evaluations) {
+    await tx.goodsReceiptLine.updateMany({
+      where: { id: ev.lineId, tenantId, goodsReceiptId: grnId },
+      data: grnLineToleranceSnapshotData(ev.tol, ev.input, ev.itemConfig),
+    })
+  }
+}
+
 async function buildLineCreates(
   tenantId: string,
   po: Awaited<ReturnType<typeof loadReceivablePo>>,
@@ -416,6 +476,21 @@ async function buildLineCreates(
       manualWeightEntry: input.manualWeightEntry,
       weightUomCode: itemConfig?.weightUom?.code ?? null,
     })
+
+    if (
+      received > 0 &&
+      itemConfig?.receiptEntryMode &&
+      itemConfig.receiptEntryMode !== 'UNIT_ONLY' &&
+      itemConfig.requireWeightAtReceipt &&
+      (input.receivedWeight == null || qty(input.receivedWeight) <= 0)
+    ) {
+      const itemLabel = (poLine.itemCodeSnapshot || poLine.itemNameSnapshot || `line ${i + 1}`).trim()
+      throw new GoodsReceiptValidationError(
+        `Actual weight is required for ${itemLabel} at receipt.`,
+        PURCHASE_ERROR_CODE.GRN_VALIDATION_FAILED,
+        [{ field: `lines[${i}].receivedWeight`, message: 'Weight is required for this item' }],
+      )
+    }
 
     // Hard block: never save more than open PO qty + resolved over-receipt tolerance.
     const maxAllowed = Number(tol.maximumAllowedUnitQuantity)
@@ -1144,6 +1219,12 @@ export async function submitGoodsReceipt(
   const itemConfigById = await loadItemReceiptConfigMap(tenantId, itemIds)
 
   let needsApproval = false
+  const lineEvaluations: Array<{
+    lineId: string
+    tol: ReturnType<typeof evaluateGrnLineTolerance>
+    input: GoodsReceiptLineInput
+    itemConfig?: ItemReceiptConfig | null
+  }> = []
   for (const line of existing.lines) {
     const poLine = poLineById.get(line.purchaseOrderLineId)
     if (!poLine) {
@@ -1159,6 +1240,20 @@ export async function submitGoodsReceipt(
       (line as { shortCloseRequested?: boolean }).shortCloseRequested ??
         (line as { closeOpenQuantity?: boolean }).closeOpenQuantity,
     )
+    const toleranceInput: GoodsReceiptLineInput = {
+      purchaseOrderLineId: line.purchaseOrderLineId,
+      receivedQuantity: received,
+      receivedUomQuantity: qty(line.receivedUomQuantity),
+      receivedWeight:
+        (line as { receivedWeight?: unknown }).receivedWeight != null
+          ? qty((line as { receivedWeight?: unknown }).receivedWeight)
+          : null,
+      shortCloseRequested,
+      closeOpenQuantity: shortCloseRequested,
+      shortCloseReason: (line as { shortCloseReason?: string | null }).shortCloseReason,
+      manualUnitEntry: Boolean((line as { manualUnitEntry?: boolean }).manualUnitEntry),
+      manualWeightEntry: Boolean((line as { manualWeightEntry?: boolean }).manualWeightEntry),
+    }
     const tol = evaluateGrnLineTolerance({
       openQuantity: open,
       receivedQuantity: received,
@@ -1171,19 +1266,24 @@ export async function submitGoodsReceipt(
       allowOverReceipt: settings.allowOverReceipt,
       closeOpenQuantity: shortCloseRequested,
       shortCloseRequested,
-      shortCloseReason: (line as { shortCloseReason?: string | null }).shortCloseReason,
-      receivedWeight: (line as { receivedWeight?: unknown }).receivedWeight != null
-        ? qty((line as { receivedWeight?: unknown }).receivedWeight)
-        : null,
+      shortCloseReason: toleranceInput.shortCloseReason,
+      receivedWeight: toleranceInput.receivedWeight,
       standardWeightPerBaseUnit: itemConfig ? Number(itemConfig.standardWeightPerBaseUnit ?? 0) : 0,
       receiptEntryMode: itemConfig?.receiptEntryMode,
       weightUomCode: itemConfig?.weightUom?.code ?? null,
+    })
+    lineEvaluations.push({
+      lineId: line.id,
+      tol,
+      input: toleranceInput,
+      itemConfig,
     })
     if (tol.requiresApproval) needsApproval = true
   }
 
   if (needsApproval) {
     await prisma.$transaction(async (tx) => {
+      await persistGrnLineToleranceSnapshots(tx, tenantId, id, lineEvaluations)
       await repo.updateGoodsReceipt(
         tenantId,
         id,
@@ -1235,6 +1335,10 @@ export async function submitGoodsReceipt(
 
     return mapGoodsReceiptToDto(await loadOrThrow(tenantId, id))
   }
+
+  await prisma.$transaction(async (tx) => {
+    await persistGrnLineToleranceSnapshots(tx, tenantId, id, lineEvaluations)
+  })
 
   return finalizeGoodsReceiptSubmit(tenantId, id, actorId, body)
 }

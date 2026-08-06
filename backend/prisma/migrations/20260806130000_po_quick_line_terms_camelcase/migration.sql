@@ -1,9 +1,5 @@
 -- Repair follow-up for 20260806120000_po_quick_line_terms.
--- That migration added snake_case columns; Prisma PurchaseOrder / PurchaseOrderLine
--- map fields without @map, so MySQL columns must be camelCase like the rest of purchase_*.
---
--- Idempotent: RENAME only when snake_case exists and camelCase does not
--- (safe when local was already fixed by hand rename).
+-- MariaDB / older MySQL: use CHANGE COLUMN (RENAME COLUMN is MySQL 8+ only).
 
 SET @db := DATABASE();
 
@@ -18,7 +14,7 @@ SET @sql := (
       SELECT 1 FROM information_schema.COLUMNS
       WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'purchase_orders' AND COLUMN_NAME = 'paymentTermId'
     ),
-    'ALTER TABLE `purchase_orders` RENAME COLUMN `payment_term_id` TO `paymentTermId`',
+    'ALTER TABLE `purchase_orders` CHANGE COLUMN `payment_term_id` `paymentTermId` VARCHAR(36) NULL',
     'SELECT ''skip paymentTermId (already camelCase or missing snake)'' AS note'
   )
 );
@@ -35,7 +31,7 @@ SET @sql := (
       SELECT 1 FROM information_schema.COLUMNS
       WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'purchase_orders' AND COLUMN_NAME = 'deliveryTermId'
     ),
-    'ALTER TABLE `purchase_orders` RENAME COLUMN `delivery_term_id` TO `deliveryTermId`',
+    'ALTER TABLE `purchase_orders` CHANGE COLUMN `delivery_term_id` `deliveryTermId` VARCHAR(36) NULL',
     'SELECT ''skip deliveryTermId (already camelCase or missing snake)'' AS note'
   )
 );
@@ -52,7 +48,7 @@ SET @sql := (
       SELECT 1 FROM information_schema.COLUMNS
       WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'purchase_orders' AND COLUMN_NAME = 'termsAndConditions'
     ),
-    'ALTER TABLE `purchase_orders` RENAME COLUMN `terms_and_conditions` TO `termsAndConditions`',
+    'ALTER TABLE `purchase_orders` CHANGE COLUMN `terms_and_conditions` `termsAndConditions` TEXT NULL',
     'SELECT ''skip termsAndConditions (already camelCase or missing snake)'' AS note'
   )
 );
@@ -69,7 +65,7 @@ SET @sql := (
       SELECT 1 FROM information_schema.COLUMNS
       WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'purchase_order_lines' AND COLUMN_NAME = 'lineType'
     ),
-    'ALTER TABLE `purchase_order_lines` RENAME COLUMN `line_type` TO `lineType`',
+    'ALTER TABLE `purchase_order_lines` CHANGE COLUMN `line_type` `lineType` VARCHAR(16) NOT NULL DEFAULT ''GOODS''',
     'SELECT ''skip lineType (already camelCase or missing snake)'' AS note'
   )
 );

@@ -1,7 +1,12 @@
 /**
  * Probe live DB + local Prisma client for POST /purchase/requisitions/:id/approve failures.
  *
- * Usage (point backend/.env at stage DB):
+ * Quick start (Windows, remote stage DB — no SSH):
+ *   cd backend
+ *   $env:DB_PASS = 'your-mysql-password'
+ *   .\scripts\stage-pr-approve-debug.ps1
+ *
+ * Manual:
  *   PR_ID=4df7a5be-0ef5-4c85-86ec-8e8f51d5a4ba TENANT_SLUG=vasant-trailers npx tsx scripts/probe-pr-approve-live.ts
  */
 import { prisma } from '../src/config/prisma.js'

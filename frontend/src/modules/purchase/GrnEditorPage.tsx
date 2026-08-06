@@ -585,44 +585,6 @@ export function GrnEditorPage() {
     markDirty()
   }
 
-  const fillLinePending = (index: number) => {
-    const row = lines[index]
-    if (!row) return
-    const pendingUom = Number(row.pendingUomQty) || Number(row.pendingQty) || 0
-    if (pendingUom <= 0) return
-    const factor = Number(row.uomConversionFactor) || 1
-    updateLine(index, {
-      receivedUomQty: pendingUom,
-      receivedQty: purchaseQtyToBaseQty(pendingUom, factor),
-    })
-  }
-
-  const fillAllPending = () => {
-    setLines((prev) =>
-      prev.map((row) => {
-        const pendingUom = Number(row.pendingUomQty) || Number(row.pendingQty) || 0
-        if (pendingUom <= 0) return row
-        const factor = Number(row.uomConversionFactor) || 1
-        return recalcGrnLineDraft(
-          {
-            ...row,
-            receivedUomQty: pendingUom,
-            receivedQty: purchaseQtyToBaseQty(pendingUom, factor),
-          },
-          receiptSetup,
-          inspectionRequired,
-        )
-      }),
-    )
-    markDirty()
-  }
-
-  const hasFillablePending = lines.some((l) => {
-    const pendingUom = Number(l.pendingUomQty) || Number(l.pendingQty) || 0
-    const received = Number(l.receivedUomQty ?? l.receivedQty) || 0
-    return pendingUom > 0 && received < pendingUom - 1e-9
-  })
-
   const requestShortClose = (index: number, checked: boolean) => {
     if (!checked) {
       updateLine(index, { closeOpenQuantity: false, shortCloseReason: '' })
@@ -1273,10 +1235,16 @@ export function GrnEditorPage() {
               </dl>
             </details>
             <p className="text-[11px]">
-              Condition is auto-suggested from received vs pending and rejected qty — adjust if needed.
-              Weight columns appear for casting / KG items. <strong>Received</strong> starts empty —
-              type the actual qty for each item. Leave blank / 0 for not received (line stays open on the PO).
+              Enter qty in the <strong>vendor/purchase unit</strong> (Receive UOM). Weight columns
+              appear for casting items. Leave Receive Qty blank / 0 for not received (line stays open
+              on the PO).
             </p>
+            {lineTotals.requiresToleranceApproval ? (
+              <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-950">
+                One or more lines exceed quantity or weight tolerance — saving/submitting will route
+                this GRN for <strong>approval</strong> before inventory posting.
+              </p>
+            ) : null}
             {lineTotals.remainingOpenQty > 0 ||
             lineTotals.notReceivedCount > 0 ||
             lineTotals.partialCount > 0 ||
@@ -1294,16 +1262,6 @@ export function GrnEditorPage() {
             ) : null}
           </div>
         )}
-        <div className="mb-2 flex justify-end">
-          <button
-            type="button"
-            className="erp-btn erp-btn--secondary text-[12px]"
-            disabled={!hasFillablePending}
-            onClick={fillAllPending}
-          >
-            Fill all pending
-          </button>
-        </div>
         <div className="purchase-doc-lines-grid-scroll relative rounded-md border border-erp-border">
           <table className="erp-table purchase-doc-lines-grid grn-lines-grid w-max min-w-full text-left text-[12px]">
             <thead>
@@ -1312,23 +1270,26 @@ export function GrnEditorPage() {
                 <th className="num">PO Qty</th>
                 <th className="num">Prev. Recd</th>
                 <th className="num">Pending</th>
-                <th className="num" title={GRN_LINES_RECEIVING_GUIDE.columns[0].meaning}>
-                  Received
+                <th className="num grn-lines-grid__receive-qty-col" title={GRN_LINES_RECEIVING_GUIDE.columns[0].meaning}>
+                  Receive Qty
+                </th>
+                <th className="purchase-doc-lines-grid__uom-col" title="Vendor / purchase unit">
+                  Receive UOM
                 </th>
                 <th
-                  className="num"
+                  className="num grn-lines-grid__accepted-col"
                   title={GRN_LINES_RECEIVING_GUIDE.columns[1].meaning}
                 >
                   Accepted
+                  <span className="block text-[10px] font-normal text-erp-muted">(stock UOM)</span>
                 </th>
                 <th
                   className="num"
                   title={GRN_LINES_RECEIVING_GUIDE.columns[2].meaning}
                 >
                   Rejected
-                  <span className="block text-[10px] font-normal text-erp-muted">(incl. damage)</span>
+                  <span className="block text-[10px] font-normal text-erp-muted">(incl. damage · stock UOM)</span>
                 </th>
-                <th className="purchase-doc-lines-grid__uom-col">UOM</th>
                 {showWeightCol ? <th className="num">Weight</th> : null}
                 <th className="num">Qty Tol %</th>
                 {showWeightCol ? <th className="num">Wt Tol %</th> : null}
@@ -1414,51 +1375,37 @@ export function GrnEditorPage() {
                       )
                     })()}
                   </td>
-                  <td className="num">
-                    <DecimalInput
-                      className="w-24"
-                      min={0}
-                      blankZero
-                      placeholder="Enter qty"
-                      value={Number(l.receivedUomQty ?? l.receivedQty) || 0}
-                      onChange={(v) => {
-                        const factor = Number(l.uomConversionFactor) || 1
-                        updateLine(i, {
-                          receivedUomQty: v,
-                          receivedQty: purchaseQtyToBaseQty(v, factor),
-                        })
-                      }}
-                    />
-                    {purchaseLineHasDualUom({
-                      itemId: l.itemId,
-                      uomConversionFactor: l.uomConversionFactor,
-                    }) && l.baseUom ? (
-                      <p className="mt-1 text-[10px] tabular-nums text-erp-muted">
-                        {formatPurchaseQty(Number(l.receivedQty) || 0)} {l.baseUom}
-                      </p>
-                    ) : null}
+                  <td className="num grn-lines-grid__received-col">
                     {(() => {
-                      const pendingUom =
-                        Number(l.pendingUomQty) || Number(l.pendingQty) || 0
-                      const received = Number(l.receivedUomQty ?? l.receivedQty) || 0
-                      if (pendingUom <= 0 || received >= pendingUom - 1e-9) return null
+                      const qtyError =
+                        fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`]
                       return (
-                        <button
-                          type="button"
-                          className="mt-1 text-[11px] font-medium text-erp-primary hover:underline"
-                          onClick={() => fillLinePending(i)}
-                        >
-                          Fill pending
-                        </button>
+                        <div className="grn-received-cell">
+                          <DecimalInput
+                            className="grn-received-cell__input"
+                            min={0}
+                            blankZero
+                            placeholder="Enter qty"
+                            value={Number(l.receivedUomQty ?? l.receivedQty) || 0}
+                            onChange={(v) => {
+                              const factor = Number(l.uomConversionFactor) || 1
+                              updateLine(i, {
+                                receivedUomQty: v,
+                                receivedQty: purchaseQtyToBaseQty(v, factor),
+                              })
+                            }}
+                          />
+                          {qtyError ? (
+                            <p className="grn-received-cell__error">{qtyError}</p>
+                          ) : null}
+                        </div>
                       )
                     })()}
-                    {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`] ? (
-                      <p className="mt-1 text-xs text-erp-danger-fg">
-                        {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`]}
-                      </p>
-                    ) : null}
                   </td>
-                  <td className="num">
+                  <td className="purchase-doc-lines-grid__uom-col text-[11px] font-semibold uppercase">
+                    {l.uom || '—'}
+                  </td>
+                  <td className="num grn-lines-grid__accepted-col">
                     <DecimalInput
                       className="w-20"
                       min={0}
@@ -1466,6 +1413,9 @@ export function GrnEditorPage() {
                       disabled={l.qcRequired || inspectionRequired}
                       onChange={(v) => updateLine(i, { acceptedQty: v })}
                     />
+                    {l.baseUom ? (
+                      <p className="mt-1 text-[10px] uppercase text-erp-muted">{l.baseUom}</p>
+                    ) : null}
                   </td>
                   <td className="num">
                     <DecimalInput
@@ -1480,9 +1430,9 @@ export function GrnEditorPage() {
                         })
                       }
                     />
-                  </td>
-                  <td className="purchase-doc-lines-grid__uom-col text-[11px] font-medium uppercase">
-                    {l.uom || '—'}
+                    {l.baseUom ? (
+                      <p className="mt-1 text-[10px] uppercase text-erp-muted">{l.baseUom}</p>
+                    ) : null}
                   </td>
                   {showWeightCol ? (
                     <td className="num">
