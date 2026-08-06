@@ -1,15 +1,7 @@
 /* =========================================================
-   EMERGENCY UNBLOCK — stale Hostinger Prisma client on purchase_orders
+   EMERGENCY UNBLOCK — paymentTermId + deliveryTermId only.
 
-   Symptom: P2022 on paymentTermId, deliveryTermId, etc.
-   Current main schema uses paymentTerms / deliveryTerms (varchar text).
-
-   Band-aid: add nullable FK-shaped columns the stale client SELECTs.
-   Proper fix: redeploy + hostinger-start runs prisma generate (or SSH:
-     cd nodejs && npx prisma generate --schema=./prisma/schema.prisma
-     then Stop → Start app in hPanel).
-
-   Run in phpMyAdmin on stage/live DB. Safe to re-run (idempotent).
+   Prefer: live-fix-po-stale-prisma-client-columns.sql (full stale-client pack).
    ========================================================= */
 
 USE `u233611619_foserp`;

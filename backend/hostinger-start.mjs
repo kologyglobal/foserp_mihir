@@ -63,16 +63,18 @@ if (skipPrismaGenerate) {
     console.warn(`[hostinger-start] Missing ${prismaSchema} — skipping prisma generate.`)
   } else {
     console.log('[hostinger-start] Running prisma generate so runtime client matches schema.prisma…')
-    const generate = spawnSync(
-      process.execPath,
-      [
-        join(backend, 'node_modules', 'prisma', 'build', 'index.js'),
-        'generate',
-        '--schema',
-        prismaSchema,
-      ],
-      { cwd: backend, env: process.env, stdio: 'inherit' },
-    )
+    const isWin = process.platform === 'win32'
+    const generate = isWin
+      ? spawnSync(
+          process.env.ComSpec ?? 'cmd.exe',
+          ['/d', '/s', '/c', `npx prisma generate --schema="${prismaSchema}"`],
+          { cwd: backend, env: process.env, stdio: 'inherit' },
+        )
+      : spawnSync('npx', ['prisma', 'generate', '--schema', prismaSchema], {
+          cwd: backend,
+          env: process.env,
+          stdio: 'inherit',
+        })
     if (generate.status !== 0) {
       throw new Error(
         'Prisma generate failed on startup. Fix schema or set RUN_PRISMA_GENERATE_ON_START=false and regenerate manually.',
