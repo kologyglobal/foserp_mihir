@@ -5892,13 +5892,23 @@ export async function createPurchaseInvoiceFromPo(purchaseOrderId: string): Prom
   const po = state.orders.find((o) => o.id === purchaseOrderId)
   if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `PO not found: ${purchaseOrderId}`)
   const postedGrn = state.grns.find((g) => g.purchaseOrderId === po.id && g.status === 'posted')
+  // Align with API: when a posted GRN exists, invoice from receipt (3-way qty).
+  if (postedGrn) {
+    return createPurchaseInvoiceFromGrn(postedGrn.id)
+  }
+  if (state.setup.invoiceMatchTolerances.requireGrnMatch && po.orderType !== 'service') {
+    throw new PurchaseServiceError(
+      'GRN_REQUIRED',
+      'Purchase Setup requires a posted GRN match. Switch origin to “Posted GRN” and select the GRN for this PO, or create and post a GRN first (Purchase → Goods receipts). Service-only POs use origin “Service PO”.',
+    )
+  }
   return createPurchaseInvoice({
     vendorId: po.vendor.id,
     vendorInvoiceNumber: '',
     vendorInvoiceDate: todayDate(),
     origin: po.orderType === 'service' ? 'service_po' : 'purchase_order',
     purchaseOrderId: po.id,
-    goodsReceiptId: postedGrn?.id ?? null,
+    goodsReceiptId: null,
     paymentTerms: po.paymentTerms,
     placeOfSupply: po.placeOfSupply || po.vendor.state,
     lines: po.lines
@@ -5908,8 +5918,7 @@ export async function createPurchaseInvoiceFromPo(purchaseOrderId: string): Prom
         quantity: Math.max(0, l.quantity - (l.invoicedQty ?? 0)) || l.quantity,
         rate: l.rate,
         purchaseOrderLineId: l.id,
-        goodsReceiptLineId:
-          postedGrn?.lines.find((gl) => gl.purchaseOrderLineId === l.id)?.id ?? null,
+        goodsReceiptLineId: null,
         description: l.description || l.itemName,
         gstRatePct: l.gstRatePct,
       })),

@@ -2929,37 +2929,55 @@ export async function createDirectPurchaseInvoice(
   return createPurchaseInvoice({ ...input, origin: 'direct' })
 }
 
+/** Posted GRNs for a PO (3-way match). Prefer API PO filter; fall back to full list. */
+export async function listPostedGrnsForPurchaseOrder(
+  purchaseOrderId: string,
+): Promise<GoodsReceiptNote[]> {
+  if (!isApiMode()) {
+    const grns = await demo.getGRNs()
+    return grns.filter((g) => g.purchaseOrderId === purchaseOrderId && g.status === 'posted')
+  }
+  const byId = new Map<string, GoodsReceiptNote>()
+  try {
+    const res = await grnApi.listGoodsReceiptsApi({
+      page: 1,
+      pageSize: 100,
+      sortOrder: 'desc',
+      purchaseOrderId,
+    })
+    for (const g of res.data.map(mapApiGoodsReceiptToDomain)) {
+      if (g.status === 'posted') byId.set(g.id, g)
+    }
+  } catch {
+    // list with PO filter may fail — fall through to full catalog
+  }
+  if (!byId.size) {
+    const all = await getGRNs().catch(() => [] as GoodsReceiptNote[])
+    for (const g of all) {
+      if (g.purchaseOrderId === purchaseOrderId && g.status === 'posted') byId.set(g.id, g)
+    }
+  }
+  return [...byId.values()]
+}
+
+const GRN_REQUIRED_FOR_INVOICE_MSG =
+  'Purchase Setup requires a posted GRN match. Switch origin to “Posted GRN” and select the GRN for this PO, or create and post a GRN first (Purchase → Goods receipts). Service-only POs use origin “Service PO”.'
+
 export async function createPurchaseInvoiceFromPo(purchaseOrderId: string): Promise<PurchaseInvoice> {
   if (!isApiMode()) return demo.createPurchaseInvoiceFromPo(purchaseOrderId)
   const po = await getPurchaseOrderById(purchaseOrderId)
   if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `PO not found: ${purchaseOrderId}`)
 
   const setup = await getPurchaseSetup().catch(() => null)
-  let postedGrn: GoodsReceiptNote | undefined
-  try {
-    const res = await grnApi.listGoodsReceiptsApi({
-      page: 1,
-      pageSize: 20,
-      sortOrder: 'desc',
-      purchaseOrderId: po.id,
-    })
-    postedGrn = res.data
-      .map(mapApiGoodsReceiptToDomain)
-      .find((g) => g.status === 'posted')
-  } catch {
-    const grns = await getGRNs().catch(() => [] as GoodsReceiptNote[])
-    postedGrn = grns.find((g) => g.purchaseOrderId === po.id && g.status === 'posted')
-  }
+  const postedGrns = await listPostedGrnsForPurchaseOrder(po.id)
+  const postedGrn = postedGrns[0]
 
   // Setup requireGrnMatch: PO-only create is rejected by API — use posted GRN when present.
   if (postedGrn) {
     return createPurchaseInvoiceFromGrn(postedGrn.id)
   }
   if (setup?.invoiceMatchTolerances.requireGrnMatch) {
-    throw new PurchaseServiceError(
-      'GRN_REQUIRED',
-      'Purchase Setup requires a posted GRN match. Open origin “Posted GRN” and select the GRN for this PO (or post a GRN first).',
-    )
+    throw new PurchaseServiceError('GRN_REQUIRED', GRN_REQUIRED_FOR_INVOICE_MSG)
   }
 
   const today = new Date().toISOString().slice(0, 10)
