@@ -1805,7 +1805,7 @@ export function PurchaseOrderEditorPage() {
                         value={header.placeOfSupply}
                         disabled={!editable}
                         onChange={(e) => {
-                          const gst = resolvePoGstFromLocations(
+                          const gst = resolvePurchaseOrderGstSupply(
                             selectedVendor,
                             selectedDeliveryLocation,
                             purchaseSetup,
