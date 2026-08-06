@@ -1,5 +1,9 @@
 import { formatApiError, ApiError } from '../api/apiErrors'
-import { mapPurchaseErrorMessage, isTechnicalPurchaseMessage } from '../../utils/purchase/purchaseErrorMessages'
+import { mapPurchaseErrorMessage } from '../../utils/purchase/purchaseErrorMessages'
+import {
+  formatPurchaseValidationItem,
+  formatPurchaseValidationNotifyMessage,
+} from '../../utils/purchase/purchaseFieldErrorLabels'
 import { getStoredSession } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
 import { resolveUomCode } from '../../utils/purchaseLineUom'
@@ -110,18 +114,42 @@ import { formatGrnStatusLabel } from './grnReceiptSummary'
 const EMPTY_PARTY = { id: '', code: '', name: '' }
 const EMPTY_LOCATION = { id: '', code: '', name: '', state: '', city: '' }
 
-export function formatPurchaseApiError(err: unknown): { code: string; message: string } {
+export type PurchaseApiFieldError = { field: string; message: string; label: string }
+
+export function formatPurchaseApiError(err: unknown): {
+  code: string
+  message: string
+  fieldErrors?: PurchaseApiFieldError[]
+} {
   if (err instanceof ApiError) {
     const code = err.code ?? `HTTP_${err.statusCode}`
-    const raw =
-      err.fieldErrors?.length && !isTechnicalPurchaseMessage(err.message)
-        ? formatApiError(err)
-        : err.message || formatApiError(err)
+    if (err.fieldErrors?.length) {
+      const fieldErrors = err.fieldErrors.map((e) =>
+        formatPurchaseValidationItem(e.field, e.message),
+      )
+      return {
+        code,
+        message: formatPurchaseValidationNotifyMessage(err.fieldErrors),
+        fieldErrors,
+      }
+    }
+    const raw = err.message || formatApiError(err)
     return { code, message: mapPurchaseErrorMessage(code, raw) }
   }
   if (err && typeof err === 'object' && 'code' in err && 'message' in err) {
     const code = String((err as { code: string }).code)
     const raw = String((err as { message: string }).message)
+    const nested =
+      'fieldErrors' in err && Array.isArray((err as { fieldErrors?: unknown }).fieldErrors)
+        ? ((err as { fieldErrors: Array<{ field: string; message: string }> }).fieldErrors ?? [])
+        : []
+    if (nested.length) {
+      return {
+        code,
+        message: formatPurchaseValidationNotifyMessage(nested),
+        fieldErrors: nested.map((e) => formatPurchaseValidationItem(e.field, e.message)),
+      }
+    }
     return { code, message: mapPurchaseErrorMessage(code, raw) }
   }
   return {

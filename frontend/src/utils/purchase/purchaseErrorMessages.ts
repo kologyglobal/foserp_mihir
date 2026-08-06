@@ -92,13 +92,31 @@ export function isTechnicalPurchaseMessage(message: string | undefined | null): 
   return TECHNICAL_NOISE.test(message.trim())
 }
 
+/** Codes whose catalog text is generic; prefer a detailed field list when present. */
+const GENERIC_VALIDATION_CODES = new Set([
+  'VALIDATION_ERROR',
+  'PO_VALIDATION_FAILED',
+  'PR_VALIDATION_FAILED',
+  'GRN_VALIDATION_FAILED',
+])
+
 export function mapPurchaseErrorMessage(code?: string, fallback?: string): string {
-  if (code && PURCHASE_ERROR_MESSAGES[code]) {
-    return PURCHASE_ERROR_MESSAGES[code]
+  const catalog = code ? PURCHASE_ERROR_MESSAGES[code] : undefined
+  const detail = fallback?.trim()
+  const detailUsable =
+    Boolean(detail) &&
+    !isTechnicalPurchaseMessage(detail) &&
+    detail !== 'Validation failed' &&
+    detail !== catalog
+
+  // "Please correct the highlighted fields…" is useless without naming them.
+  if (code && GENERIC_VALIDATION_CODES.has(code)) {
+    if (detailUsable) return detail!
+    return catalog ?? 'Please correct the highlighted fields and try again.'
   }
-  if (fallback && !isTechnicalPurchaseMessage(fallback)) {
-    return fallback.trim()
-  }
+
+  if (catalog) return catalog
+  if (detailUsable) return detail!
   if (code) {
     return code.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) + '.'
   }

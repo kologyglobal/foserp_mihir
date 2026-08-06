@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   FileText,
   MapPin,
-  PackageCheck,
+  Package,
   StickyNote,
   Truck,
 } from 'lucide-react'
@@ -15,7 +17,10 @@ import {
   buildPurchaseRelatedLinks,
   purchaseDocumentApprovalFact,
 } from '@/components/purchase/PurchaseDocumentFactBox'
-import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
+import {
+  PurchaseStatusChip,
+  purchaseStatusTone,
+} from '@/components/purchase/purchaseCardFormShared'
 import { ErpCardSection, ErpFieldRow, ErpFormSpan } from '@/components/erp/card-form'
 import { ErpSmartSelect } from '@/components/erp/ErpSmartSelect'
 import { FormActionBar } from '@/components/erp/FormActionBar'
@@ -143,6 +148,7 @@ export function GrnEditorPage() {
   const [remarks, setRemarks] = useState('')
   const [lines, setLines] = useState<GrnLineDraft[]>([])
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [showAdvancedDetails, setShowAdvancedDetails] = useState(false)
   const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(true)
 
   const warehouses = useActiveWarehouses()
@@ -736,6 +742,23 @@ export function GrnEditorPage() {
     { label: isNew ? 'New' : documentNumber ?? 'Edit' },
   ]
 
+  const validationErrorList = useMemo(() => Object.values(fieldErrors), [fieldErrors])
+  const validationItems = useMemo(
+    () =>
+      validationErrorList.map((message, i) => ({
+        id: `grn-err-${i}`,
+        label: message,
+        message: 'Required',
+      })),
+    [validationErrorList],
+  )
+
+  const receivingLocationLabel = useMemo(() => {
+    if (!receivingLocation) return ''
+    const loc = storageLocations.find((l) => l.id === receivingLocation)
+    return loc ? `${loc.locationCode} — ${loc.locationName}` : receivingLocation
+  }, [receivingLocation, storageLocations])
+
   if (loading) {
     return (
       <PurchaseCardFormShell
@@ -758,6 +781,7 @@ export function GrnEditorPage() {
     <PurchaseCardFormShell
       title={isNew ? 'New Goods Receipt Note' : `Edit ${documentNumber ?? 'GRN'}`}
       description="Receive against a released purchase order with open quantity"
+      className="purchase-order-editor--scrollbar-hidden"
       recordNo={documentNumber ?? (isNew ? 'New' : undefined)}
       recordTitle={documentTitle}
       status={statusLabel}
@@ -767,7 +791,13 @@ export function GrnEditorPage() {
       favoritePath={recordId ? `/purchase/grn/${recordId}/edit` : '/purchase/grn/new'}
       breadcrumbs={breadcrumbs}
       factBox={documentFactBox}
+      collapsibleFactBox
       commandBar={null}
+      validationTitle={
+        validationErrorList.length ? 'Goods Receipt cannot be saved.' : undefined
+      }
+      validationErrors={validationErrorList}
+      validationItems={validationErrorList.length ? validationItems : undefined}
       stickyFooter
       footer={
         <FormActionBar
@@ -784,6 +814,7 @@ export function GrnEditorPage() {
       }
       onSaveShortcut={() => void saveDraft()}
     >
+      <div className="space-y-3">
       {showPoPicker ? (
         <ErpCardSection
           id={purchaseSectionId('po-source')}
@@ -882,8 +913,8 @@ export function GrnEditorPage() {
 
       <ErpCardSection
         id={purchaseSectionId('document')}
-        title="Document"
-        subtitle="GRN identity, vendor, and challan references"
+        title="Receipt & Vendor"
+        subtitle="GRN date, vendor, and challan references"
         icon={FileText}
         accent="blue"
         collapsible
@@ -891,21 +922,6 @@ export function GrnEditorPage() {
         dense
         columns={6}
       >
-        <ErpFormSpan span={3}>
-          <p className="erp-field-group__label">Document</p>
-        </ErpFormSpan>
-        <ErpFieldRow
-          label="GRN Number"
-          readOnly
-          hint={isNew ? 'Preview from number series — assigned when you save' : undefined}
-        >
-          <Input
-            value={documentNumber ?? ''}
-            placeholder="Loading number…"
-            readOnly
-            className="bg-erp-surface-alt"
-          />
-        </ErpFieldRow>
         <ErpFieldRow label="GRN Date" required>
           <Input
             type="date"
@@ -916,13 +932,6 @@ export function GrnEditorPage() {
             }}
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Status" readOnly>
-          <Input value={statusLabel} readOnly className="bg-erp-surface-alt" />
-        </ErpFieldRow>
-
-        <ErpFormSpan span={3}>
-          <p className="erp-field-group__label">Vendor / PO</p>
-        </ErpFormSpan>
         {!showPoPicker ? (
           <ErpFieldRow label="Purchase Order" readOnly>
             <Input
@@ -954,6 +963,57 @@ export function GrnEditorPage() {
             }}
           />
         </ErpFieldRow>
+
+        <ErpFormSpan span={3} className="erp-po-advanced-details">
+          <button
+            type="button"
+            className="erp-po-advanced-details__toggle"
+            onClick={() => setShowAdvancedDetails((open) => !open)}
+            aria-expanded={showAdvancedDetails}
+            aria-controls={
+              showAdvancedDetails ? purchaseSectionId('advanced') : undefined
+            }
+          >
+            {showAdvancedDetails ? (
+              <ChevronDown className="erp-po-advanced-details__chevron" aria-hidden />
+            ) : (
+              <ChevronRight className="erp-po-advanced-details__chevron" aria-hidden />
+            )}
+            <span>
+              {showAdvancedDetails
+                ? 'Hide advanced details'
+                : 'Show advanced details · number and status'}
+            </span>
+          </button>
+          {showAdvancedDetails ? (
+            <div
+              id={purchaseSectionId('advanced')}
+              className="erp-po-advanced-details__panel"
+              role="region"
+              aria-label="Advanced details"
+            >
+              <div className="erp-card-section__grid erp-card-section__grid--dense erp-card-section__grid--cols-6">
+                <ErpFieldRow
+                  label="GRN Number"
+                  readOnly
+                  hint={isNew ? 'Preview from number series — assigned when you save' : undefined}
+                >
+                  <Input
+                    value={documentNumber ?? ''}
+                    placeholder="Loading number…"
+                    readOnly
+                    className="bg-erp-surface-alt"
+                  />
+                </ErpFieldRow>
+                <ErpFieldRow label="Status" readOnly hint="Lifecycle status — not editable on the form">
+                  <div className="flex min-h-9 items-center">
+                    <PurchaseStatusChip status={status} kind="grn" />
+                  </div>
+                </ErpFieldRow>
+              </div>
+            </div>
+          ) : null}
+        </ErpFormSpan>
       </ErpCardSection>
 
       <ErpCardSection
@@ -987,7 +1047,7 @@ export function GrnEditorPage() {
               markDirty()
             }}
           >
-            <option value="">— Select —</option>
+            <option value="">{SELECT_PLACEHOLDER}</option>
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
                 {w.warehouseCode} — {w.warehouseName}
@@ -1004,7 +1064,7 @@ export function GrnEditorPage() {
             }}
             disabled={!warehouseId}
           >
-            <option value="">— Select —</option>
+            <option value="">{SELECT_PLACEHOLDER}</option>
             {warehouseLocations.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.locationCode} — {l.locationName}
@@ -1032,7 +1092,7 @@ export function GrnEditorPage() {
         </ErpFieldRow>
 
         <ErpFormSpan span={3}>
-          <p className="erp-field-group__label">Transport</p>
+          <p className="erp-field-group__label mt-2">Transport</p>
         </ErpFormSpan>
         <ErpFieldRow label="Vehicle Number">
           <Input
@@ -1063,10 +1123,10 @@ export function GrnEditorPage() {
         </ErpFieldRow>
 
         <ErpFormSpan span={3}>
-          <p className="erp-field-group__label">QC / Excess</p>
+          <p className="erp-field-group__label mt-2">QC / Excess</p>
         </ErpFormSpan>
         <ErpFieldRow label="Inspection Required">
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex min-h-9 items-center gap-2 text-[13px] text-erp-text">
             <input
               type="checkbox"
               checked={inspectionRequired}
@@ -1079,7 +1139,7 @@ export function GrnEditorPage() {
           </label>
         </ErpFieldRow>
         <ErpFieldRow label="Allow Excess">
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex min-h-9 items-center gap-2 text-[13px] text-erp-text">
             <input
               type="checkbox"
               checked={allowExcess}
@@ -1096,7 +1156,7 @@ export function GrnEditorPage() {
             <p className="flex items-center gap-1.5 text-[12px] text-erp-muted">
               <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Receiving into {warehouseName}
-              {receivingLocation ? ` · ${receivingLocation}` : ''}
+              {receivingLocationLabel ? ` · ${receivingLocationLabel}` : ''}
             </p>
           </ErpFormSpan>
         ) : null}
@@ -1104,19 +1164,25 @@ export function GrnEditorPage() {
 
       <ErpCardSection
         id={purchaseSectionId('lines')}
-        title="Lines"
-        subtitle="Qty breakdown against PO open quantity"
+        title="Item Lines"
+        subtitle="Receive quantities against open PO lines"
         collapsedSummary={linesPeek || undefined}
-        icon={PackageCheck}
-        accent="amber"
+        icon={Package}
+        accent="teal"
         collapsible
         defaultOpen
         dense
         columns={1}
+        className="purchase-doc-lines-section ring-1 ring-teal-200/70 shadow-sm"
+        badge={
+          <span className="text-[11px] tabular-nums text-erp-muted">
+            {lineTotals.lineCount} line{lineTotals.lineCount === 1 ? '' : 's'}
+          </span>
+        }
       >
-        <ErpFormSpan span={1}>
+        <div className="min-w-0 max-w-full">
         {fieldErrors.lines ? (
-          <p className="mb-2 text-sm text-red-600">{fieldErrors.lines}</p>
+          <p className="mb-2 text-[12px] text-erp-danger-fg">{fieldErrors.lines}</p>
         ) : (
           <div className="mb-2 space-y-2 text-[12px] text-erp-muted">
             <p>{GRN_LINES_RECEIVING_GUIDE.intro}</p>
@@ -1155,11 +1221,11 @@ export function GrnEditorPage() {
             ) : null}
           </div>
         )}
-        <div className="min-w-0 overflow-x-auto rounded-md border border-erp-border">
-          <table className="erp-table min-w-full text-left text-[12px]">
+        <div className="purchase-doc-lines-grid-scroll relative rounded-md border border-erp-border">
+          <table className="erp-table purchase-doc-lines-grid purchase-grn-lines-grid w-max min-w-full text-left text-[11px]">
             <thead>
               <tr>
-                <th>Item</th>
+                <th className="purchase-doc-lines-grid__sticky-item">Item</th>
                 <th className="num">PO Qty</th>
                 <th className="num">Prev. Recd</th>
                 <th className="num">Pending</th>
@@ -1201,9 +1267,9 @@ export function GrnEditorPage() {
             <tbody>
               {lines.map((l, i) => (
                 <tr key={l.purchaseOrderLineId} className="align-top">
-                  <td>
+                  <td className="purchase-doc-lines-grid__sticky-item">
                     <div className="font-mono text-[11px]">{l.itemCode}</div>
-                    <div>{l.itemName}</div>
+                    <div className="leading-snug">{l.itemName}</div>
                   </td>
                   <td className="num">
                     {(() => {
@@ -1289,7 +1355,7 @@ export function GrnEditorPage() {
                       </p>
                     ) : null}
                     {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`] ? (
-                      <p className="mt-1 text-xs text-red-600">
+                      <p className="mt-1 text-xs text-erp-danger-fg">
                         {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`]}
                       </p>
                     ) : null}
@@ -1430,7 +1496,7 @@ export function GrnEditorPage() {
                         <span className="text-[11px] text-erp-muted">—</span>
                       ) : null}
                       {fieldErrors[`line-${i}-batch`] || fieldErrors[`line-${i}-serial`] ? (
-                        <p className="mt-1 text-xs text-red-600">
+                        <p className="mt-1 text-xs text-erp-danger-fg">
                           {fieldErrors[`line-${i}-batch`] || fieldErrors[`line-${i}-serial`]}
                         </p>
                       ) : null}
@@ -1451,13 +1517,13 @@ export function GrnEditorPage() {
                         onChange={(e) => updateLine(i, { expiryDate: e.target.value })}
                       />
                       {fieldErrors[`line-${i}-expiry`] ? (
-                        <p className="mt-1 text-xs text-red-600">{fieldErrors[`line-${i}-expiry`]}</p>
+                        <p className="mt-1 text-xs text-erp-danger-fg">{fieldErrors[`line-${i}-expiry`]}</p>
                       ) : null}
                     </td>
                   ) : null}
                   <td>
-                    <select
-                      className="erp-input h-8 min-w-[7rem] text-[11px]"
+                    <Select
+                      className="min-w-[7rem] text-[11px]"
                       value={l.binId ?? ''}
                       onChange={(e) => {
                         const nextBinId = e.target.value || null
@@ -1474,7 +1540,7 @@ export function GrnEditorPage() {
                       {l.binId && !warehouseBins.some((b) => b.id === l.binId) && l.bin ? (
                         <option value={l.binId}>{l.bin}</option>
                       ) : null}
-                    </select>
+                    </Select>
                     {!warehouseBins.length && warehouseId ? (
                       <p className="mt-1 text-[10px] text-erp-muted">No bins for this warehouse</p>
                     ) : null}
@@ -1500,7 +1566,7 @@ export function GrnEditorPage() {
             </p>
           ) : null}
         </div>
-        </ErpFormSpan>
+        </div>
       </ErpCardSection>
 
       <ErpCardSection
@@ -1509,9 +1575,9 @@ export function GrnEditorPage() {
         subtitle="Receiving remarks and QC context"
         collapsedSummary={notesPeek || undefined}
         icon={StickyNote}
-        accent="violet"
+        accent="slate"
         collapsible
-        defaultOpen
+        defaultOpen={false}
         dense
         columns={1}
       >
@@ -1527,6 +1593,7 @@ export function GrnEditorPage() {
           />
         </ErpFieldRow>
       </ErpCardSection>
+      </div>
 
       {shortCloseLineIndex != null ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

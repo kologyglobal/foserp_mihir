@@ -165,11 +165,17 @@ const LATENCY_MS = 35
 
 export class PurchaseServiceError extends Error {
   readonly code: string
+  readonly fieldErrors?: Array<{ field: string; message: string; label?: string }>
 
-  constructor(code: string, message: string) {
+  constructor(
+    code: string,
+    message: string,
+    fieldErrors?: Array<{ field: string; message: string; label?: string }>,
+  ) {
     super(mapPurchaseErrorMessage(code, message))
     this.name = 'PurchaseServiceError'
     this.code = code
+    this.fieldErrors = fieldErrors
   }
 }
 

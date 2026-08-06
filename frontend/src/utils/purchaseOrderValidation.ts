@@ -99,6 +99,11 @@ export function validatePurchaseOrderForm(
   // Draft still hits the same create/update line schema — free-text HSN must be present
   // before the API, otherwise save fails with lines.N.hsnId validation.
   if (mode === 'draft') {
+    if (usableLines.length === 0) {
+      errors.push('At least one item line is required.')
+      pushSection('lines')
+    }
+
     for (const line of usableLines) {
       if (!isFreeTextLine(line)) continue
       const prefix = `Line ${line.lineNo}`
@@ -114,8 +119,19 @@ export function validatePurchaseOrderForm(
       }
     }
 
+    // Catalog lines need a positive qty when content is entered (API requires quantity).
+    for (const line of usableLines) {
+      if (isFreeTextLine(line)) continue
+      if (!(Number(line.quantity) > 0)) {
+        errors.push(`Line ${line.lineNo}: Quantity must be greater than zero.`)
+        lineErrors[`${line.key}:quantity`] = 'Must be > 0'
+        pushSection('lines')
+      }
+    }
+
     let firstFieldId: string | null = null
     if (fieldErrors.vendorId) firstFieldId = purchaseFieldId('vendorId')
+    else if (usableLines.length === 0) firstFieldId = purchaseFieldId('lines')
     else {
       for (const line of usableLines) {
         if (lineErrors[`${line.key}:item`]) {
@@ -124,6 +140,10 @@ export function validatePurchaseOrderForm(
         }
         if (lineErrors[`${line.key}:hsn`]) {
           firstFieldId = purchaseLineFieldId(line.key, 'hsn')
+          break
+        }
+        if (lineErrors[`${line.key}:quantity`]) {
+          firstFieldId = purchaseLineFieldId(line.key, 'quantity')
           break
         }
       }
