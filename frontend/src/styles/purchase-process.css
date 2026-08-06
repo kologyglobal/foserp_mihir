@@ -712,6 +712,10 @@ a.purchase-process-map__step:hover {
   z-index: 22;
 }
 
+.grn-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item {
+  background: var(--erp-surface-alt, #f8fafc);
+}
+
 .purchase-doc-lines-grid-scroll {
   width: 100%;
   min-width: 0;

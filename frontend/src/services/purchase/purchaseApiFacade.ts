@@ -125,8 +125,8 @@ import {
 import type { PlanningSheetSummary } from './purchaseApiTypes'
 
 function throwApi(err: unknown): never {
-  const { code, message } = formatPurchaseApiError(err)
-  throw new PurchaseServiceError(code, message)
+  const { code, message, fieldErrors } = formatPurchaseApiError(err)
+  throw new PurchaseServiceError(code, message, fieldErrors)
 }
 
 function throwIfMissing(err: unknown, feature: string): never {

@@ -1,6 +1,11 @@
 /**
  * Diagnose PurchaseOrder P2022 — prints Prisma error with missing column/table.
  * Usage: npx tsx scripts/diagnose-po-p2022.ts
+ *
+ * If paymentTermId / deliveryTermId / termsAndConditions / lineType are missing but
+ * payment_term_id / delivery_term_id / terms_and_conditions / line_type exist, apply:
+ *   prisma migrate deploy  (20260806130000_po_quick_line_terms_camelcase)
+ * or scripts/repair-po-quick-line-terms-camelcase.sql
  */
 import { createPrismaClient } from '../src/config/prisma.js'
 
@@ -10,14 +15,16 @@ const EXPECTED: Record<string, string[]> = {
   purchase_orders: [
     'id', 'tenantId', 'orderNumber', 'orderDate', 'vendorId', 'origin', 'status',
     'purchaseRequisitionId', 'requestForQuotationId', 'vendorQuotationId', 'vendorComparisonId',
-    'currencyCode', 'expectedDeliveryDate', 'paymentTerms', 'deliveryTerms', 'deliveryWarehouseId',
-    'subtotalAmount', 'taxAmount', 'freightAmount', 'totalAmount', 'remarks', 'revisionNo',
+    'currencyCode', 'expectedDeliveryDate', 'paymentTerms', 'deliveryTerms',
+    // PO commercial masters / free-text T&C (camelCase; see 20260806130000_po_quick_line_terms_camelcase)
+    'paymentTermId', 'deliveryTermId', 'deliveryWarehouseId',
+    'subtotalAmount', 'taxAmount', 'freightAmount', 'totalAmount', 'termsAndConditions', 'remarks', 'revisionNo',
     'submittedAt', 'approvedAt', 'rejectedAt', 'rejectionReason', 'sentBackAt', 'sendBackReason',
     'sentAt', 'closedAt', 'cancelledAt', 'createdById', 'updatedById', 'createdAt', 'updatedAt', 'deletedAt',
   ],
   purchase_order_lines: [
     'id', 'tenantId', 'purchaseOrderId', 'lineNumber', 'purchaseRequisitionLineId', 'purchasePlanningRowId',
-    'itemId', 'itemCodeSnapshot', 'itemNameSnapshot', 'description', 'quantity', 'uomQuantity',
+    'itemId', 'lineType', 'itemCodeSnapshot', 'itemNameSnapshot', 'description', 'quantity', 'uomQuantity',
     'uomConversionFactor', 'unitCostPrimary', 'uomId', 'rate', 'amount', 'receivedQuantity',
     'acceptedQuantity', 'rejectedQuantity', 'returnedQuantity', 'invoicedQuantity',
     'gstGroupId', 'hsnId', 'hsnCodeSnapshot', 'gstGroupCodeSnapshot', 'binId', 'qcRequiredSnapshot',

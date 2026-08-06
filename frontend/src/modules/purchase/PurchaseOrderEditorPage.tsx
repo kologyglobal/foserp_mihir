@@ -117,6 +117,7 @@ import {
 import { nextPurchaseLineNo } from '@/utils/purchaseLineNumbers'
 import { notify } from '@/store/toastStore'
 import { purchaseUserMessage } from '@/utils/purchase/purchaseErrorMessages'
+import { formatRequiredFieldsNotifyMessage, toRequiredFieldLabel } from '@/utils/formValidation'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 import { useOptionalAuth } from '@/context/AuthProvider'
 import { useMasterStore } from '@/store/masterStore'
@@ -549,6 +550,8 @@ export function PurchaseOrderEditorPage() {
   const [attachments, setAttachments] = useState<PurchaseDocumentAttachmentRow[]>([])
   const [, setActiveSection] = useState('general')
   const [attemptedMode, setAttemptedMode] = useState<'draft' | 'submit' | null>(null)
+  /** API validation messages (human labels) shown in the page banner when save fails. */
+  const [serverValidationErrors, setServerValidationErrors] = useState<string[]>([])
   const [forceOpenKey, setForceOpenKey] = useState(0)
   const [forceOpenSections, setForceOpenSections] = useState<
     Partial<Record<'general' | 'lines' | 'notes', number>>
@@ -735,8 +738,29 @@ export function PurchaseOrderEditorPage() {
       ),
     [header.documentDate, header.vendorId, header.expectedDeliveryDate, computedLines],
   )
-  const showErrors = attemptedMode !== null
-  const activeValidation = attemptedMode === 'draft' ? draftValidation : validation
+  const showErrors = attemptedMode !== null || serverValidationErrors.length > 0
+  const activeValidation = attemptedMode === 'submit' ? validation : draftValidation
+  const displayedValidationErrors = useMemo(() => {
+    if (!showErrors) return [] as string[]
+    const client = attemptedMode !== null ? activeValidation.errors : []
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const msg of [...client, ...serverValidationErrors]) {
+      const key = msg.trim().toLowerCase()
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      out.push(msg)
+    }
+    return out
+  }, [showErrors, attemptedMode, activeValidation.errors, serverValidationErrors])
+
+  // Clear server banner once the form changes after a failed save.
+  useEffect(() => {
+    if (!serverValidationErrors.length) return
+    setServerValidationErrors([])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: clear on user edit
+  }, [header, lines])
+
   const orderDocumentTotals = useMemo(
     () => computePoOrderDocumentTotals(computedLines, orderAdjustments),
     [computedLines, orderAdjustments],
@@ -1362,7 +1386,11 @@ export function PurchaseOrderEditorPage() {
   const revealValidation = useCallback(
     (result: typeof validation, mode: 'draft' | 'submit') => {
       setAttemptedMode(mode)
+      setServerValidationErrors([])
       if (!result.errors.length) return
+      notify.error(
+        formatRequiredFieldsNotifyMessage(result.errors.map((e) => toRequiredFieldLabel(e))),
+      )
       const nextKey = forceOpenKey + 1
       setForceOpenKey(nextKey)
       const opened: Partial<Record<'general' | 'lines' | 'notes', number>> = {}
@@ -1418,9 +1446,22 @@ export function PurchaseOrderEditorPage() {
         setLastSavedAt(new Date())
         resetDirty()
       }
+      setServerValidationErrors([])
       navigate(PURCHASE_FORM_ROUTES.purchaseOrder.list, { replace: true })
     } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
+      if (err instanceof PurchaseServiceError && err.fieldErrors?.length) {
+        const labels = err.fieldErrors.map((e) => e.label || e.message || e.field)
+        setServerValidationErrors(labels)
+        setAttemptedMode('draft')
+        setForceOpenKey((k) => {
+          const next = k + 1
+          setForceOpenSections({ general: next, lines: next })
+          return next
+        })
+        notify.error(err.message)
+      } else {
+        notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
+      }
     } finally {
       setSaving(false)
     }
@@ -1542,19 +1583,19 @@ export function PurchaseOrderEditorPage() {
       modifiedBy={updatedMeta.by || undefined}
       modifiedDate={updatedMeta.at ? formatDate(updatedMeta.at.slice(0, 10)) : undefined}
       validationTitle={
-        showErrors && activeValidation.errors.length
-          ? attemptedMode === 'draft'
-            ? 'Purchase Order cannot be saved.'
-            : 'Purchase Order cannot be submitted.'
+        showErrors && displayedValidationErrors.length
+          ? attemptedMode === 'submit'
+            ? 'Purchase Order cannot be submitted.'
+            : 'Purchase Order cannot be saved — missing or invalid fields:'
           : undefined
       }
-      validationErrors={showErrors ? activeValidation.errors : []}
+      validationErrors={showErrors ? displayedValidationErrors : []}
       validationItems={
         showErrors
-          ? activeValidation.errors.map((message, i) => ({
+          ? displayedValidationErrors.map((message, i) => ({
               id: `po-err-${i}`,
               label: message,
-              message: 'Required',
+              message: '',
               onClick: () => focusValidationItem(),
             }))
           : undefined
