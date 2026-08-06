@@ -2327,6 +2327,8 @@ export interface QualityInspection extends PurchaseAuditFields {
   acceptedQty: number
   rejectedQty: number
   inspectionPlan: string
+  /** Master Inspection Plan id when snapshotted (API mode). */
+  inspectionPlanId?: string | null
   inspector: PurchasePartyRef
   inspectedAt: IsoDateTime | null
   deviationRequested: boolean
@@ -3008,7 +3010,10 @@ export type QualityInspectionInput = {
   goodsReceiptLineId?: string
   inspectorId?: string
   inspectorName?: string
+  /** Free-text plan label (legacy). Prefer `inspectionPlanId` for master plan snapshot. */
   inspectionPlan?: string
+  /** Quality Inspection Plan master id — snapshots checklist parameters. */
+  inspectionPlanId?: string | null
   sampleQty?: number
   acceptedQty?: number
   rejectedQty?: number

@@ -980,6 +980,10 @@ export interface ApiQualityInspection {
   warehouseId: string | null
   status: ApiQualityInspectionStatus
   inspectionPlan?: string | null
+  inspectionPlanId?: string | null
+  inspectionPlanRevisionId?: string | null
+  planCodeSnapshot?: string | null
+  planRevisionSnapshot?: string | null
   remarks: string | null
   deviationRemarks: string | null
   inspectedById: string | null

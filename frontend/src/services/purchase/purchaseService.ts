@@ -5167,6 +5167,7 @@ function createQualityInspectionInternal(input: QualityInspectionInput): Quality
     acceptedQty: input.acceptedQty ?? 0,
     rejectedQty: input.rejectedQty ?? 0,
     inspectionPlan: input.inspectionPlan ?? `Incoming inspection — ${grnLine.itemCode}`,
+    inspectionPlanId: input.inspectionPlanId ?? null,
     inspector: {
       id: input.inspectorId ?? PURCHASE_DOMAIN_ACTORS.qc.id,
       code: 'QC01',
