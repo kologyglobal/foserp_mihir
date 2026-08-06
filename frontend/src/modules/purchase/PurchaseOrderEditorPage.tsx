@@ -954,7 +954,6 @@ export function PurchaseOrderEditorPage() {
       vendor,
       selectedDeliveryLocation,
       purchaseSetup,
-      header.placeOfSupply,
     )
     patchHeader({
       vendorId: vendor.id,
@@ -1126,8 +1125,8 @@ export function PurchaseOrderEditorPage() {
           deliveryLocationId: prev.deliveryLocationId || preferred,
           paymentTerms: prev.paymentTerms || setup.general.defaultPaymentTerms || prev.paymentTerms,
           deliveryTerms: prev.deliveryTerms || setup.general.defaultDeliveryTerms || prev.deliveryTerms,
-          placeOfSupply: prev.placeOfSupply || gst.placeOfSupplyLabel,
-          isInterstate: prev.vendorId ? prev.isInterstate : gst.isInterstate,
+          placeOfSupply: gst.placeOfSupplyLabel,
+          isInterstate: gst.isInterstate,
         }))
         void previewNextPurchaseOrderNumber()
           .then((next) => {
@@ -1175,14 +1174,12 @@ export function PurchaseOrderEditorPage() {
       vendor,
       selectedDeliveryLocation,
       purchaseSetup,
-      header.placeOfSupply || undefined,
     )
     setHeader((h) => {
-      const nextPos = h.placeOfSupply.trim() || gst.placeOfSupplyLabel
-      if (h.isInterstate === gst.isInterstate && h.placeOfSupply === nextPos) return h
+      if (h.isInterstate === gst.isInterstate && h.placeOfSupply === gst.placeOfSupplyLabel) return h
       return {
         ...h,
-        placeOfSupply: nextPos,
+        placeOfSupply: gst.placeOfSupplyLabel,
         isInterstate: gst.isInterstate,
       }
     })
@@ -1191,7 +1188,6 @@ export function PurchaseOrderEditorPage() {
     header.vendorId,
     header.vendorGstin,
     header.vendorState,
-    header.placeOfSupply,
     selectedVendor,
     selectedDeliveryLocation,
     purchaseSetup,
@@ -1651,6 +1647,7 @@ export function PurchaseOrderEditorPage() {
                     isInterstate: gst.isInterstate,
                   })
                 }}
+                placeholder="Receiving state (delivery warehouse / setup)"
               />
             </ErpFieldRow>
             <ErpFieldRow label="GST scheme" readOnly>

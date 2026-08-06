@@ -38,4 +38,22 @@ describe('resolvePurchaseOrderGstSupply', () => {
     )
     expect(gst.isInterstate).toBe(true)
   })
+
+  it('updates IGST scheme when vendor changes against fixed delivery POS', () => {
+    const delivery = { state: 'Gujarat' }
+    const intra = resolvePurchaseOrderGstSupply({ state: 'Gujarat', gstin: '24AAAAA0000A1Z5' }, delivery, setup)
+    const inter = resolvePurchaseOrderGstSupply({ state: 'Maharashtra', gstin: '27AAAAA0000A1Z5' }, delivery, setup)
+    expect(intra.placeOfSupplyLabel).toBe(inter.placeOfSupplyLabel)
+    expect(intra.isInterstate).toBe(false)
+    expect(inter.isInterstate).toBe(true)
+  })
+
+  it('resolves vendor state from stateCode when state name is empty', () => {
+    const gst = resolvePurchaseOrderGstSupply(
+      { state: '', stateCode: '27', gstin: '27AAAAA0000A1Z5' },
+      { state: 'Gujarat' },
+      setup,
+    )
+    expect(gst.isInterstate).toBe(true)
+  })
 })

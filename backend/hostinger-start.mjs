@@ -51,4 +51,34 @@ if (runMigrateOnStart) {
   console.log('[hostinger-start] Skipping startup migrate (run build:with-migrate or RUN_MIGRATE_ON_START when DB is ready).')
 }
 
+const skipPrismaGenerate =
+  process.env.RUN_PRISMA_GENERATE_ON_START === 'false'
+  || process.env.RUN_PRISMA_GENERATE_ON_START === '0'
+
+if (skipPrismaGenerate) {
+  console.log('[hostinger-start] Skipping prisma generate (RUN_PRISMA_GENERATE_ON_START=false).')
+} else {
+  const prismaSchema = join(backend, 'prisma', 'schema.prisma')
+  if (!existsSync(prismaSchema)) {
+    console.warn(`[hostinger-start] Missing ${prismaSchema} — skipping prisma generate.`)
+  } else {
+    console.log('[hostinger-start] Running prisma generate so runtime client matches schema.prisma…')
+    const generate = spawnSync(
+      process.execPath,
+      [
+        join(backend, 'node_modules', 'prisma', 'build', 'index.js'),
+        'generate',
+        '--schema',
+        prismaSchema,
+      ],
+      { cwd: backend, env: process.env, stdio: 'inherit' },
+    )
+    if (generate.status !== 0) {
+      throw new Error(
+        'Prisma generate failed on startup. Fix schema or set RUN_PRISMA_GENERATE_ON_START=false and regenerate manually.',
+      )
+    }
+  }
+}
+
 await import(pathToFileURL(server).href)
