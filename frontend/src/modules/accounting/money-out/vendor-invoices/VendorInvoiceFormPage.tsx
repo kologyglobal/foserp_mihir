@@ -540,12 +540,6 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
   }, [createSource, mode, watched.vendorId])
 
-  const vendorNameById = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const v of vendors) map.set(v.id, v.vendorName)
-    return map
-  }, [vendors])
-
   const poOptions: ErpSmartSelectOption<string>[] = useMemo(
     () =>
       purchaseOrders.map((po) => ({
