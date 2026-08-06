@@ -120,6 +120,29 @@ describe('grn-tolerance', () => {
     expect(lineRequiresToleranceApproval('NOT_RECEIVED')).toBe(false)
     expect(lineRequiresToleranceApproval('EXCESS_OUTSIDE_TOLERANCE')).toBe(true)
   })
+
+  it('does not allow any receipt when open quantity is zero', () => {
+    const r = evaluateGrnLineTolerance({
+      openQuantity: 0,
+      receivedQuantity: 5,
+      itemTolerancePct: 10,
+    })
+    expect(r.upperBound).toBe(0)
+    expect(r.maximumAllowedUnitQuantity).toBe(0)
+    expect(r.toleranceStatus).toBe('EXCESS_OUTSIDE_TOLERANCE')
+  })
+
+  it('caps max receipt at open + tolerance (hard upper bound)', () => {
+    const r = evaluateGrnLineTolerance({
+      openQuantity: 10,
+      receivedQuantity: 110,
+      itemTolerancePct: 0,
+    })
+    expect(r.upperBound).toBe(10)
+    expect(r.maximumAllowedUnitQuantity).toBe(10)
+    expect(r.toleranceStatus).toBe('EXCESS_OUTSIDE_TOLERANCE')
+    expect(r.requiresApproval).toBe(true)
+  })
 })
 
 describe('grn-tolerance document (multi-line)', () => {

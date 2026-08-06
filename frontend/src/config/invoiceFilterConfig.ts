@@ -39,6 +39,8 @@ export const DEFAULT_INVOICE_LIST_FILTERS: InvoiceListFilters = {
 export type InvoiceSortKey =
   | 'documentDate'
   | 'documentNumber'
+  | 'documentNumberAsc'
+  | 'documentNumberDesc'
   | 'vendorName'
   | 'totalAmount'
   | 'status'
@@ -47,7 +49,8 @@ export type InvoiceSortKey =
 
 export const INVOICE_SORT_OPTIONS: { value: InvoiceSortKey; label: string }[] = [
   { value: 'documentDate', label: 'Sort: Invoice Date' },
-  { value: 'documentNumber', label: 'Sort: Invoice Number' },
+  { value: 'documentNumberAsc', label: 'Sort: Invoice Number (A→Z)' },
+  { value: 'documentNumberDesc', label: 'Sort: Invoice Number (Z→A)' },
   { value: 'vendorName', label: 'Sort: Vendor' },
   { value: 'totalAmount', label: 'Sort: Total Amount' },
   { value: 'status', label: 'Sort: Status' },

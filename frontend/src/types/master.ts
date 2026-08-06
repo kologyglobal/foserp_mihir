@@ -290,6 +290,10 @@ export interface Item extends MasterRecordAudit {
   subAssemblyRule: SubAssemblyRule | null
   /** Product image — API storage key or demo data URL */
   imageUrl?: string | null
+  /** Default Bin Master id — auto-fills PR/PO/GRN bin when item is selected. */
+  defaultBinId?: string | null
+  /** Resolved code snapshot from API when bin included. */
+  defaultBinCode?: string | null
   createdAt: string
   updatedAt: string
 }

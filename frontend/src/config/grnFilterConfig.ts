@@ -13,11 +13,18 @@ export const DEFAULT_GRN_LIST_FILTERS: GrnListFilters = {
   vendorName: '',
 }
 
-export type GrnSortKey = 'documentDate' | 'documentNumber' | 'vendorName' | 'status'
+export type GrnSortKey =
+  | 'documentDate'
+  | 'documentNumber'
+  | 'documentNumberAsc'
+  | 'documentNumberDesc'
+  | 'vendorName'
+  | 'status'
 
 export const GRN_SORT_OPTIONS: { value: GrnSortKey; label: string }[] = [
   { value: 'documentDate', label: 'Sort: Date' },
-  { value: 'documentNumber', label: 'Sort: GRN Number' },
+  { value: 'documentNumberAsc', label: 'Sort: GRN Number (A→Z)' },
+  { value: 'documentNumberDesc', label: 'Sort: GRN Number (Z→A)' },
   { value: 'vendorName', label: 'Sort: Vendor' },
   { value: 'status', label: 'Sort: Status' },
 ]
@@ -84,7 +91,12 @@ export function filterGrnRows(rows: GrnListRow[], filters: GrnListFilters): GrnL
 export function sortGrnRows(rows: GrnListRow[], sortBy: GrnSortKey): GrnListRow[] {
   const list = [...rows]
   list.sort((a, b) => {
-    if (sortBy === 'documentNumber') return b.documentNumber.localeCompare(a.documentNumber)
+    if (sortBy === 'documentNumber' || sortBy === 'documentNumberAsc') {
+      return a.documentNumber.localeCompare(b.documentNumber, undefined, { numeric: true })
+    }
+    if (sortBy === 'documentNumberDesc') {
+      return b.documentNumber.localeCompare(a.documentNumber, undefined, { numeric: true })
+    }
     if (sortBy === 'vendorName') return a.vendorName.localeCompare(b.vendorName)
     if (sortBy === 'status') return a.status.localeCompare(b.status)
     return b.documentDate.localeCompare(a.documentDate)

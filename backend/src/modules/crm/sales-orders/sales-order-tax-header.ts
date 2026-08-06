@@ -38,6 +38,8 @@ export type SalesOrderTaxHeaderResolved = {
   utgstAmount: number
   igstAmount: number
   cessAmount: number
+  /** Lines with scheme/components realigned to resolved header. */
+  lines: SalesOrderLineDto[]
 }
 
 type CustomerLike = {
@@ -157,14 +159,13 @@ export async function resolveSalesOrderTaxHeader(opts: {
     opts.input.supplierStateCode,
   )
 
+  const isOverride = Boolean(opts.input.placeOfSupplyOverride)
+  // Auto path must not re-use a previously saved PoS label (that blocks ship-to recalculation).
   const pos = resolveCommercialPlaceOfSupply({
-    placeOfSupplyOverride: Boolean(opts.input.placeOfSupplyOverride),
-    placeOfSupplyOverrideValue: opts.input.placeOfSupply,
-    explicitPlaceOfSupply: opts.input.placeOfSupplyOverride
-      ? opts.input.placeOfSupply
-      : opts.input.placeOfSupply,
+    placeOfSupplyOverride: isOverride,
+    placeOfSupplyOverrideValue: isOverride ? opts.input.placeOfSupply : null,
     shipToState: opts.input.deliveryLocation ?? opts.input.shippingAddress,
-    billToState: opts.input.billingAddress ?? opts.customer.state,
+    billToState: opts.input.billingAddress,
     customerState: opts.customer.state,
     customerGstin: opts.customer.gstin,
     isServiceDocument: opts.input.isServiceDocument,
@@ -175,7 +176,14 @@ export async function resolveSalesOrderTaxHeader(opts: {
     placeOfSupplyStateCode: pos.placeOfSupplyStateCode,
   })
 
-  const components = sumLineTaxComponents(opts.lines)
+  // Force line components to match resolved scheme (intra↔inter swap).
+  const { applyDocumentTaxSchemeToLines } = await import('./sales-order.workflow.js')
+  const alignedLines =
+    supply.taxScheme !== 'UNRESOLVED'
+      ? applyDocumentTaxSchemeToLines(opts.lines, supply.taxScheme)
+      : opts.lines
+
+  const components = sumLineTaxComponents(alignedLines)
   const gstScheme =
     supply.taxScheme !== 'UNRESOLVED'
       ? supply.taxScheme
@@ -184,9 +192,9 @@ export async function resolveSalesOrderTaxHeader(opts: {
   return {
     placeOfSupply: pos.placeOfSupplyLabel,
     placeOfSupplyStateCode: pos.placeOfSupplyStateCode,
-    placeOfSupplySource: pos.source,
-    placeOfSupplyOverride: Boolean(opts.input.placeOfSupplyOverride),
-    placeOfSupplyOverrideReason: opts.input.placeOfSupplyOverride
+    placeOfSupplySource: pos.source === 'UNRESOLVED' ? 'AUTO' : pos.source,
+    placeOfSupplyOverride: isOverride,
+    placeOfSupplyOverrideReason: isOverride
       ? (opts.input.placeOfSupplyOverrideReason?.trim() ?? null)
       : null,
     supplierStateCode: supply.supplierStateCode,
@@ -197,6 +205,7 @@ export async function resolveSalesOrderTaxHeader(opts: {
     utgstAmount: components.utgstAmount,
     igstAmount: components.igstAmount,
     cessAmount: components.cessAmount,
+    lines: alignedLines,
   }
 }
 

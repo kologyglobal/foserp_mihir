@@ -1,8 +1,8 @@
 # Commercial HSN/SAC & GST Architecture Audit
 
-**Date:** 2026-08-05  
+**Date:** 2026-08-05 (updated after auto PoS / supply / snapshot completion pass)  
 **Scope:** Quotation → Sales Order → Proforma → CRM Tax Invoice → Money-In Sales Invoice / Credit Notes  
-**Status:** Phase 1 complete — source of truth for Phase 2–16 implementation
+**Status:** Auto Place of Supply + Supply Type + SO header snapshot **READY WITH CONDITIONS** — see `COMMERCIAL_HSN_GST_IMPLEMENTATION.md` and UAT checklist.
 
 ---
 
@@ -10,15 +10,28 @@
 
 | Decision | Detail |
 |----------|--------|
-| **Tax engine** | **Reuse only** `backend/src/modules/tax/gst-tax-resolve.service.ts` → `resolveGstTax` |
+| **Tax engine** | **Reuse only** `resolveGstTax` + shared pure PoS/`resolveCommercialSupplyType` (`commercial-supply-context.ts`) |
 | **Master lane** | `resolveLineGstFromMasters` in `accounting-tax-resolver.ts` |
-| **FE facade** | `frontend/src/utils/commercialLineTax.ts` → `resolveCommercialLineTax` → API `/masters/tax/resolve` |
-| **Supply type (AR)** | `gst-supply-determination.service.ts` + `SalesInvoiceSupplyType` |
-| **CRM header split** | `commercial.service.ts` `buildGst` (half/half vs IGST from states) — does **not** call `resolveGstTax` on save |
-| **Best snapshot** | Money-In `SalesInvoiceLine` (full CGST/SGST/IGST rates + amounts + `hsnCodeSnapshot`) |
-| **Weakest snapshot** | Quotation `priceLines` + Sales Order `lines` JSON — **no HSN**, single `taxPct` only |
+| **FE facade** | `commercialLineTax.ts` + `commercialSupplyContext.ts` (mirror BE PoS/supply) |
+| **SO tax header** | `sales-order-tax-header.ts` — PoS, supply type, scheme totals, line realign |
+| **Best snapshot** | Money-In `SalesInvoiceLine` + SO `lines` JSON components when saved via workflow |
+| **Former weakest** | Quotation `priceLines` — **now accepts** full optional HSN/scheme snapshot fields (JSON) |
 
-**Do not** invent a second tax engine. Extend snapshots + reconversion mappers + UI columns + call `resolveGstTax` / FE facade on tax-determining field changes.
+**Do not** invent a second tax engine.
+
+### Confirmed 2026-08-05 completion pass
+
+| Capability | State |
+|------------|--------|
+| Auto PoS priority (override → ship → GSTIN → bill-to → customer) | Done |
+| Sticky non-override saved PoS removed | Done |
+| Supply type read-only | Done |
+| Override permission + reason + audit | Done |
+| Confirm blocks UNRESOLVED / dual scheme | Done |
+| Q line DTO snapshot fields | Done (optional JSON) |
+| Full PI→TI→AR E2E | Manual UAT remaining |
+
+**No migration in this pass** (SO header used existing columns). **No commit/push/deploy.**
 
 ---
 
@@ -28,25 +41,39 @@
 
 | Symbol | File | Role |
 |--------|------|------|
-| `resolveGstTax` | `backend/src/modules/tax/gst-tax-resolve.service.ts` | Authoritative determination; scheme `cgst_sgst` \| `igst` \| `utgst_pair` |
-| HTTP | `GET …/masters/tax/resolve` | `tax-resolve.controller.ts` |
-| `resolveLineGstFromMasters` | `accounting-tax-resolver.ts` | Master HSN → GST group → dated rate |
-| `determineSupplyType` | `gst-supply-determination.service.ts` | INTRA/INTER/EXPORT/SEZ |
-| `computeLineTaxes` / `splitGstRate` | `gst-calculation.service.ts` | AR amount split |
-| `buildGst` | `crm/commercial/commercial.service.ts` | CRM PI/TI header tax from states + avg line rate |
-| `buildSalesLineSnapshots` / `normalizeSalesLineForWrite` | `crm/shared/crm-item-resolver.ts` | Item code/name; HSN available for write if passed |
+| `resolveGstTax` | `gst-tax-resolve.service.ts` | Rate determination |
+| `resolveCommercialPlaceOfSupply` | `commercial-supply-context.ts` | PoS priority |
+| `resolveCommercialSupplyType` | same | Intra/Inter + scheme |
+| `resolveSalesOrderTaxHeader` | `sales-order-tax-header.ts` | SO header + re-align lines |
+| `applyDocumentTaxSchemeToLines` | `sales-order.workflow.ts` | Clear dual-scheme amounts |
+| HTTP tax resolve | `GET …/masters/tax/resolve` | Masters API |
 
 ### 2.2 Frontend
 
 | Symbol | File |
 |--------|------|
 | `resolveCommercialLineTax` | `utils/commercialLineTax.ts` |
-| `resolveGstTaxFromMasters` | `services/accounting/taxResolutionApi.ts` |
-| `lineTaxAmounts` | `utils/commercialLineTax.ts` |
-| `determineSalesGstSupply` / `resolvePlaceOfSupplyFromBilling` | `utils/gstSupply.ts` |
-| `computeGst` | `utils/gstEngine.ts` (demo; avoid inventing 18% on commercial path) |
+| `resolveCommercialPlaceOfSupply` | `utils/commercialSupplyContext.ts` |
+| `CommercialGstSupplyPanel` | `components/sales/CommercialGstSupplyPanel.tsx` |
 
 ### 2.3 Enums (reuse — no duplicates)
+
+| Name | Values |
+|------|--------|
+| Supply type | `INTRA_STATE` \| `INTER_STATE` \| `UNRESOLVED` |
+| Tax scheme | `cgst_sgst` \| `igst` \| `utgst_pair` \| `UNRESOLVED` (string) |
+| PoS source | `OVERRIDE` \| `SHIP_TO` \| `BILL_TO` \| `CUSTOMER_GSTIN` \| `CUSTOMER` \| `UNRESOLVED` \| `AUTO` |
+
+---
+
+For full historical gap tables and older document matrices, retain the sections below as archive context; treat the **Completion report in COMMERCIAL_HSN_GST_UAT.md** as the live checklist.
+
+---
+
+## Archive notes (pre-completion)
+
+Weakest commercial line storage was single `taxPct` — SO workflow and quote DTO now carry optional component snapshots. CRM commercial `buildGst` may still average rates for older CRM PI/TI paths; prefer `CommercialGstSupplyPanel` + line resolve on new work.
+
 
 | Name | Values | Path |
 |------|--------|------|

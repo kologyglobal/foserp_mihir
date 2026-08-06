@@ -1166,7 +1166,7 @@
   gap: 4px;
   min-width: 0;
   flex: 0 1 auto;
-  max-width: min(280px, 36vw);
+  max-width: min(420px, 48vw);
 }
 
 .crm-sticky-record-header__title {
@@ -1377,7 +1377,7 @@
   }
 
   .crm-sticky-record-header__title-row {
-    max-width: min(220px, 50vw);
+    max-width: min(320px, 70vw);
   }
 
   .crm-sticky-record-header__actions {

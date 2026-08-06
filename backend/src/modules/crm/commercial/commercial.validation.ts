@@ -53,6 +53,16 @@ export const invoiceLineSchema = z.object({
   unitPrice: z.number().nonnegative(),
   discountPct: z.number().min(0).max(100).optional(),
   taxPct: z.number().min(0).max(100).optional(),
+  /** Optional GST snapshot from upstream SO/PI (prefer over re-resolve). */
+  taxScheme: z.string().trim().max(32).optional().nullable(),
+  cgstRate: z.number().min(0).max(100).optional().nullable(),
+  sgstRate: z.number().min(0).max(100).optional().nullable(),
+  utgstRate: z.number().min(0).max(100).optional().nullable(),
+  igstRate: z.number().min(0).max(100).optional().nullable(),
+  cgstAmount: z.number().min(0).optional().nullable(),
+  sgstAmount: z.number().min(0).optional().nullable(),
+  utgstAmount: z.number().min(0).optional().nullable(),
+  igstAmount: z.number().min(0).optional().nullable(),
   sourceLineId: z.string().trim().max(64).optional().nullable(),
   maxQty: z.number().positive().optional().nullable(),
 })
@@ -75,6 +85,12 @@ export const createInvoiceSchema = z.object({
   shippingAddress: z.string().trim().max(2000).optional().nullable(),
   remarks: z.string().trim().max(2000).optional().nullable(),
   customerState: z.string().trim().max(100).optional().nullable(),
+  /** Upstream commercial GST header snapshot (SO/PI). */
+  placeOfSupply: z.string().trim().max(200).optional().nullable(),
+  placeOfSupplyStateCode: z.string().trim().max(8).optional().nullable(),
+  supplierStateCode: z.string().trim().max(8).optional().nullable(),
+  supplyType: z.string().trim().max(32).optional().nullable(),
+  gstScheme: z.string().trim().max(32).optional().nullable(),
   lines: z.array(invoiceLineSchema).min(1),
 })
 
@@ -106,6 +122,11 @@ export const createProformaSchema = z.object({
   remarks: z.string().trim().max(2000).optional().nullable(),
   customerState: z.string().trim().max(100).optional().nullable(),
   locationId: z.string().uuid().optional().nullable(),
+  placeOfSupply: z.string().trim().max(200).optional().nullable(),
+  placeOfSupplyStateCode: z.string().trim().max(8).optional().nullable(),
+  supplierStateCode: z.string().trim().max(8).optional().nullable(),
+  supplyType: z.string().trim().max(32).optional().nullable(),
+  gstScheme: z.string().trim().max(32).optional().nullable(),
   lines: z.array(invoiceLineSchema).min(1),
 })
 

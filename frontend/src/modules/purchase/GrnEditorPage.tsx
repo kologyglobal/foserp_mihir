@@ -66,6 +66,7 @@ import {
   formatPurchaseQty,
   purchaseLineHasDualUom,
   purchaseQtyToBaseQty,
+  toUomQuantityFromBase,
 } from '@/utils/purchaseLineUom'
 import { notify } from '@/store/toastStore'
 import { systemConfirm } from '@/utils/systemConfirm'
@@ -576,7 +577,11 @@ export function GrnEditorPage() {
     inspectionRequired,
     allowExcess,
     remarks,
-    lines: lines.map((l) => ({
+    // Create shows all open PO lines; only received / short-close rows are saved on the GRN.
+    lines: lines.filter((l) => {
+      const received = Number(l.receivedUomQty ?? l.receivedQty) || 0
+      return received > 0 || Boolean(l.closeOpenQuantity)
+    }).map((l) => ({
       purchaseOrderLineId: l.purchaseOrderLineId,
       receivedUomQty: Number(l.receivedUomQty ?? l.receivedQty) || 0,
       receivedQty: Number(l.receivedQty) || 0,
@@ -619,19 +624,54 @@ export function GrnEditorPage() {
     if (!vendorId) push('vendorId', 'Please select a vendor.')
     if (!warehouseId.trim()) push('warehouseId', 'Please select a warehouse.')
     if (!lines.length) push('lines', 'Add at least one open PO line to receive.')
+    const includedLines = lines.filter((l) => {
+      const received = Number(l.receivedUomQty ?? l.receivedQty) || 0
+      return received > 0 || Boolean(l.closeOpenQuantity)
+    })
+    if (lines.length && !includedLines.length) {
+      push(
+        'lines',
+        'Enter received quantity on at least one line (unused PO lines stay open for a later GRN).',
+      )
+    }
 
     lines.forEach((l, i) => {
       const itemLabel = (l.itemCode || l.itemName || `Line ${i + 1}`).trim()
-      if ((Number(l.receivedQty) || 0) < 0) {
+      const received = Number(l.receivedUomQty ?? l.receivedQty) || 0
+      const open = Math.max(0, Number(l.pendingUomQty ?? l.pendingQty) || 0)
+      if (received <= 0 && !l.closeOpenQuantity) {
+        // Idle open PO row — not part of this GRN; skip per-line receive checks.
+        return
+      }
+      if (received < 0) {
         push(`line-${i}-qty`, `Received quantity cannot be negative for ${itemLabel}.`)
       }
-      if (l.batchControlled && (Number(l.receivedQty) || 0) > 0 && !l.batchNumber.trim()) {
+      // Hard max = open PO qty + item/setup over-receipt tolerance (never save beyond band).
+      const tol = evaluateGrnLineTolerance({
+        openQuantity: open,
+        receivedQuantity: received,
+        itemTolerancePct: l.quantityTolerancePct,
+        setupTolerancePct,
+        allowOverReceipt: allowExcess || l.allowExcess,
+      })
+      if (received > tol.upperBound + 1e-9) {
+        const maxLabel = Number(tol.upperBound.toFixed(4))
+        push(
+          `line-${i}-excess`,
+          `Received quantity (${received}) for ${itemLabel} exceeds maximum allowed (${maxLabel}). ` +
+            `Open PO quantity is ${open}` +
+            (tol.tolerancePercentage > 0
+              ? ` with over-receipt tolerance ${tol.tolerancePercentage}%.`
+              : ' (no over-receipt tolerance).'),
+        )
+      }
+      if (l.batchControlled && received > 0 && !l.batchNumber.trim()) {
         push(`line-${i}-batch`, `Batch number is required for ${itemLabel}.`)
       }
-      if (l.serialControlled && (Number(l.receivedQty) || 0) > 0 && !l.serialNumber.trim()) {
+      if (l.serialControlled && received > 0 && !l.serialNumber.trim()) {
         push(`line-${i}-serial`, `Serial number is required for ${itemLabel}.`)
       }
-      if (l.expiryControlled && (Number(l.receivedQty) || 0) > 0 && !l.expiryDate) {
+      if (l.expiryControlled && received > 0 && !l.expiryDate) {
         push(`line-${i}-expiry`, `Expiry date is required for ${itemLabel}.`)
       }
     })
@@ -1094,8 +1134,8 @@ export function GrnEditorPage() {
             </details>
             <p className="text-[11px]">
               Condition is auto-suggested from received vs pending and rejected qty — adjust if needed.
-              Weight columns appear for casting / KG items. Enter <strong>0</strong> in Received for
-              not received (line stays open).
+              Weight columns appear for casting / KG items. <strong>Received</strong> starts empty —
+              type the actual qty for each item. Leave blank / 0 for not received (line stays open on the PO).
             </p>
             {lineTotals.remainingOpenQty > 0 ||
             lineTotals.notReceivedCount > 0 ||
@@ -1164,13 +1204,72 @@ export function GrnEditorPage() {
                     <div className="font-mono text-[11px]">{l.itemCode}</div>
                     <div>{l.itemName}</div>
                   </td>
-                  <td className="num">{formatNumber(l.orderedQty)}</td>
-                  <td className="num">{formatNumber(l.previouslyReceivedQty)}</td>
-                  <td className="num">{formatNumber(l.pendingQty)}</td>
+                  <td className="num">
+                    {(() => {
+                      const dual = purchaseLineHasDualUom({
+                        itemId: l.itemId,
+                        uomConversionFactor: l.uomConversionFactor,
+                      })
+                      const uomQty = Number(l.orderedUomQty) || Number(l.orderedQty) || 0
+                      return (
+                        <>
+                          <span className="tabular-nums">{formatNumber(uomQty)}</span>
+                          {dual && l.baseUom ? (
+                            <p className="mt-1 text-[10px] tabular-nums text-erp-muted">
+                              {formatPurchaseQty(Number(l.orderedQty) || 0)} {l.baseUom}
+                            </p>
+                          ) : null}
+                        </>
+                      )
+                    })()}
+                  </td>
+                  <td className="num">
+                    {(() => {
+                      const dual = purchaseLineHasDualUom({
+                        itemId: l.itemId,
+                        uomConversionFactor: l.uomConversionFactor,
+                      })
+                      const factor = Number(l.uomConversionFactor) || 1
+                      const prevBase = Number(l.previouslyReceivedQty) || 0
+                      const prevUom = toUomQuantityFromBase(prevBase, factor)
+                      return (
+                        <>
+                          <span className="tabular-nums">{formatNumber(prevUom)}</span>
+                          {dual && l.baseUom ? (
+                            <p className="mt-1 text-[10px] tabular-nums text-erp-muted">
+                              {formatPurchaseQty(prevBase)} {l.baseUom}
+                            </p>
+                          ) : null}
+                        </>
+                      )
+                    })()}
+                  </td>
+                  <td className="num">
+                    {(() => {
+                      const dual = purchaseLineHasDualUom({
+                        itemId: l.itemId,
+                        uomConversionFactor: l.uomConversionFactor,
+                      })
+                      const pendingUom =
+                        Number(l.pendingUomQty) || Number(l.pendingQty) || 0
+                      return (
+                        <>
+                          <span className="tabular-nums">{formatNumber(pendingUom)}</span>
+                          {dual && l.baseUom ? (
+                            <p className="mt-1 text-[10px] tabular-nums text-erp-muted">
+                              {formatPurchaseQty(Number(l.pendingQty) || 0)} {l.baseUom}
+                            </p>
+                          ) : null}
+                        </>
+                      )
+                    })()}
+                  </td>
                   <td className="num">
                     <DecimalInput
                       className="w-24"
                       min={0}
+                      blankZero
+                      placeholder="Enter qty"
                       value={Number(l.receivedUomQty ?? l.receivedQty) || 0}
                       onChange={(v) => {
                         const factor = Number(l.uomConversionFactor) || 1

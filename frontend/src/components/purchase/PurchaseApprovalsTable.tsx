@@ -125,6 +125,7 @@ export interface PurchaseApprovalsTableProps {
   emptyAction?: React.ReactNode
   hasActiveFilters?: boolean
   onClearFilters?: () => void
+  sortBy?: string
 }
 
 export function PurchaseApprovalsTable({
@@ -135,6 +136,7 @@ export function PurchaseApprovalsTable({
   emptyAction,
   hasActiveFilters,
   onClearFilters,
+  sortBy,
 }: PurchaseApprovalsTableProps) {
   const densityClass = useDensityClass()
 
@@ -304,6 +306,7 @@ export function PurchaseApprovalsTable({
       stickyFirstColumn
       showCompactSearch={false}
       enableColumnSorting={false}
+      sortResetToken={sortBy}
       getRowId={(r) => r.approvalId}
       onRowQuickView={(r) => handlers.onReview(r)}
       registerBar={

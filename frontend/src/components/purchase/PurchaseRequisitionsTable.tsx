@@ -206,6 +206,7 @@ export interface PurchaseRequisitionsTableProps {
   hasActiveFilters?: boolean
   onClearFilters?: () => void
   onExport?: () => void
+  sortBy?: string
 }
 
 export function PurchaseRequisitionsTable({
@@ -217,6 +218,7 @@ export function PurchaseRequisitionsTable({
   hasActiveFilters,
   onClearFilters,
   onExport,
+  sortBy,
 }: PurchaseRequisitionsTableProps) {
   const densityClass = useDensityClass()
 
@@ -423,6 +425,7 @@ export function PurchaseRequisitionsTable({
       stickyFirstColumn
       showCompactSearch={false}
       enableColumnSorting={false}
+      sortResetToken={sortBy}
       exportFileName="purchase-requisitions"
       onExport={onExport}
       getRowId={(r) => r.id}

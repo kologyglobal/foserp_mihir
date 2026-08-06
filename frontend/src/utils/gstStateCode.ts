@@ -94,9 +94,17 @@ export function formatPlaceOfSupplyLabel(
   stateCode: string | null | undefined,
   stateName?: string | null,
 ): string {
-  const code = stateCode ? validateStateCode(stateCode) : null
+  // Accept bare code, name, or already-labelled "Maharashtra (27)" without double-appending.
+  const code =
+    (stateCode ? validateStateCode(stateCode) : null) ??
+    resolveGstStateCode(stateCode) ??
+    resolveGstStateCode(stateName)
+
+  // Strip trailing `(NN)` so `format(code, "Maharashtra (27)")` → once, not `(27) (27)`.
+  const cleanedName = (stateName?.trim() || '').replace(/\s*\(\d{1,2}\)\s*$/, '').trim()
+
   const name =
-    stateName?.trim() ||
+    cleanedName ||
     (code ? INDIAN_GST_STATE_CODE_TO_NAME[code]?.replace(/\b\w/g, (c) => c.toUpperCase()) : '') ||
     ''
   if (code && name) {

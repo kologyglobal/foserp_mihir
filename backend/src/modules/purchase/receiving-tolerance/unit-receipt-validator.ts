@@ -19,8 +19,9 @@ export function validateUnitReceipt(input: {
   const open = maxQty(toQty(input.openUnitQuantity), 0)
   const received = maxQty(toQty(input.receivedUnitQuantity), 0)
   const tolerancePct = toQty(input.tolerancePercentage)
+  // Nothing open on the PO → nothing may be received (do not treat any qty as allowed).
   const maxAllowed = open.isZero()
-    ? received
+    ? toQty(0)
     : open.add(mulQty(open, tolerancePct.div(100)))
 
   const unitVariance = subQty(received, open)

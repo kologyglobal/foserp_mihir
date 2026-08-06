@@ -2979,6 +2979,7 @@ model MasterBin {
   storageLocation    MasterLocation      @relation(fields: [storageLocationId], references: [id])
   goodsReceiptLines  GoodsReceiptLine[]
   purchaseOrderLines PurchaseOrderLine[]
+  defaultForItems    MasterItem[]
 
   @@unique([tenantId, warehouseId, code])
   @@index([tenantId])
@@ -3213,6 +3214,8 @@ model MasterItem {
   subAssemblyRule         String?                   @db.VarChar(32)
   /// Relative storage key under uploads/items (tenantId/itemId.ext)
   imageUrl                String?                   @db.VarChar(500)
+  /// Default put-away / line bin from Bin Master (code resolved for PR/PO/GRN).
+  defaultBinId            String?
   status                  MasterRecordStatus        @default(ACTIVE)
   createdBy               String?
   updatedBy               String?
@@ -3229,6 +3232,7 @@ model MasterItem {
   receivingTolerance       MasterReceivingTolerance? @relation("ItemQuantityReceivingTolerance", fields: [receivingToleranceId], references: [id])
   weightReceivingTolerance MasterReceivingTolerance? @relation("ItemWeightReceivingTolerance", fields: [weightReceivingToleranceId], references: [id])
   weightUom                MasterUom?                @relation("ItemWeightUom", fields: [weightUomId], references: [id])
+  defaultBin               MasterBin?                @relation(fields: [defaultBinId], references: [id], onDelete: SetNull)
   uomConversions           MasterItemUomConversion[]
   purchaseRequisitionLines PurchaseRequisitionLine[]
   purchasePlanningRows     PurchasePlanningRow[]
@@ -3288,6 +3292,7 @@ model MasterItem {
   @@index([tenantId, receivingToleranceId])
   @@index([tenantId, weightReceivingToleranceId])
   @@index([tenantId, weightUomId])
+  @@index([tenantId, defaultBinId])
   @@map("master_items")
 }
 
@@ -7612,6 +7617,11 @@ model GoodsReceiptLine {
   closeOpenQuantity          Boolean   @default(false)
   receivingCondition         GrnReceivingCondition @default(NORMAL)
   receivingConditionReason   String?               @db.Text
+  /// Cumulative reverse of received qty (full-line reverse of selected lines sets this to receivedQuantity).
+  reversedQuantity           Decimal               @default(0) @db.Decimal(18, 4)
+  reversedAcceptedQuantity   Decimal               @default(0) @db.Decimal(18, 4)
+  reversedRejectedQuantity   Decimal               @default(0) @db.Decimal(18, 4)
+  reversedAt                 DateTime?
   remarks                    String?   @db.Text
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt

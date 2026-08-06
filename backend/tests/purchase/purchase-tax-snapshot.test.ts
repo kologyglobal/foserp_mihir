@@ -25,6 +25,31 @@ describe('purchase tax snapshot helpers', () => {
     expect(snap.gstSchemeSnapshot).toBe('igst')
   })
 
+  it('taxSnapshotFromRates zeros unused legs when isInterstate is known', () => {
+    const inter = taxSnapshotFromRates({
+      cgstRate: 9,
+      sgstRate: 9,
+      igstRate: 18,
+      isInterstate: true,
+    })
+    expect(inter.gstSchemeSnapshot).toBe('igst')
+    expect(inter.igstRateSnapshot).toBe(18)
+    expect(inter.cgstRateSnapshot).toBe(0)
+    expect(inter.sgstRateSnapshot).toBe(0)
+
+    const intra = taxSnapshotFromRates({
+      cgstRate: 9,
+      sgstRate: 9,
+      igstRate: 18,
+      isInterstate: false,
+    })
+    expect(intra.gstSchemeSnapshot).toBe('cgst_sgst')
+    expect(intra.cgstRateSnapshot).toBe(9)
+    expect(intra.sgstRateSnapshot).toBe(9)
+    expect(intra.igstRateSnapshot).toBe(0)
+    expect(intra.gstRatePctSnapshot).toBe(18)
+  })
+
   it('taxSnapshotFromPoLine maps PO FK fields to snapshot columns', () => {
     const snap = taxSnapshotFromPoLine({
       hsnId: 'hsn-1',

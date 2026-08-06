@@ -510,7 +510,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
     expect(res.body.data.lines[0].toleranceStatus).toBe('EXCESS_OUTSIDE_TOLERANCE')
   })
 
-  it('zero received is NOT_RECEIVED; approve/reject tolerance paths work', async () => {
+  it('drops idle zero-qty PO lines; pure zero draft is rejected; approve/reject tolerance paths work', async () => {
     await putSetup({
       allowOverReceipt: false,
       overReceiptTolerancePct: 0,
@@ -529,8 +529,48 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
           lines: [{ purchaseOrderLineId: lineId, receivedQuantity: 0, binId }],
         }),
       )
-    expect(zeroDraft.status).toBe(201)
-    expect(zeroDraft.body.data.lines[0].toleranceStatus).toBe('NOT_RECEIVED')
+    expect(zeroDraft.status).toBe(400)
+    // Only one of two PO lines received → GRN persists only that line.
+    {
+      const createPo = await request(app)
+        .post(poBase())
+        .set(auth())
+        .send({
+          vendorId,
+          orderDate: isoToday(),
+          deliveryWarehouseId: warehouseId,
+          lines: [
+            { itemCode: `ITM-A-${Date.now()}`, itemName: 'Line A', quantity: 100, uomId, rate: 1 },
+            { itemCode: `ITM-B-${Date.now()}`, itemName: 'Line B', quantity: 80, uomId, rate: 1 },
+          ],
+        })
+      expect(createPo.status).toBe(201)
+      const multiPoId = createPo.body.data.id as string
+      const multiLine1 = createPo.body.data.lines[0].id as string
+      const multiLine2 = createPo.body.data.lines[1].id as string
+      await request(app).post(`${poBase()}/${multiPoId}/submit`).set(auth()).send({})
+      await request(app).post(`${poBase()}/${multiPoId}/approve`).set(auth(approverToken)).send({})
+      const approved = await request(app).get(`${poBase()}/${multiPoId}`).set(auth())
+      if (approved.body.data?.status !== 'SENT_TO_VENDOR') {
+        await request(app).post(`${poBase()}/${multiPoId}/send-to-vendor`).set(auth()).send({})
+      }
+      const partialOnly = await request(app)
+        .post(grnBase())
+        .set(auth())
+        .send(
+          draftPayload({
+            purchaseOrderId: multiPoId,
+            lines: [
+              { purchaseOrderLineId: multiLine1, receivedQuantity: 40, binId },
+              { purchaseOrderLineId: multiLine2, receivedQuantity: 0, binId },
+            ],
+          }),
+        )
+      expect(partialOnly.status).toBe(201)
+      expect(partialOnly.body.data.lines).toHaveLength(1)
+      expect(Number(partialOnly.body.data.lines[0].receivedQuantity)).toBe(40)
+      expect(partialOnly.body.data.lines[0].purchaseOrderLineId).toBe(multiLine1)
+    }
 
     const { poId: excessPoId, lineId: excessLineId } = await createReceivablePo(100)
     const excessDraft = await request(app)
@@ -683,6 +723,97 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
     })
     expect(Number(po?.lines[0]?.receivedQuantity)).toBe(0)
     expect(po?.status).toBe('SENT_TO_VENDOR')
+  })
+
+  it('partial reverse only restores selected GRN lines on the PO', async () => {
+    const createPo = await request(app)
+      .post(poBase())
+      .set(auth())
+      .send({
+        vendorId,
+        orderDate: isoToday(),
+        lines: [
+          { itemCode: 'PR1', itemName: 'Partial Reverse A', quantity: 30, uomId, rate: 2 },
+          { itemCode: 'PR2', itemName: 'Partial Reverse B', quantity: 40, uomId, rate: 3 },
+        ],
+      })
+    expect(createPo.status).toBe(201)
+    const pPoId = createPo.body.data.id as string
+    const pLineA = createPo.body.data.lines[0].id as string
+    const pLineB = createPo.body.data.lines[1].id as string
+    await request(app).post(`${poBase()}/${pPoId}/submit`).set(auth()).send({})
+    await request(app).post(`${poBase()}/${pPoId}/approve`).set(auth(approverToken)).send({})
+    await request(app).post(`${poBase()}/${pPoId}/send-to-vendor`).set(auth()).send({})
+
+    const created = await request(app)
+      .post(grnBase())
+      .set(auth())
+      .send(
+        draftPayload({
+          purchaseOrderId: pPoId,
+          lines: [
+            { purchaseOrderLineId: pLineA, receivedQuantity: 30, binId },
+            { purchaseOrderLineId: pLineB, receivedQuantity: 40, binId },
+          ],
+        }),
+      )
+    expect(created.status).toBe(201)
+    const grnId = created.body.data.id as string
+    const grnLineA = (created.body.data.lines as Array<{ id: string; purchaseOrderLineId: string }>).find(
+      (l) => l.purchaseOrderLineId === pLineA,
+    )!.id
+    await request(app).post(`${grnBase()}/${grnId}/submit`).set(auth()).send({})
+
+    const rev = await request(app)
+      .post(`${grnBase()}/${grnId}/reverse`)
+      .set(auth())
+      .send({
+        remarks: 'Wrong first item',
+        lineIds: [grnLineA],
+      })
+    expect(rev.status).toBe(200)
+    expect(rev.body.data.status).not.toBe('REVERSED')
+    expect(rev.body.data.partiallyReversed).toBe(true)
+    const revLines = rev.body.data.lines as Array<{
+      id: string
+      purchaseOrderLineId: string
+      receivedQuantity: number
+      reversedQuantity: number
+      remainingReversibleQuantity: number
+      lineFullyReversed: boolean
+    }>
+    const revA = revLines.find((l) => l.id === grnLineA)!
+    const revB = revLines.find((l) => l.purchaseOrderLineId === pLineB)!
+    expect(revA.reversedQuantity).toBe(30)
+    expect(revA.remainingReversibleQuantity).toBe(0)
+    expect(revA.lineFullyReversed).toBe(true)
+    expect(revB.reversedQuantity).toBe(0)
+    expect(revB.remainingReversibleQuantity).toBe(40)
+    expect(rev.body.data.allowedActions.canReverse).toBe(true)
+
+    const po = await prisma.purchaseOrder.findFirst({
+      where: { id: pPoId, tenantId },
+      include: { lines: true },
+    })
+    expect(Number(po?.lines.find((l) => l.id === pLineA)?.receivedQuantity)).toBe(0)
+    expect(Number(po?.lines.find((l) => l.id === pLineB)?.receivedQuantity)).toBe(40)
+    expect(po?.status).toBe('PARTIALLY_RECEIVED')
+
+    // Reverse remaining line → full reverse
+    const revAll = await request(app)
+      .post(`${grnBase()}/${grnId}/reverse`)
+      .set(auth())
+      .send({ remarks: 'Finish reverse', lineIds: [revB.id] })
+    expect(revAll.status).toBe(200)
+    expect(revAll.body.data.status).toBe('REVERSED')
+    expect(revAll.body.data.allowedActions.canReverse).toBe(false)
+
+    const poAfter = await prisma.purchaseOrder.findFirst({
+      where: { id: pPoId, tenantId },
+      include: { lines: true },
+    })
+    expect(Number(poAfter?.lines.find((l) => l.id === pLineA)?.receivedQuantity)).toBe(0)
+    expect(Number(poAfter?.lines.find((l) => l.id === pLineB)?.receivedQuantity)).toBe(0)
   })
 
   it('blocks editing a submitted GRN', async () => {

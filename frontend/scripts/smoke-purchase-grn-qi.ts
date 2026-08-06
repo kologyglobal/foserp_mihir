@@ -80,8 +80,8 @@ async function main() {
   })
   console.log('created draft', created.documentNumber, created.status, created.lines[0]?.batchNumber)
 
-  // Excess without permission
-  await expectError('EXCESS_QTY_REQUIRES_PERMISSION', () =>
+  // Over PO open qty beyond tolerance — hard reject
+  await expectError('GRN_QTY_EXCEEDS', () =>
     updateGRN(created.id, {
       allowExcess: false,
       lines: [

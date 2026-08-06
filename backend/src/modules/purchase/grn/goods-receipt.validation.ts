@@ -103,6 +103,14 @@ export const grnLifecycleRemarksSchema = z
   })
   .default({})
 
+/** Full reverse when lineIds omitted/empty; otherwise reverse only those GRN line ids. */
+export const reverseGoodsReceiptSchema = z
+  .object({
+    remarks: z.string().trim().max(2000).optional(),
+    lineIds: z.array(z.string().uuid()).max(500).optional(),
+  })
+  .default({})
+
 export const evaluateGrnLinesSchema = z.object({
   purchaseOrderId: z.string().uuid(),
   lines: z.array(goodsReceiptLineInputSchema).min(1),
@@ -113,3 +121,4 @@ export type CreateGoodsReceiptInput = z.infer<typeof createGoodsReceiptSchema>
 export type UpdateGoodsReceiptInput = z.infer<typeof updateGoodsReceiptSchema>
 export type GoodsReceiptLineInput = z.infer<typeof goodsReceiptLineInputSchema>
 export type EvaluateGrnLinesInput = z.infer<typeof evaluateGrnLinesSchema>
+export type ReverseGoodsReceiptInput = z.infer<typeof reverseGoodsReceiptSchema>

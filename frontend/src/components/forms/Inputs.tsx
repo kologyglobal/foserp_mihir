@@ -42,6 +42,11 @@ interface DecimalInputProps
   error?: boolean
   /** Focus on a zero value starts blank so typing "29" does not become "029". Default true. */
   clearZeroOnFocus?: boolean
+  /**
+   * When true (and not focused), value 0 renders as empty so the user types qty intentionally.
+   * Useful for receipt / return quantities that must not default visually to a full open qty.
+   */
+  blankZero?: boolean
   /** Select existing text on focus when non-zero. Default true. */
   selectAllOnFocus?: boolean
 }
@@ -62,6 +67,7 @@ export function DecimalInput({
   value,
   onChange,
   clearZeroOnFocus = true,
+  blankZero = false,
   selectAllOnFocus = true,
   min,
   max,
@@ -93,9 +99,13 @@ export function DecimalInput({
 
   const displayValue = focused
     ? draft
-    : Number.isFinite(value)
-      ? value
-      : 0
+    : blankZero && value === 0
+      ? ''
+      : Number.isFinite(value)
+        ? value
+        : blankZero
+          ? ''
+          : 0
 
   return (
     <input

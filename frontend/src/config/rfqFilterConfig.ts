@@ -16,11 +16,19 @@ export const DEFAULT_RFQ_LIST_FILTERS: RfqListFilters = {
   locationName: '',
 }
 
-export type RfqSortKey = 'documentDate' | 'documentNumber' | 'bidDueDate' | 'estimatedValue' | 'status'
+export type RfqSortKey =
+  | 'documentDate'
+  | 'documentNumber'
+  | 'documentNumberAsc'
+  | 'documentNumberDesc'
+  | 'bidDueDate'
+  | 'estimatedValue'
+  | 'status'
 
 export const RFQ_SORT_OPTIONS: { value: RfqSortKey; label: string }[] = [
   { value: 'documentDate', label: 'Sort: RFQ Date' },
-  { value: 'documentNumber', label: 'Sort: RFQ Number' },
+  { value: 'documentNumberAsc', label: 'Sort: RFQ Number (A→Z)' },
+  { value: 'documentNumberDesc', label: 'Sort: RFQ Number (Z→A)' },
   { value: 'bidDueDate', label: 'Sort: Bid Due' },
   { value: 'estimatedValue', label: 'Sort: Value' },
   { value: 'status', label: 'Sort: Status' },
@@ -100,7 +108,10 @@ export function sortRfqRows(rows: RfqListRow[], sortBy: RfqSortKey): RfqListRow[
   list.sort((a, b) => {
     switch (sortBy) {
       case 'documentNumber':
-        return a.documentNumber.localeCompare(b.documentNumber)
+      case 'documentNumberAsc':
+        return a.documentNumber.localeCompare(b.documentNumber, undefined, { numeric: true })
+      case 'documentNumberDesc':
+        return b.documentNumber.localeCompare(a.documentNumber, undefined, { numeric: true })
       case 'bidDueDate':
         return a.bidDueDate.localeCompare(b.bidDueDate)
       case 'estimatedValue':

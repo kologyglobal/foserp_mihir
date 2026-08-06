@@ -1,15 +1,17 @@
 /**
  * Commercial Place of Supply + supply type (FE preview; BE is authoritative on write).
- * Mirrors backend commercial-supply-context.ts.
+ * Mirrors backend commercial-supply-context.ts — keep logic in lockstep.
  */
 import { formatPlaceOfSupplyLabel, resolveGstStateCode } from './gstStateCode'
 
 export type CommercialPlaceOfSupplySource =
   | 'AUTO'
   | 'CUSTOMER'
+  | 'CUSTOMER_GSTIN'
   | 'SHIP_TO'
   | 'BILL_TO'
   | 'OVERRIDE'
+  | 'UNRESOLVED'
 
 export type CommercialSupplyType = 'INTRA_STATE' | 'INTER_STATE' | 'UNRESOLVED'
 export type CommercialGstScheme = 'cgst_sgst' | 'igst' | 'utgst_pair' | 'UNRESOLVED'
@@ -31,6 +33,7 @@ export function resolveCommercialPlaceOfSupply(input: {
   billToState?: string | null
   customerState?: string | null
   customerGstin?: string | null
+  /** @deprecated Not used for auto path — only override value is sticky. */
   explicitPlaceOfSupply?: string | null
   isServiceDocument?: boolean
 }): {
@@ -64,49 +67,78 @@ export function resolveCommercialPlaceOfSupply(input: {
     }
   }
 
-  if (input.explicitPlaceOfSupply?.trim()) {
-    const c = code(input.explicitPlaceOfSupply)
-    if (c) {
+  if (!input.isServiceDocument) {
+    const ship = code(input.shipToState)
+    if (ship) {
       return {
-        placeOfSupplyStateCode: c,
-        placeOfSupplyLabel: formatPlaceOfSupplyLabel(c, input.explicitPlaceOfSupply) || c,
-        source: 'AUTO',
+        placeOfSupplyStateCode: ship,
+        placeOfSupplyLabel: formatPlaceOfSupplyLabel(ship, input.shipToState) || ship,
+        source: 'SHIP_TO',
+        warnings,
+      }
+    }
+  } else {
+    const bill = code(input.billToState)
+    if (bill) {
+      return {
+        placeOfSupplyStateCode: bill,
+        placeOfSupplyLabel: formatPlaceOfSupplyLabel(bill, input.billToState) || bill,
+        source: 'BILL_TO',
         warnings,
       }
     }
   }
 
-  const primary = input.isServiceDocument
-    ? [input.billToState, input.shipToState]
-    : [input.shipToState, input.billToState]
-  for (const p of primary) {
-    const c = code(p)
-    if (c) {
-      return {
-        placeOfSupplyStateCode: c,
-        placeOfSupplyLabel: formatPlaceOfSupplyLabel(c, p) || c,
-        source: input.isServiceDocument ? 'BILL_TO' : 'SHIP_TO',
-        warnings,
-      }
-    }
-  }
-
-  const customerCode = code(input.customerState) ?? code(input.customerGstin)
-  if (customerCode) {
+  const fromGstin = code(input.customerGstin)
+  if (fromGstin) {
     return {
-      placeOfSupplyStateCode: customerCode,
+      placeOfSupplyStateCode: fromGstin,
+      placeOfSupplyLabel: formatPlaceOfSupplyLabel(fromGstin) || fromGstin,
+      source: 'CUSTOMER_GSTIN',
+      warnings,
+    }
+  }
+
+  if (!input.isServiceDocument) {
+    const bill = code(input.billToState)
+    if (bill) {
+      return {
+        placeOfSupplyStateCode: bill,
+        placeOfSupplyLabel: formatPlaceOfSupplyLabel(bill, input.billToState) || bill,
+        source: 'BILL_TO',
+        warnings,
+      }
+    }
+  } else {
+    const ship = code(input.shipToState)
+    if (ship) {
+      return {
+        placeOfSupplyStateCode: ship,
+        placeOfSupplyLabel: formatPlaceOfSupplyLabel(ship, input.shipToState) || ship,
+        source: 'SHIP_TO',
+        warnings,
+      }
+    }
+  }
+
+  const customer = code(input.customerState)
+  if (customer) {
+    return {
+      placeOfSupplyStateCode: customer,
       placeOfSupplyLabel:
-        formatPlaceOfSupplyLabel(customerCode, input.customerState) || customerCode,
+        formatPlaceOfSupplyLabel(customer, input.customerState) || customer,
       source: 'CUSTOMER',
       warnings,
     }
   }
 
-  warnings.push('Place of Supply could not be determined')
+  warnings.push(
+    'Place of Supply could not be determined. Complete the customer or delivery tax details before posting.',
+  )
   return {
     placeOfSupplyStateCode: null,
     placeOfSupplyLabel: null,
-    source: 'AUTO',
+    source: 'UNRESOLVED',
     warnings,
   }
 }
@@ -184,4 +216,23 @@ export function formatTaxSchemeLabel(s: CommercialGstScheme | string): string {
   if (s === 'utgst_pair' || s === 'cgst_utgst') return 'CGST + UTGST'
   if (s === 'cgst_sgst') return 'CGST + SGST'
   return 'Unresolved'
+}
+
+export function formatPlaceOfSupplySourceLabel(source: CommercialPlaceOfSupplySource): string {
+  switch (source) {
+    case 'OVERRIDE':
+      return 'Authorised override'
+    case 'SHIP_TO':
+      return 'Delivery / ship-to address'
+    case 'BILL_TO':
+      return 'Bill-to address'
+    case 'CUSTOMER_GSTIN':
+      return 'Customer GST registration'
+    case 'CUSTOMER':
+      return 'Customer master state'
+    case 'UNRESOLVED':
+      return 'Not resolved'
+    default:
+      return 'Auto'
+  }
 }

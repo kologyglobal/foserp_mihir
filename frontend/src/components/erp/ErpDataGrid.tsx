@@ -38,8 +38,18 @@ export interface ErpDataGridProps<T> {
   showCompactSearch?: boolean
   showToolbarView?: boolean
   showToolbarExport?: boolean
-  /** When false, column headers are not sortable (use page-level sort instead) */
+  /**
+   * When false, only document-number columns support header sort (page-level Sort handles the rest).
+   * When true, all columns can use header sorting.
+   */
   enableColumnSorting?: boolean
+  /** Persist Columns menu layout; defaults to route path. Pass `false` to disable. */
+  columnLayoutKey?: string | false
+  /**
+   * When page Sort dropdown changes, pass the sort key so header column sort is cleared
+   * and page-level order applies.
+   */
+  sortResetToken?: string | number
   /** Search / filters / sort / view controls inside table shell */
   registerBar?: React.ReactNode
 }
@@ -52,6 +62,8 @@ export function ErpDataGrid<T>({
   showToolbarView = false,
   showToolbarExport = false,
   enableColumnSorting = true,
+  columnLayoutKey,
+  sortResetToken,
   registerBar,
   ...props
 }: ErpDataGridProps<T>) {
@@ -78,6 +90,8 @@ export function ErpDataGrid<T>({
         showToolbarView={showToolbarView}
         showToolbarExport={showToolbarExport}
         enableColumnSorting={enableColumnSorting}
+        columnLayoutKey={columnLayoutKey}
+        sortResetToken={sortResetToken}
         registerBar={registerBar}
       />
     </div>

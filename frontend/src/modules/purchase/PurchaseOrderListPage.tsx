@@ -71,7 +71,10 @@ function sortPoRows(rows: PurchaseOrderListRow[], sortBy: PoSortKey): PurchaseOr
   }
   switch (sortBy) {
     case 'documentNumber':
+    case 'documentNumberAsc':
       return list.sort((a, b) => cmp(a.documentNumber, b.documentNumber))
+    case 'documentNumberDesc':
+      return list.sort((a, b) => cmp(b.documentNumber, a.documentNumber))
     case 'vendorName':
       return list.sort((a, b) => cmp(a.vendorName, b.vendorName))
     case 'totalAmount':
@@ -492,6 +495,7 @@ export function PurchaseOrderListPage() {
                 hasActiveFilters={activeFilters}
                 onClearFilters={clearFilters}
                 onExport={exportList}
+                sortBy={sortBy}
                 registerFilter={{
                   search: filters.search,
                   onSearchChange: (search) => setFilters((f) => ({ ...f, search })),

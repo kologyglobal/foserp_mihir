@@ -13,6 +13,7 @@ import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
 import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
 import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
 import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
+import { isIncludedGrnLine } from '@/modules/purchase/grnLineDraft'
 
 function factorOf(l: GoodsReceiptNote['lines'][number]) {
   return Number(l.uomConversionFactor ?? 1) > 0 ? Number(l.uomConversionFactor ?? 1) : 1
@@ -88,6 +89,8 @@ export function GrnPrintPage() {
     return <div className="erp-page p-12 text-center text-erp-muted">Loading GRN…</div>
   }
 
+  const documentLines = grn.lines.filter(isIncludedGrnLine)
+
   return (
     <DocumentPrintShell
       title={grn.documentNumber}
@@ -154,7 +157,7 @@ export function GrnPrintPage() {
             </tr>
           </thead>
           <tbody>
-            {grn.lines.map((l) => {
+            {documentLines.map((l) => {
               const factor = factorOf(l)
               const purchaseUom = purchaseUomOf(l)
               const stockUom = stockUomOf(l)

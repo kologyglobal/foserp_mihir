@@ -283,6 +283,7 @@ export function PurchaseReturnListPage() {
                   columns={columns}
                   showCompactSearch={false}
                   enableColumnSorting={false}
+                  sortResetToken={sortBy}
                   stickyFirstColumn
                   emptyMessage={
                     activeFilters

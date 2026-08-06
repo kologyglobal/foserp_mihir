@@ -217,8 +217,10 @@ function buildReturnLines(
   inputs: PurchaseReturnLineInput[],
   refs: Awaited<ReturnType<typeof resolveReturnRefs>>,
   remainingByKey?: Map<string, number>,
+  opts?: { requireReturnableCap?: boolean },
 ) {
   validateReturnLines(inputs)
+  const requireCap = opts?.requireReturnableCap !== false
   const poLines = new Map((refs.po?.lines ?? []).map((line) => [line.id, line]))
   const grnLines = new Map((refs.grn?.lines ?? []).map((line) => [line.id, line]))
   const qiLines = new Map((refs.qi?.lines ?? []).map((line) => [line.goodsReceiptLineId, line]))
@@ -227,32 +229,55 @@ function buildReturnLines(
     const grnLine = input.goodsReceiptLineId ? grnLines.get(input.goodsReceiptLineId) : undefined
     if (input.purchaseOrderLineId && !poLine) throw new PurchaseReturnValidationError(`Invalid PO line ${index + 1}.`)
     if (input.goodsReceiptLineId && !grnLine) throw new PurchaseReturnValidationError(`Invalid GRN line ${index + 1}.`)
-    if (poLine && grnLine && grnLine.purchaseOrderLineId !== poLine.id) throw new PurchaseReturnValidationError(`PO/GRN mismatch on line ${index + 1}.`)
+    if (poLine && grnLine && grnLine.purchaseOrderLineId !== poLine.id) {
+      throw new PurchaseReturnValidationError(`PO/GRN mismatch on line ${index + 1}.`)
+    }
+    // Returns must be tied to a received GRN line (never free master items / unreceived PO lines).
+    if (!grnLine) {
+      throw new PurchaseReturnValidationError(
+        `Line ${index + 1}: goods receipt line is required. Only items received on a GRN can be returned.`,
+      )
+    }
     const quantity = returnQty(input.returnQuantity)
-    const key = grnLine?.id ?? poLine?.id ?? `idx-${index}`
-    let available = remainingByKey?.get(key)
+    const key = grnLine.id
+    const poKey = grnLine.purchaseOrderLineId ?? poLine?.id ?? null
+    let available: number | undefined = remainingByKey?.get(key)
+    if (available === undefined && poKey) available = remainingByKey?.get(poKey)
     if (available === undefined) {
-      available = refs.qi
-        ? returnQty(qiLines.get(grnLine?.id ?? null)?.rejectedQuantity)
-        : grnLine
-          ? returnQty(grnLine.acceptedQuantity) + returnQty(grnLine.rejectedQuantity)
-          : poLine
-            ? returnQty(poLine.receivedQuantity) - returnQty(poLine.returnedQuantity)
-            : quantity
+      if (requireCap && remainingByKey) {
+        // Cap map was computed — missing key means not returnable (or fully returned).
+        available = 0
+      } else if (refs.qi) {
+        available = returnQty(qiLines.get(grnLine.id)?.rejectedQuantity)
+      } else {
+        available =
+          returnQty(grnLine.acceptedQuantity) + returnQty(grnLine.rejectedQuantity) ||
+          returnQty(grnLine.receivedQuantity)
+      }
     }
     if (quantity > available + 1e-9) {
       throw new PurchaseReturnValidationError(
         `Return quantity exceeds remaining returnable quantity on line ${index + 1} (available ${available}).`,
       )
     }
-    const rate = input.rate ?? returnQty(grnLine?.rate ?? poLine?.rate)
+    if (available <= 0) {
+      throw new PurchaseReturnValidationError(
+        `Line ${index + 1} has no remaining returnable quantity (item must be received on GRN).`,
+      )
+    }
+    const rate = input.rate ?? returnQty(grnLine.rate ?? poLine?.rate)
     const taxSnap = taxSnapshotFromGrnOrPoLine(grnLine, poLine)
     return {
-      lineNumber: index + 1, goodsReceiptLineId: grnLine?.id ?? null, purchaseOrderLineId: poLine?.id ?? grnLine?.purchaseOrderLineId ?? null,
-      itemId: input.itemId ?? grnLine?.itemId ?? poLine?.itemId ?? null,
-      itemCodeSnapshot: input.itemCode || grnLine?.itemCodeSnapshot || poLine?.itemCodeSnapshot || '',
-      itemNameSnapshot: input.itemName || grnLine?.itemNameSnapshot || poLine?.itemNameSnapshot || '',
-      returnQuantity: quantity, rate, amount: returnMoney(quantity * rate), remarks: input.remarks?.trim() || null,
+      lineNumber: index + 1,
+      goodsReceiptLineId: grnLine.id,
+      purchaseOrderLineId: poLine?.id ?? grnLine.purchaseOrderLineId ?? null,
+      itemId: input.itemId ?? grnLine.itemId ?? poLine?.itemId ?? null,
+      itemCodeSnapshot: input.itemCode || grnLine.itemCodeSnapshot || poLine?.itemCodeSnapshot || '',
+      itemNameSnapshot: input.itemName || grnLine.itemNameSnapshot || poLine?.itemNameSnapshot || '',
+      returnQuantity: quantity,
+      rate,
+      amount: returnMoney(quantity * rate),
+      remarks: input.remarks?.trim() || null,
       hsnIdSnapshot: taxSnap?.hsnIdSnapshot ?? null,
       hsnCodeSnapshot: taxSnap?.hsnCodeSnapshot ?? '',
       gstGroupIdSnapshot: taxSnap?.gstGroupIdSnapshot ?? null,
@@ -264,6 +289,24 @@ function buildReturnLines(
       gstSchemeSnapshot: taxSnap?.gstSchemeSnapshot ?? 'cgst_sgst',
     }
   })
+}
+
+function remainingMapFromReturnable(
+  returnable: Awaited<ReturnType<typeof computeRemainingReturnable>>,
+): Map<string, number> {
+  const remainingByKey = new Map<string, number>()
+  for (const l of returnable.lines) {
+    if (l.goodsReceiptLineId) {
+      remainingByKey.set(l.goodsReceiptLineId, l.remainingReturnableQuantity)
+    }
+    if (l.purchaseOrderLineId) {
+      // Prefer GRN line key; PO key only as secondary for legacy line payloads.
+      if (!remainingByKey.has(l.purchaseOrderLineId)) {
+        remainingByKey.set(l.purchaseOrderLineId, l.remainingReturnableQuantity)
+      }
+    }
+  }
+  return remainingByKey
 }
 export async function listPurchaseReturns(tenantId: string, query: ListPurchaseReturnsQuery) {
   const result = await repo.findPurchaseReturns(tenantId, query)
@@ -281,27 +324,53 @@ export async function getPurchaseReturn(tenantId: string, id: string) {
 }
 export async function createPurchaseReturn(tenantId: string, actorId: string, input: CreatePurchaseReturnInput) {
   if (!input.reason?.trim()) throw new PurchaseReturnValidationError('Return reason is required.')
+  if (!input.goodsReceiptId && !input.qualityInspectionId) {
+    throw new PurchaseReturnValidationError(
+      'Select a goods receipt or quality inspection. Purchase returns only use received GRN / QI quantities.',
+    )
+  }
   const refs = await resolveReturnRefs(tenantId, input)
-  if (refs.grn?.status === 'CANCELLED') {
+  let { grn, qi, po, warehouseId } = refs
+  if (!grn && !qi) {
+    throw new PurchaseReturnValidationError('Goods receipt or quality inspection is required.')
+  }
+  // QI-only clients must resolve to the linked GRN so lines can bind goodsReceiptLineId.
+  if (qi && !grn && qi.goodsReceiptId) {
+    const linkedGrn = await prisma.goodsReceipt.findFirst({
+      where: {
+        id: qi.goodsReceiptId,
+        ...tenantActiveFilter(tenantId),
+        vendorId: input.vendorId,
+      },
+      include: { lines: true },
+    })
+    if (!linkedGrn) {
+      throw new PurchaseReturnValidationError('Quality inspection is not linked to a valid goods receipt.')
+    }
+    grn = linkedGrn
+  }
+  if (!grn) {
+    throw new PurchaseReturnValidationError('A goods receipt is required to return items.')
+  }
+  if (grn.status === 'CANCELLED') {
     throw new PurchaseReturnValidationError('Cannot create a return for a cancelled goods receipt.')
   }
   const returnable = await computeRemainingReturnable(tenantId, {
-    qualityInspectionId: input.qualityInspectionId,
-    goodsReceiptId: input.goodsReceiptId,
+    qualityInspectionId: input.qualityInspectionId ?? qi?.id,
+    goodsReceiptId: grn.id,
   })
   if (returnable.closedForReturn) {
     throw new PurchaseReturnValidationError('Goods receipt is closed for returns.')
   }
-  const remainingByKey = new Map(
-    returnable.lines
-      .filter((l) => l.goodsReceiptLineId || l.purchaseOrderLineId)
-      .map((l) => [l.goodsReceiptLineId ?? l.purchaseOrderLineId!, l.remainingReturnableQuantity]),
-  )
-  // Without QI/GRN remaining map, fall through to classic caps
+  const remainingByKey = remainingMapFromReturnable(returnable)
+  if (![...remainingByKey.values()].some((q) => q > 0)) {
+    throw new PurchaseReturnValidationError('No remaining returnable quantity on this GRN/QI.')
+  }
   const lines = buildReturnLines(
     input.lines,
-    refs,
-    remainingByKey.size ? remainingByKey : undefined,
+    { po, grn, qi, warehouseId },
+    remainingByKey,
+    { requireReturnableCap: true },
   )
   if (lines.every((l) => l.returnQuantity <= 0)) {
     throw new PurchaseReturnValidationError('No remaining returnable quantity.')
@@ -311,11 +380,11 @@ export async function createPurchaseReturn(tenantId: string, actorId: string, in
   const row = await prisma.$transaction(async (tx) => {
     const created = await tx.purchaseReturn.create({ data: {
       tenantId, returnNumber, returnDate: returnDate(input.returnDate) ?? new Date(), vendorId: input.vendorId,
-      purchaseOrderId: refs.po?.id ?? input.purchaseOrderId ?? null, goodsReceiptId: refs.grn?.id ?? input.goodsReceiptId ?? null,
-      qualityInspectionId: refs.qi?.id ?? input.qualityInspectionId ?? null, warehouseId: refs.warehouseId,
+      purchaseOrderId: po?.id ?? input.purchaseOrderId ?? null, goodsReceiptId: grn.id,
+      qualityInspectionId: qi?.id ?? input.qualityInspectionId ?? null, warehouseId,
       status: 'DRAFT',
       returnType,
-      decisionCode: input.decisionCode?.trim() || refs.qi?.decisionCode || null,
+      decisionCode: input.decisionCode?.trim() || qi?.decisionCode || null,
       ncrId: input.ncrId ?? null,
       replacedReturnId: input.replacedReturnId ?? null,
       accountingStatus: 'NONE',
@@ -330,20 +399,66 @@ export async function createPurchaseReturn(tenantId: string, actorId: string, in
 }
 export async function updatePurchaseReturn(tenantId: string, id: string, actorId: string, input: UpdatePurchaseReturnInput) {
   const existing = await loadOrThrow(tenantId, id); assertReturnStatus(existing.status, ['DRAFT'], 'updated')
+  const vendorId = input.vendorId ?? existing.vendorId
+  const goodsReceiptId =
+    input.goodsReceiptId !== undefined ? input.goodsReceiptId : existing.goodsReceiptId
+  const qualityInspectionId =
+    input.qualityInspectionId !== undefined ? input.qualityInspectionId : existing.qualityInspectionId
+  if (!goodsReceiptId && !qualityInspectionId) {
+    throw new PurchaseReturnValidationError(
+      'Select a goods receipt or quality inspection. Purchase returns only use received GRN / QI quantities.',
+    )
+  }
   const refs = await resolveReturnRefs(tenantId, {
-    vendorId: input.vendorId ?? existing.vendorId,
+    vendorId,
     purchaseOrderId: input.purchaseOrderId !== undefined ? input.purchaseOrderId : existing.purchaseOrderId,
-    goodsReceiptId: input.goodsReceiptId !== undefined ? input.goodsReceiptId : existing.goodsReceiptId,
-    qualityInspectionId: input.qualityInspectionId !== undefined ? input.qualityInspectionId : existing.qualityInspectionId,
+    goodsReceiptId,
+    qualityInspectionId,
     warehouseId: input.warehouseId !== undefined ? input.warehouseId : existing.warehouseId,
     plantId: input.plantId,
   })
-  const lines = input.lines ? buildReturnLines(input.lines, refs) : undefined
+  let { grn, qi, po, warehouseId } = refs
+  if (qi && !grn && qi.goodsReceiptId) {
+    const linkedGrn = await prisma.goodsReceipt.findFirst({
+      where: {
+        id: qi.goodsReceiptId,
+        ...tenantActiveFilter(tenantId),
+        vendorId,
+      },
+      include: { lines: true },
+    })
+    if (linkedGrn) grn = linkedGrn
+  }
+  if (!grn) {
+    throw new PurchaseReturnValidationError('A goods receipt is required to return items.')
+  }
+  let lines = undefined as ReturnType<typeof buildReturnLines> | undefined
+  if (input.lines) {
+    const returnable = await computeRemainingReturnable(tenantId, {
+      qualityInspectionId: qualityInspectionId ?? qi?.id,
+      goodsReceiptId: grn.id,
+      excludeReturnId: id,
+    })
+    if (returnable.closedForReturn) {
+      throw new PurchaseReturnValidationError('Goods receipt is closed for returns.')
+    }
+    const remainingByKey = remainingMapFromReturnable(returnable)
+    lines = buildReturnLines(
+      input.lines,
+      { po, grn, qi, warehouseId },
+      remainingByKey,
+      { requireReturnableCap: true },
+    )
+  }
   await prisma.$transaction(async (tx) => {
     if (lines) await repo.replacePurchaseReturnLines(tenantId, id, lines, tx)
     await repo.updatePurchaseReturn(tenantId, id, {
-      vendorId: input.vendorId ?? existing.vendorId, purchaseOrderId: refs.po?.id ?? null, goodsReceiptId: refs.grn?.id ?? null,
-      qualityInspectionId: refs.qi?.id ?? null, warehouseId: refs.warehouseId, updatedById: actorId,
+      vendorId,
+      purchaseOrderId: po?.id ?? null,
+      goodsReceiptId: grn?.id ?? null,
+      qualityInspectionId: qi?.id ?? null,
+      warehouseId,
+      updatedById: actorId,
       ...(input.returnDate !== undefined ? { returnDate: returnDate(input.returnDate) ?? existing.returnDate } : {}),
       ...(input.reason !== undefined ? { reason: input.reason?.trim() || null } : {}),
       ...(input.remarks !== undefined ? { remarks: input.remarks?.trim() || null } : {}),

@@ -16,11 +16,18 @@ export const DEFAULT_RETURN_LIST_FILTERS: ReturnListFilters = {
   vendorName: '',
 }
 
-export type ReturnSortKey = 'documentDate' | 'documentNumber' | 'vendorName' | 'status'
+export type ReturnSortKey =
+  | 'documentDate'
+  | 'documentNumber'
+  | 'documentNumberAsc'
+  | 'documentNumberDesc'
+  | 'vendorName'
+  | 'status'
 
 export const RETURN_SORT_OPTIONS: { value: ReturnSortKey; label: string }[] = [
   { value: 'documentDate', label: 'Sort: Date' },
-  { value: 'documentNumber', label: 'Sort: Return No' },
+  { value: 'documentNumberAsc', label: 'Sort: Return No (A→Z)' },
+  { value: 'documentNumberDesc', label: 'Sort: Return No (Z→A)' },
   { value: 'vendorName', label: 'Sort: Vendor' },
   { value: 'status', label: 'Sort: Status' },
 ]
@@ -97,7 +104,12 @@ export function sortReturnRows(
 ): PurchaseReturnListRow[] {
   const list = [...rows]
   list.sort((a, b) => {
-    if (sortBy === 'documentNumber') return b.documentNumber.localeCompare(a.documentNumber)
+    if (sortBy === 'documentNumber' || sortBy === 'documentNumberAsc') {
+      return a.documentNumber.localeCompare(b.documentNumber, undefined, { numeric: true })
+    }
+    if (sortBy === 'documentNumberDesc') {
+      return b.documentNumber.localeCompare(a.documentNumber, undefined, { numeric: true })
+    }
     if (sortBy === 'vendorName') return a.vendorName.localeCompare(b.vendorName)
     if (sortBy === 'status') return a.status.localeCompare(b.status)
     return b.documentDate.localeCompare(a.documentDate)

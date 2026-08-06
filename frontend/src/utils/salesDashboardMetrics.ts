@@ -302,6 +302,8 @@ export type SalesOrderSortKey =
   | 'customer'
   | 'status'
   | 'soNo'
+  | 'soNoAsc'
+  | 'soNoDesc'
 
 function salesOrderLastTouched(so: SalesOrder): string {
   return so.modifiedAt || so.createdAt || so.orderDate || ''
@@ -340,7 +342,15 @@ export function sortSalesOrders(
       sorted.sort((a, b) => statusRank(a.status) - statusRank(b.status))
       break
     case 'soNo':
-      sorted.sort((a, b) => b.salesOrderNo.localeCompare(a.salesOrderNo))
+    case 'soNoAsc':
+      sorted.sort((a, b) =>
+        a.salesOrderNo.localeCompare(b.salesOrderNo, undefined, { numeric: true }),
+      )
+      break
+    case 'soNoDesc':
+      sorted.sort((a, b) =>
+        b.salesOrderNo.localeCompare(a.salesOrderNo, undefined, { numeric: true }),
+      )
       break
     case 'orderDate':
     default:

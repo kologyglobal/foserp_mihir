@@ -52,7 +52,16 @@ import {
 } from '../../types/crmCommercial'
 import type { StatusDotTone } from '../../components/design-system/StatusDot'
 
-type InvoiceSortKey = 'invoiceDate' | 'dueDate' | 'customer' | 'amount' | 'balance' | 'status' | 'invoiceNo'
+type InvoiceSortKey =
+  | 'invoiceDate'
+  | 'dueDate'
+  | 'customer'
+  | 'amount'
+  | 'balance'
+  | 'status'
+  | 'invoiceNo'
+  | 'invoiceNoAsc'
+  | 'invoiceNoDesc'
 
 const INVOICE_FILTER_DEFAULTS = {
   search: '',
@@ -115,7 +124,8 @@ const INVOICE_SORT_OPTIONS: { value: InvoiceSortKey; label: string }[] = [
   { value: 'amount', label: 'Sort: Amount' },
   { value: 'balance', label: 'Sort: Balance Due' },
   { value: 'status', label: 'Sort: Status' },
-  { value: 'invoiceNo', label: 'Sort: Invoice No.' },
+  { value: 'invoiceNoAsc', label: 'Sort: Invoice No. (A→Z)' },
+  { value: 'invoiceNoDesc', label: 'Sort: Invoice No. (Z→A)' },
 ]
 
 function invoiceTone(status: CrmTaxInvoiceStatus): StatusDotTone {
@@ -166,7 +176,10 @@ function sortInvoices(list: CrmTaxInvoice[], sortBy: InvoiceSortKey): CrmTaxInvo
       case 'status':
         return a.status.localeCompare(b.status) || b.invoiceDate.localeCompare(a.invoiceDate)
       case 'invoiceNo':
-        return b.invoiceNo.localeCompare(a.invoiceNo)
+      case 'invoiceNoAsc':
+        return a.invoiceNo.localeCompare(b.invoiceNo, undefined, { numeric: true })
+      case 'invoiceNoDesc':
+        return b.invoiceNo.localeCompare(a.invoiceNo, undefined, { numeric: true })
       case 'dueDate':
         return a.dueDate.localeCompare(b.dueDate) || b.invoiceNo.localeCompare(a.invoiceNo)
       case 'invoiceDate':
@@ -632,6 +645,7 @@ export function SalesTaxInvoiceListPage() {
             showCompactSearch={false}
             showToolbarExport={false}
             enableColumnSorting={false}
+            sortResetToken={sortBy}
             emptyMessage={
               hasActiveFilters
                 ? 'No invoices match the current filters.'

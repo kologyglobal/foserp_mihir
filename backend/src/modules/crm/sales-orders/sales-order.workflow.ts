@@ -192,6 +192,45 @@ export function assertDraftEditable(order: CrmSalesOrder): void {
   }
 }
 
+/**
+ * Re-apply document-level tax scheme to every line so CGST/SGST/UTGST/IGST never mix.
+ * Clears opposite-scheme rates then rebuilds amounts from taxPct.
+ */
+export function applyDocumentTaxSchemeToLines(
+  lines: SalesOrderLineDto[],
+  taxScheme: string | null | undefined,
+): SalesOrderLineDto[] {
+  if (!taxScheme || taxScheme === 'UNRESOLVED' || !lines.length) return lines
+  return buildLinesFromInput({
+    lines: lines.map((l) => ({
+      id: l.id,
+      lineNo: l.lineNo,
+      productOrItem: l.productOrItem,
+      description: l.description,
+      itemId: l.itemId,
+      itemCodeSnapshot: l.itemCodeSnapshot,
+      itemNameSnapshot: l.itemNameSnapshot,
+      qty: l.qty,
+      uom: l.uom,
+      unitPrice: l.unitPrice,
+      discountPct: l.discountPct,
+      taxPct: l.taxPct,
+      technicalScopeRef: l.technicalScopeRef,
+      hsnCode: l.hsnCode,
+      hsnId: l.hsnId,
+      taxScheme,
+      cgstRate: null,
+      sgstRate: null,
+      utgstRate: null,
+      igstRate: null,
+      cgstAmount: null,
+      sgstAmount: null,
+      utgstAmount: null,
+      igstAmount: null,
+    })),
+  }).lines
+}
+
 export function assertConfirmable(order: CrmSalesOrder): void {
   if (order.status !== 'open') {
     throw new InvalidStateError(`Cannot confirm sales order in status ${order.status}`)
@@ -213,6 +252,46 @@ export function assertConfirmable(order: CrmSalesOrder): void {
   const grand = order.grandTotal != null ? Number(order.grandTotal) : 0
   if (!(grand > 0)) {
     throw new ValidationError('Grand total must be greater than zero before confirmation')
+  }
+
+  const placeCode = order.placeOfSupplyStateCode?.trim()
+  const supplyType = order.supplyType?.trim()
+  if (!placeCode || !order.supplierStateCode?.trim()) {
+    throw new ValidationError(
+      'Place of Supply could not be determined. Complete customer or delivery tax details before posting.',
+    )
+  }
+  if (!supplyType || supplyType === 'UNRESOLVED' || order.gstScheme === 'UNRESOLVED') {
+    throw new ValidationError(
+      'GST supply type is unresolved. Complete supplier state and Place of Supply before confirmation.',
+    )
+  }
+  // Header / line scheme integrity (no dual scheme retention)
+  assertLineGstSchemeIntegrity(order)
+}
+
+function assertLineGstSchemeIntegrity(order: CrmSalesOrder): void {
+  const scheme = (order.gstScheme ?? '').toLowerCase()
+  if (!scheme || scheme === 'unresolved') return
+  const lines = Array.isArray(order.lines) ? (order.lines as SalesOrderLineDto[]) : []
+  for (const line of lines) {
+    const cgst = Number(line.cgstAmount ?? 0)
+    const sgst = Number(line.sgstAmount ?? 0)
+    const utgst = Number(line.utgstAmount ?? 0)
+    const igst = Number(line.igstAmount ?? 0)
+    if (scheme === 'igst' && (cgst > 0.009 || sgst > 0.009 || utgst > 0.009)) {
+      throw new ValidationError(
+        'GST treatment changed based on the resolved Place of Supply. Inter-state lines must not retain CGST/SGST/UTGST. Review the updated tax calculation before continuing.',
+      )
+    }
+    if (
+      (scheme === 'cgst_sgst' || scheme === 'utgst_pair' || scheme === 'cgst_utgst') &&
+      igst > 0.009
+    ) {
+      throw new ValidationError(
+        'GST treatment changed based on the resolved Place of Supply. Intra-state lines must not retain IGST. Review the updated tax calculation before continuing.',
+      )
+    }
   }
 }
 

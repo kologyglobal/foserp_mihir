@@ -25,18 +25,14 @@ import {
   mapReceiptDto,
 } from './commercial.types.js'
 import { resolveGstStateCode } from '../../accounting/receivables/validation/state-code.validator.js'
-import { resolveEffectivePurchaseDefaults } from '../../purchase/shared/purchase-defaults.js'
+import { resolveSupplierStateCode } from '../sales-orders/sales-order-tax-header.js'
 
-/** Fallback when tenant setup has no billing state configured. */
-const FALLBACK_COMPANY_STATE_CODE = '27'
-
-async function resolveTenantBillingStateCode(tenantId: string): Promise<string | null> {
-  const defaults = await resolveEffectivePurchaseDefaults(tenantId)
-  return (
-    resolveGstStateCode(defaults.placeOfSupplyStateCode) ??
-    resolveGstStateCode(defaults.placeOfSupplyState) ??
-    FALLBACK_COMPANY_STATE_CODE
-  )
+/**
+ * Seller (supply) state for commercial PI/TI when the client did not send supplierStateCode.
+ * Default Legal Entity only — never invent purchase POS or silent "27".
+ */
+async function resolveTenantSellerStateCode(tenantId: string): Promise<string | null> {
+  return resolveSupplierStateCode(tenantId, null, null)
 }
 
 function resolveCustomerPlaceOfSupplyCode(
@@ -254,16 +250,19 @@ async function buildProformaPayload(
 
   const customerState = input.customerState ?? company.state ?? ''
   const customerGstin = company.gstin ?? null
-  const companyStateCode = await resolveTenantBillingStateCode(tenantId)
-  const placeOfSupplyCode = resolveCustomerPlaceOfSupplyCode(
+  // Prefer explicit seller state / SO snapshot / Legal Entity — never silent "27".
+  let companyStateCode: string | null = null
+  if (input.supplierStateCode) {
+    companyStateCode = resolveGstStateCode(input.supplierStateCode)
+  }
+  if (!companyStateCode) {
+    companyStateCode = await resolveTenantSellerStateCode(tenantId)
+  }
+  let placeOfSupplyCode = resolveCustomerPlaceOfSupplyCode(
     customerState,
     customerGstin,
-    existing?.placeOfSupply ?? null,
+    input.placeOfSupplyStateCode ?? input.placeOfSupply ?? existing?.placeOfSupply ?? null,
   )
-  const gst = buildGst(companyStateCode, placeOfSupplyCode, computedLines)
-  const address = [company.addressLine1, company.city, company.state, company.pincode].filter(Boolean).join(', ')
-  const proformaDate = (input.proformaDate ?? existing?.proformaDate.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
-  const validUntil = (input.validUntil ?? existing?.validUntil.toISOString().slice(0, 10) ?? addDays(proformaDate, 30)).slice(0, 10)
 
   let salesOrderId = input.salesOrderId ?? existing?.salesOrderId ?? null
   let salesOrderNo = input.salesOrderNo ?? existing?.salesOrderNo ?? null
@@ -281,7 +280,39 @@ async function buildProformaPayload(
     salesOrderNo = salesOrderNo ?? so.salesOrderNo
     quotationId = quotationId ?? so.quotationId
     quotationNo = quotationNo ?? so.quotationNo
+    // Carry SO GST header snapshot when create did not override.
+    const soPos =
+      resolveGstStateCode(so.placeOfSupplyStateCode) ?? resolveGstStateCode(so.placeOfSupply)
+    if (soPos && !input.placeOfSupplyStateCode && !input.placeOfSupply) {
+      placeOfSupplyCode = soPos
+    }
+    const soSupplier = resolveGstStateCode(so.supplierStateCode)
+    if (soSupplier && !input.supplierStateCode) {
+      companyStateCode = soSupplier
+    }
   }
+
+  const gst = buildGst(companyStateCode, placeOfSupplyCode, computedLines)
+  // Honour explicit gstScheme from upstream when supplied
+  if (input.gstScheme === 'igst' || input.gstScheme === 'cgst_sgst' || input.gstScheme === 'utgst_pair') {
+    if (input.gstScheme === 'igst' && gst.gstScheme !== 'igst') {
+      gst.gstScheme = 'igst'
+      gst.igstAmount = gst.totalTaxAmount
+      gst.cgstAmount = 0
+      gst.sgstAmount = 0
+    } else if (input.gstScheme !== 'igst' && gst.gstScheme === 'igst') {
+      const half = Math.round((gst.totalTaxAmount / 2) * 100) / 100
+      gst.gstScheme = input.gstScheme
+      gst.cgstAmount = half
+      gst.sgstAmount = Math.round((gst.totalTaxAmount - half) * 100) / 100
+      gst.igstAmount = 0
+    } else {
+      gst.gstScheme = input.gstScheme
+    }
+  }
+  const address = [company.addressLine1, company.city, company.state, company.pincode].filter(Boolean).join(', ')
+  const proformaDate = (input.proformaDate ?? existing?.proformaDate.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
+  const validUntil = (input.validUntil ?? existing?.validUntil.toISOString().slice(0, 10) ?? addDays(proformaDate, 30)).slice(0, 10)
 
   return {
     company,

@@ -42,7 +42,14 @@ import {
 } from '../moneyInUi'
 import { MoneyInWorkspaceShell } from '../MoneyInWorkspaceShell'
 
-type CreditNoteSortKey = 'creditNoteDate' | 'customer' | 'amount' | 'status' | 'creditNoteNo'
+type CreditNoteSortKey =
+  | 'creditNoteDate'
+  | 'customer'
+  | 'amount'
+  | 'status'
+  | 'creditNoteNo'
+  | 'creditNoteNoAsc'
+  | 'creditNoteNoDesc'
 
 const CREDIT_NOTE_FILTER_DEFAULTS = {
   search: '',
@@ -73,7 +80,8 @@ const CREDIT_NOTE_SORT_OPTIONS: { value: CreditNoteSortKey; label: string }[] = 
   { value: 'customer', label: 'Sort: Customer' },
   { value: 'amount', label: 'Sort: Amount' },
   { value: 'status', label: 'Sort: Status' },
-  { value: 'creditNoteNo', label: 'Sort: Credit Note No.' },
+  { value: 'creditNoteNoAsc', label: 'Sort: Credit Note No. (A→Z)' },
+  { value: 'creditNoteNoDesc', label: 'Sort: Credit Note No. (Z→A)' },
 ]
 
 function chipToneFromErp(tone: string): StatusDotTone {
@@ -102,7 +110,14 @@ function sortRows(
           || b.creditNoteDate.localeCompare(a.creditNoteDate)
         )
       case 'creditNoteNo':
-        return creditNoteDisplayNumber(b).localeCompare(creditNoteDisplayNumber(a))
+      case 'creditNoteNoAsc':
+        return creditNoteDisplayNumber(a).localeCompare(creditNoteDisplayNumber(b), undefined, {
+          numeric: true,
+        })
+      case 'creditNoteNoDesc':
+        return creditNoteDisplayNumber(b).localeCompare(creditNoteDisplayNumber(a), undefined, {
+          numeric: true,
+        })
       case 'creditNoteDate':
       default:
         return (
@@ -374,6 +389,7 @@ export function CreditNoteListPage() {
               showCompactSearch={false}
               showToolbarExport={false}
               enableColumnSorting={false}
+              sortResetToken={sortBy}
               emptyMessage={
                 hasActiveFilters
                   ? 'No credit notes match the current filters.'

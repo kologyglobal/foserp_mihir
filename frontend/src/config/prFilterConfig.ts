@@ -41,6 +41,8 @@ export const DEFAULT_PR_LIST_FILTERS: PrListFilters = {
 export type PrSortKey =
   | 'documentDate'
   | 'documentNumber'
+  | 'documentNumberAsc'
+  | 'documentNumberDesc'
   | 'estimatedValue'
   | 'requiredBy'
   | 'status'
@@ -50,7 +52,8 @@ export type PrSortKey =
 
 export const PR_SORT_OPTIONS: { value: PrSortKey; label: string }[] = [
   { value: 'documentDate', label: 'Sort: PR Date' },
-  { value: 'documentNumber', label: 'Sort: PR Number' },
+  { value: 'documentNumberAsc', label: 'Sort: PR Number (A→Z)' },
+  { value: 'documentNumberDesc', label: 'Sort: PR Number (Z→A)' },
   { value: 'estimatedValue', label: 'Sort: Est. Value' },
   { value: 'requiredBy', label: 'Sort: Required By' },
   { value: 'status', label: 'Sort: Status' },

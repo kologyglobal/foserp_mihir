@@ -69,7 +69,8 @@ import {
 import { SalesTaxInvoiceListPage } from '../../sales/SalesTaxInvoiceListPage'
 import { cn } from '../../../utils/cn'
 import type { CrmCommercialLine } from '../../../types/crmCommercial'
-import { COMPANY_STATE } from '../../../types/invoice'
+import { resolveGstStateCode } from '../../../utils/gstStateCode'
+import { loadSellerStateCode } from '../../../utils/sellerGstState'
 import {
   CommercialGstSupplyPanel,
   type CommercialGstSupplyValue,
@@ -78,7 +79,6 @@ import {
   formatTaxSchemeLabel,
   resolveHsnSacDisplay,
 } from '../../../utils/commercialLineSnapshot'
-import { resolveGstStateCode } from '../../../utils/gstStateCode'
 
 type InvoiceCreateSource = 'sales_order' | 'proforma' | 'direct'
 
@@ -97,10 +97,17 @@ function recomputePrefill(prefill: TaxInvoicePrefill, lines: CrmCommercialLine[]
   const avgRate = withNos.length
     ? withNos.reduce((s, l) => s + l.taxPct, 0) / withNos.length
     : 0
+  const placeOfSupply =
+    prefill.placeOfSupplyStateCode || prefill.placeOfSupply || prefill.customerState
   return {
     ...prefill,
     lines: withNos,
-    gst: computeGst(taxable, prefill.customerState, avgRate),
+    gst: computeGst(
+      taxable,
+      placeOfSupply,
+      avgRate,
+      prefill.supplierStateCode || undefined,
+    ),
   }
 }
 
@@ -177,21 +184,60 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
     placeOfSupply: '',
     placeOfSupplyOverride: false,
     placeOfSupplyOverrideReason: '',
-    supplierStateCode: resolveGstStateCode(COMPANY_STATE) ?? '27',
+    /** Filled from default Legal Entity; do not seed from customer. */
+    supplierStateCode: '',
   }))
+
+  useEffect(() => {
+    let cancelled = false
+    void loadSellerStateCode().then((code) => {
+      if (cancelled || !code) return
+      setGstSupply((prev) =>
+        prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Seed supplier from SO/PI snapshot when present; LE seed effect fills when missing.
+  useEffect(() => {
+    const code = prefill?.supplierStateCode?.trim()
+    if (!code) return
+    setGstSupply((prev) =>
+      prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
+    )
+  }, [prefill?.supplierStateCode, prefill?.salesOrderId, prefill?.proformaInvoiceId])
 
   const isDirect = sourceType === 'direct' || prefill?.source === 'direct'
 
-  // Seed auto Place of Supply when customer context loads (don't clobber authorise override).
+  // Prefer upstream SO/PI snapshot for Place of Supply; fallback to customer state.
   useEffect(() => {
-    if (!prefill?.customerState) return
+    if (!prefill) return
     setGstSupply((prev) => {
       if (prev.placeOfSupplyOverride) return prev
-      const code = resolveGstStateCode(prefill.customerState) ?? ''
-      if (code === prev.placeOfSupply) return prev
-      return { ...prev, placeOfSupply: code }
+      const fromUpstream =
+        resolveGstStateCode(prefill.placeOfSupplyStateCode) ??
+        resolveGstStateCode(prefill.placeOfSupply) ??
+        resolveGstStateCode(prefill.customerState) ??
+        ''
+      const seller =
+        resolveGstStateCode(prefill.supplierStateCode) ?? prev.supplierStateCode
+      if (fromUpstream === prev.placeOfSupply && seller === prev.supplierStateCode) return prev
+      return {
+        ...prev,
+        placeOfSupply: fromUpstream || prev.placeOfSupply,
+        supplierStateCode: seller || prev.supplierStateCode,
+      }
     })
-  }, [prefill?.customerId, prefill?.customerState])
+  }, [
+    prefill?.customerId,
+    prefill?.customerState,
+    prefill?.placeOfSupply,
+    prefill?.placeOfSupplyStateCode,
+    prefill?.supplierStateCode,
+  ])
 
   const confirmedSos = useMemo(
     () => salesOrders.filter((s) => s.status !== 'open' && s.status !== 'closed'),
@@ -447,8 +493,7 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
       const snap = await resolveCommercialLineTax({
         direction: 'SALES',
         item: item ?? null,
-        companyState: COMPANY_STATE,
-        companyStateCode: gstSupply.supplierStateCode || resolveGstStateCode(COMPANY_STATE),
+        companyStateCode: gstSupply.supplierStateCode || undefined,
         partyState: prefill.customerState,
         partyGstin: prefill.customerGstin,
         placeOfSupply: gstSupply.placeOfSupplyOverride
@@ -528,6 +573,9 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
       customerState: draft.customerState,
       invoiceDate: draft.invoiceDate,
       dueDate: draft.dueDate,
+      placeOfSupply: gstSupply.placeOfSupply || draft.placeOfSupply || null,
+      placeOfSupplyStateCode: gstSupply.placeOfSupply || null,
+      supplierStateCode: gstSupply.supplierStateCode || null,
       lines: draft.lines,
     })
   }
@@ -555,6 +603,9 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
       customerState: prefill.customerState,
       invoiceDate: invoiceMeta.invoiceDate,
       dueDate: invoiceMeta.dueDate,
+      placeOfSupply: gstSupply.placeOfSupply || prefill.placeOfSupply || null,
+      placeOfSupplyStateCode: gstSupply.placeOfSupply || prefill.placeOfSupplyStateCode || null,
+      supplierStateCode: gstSupply.supplierStateCode || prefill.supplierStateCode || null,
       lines: activeLines,
     })
   }
@@ -592,6 +643,11 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
       remarks: prefill.remarks,
       invoiceDate: invoiceMeta?.invoiceDate,
       dueDate: invoiceMeta?.dueDate,
+      placeOfSupply: gstSupply.placeOfSupply || prefill.placeOfSupply || null,
+      placeOfSupplyStateCode: gstSupply.placeOfSupply || prefill.placeOfSupplyStateCode || null,
+      supplierStateCode: gstSupply.supplierStateCode || prefill.supplierStateCode || null,
+      supplyType: prefill.supplyType ?? null,
+      gstScheme: prefill.gstScheme ?? null,
       lines: activeLines,
     }
     const result = isEdit && invoiceMeta

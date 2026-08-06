@@ -24,7 +24,6 @@ import {
   emptyPurchaseOrderAdjustments,
   computePrOrderDocumentTotals,
   PurchaseOrderAdjustmentsBlock,
-  PR_ESTIMATE_TAX_PCT,
   type PurchaseOrderAdjustmentsState,
 } from '@/components/purchase/PurchaseOrderAdjustmentsBlock'
 import { PurchaseRequisitionPathBanner } from '@/components/purchase/PurchaseRequisitionPathBanner'
@@ -98,6 +97,9 @@ import {
   getPurchaseLineUomOptions,
   resolveDefaultPurchaseUom,
 } from '@/utils/purchaseLineUom'
+import { resolveItemDefaultBin } from '@/utils/itemDefaultBin'
+import { useBinOptions } from '@/hooks/useBinOptions'
+import { useMasterStore } from '@/store/masterStore'
 import { notify } from '@/store/toastStore'
 import { systemConfirm } from '@/utils/systemConfirm'
 import { getSessionUser } from '@/utils/permissions'
@@ -339,6 +341,7 @@ export function PurchaseRequisitionEditorPage() {
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
   const [, setLastSavedAt] = useState<Date | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const binOptions = useBinOptions()
 
   const editable = status === 'draft' || status === 'rejected'
   const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(editable)
@@ -387,7 +390,8 @@ export function PurchaseRequisitionEditorPage() {
   const showErrors = attemptedSubmit
   const summary = useMemo(() => summarizePrLines(lines), [lines])
   const orderTotals = useMemo(
-    () => computePrOrderDocumentTotals(lines, orderAdjustments, PR_ESTIMATE_TAX_PCT),
+    // PR is demand capture — no commercial GST until RFQ/PO/invoice.
+    () => computePrOrderDocumentTotals(lines, orderAdjustments, 0),
     [lines, orderAdjustments],
   )
   const financeDefaultOpen = hasMeaningfulTaxTotals(
@@ -464,12 +468,6 @@ export function PurchaseRequisitionEditorPage() {
         accent: 'blue' as const,
       },
       {
-        label: 'Est. Taxes',
-        value: formatCurrency(orderTotals.gstAmount),
-        accent: 'violet' as const,
-        hint: `${PR_ESTIMATE_TAX_PCT}% provisional`,
-      },
-      {
         label: 'Est. Total',
         value: formatCurrency(orderTotals.grandTotal),
         accent: 'amber' as const,
@@ -492,9 +490,8 @@ export function PurchaseRequisitionEditorPage() {
     return { label: 'On track', highlight: false as const }
   }, [header.priority, header.expectedDeliveryDate])
 
-  const documentTitle = isNew
-    ? 'New Purchase Requisition'
-    : (documentNumber ?? 'Purchase Requisition')
+  const documentTitle =
+    documentNumber ?? (isNew ? 'New requisition' : 'Purchase Requisition')
   const departmentFact = header.department
     ? prDepartmentLabel(header.department)
     : 'Not selected'
@@ -894,6 +891,14 @@ export function PurchaseRequisitionEditorPage() {
       ? vendors.find((v) => v.id === item.preferredVendorId)
       : undefined
     const defaultUom = resolveDefaultPurchaseUom(item.id)
+    const master = useMasterStore.getState().items.find((i) => i.id === itemId)
+    const defaultBin = resolveItemDefaultBin(
+      {
+        defaultBinId: master?.defaultBinId ?? item.defaultBinId,
+        defaultBinCode: master?.defaultBinCode ?? item.defaultBinCode,
+      },
+      binOptions,
+    )
     patchLine(key, {
       itemId: item.id,
       itemCode: item.itemCode,
@@ -914,6 +919,7 @@ export function PurchaseRequisitionEditorPage() {
       vendorNumber: vendor?.vendorCode ?? '',
       currentStock: Math.max(0, Math.round(item.reorderLevel * 1.4)),
       openPoQty: Math.max(0, Math.round(item.reorderLevel * 0.3)),
+      binCode: defaultBin.binCode || line.binCode || '',
     })
   }
 
@@ -1505,7 +1511,7 @@ export function PurchaseRequisitionEditorPage() {
               lines={lines}
               value={orderAdjustments}
               readOnly={!editable}
-              taxPct={PR_ESTIMATE_TAX_PCT}
+              taxPct={0}
               onChange={(next) => {
                 setOrderAdjustments(next)
                 markDirty()
@@ -1528,7 +1534,7 @@ export function PurchaseRequisitionEditorPage() {
         <ErpCardSection
           id={purchaseSectionId('notes')}
           title="Notes"
-          subtitle="Internal remarks and provisional totals"
+          subtitle="Internal remarks and estimated line totals"
           collapsedSummary={
             financeSummaryText || (header.remarks.trim() ? 'Remarks set' : undefined)
           }
@@ -1561,14 +1567,7 @@ export function PurchaseRequisitionEditorPage() {
               className="bg-erp-surface-alt"
             />
           </ErpFieldRow>
-          <ErpFieldRow label={`Est. Taxes (${PR_ESTIMATE_TAX_PCT}%)`} readOnly horizontal={false}>
-            <Input
-              value={formatCurrency(orderTotals.gstAmount)}
-              readOnly
-              className="bg-erp-surface-alt"
-            />
-          </ErpFieldRow>
-          <ErpFieldRow label="Grand total" readOnly horizontal={false}>
+          <ErpFieldRow label="Est. Total" readOnly horizontal={false}>
             <Input
               value={formatCurrency(orderTotals.grandTotal)}
               readOnly

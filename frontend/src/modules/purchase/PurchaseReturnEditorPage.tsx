@@ -86,6 +86,7 @@ type EditorLine = {
   replacementQty: number
   remarks: string
   goodsReceiptLineId: string | null
+  purchaseOrderLineId: string | null
 }
 
 function emptyLine(partial?: Partial<EditorLine>): EditorLine {
@@ -106,6 +107,7 @@ function emptyLine(partial?: Partial<EditorLine>): EditorLine {
     replacementQty: 0,
     remarks: '',
     goodsReceiptLineId: null,
+    purchaseOrderLineId: null,
     ...partial,
   }
 }
@@ -151,7 +153,11 @@ export function PurchaseReturnEditorPage() {
   const [debitNoteRequired, setDebitNoteRequired] = useState(true)
   const [replacementRequired, setReplacementRequired] = useState(false)
   const [remarks, setRemarks] = useState('')
-  const [lines, setLines] = useState<EditorLine[]>([emptyLine()])
+  /** Only returnable GRN/QI lines — never the full item master. */
+  const [lines, setLines] = useState<EditorLine[]>([])
+  const [returnableCatalog, setReturnableCatalog] = useState<
+    ReturnWizardPrefill['lines']
+  >([])
   const [prefillBanner, setPrefillBanner] = useState<string | null>(null)
 
   const [vendors, setVendors] = useState<Vendor[]>([])
@@ -293,16 +299,25 @@ export function PurchaseReturnEditorPage() {
     setLinesDirty(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)))
   }
 
-  const applyItem = (key: string, itemId: string) => {
-    const item = items.find((i) => i.id === itemId)
-    if (!item) return
+  const applyItem = (key: string, goodsReceiptLineId: string) => {
+    const catalog = returnableCatalog.find((c) => c.goodsReceiptLineId === goodsReceiptLineId)
+    if (!catalog) return
+    const item = items.find((i) => i.id === catalog.itemId)
+    const maxQty = Math.max(0, Number(catalog.availableReturnQty) || 0)
     patchLine(key, {
-      itemId: item.id,
-      itemCode: item.itemCode,
-      description: item.itemName,
-      uom: item.uom,
-      unitCost: item.standardRate,
-      gstRatePct: item.gstRatePct,
+      itemId: catalog.itemId || item?.id || '',
+      itemCode: catalog.itemCode || item?.itemCode || '',
+      description: catalog.itemName || item?.itemName || '',
+      batchLotNo: catalog.batchLotNo || '',
+      serialNumber: catalog.serialNumber || '',
+      receivedQty: maxQty,
+      availableReturnQty: maxQty,
+      returnQty: Math.min(maxQty, maxQty),
+      uom: item?.uom || 'NOS',
+      unitCost: catalog.unitCost || item?.standardRate || 0,
+      gstRatePct: catalog.gstRatePct ?? item?.gstRatePct ?? 0,
+      goodsReceiptLineId: catalog.goodsReceiptLineId,
+      purchaseOrderLineId: catalog.purchaseOrderLineId,
     })
   }
 
@@ -323,14 +338,15 @@ export function PurchaseReturnEditorPage() {
     replacementRequired,
     remarks,
     lines: lines
-      .filter((l) => l.itemId)
+      .filter((l) => l.itemId && l.goodsReceiptLineId && Number(l.returnQty) > 0)
       .map((l) => ({
         itemId: l.itemId,
         itemCode: l.itemCode,
         itemName: l.description,
-        returnQty: l.returnQty,
+        returnQty: Math.min(Number(l.returnQty) || 0, Number(l.availableReturnQty) || 0),
         unitCost: l.unitCost,
         goodsReceiptLineId: l.goodsReceiptLineId,
+        purchaseOrderLineId: l.purchaseOrderLineId,
         description: l.description,
         batchLotNo: l.batchLotNo,
         serialNumber: l.serialNumber,
@@ -355,28 +371,34 @@ export function PurchaseReturnEditorPage() {
       setReturnReason('quality_rejection')
       setRemarks(prefill.reason)
       setDebitNoteRequired(prefill.suggestedReturnType !== 'REPLACEMENT')
+      const returnable = prefill.lines.filter(
+        (l) => l.goodsReceiptLineId && Number(l.availableReturnQty) > 0,
+      )
+      setReturnableCatalog(returnable)
       setLines(
-        prefill.lines.length
-          ? prefill.lines.map((l) => {
+        returnable.length
+          ? returnable.map((l) => {
               const item = itemCatalog.find((i) => i.id === l.itemId)
+              const maxQty = Math.max(0, Number(l.availableReturnQty) || 0)
               return emptyLine({
                 itemId: l.itemId,
                 itemCode: l.itemCode || item?.itemCode || '',
                 description: l.itemName || item?.itemName || '',
                 batchLotNo: l.batchLotNo,
                 serialNumber: l.serialNumber,
-                receivedQty: l.availableReturnQty,
-                availableReturnQty: l.availableReturnQty,
-                returnQty: l.returnQty,
+                receivedQty: maxQty,
+                availableReturnQty: maxQty,
+                returnQty: Math.min(Number(l.returnQty) || maxQty, maxQty),
                 uom: item?.uom || 'NOS',
                 unitCost: l.unitCost || item?.standardRate || 0,
                 gstRatePct: l.gstRatePct ?? item?.gstRatePct ?? 0,
                 reason: 'quality_rejection',
                 goodsReceiptLineId: l.goodsReceiptLineId,
+                purchaseOrderLineId: l.purchaseOrderLineId,
                 remarks: prefill.reason,
               })
             })
-          : [emptyLine()],
+          : [],
       )
       const src =
         prefill.qualityInspectionNumber ||
@@ -384,7 +406,9 @@ export function PurchaseReturnEditorPage() {
         prefill.goodsReceiptId ||
         'source'
       setPrefillBanner(
-        `Prefilled from ${src} · remaining returnable ${prefill.totalRemaining} (rejected ${prefill.totalRejected}, already returned ${prefill.totalReturned})`,
+        returnable.length
+          ? `Prefilled from ${src} · ${returnable.length} returnable GRN line(s) · remaining ${prefill.totalRemaining}`
+          : `No remaining returnable quantity from ${src}. Only items with GRN receipt (accepted/rejected) can be returned.`,
       )
       markDirty()
     },
@@ -428,8 +452,27 @@ export function PurchaseReturnEditorPage() {
             replacementQty: l.replacementQty,
             remarks: l.remarks,
             goodsReceiptLineId: l.goodsReceiptLineId,
+            purchaseOrderLineId: l.purchaseOrderLineId ?? null,
           }),
         ),
+      )
+      // Catalog for edit: keep existing lines as returnable options.
+      setReturnableCatalog(
+        doc.lines
+          .filter((l) => l.goodsReceiptLineId)
+          .map((l) => ({
+            goodsReceiptLineId: l.goodsReceiptLineId!,
+            purchaseOrderLineId: l.purchaseOrderLineId ?? null,
+            itemId: l.itemId,
+            itemCode: l.itemCode,
+            itemName: l.itemName || l.description,
+            batchLotNo: l.batchLotNo,
+            serialNumber: l.serialNumber,
+            returnQty: l.returnQty,
+            availableReturnQty: Math.max(l.availableReturnQty, l.returnQty),
+            unitCost: l.unitCost,
+            gstRatePct: l.gstRatePct,
+          })),
       )
       resetDirty()
     },
@@ -541,13 +584,31 @@ export function PurchaseReturnEditorPage() {
       notify.error('Select a vendor')
       return
     }
+    if (!goodsReceiptId && !qualityInspectionId) {
+      notify.error('Load lines from a GRN or quality inspection first')
+      return
+    }
     const input = toInput()
     if (!input.lines.length) {
-      notify.error('Add at least one line with an item')
+      notify.error(
+        'Add returnable lines from GRN/QI. Items without a goods receipt cannot be returned.',
+      )
+      return
+    }
+    if (input.lines.some((l) => !l.goodsReceiptLineId)) {
+      notify.error('Every line must come from a GRN line (received quantity).')
       return
     }
     if (input.lines.some((l) => !(Number(l.returnQty) > 0))) {
       notify.error('Return quantity must be greater than zero on every line')
+      return
+    }
+    if (
+      input.lines.some(
+        (l) => Number(l.returnQty) > Number(l.availableReturnQty || 0) + 1e-9,
+      )
+    ) {
+      notify.error('Return quantity cannot exceed available returnable quantity')
       return
     }
     setSaving(true)
@@ -647,9 +708,10 @@ export function PurchaseReturnEditorPage() {
           dense
           columns={1}
         >
-          <p className="mb-2 text-[12px] text-erp-muted">
-            Load lines via wizard prefill (remaining returnable qty). Review header and lines, then save draft.
-          </p>
+      <p className="mb-2 text-[12px] text-erp-muted">
+        Returns require a posted GRN (or QI rejection). Unreceived PO items never appear. Load remaining
+        returnable lines from GRN or quality inspection, then save draft.
+      </p>
           <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Purchase return origin">
             {(Object.entries(PURCHASE_RETURN_ORIGIN_LABELS) as [PurchaseReturnOrigin, string][]).map(
               ([mode, label]) => (
@@ -675,8 +737,20 @@ export function PurchaseReturnEditorPage() {
             <Select
               value={goodsReceiptId}
               onChange={(e) => {
-                setGoodsReceiptId(e.target.value)
+                const next = e.target.value
+                setGoodsReceiptId(next)
                 markDirty()
+                if (next) {
+                  void getReturnWizardPrefill({ goodsReceiptId: next })
+                    .then((prefill) => applyWizardPrefill(prefill, items))
+                    .catch((err) =>
+                      notify.error(purchaseUserMessage(err, 'Could not load returnable GRN lines')),
+                    )
+                } else {
+                  setReturnableCatalog([])
+                  setLines([])
+                  setPrefillBanner(null)
+                }
               }}
               className="max-w-md"
               aria-label="Source GRN"
@@ -691,8 +765,19 @@ export function PurchaseReturnEditorPage() {
             <Select
               value={qualityInspectionId}
               onChange={(e) => {
-                setQualityInspectionId(e.target.value)
+                const next = e.target.value
+                setQualityInspectionId(next)
                 markDirty()
+                if (next) {
+                  void getReturnWizardPrefill({
+                    qualityInspectionId: next,
+                    goodsReceiptId: goodsReceiptId || undefined,
+                  })
+                    .then((prefill) => applyWizardPrefill(prefill, items))
+                    .catch((err) =>
+                      notify.error(purchaseUserMessage(err, 'Could not load returnable QI lines')),
+                    )
+                }
               }}
               className="max-w-md"
               aria-label="Source quality inspection"
@@ -965,7 +1050,7 @@ export function PurchaseReturnEditorPage() {
 
       <ErpCardSection
         title="Return Lines"
-        subtitle="Items, quantities, cost, and per-line return reason"
+        subtitle="Only items with remaining returnable quantity on a GRN (or QI rejection) appear here"
         icon={Package}
         accent="teal"
         collapsible
@@ -979,15 +1064,45 @@ export function PurchaseReturnEditorPage() {
         }
       >
         <PurchaseTableToolbar>
-          {editable ? (
+          {editable && returnableCatalog.length > 0 ? (
             <ErpButton
               type="button"
               size="sm"
               variant="secondary"
               icon={Plus}
-              onClick={() => setLinesDirty([...lines, emptyLine({ reason: returnReason })])}
+              onClick={() => {
+                const used = new Set(lines.map((l) => l.goodsReceiptLineId).filter(Boolean))
+                const next = returnableCatalog.find(
+                  (c) => c.goodsReceiptLineId && !used.has(c.goodsReceiptLineId),
+                )
+                if (!next?.goodsReceiptLineId) {
+                  notify.info('All returnable GRN lines are already on this return')
+                  return
+                }
+                const item = items.find((i) => i.id === next.itemId)
+                const maxQty = Math.max(0, Number(next.availableReturnQty) || 0)
+                setLinesDirty([
+                  ...lines,
+                  emptyLine({
+                    itemId: next.itemId || item?.id || '',
+                    itemCode: next.itemCode || item?.itemCode || '',
+                    description: next.itemName || item?.itemName || '',
+                    batchLotNo: next.batchLotNo || '',
+                    serialNumber: next.serialNumber || '',
+                    receivedQty: maxQty,
+                    availableReturnQty: maxQty,
+                    returnQty: maxQty,
+                    uom: item?.uom || 'NOS',
+                    unitCost: next.unitCost || item?.standardRate || 0,
+                    gstRatePct: next.gstRatePct ?? item?.gstRatePct ?? 0,
+                    reason: returnReason,
+                    goodsReceiptLineId: next.goodsReceiptLineId,
+                    purchaseOrderLineId: next.purchaseOrderLineId,
+                  }),
+                ])
+              }}
             >
-              Add Line
+              Add returnable line
             </ErpButton>
           ) : null}
           <span className="ml-auto text-[12px] tabular-nums text-erp-muted">
@@ -995,16 +1110,19 @@ export function PurchaseReturnEditorPage() {
           </span>
         </PurchaseTableToolbar>
         {lines.length === 0 ? (
-          <EmptyState icon={Plus} title="No lines" description="Add items to return." />
+          <EmptyState
+            icon={Package}
+            title="No returnable lines"
+            description="Select a GRN or quality inspection above, then Load lines. Unreceived PO items cannot be returned."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="quo-editor-price__table w-full min-w-[1100px]">
               <thead>
                 <tr>
-                  <th>Item</th>
+                  <th>Item (GRN line)</th>
                   <th>Batch / Serial</th>
-                  <th>Recv</th>
-                  <th>Avail</th>
+                  <th>Recv / Avail</th>
                   <th>Return Qty</th>
                   <th>UOM</th>
                   <th>Unit Cost</th>
@@ -1016,18 +1134,33 @@ export function PurchaseReturnEditorPage() {
                 </tr>
               </thead>
               <tbody>
-                {lines.map((l) => (
+                {lines.map((l) => {
+                  const lineOptions = returnableCatalog.filter(
+                    (c) =>
+                      c.goodsReceiptLineId &&
+                      (c.goodsReceiptLineId === l.goodsReceiptLineId ||
+                        !lines.some(
+                          (x) =>
+                            x.key !== l.key &&
+                            x.goodsReceiptLineId === c.goodsReceiptLineId,
+                        )),
+                  )
+                  return (
                   <tr key={l.key}>
                     <td>
                       <Select
-                        value={l.itemId}
+                        value={l.goodsReceiptLineId ?? ''}
                         onChange={(e) => applyItem(l.key, e.target.value)}
-                        disabled={!editable}
+                        disabled={!editable || returnableCatalog.length === 0}
                       >
                         <option value="">{SELECT_PLACEHOLDER}</option>
-                        {items.map((it) => (
-                          <option key={it.id} value={it.id}>
-                            {it.itemCode} — {it.itemName}
+                        {lineOptions.map((c) => (
+                          <option
+                            key={c.goodsReceiptLineId!}
+                            value={c.goodsReceiptLineId!}
+                          >
+                            {(c.itemCode || '—') + ' — ' + (c.itemName || 'Item')}
+                            {` · avail ${c.availableReturnQty}`}
                           </option>
                         ))}
                       </Select>
@@ -1054,13 +1187,24 @@ export function PurchaseReturnEditorPage() {
                         placeholder="Serial"
                       />
                     </td>
-                    <td className="tabular-nums">{l.receivedQty}</td>
-                    <td className="tabular-nums">{l.availableReturnQty}</td>
+                    <td className="tabular-nums text-[12px]">
+                      {l.receivedQty}
+                      <span className="text-erp-muted"> / </span>
+                      {l.availableReturnQty}
+                    </td>
                     <td>
                       <DecimalInput
                         min={0}
+                        max={l.availableReturnQty > 0 ? l.availableReturnQty : undefined}
                         value={l.returnQty}
-                        onChange={(v) => patchLine(l.key, { returnQty: v })}
+                        onChange={(v) =>
+                          patchLine(l.key, {
+                            returnQty: Math.min(
+                              Math.max(0, v),
+                              l.availableReturnQty > 0 ? l.availableReturnQty : v,
+                            ),
+                          })
+                        }
                         disabled={!editable}
                       />
                     </td>
@@ -1111,7 +1255,8 @@ export function PurchaseReturnEditorPage() {
                       ) : null}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

@@ -112,6 +112,9 @@ export interface ItemDto {
   drawingNo?: string | null
   subAssemblyRule?: string | null
   imageUrl?: string | null
+  defaultBinId?: string | null
+  defaultBinCode?: string | null
+  defaultBinName?: string | null
   status: 'ACTIVE' | 'INACTIVE'
   createdAt: string
   updatedAt: string
@@ -348,6 +351,8 @@ export function mapItemDto(row: ItemDto): Item {
     drawingNo: row.drawingNo ?? null,
     subAssemblyRule: (row.subAssemblyRule ?? null) as Item['subAssemblyRule'],
     imageUrl: row.imageUrl ?? null,
+    defaultBinId: row.defaultBinId ?? null,
+    defaultBinCode: row.defaultBinCode ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
@@ -516,6 +521,7 @@ export function itemToApiPayload(data: Item): Record<string, unknown> {
     routingNo: data.routingNo || null,
     drawingNo: data.drawingNo || null,
     subAssemblyRule: data.subAssemblyRule,
+    defaultBinId: data.defaultBinId || null,
     status: toStatus(data.isActive),
     uomConversions: (data.uomConversions ?? [])
       .filter((row) => row.uomId)

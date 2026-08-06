@@ -88,23 +88,24 @@ async function buildSoLines(
       itemCodeSnapshot: line.itemCodeSnapshot ?? null,
       itemNameSnapshot: line.itemNameSnapshot ?? null,
       qty: line.qty,
-      uom: line.uom ?? 'NOS',
+      uom: line.uom ?? line.uomCode ?? 'NOS',
       unitPrice: line.unitPrice,
       discountPct,
-      taxPct,
+      taxPct: taxPct || Number(line.gstPct ?? 0),
       taxableValue: Math.round(taxableValue * 100) / 100,
       gstAmount: Math.round(gstAmount * 100) / 100,
       lineTotal: Math.round(lineTotal * 100) / 100,
-      hsnCode: (line as { hsnCode?: string | null }).hsnCode ?? null,
-      taxScheme: (line as { taxScheme?: string | null }).taxScheme ?? null,
-      cgstRate: (line as { cgstRate?: number | null }).cgstRate ?? null,
-      sgstRate: (line as { sgstRate?: number | null }).sgstRate ?? null,
-      utgstRate: (line as { utgstRate?: number | null }).utgstRate ?? null,
-      igstRate: (line as { igstRate?: number | null }).igstRate ?? null,
-      cgstAmount: (line as { cgstAmount?: number | null }).cgstAmount ?? null,
-      sgstAmount: (line as { sgstAmount?: number | null }).sgstAmount ?? null,
-      utgstAmount: (line as { utgstAmount?: number | null }).utgstAmount ?? null,
-      igstAmount: (line as { igstAmount?: number | null }).igstAmount ?? null,
+      hsnCode: line.hsnCode ?? line.sacCode ?? null,
+      hsnId: line.hsnId ?? null,
+      taxScheme: line.taxScheme ?? null,
+      cgstRate: line.cgstRate ?? line.cgstPct ?? null,
+      sgstRate: line.sgstRate ?? line.sgstPct ?? null,
+      utgstRate: line.utgstRate ?? line.utgstPct ?? null,
+      igstRate: line.igstRate ?? line.igstPct ?? null,
+      cgstAmount: line.cgstAmount ?? null,
+      sgstAmount: line.sgstAmount ?? null,
+      utgstAmount: line.utgstAmount ?? null,
+      igstAmount: line.igstAmount ?? null,
     }
   })
   const lines = await Promise.all(linesRaw.map((line) => normalizeSalesLineForWrite(tenantId, line)))
@@ -334,6 +335,20 @@ export async function convertQuotationToSalesOrder(
           billingAddress,
         },
       })
+      const alignedLines = taxHeader.lines
+      const basicAmount =
+        Math.round(alignedLines.reduce((s, l) => s + l.taxableValue, 0) * 100) / 100
+      const gstAmount =
+        Math.round(alignedLines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100
+      const grandTotal =
+        Math.round(alignedLines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100
+      // Prefer snapshot-aligned line totals for GST body; keep order adjustments from quote summary
+      // for freight/install when those lived only on quotation document charges.
+      const soGrand =
+        summary.grandTotal > grandTotal
+          ? Math.round((basicAmount + gstAmount + (summary.grandTotal - summary.taxableValue - summary.gstAmount)) * 100) /
+            100
+          : grandTotal
 
       const salesOrder = await tx.crmSalesOrder.create({
         data: {
@@ -357,9 +372,9 @@ export async function convertQuotationToSalesOrder(
           contactId: contactId ?? null,
           unitPrice: primaryLine.unitPrice,
           discountPct: primaryLine.discountPct,
-          grandTotal: summary.grandTotal,
-          basicAmount: summary.taxableValue,
-          gstAmount: summary.gstAmount,
+          grandTotal: soGrand > 0 ? soGrand : grandTotal,
+          basicAmount,
+          gstAmount,
           paymentTerms,
           deliveryTerms,
           deliveryTime,
@@ -382,7 +397,7 @@ export async function convertQuotationToSalesOrder(
           locationId: input.locationId ?? doc.locationId ?? quotation.locationId,
           legalEntityId: quotation.legalEntityId,
           branchId: quotation.branchId,
-          lines: lines as unknown as Prisma.InputJsonValue,
+          lines: alignedLines as unknown as Prisma.InputJsonValue,
           ...taxHeaderToPrismaCreate(taxHeader),
           createdBy: userId,
           updatedBy: userId,

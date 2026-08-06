@@ -696,6 +696,10 @@ export interface PurchaseItem {
   expiryControlled: boolean
   /** Item Master ±% vs open qty for GRN receiving. */
   receivingTolerancePercentage?: number
+  /** Default Bin Master id from Item Master. */
+  defaultBinId?: string | null
+  /** Default bin code (resolved). */
+  defaultBinCode?: string | null
   isActive: boolean
   remarks: string
   createdBy: string
@@ -2135,6 +2139,14 @@ export interface GoodsReceiptLine {
   returnedQty?: number
   /** Qty still eligible for material return. */
   returnableQty?: number
+  /** Cumulative reversed received qty on this GRN line. */
+  reversedQty?: number
+  reversedAcceptedQty?: number
+  reversedRejectedQty?: number
+  reversedAt?: IsoDateTime | null
+  /** Remaining qty that can still be reversed on this line. */
+  remainingReversibleQty?: number
+  lineFullyReversed?: boolean
   shortQty: number
   excessQty: number
   damagedQty: number
@@ -2226,6 +2238,8 @@ export interface GoodsReceiptNote extends PurchaseMoneyTotals, PurchaseAuditFiel
   qualityInspectionId: string | null
   allowedActions?: GoodsReceiptAllowedActions
   reversedAt?: IsoDateTime | null
+  /** True when some (not all) received lines have been reversed. */
+  partiallyReversed?: boolean
   /** Sum of completed material return qty on this GRN. */
   totalReturnedQty?: number
   /** Sum of remaining returnable qty (detail API only). */
@@ -2479,6 +2493,7 @@ export interface PurchaseReturnLine {
   id: string
   lineNo: number
   goodsReceiptLineId: string | null
+  purchaseOrderLineId?: string | null
   itemId: string
   itemCode: string
   itemName: string

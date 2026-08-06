@@ -1,6 +1,11 @@
 import type { GoodsReceipt, GoodsReceiptLine, MasterVendor, MasterWarehouse, PurchaseOrder } from '@prisma/client'
 import type { GrnMaterialReturnEntry, GrnMaterialReturnLineSummary } from '../returns/returnable-quantity.service.js'
-import { allowedActions, qty } from './goods-receipt.workflow.js'
+import {
+  allowedActions,
+  isGrnLineFullyReversed,
+  qty,
+  remainingReversibleReceived,
+} from './goods-receipt.workflow.js'
 
 const date = (value: Date | null | undefined) => value?.toISOString().slice(0, 10) ?? null
 const iso = (value: Date | null | undefined) => value?.toISOString() ?? null
@@ -25,10 +30,42 @@ export function mapGoodsReceiptToDto(
   },
   uomCodeById?: Map<string, string>,
 ) {
-  const totalReceived = grn.lines.reduce((s, l) => s + qty(l.receivedQuantity), 0)
-  const totalAccepted = grn.lines.reduce((s, l) => s + qty(l.acceptedQuantity), 0)
-  const totalRejected = grn.lines.reduce((s, l) => s + qty(l.rejectedQuantity), 0)
-  const totalAmount = grn.lines.reduce((s, l) => s + qty(l.amount), 0)
+  // View/API expose what belongs on the document: received > 0 or short-closed.
+  // Idle zero-qty rows (legacy) are not shown as if they were received.
+  const documentLines = grn.lines.filter((line) => {
+    const received = qty(line.receivedQuantity)
+    const shortClosed = Boolean(
+      (line as { shortCloseRequested?: boolean }).shortCloseRequested ||
+        (line as { closeOpenQuantity?: boolean }).closeOpenQuantity,
+    )
+    return received > 0 || shortClosed
+  })
+  const totalReceived = documentLines.reduce((s, l) => s + remainingReversibleReceived(l), 0)
+  const totalAccepted = documentLines.reduce(
+    (s, l) => s + Math.max(0, qty(l.acceptedQuantity) - qty((l as { reversedAcceptedQuantity?: unknown }).reversedAcceptedQuantity)),
+    0,
+  )
+  const totalRejected = documentLines.reduce(
+    (s, l) => s + Math.max(0, qty(l.rejectedQuantity) - qty((l as { reversedRejectedQuantity?: unknown }).reversedRejectedQuantity)),
+    0,
+  )
+  const totalAmount = documentLines.reduce((s, l) => {
+    const netRatio =
+      qty(l.receivedQuantity) > 0
+        ? remainingReversibleReceived(l) / qty(l.receivedQuantity)
+        : qty(l.acceptedQuantity) > 0
+          ? Math.max(
+              0,
+              qty(l.acceptedQuantity) - qty((l as { reversedAcceptedQuantity?: unknown }).reversedAcceptedQuantity),
+            ) / qty(l.acceptedQuantity)
+          : 1
+    return s + qty(l.amount) * netRatio
+  }, 0)
+  const partiallyReversed =
+    grn.status !== 'REVERSED' &&
+    documentLines.some(
+      (l) => isGrnLineFullyReversed(l) || qty((l as { reversedQuantity?: unknown }).reversedQuantity) > 0,
+    )
 
   return {
     id: grn.id,
@@ -37,6 +74,7 @@ export function mapGoodsReceiptToDto(
     receiptDate: date(grn.receiptDate),
     documentDate: date(grn.receiptDate),
     status: grn.status,
+    partiallyReversed,
     purchaseOrderId: grn.purchaseOrderId,
     purchaseOrderNumber: grn.purchaseOrderNumber || grn.purchaseOrder?.orderNumber || '',
     purchaseOrderStatus: grn.purchaseOrder?.status ?? null,
@@ -75,7 +113,7 @@ export function mapGoodsReceiptToDto(
     closedAt: iso(grn.closedAt),
     createdAt: iso(grn.createdAt),
     updatedAt: iso(grn.updatedAt),
-    lineCount: grn.lines.length,
+    lineCount: documentLines.length,
     totalReceivedQty: totalReceived,
     totalAcceptedQty: totalAccepted,
     totalRejectedQty: totalRejected,
@@ -88,8 +126,15 @@ export function mapGoodsReceiptToDto(
     paymentTerms: grn.purchaseOrder?.paymentTerms ?? '',
     deliveryTerms: grn.purchaseOrder?.deliveryTerms ?? '',
     allowedActions: allowedActions(grn),
-    lines: grn.lines.map((line) => {
+    lines: documentLines.map((line) => {
       const returnLine = returnStats?.byGrnLineId?.get(line.id)
+      const reversedQuantity = qty((line as { reversedQuantity?: unknown }).reversedQuantity)
+      const reversedAcceptedQuantity = qty(
+        (line as { reversedAcceptedQuantity?: unknown }).reversedAcceptedQuantity,
+      )
+      const reversedRejectedQuantity = qty(
+        (line as { reversedRejectedQuantity?: unknown }).reversedRejectedQuantity,
+      )
       return {
       id: line.id,
       lineNumber: line.lineNumber,
@@ -120,6 +165,12 @@ export function mapGoodsReceiptToDto(
       acceptedForQcQuantity: qty(line.acceptedForQcQuantity),
       acceptedQuantity: qty(line.acceptedQuantity),
       rejectedQuantity: qty(line.rejectedQuantity),
+      reversedQuantity,
+      reversedAcceptedQuantity,
+      reversedRejectedQuantity,
+      reversedAt: iso((line as { reversedAt?: Date | null }).reversedAt),
+      remainingReversibleQuantity: remainingReversibleReceived(line),
+      lineFullyReversed: isGrnLineFullyReversed(line) || (reversedQuantity > 0 && remainingReversibleReceived(line) <= 0),
       returnedQuantity: returnLine?.returnedQuantity ?? 0,
       returnableQuantity: returnLine?.returnableQuantity ?? 0,
       rate: qty(line.rate),

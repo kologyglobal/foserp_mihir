@@ -386,16 +386,20 @@ export function PurchaseOrderAdjustmentsBlock({
               </span>
             </div>
           ) : null}
-          {orderSummary.gstByRate.map(({ rate, amount }) => (
-            <div key={rate} className="so-pricing-summary__row">
-              <span>GST @ {rate}%</span>
-              <span className="tabular-nums">{formatCurrency(amount)}</span>
-            </div>
-          ))}
-          <div className="so-pricing-summary__row">
-            <span>Total GST</span>
-            <span className="tabular-nums">{formatCurrency(orderSummary.gstAmount)}</span>
-          </div>
+          {orderSummary.gstByRate.length > 0 || orderSummary.gstAmount > 0 ? (
+            <>
+              {orderSummary.gstByRate.map(({ rate, amount }) => (
+                <div key={rate} className="so-pricing-summary__row">
+                  <span>GST @ {rate}%</span>
+                  <span className="tabular-nums">{formatCurrency(amount)}</span>
+                </div>
+              ))}
+              <div className="so-pricing-summary__row">
+                <span>Total GST</span>
+                <span className="tabular-nums">{formatCurrency(orderSummary.gstAmount)}</span>
+              </div>
+            </>
+          ) : null}
         </div>
         <div className="so-pricing-summary__grand">
           <span>Grand total</span>

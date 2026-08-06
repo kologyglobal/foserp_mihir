@@ -334,6 +334,19 @@ function computeTotals(
   }
 }
 
+/** Header tax from line amount × GST % snapshot (exclusive tax). */
+function taxAmountFromLineSnapshots(
+  lines: Array<{ amount: number; gstRatePctSnapshot?: number }>,
+): number {
+  return money(
+    lines.reduce((sum, line) => {
+      const rate = Number(line.gstRatePctSnapshot ?? 0)
+      if (!(rate > 0)) return sum
+      return sum + money(line.amount * (rate / 100))
+    }, 0),
+  )
+}
+
 /** Shared PO line pipeline: item UOM enrichment → dual qty normalize → master snapshots. */
 export async function preparePurchaseOrderLinesForCreate(
   tenantId: string,
@@ -456,7 +469,11 @@ export async function createPurchaseOrder(
 
   assertPoOrderDateAllowed(orderDate, toPoBackdatePolicy(settings))
 
-  const totals = computeTotals(lines, input.taxAmount ?? 0, input.freightAmount ?? 0)
+  const resolvedTax =
+    input.taxAmount != null && Number(input.taxAmount) > 0
+      ? money(input.taxAmount)
+      : taxAmountFromLineSnapshots(lines)
+  const totals = computeTotals(lines, resolvedTax, input.freightAmount ?? 0)
   const orderNumber = await nextPurchaseDocumentNumber(tenantId, 'PURCHASE_ORDER', 'PO')
 
   const created = await prisma.$transaction(async (tx) => {
@@ -564,10 +581,21 @@ export async function updatePurchaseOrder(
   )
   const backdatePolicy = toPoBackdatePolicy(settings)
 
-  const effectiveLines = lines ?? existing.lines.map((l) => ({ amount: Number(l.amount) }))
+  const effectiveLines =
+    lines ??
+    existing.lines.map((l) => ({
+      amount: Number(l.amount),
+      gstRatePctSnapshot: Number((l as { gstRatePctSnapshot?: unknown }).gstRatePctSnapshot ?? 0),
+    }))
+  const resolvedTax =
+    input.taxAmount != null && Number(input.taxAmount) > 0
+      ? money(input.taxAmount)
+      : lines
+        ? taxAmountFromLineSnapshots(lines)
+        : money(Number(existing.taxAmount) || taxAmountFromLineSnapshots(effectiveLines))
   const totals = computeTotals(
     effectiveLines,
-    input.taxAmount ?? Number(existing.taxAmount),
+    resolvedTax,
     input.freightAmount ?? Number(existing.freightAmount),
   )
 

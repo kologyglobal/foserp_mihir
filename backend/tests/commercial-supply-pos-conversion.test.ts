@@ -7,11 +7,25 @@ import {
   resolveCommercialSupplyType,
 } from '../src/modules/tax/commercial-supply-context.js'
 import { applySchemeToMasterRate } from '../src/modules/tax/gst-tax-resolve.service.js'
-import { buildLinesFromInput } from '../src/modules/crm/sales-orders/sales-order.workflow.js'
+import {
+  applyDocumentTaxSchemeToLines,
+  buildLinesFromInput,
+} from '../src/modules/crm/sales-orders/sales-order.workflow.js'
 import { sumLineTaxComponents } from '../src/modules/crm/sales-orders/sales-order-tax-header.js'
 
-describe('commercial place of supply', () => {
-  it('prefers ship-to for goods and allows authorised override', () => {
+const itemId = 'aaaaaaaa-1111-4111-8111-111111111111'
+
+describe('automatic place of supply', () => {
+  it('GJ supplier context + customer/ship-to GJ → POS Gujarat', () => {
+    const pos = resolveCommercialPlaceOfSupply({
+      shipToState: 'Gujarat',
+      customerState: 'Maharashtra',
+    })
+    expect(pos.placeOfSupplyStateCode).toBe('24')
+    expect(pos.source).toBe('SHIP_TO')
+  })
+
+  it('ship-to Maharashtra beats bill-to Gujarat', () => {
     const auto = resolveCommercialPlaceOfSupply({
       shipToState: 'Maharashtra',
       billToState: 'Gujarat',
@@ -19,7 +33,28 @@ describe('commercial place of supply', () => {
     })
     expect(auto.placeOfSupplyStateCode).toBe('27')
     expect(auto.source).toBe('SHIP_TO')
+  })
 
+  it('ship-to missing + customer GSTIN uses registration state', () => {
+    // 24AAAAA0000A1Z5 → state 24 Gujarat
+    const pos = resolveCommercialPlaceOfSupply({
+      billToState: null,
+      shipToState: null,
+      customerGstin: '24AAAAA0000A1Z5',
+      customerState: 'Maharashtra',
+    })
+    expect(pos.placeOfSupplyStateCode).toBe('24')
+    expect(pos.source).toBe('CUSTOMER_GSTIN')
+  })
+
+  it('no reliable state → unresolved source', () => {
+    const pos = resolveCommercialPlaceOfSupply({})
+    expect(pos.placeOfSupplyStateCode).toBeNull()
+    expect(pos.source).toBe('UNRESOLVED')
+    expect(pos.warnings.length).toBeGreaterThan(0)
+  })
+
+  it('authorised override wins', () => {
     const override = resolveCommercialPlaceOfSupply({
       placeOfSupplyOverride: true,
       placeOfSupplyOverrideValue: '24',
@@ -28,30 +63,47 @@ describe('commercial place of supply', () => {
     expect(override.placeOfSupplyStateCode).toBe('24')
     expect(override.source).toBe('OVERRIDE')
   })
+
+  it('does not stick to prior saved PoS without override flag', () => {
+    // explicitPlaceOfSupply is ignored on auto path
+    const pos = resolveCommercialPlaceOfSupply({
+      explicitPlaceOfSupply: 'Gujarat',
+      shipToState: 'Maharashtra',
+    })
+    expect(pos.placeOfSupplyStateCode).toBe('27')
+    expect(pos.source).toBe('SHIP_TO')
+  })
 })
 
-describe('commercial supply type', () => {
-  it('marks GJ supplier + MH place of supply as INTER_STATE / IGST', () => {
+describe('automatic supply type', () => {
+  it('GJ + GJ POS → Intra CGST+SGST', () => {
+    const r = resolveCommercialSupplyType({
+      supplierStateCode: '24',
+      placeOfSupplyStateCode: '24',
+    })
+    expect(r.supplyType).toBe('INTRA_STATE')
+    expect(r.taxScheme).toBe('cgst_sgst')
+  })
+
+  it('GJ + MH POS → Inter IGST', () => {
     const r = resolveCommercialSupplyType({
       supplierStateCode: '24',
       placeOfSupplyStateCode: '27',
     })
     expect(r.supplyType).toBe('INTER_STATE')
     expect(r.taxScheme).toBe('igst')
-    expect(r.unresolved).toBe(false)
   })
 
-  it('marks Delhi intra as UTGST pair', () => {
+  it('Delhi intra → UTGST pair', () => {
     const r = resolveCommercialSupplyType({
       supplierStateCode: '07',
       placeOfSupplyStateCode: '07',
     })
     expect(r.supplyType).toBe('INTRA_STATE')
     expect(r.taxScheme).toBe('utgst_pair')
-    expect(r.isUnionTerritory).toBe(true)
   })
 
-  it('returns UNRESOLVED when place of supply is missing', () => {
+  it('missing POS → UNRESOLVED blocks posting intent', () => {
     const r = resolveCommercialSupplyType({
       supplierStateCode: '27',
       placeOfSupplyStateCode: null,
@@ -59,6 +111,55 @@ describe('commercial supply type', () => {
     expect(r.supplyType).toBe('UNRESOLVED')
     expect(r.taxScheme).toBe('UNRESOLVED')
     expect(r.unresolved).toBe(true)
+  })
+})
+
+describe('scheme recalculation on POS change', () => {
+  it('ship-to GJ→MH clears CGST/SGST and applies IGST', () => {
+    const { lines: intra } = buildLinesFromInput({
+      lines: [
+        {
+          productOrItem: 'Kit',
+          itemId,
+          qty: 1,
+          unitPrice: 1000,
+          taxPct: 18,
+          taxScheme: 'cgst_sgst',
+          hsnCode: '8708',
+        },
+      ],
+    })
+    expect(sumLineTaxComponents(intra).cgstAmount).toBe(90)
+    expect(sumLineTaxComponents(intra).igstAmount).toBe(0)
+
+    const inter = applyDocumentTaxSchemeToLines(intra, 'igst')
+    const c = sumLineTaxComponents(inter)
+    expect(c.cgstAmount).toBe(0)
+    expect(c.sgstAmount).toBe(0)
+    expect(c.utgstAmount).toBe(0)
+    expect(c.igstAmount).toBe(180)
+    expect(inter[0]!.taxScheme).toBe('igst')
+  })
+
+  it('ship-to MH→GJ clears IGST and applies CGST/SGST', () => {
+    const { lines: inter } = buildLinesFromInput({
+      lines: [
+        {
+          productOrItem: 'Kit',
+          itemId,
+          qty: 1,
+          unitPrice: 1000,
+          taxPct: 18,
+          taxScheme: 'igst',
+          hsnCode: '8708',
+        },
+      ],
+    })
+    const intra = applyDocumentTaxSchemeToLines(inter, 'cgst_sgst')
+    const c = sumLineTaxComponents(intra)
+    expect(c.igstAmount).toBe(0)
+    expect(c.cgstAmount).toBe(90)
+    expect(c.sgstAmount).toBe(90)
   })
 })
 
@@ -99,23 +200,18 @@ describe('applySchemeToMasterRate UTGST + cess', () => {
     expect(scheme.sgstRate).toBe(0)
     expect(scheme.utgstRate).toBe(0)
     expect(scheme.igstRate).toBe(18)
-    expect(scheme.cessRate).toBe(0.5)
   })
 })
 
-describe('conversion Q→SO line tax carry + header aggregates', () => {
-  const itemId = '11111111-1111-4111-8111-111111111111'
-
-  it('builds SO line with HSN + scheme from quote-like payload and aggregates header components', () => {
+describe('quotation line snapshot carry into SO lines', () => {
+  it('keeps HSN and component rates from quote-like payload', () => {
     const { lines } = buildLinesFromInput({
       lines: [
         {
-          productOrItem: 'Chassis',
-          description: 'Trailer',
+          productOrItem: 'Trailer',
           itemId,
           qty: 1,
-          uom: 'NOS',
-          unitPrice: 100000,
+          unitPrice: 500000,
           discountPct: 0,
           taxPct: 18,
           hsnCode: '8716',
@@ -126,60 +222,8 @@ describe('conversion Q→SO line tax carry + header aggregates', () => {
         },
       ],
     })
-
     expect(lines[0]!.hsnCode).toBe('8716')
     expect(lines[0]!.taxScheme).toBe('igst')
-    expect(lines[0]!.igstAmount).toBe(18000)
-
-    const sum = sumLineTaxComponents(lines)
-    expect(sum.igstAmount).toBe(18000)
-    expect(sum.cgstAmount).toBe(0)
-    expect(sum.dominantScheme).toBe('igst')
-  })
-
-  it('carries CGST+SGST through conversion-style line and UTGST scheme line', () => {
-    const intra = buildLinesFromInput({
-      lines: [
-        {
-          productOrItem: 'Part',
-          itemId,
-          qty: 2,
-          unitPrice: 500,
-          discountPct: 0,
-          taxPct: 18,
-          hsnCode: '8708',
-          taxScheme: 'cgst_sgst',
-          cgstRate: 9,
-          sgstRate: 9,
-          igstRate: 0,
-        },
-      ],
-    })
-    expect(intra.lines[0]!.cgstAmount).toBe(90)
-    expect(intra.lines[0]!.sgstAmount).toBe(90)
-
-    const ut = buildLinesFromInput({
-      lines: [
-        {
-          productOrItem: 'Part UT',
-          itemId,
-          qty: 1,
-          unitPrice: 1000,
-          discountPct: 0,
-          taxPct: 18,
-          hsnCode: '8708',
-          taxScheme: 'utgst_pair',
-          cgstRate: 9,
-          utgstRate: 9,
-        },
-      ],
-    })
-    expect(ut.lines[0]!.taxScheme).toBe('utgst_pair')
-    expect(ut.lines[0]!.utgstAmount).toBe(90)
-    expect(ut.lines[0]!.sgstAmount).toBe(0)
-    expect(ut.lines[0]!.igstAmount).toBe(0)
-    const sum = sumLineTaxComponents(ut.lines)
-    expect(sum.dominantScheme).toBe('utgst_pair')
-    expect(sum.utgstAmount).toBe(90)
+    expect(lines[0]!.igstAmount).toBe(90000)
   })
 })

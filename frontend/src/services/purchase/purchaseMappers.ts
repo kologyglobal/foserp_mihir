@@ -4,6 +4,10 @@ import { getStoredSession } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
 import { resolveUomCode } from '../../utils/purchaseLineUom'
 import {
+  aggregatePurchasePoGstTotals,
+  computePurchasePoLineTax,
+} from '../../utils/purchasePoGst'
+import {
   mapEngineeringProductTypeToPurchaseCategory,
   normalizeEngineeringProductType,
 } from '../../utils/purchaseProductType'
@@ -1239,6 +1243,14 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     Number((line as { outstandingQty?: number }).outstandingQty) ||
     Math.max(0, uomQuantity - receivedUomQty)
   const requiredDate = line.requiredDate ?? new Date().toISOString().slice(0, 10)
+  const lineTax = computePurchasePoLineTax({
+    amount,
+    gstRatePct: Number(line.gstRatePct) || 0,
+    cgstRate: Number(line.cgstRate) || 0,
+    sgstRate: Number(line.sgstRate) || 0,
+    igstRate: Number(line.igstRate) || 0,
+    gstScheme: line.gstScheme ?? null,
+  })
   return {
     id: line.id,
     lineNo: line.lineNumber,
@@ -1270,13 +1282,13 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     rate,
     discountPct: 0,
     discountAmount: 0,
-    gstRatePct: 0,
-    taxAmount: 0,
-    taxableAmount: amount,
-    cgst: 0,
-    sgst: 0,
-    igst: 0,
-    lineTotal: amount,
+    gstRatePct: lineTax.gstRatePct,
+    taxAmount: lineTax.taxAmount,
+    taxableAmount: lineTax.taxableAmount,
+    cgst: lineTax.cgst,
+    sgst: lineTax.sgst,
+    igst: lineTax.igst,
+    lineTotal: lineTax.lineTotal,
     requiredDate,
     deliverySchedule: '',
     warehouseId: '',
@@ -1329,16 +1341,31 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
   const expectedDeliveryDate =
     api.expectedDeliveryDate ?? documentDate
   const subtotal = Number(api.subtotalAmount ?? api.totalAmount) || 0
-  const tax = Number(api.taxAmount) || 0
   const freight = Number(api.freightAmount) || 0
+  const mappedLines = (api.lines ?? []).map(mapApiPoLine)
+  const gstFromLines = aggregatePurchasePoGstTotals(mappedLines)
+  const tax =
+    Number(api.taxAmount) > 0 ? Number(api.taxAmount) : gstFromLines.taxAmount
   const total = Number(api.totalAmount) || subtotal + tax + freight
+  // Server line scheme is authoritative (after tax snapshot apply). Fallback: any IGST-only total.
+  const isInterstate =
+    gstFromLines.gstScheme === 'igst' ||
+    mappedLines.some((l) => l.igst > 0 && l.cgst === 0 && l.sgst === 0)
+  const gstScheme = isInterstate ? ('igst' as const) : ('cgst_sgst' as const)
+  const headerGst = isInterstate
+    ? { cgst: 0, sgst: 0, igst: tax }
+    : {
+        cgst: Number((tax / 2).toFixed(2)),
+        sgst: Number((tax / 2).toFixed(2)),
+        igst: 0,
+      }
   const vendorParty = {
     id: api.vendorId,
     code: api.vendorCode ?? '',
     name: api.vendorName ?? api.vendorId,
     gstin: api.vendorGstin ?? '',
     state: api.vendorState ?? '',
-    isInterstate: false,
+    isInterstate,
     address: api.vendorAddress ?? '',
   }
   const approvalStatus =
@@ -1388,7 +1415,8 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     requester: { ...EMPTY_PARTY },
     approver: null,
     vendor: vendorParty,
-    placeOfSupply: api.vendorState ?? '',
+    // Backend does not persist POS on PO header yet — editor derives from delivery / setup.
+    placeOfSupply: '',
     currency: 'INR',
     paymentTerms: api.paymentTerms ?? '',
     deliveryTerms: api.deliveryTerms ?? '',
@@ -1400,7 +1428,7 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     priceBasis: '',
     validityDate: null,
     expectedDeliveryDate,
-    gstScheme: 'cgst_sgst',
+    gstScheme,
     purchaseRequisitionId: api.purchaseRequisitionId,
     purchaseRequisitionNumber: api.purchaseRequisitionNumber ?? null,
     rfqId: api.requestForQuotationId ?? null,
@@ -1414,9 +1442,9 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     subtotal,
     discount: 0,
     taxableAmount: subtotal,
-    cgst: 0,
-    sgst: 0,
-    igst: tax,
+    cgst: headerGst.cgst,
+    sgst: headerGst.sgst,
+    igst: headerGst.igst,
     freight,
     otherCharges: 0,
     roundOff: 0,
@@ -1426,7 +1454,7 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     packingCharges: 0,
     insuranceCharges: 0,
     tcsAmount: 0,
-    lines: (api.lines ?? []).map(mapApiPoLine),
+    lines: mappedLines,
     termsAndConditions: '',
     internalNotes: '',
     remarks: api.remarks ?? '',
@@ -1536,6 +1564,12 @@ function uuidOrNull(value: string | null | undefined): string | null {
 export function mapDomainPoInputToApiPayload(
   input: PurchaseOrderInput,
 ): import('./purchaseApiTypes').ApiPurchaseOrderInput {
+  const taxAmount = (input.lines ?? []).reduce((sum, line) => {
+    const explicit =
+      (Number(line.cgst) || 0) + (Number(line.sgst) || 0) + (Number(line.igst) || 0)
+    if (explicit > 0) return sum + explicit
+    return sum + (Number(line.taxAmount) || 0)
+  }, 0)
   return {
     vendorId: input.vendorId,
     orderDate: input.documentDate ?? undefined,
@@ -1545,6 +1579,7 @@ export function mapDomainPoInputToApiPayload(
     deliveryTerms: input.deliveryTerms ?? null,
     deliveryWarehouseId: uuidOrNull(input.deliveryLocation?.id ?? null),
     freightAmount: input.freight ?? undefined,
+    taxAmount: taxAmount > 0 ? Number(taxAmount.toFixed(2)) : undefined,
     remarks: input.remarks ?? null,
     lines: (input.lines ?? []).map((line, index) => {
       const factor = Number(line.uomConversionFactor ?? 1) || 1
@@ -1657,6 +1692,7 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
         }
       : undefined,
     reversedAt: api.reversedAt ?? null,
+    partiallyReversed: Boolean(api.partiallyReversed),
     lines: (api.lines ?? []).map((l) => ({
       id: l.id,
       lineNo: l.lineNumber,
@@ -1678,6 +1714,15 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       rejectedQty: Number(l.rejectedQuantity) || 0,
       returnedQty: Number(l.returnedQuantity) || 0,
       returnableQty: Number(l.returnableQuantity) || 0,
+      reversedQty: Number(l.reversedQuantity) || 0,
+      reversedAcceptedQty: Number(l.reversedAcceptedQuantity) || 0,
+      reversedRejectedQty: Number(l.reversedRejectedQuantity) || 0,
+      reversedAt: l.reversedAt ?? null,
+      remainingReversibleQty:
+        l.remainingReversibleQuantity == null
+          ? Math.max(0, (Number(l.receivedQuantity) || 0) - (Number(l.reversedQuantity) || 0))
+          : Number(l.remainingReversibleQuantity) || 0,
+      lineFullyReversed: Boolean(l.lineFullyReversed),
       shortQty: Number(l.shortQuantity) || 0,
       excessQty: Number(l.excessQuantity) || 0,
       damagedQty: Number(l.damagedQuantity) || 0,
@@ -2281,6 +2326,7 @@ export function mapApiPurchaseReturnToDomain(api: ApiPurchaseReturn): PurchaseRe
         id: l.id,
         lineNo: l.lineNumber,
         goodsReceiptLineId: l.goodsReceiptLineId,
+        purchaseOrderLineId: l.purchaseOrderLineId ?? null,
         itemId: l.itemId || '',
         itemCode: l.itemCodeSnapshot || '',
         itemName: l.itemNameSnapshot || '',
@@ -2408,9 +2454,15 @@ export function mapDomainGrnInputToApiPayload(input: GrnInput): Record<string, u
     inspectionRequired: input.inspectionRequired ?? false,
     allowExcess: input.allowExcess ?? false,
     remarks: input.remarks ?? null,
-    lines: input.lines.map((line) => ({
+    lines: input.lines
+      .filter((line) => {
+        const received =
+          line.receivedUomQty != null ? Number(line.receivedUomQty) : Number(line.receivedQty) || 0
+        return received > 0 || Boolean(line.shortCloseRequested ?? line.closeOpenQuantity)
+      })
+      .map((line) => ({
       purchaseOrderLineId: line.purchaseOrderLineId,
-      /** Vendor UOM qty — backend converts to primary receivedQuantity. Zero = Not Received. */
+      /** Vendor UOM qty — backend converts to primary receivedQuantity. */
       receivedUomQuantity:
         line.receivedUomQty != null ? Number(line.receivedUomQty) : Number(line.receivedQty) || 0,
       damagedQuantity: Number(line.damagedQty) || 0,

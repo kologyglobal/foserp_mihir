@@ -52,7 +52,7 @@ import {
   CommercialGstSupplyPanel,
   type CommercialGstSupplyValue,
 } from '../../components/sales/CommercialGstSupplyPanel'
-import { COMPANY_STATE } from '../../types/invoice'
+import { loadSellerStateCode } from '../../utils/sellerGstState'
 import { resolveGstStateCode } from '../../utils/gstStateCode'
 import { notify } from '../../store/toastStore'
 
@@ -160,8 +160,22 @@ export function ProformaInvoiceFormPage() {
     placeOfSupply: '',
     placeOfSupplyOverride: false,
     placeOfSupplyOverrideReason: '',
-    supplierStateCode: resolveGstStateCode(COMPANY_STATE) ?? '27',
+    supplierStateCode: '',
   }))
+
+  useEffect(() => {
+    let cancelled = false
+    void loadSellerStateCode().then((code) => {
+      if (cancelled || !code) return
+      setGstSupply((prev) =>
+        prev.supplierStateCode === code ? prev : { ...prev, supplierStateCode: code },
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const [lineRows, setLineRows] = useState<PiLineRow[]>(() => [{
     key: crypto.randomUUID(),
     itemId: '',
@@ -201,6 +215,20 @@ export function ProformaInvoiceFormPage() {
     setShippingAddress(prefill.shippingAddress)
     setRemarks(prefill.remarks)
     if (prefill.locationId) setLocationId(prefill.locationId)
+    // Carry SO GST supply snapshot (supplier + place of supply); LE async seed only fills empty seller.
+    setGstSupply((prev) => ({
+      ...prev,
+      supplierStateCode:
+        prefill.so.supplierStateCode?.trim() ||
+        prefill.supplierStateCode?.trim() ||
+        prev.supplierStateCode,
+      placeOfSupply:
+        prefill.so.placeOfSupplyStateCode?.trim() ||
+        prefill.placeOfSupplyStateCode?.trim() ||
+        resolveGstStateCode(prefill.so.placeOfSupply) ||
+        resolveGstStateCode(prefill.placeOfSupply) ||
+        prev.placeOfSupply,
+    }))
     // Do not invent SO-level freight / order discount — SO header has no charge fields.
     setFreightMode('flat')
     setFreightAmount(0)
@@ -339,9 +367,14 @@ export function ProformaInvoiceFormPage() {
   const gstPreview = useMemo(
     () =>
       customer
-        ? computeGst(pricingSummary.taxableAfterDiscount, customer.state)
+        ? computeGst(
+            pricingSummary.taxableAfterDiscount,
+            customer.state,
+            undefined,
+            gstSupply.supplierStateCode || null,
+          )
         : null,
-    [pricingSummary.taxableAfterDiscount, customer],
+    [pricingSummary.taxableAfterDiscount, customer, gstSupply.supplierStateCode],
   )
 
   const hasValidLines = lines.length > 0 && lines.every((l) => l.itemId && l.qty > 0 && l.unitPrice > 0)
@@ -414,6 +447,9 @@ export function ProformaInvoiceFormPage() {
       shippingAddress,
       remarks,
       locationId: locationId || null,
+      placeOfSupply: gstSupply.placeOfSupply || null,
+      placeOfSupplyStateCode: gstSupply.placeOfSupply || null,
+      supplierStateCode: gstSupply.supplierStateCode || null,
       lines,
     }
 

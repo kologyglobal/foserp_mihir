@@ -13,6 +13,7 @@ import type { Item as MasterItem, Vendor as MasterVendor } from '../../types/mas
 import { deriveEngineeringProductTypeFromMaster, normalizeEngineeringProductType } from '../../utils/purchaseProductType'
 import { resolveGstStateCode } from '../../utils/gstStateCode'
 import { determinePurchaseGstSupply } from '../../utils/gstSupply'
+import { resolveLineTaxFromLocalMasters } from '../../utils/commercialLineTax'
 import type {
   PurchaseApprovalDocumentType,
   PurchaseApprovalQueueFilters,
@@ -69,7 +70,8 @@ import type {
 import { INVOICE_MATCHING_RESULT_STATUS_LABELS } from '../../types/purchaseDomain'
 import { ApiError } from '../api/apiErrors'
 import * as demo from './purchaseService'
-import { PurchaseServiceError, type PurchaseOrderSeriesOption } from './purchaseService'
+import { PurchaseServiceError, type PurchaseOrderSeriesOption, type CreatePurchaseOrderFromPrOptions } from './purchaseService'
+export type { CreatePurchaseOrderFromPrOptions }
 import * as prApi from './purchaseRequisitionApi'
 import * as approvalApi from './purchaseApprovalApi'
 import * as planningApi from './purchasePlanningApi'
@@ -736,15 +738,16 @@ export async function createPurchaseOrderFromPlanningRow(id: string): Promise<Pu
 }
 
 /**
- * Create PO from an approved PR.
+ * Create PO from an approved PR (optionally a line subset + partial qtys).
  * Demo: direct PO from PR lines.
  * API: RFQ-required PRs are blocked; direct PRs use Planning Sheet create-PO.
  */
 export async function createPurchaseOrderFromPr(
   prId: string,
   vendorId?: string,
+  options?: CreatePurchaseOrderFromPrOptions,
 ): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.createPurchaseOrderFromPr(prId, vendorId)
+  if (!isApiMode()) return demo.createPurchaseOrderFromPr(prId, vendorId, options)
 
   const pr = await getPurchaseRequisitionById(prId)
   if (!pr) {
@@ -769,10 +772,17 @@ export async function createPurchaseOrderFromPr(
       !['po_created', 'cancelled', 'completed'].includes(r.status),
   )
 
+  if (options?.lineIds?.length) {
+    const want = new Set(options.lineIds)
+    rows = rows.filter((r) => want.has(r.purchaseRequisitionLineId))
+  }
+
   if (rows.length === 0) {
     throw new PurchaseServiceError(
       'PPS_PO_NOT_READY',
-      'No Planning Sheet rows for this PR. Open Planning Sheet after approval, set vendor/rate, then create PO.',
+      options?.lineIds?.length
+        ? 'No Planning Sheet rows for the selected PR lines. Open Planning Sheet, set vendor/rate, then create PO.'
+        : 'No Planning Sheet rows for this PR. Open Planning Sheet after approval, set vendor/rate, then create PO.',
     )
   }
 
@@ -788,6 +798,10 @@ export async function createPurchaseOrderFromPr(
         r.purchaseRequisitionId === prId &&
         !['po_created', 'cancelled', 'completed'].includes(r.status),
     )
+    if (options?.lineIds?.length) {
+      const want = new Set(options.lineIds)
+      rows = rows.filter((r) => want.has(r.purchaseRequisitionLineId))
+    }
   }
 
   const eligible = rows.filter(demo.canSelectPlanningRowForPo)
@@ -798,7 +812,20 @@ export async function createPurchaseOrderFromPr(
     )
   }
 
-  const orders = await createPurchaseOrdersFromPlanningSelection(eligible.map((r) => r.id))
+  const orderQuantitiesByRow: Record<string, number> = {}
+  if (options?.orderQuantities) {
+    for (const row of eligible) {
+      const q = options.orderQuantities[row.purchaseRequisitionLineId]
+      if (q != null && Number.isFinite(q) && q > 0) {
+        orderQuantitiesByRow[row.id] = q
+      }
+    }
+  }
+
+  const orders = await createPurchaseOrdersFromPlanningSelection(
+    eligible.map((r) => r.id),
+    Object.keys(orderQuantitiesByRow).length ? { orderQuantities: orderQuantitiesByRow } : undefined,
+  )
   if (!orders[0]) {
     throw new PurchaseServiceError('PPS_PO_NOT_READY', 'PO was not created')
   }
@@ -1233,12 +1260,19 @@ export async function cancelGRN(id: string, remarks = ''): Promise<GoodsReceiptN
   }
 }
 
-export async function reverseGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
+export async function reverseGRN(
+  id: string,
+  remarks = '',
+  options?: { lineIds?: string[] },
+): Promise<GoodsReceiptNote> {
   if (!isApiMode()) {
     throw new PurchaseServiceError('NOT_SUPPORTED', 'Reverse GRN is only available in API mode.')
   }
   try {
-    const res = await grnApi.reverseGoodsReceiptApi(id, remarks ? { remarks } : {})
+    const payload: Record<string, unknown> = {}
+    if (remarks.trim()) payload.remarks = remarks.trim()
+    if (options?.lineIds?.length) payload.lineIds = options.lineIds
+    const res = await grnApi.reverseGoodsReceiptApi(id, payload)
     return mapApiGoodsReceiptToDomain(res.data)
   } catch (err) {
     throwApi(err)
@@ -2130,15 +2164,27 @@ function mapMasterItemToPurchaseCategory(item: MasterItem): PurchaseItemCategory
 }
 
 function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
+  const store = useMasterStore.getState()
   const uom =
-    useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomCode ??
-    useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomName ??
+    store.uoms.find((u) => u.id === item.baseUomId)?.uomCode ??
+    store.uoms.find((u) => u.id === item.baseUomId)?.uomName ??
     'NOS'
   const productType = deriveEngineeringProductTypeFromMaster({
     productType: item.productType,
     itemType: item.itemType,
     category: mapMasterItemToPurchaseCategory(item),
   })
+  let gstRatePct = 0
+  if (store.gstRates?.length) {
+    const snap = resolveLineTaxFromLocalMasters({
+      direction: 'PURCHASE',
+      item,
+      hsnById: (id) => store.getHsn(id),
+      hsnByCode: (code) => store.getHsnByCode(code),
+      gstRates: store.gstRates,
+    })
+    if (snap.resolved) gstRatePct = snap.taxPct
+  }
   return {
     id: item.id,
     itemCode: item.itemCode,
@@ -2154,7 +2200,7 @@ function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
     gstGroupId: item.gstGroupId ?? null,
     hsnId: item.hsnId ?? null,
     qualityTestGroupCode: item.qualityTestGroupCode ?? null,
-    gstRatePct: 0,
+    gstRatePct,
     standardRate: Number(item.standardRate ?? 0),
     reorderLevel: Number(item.reorderLevel ?? 0),
     preferredVendorId: null,
@@ -2164,6 +2210,8 @@ function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
     serialControlled: Boolean(item.serialTracked),
     expiryControlled: false,
     receivingTolerancePercentage: Number(item.receivingTolerancePercentage ?? 0),
+    defaultBinId: item.defaultBinId ?? null,
+    defaultBinCode: item.defaultBinCode ?? null,
     isActive: item.isActive !== false && item.isBlocked !== true,
     remarks: '',
     createdBy: 'API',

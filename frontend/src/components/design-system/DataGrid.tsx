@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   flexRender,
   getCoreRowModel,
@@ -13,6 +14,11 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table'
+import {
+  isDocumentNumberColumnId,
+  loadDataGridColumnLayout,
+  saveDataGridColumnLayout,
+} from '../../utils/dataGridColumnLayout'
 import {
   ArrowDown,
   ArrowUp,
@@ -95,8 +101,23 @@ export interface DataGridProps<T> {
   bulkActions?: ReactNode
   pageSizeOptions?: number[]
   onPageSizeChange?: (size: number) => void
-  /** When false, disables header click sorting (page-level sort handles ordering) */
+  /**
+   * When true, all hideable columns support header sort.
+   * When false, only document-number columns support header sort (A→Z / Z→A);
+   * page-level Sort handles the rest.
+   */
   enableColumnSorting?: boolean
+  /**
+   * Persist Columns show/hide + order in localStorage.
+   * Defaults to the current route path. Pass a stable id when multiple grids share a route,
+   * or `false` to disable persistence.
+   */
+  columnLayoutKey?: string | false
+  /**
+   * When this value changes (e.g. page Sort dropdown), clear header sorting so page-level
+   * order is not overridden by a prior column-header sort.
+   */
+  sortResetToken?: string | number
   /** Search / filters / sort / view row rendered inside the table shell above column headers */
   registerBar?: ReactNode
 }
@@ -147,13 +168,27 @@ export function DataGrid<T>({
   pageSizeOptions = [10, 25, 50, 100],
   onPageSizeChange,
   enableColumnSorting = true,
+  columnLayoutKey,
+  sortResetToken,
   registerBar,
 }: DataGridProps<T>) {
   const densityClass = useDensityClass()
+  const location = useLocation()
+  const resolvedLayoutKey =
+    columnLayoutKey === false ? null : columnLayoutKey?.trim() || `route:${location.pathname}`
+
   const [sorting, setSorting] = useState<SortingState>([])
+  const sortResetSeen = useRef(false)
   const [internalSearch, setInternalSearch] = useState('')
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
-  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>([])
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (!resolvedLayoutKey) return {}
+    return loadDataGridColumnLayout(resolvedLayoutKey)?.visibility ?? {}
+  })
+  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(() => {
+    if (!resolvedLayoutKey) return []
+    return loadDataGridColumnLayout(resolvedLayoutKey)?.order ?? []
+  })
+  const layoutHydratedKey = useRef<string | null>(resolvedLayoutKey)
   const [dragColumnId, setDragColumnId] = useState<string | null>(null)
   const [showColumnChooser, setShowColumnChooser] = useState(false)
   const [showViewMenu, setShowViewMenu] = useState(false)
@@ -199,9 +234,59 @@ export function DataGrid<T>({
     return data.filter((row) => globalFilterFn(row, searchValue.toLowerCase()))
   }, [data, searchValue, globalFilterFn])
 
+  // When page-level Sort is used, still allow Document Number header A→Z / Z→A.
+  const resolvedColumns = useMemo(() => {
+    return columns.map((col) => {
+      const id = String(
+        col.id ??
+          ('accessorKey' in col && col.accessorKey != null ? String(col.accessorKey) : '') ??
+          '',
+      )
+      if (enableColumnSorting) {
+        return col
+      }
+      if (isDocumentNumberColumnId(id)) {
+        return { ...col, enableSorting: col.enableSorting !== false }
+      }
+      return { ...col, enableSorting: false }
+    })
+  }, [columns, enableColumnSorting])
+
+  // Reload stored layout when the storage key changes (e.g. route navigation).
+  useEffect(() => {
+    if (!resolvedLayoutKey) {
+      layoutHydratedKey.current = null
+      return
+    }
+    if (layoutHydratedKey.current === resolvedLayoutKey) return
+    const saved = loadDataGridColumnLayout(resolvedLayoutKey)
+    setColumnVisibility(saved?.visibility ?? {})
+    setColumnOrder(saved?.order ?? [])
+    layoutHydratedKey.current = resolvedLayoutKey
+  }, [resolvedLayoutKey])
+
+  // Persist column show/hide + order after user changes.
+  useEffect(() => {
+    if (!resolvedLayoutKey || layoutHydratedKey.current !== resolvedLayoutKey) return
+    saveDataGridColumnLayout(resolvedLayoutKey, {
+      visibility: columnVisibility,
+      order: columnOrder,
+    })
+  }, [resolvedLayoutKey, columnVisibility, columnOrder])
+
+  // Page-level Sort dropdown should win over a previous Document Number header click.
+  useEffect(() => {
+    if (sortResetToken === undefined) return
+    if (!sortResetSeen.current) {
+      sortResetSeen.current = true
+      return
+    }
+    setSorting([])
+  }, [sortResetToken])
+
   const table = useReactTable({
     data: filteredData,
-    columns,
+    columns: resolvedColumns,
     state: {
       sorting,
       columnVisibility,
@@ -217,7 +302,8 @@ export function DataGrid<T>({
         ? (row) => getRowCanSelect(row.original)
         : true
       : false,
-    enableSorting: enableColumnSorting,
+    // Always on at table level — column defs gate whether a header is sortable.
+    enableSorting: true,
     getRowId: getRowId ?? ((_, index) => String(index)),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -225,6 +311,18 @@ export function DataGrid<T>({
     getPaginationRowModel: getPaginationRowModel(),
     initialState: { pagination: { pageSize: currentPageSize } },
   })
+
+  // Drop stale ids and append columns added in newer builds so layout stays valid.
+  useEffect(() => {
+    const validIds = table.getAllLeafColumns().map((col) => col.id)
+    const validSet = new Set(validIds)
+    if (columnOrder.length === 0) return
+    const filtered = columnOrder.filter((id) => validSet.has(id))
+    const missing = validIds.filter((id) => !filtered.includes(id))
+    if (filtered.length === columnOrder.length && missing.length === 0) return
+    setColumnOrder([...filtered, ...missing])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-sync when column defs change shape
+  }, [resolvedColumns])
 
   function currentColumnOrderIds() {
     return columnOrder.length > 0

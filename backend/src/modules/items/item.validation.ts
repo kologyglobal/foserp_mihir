@@ -118,6 +118,8 @@ const itemBaseSchema = z.object({
   routingNo: z.string().trim().max(64).nullable().optional(),
   drawingNo: z.string().trim().max(64).nullable().optional(),
   subAssemblyRule: z.enum(['phantom', 'manufactured', 'purchased', 'subcontracted']).nullable().optional(),
+  /** Optional default put-away / transaction bin (Bin Master). */
+  defaultBinId: z.string().uuid().nullable().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
   uomConversions: z
     .array(
