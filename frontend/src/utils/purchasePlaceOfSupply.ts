@@ -1,6 +1,6 @@
 import type { PurchaseSetup } from '../types/purchaseDomain'
 import { DEFAULT_PURCHASE_SETUP } from '../data/purchase/purchaseSetupSeed'
-import { coalesceGstStateCode, formatPlaceOfSupplyLabel, resolveGstStateCode } from './gstStateCode'
+import { coalesceGstStateCode, formatPlaceOfSupplyLabel } from './gstStateCode'
 import { determinePurchaseGstSupply, type GstSupplyContext } from './gstSupply'
 
 export type PurchaseLocationGstRef = {
