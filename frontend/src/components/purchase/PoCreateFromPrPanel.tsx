@@ -70,7 +70,12 @@ export function PoCreateFromPrPanel({ initialPrId = '', initialVendorId = '', on
       const [list, v] = await Promise.all([getPurchaseRequisitions(), getVendors()])
       setPrRows(
         list
-          .filter((r) => r.status === 'approved' || r.status === 'converted')
+          .filter(
+            (r) =>
+              r.status === 'approved' ||
+              r.status === 'partially_converted' ||
+              r.status === 'converted_to_rfq',
+          )
           .map((r) => ({
             id: r.id,
             documentNumber: r.documentNumber,

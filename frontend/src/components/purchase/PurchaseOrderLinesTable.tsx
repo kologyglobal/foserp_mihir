@@ -691,7 +691,7 @@ export function PurchaseOrderLinesTable({
                           (line.binCode
                             ? binOptions.find(
                                 (b) =>
-                                  b.code.localeCompare(line.binCode, undefined, {
+                                  b.code.localeCompare(line.binCode ?? '', undefined, {
                                     sensitivity: 'accent',
                                   }) === 0,
                               )?.id
