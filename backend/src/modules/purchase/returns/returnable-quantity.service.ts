@@ -109,7 +109,11 @@ export async function computeRemainingReturnable(
     })
   }
 
-  const hardBlock = grn?.status === 'REVERSED' || grn?.status === 'CANCELLED'
+  const hardBlock =
+    grn?.status === 'REVERSED' ||
+    grn?.status === 'CANCELLED' ||
+    grn?.status === 'DRAFT' ||
+    grn?.status === 'PENDING_TOLERANCE_APPROVAL'
 
   const returns = await prisma.purchaseReturn.findMany({
     where: {

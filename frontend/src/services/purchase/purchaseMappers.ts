@@ -12,6 +12,13 @@ import {
   normalizeEngineeringProductType,
 } from '../../utils/purchaseProductType'
 import { prDepartmentLabel } from '../../utils/purchaseRequisitionValidation'
+import {
+  purchaseDeliveryPlaceOfSupplyLabel,
+  purchaseSetupPlaceState,
+} from '../../utils/purchasePlaceOfSupply'
+import { getCachedPurchaseSetup } from './purchaseApiFacade'
+import { getCachedPurchaseBins } from '../../hooks/useBinOptions'
+import { resolveBinSelection } from '../../utils/itemDefaultBin'
 import type { EngineeringProductType } from '../../types/taxMaster'
 import type {
   ApiPurchaseOrder,
@@ -297,12 +304,13 @@ function resolveWarehouseFromMaster(warehouseId: string | null | undefined): {
   const id = (warehouseId ?? '').trim()
   if (!id) return { ...EMPTY_LOCATION }
   const warehouse = useMasterStore.getState().warehouses.find((w) => w.id === id)
+  const pos = purchaseSetupPlaceState(getCachedPurchaseSetup())
   return {
     id,
     code: warehouse?.warehouseCode?.trim() || '',
     name: warehouse?.warehouseName?.trim() || warehouse?.warehouseCode?.trim() || '—',
-    state: '',
-    city: '',
+    state: pos.state,
+    city: pos.city,
   }
 }
 
@@ -367,6 +375,7 @@ export function mapApiLineToDomain(line: ApiPurchaseRequisitionLine): PurchaseRe
         useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomCode ?? 'NOS'
       )
     })()
+  const binResolved = resolveBinSelection(line.binId, null, getCachedPurchaseBins())
   return {
     id: line.id,
     lineNo: line.lineNumber,
@@ -400,7 +409,8 @@ export function mapApiLineToDomain(line: ApiPurchaseRequisitionLine): PurchaseRe
     customerName: '',
     locationId: line.warehouseId ?? '',
     locationName: resolveWarehouseFromMaster(line.warehouseId).name,
-    binCode: line.binId ?? '',
+    binId: binResolved.binId,
+    binCode: binResolved.binCode,
     purchaseOrderId: line.purchaseOrderId ?? null,
     purchaseOrderNumber: line.purchaseOrderNumber ?? '',
     purchaseQuoteNumber: '',
@@ -534,7 +544,12 @@ export function mapDomainInputToApiPayload(
       uomId: resolveUomId(line),
       estimatedRate: Number(line.estimatedRate ?? 0),
       warehouseId: asUuid(line.locationId) ?? asUuid(input.location?.id),
-      binId: line.binCode?.trim() ? line.binCode.trim().slice(0, 36) : null,
+      binId: (() => {
+        const direct = asUuid((line as { binId?: string | null }).binId)
+        if (direct) return direct
+        const fromCode = resolveBinSelection(null, line.binCode, getCachedPurchaseBins())
+        return asUuid(fromCode.binId)
+      })(),
       preferredVendorId: asUuid(line.preferredVendorId),
       requiredDate: line.requiredDate || null,
       remarks: line.remarks?.trim() ? line.remarks : null,
@@ -1359,10 +1374,19 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
         sgst: Number((tax / 2).toFixed(2)),
         igst: 0,
       }
+  const setup = getCachedPurchaseSetup()
+  const locationFromApi = resolveWarehouseFromMaster(api.deliveryWarehouseId)
+  const placeOfSupply = purchaseDeliveryPlaceOfSupplyLabel(locationFromApi, setup)
+  const vendorFromMaster = resolveVendorFromMaster(api.vendorId)
+  const vendorDisplayName =
+    (api.vendorName ?? '').trim() ||
+    vendorFromMaster.name ||
+    (api.vendorCode ?? '').trim() ||
+    ''
   const vendorParty = {
     id: api.vendorId,
-    code: api.vendorCode ?? '',
-    name: api.vendorName ?? api.vendorId,
+    code: api.vendorCode ?? vendorFromMaster.code ?? '',
+    name: vendorDisplayName,
     gstin: api.vendorGstin ?? '',
     state: api.vendorState ?? '',
     isInterstate,
@@ -1377,7 +1401,7 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
           ? 'rejected'
           : 'approved'
 
-  const locationFromApi =
+  const locationFromApiResolved =
     api.deliveryWarehouseId || api.deliveryWarehouseName
       ? {
           id: api.deliveryWarehouseId ?? '',
@@ -1385,10 +1409,10 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
           name:
             (api.deliveryWarehouseName ?? '').trim() ||
             resolveWarehouseFromMaster(api.deliveryWarehouseId).name,
-          state: '',
-          city: '',
+          state: locationFromApi.state,
+          city: locationFromApi.city,
         }
-      : resolveWarehouseFromMaster(api.deliveryWarehouseId)
+      : locationFromApi
 
   const buyer =
     api.createdById || api.createdByName
@@ -1408,15 +1432,14 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     origin: mapApiPoOrigin(String(api.origin), Boolean(api.purchaseRequisitionId)),
     revisionNo: Number(api.revisionNo ?? 0),
     buyer,
-    location: locationFromApi,
-    purchaseLocation: locationFromApi,
-    deliveryLocation: locationFromApi,
+    location: locationFromApiResolved,
+    purchaseLocation: locationFromApiResolved,
+    deliveryLocation: locationFromApiResolved,
     department: '',
     requester: { ...EMPTY_PARTY },
     approver: null,
     vendor: vendorParty,
-    // Backend does not persist POS on PO header yet — editor derives from delivery / setup.
-    placeOfSupply: '',
+    placeOfSupply,
     currency: 'INR',
     paymentTerms: api.paymentTerms ?? '',
     deliveryTerms: api.deliveryTerms ?? '',
@@ -1674,6 +1697,7 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
     gateEntryNo: api.gateEntryNumber,
     warehouseId: api.warehouseId,
     warehouseName: api.warehouseName,
+    storageLocationId: api.storageLocationId ?? null,
     receivingLocation: api.storageLocationName || '',
     qcRequired: api.inspectionRequired,
     inspectionRequired: api.inspectionRequired,

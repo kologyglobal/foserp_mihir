@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSavedViewsStore, type SavedViewConfig } from '../store/savedViewsStore'
+import { loadListPagePreference, saveListPagePreference } from '../utils/listPagePreferences'
 
 /** Stable fallback — never use inline `?? []` in Zustand selectors (new ref every render → infinite loop). */
 const EMPTY_SAVED_VIEWS: SavedViewConfig[] = []
@@ -13,6 +14,8 @@ export interface UseSavedViewsOptions {
   onApply: (filters: Record<string, string>) => void
   /** Built-in preset snapshots keyed by view name */
   systemPresets?: Record<string, Record<string, string>>
+  /** Restore last active view + sort on mount (localStorage). Default true. */
+  autoRestoreSession?: boolean
 }
 
 /**
@@ -22,7 +25,7 @@ export interface UseSavedViewsOptions {
  * 3. Save View captures current filters under a name (persisted in localStorage).
  * 4. Re-saving an existing custom view name updates that view.
  */
-export function useSavedViews({ pageId, filters, onApply, systemPresets = {} }: UseSavedViewsOptions) {
+export function useSavedViews({ pageId, filters, onApply, systemPresets = {}, autoRestoreSession = true }: UseSavedViewsOptions) {
   const customViews = useSavedViewsStore((s) => s.customViews[pageId] ?? EMPTY_SAVED_VIEWS)
   const saveViewToStore = useSavedViewsStore((s) => s.saveView)
   const deleteViewFromStore = useSavedViewsStore((s) => s.deleteView)
@@ -30,6 +33,7 @@ export function useSavedViews({ pageId, filters, onApply, systemPresets = {} }: 
   const [activeView, setActiveView] = useState<string>('My View')
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [defaultView, setDefaultView] = useState<string>('My View')
+  const restoredRef = useRef(false)
 
   const viewNames = useMemo(() => {
     const system = Object.keys(systemPresets)
@@ -61,6 +65,20 @@ export function useSavedViews({ pageId, filters, onApply, systemPresets = {} }: 
     },
     [customViews, onApply, systemPresets],
   )
+
+  useEffect(() => {
+    if (!autoRestoreSession || restoredRef.current) return
+    restoredRef.current = true
+    const pref = loadListPagePreference(pageId)
+    if (!pref?.activeView) return
+    setActiveView(pref.activeView)
+    selectView(pref.activeView)
+  }, [autoRestoreSession, pageId, selectView])
+
+  useEffect(() => {
+    if (!autoRestoreSession) return
+    saveListPagePreference(pageId, { activeView })
+  }, [activeView, autoRestoreSession, pageId])
 
   const openSaveDialog = useCallback(() => setSaveDialogOpen(true), [])
   const closeSaveDialog = useCallback(() => setSaveDialogOpen(false), [])

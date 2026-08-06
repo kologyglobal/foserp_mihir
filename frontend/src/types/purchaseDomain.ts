@@ -1360,6 +1360,8 @@ export interface PurchaseRequisitionLine {
   locationName: string
   /** Warehouse bin / storage location code. */
   binCode: string
+  /** Bin master id (persisted on API); resolved from code when saving. */
+  binId?: string | null
   /**
    * Linked PO after Planning→PO or RFQ→PO (read-only track record on the PR line).
    */
@@ -2228,7 +2230,9 @@ export interface GoodsReceiptNote extends PurchaseMoneyTotals, PurchaseAuditFiel
   gateEntryNo: string | null
   warehouseId: string
   warehouseName: string
+  /** Display name (view/print). Editor uses `storageLocationId` when set. */
   receivingLocation: string
+  storageLocationId?: string | null
   /** Alias kept for dashboard / legacy reads — mirrors inspectionRequired. */
   qcRequired: boolean
   inspectionRequired: boolean
@@ -2987,7 +2991,8 @@ export type GrnInput = {
 
 export type QualityInspectionInput = {
   goodsReceiptId: string
-  goodsReceiptLineId: string
+  /** When omitted, backend/demo uses all QC-required GRN lines (full received qty). */
+  goodsReceiptLineId?: string
   inspectorId?: string
   inspectorName?: string
   inspectionPlan?: string

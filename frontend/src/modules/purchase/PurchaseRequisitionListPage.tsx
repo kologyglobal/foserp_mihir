@@ -36,9 +36,9 @@ import {
   buildPrRegisterOverview,
   buildPrRegisterSuggestions,
 } from '../../utils/prRegisterInsights'
+import { loadListPagePreference, saveListPagePreference } from '../../utils/listPagePreferences'
 import {
   cancelPurchaseRequisition,
-  convertPurchaseRequisitionToPo,
   convertPurchaseRequisitionToRfq,
   duplicatePurchaseRequisition,
   getPurchaseRequisitions,
@@ -48,6 +48,7 @@ import {
 import type { PurchaseRequisitionListRow } from '../../types/purchaseDomain'
 import { exportRowsToCsv } from '../../utils/exportCsv'
 import { prListBreadcrumbs } from '../../utils/purchaseNavigation'
+import { purchaseOrderFromPrHref } from '../../utils/purchaseRequisitionNextStep'
 import { notify } from '../../store/toastStore'
 import { usePurchasePermissions } from '../../utils/permissions'
 
@@ -95,7 +96,12 @@ export function PurchaseRequisitionListPage() {
     ...DEFAULT_PR_LIST_FILTERS,
     status: searchParams.get('status') === 'open' ? '' : (searchParams.get('status') ?? ''),
   }))
-  const [sortBy, setSortBy] = useState<PrSortKey>('documentDate')
+  const [sortBy, setSortBy] = useState<PrSortKey>(() => {
+    const pref = loadListPagePreference('/purchase/requisitions')
+    const sb = pref?.sortBy as PrSortKey | undefined
+    if (sb && PR_SORT_OPTIONS.some((o) => o.value === sb)) return sb
+    return 'documentDate'
+  })
   const [rows, setRows] = useState<PurchaseRequisitionListRow[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -139,6 +145,10 @@ export function PurchaseRequisitionListPage() {
     }
     setFilters((f) => ({ ...f, status }))
   }, [searchParams])
+
+  useEffect(() => {
+    saveListPagePreference('/purchase/requisitions', { sortBy })
+  }, [sortBy])
 
   const applyPrFilters = useCallback((saved: Record<string, string>) => {
     setFilters({
@@ -325,10 +335,7 @@ export function PurchaseRequisitionListPage() {
         }, `${pr.documentNumber} converted to RFQ`)
       },
       onConvertPo: (pr: PurchaseRequisitionListRow) =>
-        void runAction(pr.id, async () => {
-          const po = await convertPurchaseRequisitionToPo(pr.id)
-          navigate(`/purchase/orders/${po.id}`)
-        }, `${pr.documentNumber} converted to PO`),
+        navigate(purchaseOrderFromPrHref(pr.id)),
       onViewPlanning: (pr: PurchaseRequisitionListRow) => {
         const q = encodeURIComponent(pr.documentNumber)
         navigate(`/purchase/planning-sheet?search=${q}`)

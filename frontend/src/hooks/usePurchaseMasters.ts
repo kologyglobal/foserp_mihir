@@ -62,7 +62,7 @@ export function useReturnReasonOptions() {
   return usePurchaseMasterOptions('return-reasons')
 }
 
-export { useBinCodeOptions } from './useBinOptions'
+export { useBinCodeOptions, useBinOptions } from './useBinOptions'
 
 export function resolvePurchaseMasterLabel(kind: PurchaseMasterKind, code: string): string {
   return usePurchaseMasterStore.getState().getLabel(kind, code)

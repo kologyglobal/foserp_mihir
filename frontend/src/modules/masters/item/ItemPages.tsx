@@ -50,9 +50,11 @@ import { EnterpriseMasterWorkspace, MasterStickyFooter } from '../shared/Enterpr
 import { MasterCodeField } from '../../../components/masters/MasterCodeField'
 import { MasterItemImageField } from '../../../components/masters/MasterItemImageField'
 import {
-  applyGeneralQuantityToPurchaseUoms,
   ItemUomConversionEditor,
+  applyQuantityPerUomToPurchaseRows,
+  deriveItemQuantityPerUom,
   itemToUomConversionRows,
+  quantityPerUomFromPurchaseRows,
   type ItemUomConversionRow,
 } from '../../../components/masters/ItemUomConversionEditor'
 import type { MasterCodeSeriesHandle } from '../../../hooks/useMasterCodeSeries'
@@ -282,7 +284,7 @@ function buildItemFormDefaults(
       qcRequired: existing.qcRequired ?? false,
       batchTracked: existing.batchTracked ?? false,
       serialTracked: existing.serialTracked ?? false,
-      quantityPerUom: existing.quantityPerUom ?? 1,
+      quantityPerUom: deriveItemQuantityPerUom(existing),
       purchaseQtyPerUom: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
       uomConversionFactor: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
       receivingToleranceId: optionalUuidFormValue(existing.receivingToleranceId),
@@ -483,6 +485,8 @@ export function ItemFormPage() {
   const formRootRef = useRef<HTMLDivElement>(null)
   const codeSeriesRef = useRef<MasterCodeSeriesHandle | null>(null)
   const [uomConversionRows, setUomConversionRows] = useState<ItemUomConversionRow[]>([])
+  const purchaseQtySyncRef = useRef(false)
+  const prevBaseUomIdRef = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     if (!existing) {
@@ -521,7 +525,7 @@ export function ItemFormPage() {
     getValues,
     watch,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
     defaultValues: formDefaults,
@@ -529,9 +533,9 @@ export function ItemFormPage() {
   })
 
   useEffect(() => {
-    if (!existing) return
+    if (!existing || isDirty) return
     reset(buildItemFormDefaults(existing, leafCategories, uoms, taxLookup))
-  }, [existing?.id, existing?.updatedAt, leafCategories, uoms, taxLookup, reset])
+  }, [existing?.id, existing?.updatedAt, leafCategories, uoms, taxLookup, reset, isDirty])
 
   /** Patch tax FKs once masters are in the store — never wipe user-picked values. */
   useEffect(() => {
@@ -558,9 +562,9 @@ export function ItemFormPage() {
   const hsnId = watch('hsnId') ?? ''
   const gstGroupId = watch('gstGroupId') ?? ''
   const baseUomId = watch('baseUomId')
+  const quantityPerUom = watch('quantityPerUom')
 
   const baseUomCode = uoms.find((u) => u.id === baseUomId)?.uomCode ?? '—'
-  const quantityPerUom = watch('quantityPerUom')
 
   /** General → Quantity drives purchase conversion factor (PO/GRN multi-unit). */
   function syncPurchaseQtyFromGeneral(raw: number) {
@@ -569,10 +573,61 @@ export function ItemFormPage() {
     setValue('purchaseQtyPerUom', factor, { shouldValidate: true, shouldDirty: true })
     const baseId = getValues('baseUomId')
     if (!baseId) return
-    setUomConversionRows((rows) => applyGeneralQuantityToPurchaseUoms(rows, baseId, factor))
+    setUomConversionRows((rows) => applyQuantityPerUomToPurchaseRows(factor, baseId, rows))
   }
 
   const quantityPerUomRegister = register('quantityPerUom')
+
+  /** General Quantity ↔ default purchase UOM factor (when purchase UOM ≠ base). */
+  useEffect(() => {
+    if (purchaseQtySyncRef.current || !baseUomId) return
+    const qty = Number(quantityPerUom)
+    if (!Number.isFinite(qty) || qty <= 0) return
+    setUomConversionRows((rows) => applyQuantityPerUomToPurchaseRows(qty, baseUomId, rows))
+  }, [quantityPerUom, baseUomId])
+
+  /** Rebuild purchase UOM rows when base UOM changes. */
+  useEffect(() => {
+    if (!baseUomId) return
+    const prev = prevBaseUomIdRef.current
+    prevBaseUomIdRef.current = baseUomId
+    if (prev === undefined || prev === baseUomId) return
+    const factor = Number(getValues('quantityPerUom')) || 1
+    setUomConversionRows((rows) => {
+      const seed =
+        rows.length > 0
+          ? rows.map((r) =>
+              r.uomId === prev
+                ? { ...r, uomId: baseUomId, conversionFactor: 1, isDefaultPurchase: true }
+                : r,
+            )
+          : itemToUomConversionRows({
+              baseUomId,
+              purchaseUomId: baseUomId,
+              uomConversionFactor: factor,
+              uomConversions: [],
+            })
+      return applyQuantityPerUomToPurchaseRows(factor, baseUomId, seed)
+    })
+  }, [baseUomId, getValues])
+
+  const handleUomConversionRowsChange = useCallback(
+    (rows: ItemUomConversionRow[]) => {
+      setUomConversionRows(rows)
+      const syncedQty = quantityPerUomFromPurchaseRows(baseUomId, rows)
+      if (syncedQty == null) return
+      const current = Number(getValues('quantityPerUom'))
+      if (Math.abs(current - syncedQty) < 1e-9) return
+      purchaseQtySyncRef.current = true
+      setValue('quantityPerUom', syncedQty, { shouldValidate: true })
+      setValue('uomConversionFactor', syncedQty)
+      setValue('purchaseQtyPerUom', syncedQty)
+      queueMicrotask(() => {
+        purchaseQtySyncRef.current = false
+      })
+    },
+    [baseUomId, getValues, setValue],
+  )
 
   const categoryOptions = useMemo(
     () => leafCategories.map((c) => ({ value: c.id, label: `${c.categoryCode} — ${c.categoryName}`, searchText: c.categoryName.toLowerCase() })),
@@ -823,7 +878,12 @@ export function ItemFormPage() {
             />
           </FormField>
           <FormField label="Unit of Measure" required error={errors.baseUomId?.message}>
-            <UomMasterSelect value={baseUomId} onChange={(v) => setValue('baseUomId', v, { shouldValidate: true })} />
+            <UomMasterSelect
+              value={baseUomId}
+              onChange={(v) =>
+                setValue('baseUomId', v, { shouldValidate: true, shouldDirty: true })
+              }
+            />
           </FormField>
           <FormField label="Quantity" error={errors.quantityPerUom?.message}>
             <Input
@@ -837,7 +897,8 @@ export function ItemFormPage() {
               }}
             />
             <p className="mt-1 text-xs text-erp-muted">
-              Also sets purchase UOM conversion factor (vendor units per 1 stock unit).
+              When a purchase UOM differs from base UOM, this qty syncs to the Purchase section
+              conversion factor (vendor units per 1 base unit).
             </p>
           </FormField>
           <FormField label="Material Grade">
@@ -882,7 +943,7 @@ export function ItemFormPage() {
             baseUomId={baseUomId}
             baseUomCode={baseUomCode}
             rows={uomConversionRows}
-            onChange={setUomConversionRows}
+            onChange={handleUomConversionRowsChange}
             uomCodeOf={(uomId) => uoms.find((u) => u.id === uomId)?.uomCode ?? '—'}
             defaultConversionFactor={Number(quantityPerUom) > 0 ? Number(quantityPerUom) : 1}
           />

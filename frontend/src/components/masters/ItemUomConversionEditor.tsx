@@ -266,6 +266,90 @@ export function legacyPurchaseFieldsToConversions(input: {
   return rows
 }
 
+/** Default purchase alternate row index (non-base UOM used on PO/GRN). */
+export function findDefaultPurchaseAlternateRowIndex(
+  baseUomId: string,
+  rows: ItemUomConversionRow[],
+): number {
+  const byDefault = rows.findIndex(
+    (r) =>
+      r.isDefaultPurchase &&
+      r.isPurchaseAllowed !== false &&
+      r.uomId &&
+      r.uomId !== baseUomId,
+  )
+  if (byDefault >= 0) return byDefault
+  return rows.findIndex(
+    (r) => r.uomId && r.uomId !== baseUomId && r.isPurchaseAllowed !== false,
+  )
+}
+
+/** General Quantity → default purchase UOM conversion factor (when purchase UOM ≠ base). */
+export function applyQuantityPerUomToPurchaseRows(
+  quantityPerUom: number,
+  baseUomId: string,
+  rows: ItemUomConversionRow[],
+): ItemUomConversionRow[] {
+  const qty = Number(quantityPerUom)
+  if (!baseUomId || !Number.isFinite(qty) || qty <= 0) return rows
+
+  const list =
+    rows.length > 0
+      ? rows
+      : [
+          {
+            uomId: baseUomId,
+            conversionFactor: 1,
+            isPurchaseAllowed: true,
+            isDefaultPurchase: true,
+          },
+        ]
+
+  const targetIdx = findDefaultPurchaseAlternateRowIndex(baseUomId, list)
+  if (targetIdx < 0) return rows
+
+  const current = Number(list[targetIdx]?.conversionFactor)
+  if (Math.abs(current - qty) < 1e-9) return rows
+
+  return list.map((r, i) => (i === targetIdx ? { ...r, conversionFactor: qty } : r))
+}
+
+/** Purchase conversion factor → General Quantity (reverse sync). */
+export function quantityPerUomFromPurchaseRows(
+  baseUomId: string,
+  rows: ItemUomConversionRow[],
+): number | null {
+  const targetIdx = findDefaultPurchaseAlternateRowIndex(baseUomId, rows)
+  if (targetIdx < 0) return null
+  const factor = Number(rows[targetIdx]?.conversionFactor)
+  return Number.isFinite(factor) && factor > 0 ? factor : null
+}
+
+/** Prefer purchase conversion factor for General Quantity when item uses alternate purchase UOM. */
+export function deriveItemQuantityPerUom(item: {
+  baseUomId: string
+  purchaseUomId?: string | null
+  quantityPerUom?: number
+  uomConversionFactor?: number
+  purchaseQtyPerUom?: number
+  uomConversions?: ItemUomConversion[]
+}): number {
+  const conversions = item.uomConversions
+  if (conversions?.length) {
+    const idx = findDefaultPurchaseAlternateRowIndex(item.baseUomId, conversions)
+    if (idx >= 0) {
+      const factor = Number(conversions[idx]?.conversionFactor)
+      if (factor > 0) return factor
+    }
+  }
+  const purchaseUomId = item.purchaseUomId ?? item.baseUomId
+  const legacyFactor = Number(item.uomConversionFactor ?? item.purchaseQtyPerUom ?? 0)
+  if (purchaseUomId && purchaseUomId !== item.baseUomId && legacyFactor > 0) {
+    return legacyFactor
+  }
+  return Number(item.quantityPerUom) > 0 ? Number(item.quantityPerUom) : 1
+}
+
 /** Map API item to editor rows. */
 export function itemToUomConversionRows(item: {
   baseUomId: string

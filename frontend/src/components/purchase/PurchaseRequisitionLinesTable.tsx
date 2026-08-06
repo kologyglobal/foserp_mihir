@@ -9,7 +9,7 @@ import { Select } from '@/components/forms/Inputs'
 import { PurchaseLineQtyCell } from '@/components/purchase/PurchaseLineQtyCell'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableLink } from '@/components/ui/AppLink'
-import { useBinCodeOptions } from '@/hooks/usePurchaseMasters'
+import { useBinCodeOptions, useBinOptions } from '@/hooks/usePurchaseMasters'
 import { cn } from '@/utils/cn'
 import type { PrEditorLine } from '@/utils/purchaseRequisitionValidation'
 import {
@@ -115,6 +115,7 @@ export function PurchaseRequisitionLinesTable({
 }: PurchaseRequisitionLinesTableProps) {
   const canEdit = editable && !readOnly
   const binCodeOptions = useBinCodeOptions()
+  const bins = useBinOptions()
 
   const totals = useMemo(() => {
     return lines.reduce(
@@ -267,8 +268,8 @@ export function PurchaseRequisitionLinesTable({
           }
         />
       ) : (
-        <div className="purchase-pr-lines-scroll max-h-[min(36rem,62vh)] overflow-auto rounded-[10px] border border-erp-border bg-white">
-          <table className="erp-table purchase-pr-lines-grid purchase-doc-lines-grid w-max min-w-full text-[12.5px]">
+        <div className="purchase-doc-lines-grid-scroll relative rounded-[10px] border border-erp-border bg-white">
+          <table className="erp-table purchase-doc-lines-grid w-max min-w-full text-[12.5px]">
             <thead>
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-line">#</th>
@@ -532,7 +533,11 @@ export function PurchaseRequisitionLinesTable({
                         <Select
                           className="h-8 min-w-[7rem] text-[12px]"
                           value={line.binCode}
-                          onChange={(e) => patch(line.key, { binCode: e.target.value })}
+                          onChange={(e) => {
+                            const code = e.target.value
+                            const hit = bins.find((b) => b.code === code)
+                            patch(line.key, { binCode: code, binId: hit?.id ?? null })
+                          }}
                         >
                           <option value="">— Select —</option>
                           {binCodeOptions.map((opt) => (
@@ -627,122 +632,6 @@ export function PurchaseRequisitionLinesTable({
         </div>
       )}
 
-      <style>{`
-        .purchase-pr-lines-grid {
-          border-collapse: separate !important;
-          border-spacing: 0;
-        }
-        .purchase-pr-lines-grid thead th {
-          position: sticky;
-          top: 0;
-          z-index: 20;
-          background: var(--erp-surface-alt, #f8fafc);
-          white-space: nowrap;
-        }
-        .purchase-pr-lines-grid .purchase-doc-lines-grid__uom-col {
-          width: 4.25rem !important;
-          min-width: 4.25rem !important;
-          max-width: 4.75rem !important;
-        }
-        .purchase-pr-lines-grid__uom-text {
-          display: block;
-          text-align: center;
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.02em;
-          text-transform: uppercase;
-          color: var(--erp-text, #242424);
-          line-height: 2rem;
-        }
-        .purchase-pr-lines-grid__uom-select {
-          max-width: 100% !important;
-          min-width: 0 !important;
-          padding: 0 2px !important;
-        }
-        .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-line {
-          position: sticky;
-          left: 0;
-          z-index: 13;
-          width: 2.5rem;
-          min-width: 2.5rem;
-          max-width: 2.5rem;
-          box-sizing: border-box;
-          background: #fff;
-          box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
-        }
-        .purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-line,
-        .purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-line {
-          top: 0;
-          z-index: 31;
-          background: var(--erp-surface-alt, #f8fafc);
-        }
-        .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-type {
-          position: sticky;
-          left: 2.5rem;
-          z-index: 12;
-          width: 9.5rem;
-          min-width: 9.5rem;
-          max-width: 9.5rem;
-          box-sizing: border-box;
-          background: #fff;
-          box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
-        }
-        .purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-type,
-        .purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-type {
-          top: 0;
-          z-index: 30;
-          background: var(--erp-surface-alt, #f8fafc);
-        }
-        .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-item {
-          position: sticky;
-          left: 12rem;
-          z-index: 11;
-          width: 20rem;
-          min-width: 20rem;
-          max-width: 20rem;
-          box-sizing: border-box;
-          background: #fff;
-          box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
-          overflow: hidden;
-        }
-        .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-item > * {
-          width: 100%;
-          max-width: 100%;
-          min-width: 0 !important;
-        }
-        .purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-item,
-        .purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-item {
-          top: 0;
-          z-index: 29;
-          background: var(--erp-surface-alt, #f8fafc);
-          overflow: hidden;
-        }
-        .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-actions {
-          position: sticky;
-          right: 0;
-          z-index: 12;
-          min-width: 3.25rem;
-          width: 3.25rem;
-          text-align: center;
-          background: #fff;
-          box-shadow: -4px 0 8px rgb(15 23 42 / 0.06);
-        }
-        .purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-actions,
-        .purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-actions {
-          top: 0;
-          z-index: 30;
-          background: var(--erp-surface-alt, #f8fafc);
-        }
-        .purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-line,
-        .purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-type,
-        .purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item,
-        .purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-actions {
-          background: #f0f7ff;
-        }
-        .purchase-pr-lines-grid tfoot td {
-          border-top: 1px solid var(--erp-border-strong, #cbd5e1);
-        }
-      `}</style>
     </>
   )
 }

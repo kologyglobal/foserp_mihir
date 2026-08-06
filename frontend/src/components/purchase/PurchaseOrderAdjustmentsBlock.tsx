@@ -209,6 +209,10 @@ export type PurchaseOrderAdjustmentsBlockProps = {
   readOnly?: boolean
   taxPct?: number
   className?: string
+  /** When set, order summary shows CGST+SGST vs IGST split (PO editor). */
+  isInterstate?: boolean
+  /** When false, hide GST rows in order summary (PR demand capture). Default: show when taxPct > 0. */
+  showGstSummary?: boolean
   /** PO editor supplies per-line GST; default uses PR estimate tax %. */
   computeTotals?: (
     lines: PrLineForOrderAdjust[] | PoLineForOrderAdjust[],
@@ -228,6 +232,8 @@ export function PurchaseOrderAdjustmentsBlock({
   readOnly = false,
   taxPct = PR_ESTIMATE_TAX_PCT,
   className,
+  isInterstate,
+  showGstSummary,
   computeTotals,
 }: PurchaseOrderAdjustmentsBlockProps) {
   const orderSummary = useMemo(() => {
@@ -243,6 +249,9 @@ export function PurchaseOrderAdjustmentsBlock({
     valueRef.current = next
     onChange(next)
   }
+
+  const showGst =
+    showGstSummary ?? (taxPct > 0 || orderSummary.gstAmount > 0)
 
   return (
     <div
@@ -386,14 +395,38 @@ export function PurchaseOrderAdjustmentsBlock({
               </span>
             </div>
           ) : null}
-          {orderSummary.gstByRate.length > 0 || orderSummary.gstAmount > 0 ? (
+          {showGst && (orderSummary.gstByRate.length > 0 || orderSummary.gstAmount > 0) ? (
             <>
-              {orderSummary.gstByRate.map(({ rate, amount }) => (
-                <div key={rate} className="so-pricing-summary__row">
-                  <span>GST @ {rate}%</span>
-                  <span className="tabular-nums">{formatCurrency(amount)}</span>
-                </div>
-              ))}
+              {orderSummary.gstByRate.flatMap(({ rate, amount }) => {
+                if (isInterstate === true) {
+                  return [
+                    <div key={`igst-${rate}`} className="so-pricing-summary__row">
+                      <span>IGST @ {rate}%</span>
+                      <span className="tabular-nums">{formatCurrency(amount)}</span>
+                    </div>,
+                  ]
+                }
+                if (isInterstate === false) {
+                  const halfRate = Number((rate / 2).toFixed(2))
+                  const halfAmount = Number((amount / 2).toFixed(2))
+                  return [
+                    <div key={`cgst-${rate}`} className="so-pricing-summary__row">
+                      <span>CGST @ {halfRate}%</span>
+                      <span className="tabular-nums">{formatCurrency(halfAmount)}</span>
+                    </div>,
+                    <div key={`sgst-${rate}`} className="so-pricing-summary__row">
+                      <span>SGST @ {halfRate}%</span>
+                      <span className="tabular-nums">{formatCurrency(halfAmount)}</span>
+                    </div>,
+                  ]
+                }
+                return [
+                  <div key={rate} className="so-pricing-summary__row">
+                    <span>GST @ {rate}%</span>
+                    <span className="tabular-nums">{formatCurrency(amount)}</span>
+                  </div>,
+                ]
+              })}
               <div className="so-pricing-summary__row">
                 <span>Total GST</span>
                 <span className="tabular-nums">{formatCurrency(orderSummary.gstAmount)}</span>

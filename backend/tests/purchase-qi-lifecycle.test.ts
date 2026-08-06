@@ -285,6 +285,23 @@ describe.skipIf(!dbAvailable)('Purchase quality inspection lifecycle (live HTTP)
     expect(patched.body.data.parameters[0].result).toBe('pass')
   })
 
+  it('rejects duplicate QI for the same GRN while one is still open', async () => {
+    const grn = await freshQcPendingGrn()
+    const first = await request(app)
+      .post(qiBase())
+      .set(auth())
+      .send({ goodsReceiptId: grn.grnId })
+    expect(first.status).toBe(201)
+
+    const second = await request(app)
+      .post(qiBase())
+      .set(auth())
+      .send({ goodsReceiptId: grn.grnId })
+    expect(second.status).toBe(409)
+    expect(second.body.code).toBe('QI_DUPLICATE_FOR_GRN')
+    expect(second.body.message).toMatch(/QI-/)
+  })
+
   it('denies create without permission', async () => {
     const grn = await freshQcPendingGrn()
     const res = await request(app)

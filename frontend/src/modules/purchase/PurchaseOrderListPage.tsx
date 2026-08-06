@@ -27,6 +27,7 @@ import {
   type PoSortKey,
 } from '../../config/poFilterConfig'
 import { PO_RELEASED_OR_LATER_STATUSES } from '../../utils/poKpiItems'
+import { loadListPagePreference, saveListPagePreference } from '../../utils/listPagePreferences'
 import {
   buildPoRegisterOverview,
   buildPoRegisterSuggestions,
@@ -102,7 +103,12 @@ export function PurchaseOrderListPage() {
     ...DEFAULT_PO_LIST_FILTERS,
     status: searchParams.get('status') ?? '',
   }))
-  const [sortBy, setSortBy] = useState<PoSortKey>('documentDate')
+  const [sortBy, setSortBy] = useState<PoSortKey>(() => {
+    const pref = loadListPagePreference('/purchase/orders')
+    const sb = pref?.sortBy as PoSortKey | undefined
+    if (sb && PO_SORT_OPTIONS.some((o) => o.value === sb)) return sb
+    return 'documentDate'
+  })
   const [rows, setRows] = useState<PurchaseOrderListRow[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -144,6 +150,10 @@ export function PurchaseOrderListPage() {
     if (!status) return
     setFilters((f) => ({ ...f, status }))
   }, [searchParams])
+
+  useEffect(() => {
+    saveListPagePreference('/purchase/orders', { sortBy })
+  }, [sortBy])
 
   const applyPoFilters = useCallback((saved: Record<string, string>) => {
     setFilters({

@@ -1,4 +1,5 @@
 import { env } from '../../../config/env.js'
+import { resolveKnowledgeEmbeddingLlmConfig } from '../llm-config.js'
 import { logger } from '../../../config/logger.js'
 import {
   KNOWLEDGE_LOCAL_EMBEDDING_DIM,
@@ -14,11 +15,9 @@ export type EmbeddingResult = {
 }
 
 function openaiConfig(): { apiKey: string; baseUrl: string; model: string } | null {
-  const apiKey = env.OPENAI_API_KEY?.trim()
-  if (!apiKey) return null
-  const baseUrl = (env.OPENAI_BASE_URL?.trim() || 'https://api.openai.com/v1').replace(/\/$/, '')
-  const model = env.KB_EMBEDDING_MODEL?.trim() || 'text-embedding-3-small'
-  return { apiKey, baseUrl, model }
+  const cfg = resolveKnowledgeEmbeddingLlmConfig()
+  if (!cfg) return null
+  return { apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, model: cfg.model }
 }
 
 async function embedOpenAiCompatible(

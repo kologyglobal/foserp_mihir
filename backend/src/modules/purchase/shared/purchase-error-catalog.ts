@@ -95,6 +95,7 @@ export const PURCHASE_ERROR_CODE = {
   GRN_REVERSE_NO_LINES: 'GRN_REVERSE_NO_LINES',
   GRN_REVERSE_LINE_INVALID: 'GRN_REVERSE_LINE_INVALID',
   GRN_REVERSE_LINE_EMPTY: 'GRN_REVERSE_LINE_EMPTY',
+  GRN_REVERSE_QTY_EXCEEDS: 'GRN_REVERSE_QTY_EXCEEDS',
   GRN_PO_NOT_RECEIVABLE: 'GRN_PO_NOT_RECEIVABLE',
   GRN_WAREHOUSE_REQUIRED: 'GRN_WAREHOUSE_REQUIRED',
   GRN_NO_LINES: 'GRN_NO_LINES',
@@ -239,6 +240,8 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
     'One or more selected lines are not part of this goods receipt.',
   [PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_EMPTY]:
     'Selected line(s) have no remaining receivable quantity to reverse (not received or already reversed).',
+  [PURCHASE_ERROR_CODE.GRN_REVERSE_QTY_EXCEEDS]:
+    'Reverse quantity exceeds remaining received quantity on one or more lines.',
   [PURCHASE_ERROR_CODE.GRN_PO_NOT_RECEIVABLE]: 'Purchase order is not open for receipt.',
   [PURCHASE_ERROR_CODE.GRN_WAREHOUSE_REQUIRED]: 'Warehouse is required.',
   [PURCHASE_ERROR_CODE.GRN_NO_LINES]:

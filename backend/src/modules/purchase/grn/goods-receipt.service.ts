@@ -55,6 +55,7 @@ import {
   assertReversible,
   assertSubmittable,
   assertToleranceApprovable,
+  allocatePartialReverseQuantities,
   isGrnLineFullyReversed,
   isGrnLineReversible,
   money,
@@ -1634,13 +1635,25 @@ export async function reverseGoodsReceipt(
   tenantId: string,
   id: string,
   actorId: string,
-  body: { remarks?: string; lineIds?: string[] } = {},
+  body: {
+    remarks?: string
+    lineIds?: string[]
+    lineQuantities?: Array<{ lineId: string; quantity: number }>
+  } = {},
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertReversible(existing)
   await assertReverseNotBlocked(tenantId, id)
 
-  const selectedIds = body.lineIds?.length ? [...new Set(body.lineIds)] : null
+  const qtyByLineId = new Map(
+    (body.lineQuantities ?? []).map((row) => [row.lineId, qty(row.quantity)]),
+  )
+  const selectedIds = body.lineIds?.length
+    ? [...new Set(body.lineIds)]
+    : qtyByLineId.size > 0
+      ? [...qtyByLineId.keys()]
+      : null
+
   let targetLines = existing.lines.filter((l) => isGrnLineReversible(l))
 
   if (selectedIds) {
@@ -1671,44 +1684,92 @@ export async function reverseGoodsReceipt(
     )
   }
 
-  const targetIdSet = new Set(targetLines.map((l) => l.id))
+  type ReversePlan = {
+    line: (typeof existing.lines)[number]
+    reverseReceived: number
+    reverseAccepted: number
+    reverseRejected: number
+  }
+
+  const plans: ReversePlan[] = []
+  for (const line of targetLines) {
+    const remaining = remainingReversibleReceived(line)
+    const requested = qtyByLineId.has(line.id) ? qtyByLineId.get(line.id)! : remaining
+    if (requested > remaining + 1e-9) {
+      throw new GoodsReceiptValidationError(
+        purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_QTY_EXCEEDS),
+        PURCHASE_ERROR_CODE.GRN_REVERSE_QTY_EXCEEDS,
+        [
+          {
+            field: `lineQuantities.${line.id}`,
+            message: `Reverse quantity (${requested}) exceeds remaining (${remaining}) on line ${line.lineNumber}`,
+          },
+        ],
+      )
+    }
+    const split = allocatePartialReverseQuantities(line, requested)
+    if (split.received <= 0) continue
+    plans.push({
+      line,
+      reverseReceived: split.received,
+      reverseAccepted: split.accepted,
+      reverseRejected: split.rejected,
+    })
+  }
+
+  if (plans.length === 0) {
+    throw new GoodsReceiptValidationError(
+      purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_EMPTY),
+      PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_EMPTY,
+      [{ field: 'lineQuantities', message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_EMPTY) }],
+    )
+  }
+
+  const planByLineId = new Map(plans.map((p) => [p.line.id, p]))
   const willFullyReverse = existing.lines.every((l) => {
     if (qty(l.receivedQuantity) <= 0 && qty(l.acceptedQuantity) <= 0 && qty(l.rejectedQuantity) <= 0) {
       return true
     }
-    if (targetIdSet.has(l.id)) return true
-    return isGrnLineFullyReversed(l) || !isGrnLineReversible(l)
+    const plan = planByLineId.get(l.id)
+    const nextReversed = qty(l.reversedQuantity) + (plan?.reverseReceived ?? 0)
+    return nextReversed >= qty(l.receivedQuantity) - 1e-6 || isGrnLineFullyReversed(l)
   })
 
-  const deltas = targetLines.map((l) => ({
-    purchaseOrderLineId: l.purchaseOrderLineId,
-    receivedDelta: -remainingReversibleReceived(l),
-    acceptedDelta: -remainingReversibleAccepted(l),
-    rejectedDelta: -remainingReversibleRejected(l),
+  const deltas = plans.map((p) => ({
+    purchaseOrderLineId: p.line.purchaseOrderLineId,
+    receivedDelta: -p.reverseReceived,
+    acceptedDelta: -p.reverseAccepted,
+    rejectedDelta: -p.reverseRejected,
   }))
 
-  // Stock reverse must use remaining (not yet reversed) quantities only.
-  const stockLines = targetLines.map((l) => ({
-    ...l,
-    receivedQuantity: remainingReversibleReceived(l),
-    acceptedQuantity: remainingReversibleAccepted(l),
-    rejectedQuantity: remainingReversibleRejected(l),
-    acceptedForQcQuantity: Math.max(
+  const stockLines = plans.map((p) => {
+    const { line, reverseReceived, reverseAccepted, reverseRejected } = p
+    const remReceived = remainingReversibleReceived(line)
+    const ratio = remReceived > 0 ? reverseReceived / remReceived : 0
+    const remQc = Math.max(
       0,
-      qty(l.acceptedForQcQuantity) - qty((l as { reversedAcceptedQuantity?: unknown }).reversedAcceptedQuantity),
-    ),
-  }))
+      qty(line.acceptedForQcQuantity) -
+        qty((line as { reversedAcceptedQuantity?: unknown }).reversedAcceptedQuantity),
+    )
+    return {
+      ...line,
+      receivedQuantity: reverseReceived,
+      acceptedQuantity: reverseAccepted,
+      rejectedQuantity: reverseRejected,
+      acceptedForQcQuantity: remQc * ratio,
+    }
+  })
 
   const reverseNow = new Date()
-  const lineSummary = targetLines
+  const lineSummary = plans
     .map(
-      (l) =>
-        `${l.itemCodeSnapshot || l.lineNumber}: ${remainingReversibleReceived(l) || remainingReversibleAccepted(l)}`,
+      (p) =>
+        `${p.line.itemCodeSnapshot || p.line.lineNumber}: ${p.reverseReceived}`,
     )
     .join(', ')
   const historyRemarks = [
     body.remarks?.trim(),
-    willFullyReverse ? 'Full reverse' : `Partial reverse (${targetLines.length} line${targetLines.length === 1 ? '' : 's'})`,
+    willFullyReverse ? 'Full reverse' : `Partial reverse (${plans.length} line${plans.length === 1 ? '' : 's'})`,
     lineSummary ? `Lines: ${lineSummary}` : null,
   ]
     .filter(Boolean)
@@ -1741,13 +1802,14 @@ export async function reverseGoodsReceipt(
       }
     }
 
-    for (const line of targetLines) {
+    for (const plan of plans) {
+      const { line, reverseReceived, reverseAccepted, reverseRejected } = plan
       await tx.goodsReceiptLine.updateMany({
         where: { id: line.id, tenantId, goodsReceiptId: id },
         data: {
-          reversedQuantity: qty(line.receivedQuantity),
-          reversedAcceptedQuantity: qty(line.acceptedQuantity),
-          reversedRejectedQuantity: qty(line.rejectedQuantity),
+          reversedQuantity: qty(line.reversedQuantity) + reverseReceived,
+          reversedAcceptedQuantity: qty(line.reversedAcceptedQuantity) + reverseAccepted,
+          reversedRejectedQuantity: qty(line.reversedRejectedQuantity) + reverseRejected,
           reversedAt: reverseNow,
         },
       })
@@ -1802,7 +1864,11 @@ export async function reverseGoodsReceipt(
     newValue: {
       status: willFullyReverse ? 'REVERSED' : existing.status,
       partial: !willFullyReverse,
-      reversedLineIds: targetLines.map((l) => l.id),
+      reversedLineIds: plans.map((p) => p.line.id),
+      lineQuantities: plans.map((p) => ({
+        lineId: p.line.id,
+        quantity: p.reverseReceived,
+      })),
     },
   })
 
