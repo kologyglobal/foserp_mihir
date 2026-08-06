@@ -1,5 +1,5 @@
-import { useMemo, type KeyboardEvent, type ReactNode } from 'react'
-import { MoreHorizontal, Package, Plus, Trash2, type LucideIcon } from 'lucide-react'
+import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { MoreHorizontal, Package, Pencil, Plus, Trash2, type LucideIcon } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { PurchaseTableToolbar } from '@/components/purchase/purchaseCardFormShared'
 import {
@@ -7,6 +7,7 @@ import {
   type PurchaseItemCodeCatalogOption,
 } from '@/components/purchase/PurchaseItemCodeCell'
 import { PurchaseDocumentLineCards } from '@/components/purchase/PurchaseDocumentLineCards'
+import { QuickManualLineDrawer } from '@/components/purchase/QuickManualLineDrawer'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CommandBarOverflowMenu } from '@/components/ui/CommandBar'
 import { MQ_BELOW_LG, useMediaQuery } from '@/hooks/useMediaQuery'
@@ -27,7 +28,11 @@ import type { PurchaseOrderLine } from '@/types/purchaseDomain'
 import { useMasterStore } from '@/store/masterStore'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 
-export type PoLinesEditorLine = PurchaseOrderLine & { key: string }
+export type PoLinesEditorLine = PurchaseOrderLine & {
+  key: string
+  /** Client-only free-text / Quick New Item flag from PO editor. */
+  manualEntry?: boolean
+}
 
 export type PurchaseOrderLinesToolbarAction = {
   id: string
@@ -37,6 +42,8 @@ export type PurchaseOrderLinesToolbarAction = {
   disabled?: boolean
   disabledReason?: string
 }
+
+export type LinePatch = Partial<PurchaseOrderLine> & { manualEntry?: boolean }
 
 export type PurchaseOrderLinesTableProps = {
   lines: PoLinesEditorLine[]
@@ -49,7 +56,14 @@ export type PurchaseOrderLinesTableProps = {
   dirty?: boolean
   formatCurrency: (n: number) => string
   onAddLine: () => void
-  onPatchLine: (key: string, patch: Partial<PurchaseOrderLine>) => void
+  /**
+   * Enables + Quick New Item. Prefer onCreateQuickLine so the drawer save
+   * appends a complete free-text line; bare onAddQuickLine is legacy fallback.
+   */
+  onAddQuickLine?: () => void
+  /** Append free-text line from Quick Manual Entry drawer (itemId null, HSN snapshots). */
+  onCreateQuickLine?: (patch: LinePatch) => void
+  onPatchLine: (key: string, patch: LinePatch) => void
   onRemoveLine: (key: string) => void
   onSelectCatalogItem: (key: string, itemId: string) => void
   /** When true, incomplete cells use error styling + messages instead of soft amber peek */
@@ -60,15 +74,56 @@ export type PurchaseOrderLinesTableProps = {
   toolbarExtra?: ReactNode
 }
 
+const QUICK_CREATE_INITIAL: Partial<PurchaseOrderLine> = {
+  lineType: 'GOODS',
+  itemType: 'raw_material',
+  category: 'raw_material',
+  productType: '',
+  itemId: '',
+  itemCode: '',
+  itemName: '',
+  description: '',
+  hsnCode: '',
+  sacCode: null,
+  hsnId: null,
+  uom: 'NOS',
+  uomQuantity: 1,
+  quantity: 1,
+  rate: 0,
+}
+
+function isFreeTextLine(line: PoLinesEditorLine) {
+  if (line.itemId) return false
+  if (line.manualEntry) return true
+  return Boolean(
+    line.itemName?.trim() ||
+      line.itemCode?.trim() ||
+      line.hsnCode?.trim() ||
+      line.hsnId ||
+      line.sacCode?.trim(),
+  )
+}
+
+function lineGoodsService(line: PoLinesEditorLine): 'GOODS' | 'SERVICE' {
+  return line.lineType === 'SERVICE' || line.itemType === 'service' ? 'SERVICE' : 'GOODS'
+}
+
 function missingMandatory(line: PoLinesEditorLine) {
-  const missingItem = !line.itemId && !line.itemCode.trim()
+  const freeText = isFreeTextLine(line)
+  const missingItem = freeText
+    ? !line.itemName.trim()
+    : !line.itemId && !line.itemCode.trim()
   const missingQty = !(Number(line.uomQuantity ?? line.quantity) > 0)
   const missingRate = !(Number(line.rate) > 0)
+  const missingHsn =
+    freeText && !(line.hsnId || line.hsnCode?.trim() || line.sacCode?.trim())
   const started = Boolean(
     line.productType ||
       line.itemId ||
       line.itemCode.trim() ||
       line.itemName.trim() ||
+      line.hsnCode?.trim() ||
+      line.hsnId ||
       Number(line.rate) > 0 ||
       Number(line.uomQuantity ?? line.quantity) > 0,
   )
@@ -76,7 +131,8 @@ function missingMandatory(line: PoLinesEditorLine) {
     missingItem,
     missingQty,
     missingRate,
-    any: started && (missingItem || missingQty || missingRate),
+    missingHsn,
+    any: started && (missingItem || missingQty || missingRate || missingHsn),
   }
 }
 
@@ -145,6 +201,8 @@ export function PurchaseOrderLinesTable({
   dirty,
   formatCurrency,
   onAddLine,
+  onAddQuickLine,
+  onCreateQuickLine,
   onPatchLine,
   onRemoveLine,
   onSelectCatalogItem,
@@ -158,6 +216,33 @@ export function PurchaseOrderLinesTable({
   const hsnMasters = useMasterStore((s) => s.hsnMasters)
   const getHsn = useMasterStore((s) => s.getHsn)
   const getGstGroup = useMasterStore((s) => s.getGstGroup)
+
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create')
+  const [drawerKey, setDrawerKey] = useState<string | null>(null)
+
+  const quickLineEnabled = Boolean(onCreateQuickLine || onAddQuickLine)
+
+  const openQuickCreate = () => {
+    setDrawerMode('create')
+    setDrawerKey(null)
+    setDrawerOpen(true)
+  }
+
+  const openQuickEdit = (key: string) => {
+    setDrawerMode('edit')
+    setDrawerKey(key)
+    setDrawerOpen(true)
+  }
+
+  const closeDrawer = () => {
+    setDrawerOpen(false)
+    setDrawerKey(null)
+  }
+
+  const drawerLine = drawerKey ? lines.find((l) => l.key === drawerKey) : null
+  const initialForDrawer =
+    drawerMode === 'edit' && drawerLine ? drawerLine : QUICK_CREATE_INITIAL
 
   const totals = useMemo(() => {
     return lines.reduce(
@@ -257,6 +342,19 @@ export function PurchaseOrderLinesTable({
         >
           Add Line
         </ErpButton>
+        {quickLineEnabled ? (
+          <ErpButton
+            type="button"
+            size="sm"
+            variant="secondary"
+            icon={Plus}
+            disabled={!editable}
+            onClick={openQuickCreate}
+            title="Free-text goods or service without Item Master"
+          >
+            Quick New Item
+          </ErpButton>
+        ) : null}
         {collapseSecondary ? (
           secondaryOverflow.length > 0 ? (
             <CommandBarOverflowMenu actions={secondaryOverflow} label="More actions" />
@@ -291,13 +389,26 @@ export function PurchaseOrderLinesTable({
         <EmptyState
           icon={Package}
           title="No item lines yet"
-          description="Add catalog or manual lines to build this purchase order."
+          description="Add Item Master lines or Quick New Item free-text goods/services."
           className="rounded-md border border-dashed border-erp-border bg-erp-surface-alt/40 py-12"
           action={
             editable ? (
-              <ErpButton type="button" size="sm" variant="secondary" icon={Plus} onClick={onAddLine}>
-                Add Line
-              </ErpButton>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <ErpButton type="button" size="sm" variant="secondary" icon={Plus} onClick={onAddLine}>
+                  Add Line
+                </ErpButton>
+                {quickLineEnabled ? (
+                  <ErpButton
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    icon={Plus}
+                    onClick={openQuickCreate}
+                  >
+                    Quick New Item
+                  </ErpButton>
+                ) : null}
+              </div>
             ) : undefined
           }
         />
@@ -334,9 +445,14 @@ export function PurchaseOrderLinesTable({
                 <th className="num min-w-[5rem]">Discount</th>
                 <th className="num min-w-[4rem]">Tax %</th>
                 <th className="num min-w-[5.75rem]">Taxable Amount</th>
-                <th className="num min-w-[4.5rem]">CGST</th>
-                <th className="num min-w-[4.5rem]">SGST</th>
-                <th className="num min-w-[4.5rem]">IGST</th>
+                {isInterstate ? (
+                  <th className="num min-w-[4.5rem]">IGST</th>
+                ) : (
+                  <>
+                    <th className="num min-w-[4.5rem]">CGST</th>
+                    <th className="num min-w-[4.5rem]">SGST</th>
+                  </>
+                )}
                 <th className="num min-w-[5.75rem]">Line Total</th>
                 <th className="min-w-[9rem]">Expected Delivery Date</th>
                 <th className="min-w-[8rem]">Requisition no.</th>
@@ -353,11 +469,15 @@ export function PurchaseOrderLinesTable({
             </thead>
             <tbody>
               {lines.map((line) => {
+                const freeText = isFreeTextLine(line)
+                const lineType = lineGoodsService(line)
+                const isService = lineType === 'SERVICE'
                 const miss = missingMandatory(line)
                 const itemErr = showErrors ? lineErrors[`${line.key}:item`] : undefined
                 const qtyErr = showErrors ? lineErrors[`${line.key}:quantity`] : undefined
                 const rateErr = showErrors ? lineErrors[`${line.key}:rate`] : undefined
-                const hasSubmitError = Boolean(itemErr || qtyErr || rateErr)
+                const hsnErr = showErrors ? lineErrors[`${line.key}:hsn`] : undefined
+                const hasSubmitError = Boolean(itemErr || qtyErr || rateErr || hsnErr)
                 const rowCatalog = catalogForLine(line.productType, line.itemId)
                 return (
                   <tr
@@ -370,21 +490,45 @@ export function PurchaseOrderLinesTable({
                   >
                     <td className="purchase-doc-lines-grid__sticky-line tabular-nums">{line.lineNo}</td>
                     <td className="purchase-doc-lines-grid__sticky-type" onKeyDown={onCellKeyDown}>
-                      <select
-                        className="erp-input h-8 w-full min-w-0 text-[11px]"
-                        disabled={!editable}
-                        value={line.productType ?? ''}
-                        onChange={(e) =>
-                          setRowProductType(line, e.target.value as EngineeringProductType | '')
-                        }
-                      >
-                        <option value="">— Select —</option>
-                        {ENGINEERING_PRODUCT_TYPES.map((pt) => (
-                          <option key={pt} value={pt}>
-                            {ENGINEERING_PRODUCT_TYPE_LABELS[pt]}
-                          </option>
-                        ))}
-                      </select>
+                      {freeText ? (
+                        <select
+                          className="erp-input h-8 w-full min-w-0 text-[11px]"
+                          disabled={!editable}
+                          value={lineType}
+                          title="Goods or Service"
+                          onChange={(e) => {
+                            const next = e.target.value === 'SERVICE' ? 'SERVICE' : 'GOODS'
+                            const service = next === 'SERVICE'
+                            onPatchLine(line.key, {
+                              manualEntry: true,
+                              lineType: next,
+                              itemType: service ? 'service' : 'raw_material',
+                              category: service ? 'job_work' : 'raw_material',
+                              productType: service ? 'service' : '',
+                              sacCode: service ? line.hsnCode || line.sacCode || null : null,
+                            })
+                          }}
+                        >
+                          <option value="GOODS">Goods</option>
+                          <option value="SERVICE">Service</option>
+                        </select>
+                      ) : (
+                        <select
+                          className="erp-input h-8 w-full min-w-0 text-[11px]"
+                          disabled={!editable}
+                          value={line.productType ?? ''}
+                          onChange={(e) =>
+                            setRowProductType(line, e.target.value as EngineeringProductType | '')
+                          }
+                        >
+                          <option value="">{SELECT_PLACEHOLDER}</option>
+                          {ENGINEERING_PRODUCT_TYPES.map((pt) => (
+                            <option key={pt} value={pt}>
+                              {ENGINEERING_PRODUCT_TYPE_LABELS[pt]}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td
                       id={`purchase-line-${line.key}-item`}
@@ -396,33 +540,61 @@ export function PurchaseOrderLinesTable({
                       )}
                       onKeyDown={onCellKeyDown}
                     >
-                      <PurchaseItemCodeCell
-                        itemId={line.itemId}
-                        itemCode={line.itemCode}
-                        catalogItems={rowCatalog}
-                        disabled={!editable}
-                        textClassName="text-[11px]"
-                        className="w-full min-w-0 max-w-none"
-                        emptyCatalogHint={
-                          line.productType
-                            ? 'No Item Master rows for this product type'
-                            : 'No purchasable items from Item Master'
-                        }
-                        onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
-                        onClearCatalog={() => onPatchLine(line.key, { itemId: '', itemCode: '' })}
-                        onManualCodeChange={(code) => onPatchLine(line.key, { itemCode: code })}
-                      />
+                      {freeText ? (
+                        <input
+                          className="erp-input h-8 w-full min-w-0 text-[11px]"
+                          disabled={!editable}
+                          value={line.itemName}
+                          placeholder="Item / service name"
+                          onChange={(e) =>
+                            onPatchLine(line.key, {
+                              manualEntry: true,
+                              itemId: '',
+                              itemName: e.target.value,
+                              description: e.target.value,
+                            })
+                          }
+                        />
+                      ) : (
+                        <PurchaseItemCodeCell
+                          itemId={line.itemId}
+                          itemCode={line.itemCode}
+                          catalogItems={rowCatalog}
+                          disabled={!editable}
+                          textClassName="text-[11px]"
+                          className="w-full min-w-0 max-w-none"
+                          emptyCatalogHint={
+                            line.productType
+                              ? 'No Item Master rows for this product type'
+                              : 'No purchasable items from Item Master'
+                          }
+                          onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
+                          onClearCatalog={() => onPatchLine(line.key, { itemId: '', itemCode: '' })}
+                          onManualCodeChange={(code) => onPatchLine(line.key, { itemCode: code })}
+                        />
+                      )}
                       {itemErr ? (
                         <p className="mt-0.5 text-[10px] text-erp-danger-fg">{itemErr}</p>
+                      ) : null}
+                      {freeText ? (
+                        <p className="mt-0.5 text-[10px] uppercase tracking-wide text-erp-muted">Quick</p>
                       ) : null}
                     </td>
                     <td onKeyDown={onCellKeyDown}>
                       <input
                         className="erp-input h-8 min-w-[11rem] text-[11px]"
                         disabled={!editable}
-                        value={line.itemName}
+                        value={line.description || (freeText ? '' : line.itemName)}
                         onChange={(e) =>
-                          onPatchLine(line.key, { itemName: e.target.value, description: e.target.value })
+                          onPatchLine(line.key, {
+                            description: e.target.value,
+                            ...(freeText
+                              ? {
+                                  manualEntry: true,
+                                  itemName: line.itemName.trim() ? line.itemName : e.target.value,
+                                }
+                              : { itemName: e.target.value }),
+                          })
                         }
                       />
                     </td>
@@ -436,6 +608,24 @@ export function PurchaseOrderLinesTable({
                     </td>
                     <td className="purchase-doc-lines-grid__uom-col" onKeyDown={onCellKeyDown}>
                       {(() => {
+                        if (freeText) {
+                          return (
+                            <input
+                              className="erp-input h-8 w-full px-0.5 text-center text-[10px] uppercase"
+                              disabled={!editable}
+                              value={line.uom || '—'}
+                              placeholder="UOM"
+                              onChange={(e) =>
+                                onPatchLine(line.key, {
+                                  manualEntry: true,
+                                  uom: e.target.value.toUpperCase(),
+                                  uomId: null,
+                                  uomConversionFactor: 1,
+                                })
+                              }
+                            />
+                          )
+                        }
                         const uomOptions = getPurchaseLineUomOptions(line.itemId)
                         const multi = uomOptions.length > 1
                         const uomCode = uomOptions[0]?.code || line.uom || '—'
@@ -547,15 +737,20 @@ export function PurchaseOrderLinesTable({
                       />
                     </td>
                     <td className="num tabular-nums">{formatCurrency(line.taxableAmount)}</td>
-                    <td className="num tabular-nums text-erp-muted">
-                      {isInterstate ? '—' : formatCurrency(line.cgst)}
-                    </td>
-                    <td className="num tabular-nums text-erp-muted">
-                      {isInterstate ? '—' : formatCurrency(line.sgst)}
-                    </td>
-                    <td className="num tabular-nums text-erp-muted">
-                      {!isInterstate ? '—' : formatCurrency(line.igst)}
-                    </td>
+                    {isInterstate ? (
+                      <td className="num tabular-nums text-erp-muted">
+                        {formatCurrency(line.igst)}
+                      </td>
+                    ) : (
+                      <>
+                        <td className="num tabular-nums text-erp-muted">
+                          {formatCurrency(line.cgst)}
+                        </td>
+                        <td className="num tabular-nums text-erp-muted">
+                          {formatCurrency(line.sgst)}
+                        </td>
+                      </>
+                    )}
                     <td className="num tabular-nums font-medium">{formatCurrency(line.lineTotal)}</td>
                     <td onKeyDown={onCellKeyDown}>
                       <input
@@ -613,29 +808,81 @@ export function PurchaseOrderLinesTable({
                           ))}
                       </select>
                     </td>
-                    <td onKeyDown={onCellKeyDown}>
-                      <select
-                        className="erp-input h-8 min-w-[7rem] text-[11px]"
-                        disabled={!editable || !line.gstGroupId}
-                        value={line.hsnId ?? ''}
-                        onChange={(e) => {
-                          const nextHsnId = e.target.value || null
-                          const hsn = nextHsnId ? getHsn(nextHsnId) : null
-                          onPatchLine(line.key, {
-                            hsnId: nextHsnId,
-                            hsnCode: hsn?.code ?? '',
-                          })
-                        }}
-                      >
-                        <option value="">{SELECT_PLACEHOLDER}</option>
-                        {hsnMasters
-                          .filter((h) => h.isActive && h.gstGroupId === line.gstGroupId)
-                          .map((h) => (
-                            <option key={h.id} value={h.id}>
-                              {h.code}
-                            </option>
-                          ))}
-                      </select>
+                    <td
+                      id={`purchase-line-${line.key}-hsn`}
+                      className={cn(
+                        hsnErr || miss.missingHsn ? 'ring-1 ring-inset ring-red-400/80' : undefined,
+                      )}
+                      onKeyDown={onCellKeyDown}
+                    >
+                      {freeText ? (
+                        <>
+                          <input
+                            className={cn(
+                              'erp-input h-8 min-w-[7rem] font-mono text-[11px]',
+                              (hsnErr || miss.missingHsn) && 'border-erp-danger-fg',
+                            )}
+                            disabled={!editable}
+                            value={line.hsnCode || line.sacCode || ''}
+                            placeholder={isService ? 'SAC code' : 'HSN code'}
+                            title={
+                              isService
+                                ? 'Type SAC code or match a master later'
+                                : 'Type HSN code or match a master later'
+                            }
+                            onChange={(e) => {
+                              const raw = e.target.value
+                              const matched = raw.trim()
+                                ? hsnMasters.find(
+                                    (h) =>
+                                      h.isActive &&
+                                      h.code.localeCompare(raw.trim(), undefined, {
+                                        sensitivity: 'accent',
+                                      }) === 0,
+                                  )
+                                : null
+                              onPatchLine(line.key, {
+                                manualEntry: true,
+                                hsnId: matched?.id ?? null,
+                                hsnCode: raw,
+                                sacCode: isService ? raw : null,
+                                ...(matched?.gstGroupId
+                                  ? {
+                                      gstGroupId: matched.gstGroupId,
+                                      gstGroupCode: getGstGroup(matched.gstGroupId)?.code ?? '',
+                                    }
+                                  : {}),
+                              })
+                            }}
+                          />
+                          {hsnErr ? (
+                            <p className="mt-0.5 text-[10px] text-erp-danger-fg">{hsnErr}</p>
+                          ) : null}
+                        </>
+                      ) : (
+                        <select
+                          className="erp-input h-8 min-w-[7rem] text-[11px]"
+                          disabled={!editable || !line.gstGroupId}
+                          value={line.hsnId ?? ''}
+                          onChange={(e) => {
+                            const nextHsnId = e.target.value || null
+                            const hsn = nextHsnId ? getHsn(nextHsnId) : null
+                            onPatchLine(line.key, {
+                              hsnId: nextHsnId,
+                              hsnCode: hsn?.code ?? '',
+                            })
+                          }}
+                        >
+                          <option value="">{SELECT_PLACEHOLDER}</option>
+                          {hsnMasters
+                            .filter((h) => h.isActive && h.gstGroupId === line.gstGroupId)
+                            .map((h) => (
+                              <option key={h.id} value={h.id}>
+                                {h.code}
+                              </option>
+                            ))}
+                        </select>
+                      )}
                     </td>
                     <td className="num">
                       <PurchaseLineTrackingQtyCell
@@ -746,6 +993,17 @@ export function PurchaseOrderLinesTable({
                     </td>
                     <td className="purchase-doc-lines-grid__sticky-actions">
                       <div className="flex items-center justify-center gap-0.5">
+                        {freeText && editable ? (
+                          <button
+                            type="button"
+                            className="rounded p-1 text-erp-muted hover:bg-erp-surface-alt hover:text-erp-text disabled:opacity-40"
+                            onClick={() => openQuickEdit(line.key)}
+                            title="Edit manual line"
+                            aria-label="Edit manual line"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="rounded p-1 text-erp-danger-fg hover:bg-red-50 disabled:opacity-40"
@@ -774,15 +1032,14 @@ export function PurchaseOrderLinesTable({
                   {formatCurrency(totals.tax)}
                 </td>
                 <td className="num tabular-nums">{formatCurrency(totals.taxable)}</td>
-                <td className="num tabular-nums">
-                  {isInterstate ? '—' : formatCurrency(totals.cgst)}
-                </td>
-                <td className="num tabular-nums">
-                  {isInterstate ? '—' : formatCurrency(totals.sgst)}
-                </td>
-                <td className="num tabular-nums">
-                  {!isInterstate ? '—' : formatCurrency(totals.igst)}
-                </td>
+                {isInterstate ? (
+                  <td className="num tabular-nums">{formatCurrency(totals.igst)}</td>
+                ) : (
+                  <>
+                    <td className="num tabular-nums">{formatCurrency(totals.cgst)}</td>
+                    <td className="num tabular-nums">{formatCurrency(totals.sgst)}</td>
+                  </>
+                )}
                 <td className="num tabular-nums">{formatCurrency(totals.lineTotal)}</td>
                 <td colSpan={2} />
                 <td colSpan={8} />
@@ -793,6 +1050,45 @@ export function PurchaseOrderLinesTable({
         </div>
         </>
       )}
+
+      {quickLineEnabled ? (
+        <QuickManualLineDrawer
+          open={drawerOpen}
+          mode={drawerMode}
+          initial={initialForDrawer}
+          isInterstate={isInterstate}
+          qualityTestGroupOptions={qualityTestGroupOptions}
+          formatCurrency={formatCurrency}
+          onClose={closeDrawer}
+          onSave={(patch) => {
+            if (drawerMode === 'edit' && drawerKey) {
+              onPatchLine(drawerKey, { ...patch, manualEntry: true, itemId: '' })
+              closeDrawer()
+              return
+            }
+            if (onCreateQuickLine) {
+              onCreateQuickLine({
+                ...patch,
+                manualEntry: true,
+                itemId: '',
+                itemCode: patch.itemCode ?? '',
+              })
+              closeDrawer()
+              return
+            }
+            onAddQuickLine?.()
+            closeDrawer()
+          }}
+          onDelete={
+            drawerMode === 'edit' && drawerKey && editable
+              ? () => {
+                  onRemoveLine(drawerKey)
+                  closeDrawer()
+                }
+              : undefined
+          }
+        />
+      ) : null}
 
       <style>{`
         .purchase-doc-lines-grid-scroll {
@@ -880,8 +1176,8 @@ export function PurchaseOrderLinesTable({
           position: sticky;
           right: 0;
           z-index: 12;
-          min-width: 2.75rem;
-          width: 2.75rem;
+          min-width: 4.5rem;
+          width: 4.5rem;
           text-align: center;
           background: #fff;
           border-left: 1px solid var(--erp-border, #e2e8f0);

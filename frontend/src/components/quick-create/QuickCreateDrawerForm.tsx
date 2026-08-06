@@ -71,18 +71,21 @@ export function QuickCreateDrawerForm() {
     setError(null)
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
-    const result = saveEntity(form)
-    setSubmitting(false)
-    if (!result.ok) {
-      setError(result.error)
-      return
+    try {
+      const result = await saveEntity(form)
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      setToast(`${drawer!.title} saved`)
+      setTimeout(() => setToast(null), 2500)
+    } finally {
+      setSubmitting(false)
     }
-    setToast(`${drawer!.title} saved`)
-    setTimeout(() => setToast(null), 2500)
   }
 
   function renderFields() {

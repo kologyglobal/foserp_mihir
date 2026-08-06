@@ -532,6 +532,17 @@ export async function submitPurchaseRequisition(
     newValue: { status: updated.status },
   })
 
+  const { notifyPrPendingApproval } = await import(
+    '../notifications/purchase-notification.emitters.js'
+  )
+  notifyPrPendingApproval({
+    tenantId,
+    actorUserId: actorId,
+    prId: updated.id,
+    prNumber: updated.requisitionNumber,
+    amount: estimatedTotal,
+  })
+
   return mapPrToDto(tenantId, updated)
 }
 

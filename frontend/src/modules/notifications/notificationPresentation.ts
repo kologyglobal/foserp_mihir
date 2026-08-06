@@ -29,14 +29,31 @@ function humanizeToken(value: string | null | undefined): string | null {
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-/** Infer Lead / Opportunity label from dense legacy messages. */
+/** Infer document kind from code patterns and dense legacy messages. */
 function inferRecordKind(message: string, code: string | null): string | null {
   if (!code) return null
-  const m = message.match(new RegExp(`\\b(Lead|Opportunity|Company|Quotation)\\s+${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'))
-  if (m?.[1]) return m[1]
+  const m = message.match(
+    new RegExp(
+      `\\b(Lead|Opportunity|Company|Quotation|PR|PO|GRN|RFQ|Invoice)\\s+${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+      'i',
+    ),
+  )
+  if (m?.[1]) {
+    const t = m[1]
+    if (t === 'PR') return 'Requisition'
+    if (t === 'PO') return 'Purchase order'
+    if (t === 'GRN') return 'Goods receipt'
+    if (t === 'RFQ') return 'RFQ'
+    return t
+  }
   if (/^LEAD[-_]/i.test(code)) return 'Lead'
   if (/^OPP[-_]/i.test(code)) return 'Opportunity'
   if (/^QT[-_]/i.test(code) || /^QUO/i.test(code)) return 'Quotation'
+  if (/^PR[-_]/i.test(code)) return 'Requisition'
+  if (/^PO[-_]/i.test(code)) return 'Purchase order'
+  if (/^GRN[-_]/i.test(code)) return 'Goods receipt'
+  if (/^RFQ[-_]/i.test(code)) return 'RFQ'
+  if (/^PINV[-_]/i.test(code) || /^PI[-_]/i.test(code)) return 'Invoice'
   return null
 }
 

@@ -45,11 +45,11 @@ const TAB_META: Record<
   }
 > = {
   terms: {
-    label: 'Terms & Conditions',
+    label: 'Custom Terms and Conditions',
     field: 'termsAndConditions',
     rows: 5,
     minHeightClass: 'min-h-[140px] max-h-[160px]',
-    placeholder: 'Payment, delivery, warranty, and commercial terms…',
+    placeholder: 'Free-text commercial terms (line breaks are preserved on print)…',
   },
   notes: {
     label: 'Internal Notes',

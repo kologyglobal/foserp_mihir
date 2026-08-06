@@ -33,6 +33,15 @@ export const NOTIFICATION_TYPES = [
   'NEXT_FOLLOW_UP_MISSING',
   'RECORD_MISSING_OWNER',
   'LOST_REASON_MISSING',
+  // Purchase (in-app; respect Purchase Setup notificationPreferences)
+  'PR_PENDING_APPROVAL',
+  'PO_PENDING_APPROVAL',
+  'RFQ_RESPONSE_DUE',
+  'PO_DELIVERY_APPROACHING',
+  'PO_OVERDUE',
+  'GRN_PENDING_INSPECTION',
+  'INVOICE_MISMATCH',
+  'INVOICE_PENDING_APPROVAL',
 ] as const
 
 export type NotificationTypeCode = (typeof NOTIFICATION_TYPES)[number]
@@ -52,6 +61,11 @@ export const MANDATORY_NOTIFICATION_TYPES = new Set<string>([
   'INTEGRATION_SYNC_FAILED',
   'OPPORTUNITY_CLOSE_DATE_MISSED',
   'LEAD_UNATTENDED',
+  'PR_PENDING_APPROVAL',
+  'PO_PENDING_APPROVAL',
+  'PO_OVERDUE',
+  'INVOICE_MISMATCH',
+  'INVOICE_PENDING_APPROVAL',
 ])
 
 export type CreateNotificationInput = {

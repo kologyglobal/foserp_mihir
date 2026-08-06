@@ -14,4 +14,12 @@ export const NOTIFICATION_TYPES_UI = [
   { type: 'QUOTATION_EXPIRING', label: 'Quotation expiring', mandatory: false },
   { type: 'QUOTATION_ACCEPTED_AWAITING_SO', label: 'Accepted quote awaiting SO', mandatory: false },
   { type: 'INTEGRATION_SYNC_FAILED', label: 'CRM integration failure', mandatory: true },
+  { type: 'PR_PENDING_APPROVAL', label: 'PR pending approval', mandatory: true },
+  { type: 'PO_PENDING_APPROVAL', label: 'PO pending approval', mandatory: true },
+  { type: 'RFQ_RESPONSE_DUE', label: 'RFQ response due', mandatory: false },
+  { type: 'PO_DELIVERY_APPROACHING', label: 'PO delivery approaching', mandatory: false },
+  { type: 'PO_OVERDUE', label: 'PO delivery overdue', mandatory: true },
+  { type: 'GRN_PENDING_INSPECTION', label: 'GRN pending inspection', mandatory: false },
+  { type: 'INVOICE_MISMATCH', label: 'Purchase invoice mismatch', mandatory: true },
+  { type: 'INVOICE_PENDING_APPROVAL', label: 'Purchase invoice pending approval', mandatory: true },
 ] as const

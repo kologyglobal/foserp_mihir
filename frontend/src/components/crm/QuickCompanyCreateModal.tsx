@@ -294,7 +294,7 @@ export function QuickCompanyCreateModal({
         return
       }
 
-      const saved = saveQuickCreateEntity('customer', demoPayload)
+      const saved = await saveQuickCreateEntity('customer', demoPayload)
       if (!saved.ok) {
         setError(saved.error)
         notify.failed(saved.error)

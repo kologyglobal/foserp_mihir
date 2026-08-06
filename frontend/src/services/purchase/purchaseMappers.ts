@@ -33,6 +33,7 @@ import type {
   PurchaseOrderDomainStatus,
   PurchaseOrderInput,
   PurchaseOrderLine,
+  PurchaseOrderLineItemType,
   PurchaseOrderListRow,
   PurchaseOrderOrigin,
   PurchasePlanningPriority,
@@ -1251,19 +1252,24 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     igstRate: Number(line.igstRate) || 0,
     gstScheme: line.gstScheme ?? null,
   })
+  const lineType: 'GOODS' | 'SERVICE' =
+    String(line.lineType ?? '').toUpperCase() === 'SERVICE' ? 'SERVICE' : 'GOODS'
+  const itemType: PurchaseOrderLineItemType =
+    lineType === 'SERVICE' ? 'service' : 'raw_material'
   return {
     id: line.id,
     lineNo: line.lineNumber,
-    itemType: 'raw_material',
+    itemType,
+    lineType,
     itemId: line.itemId ?? '',
     itemCode: line.itemCode ?? '',
     itemName: line.itemName ?? '',
     description: line.description ?? '',
     specification: '',
-    category: 'raw_material',
+    category: lineType === 'SERVICE' ? 'job_work' : 'raw_material',
     uom: resolveApiUomCode(line),
     hsnCode: line.hsnCode ?? '',
-    sacCode: null,
+    sacCode: lineType === 'SERVICE' ? line.hsnCode ?? null : null,
     gstGroupId: line.gstGroupId ?? null,
     hsnId: line.hsnId ?? null,
     gstGroupCode: line.gstGroupCode ?? '',
@@ -1420,6 +1426,8 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     currency: 'INR',
     paymentTerms: api.paymentTerms ?? '',
     deliveryTerms: api.deliveryTerms ?? '',
+    paymentTermId: api.paymentTermId ?? null,
+    deliveryTermId: api.deliveryTermId ?? null,
     freightTerms: '',
     packingTerms: '',
     insuranceTerms: '',
@@ -1455,7 +1463,7 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     insuranceCharges: 0,
     tcsAmount: 0,
     lines: mappedLines,
-    termsAndConditions: '',
+    termsAndConditions: api.termsAndConditions ?? '',
     internalNotes: '',
     remarks: api.remarks ?? '',
     rejectionReason: api.rejectionReason ?? null,
@@ -1577,17 +1585,27 @@ export function mapDomainPoInputToApiPayload(
     expectedDeliveryDate: input.expectedDeliveryDate ?? null,
     paymentTerms: input.paymentTerms ?? null,
     deliveryTerms: input.deliveryTerms ?? null,
+    paymentTermId: uuidOrNull(input.paymentTermId ?? null),
+    deliveryTermId: uuidOrNull(input.deliveryTermId ?? null),
     deliveryWarehouseId: uuidOrNull(input.deliveryLocation?.id ?? null),
     freightAmount: input.freight ?? undefined,
     taxAmount: taxAmount > 0 ? Number(taxAmount.toFixed(2)) : undefined,
+    termsAndConditions: input.termsAndConditions ?? null,
     remarks: input.remarks ?? null,
     lines: (input.lines ?? []).map((line, index) => {
       const factor = Number(line.uomConversionFactor ?? 1) || 1
       const uomQuantity = Number(line.uomQuantity ?? line.quantity) || 0
+      const lineType: 'GOODS' | 'SERVICE' =
+        line.lineType === 'SERVICE' ||
+        line.itemType === 'service' ||
+        line.productType === 'service'
+          ? 'SERVICE'
+          : 'GOODS'
       return {
         id: uuidOrNull(line.id ?? null) ?? undefined,
         lineNumber: line.lineNo ?? index + 1,
         itemId: uuidOrNull(line.itemId ?? null),
+        lineType,
         itemCode: line.itemCode ?? null,
         itemName: line.itemName ?? null,
         description: line.description ?? null,
@@ -1601,6 +1619,11 @@ export function mapDomainPoInputToApiPayload(
         requisitionNumber: line.requisitionNo?.trim() || null,
         gstGroupId: uuidOrNull(line.gstGroupId ?? null),
         hsnId: uuidOrNull(line.hsnId ?? null),
+        // Free-text / quick lines may send only the code; BE accepts hsnId OR hsnCode.
+        hsnCode: (() => {
+          const code = line.hsnCode?.trim() || line.sacCode?.trim() || ''
+          return code || null
+        })(),
         binId: uuidOrNull(line.binId ?? null),
         qualityTestGroupCode: line.qualityTestGroupCode?.trim() || null,
       }

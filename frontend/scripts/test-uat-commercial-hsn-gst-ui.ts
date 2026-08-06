@@ -44,6 +44,9 @@ const piForm = read('src/modules/sales/ProformaInvoiceFormPage.tsx')
 const tiForm = read('src/modules/crm/commercial/CrmCommercialPages.tsx')
 const arInvoice = read('src/modules/accounting/money-in/invoices/InvoiceFormPage.tsx')
 const arCredit = read('src/modules/accounting/money-in/credit-notes/CreditNoteFormPage.tsx')
+const quoteCreate = read('src/modules/quotations/CrmQuotationNewPage.tsx')
+const quoteEdit = read('src/components/quotations/QuotationBuilder.tsx')
+const quoteLines = read('src/components/quotations/QuotationLineItemsEditor.tsx')
 const supplyPanel = read('src/components/sales/CommercialGstSupplyPanel.tsx')
 const commercialTax = read('src/utils/commercialLineTax.ts')
 const supplyCtx = read('src/utils/commercialSupplyContext.ts')
@@ -52,10 +55,11 @@ const permissions = read('src/utils/permissions/crm.ts')
 check(
   'UI-01',
   'Supply panel',
-  'CommercialGstSupplyPanel: supply type is Input readOnly (not editable Select)',
-  supplyPanel.includes('label="Supply type"') &&
-    supplyPanel.includes('readOnly') &&
-    !supplyPanel.includes('register(\'supplyType\')'),
+  'CommercialGstSupplyPanel: supply type is display-only (not editable Select)',
+  supplyPanel.includes('Supply type') &&
+    supplyPanel.includes('aria-readonly') &&
+    !supplyPanel.includes("register('supplyType')") &&
+    !/label=["']Supply type["'][\s\S]{0,400}<Select/.test(supplyPanel),
 )
 check(
   'UI-02',
@@ -90,6 +94,18 @@ check(
   'Proforma',
   'Proforma form has GST supply panel',
   piForm.includes('CommercialGstSupplyPanel'),
+)
+check(
+  'UI-06b',
+  'Quotation forms',
+  'Quotation Create + Edit wire CommercialGstSupplyPanel + supply tax props',
+  quoteCreate.includes('CommercialGstSupplyPanel') &&
+    quoteCreate.includes('loadSellerStateCode') &&
+    quoteCreate.includes('placeOfSupply={effectivePlaceOfSupply') &&
+    quoteEdit.includes('CommercialGstSupplyPanel') &&
+    quoteEdit.includes('companyStateCode={gstSupply.supplierStateCode') &&
+    quoteLines.includes('companyStateCode') &&
+    quoteLines.includes('placeOfSupply'),
 )
 check(
   'UI-07',

@@ -129,6 +129,8 @@ export {
   createPurchaseOrderFromPr,
   getPurchaseItems,
   getVendors,
+  ensurePurchaseVendorKnown,
+  mapMasterVendorToDomainVendor,
   getPurchaseWarehouses,
   getPurchaseDashboard,
   getRecommendedVendorsForItems,

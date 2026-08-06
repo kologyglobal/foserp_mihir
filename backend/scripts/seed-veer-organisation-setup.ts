@@ -175,32 +175,51 @@ async function main() {
     })
     console.log(`✓ Legal Entity created: ${le.code} (${le.entityType}) GSTIN ${le.gstin}`)
   } else {
-    await prisma.legalEntity.updateMany({
-      where: { tenantId: tenant.id, isDefault: true, NOT: { id: le.id } },
-      data: { isDefault: false },
-    })
-    le = await prisma.legalEntity.update({
-      where: { id: le.id },
-      data: {
-        code: le.code === 'VT-HO' ? 'VIT-HO' : le.code,
-        legalName: ORG.legalName,
-        displayName: ORG.name,
-        tradeName: ORG.name,
-        entityType: 'PRIVATE_LIMITED',
-        pan: PAN,
-        gstin: GSTIN,
-        baseCurrency: 'INR',
-        countryCode: 'IN',
-        stateCode: STATE_CODE,
-        registeredAddressJson: ADDRESS,
-        billingAddressJson: ADDRESS,
-        fiscalYearStartMonth: 4,
-        isDefault: true,
-        isActive: true,
-        updatedBy: userId,
-      },
-    })
-    console.log(`✓ Legal Entity updated: ${le.code} (${le.entityType}) GSTIN ${le.gstin}`)
+    // Do not force-overwrite an already-healthy LE with Gujarat tax identity.
+    // Product seller SoT for vasant-trailers is Pune / Maharashtra (27);
+    // re-run seed-veer with FORCE_VEER_GUJARAT=1 only when Veer Gujarat LE is intentional.
+    if (process.env.FORCE_VEER_GUJARAT === '1') {
+      await prisma.legalEntity.updateMany({
+        where: { tenantId: tenant.id, isDefault: true, NOT: { id: le.id } },
+        data: { isDefault: false },
+      })
+      le = await prisma.legalEntity.update({
+        where: { id: le.id },
+        data: {
+          code: le.code === 'VT-HO' ? 'VIT-HO' : le.code,
+          legalName: ORG.legalName,
+          displayName: ORG.name,
+          tradeName: ORG.name,
+          entityType: 'PRIVATE_LIMITED',
+          pan: PAN,
+          gstin: GSTIN,
+          baseCurrency: 'INR',
+          countryCode: 'IN',
+          stateCode: STATE_CODE,
+          registeredAddressJson: ADDRESS,
+          billingAddressJson: ADDRESS,
+          fiscalYearStartMonth: 4,
+          isDefault: true,
+          isActive: true,
+          updatedBy: userId,
+        },
+      })
+      console.log(`✓ Legal Entity updated (FORCE_VEER_GUJARAT): ${le.code} GSTIN ${le.gstin}`)
+    } else {
+      await prisma.legalEntity.updateMany({
+        where: { tenantId: tenant.id, isDefault: true, NOT: { id: le.id } },
+        data: { isDefault: false },
+      })
+      if (!le.isDefault) {
+        le = await prisma.legalEntity.update({
+          where: { id: le.id },
+          data: { isDefault: true, updatedBy: userId },
+        })
+      }
+      console.log(
+        `✓ Legal Entity kept as-is: ${le.code} state=${le.stateCode} gstin=${le.gstin ?? '—'} (set FORCE_VEER_GUJARAT=1 to apply Chhapi Gujarat LE)`,
+      )
+    }
   }
 
   let branch = await prisma.branch.findFirst({

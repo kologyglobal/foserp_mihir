@@ -137,7 +137,7 @@ describe('getMissingLeadStageFields', () => {
 })
 
 describe('getMissingOpportunityStageFields', () => {
-  it('requires scope + commercial for requirement_discussion', () => {
+  it('requires scope + commercial for requirement_discussion (close date optional)', () => {
     const missing = getMissingOpportunityStageFields(
       opportunityEntityForStageGate(oppRow()),
       'requirement_discussion',
@@ -146,18 +146,17 @@ describe('getMissingOpportunityStageFields', () => {
       'productRequirement',
       'contactId',
       'value',
-      'expectedCloseDate',
     ])
   })
 
-  it('allows requirement_discussion when fields filled', () => {
+  it('allows requirement_discussion without expectedCloseDate when other fields filled', () => {
     const missing = getMissingOpportunityStageFields(
       opportunityEntityForStageGate(
         oppRow({
           requirement: 'Axle kit',
           contactId: 'contact-1',
           amount: { toNumber: () => 500000 } as unknown as CrmOpportunity['amount'],
-          expectedCloseDate: new Date('2026-12-01'),
+          expectedCloseDate: null,
         }),
       ),
       'requirement_discussion',

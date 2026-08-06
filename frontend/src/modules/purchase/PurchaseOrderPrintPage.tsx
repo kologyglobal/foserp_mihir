@@ -203,11 +203,37 @@ export function PurchaseOrderPrintPage() {
         </div>
 
         <div className="po-print-terms">
-          <p className="po-print-terms__title">Terms &amp; conditions</p>
-          <p className="whitespace-pre-wrap text-[12px]">
-            {po.termsAndConditions ||
-              'Delivery as per agreed schedule. Invoice must reference this PO number and match approved rates.'}
-          </p>
+          {(po.paymentTerms?.trim() ||
+            po.deliveryTerms?.trim() ||
+            po.termsAndConditions?.trim() ||
+            po.remarks?.trim()) ? (
+            <>
+              <p className="po-print-terms__title">Terms &amp; conditions</p>
+              <div className="whitespace-pre-wrap text-[12px] space-y-2">
+                {po.paymentTerms?.trim() ? (
+                  <p>
+                    <strong>Payment Terms:</strong> {po.paymentTerms}
+                  </p>
+                ) : null}
+                {po.deliveryTerms?.trim() ? (
+                  <p>
+                    <strong>Delivery Terms:</strong> {po.deliveryTerms}
+                  </p>
+                ) : null}
+                {po.termsAndConditions?.trim() ? (
+                  <div>
+                    <strong>Custom Terms and Conditions:</strong>
+                    <p className="mt-0.5 whitespace-pre-wrap">{po.termsAndConditions}</p>
+                  </div>
+                ) : null}
+                {po.remarks?.trim() ? (
+                  <p>
+                    <strong>Remarks:</strong> {po.remarks}
+                  </p>
+                ) : null}
+              </div>
+            </>
+          ) : null}
         </div>
 
         <div className="po-print-signatures">

@@ -16529,6 +16529,45 @@ a.crm-companies-table__name:hover {
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
 }
 
+/* Global quick-create (vendor, item, transporter, …) — centered dialog */
+.erp-quick-create-modal {
+  /* ensures quick-create sits above form surfaces / sticky footers */
+  z-index: 340;
+}
+
+.erp-quick-create-modal__panel {
+  display: flex;
+  flex-direction: column;
+  max-width: 40rem; /* ~640px — within 560–720 */
+  max-height: min(90vh, 760px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.erp-quick-create-modal__header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--erp-border, #e2e8f0);
+  background: var(--erp-surface, #fff);
+}
+
+.erp-quick-create-modal__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.erp-quick-create-modal__body .erp-drawer-form {
+  min-height: 0;
+}
+
 /* Inner save bar — parent wrapper handles fixed positioning */
 .erp-form-footer-sticky {
   position: static;
