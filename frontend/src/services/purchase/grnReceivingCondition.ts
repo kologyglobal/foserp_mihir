@@ -36,11 +36,13 @@ export const GRN_LINES_RECEIVING_GUIDE = {
     },
     {
       term: 'Accepted',
-      meaning: 'Qty that will become good inventory after this GRN (or after QC if inspection is on).',
+      meaning:
+        'Qty that becomes good inventory. Editable only when QC is not required; when inspection is on, Quality Inspection sets this after receiving.',
     },
     {
       term: 'Rejected',
-      meaning: 'Damaged or failed qty — does not enter good stock (old “Dmg” field). Use when material arrived but is not usable.',
+      meaning:
+        'Damaged or failed qty that does not enter good stock. Editable only when QC is not required; when inspection is on, Quality Inspection determines this — not the receiving clerk.',
     },
     {
       term: 'Short (condition)',

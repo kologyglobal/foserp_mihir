@@ -8,6 +8,7 @@ import {
   type PurchaseTimelineEvent,
 } from '@/services/purchase/purchaseTimelineApi'
 import { formatDateTime } from '@/utils/dates/format'
+import { dedupePurchaseTimelineEvents } from '@/utils/purchaseTimelineDedup'
 import { cn } from '@/utils/cn'
 
 const UUID_RE =
@@ -157,14 +158,14 @@ export function PurchaseAuditTimeline({
       return
     }
     if (!isApiMode()) {
-      setEvents(demoEvents ?? [])
+      setEvents(dedupePurchaseTimelineEvents(demoEvents ?? []))
       return
     }
     setLoading(true)
     setError(null)
     try {
       const res = await getPurchaseTimelineApi(entityType, entityId)
-      setEvents(res.data ?? [])
+      setEvents(dedupePurchaseTimelineEvents(res.data ?? []))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load timeline')
       setEvents([])
@@ -188,7 +189,7 @@ export function PurchaseAuditTimeline({
       {loading ? <LoadingState variant="table" rows={4} cols={1} /> : null}
       {!loading && error ? <p className="text-[13px] text-red-600">{error}</p> : null}
       {!loading && !error && events.length === 0 ? (
-        <p className="text-[13px] text-erp-muted">No audit events recorded yet.</p>
+        <p className="text-[13px] text-erp-muted">No history recorded yet.</p>
       ) : null}
       {!loading && events.length > 0 ? (
         <div className="space-y-0">

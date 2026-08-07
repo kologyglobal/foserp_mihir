@@ -266,10 +266,11 @@ export const MASTER_MODULE_GROUPS: MasterModuleGroup[] = [
         countKey: 'products',
         permissionKey: 'masters.products',
       }),
-      def('quality-test-groups', 'Quality Test Group Master', '/masters/quality-test-groups', 'manufacturing', ShieldCheck, {
-        description: 'QC test groups for incoming, WIP, and FG inspection',
-        status: 'placeholder',
+      def('quality-test-groups', 'Quality Test Group Master', '/quality/inspection-plans', 'manufacturing', ShieldCheck, {
+        description: 'QC test groups for incoming, WIP, and FG inspection — managed as Inspection Plans',
+        status: 'linked',
         permissionKey: 'masters.quality-test-groups',
+        legacyPaths: ['/masters/quality-test-groups'],
       }),
     ],
   },

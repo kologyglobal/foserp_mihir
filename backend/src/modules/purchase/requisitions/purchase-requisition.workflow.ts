@@ -78,6 +78,7 @@ export function assertDraftEditable(pr: Pick<PurchaseRequisition, 'status' | 'de
     )
   }
   if (pr.status === 'DRAFT') return
+  if (pr.status === 'REJECTED') return
 
   if (pr.status === 'SUBMITTED' || pr.status === 'PENDING_APPROVAL') {
     throw new PurchaseRequisitionNotEditableError(
@@ -144,7 +145,7 @@ export function assertSubmittable(pr: PrWithLines): void {
       PURCHASE_ERROR_CODE.PR_NOT_FOUND,
     )
   }
-  if (pr.status !== 'DRAFT') {
+  if (pr.status !== 'DRAFT' && pr.status !== 'REJECTED') {
     throw new PurchaseRequisitionNotSubmittableError(
       purchaseMessage(PURCHASE_ERROR_CODE.PR_INVALID_STATUS),
       PURCHASE_ERROR_CODE.PR_INVALID_STATUS,

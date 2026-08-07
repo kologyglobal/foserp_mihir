@@ -50,6 +50,7 @@ import type {
   UpdateGoodsReceiptInput,
 } from './goods-receipt.validation.js'
 import {
+  allowedActions,
   assertCancellable,
   assertEditable,
   assertInventoryPostable,
@@ -65,6 +66,7 @@ import {
   remainingReversibleAccepted,
   remainingReversibleReceived,
   remainingReversibleRejected,
+  resolveGrnLineAcceptReject,
 } from './goods-receipt.workflow.js'
 
 async function loadOrThrow(tenantId: string, id: string) {
@@ -525,28 +527,20 @@ async function buildLineCreates(
     const rate = qty(poLine.rate)
     const unitCostPrimary =
       qty((poLine as { unitCostPrimary?: unknown }).unitCostPrimary) || toPrimaryUnitCost(rate, factor)
-    const damaged = qty(input.damagedQuantity)
+    const qcRequired = input.qcRequired ?? inspectionRequired
     const short = qty(input.shortQuantity) || tol.shortQuantity
     const excessQty = qty(input.excessQuantity) || tol.excessQuantity
-    const qcRequired = input.qcRequired ?? inspectionRequired
-    const rejected =
-      received <= 0
-        ? 0
-        : input.rejectedQuantity != null
-          ? qty(input.rejectedQuantity)
-          : damaged
-    const accepted =
-      received <= 0
-        ? 0
-        : qcRequired
-          ? 0
-          : input.acceptedQuantity != null
-            ? qty(input.acceptedQuantity)
-            : Math.max(0, received - rejected)
+    const { accepted, rejected, damaged } = resolveGrnLineAcceptReject({
+      receivedQuantity: received,
+      qcRequired,
+      rejectedQuantityInput: input.rejectedQuantity,
+      acceptedQuantityInput: input.acceptedQuantity,
+      damagedQuantityInput: input.damagedQuantity,
+    })
+    // Fully deferred to QC: never let a client-supplied acceptedForQcQuantity
+    // override the received qty put on QC hold.
     const acceptedForQc =
-      received <= 0
-        ? 0
-        : qty(input.acceptedForQcQuantity) || (qcRequired ? Math.max(0, received - rejected) : 0)
+      received <= 0 ? 0 : qcRequired ? received : qty(input.acceptedForQcQuantity) || 0
     const receivingCondition = resolveReceivingCondition({
       openQuantity: open,
       receivedQuantity: received,
@@ -774,7 +768,12 @@ export async function getGoodsReceipt(tenantId: string, id: string) {
     '../returns/returnable-quantity.service.js'
   )
   const returnStats = await summarizeMaterialReturnsForGrn(tenantId, id)
-  return mapGoodsReceiptToDto(grn, returnStats, uomCodeById)
+  // Surface why Reverse GRN would fail up front (open return / posted invoice)
+  // so the button can show a precise disabled reason instead of failing late.
+  const reverseBlockedReason = allowedActions(grn).canReverse
+    ? await findReverseBlockReason(tenantId, id)
+    : null
+  return mapGoodsReceiptToDto(grn, returnStats, uomCodeById, reverseBlockedReason?.message ?? null)
 }
 
 export async function previewNextGoodsReceiptNumber(tenantId: string) {
@@ -1729,7 +1728,16 @@ export async function cancelGoodsReceipt(
 const OPEN_RETURN_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'SHIPPED'] as const
 const BLOCKING_INVOICE_STATUSES = ['APPROVED', 'MATCHED', 'PARTIALLY_MATCHED', 'POSTED', 'CLOSED'] as const
 
-async function assertReverseNotBlocked(tenantId: string, grnId: string): Promise<void> {
+/**
+ * Non-throwing check for why Reverse GRN would fail even though the document
+ * status allows it — an open purchase return or a posted/approved purchase
+ * invoice against this GRN. Used to surface a clear disabled-reason on the
+ * button up front, instead of letting the user open the modal and fail late.
+ */
+async function findReverseBlockReason(
+  tenantId: string,
+  grnId: string,
+): Promise<{ code: string; message: string } | null> {
   const openReturns = await prisma.purchaseReturn.count({
     where: {
       tenantId,
@@ -1739,10 +1747,10 @@ async function assertReverseNotBlocked(tenantId: string, grnId: string): Promise
     },
   })
   if (openReturns > 0) {
-    throw new GoodsReceiptWorkflowError(
-      purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_OPEN_RETURN),
-      PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_OPEN_RETURN,
-    )
+    return {
+      code: PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_OPEN_RETURN,
+      message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_OPEN_RETURN),
+    }
   }
 
   const blockingInvoice = await prisma.purchaseInvoice.findFirst({
@@ -1755,10 +1763,18 @@ async function assertReverseNotBlocked(tenantId: string, grnId: string): Promise
     select: { id: true, invoiceNumber: true },
   })
   if (blockingInvoice) {
-    throw new GoodsReceiptWorkflowError(
-      purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_INVOICE),
-      PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_INVOICE,
-    )
+    return {
+      code: PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_INVOICE,
+      message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_BLOCKED_INVOICE),
+    }
+  }
+  return null
+}
+
+async function assertReverseNotBlocked(tenantId: string, grnId: string): Promise<void> {
+  const blocked = await findReverseBlockReason(tenantId, grnId)
+  if (blocked) {
+    throw new GoodsReceiptWorkflowError(blocked.message, blocked.code)
   }
 }
 

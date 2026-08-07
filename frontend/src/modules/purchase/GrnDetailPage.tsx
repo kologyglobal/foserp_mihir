@@ -219,7 +219,8 @@ export function GrnDetailPage() {
   })
   const reverseGate = purchaseActionGate({
     permission: 'purchase.grn.post',
-    statusAllowed: canReverse,
+    statusAllowed: canReverse && !grn.reverseBlockedReason,
+    statusBlockedReason: grn.reverseBlockedReason ?? undefined,
   })
   const cancelGate = purchaseActionGate({
     permission: 'purchase.grn.create',
@@ -684,6 +685,7 @@ export function GrnDetailPage() {
                   <th className="num">Prev</th>
                   <th className="num" title="Open PO quantity when this GRN was created">PO open (before)</th>
                   <th className="num">Received</th>
+                  <th className="num" title="Qty returned to vendor on this GRN line">Returned</th>
                   <th className="num" title="PO quantity still open after this GRN">Still on PO</th>
                   <th className="num">Tol %</th>
                   <th className="num">Var %</th>
@@ -701,6 +703,7 @@ export function GrnDetailPage() {
                     (r) => r.goodsReceiptLineId === l.id,
                   )
                   const returnedTotal = l.returnedQty ?? returnRows.reduce((s, r) => s + r.returnQuantity, 0)
+                  const hasReturns = returnedTotal > 0
                   const reversedQty = Number(l.reversedQty) || 0
                   const netReceived = l.receivedQty - returnedTotal - reversedQty
                   const netAccepted = l.acceptedQty - returnedTotal - (Number(l.reversedAcceptedQty) || 0)
@@ -742,6 +745,13 @@ export function GrnDetailPage() {
                             {formatPurchaseQty(l.receivedQty)} {baseUom}
                           </div>
                         ) : null}
+                      </td>
+                      <td className="num tabular-nums">
+                        {hasReturns ? (
+                          <span className="font-medium text-red-700">−{formatNumber(returnedTotal)}</span>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                       <td className="num tabular-nums">{formatNumber(remainingPoOpenAfterGrn(l))}</td>
                       <td className="num tabular-nums">{formatNumber(l.tolerancePercentage ?? 0)}</td>
@@ -787,6 +797,7 @@ export function GrnDetailPage() {
                         {dash}
                         {dash}
                         {dash}
+                        {dash}
                         <td className="num tabular-nums font-medium text-red-700">
                           −{formatNumber(Number(l.reversedAcceptedQty) || reversedQty)}
                         </td>
@@ -798,6 +809,37 @@ export function GrnDetailPage() {
                         {dash}
                         {dash}
                         <td className="text-erp-muted">GRN reverse</td>
+                      </tr>
+                    ) : null
+
+                  const fallbackReturnRow =
+                    hasReturns && returnRows.length === 0 ? (
+                      <tr key={`${l.id}-return-summary`} className="bg-violet-50/60">
+                        <td />
+                        <td className="min-w-[10rem] pl-6">
+                          <div className="font-semibold text-violet-900">↳ Material return</div>
+                          <div className="text-[11px] text-violet-800">Returned to vendor</div>
+                        </td>
+                        <td className="whitespace-nowrap font-mono text-[11px] text-violet-800">{lineUom}</td>
+                        {dash}
+                        {dash}
+                        {dash}
+                        {dash}
+                        <td className="num tabular-nums font-medium text-red-700">
+                          −{formatNumber(returnedTotal)}
+                        </td>
+                        {dash}
+                        {dash}
+                        {dash}
+                        {dash}
+                        <td className="num tabular-nums font-medium text-red-700">
+                          −{formatNumber(returnedTotal)}
+                        </td>
+                        {dash}
+                        {dash}
+                        {dash}
+                        {dash}
+                        <td className="text-erp-muted">Material return</td>
                       </tr>
                     ) : null
 
@@ -814,6 +856,7 @@ export function GrnDetailPage() {
                         <div className="text-[11px] text-violet-800">Material return to vendor</div>
                       </td>
                       <td className="whitespace-nowrap font-mono text-[11px] text-violet-800">{lineUom}</td>
+                      {dash}
                       {dash}
                       {dash}
                       {dash}
@@ -835,17 +878,20 @@ export function GrnDetailPage() {
                   ))
 
                   const netRow =
-                    returnRows.length > 0 || reversedQty > 0 ? (
+                    hasReturns || reversedQty > 0 ? (
                       <tr key={`${l.id}-net`} className="border-t border-erp-border bg-slate-50/90 font-semibold">
                         <td />
                         <td className="pl-6 text-[12px] text-erp-text">
-                          Net after reverse{returnRows.length > 0 ? ' / returns' : ''}
+                          Net after reverse{hasReturns ? ' / returns' : ''}
                         </td>
                         <td className="whitespace-nowrap font-mono text-[11px] text-erp-text">{lineUom}</td>
                         {dash}
                         {dash}
                         {dash}
                         <td className="num tabular-nums text-erp-text">{formatNumber(netReceived)}</td>
+                        <td className="num tabular-nums text-erp-text">
+                          {hasReturns ? `−${formatNumber(returnedTotal)}` : '—'}
+                        </td>
                         {dash}
                         {dash}
                         {dash}
@@ -859,14 +905,20 @@ export function GrnDetailPage() {
                             ? 'Fully reversed'
                             : (l.returnableQty ?? 0) > 0
                               ? `${formatNumber(l.returnableQty ?? 0)} still returnable`
-                              : returnRows.length > 0
+                              : hasReturns
                                 ? 'Fully returned'
                                 : '—'}
                         </td>
                       </tr>
                     ) : null
 
-                  return [receiptRow, reverseRow, ...materialReturnRows, netRow].filter(Boolean)
+                  return [
+                    receiptRow,
+                    reverseRow,
+                    fallbackReturnRow,
+                    ...materialReturnRows,
+                    netRow,
+                  ].filter(Boolean)
                 })}
               </tbody>
             </table>

@@ -252,8 +252,6 @@ export function QuickManualLineDrawer({
       rate: form.rate,
       discountPct: discount.discountPct,
       discountAmount: discount.discountAmount,
-      expectedDeliveryDate: form.expectedDeliveryDate,
-      requiredDate: form.expectedDeliveryDate,
       qcRequired: service ? false : form.qcRequired,
       qualityTestGroupCode: service
         ? null
@@ -313,7 +311,7 @@ export function QuickManualLineDrawer({
       subtitle={
         isCatalog
           ? 'Catalog item — adjust qty, rate, tax, and optional details'
-          : 'Free-text goods/service line (not from Item Master)'
+          : 'Manual line — enter description, qty, rate, and tax'
       }
       widthClassName="max-w-xl"
       footer={
@@ -341,26 +339,6 @@ export function QuickManualLineDrawer({
       <div className="space-y-4">
         <PurchaseLineDrawerSection title="Line">
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-[12px] sm:col-span-2">
-              <span className="mb-1 block font-medium text-erp-text">
-                Line Type <span className="text-erp-danger-fg">*</span>
-              </span>
-              <Select
-                value={form.lineType}
-                disabled={isCatalog}
-                onChange={(e) => {
-                  const next = e.target.value === 'SERVICE' ? 'SERVICE' : 'GOODS'
-                  patchForm({
-                    lineType: next,
-                    qcRequired: next === 'SERVICE' ? false : form.qcRequired,
-                  })
-                }}
-              >
-                <option value="GOODS">Goods</option>
-                <option value="SERVICE">Service</option>
-              </Select>
-            </label>
-
             {isCatalog ? (
               <div className="sm:col-span-2 rounded-md border border-erp-border bg-erp-surface-alt/50 px-3 py-2 text-[12px]">
                 <span className="font-medium text-erp-text">
@@ -526,17 +504,6 @@ export function QuickManualLineDrawer({
               </label>
             </div>
 
-            <label className="block text-[12px] sm:col-span-2">
-              <span className="mb-1 block font-medium text-erp-text">
-                Expected Delivery Date
-              </span>
-              <Input
-                type="date"
-                value={form.expectedDeliveryDate}
-                onChange={(e) => patchForm({ expectedDeliveryDate: e.target.value })}
-              />
-            </label>
-
             {showQualityFields && !isService ? (
               <>
                 <label className="flex items-center gap-2 text-[12px] sm:col-span-2">
@@ -563,7 +530,7 @@ export function QuickManualLineDrawer({
                       <option value="">{SELECT_PLACEHOLDER}</option>
                       {qualityTestGroupOptions.map((o) => (
                         <option key={o.code} value={o.code}>
-                          {o.label}
+                          {o.code}
                         </option>
                       ))}
                     </Select>

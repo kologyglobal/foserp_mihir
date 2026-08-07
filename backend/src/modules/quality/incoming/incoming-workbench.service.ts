@@ -201,25 +201,22 @@ export async function getIncomingWorkbench(
     }>
   }> = []
 
+  // Phase 2 hardening: once a QI reaches a terminal disposition it belongs on
+  // the Completed QC register (`/purchase/quality-inspections`), not this
+  // working queue — so the default view here is open work only. A caller may
+  // still explicitly ask for one closed status (e.g. the queue's own "Rejected"
+  // filter) with no arbitrary time window.
+  const explicitStatus = query.status && query.status !== 'ALL' ? query.status : null
   try {
     openQis = await prisma.purchaseQualityInspection.findMany({
       where: {
         tenantId,
         deletedAt: null,
-        OR: [
-          { status: { in: [...OPEN_QI] } },
-          {
-            status: { in: ['ACCEPTED', 'PARTIALLY_ACCEPTED', 'REJECTED'] },
-            completedAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
-          },
-        ],
+        status: explicitStatus ? (explicitStatus as never) : { in: [...OPEN_QI] },
         ...(query.vendorId ? { vendorId: query.vendorId } : {}),
         ...(query.warehouseId ? { warehouseId: query.warehouseId } : {}),
         ...(query.inspectorId ? { inspectedById: query.inspectorId } : {}),
         ...(query.priority ? { priority: query.priority } : {}),
-        ...(query.status && query.status !== 'ALL'
-          ? { status: query.status as never }
-          : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: 300,

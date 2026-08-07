@@ -1426,6 +1426,8 @@ export interface PurchaseRequisition extends PurchaseMoneyTotals, PurchaseAuditF
    * When false, approved PR is ready for direct Purchase Order creation.
    */
   rfqRequired: boolean
+  /** Approver rejection reason — editable PR can be corrected and resubmitted. */
+  rejectionReason?: string | null
   convertedRfqId: string | null
   convertedPoId: string | null
   /** Soft-estimated tax on subtotal (demo GST %). */
@@ -2249,6 +2251,8 @@ export interface GoodsReceiptNote extends PurchaseMoneyTotals, PurchaseAuditFiel
   reversedAt?: IsoDateTime | null
   /** True when some (not all) received lines have been reversed. */
   partiallyReversed?: boolean
+  /** Why Reverse GRN would fail despite status allowing it (open return / posted invoice). Null/undefined = not blocked. */
+  reverseBlockedReason?: string | null
   /** Sum of completed material return qty on this GRN. */
   totalReturnedQty?: number
   /** Sum of remaining returnable qty (detail API only). */
@@ -2326,6 +2330,13 @@ export interface QualityInspection extends PurchaseAuditFields {
   sampleQty: number
   acceptedQty: number
   rejectedQty: number
+  /** Purchase/vendor UOM code snapshotted on the receiving line (display only). */
+  uom?: string
+  /** Conversion factor snapshot used to derive the *UomQty fields below. */
+  uomConversionFactor?: number
+  receivedUomQty?: number
+  acceptedUomQty?: number
+  rejectedUomQty?: number
   inspectionPlan: string
   /** Master Inspection Plan id when snapshotted (API mode). */
   inspectionPlanId?: string | null

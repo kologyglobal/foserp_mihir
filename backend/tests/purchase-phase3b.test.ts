@@ -195,6 +195,30 @@ describe.skipIf(!dbAvailable)('Purchase Phase 3B — purchase requisition founda
     expect(rejected.body.data.rejectionReason).toBe('Budget not approved')
   })
 
+  it('allows rejected requisition to be edited and resubmitted', async () => {
+    const created = await auth(fx.token)(
+      request(app)
+        .post(base(fx.slug))
+        .send({ lines: [{ itemId: fx.subComponentItemId, quantity: 2 }] }),
+    )
+    const id = created.body.data.id as string
+    await auth(fx.token)(request(app).post(`${base(fx.slug)}/${id}/submit`))
+    await auth(approverToken)(
+      request(app).post(`${base(fx.slug)}/${id}/reject`).send({ reason: 'Fix quantity' }),
+    )
+
+    const updated = await auth(fx.token)(
+      request(app).patch(`${base(fx.slug)}/${id}`).send({ purchasePurpose: 'Revised after rejection' }),
+    )
+    expect(updated.status).toBe(200)
+    expect(updated.body.data.purchasePurpose).toBe('Revised after rejection')
+
+    const resubmitted = await auth(fx.token)(request(app).post(`${base(fx.slug)}/${id}/submit`))
+    expect(resubmitted.status).toBe(200)
+    expect(resubmitted.body.data.status).toBe('PENDING_APPROVAL')
+    expect(resubmitted.body.data.rejectionReason).toBeNull()
+  })
+
   it('cancels draft requisition', async () => {
     const created = await auth(fx.token)(
       request(app)

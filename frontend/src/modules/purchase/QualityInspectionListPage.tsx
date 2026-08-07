@@ -21,6 +21,13 @@ import {
   QUALITY_INSPECTION_STATUSES,
 } from '@/services/purchase'
 import type { QualityInspectionListRow, QualityInspectionStatus } from '@/types/purchaseDomain'
+
+const COMPLETED_QI_STATUSES: readonly QualityInspectionStatus[] = [
+  'accepted',
+  'partially_accepted',
+  'rejected',
+  'accepted_under_deviation',
+]
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { purchaseBreadcrumbs } from '@/utils/purchaseNavigation'
@@ -31,10 +38,11 @@ export function QualityInspectionListPage() {
   const perms = usePurchasePermissions()
   const [searchParams] = useSearchParams()
   const grnFilter = searchParams.get('grnId') ?? ''
+  const statusParam = searchParams.get('status') ?? ''
   const [rows, setRows] = useState<QualityInspectionListRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(statusParam)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -49,9 +57,14 @@ export function QualityInspectionListPage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    setStatus(statusParam)
+  }, [statusParam])
+
   const filtered = useMemo(() => {
     let list = [...rows]
-    if (status) list = list.filter((r) => r.status === status)
+    if (status === 'completed') list = list.filter((r) => COMPLETED_QI_STATUSES.includes(r.status))
+    else if (status) list = list.filter((r) => r.status === status)
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       list = list.filter(
@@ -187,8 +200,12 @@ export function QualityInspectionListPage() {
 
   return (
     <OperationalPageShell
-      title="Quality Inspections"
-      description="Incoming inspection against goods receipts"
+      title={status === 'completed' ? 'Completed QC Register' : 'Quality Inspections'}
+      description={
+        status === 'completed'
+          ? 'Full history of accepted, partially accepted, and rejected inspections — completed items live here, not in the working Incoming QC queue.'
+          : 'Incoming inspection against goods receipts'
+      }
       badge="Purchase"
       variant="dynamics"
       breadcrumbs={purchaseBreadcrumbs('Quality Inspections')}
@@ -231,10 +248,13 @@ export function QualityInspectionListPage() {
         status={status}
         onStatusChange={setStatus}
         statusAriaLabel="Filter quality inspections by status"
-        statusOptions={QUALITY_INSPECTION_STATUSES.map((s) => ({
-          value: s,
-          label: QUALITY_INSPECTION_STATUS_LABELS[s as QualityInspectionStatus],
-        }))}
+        statusOptions={[
+          { value: 'completed', label: 'Completed (Accepted / Partial / Rejected)' },
+          ...QUALITY_INSPECTION_STATUSES.map((s) => ({
+            value: s,
+            label: QUALITY_INSPECTION_STATUS_LABELS[s as QualityInspectionStatus],
+          })),
+        ]}
       />
 
       {loading && rows.length === 0 ? (

@@ -1463,6 +1463,19 @@
     box-shadow: var(--erp-focus-ring);
   }
 
+  /* Quantity / numeric fields — hide spinners; scroll must not change values */
+  .erp-input[type='number'],
+  input.erp-input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .erp-input[type='number']::-webkit-outer-spin-button,
+  .erp-input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
   /* Search field — icon + input with guaranteed left padding (beats enterprise .erp-input overrides) */
   .erp-search-field {
     position: relative;

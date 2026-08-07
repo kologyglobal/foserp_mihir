@@ -44,6 +44,7 @@ import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
 import { isApiMode } from '@/config/apiConfig'
 import { appConfirm } from '@/store/confirmDialogStore'
+import { getPurchaseLineBaseUomCode, purchaseLineHasDualUom, toUomQuantityFromBase } from '@/utils/purchaseLineUom'
 
 function editable(status: QualityInspection['status']) {
   return status === 'pending' || status === 'in_progress' || status === 'hold'
@@ -167,6 +168,23 @@ export function QualityInspectionDetailPage() {
   const canEdit = editable(qi.status)
   const statusLabel = QUALITY_INSPECTION_STATUS_LABELS[qi.status]
   const resultLabel = qi.result ? QUALITY_INSPECTION_RESULT_LABELS[qi.result] : '—'
+
+  // Dual-UOM display: qi.*Qty are base/stock qty (authoritative); the vendor/
+  // purchase UOM equivalents use the same conversion factor snapshot the GRN
+  // used — never a fresh live lookup — so QC always agrees with the GRN.
+  const factor = qi.uomConversionFactor || 1
+  const baseUomCode = getPurchaseLineBaseUomCode(qi.itemId)
+  const showDualUom =
+    purchaseLineHasDualUom({ itemId: qi.itemId, uomConversionFactor: factor }) && Boolean(qi.uom) && Boolean(baseUomCode)
+  const dualUomLine = (baseQty: number, uomQtyFromApi?: number) => {
+    if (!showDualUom) return null
+    const uomQty = uomQtyFromApi ?? toUomQuantityFromBase(baseQty, factor)
+    return (
+      <p className="mt-0.5 text-[11px] tabular-nums text-erp-muted">
+        {formatNumber(uomQty)} {qi.uom} · {formatNumber(baseQty)} {baseUomCode}
+      </p>
+    )
+  }
 
   return (
     <PurchaseCardFormShell
@@ -339,7 +357,15 @@ export function QualityInspectionDetailPage() {
           />
           <ErpViewField label="Item" value={`${qi.itemCode} — ${qi.itemName}`} />
           <ErpViewField label="Batch / Lot" value={qi.batchLotNo || '—'} />
-          <ErpViewField label="Received Qty" value={formatNumber(qi.receivedQty)} />
+          <ErpViewField
+            label="Received Qty"
+            value={
+              <>
+                {formatNumber(qi.receivedQty)}
+                {dualUomLine(qi.receivedQty, qi.receivedUomQty)}
+              </>
+            }
+          />
           {canEdit ? (
             <>
               <ErpFieldRow label="Sample Qty">
@@ -355,6 +381,7 @@ export function QualityInspectionDetailPage() {
                   value={acceptedQty}
                   onChange={setAcceptedQty}
                 />
+                {dualUomLine(acceptedQty)}
               </ErpFieldRow>
               <ErpFieldRow label="Rejected Qty">
                 <DecimalInput
@@ -362,6 +389,7 @@ export function QualityInspectionDetailPage() {
                   value={rejectedQty}
                   onChange={setRejectedQty}
                 />
+                {dualUomLine(rejectedQty)}
               </ErpFieldRow>
               <ErpFieldRow label="Inspection Plan" className="sm:col-span-2 lg:col-span-3">
                 <Input
@@ -373,8 +401,24 @@ export function QualityInspectionDetailPage() {
           ) : (
             <>
               <ErpViewField label="Sample Qty" value={formatNumber(qi.sampleQty)} />
-              <ErpViewField label="Accepted Qty" value={formatNumber(qi.acceptedQty)} />
-              <ErpViewField label="Rejected Qty" value={formatNumber(qi.rejectedQty)} />
+              <ErpViewField
+                label="Accepted Qty"
+                value={
+                  <>
+                    {formatNumber(qi.acceptedQty)}
+                    {dualUomLine(qi.acceptedQty, qi.acceptedUomQty)}
+                  </>
+                }
+              />
+              <ErpViewField
+                label="Rejected Qty"
+                value={
+                  <>
+                    {formatNumber(qi.rejectedQty)}
+                    {dualUomLine(qi.rejectedQty, qi.rejectedUomQty)}
+                  </>
+                }
+              />
               <ErpViewField label="Inspection Plan" value={qi.inspectionPlan} />
             </>
           )}

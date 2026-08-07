@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ErpButton } from '../../erp/ErpButton'
 import { Input, Select, Textarea } from '../../forms/Inputs'
 import { ErpRichTextEditor } from '../../forms/ErpRichTextEditor'
@@ -66,6 +66,7 @@ export function CrmMasterEditorDrawer({
   })
   const [errors, setErrors] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const codeSyncedRef = useRef(false)
 
   const configFields = useMemo(() => crmMasterConfigurationFields(catalog), [catalog])
   const basicExtraFields = useMemo(() => crmMasterBasicExtraFields(catalog), [catalog])
@@ -76,7 +77,10 @@ export function CrmMasterEditorDrawer({
   const effectiveDateField = catalog.fields.find((f) => f.key === 'effectiveDate')
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      codeSyncedRef.current = false
+      return
+    }
     setCode(entry?.code ?? '')
     setName(entry?.name ?? '')
     setStatus(entry?.status ?? 'active')
@@ -94,9 +98,12 @@ export function CrmMasterEditorDrawer({
   }, [open, entry, entries.length])
 
   useEffect(() => {
-    if (!open || isEdit || entry?.systemControlled) return
-    if (series.code && series.code !== code) setCode(series.code)
-  }, [open, series.code, isEdit, entry?.systemControlled, code])
+    if (!open || isEdit || entry?.systemControlled || codeSyncedRef.current) return
+    if (series.code) {
+      setCode(series.code)
+      codeSyncedRef.current = true
+    }
+  }, [open, series.code, isEdit, entry?.systemControlled])
 
   function buildAttributes() {
     const out: Record<string, string | number | boolean | null> = {}
@@ -212,10 +219,15 @@ export function CrmMasterEditorDrawer({
               setCode(e.target.value)
             }}
           />
-          {!isEdit && !series.canManual && !series.error ? (
-            <p className="mt-1 text-[12px] text-erp-muted">{MASTER_CODE_HELPER_TEXT}</p>
-          ) : null}
-          {series.error ? <p className="mt-1 text-[12px] text-erp-danger">{series.error}</p> : null}
+          <p
+            className={cn(
+              'mt-1 min-h-[1.125rem] text-[12px]',
+              series.error ? 'text-erp-danger' : 'text-erp-muted',
+            )}
+          >
+            {series.error ??
+              (!isEdit && !series.canManual ? MASTER_CODE_HELPER_TEXT : '\u00a0')}
+          </p>
         </MasterFormField>
         <MasterFormField label="Name" required>
           <Input value={name} onChange={(e) => setName(e.target.value)} />

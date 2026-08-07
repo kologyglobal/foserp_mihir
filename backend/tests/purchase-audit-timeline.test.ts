@@ -5,6 +5,7 @@ import {
   PURCHASE_AUDIT_ACTION,
   TIMELINE_ENTITY_MAP,
 } from '../src/modules/purchase/shared/purchase-audit.js'
+import { dedupePurchaseTimelineEvents } from '../src/modules/purchase/timeline/purchase-timeline.service.js'
 
 describe('purchase audit catalog', () => {
   it('labels core PR / planning / RFQ / PO actions', () => {
@@ -26,5 +27,48 @@ describe('purchase audit catalog', () => {
     expect(TIMELINE_ENTITY_MAP.rfq.auditEntity).toBe('RequestForQuotation')
     expect(TIMELINE_ENTITY_MAP['planning-row'].viewPermission).toBe('purchase.planning.view')
     expect(TIMELINE_ENTITY_MAP['purchase-order'].statusDocumentType).toBe('PURCHASE_ORDER')
+  })
+
+  it('merges duplicate lifecycle audit + status rows', () => {
+    const merged = dedupePurchaseTimelineEvents([
+      {
+        id: 'audit:1',
+        source: 'audit',
+        tenantId: 't1',
+        module: 'purchase',
+        entityType: 'PurchaseRequisition',
+        entityId: 'pr-1',
+        action: 'PR_APPROVED',
+        actionLabel: 'Approved',
+        previousValue: { status: 'PENDING_APPROVAL' },
+        newValue: { status: 'APPROVED', rfqRequired: false },
+        actorId: 'u1',
+        actorName: null,
+        timestamp: '2026-08-06T09:31:00.000Z',
+        remarks: null,
+        requestMetadata: null,
+      },
+      {
+        id: 'status:1',
+        source: 'status_history',
+        tenantId: 't1',
+        module: 'purchase',
+        entityType: 'PurchaseRequisition',
+        entityId: 'pr-1',
+        action: 'APPROVED',
+        actionLabel: 'Approved',
+        previousValue: { status: 'PENDING_APPROVAL' },
+        newValue: { status: 'APPROVED' },
+        actorId: 'u1',
+        actorName: 'Rajesh Patel',
+        timestamp: '2026-08-06T09:31:00.000Z',
+        remarks: 'E2E approve L0',
+        requestMetadata: null,
+      },
+    ])
+
+    expect(merged).toHaveLength(1)
+    expect(merged[0]?.remarks).toBe('E2E approve L0')
+    expect(merged[0]?.newValue).toEqual({ status: 'APPROVED', rfqRequired: false })
   })
 })

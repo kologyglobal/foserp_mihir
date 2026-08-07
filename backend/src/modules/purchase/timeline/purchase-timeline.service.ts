@@ -34,6 +34,58 @@ function iso(value: Date | string | null | undefined): string {
   return value.toISOString()
 }
 
+/** Map PR/PO lifecycle audit + status_history verbs to one bucket. */
+function lifecycleBucket(action: string): string | null {
+  const u = action.toUpperCase()
+  if (u === 'PR_CREATED' || u === 'CREATED' || u === 'CREATE') return 'created'
+  if (u === 'PR_SUBMITTED' || u === 'SUBMITTED' || u === 'SUBMIT') return 'submitted'
+  if (u === 'PR_APPROVED' || u === 'APPROVED' || u === 'APPROVE') return 'approved'
+  if (u === 'PR_REJECTED' || u === 'REJECTED' || u === 'REJECT') return 'rejected'
+  if (u === 'PR_SENT_BACK' || u === 'SENT_BACK') return 'sent_back'
+  if (u === 'PR_CANCELLED' || u === 'CANCELLED' || u === 'CANCEL') return 'cancelled'
+  if (u === 'PR_REOPENED' || u === 'REOPENED' || u === 'REOPEN') return 'reopened'
+  return null
+}
+
+function mergeTimelinePair(
+  a: PurchaseTimelineEventDto,
+  b: PurchaseTimelineEventDto,
+): PurchaseTimelineEventDto {
+  const status = a.source === 'status_history' ? a : b.source === 'status_history' ? b : null
+  const audit = a.source === 'audit' ? a : b.source === 'audit' ? b : null
+  const base = status ?? audit ?? a
+  if (!status || !audit) return base
+  return {
+    ...base,
+    id: status.id,
+    source: 'status_history',
+    previousValue: audit.previousValue ?? status.previousValue,
+    newValue: audit.newValue ?? status.newValue,
+    remarks: status.remarks ?? audit.remarks,
+    actorName: status.actorName ?? audit.actorName,
+    actorId: status.actorId ?? audit.actorId,
+    timestamp: status.timestamp,
+  }
+}
+
+export function dedupePurchaseTimelineEvents(
+  events: PurchaseTimelineEventDto[],
+): PurchaseTimelineEventDto[] {
+  const byKey = new Map<string, PurchaseTimelineEventDto>()
+
+  for (const event of events) {
+    const bucket = lifecycleBucket(event.action)
+    const key = bucket
+      ? `lc:${bucket}|${event.timestamp.slice(0, 19)}|${event.actorId ?? ''}`
+      : `raw:${event.source}|${event.action}|${event.timestamp.slice(0, 19)}|${event.id}`
+
+    const existing = byKey.get(key)
+    byKey.set(key, existing ? mergeTimelinePair(existing, event) : event)
+  }
+
+  return [...byKey.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+}
+
 export async function getPurchaseTimeline(
   tenantId: string,
   entityType: TimelineEntityType,
@@ -132,18 +184,7 @@ export async function getPurchaseTimeline(
     })
   }
 
-  // Prefer audit rows when both capture the same lifecycle moment (same action + second).
-  const seen = new Set<string>()
-  const deduped: PurchaseTimelineEventDto[] = []
-  for (const event of events.sort((a, b) => b.timestamp.localeCompare(a.timestamp))) {
-    const key = `${event.action}|${event.timestamp.slice(0, 19)}|${event.source}`
-    const softKey = `${event.action}|${event.timestamp.slice(0, 19)}`
-    if (event.source === 'status_history' && seen.has(`audit:${softKey}`)) continue
-    if (event.source === 'audit') seen.add(`audit:${softKey}`)
-    if (seen.has(key)) continue
-    seen.add(key)
-    deduped.push(event)
-  }
+  const deduped = dedupePurchaseTimelineEvents(events)
 
   // Resolve actor display names — never leave raw user UUIDs for the UI.
   const actorIds = [

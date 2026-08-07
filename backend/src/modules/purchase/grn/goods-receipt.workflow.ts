@@ -152,6 +152,43 @@ export function isGrnLineReversible(
   )
 }
 
+/**
+ * Received/Accepted/Rejected split for a GRN line at create/update time.
+ *
+ * Phase 2 hardening — fully deferred to QC: when inspection is required, this
+ * GRN line only captures Received. Accepted/Rejected always resolve to 0 here
+ * regardless of client input (even a stale/tampered payload cannot pre-judge
+ * acceptance) — they are set only when the Quality Inspection completes, via
+ * a separate write path (`quality-inspection.service.ts`).
+ */
+export function resolveGrnLineAcceptReject(input: {
+  receivedQuantity: number
+  qcRequired: boolean
+  /** Raw client input — `null`/`undefined` means "not provided" (distinct from 0). */
+  rejectedQuantityInput?: unknown
+  acceptedQuantityInput?: unknown
+  damagedQuantityInput?: unknown
+}): { accepted: number; rejected: number; damaged: number } {
+  const received = Math.max(0, input.receivedQuantity)
+  const qcRequired = Boolean(input.qcRequired)
+  const damaged = qcRequired ? 0 : qty(input.damagedQuantityInput)
+  const rejected =
+    received <= 0 || qcRequired
+      ? 0
+      : input.rejectedQuantityInput != null
+        ? qty(input.rejectedQuantityInput)
+        : damaged
+  const accepted =
+    received <= 0
+      ? 0
+      : qcRequired
+        ? 0
+        : input.acceptedQuantityInput != null
+          ? qty(input.acceptedQuantityInput)
+          : Math.max(0, received - rejected)
+  return { accepted, rejected, damaged }
+}
+
 export function isGrnLineFullyReversed(
   line: Pick<GoodsReceiptLine, 'receivedQuantity'> & { reversedQuantity?: unknown },
 ): boolean {

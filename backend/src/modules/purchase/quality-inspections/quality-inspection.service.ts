@@ -184,6 +184,8 @@ async function enrichmentForQi(
           batchNumber: true,
           lotNumber: true,
           receivedQuantity: true,
+          uomCodeSnapshot: true,
+          uomConversionFactor: true,
         },
       },
     },
@@ -197,6 +199,10 @@ async function enrichmentForQi(
         itemCode: l.itemCodeSnapshot,
         itemName: l.itemNameSnapshot,
         receivedQuantity: Number(l.receivedQuantity) || 0,
+        // Purchase/vendor UOM + factor snapshotted on the GRN line — reused so QI
+        // can show received/accepted/rejected in both purchase UOM and base UOM.
+        uomCode: l.uomCodeSnapshot || null,
+        uomConversionFactor: Number(l.uomConversionFactor) || 1,
       },
     ]),
   )

@@ -26,9 +26,21 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: boolean
 }
 
-export function Input({ className, error, ...props }: InputProps) {
+export function Input({ className, error, type, onWheel, ...props }: InputProps) {
   return (
-    <input className={cn('erp-input', inputClassName(error), className)} {...props} />
+    <input
+      className={cn('erp-input', type === 'number' && 'erp-input--qty', inputClassName(error), className)}
+      type={type}
+      onWheel={
+        type === 'number'
+          ? (e) => {
+              e.currentTarget.blur()
+              onWheel?.(e)
+            }
+          : onWheel
+      }
+      {...props}
+    />
   )
 }
 
@@ -116,8 +128,11 @@ export function DecimalInput({
       max={max}
       autoComplete="off"
       disabled={disabled}
-      className={cn('erp-input', inputClassName(error), className)}
+      className={cn('erp-input erp-input--qty', inputClassName(error), className)}
       value={focused && draft === '' ? '' : displayValue}
+      onWheel={(e) => {
+        e.currentTarget.blur()
+      }}
       onFocus={(e) => {
         setFocused(true)
         const start =

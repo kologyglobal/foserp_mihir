@@ -29,6 +29,8 @@ export function mapGoodsReceiptToDto(
     entries: GrnMaterialReturnEntry[]
   },
   uomCodeById?: Map<string, string>,
+  /** Why Reverse GRN would fail despite the status allowing it (open return / posted invoice). */
+  reverseBlockedReason?: string | null,
 ) {
   // View/API expose what belongs on the document: received > 0 or short-closed.
   // Idle zero-qty rows (legacy) are not shown as if they were received.
@@ -126,6 +128,7 @@ export function mapGoodsReceiptToDto(
     paymentTerms: grn.purchaseOrder?.paymentTerms ?? '',
     deliveryTerms: grn.purchaseOrder?.deliveryTerms ?? '',
     allowedActions: allowedActions(grn),
+    reverseBlockedReason: reverseBlockedReason ?? null,
     lines: documentLines.map((line) => {
       const returnLine = returnStats?.byGrnLineId?.get(line.id)
       const reversedQuantity = qty((line as { reversedQuantity?: unknown }).reversedQuantity)

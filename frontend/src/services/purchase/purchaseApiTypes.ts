@@ -777,6 +777,8 @@ export interface ApiGoodsReceipt {
   cancelledAt: string | null
   reversedAt: string | null
   partiallyReversed?: boolean
+  /** Why Reverse GRN would fail despite status allowing it (open return / posted invoice). Null = not blocked. */
+  reverseBlockedReason?: string | null
   closedAt: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -948,6 +950,13 @@ export interface ApiQualityInspectionLine {
   acceptedQuantity: number
   rejectedQuantity: number
   deviationQuantity: number
+  /** Purchase/vendor UOM code snapshotted on the linked GRN line (display only). */
+  uomCode?: string | null
+  /** Conversion factor snapshot used to derive the *UomQuantity fields below. */
+  uomConversionFactor?: number
+  inspectedUomQuantity?: number
+  acceptedUomQuantity?: number
+  rejectedUomQuantity?: number
   remarks: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -993,7 +1002,17 @@ export interface ApiQualityInspection {
   createdAt: string | null
   updatedAt: string | null
   allowedActions: { canEdit: boolean; canComplete: boolean; canCancel: boolean }
-  totals: { inspected: number; accepted: number; rejected: number; deviation: number }
+  uomCode?: string | null
+  uomConversionFactor?: number
+  totals: {
+    inspected: number
+    accepted: number
+    rejected: number
+    deviation: number
+    inspectedUom?: number
+    acceptedUom?: number
+    rejectedUom?: number
+  }
   lines: ApiQualityInspectionLine[]
   parameters?: ApiQualityInspectionParameter[]
 }
