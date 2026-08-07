@@ -22,7 +22,7 @@ const TYPE_LABELS: Record<SourceDocumentRef['type'], string> = {
  */
 export function SourceDocumentLink({
   source,
-  fallback = '—',
+  fallback = '-',
 }: {
   source: SourceDocumentRef | null | undefined
   fallback?: string

@@ -160,8 +160,8 @@ export function UomFormPage() {
       breadcrumbs={buildMasterBreadcrumbs('inventory', isEdit ? 'Edit UOM' : 'New UOM')}
       validationErrors={validationErrors}
       documentStrip={[
-        { label: 'Code', value: watched.uomCode?.trim() || '—', highlight: Boolean(watched.uomCode?.trim()) },
-        { label: 'Precision', value: watched.decimalPlaces != null ? String(watched.decimalPlaces) : '—' },
+        { label: 'Code', value: watched.uomCode?.trim() || '-', highlight: Boolean(watched.uomCode?.trim()) },
+        { label: 'Precision', value: watched.decimalPlaces != null ? String(watched.decimalPlaces) : '-' },
         { label: 'Base Unit', value: watched.isBaseUnit ? 'Yes' : 'No' },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
       ]}
@@ -170,7 +170,7 @@ export function UomFormPage() {
       activeSection={activeSection}
       onSectionSelect={setActiveSection}
       formMetrics={[
-        { label: 'Type', value: watched.uomType ?? '—', accent: 'blue' as const },
+        { label: 'Type', value: watched.uomType ?? '-', accent: 'blue' as const },
         { label: 'Decimals', value: String(watched.decimalPlaces ?? 0), accent: 'violet' as const },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive', accent: 'green' as const },
       ]}

@@ -65,15 +65,15 @@ export function MRPPage() {
       cell: ({ row }) =>
         row.original.plannedOrderQty > 0
           ? formatNumber(row.original.plannedOrderQty)
-          : '—',
+          : '-',
     },
     {
       accessorKey: 'plannedOrderDate',
       header: 'Order Date',
       cell: ({ row }) =>
-        row.original.plannedOrderDate !== '—'
+        row.original.plannedOrderDate !== '-'
           ? formatDate(row.original.plannedOrderDate)
-          : '—',
+          : '-',
     },
     { accessorKey: 'supplier', header: 'Supplier' },
     {

@@ -35,7 +35,7 @@ export function MobileQcListDemoPage() {
         >
           <div className="font-semibold">{insp.inspectionNo}</div>
           <div className="text-sm">
-            {insp.category} · {insp.woNo ?? insp.grnNo ?? insp.itemCode ?? '—'}
+            {insp.category} · {insp.woNo ?? insp.grnNo ?? insp.itemCode ?? '-'}
           </div>
           <MobileStatusChip label={insp.status} tone="amber" />
         </button>

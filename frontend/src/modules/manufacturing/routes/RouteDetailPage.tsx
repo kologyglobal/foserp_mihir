@@ -125,7 +125,7 @@ export function RouteDetailPage() {
         </div>
         <div>
           <div className="text-[11px] uppercase text-erp-muted">Default BOM</div>
-          <div className="font-medium">{route.defaultBomNumber || '—'}</div>
+          <div className="font-medium">{route.defaultBomNumber || '-'}</div>
         </div>
         <div>
           <div className="text-[11px] uppercase text-erp-muted">Finished Item</div>

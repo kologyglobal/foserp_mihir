@@ -10,7 +10,6 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { Select } from '@/components/forms/Inputs'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
-import { isApiMode } from '@/config/apiConfig'
 import {
   fetchInventoryCostLayer,
   fetchInventoryCostLayers,
@@ -20,15 +19,13 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { InventoryCostingShell } from './InventoryCostingShell'
 import { inventoryCostingPaths } from './inventoryCostingPaths'
-import { DEMO_COST_LAYERS } from './costingDemoData'
 
 function shortId(id: string | null | undefined): string {
-  if (!id) return '—'
+  if (!id) return '-'
   return id.length > 10 ? `${id.slice(0, 8)}…` : id
 }
 
 export function InventoryFifoLayersPage() {
-  const api = isApiMode()
   const [params] = useSearchParams()
   const [rows, setRows] = useState<InventoryCostLayerDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,15 +40,6 @@ export function InventoryFifoLayersPage() {
     setLoading(true)
     setError(null)
     try {
-      if (!api) {
-        let demo = DEMO_COST_LAYERS
-        if (status) demo = demo.filter((r) => r.status === status)
-        if (itemId) demo = demo.filter((r) => r.itemId === itemId)
-        if (serialId) demo = demo.filter((r) => r.serialId === serialId)
-        if (lotId) demo = demo.filter((r) => r.lotId === lotId)
-        setRows(demo)
-        return
-      }
       const res = await fetchInventoryCostLayers({
         limit: 100,
         status: status || undefined,
@@ -66,7 +54,7 @@ export function InventoryFifoLayersPage() {
     } finally {
       setLoading(false)
     }
-  }, [api, status, itemId, serialId, lotId])
+  }, [status, itemId, serialId, lotId])
 
   useEffect(() => {
     void load()
@@ -149,7 +137,7 @@ export function InventoryFifoLayersPage() {
                     {formatCurrency(Number(r.remainingValue))}
                   </td>
                   <td className="text-[12px] text-erp-muted">
-                    {r.serialId ? `S:${shortId(r.serialId)}` : r.lotId ? `L:${shortId(r.lotId)}` : '—'}
+                    {r.serialId ? `S:${shortId(r.serialId)}` : r.lotId ? `L:${shortId(r.lotId)}` : '-'}
                   </td>
                   <td className="text-right">
                     <Link to={inventoryCostingPaths.layer(r.id)} className="font-semibold text-erp-primary hover:underline">
@@ -168,7 +156,6 @@ export function InventoryFifoLayersPage() {
 
 export function InventoryFifoLayerDetailPage() {
   const { id } = useParams()
-  const api = isApiMode()
   const [row, setRow] = useState<InventoryCostLayerDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -179,10 +166,6 @@ export function InventoryFifoLayerDetailPage() {
     setLoading(true)
     ;(async () => {
       try {
-        if (!api) {
-          if (!cancelled) setRow(DEMO_COST_LAYERS.find((l) => l.id === id) ?? null)
-          return
-        }
         const res = await fetchInventoryCostLayer(id)
         if (!cancelled) setRow(res.data)
       } catch (e) {
@@ -194,7 +177,7 @@ export function InventoryFifoLayerDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [api, id])
+  }, [id])
 
   return (
     <InventoryCostingShell

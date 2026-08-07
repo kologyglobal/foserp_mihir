@@ -169,7 +169,7 @@ export function GrnDetailPage() {
       { label: 'Vendor', value: grn.vendor.name },
       { label: 'PO', value: grn.purchaseOrderNumber },
       { label: 'GRN Date', value: formatDate(grn.documentDate) },
-      { label: 'Warehouse', value: grn.warehouseName || '—' },
+      { label: 'Warehouse', value: grn.warehouseName || '-' },
     ]
   }, [grn])
 
@@ -178,7 +178,7 @@ export function GrnDetailPage() {
       <PurchaseCardFormShell
         title="Goods Receipt Note"
         description="Loading…"
-        status="—"
+        status="-"
         favoritePath="/purchase/grn"
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
@@ -525,20 +525,20 @@ export function GrnDetailPage() {
             }
           />
           <ErpViewField label="Vendor" value={`${grn.vendor.code} — ${grn.vendor.name}`} />
-          <ErpViewField label="Vendor Challan" value={grn.vendorChallanNumber || '—'} />
+          <ErpViewField label="Vendor Challan" value={grn.vendorChallanNumber || '-'} />
           <ErpViewField
             label="Challan Date"
-            value={grn.vendorChallanDate ? formatDate(grn.vendorChallanDate) : '—'}
+            value={grn.vendorChallanDate ? formatDate(grn.vendorChallanDate) : '-'}
           />
-          <ErpViewField label="Vehicle" value={grn.vehicleNo || '—'} />
-          <ErpViewField label="Transporter" value={grn.transporterName || '—'} />
-          <ErpViewField label="LR Number" value={grn.lrNumber || '—'} />
-          <ErpViewField label="Gate Entry" value={grn.gateEntryNo || '—'} />
-          <ErpViewField label="Warehouse" value={grn.warehouseName || '—'} />
-          <ErpViewField label="Receiving Location" value={grn.receivingLocation || '—'} />
+          <ErpViewField label="Vehicle" value={grn.vehicleNo || '-'} />
+          <ErpViewField label="Transporter" value={grn.transporterName || '-'} />
+          <ErpViewField label="LR Number" value={grn.lrNumber || '-'} />
+          <ErpViewField label="Gate Entry" value={grn.gateEntryNo || '-'} />
+          <ErpViewField label="Warehouse" value={grn.warehouseName || '-'} />
+          <ErpViewField label="Receiving Location" value={grn.receivingLocation || '-'} />
           <ErpViewField label="Received By" value={grn.receivedBy.name} />
           <ErpViewField label="Inspection Required" value={grn.inspectionRequired ? 'Yes' : 'No'} />
-          <ErpViewField label="Remarks" value={grn.remarks || '—'} colSpan={3} />
+          <ErpViewField label="Remarks" value={grn.remarks || '-'} colSpan={3} />
         </ErpCardSection>
 
         <ErpCardSection
@@ -707,13 +707,13 @@ export function GrnDetailPage() {
                   const reversedQty = Number(l.reversedQty) || 0
                   const netReceived = l.receivedQty - returnedTotal - reversedQty
                   const netAccepted = l.acceptedQty - returnedTotal - (Number(l.reversedAcceptedQty) || 0)
-                  const lineUom = l.uom?.trim() || '—'
+                  const lineUom = l.uom?.trim() || '-'
                   const baseUom = getPurchaseLineBaseUomCode(l.itemId) || lineUom
                   const dualReceived = purchaseLineHasDualUom({
                     itemId: l.itemId,
                     uomConversionFactor: l.uomConversionFactor,
                   })
-                  const dash = <td className="num text-erp-muted">—</td>
+                  const dash = <td className="num text-erp-muted">-</td>
                   const fullyReversed = Boolean(l.lineFullyReversed) || (reversedQty > 0 && netReceived <= 0)
 
                   const receiptRow = (
@@ -750,13 +750,13 @@ export function GrnDetailPage() {
                         {hasReturns ? (
                           <span className="font-medium text-red-700">−{formatNumber(returnedTotal)}</span>
                         ) : (
-                          '—'
+                          '-'
                         )}
                       </td>
                       <td className="num tabular-nums">{formatNumber(remainingPoOpenAfterGrn(l))}</td>
                       <td className="num tabular-nums">{formatNumber(l.tolerancePercentage ?? 0)}</td>
                       <td className="num tabular-nums">
-                        {l.variancePercentage == null ? '—' : `${formatNumber(l.variancePercentage)}%`}
+                        {l.variancePercentage == null ? '-' : `${formatNumber(l.variancePercentage)}%`}
                       </td>
                       <td className="whitespace-nowrap">
                         {GRN_TOLERANCE_STATUS_LABELS[
@@ -764,12 +764,20 @@ export function GrnDetailPage() {
                         ] ?? l.toleranceStatus}
                       </td>
                       <td className="num tabular-nums">{formatNumber(l.acceptedQty)}</td>
-                      <td className="num tabular-nums">{formatNumber(l.rejectedQty)}</td>
-                      <td className="font-mono text-[11px] whitespace-nowrap">{l.batchNumber || '—'}</td>
+                      <td
+                        className={
+                          l.rejectedQty > 0
+                            ? 'num tabular-nums font-semibold text-red-700'
+                            : 'num tabular-nums'
+                        }
+                      >
+                        {formatNumber(l.rejectedQty)}
+                      </td>
+                      <td className="font-mono text-[11px] whitespace-nowrap">{l.batchNumber || '-'}</td>
                       <td className="whitespace-nowrap">
                         {GRN_LINE_INSPECTION_STATUS_LABELS[l.inspectionStatus]}
                       </td>
-                      <td className="text-erp-muted">{l.remarks || '—'}</td>
+                      <td className="text-erp-muted">{l.remarks || '-'}</td>
                     </tr>
                   )
 
@@ -804,7 +812,7 @@ export function GrnDetailPage() {
                         <td className="num tabular-nums font-medium text-red-700">
                           {(Number(l.reversedRejectedQty) || 0) > 0
                             ? `−${formatNumber(Number(l.reversedRejectedQty) || 0)}`
-                            : '—'}
+                            : '-'}
                         </td>
                         {dash}
                         {dash}
@@ -890,7 +898,7 @@ export function GrnDetailPage() {
                         {dash}
                         <td className="num tabular-nums text-erp-text">{formatNumber(netReceived)}</td>
                         <td className="num tabular-nums text-erp-text">
-                          {hasReturns ? `−${formatNumber(returnedTotal)}` : '—'}
+                          {hasReturns ? `−${formatNumber(returnedTotal)}` : '-'}
                         </td>
                         {dash}
                         {dash}
@@ -907,7 +915,7 @@ export function GrnDetailPage() {
                               ? `${formatNumber(l.returnableQty ?? 0)} still returnable`
                               : hasReturns
                                 ? 'Fully returned'
-                                : '—'}
+                                : '-'}
                         </td>
                       </tr>
                     ) : null

@@ -97,9 +97,9 @@ export function WorkOrderOperationsPanel({
               <div><dt className="text-erp-muted">Completed</dt><dd className="font-semibold tabular-nums">{op.completedQty}</dd></div>
               <div><dt className="text-erp-muted">Pending</dt><dd className="font-semibold tabular-nums">{op.pendingQty}</dd></div>
               <div><dt className="text-erp-muted">Scrap / Rework / Reject</dt><dd className="font-semibold tabular-nums">{op.scrapQty} / {op.reworkQty} / {op.rejectedQty}</dd></div>
-              <div><dt className="text-erp-muted">Operator</dt><dd className="font-medium">{op.operator || '—'}</dd></div>
-              <div><dt className="text-erp-muted">Start</dt><dd>{op.startedAt ? formatDateTime(op.startedAt) : '—'}</dd></div>
-              <div><dt className="text-erp-muted">End</dt><dd>{op.endedAt ? formatDateTime(op.endedAt) : '—'}</dd></div>
+              <div><dt className="text-erp-muted">Operator</dt><dd className="font-medium">{op.operator || '-'}</dd></div>
+              <div><dt className="text-erp-muted">Start</dt><dd>{op.startedAt ? formatDateTime(op.startedAt) : '-'}</dd></div>
+              <div><dt className="text-erp-muted">End</dt><dd>{op.endedAt ? formatDateTime(op.endedAt) : '-'}</dd></div>
               <div className="flex flex-wrap gap-1">
                 {op.qcRequired ? <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-800 ring-1 ring-violet-200">QC</span> : null}
                 {op.jobWorkRequired ? <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-800 ring-1 ring-teal-200">Job Work</span> : null}

@@ -68,6 +68,12 @@ function mergeTimelinePair(
   }
 }
 
+function lifecycleDedupeTimeKey(timestamp: string, bucket: string | null): string {
+  // Audit rows are written after status_history in the same request — merge within the same minute.
+  if (bucket) return timestamp.slice(0, 16)
+  return timestamp.slice(0, 19)
+}
+
 export function dedupePurchaseTimelineEvents(
   events: PurchaseTimelineEventDto[],
 ): PurchaseTimelineEventDto[] {
@@ -75,9 +81,10 @@ export function dedupePurchaseTimelineEvents(
 
   for (const event of events) {
     const bucket = lifecycleBucket(event.action)
+    const timeKey = lifecycleDedupeTimeKey(event.timestamp, bucket)
     const key = bucket
-      ? `lc:${bucket}|${event.timestamp.slice(0, 19)}|${event.actorId ?? ''}`
-      : `raw:${event.source}|${event.action}|${event.timestamp.slice(0, 19)}|${event.id}`
+      ? `lc:${bucket}|${timeKey}|${event.actorId ?? ''}`
+      : `raw:${event.source}|${event.action}|${timeKey}|${event.id}`
 
     const existing = byKey.get(key)
     byKey.set(key, existing ? mergeTimelinePair(existing, event) : event)

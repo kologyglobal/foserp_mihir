@@ -172,7 +172,7 @@ export function BankCashReportsPage() {
                       <tbody>
                         {previewRows.slice(0, 30).map((row, i) => (
                           <tr key={i} className="border-t border-erp-border/70">
-                            {Object.values(row).map((v, j) => <td key={j} className="px-2 py-1">{v ?? '—'}</td>)}
+                            {Object.values(row).map((v, j) => <td key={j} className="px-2 py-1">{v ?? '-'}</td>)}
                           </tr>
                         ))}
                       </tbody>

@@ -1,7 +1,6 @@
 /**
- * Inventory accounting events workspace — dual-mode.
- * API: live gate + event register from /inventory/accounting/*.
- * Demo: small seed list so the screen is browsable without VITE_USE_API.
+ * Inventory accounting events workspace.
+ * Live gate + event register from /inventory/accounting/*.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -13,7 +12,6 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { Select } from '@/components/forms/Inputs'
-import { isApiMode } from '@/config/apiConfig'
 import {
   fetchInventoryAccountingEvents,
   fetchInventoryAccountingGate,
@@ -25,45 +23,6 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDateTime } from '@/utils/dates/format'
 import { cn } from '@/utils/cn'
 
-const DEMO_EVENTS: InventoryAccountingEventDto[] = [
-  {
-    id: 'demo-inv-acct-1',
-    legalEntityId: null,
-    eventType: 'GRN_INWARD',
-    status: 'SKIPPED_FLAG_OFF',
-    movementId: null,
-    idempotencyKey: 'DEMO:GRN:1',
-    sourceDocumentType: 'GOODS_RECEIPT',
-    sourceDocumentId: 'demo-grn-1',
-    quantity: '100.0000',
-    amount: '125000.0000',
-    currencyCode: 'INR',
-    voucherId: null,
-    postingEventId: null,
-    failureReason: null,
-    postedAt: null,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'demo-inv-acct-2',
-    legalEntityId: null,
-    eventType: 'STOCK_ADJUSTMENT',
-    status: 'RECORDED',
-    movementId: null,
-    idempotencyKey: 'DEMO:ADJ:1',
-    sourceDocumentType: 'STOCK_ADJUSTMENT',
-    sourceDocumentId: 'demo-adj-1',
-    quantity: '-2.0000',
-    amount: '4500.0000',
-    currencyCode: 'INR',
-    voucherId: null,
-    postingEventId: null,
-    failureReason: null,
-    postedAt: null,
-    createdAt: new Date().toISOString(),
-  },
-]
-
 function statusTone(status: string): 'success' | 'warning' | 'critical' | 'neutral' {
   if (status === 'POSTED') return 'success'
   if (status === 'FAILED') return 'critical'
@@ -73,7 +32,6 @@ function statusTone(status: string): 'success' | 'warning' | 'critical' | 'neutr
 
 export function InventoryAccountingEventsPage() {
   const perms = useInventoryPermissions()
-  const api = isApiMode()
   const [gate, setGate] = useState<InventoryAccountingGateStatus | null>(null)
   const [rows, setRows] = useState<InventoryAccountingEventDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,12 +48,6 @@ export function InventoryAccountingEventsPage() {
     setLoading(true)
     setError(null)
     try {
-      if (!api) {
-        setGate({ legalEntityId: null, enabled: false, reason: 'FLAG_OFF' })
-        setRows(DEMO_EVENTS)
-        setSelectedId(DEMO_EVENTS[0]?.id ?? null)
-        return
-      }
       const [gateRes, eventsRes] = await Promise.all([
         fetchInventoryAccountingGate(),
         fetchInventoryAccountingEvents({
@@ -111,7 +63,7 @@ export function InventoryAccountingEventsPage() {
     } finally {
       setLoading(false)
     }
-  }, [api, perms.canView, statusFilter])
+  }, [perms.canView, statusFilter])
 
   useEffect(() => {
     void load()
@@ -150,11 +102,7 @@ export function InventoryAccountingEventsPage() {
       layout="enterprise"
       badge="Store"
       title="Inventory Accounting"
-      description={
-        api
-          ? 'Live GRN / adjustment / dispatch accounting events. GL posts only when INVENTORY_ACCOUNTING is enabled.'
-          : 'Demo preview of inventory accounting events. Switch to API mode for live data.'
-      }
+      description="Live GRN / adjustment / dispatch accounting events. GL posts only when INVENTORY_ACCOUNTING is enabled."
       breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Accounting' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/accounting"
@@ -183,22 +131,16 @@ export function InventoryAccountingEventsPage() {
             >
               <Landmark className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
               <p>
-                {api ? (
-                  gate.enabled ? (
-                    <>
-                      <span className="font-semibold">INVENTORY_ACCOUNTING enabled.</span> Events with value post
-                      SYSTEM vouchers via the central posting engine.
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-semibold">INVENTORY_ACCOUNTING is off</span>
-                      {gate.reason === 'NO_LEGAL_ENTITY' ? ' (no legal entity)' : ''}. Events are still recorded for
-                      audit; enable the flag under Finance › Features when mappings and an open period are ready.
-                    </>
-                  )
+                {gate.enabled ? (
+                  <>
+                    <span className="font-semibold">INVENTORY_ACCOUNTING enabled.</span> Events with value post
+                    SYSTEM vouchers via the central posting engine.
+                  </>
                 ) : (
                   <>
-                    <span className="font-semibold">Demo mode.</span> Showing seed events — no live inventory GL.
+                    <span className="font-semibold">INVENTORY_ACCOUNTING is off</span>
+                    {gate.reason === 'NO_LEGAL_ENTITY' ? ' (no legal entity)' : ''}. Events are still recorded for
+                    audit; enable the flag under Finance › Features when mappings and an open period are ready.
                   </>
                 )}
               </p>

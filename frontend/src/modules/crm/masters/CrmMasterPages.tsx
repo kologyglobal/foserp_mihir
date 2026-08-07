@@ -411,7 +411,7 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
         meta: entNumericMeta('In Use'),
         cell: ({ row }) => {
           const n = countMasterUsage(row.original)
-          return n > 0 ? <EnterpriseNumericCell value={n} className="text-amber-700 font-semibold" /> : '—'
+          return n > 0 ? <EnterpriseNumericCell value={n} className="text-amber-700 font-semibold" /> : '-'
         },
       })
     }
@@ -643,10 +643,10 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
 }
 
 function masterFieldDetailValue(field: CrmMasterFieldDef, raw: string | number | boolean | null | undefined) {
-  const text = String(raw ?? '—')
+  const text = String(raw ?? '-')
   if (field.type === 'color') {
     const hex = normalizeHexColor(String(raw ?? ''))
-    if (!hex) return '—'
+    if (!hex) return '-'
     return (
       <span className="inline-flex items-center gap-2">
         <ColorSwatch color={hex} size="sm" />
@@ -1029,11 +1029,11 @@ export function CrmMasterDetailPage({ fixedSlug }: { fixedSlug?: string } = {}) 
                 value={
                   usesRichDescription && entry.description
                     ? <ErpRichTextRead html={entry.description} />
-                    : (entry.description ?? '—')
+                    : (entry.description ?? '-')
                 }
               />
             ) : null}
-            {showNotesSection ? <DetailField label="Notes" value={entry.notes ?? '—'} /> : null}
+            {showNotesSection ? <DetailField label="Notes" value={entry.notes ?? '-'} /> : null}
           </DetailGrid>
         </DetailSection>
         {configFields.length > 0 ? (

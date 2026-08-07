@@ -202,14 +202,14 @@ export function IndiaMartInboxPage() {
                     />
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-[12px]">
-                    {row.enquiryDate ? new Date(row.enquiryDate).toLocaleString() : '—'}
+                    {row.enquiryDate ? new Date(row.enquiryDate).toLocaleString() : '-'}
                   </td>
-                  <td className="px-3 py-2">{row.buyerName ?? '—'}</td>
-                  <td className="px-3 py-2">{row.buyerCompanyName ?? '—'}</td>
-                  <td className="px-3 py-2">{row.buyerMobile ?? '—'}</td>
-                  <td className="px-3 py-2">{row.buyerCity ?? '—'}</td>
+                  <td className="px-3 py-2">{row.buyerName ?? '-'}</td>
+                  <td className="px-3 py-2">{row.buyerCompanyName ?? '-'}</td>
+                  <td className="px-3 py-2">{row.buyerMobile ?? '-'}</td>
+                  <td className="px-3 py-2">{row.buyerCity ?? '-'}</td>
                   <td className="px-3 py-2 max-w-[180px] truncate" title={row.productName ?? ''}>
-                    {row.productName ?? '—'}
+                    {row.productName ?? '-'}
                   </td>
                   <td className="px-3 py-2">
                     <StatusBadge value={row.matchStatus} />
@@ -217,7 +217,7 @@ export function IndiaMartInboxPage() {
                   <td className="px-3 py-2">
                     <StatusBadge value={row.importStatus} />
                   </td>
-                  <td className="px-3 py-2">{row.slaStatus ? <StatusBadge value={row.slaStatus} /> : '—'}</td>
+                  <td className="px-3 py-2">{row.slaStatus ? <StatusBadge value={row.slaStatus} /> : '-'}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
                       <button type="button" className="text-xs text-erp-primary underline" onClick={() => setDetail(row)}>
@@ -296,7 +296,7 @@ export function IndiaMartInboxPage() {
               ].map(([k, v]) => (
                 <div key={String(k)}>
                   <dt className="text-[11px] uppercase text-erp-muted">{k}</dt>
-                  <dd className="whitespace-pre-wrap text-erp-text">{v || '—'}</dd>
+                  <dd className="whitespace-pre-wrap text-erp-text">{v || '-'}</dd>
                 </div>
               ))}
             </dl>

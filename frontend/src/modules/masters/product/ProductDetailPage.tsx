@@ -123,7 +123,7 @@ export function ProductDetailPage() {
               <DetailField label="Type" value={<TypeBadge value={product.productType} color="green" />} />
               <DetailField label="Capacity" value={product.capacity} />
               <DetailField label="UOM" value={getUomName(product.baseUomId)} />
-              <DetailField label="FG Item" value={fgItem ? <Link to={`/masters/items/${fgItem.id}`} className="font-mono text-erp-primary hover:underline">{fgItem.itemCode}</Link> : '—'} />
+              <DetailField label="FG Item" value={fgItem ? <Link to={`/masters/items/${fgItem.id}`} className="font-mono text-erp-primary hover:underline">{fgItem.itemCode}</Link> : '-'} />
               <DetailField label="FG On Hand" value={formatNumber(fgOnHand)} />
               <DetailField label="Lifecycle Status" value={<TypeBadge value={product.status} color={productStatusColor(product.status)} />} />
             </DetailGrid>
@@ -136,7 +136,7 @@ export function ProductDetailPage() {
               <DetailField label="Routing Rev" value={product.routingRevision} />
               <DetailField label="Engineering Owner" value={product.engineeringOwner} />
               <DetailField label="Effective From" value={formatDate(product.effectiveFrom)} />
-              <DetailField label="Effective To" value={product.effectiveTo ? formatDate(product.effectiveTo) : '—'} />
+              <DetailField label="Effective To" value={product.effectiveTo ? formatDate(product.effectiveTo) : '-'} />
               <DetailField label="Revision Reason" value={product.revisionReason} />
             </DetailGrid>
             <div className="mt-4 flex flex-wrap gap-2 border-t border-erp-border pt-4">
@@ -165,7 +165,7 @@ export function ProductDetailPage() {
             </DetailGrid>
           </DetailSection>
           <DetailSection title="Specifications">
-            <p className="text-sm text-erp-text">{product.specifications || '—'}</p>
+            <p className="text-sm text-erp-text">{product.specifications || '-'}</p>
           </DetailSection>
         </>
       )}
@@ -181,7 +181,7 @@ export function ProductDetailPage() {
                 <td>{product.bomRevision}</td>
                 <td>{product.routingRevision}</td>
                 <td>{formatDate(product.effectiveFrom)}</td>
-                <td>—</td>
+                <td>-</td>
                 <td>{product.engineeringOwner}</td>
                 <td>{product.status === 'obsolete' ? 'Yes' : 'No'}</td>
               </tr>
@@ -192,7 +192,7 @@ export function ProductDetailPage() {
                   <td>{r.bomRevision}</td>
                   <td>{r.routingRevision}</td>
                   <td>{formatDate(r.effectiveFrom)}</td>
-                  <td>{r.effectiveTo ? formatDate(r.effectiveTo) : '—'}</td>
+                  <td>{r.effectiveTo ? formatDate(r.effectiveTo) : '-'}</td>
                   <td>{r.engineeringOwner}</td>
                   <td>{r.locked ? 'Yes' : 'No'}</td>
                 </tr>
@@ -237,7 +237,7 @@ export function ProductDetailPage() {
             <DetailField label="Default Work Centers" value={
               product.manufacturing.defaultWorkCenterIds.length
                 ? product.manufacturing.defaultWorkCenterIds.map((wcId) => workCenters.find((w) => w.id === wcId)?.workCenterCode ?? wcId).join(', ')
-                : '—'
+                : '-'
             } />
           </DetailGrid>
           <table className="erp-table mt-4 w-full">
@@ -261,7 +261,7 @@ export function ProductDetailPage() {
             <DetailField label="Total Standard Cost" value={<span className="font-semibold">{formatCurrency(product.standardCost.totalCost)}</span>} />
             <DetailField label="List Price" value={formatCurrency(product.standardPrice)} />
             <DetailField label="Override" value={product.standardCost.costOverride ? 'Yes (pending approval)' : 'No'} />
-            <DetailField label="Derived At" value={product.standardCost.derivedAt ? formatDate(product.standardCost.derivedAt.slice(0, 10)) : '—'} />
+            <DetailField label="Derived At" value={product.standardCost.derivedAt ? formatDate(product.standardCost.derivedAt.slice(0, 10)) : '-'} />
           </DetailGrid>
           <div className="mt-4 flex gap-2 border-t border-erp-border pt-4">
             <Button size="sm" onClick={() => act('Costs derived', deriveCosts(id))}>Derive from BOM + Routing</Button>
@@ -291,8 +291,8 @@ export function ProductDetailPage() {
       {tab === 'quality' && (
         <DetailSection title="Quality Control">
           <DetailGrid>
-            <DetailField label="QC Plan" value={product.quality.qcPlanName || '—'} />
-            <DetailField label="Final Inspection Plan" value={product.quality.finalInspectionPlanName || '—'} />
+            <DetailField label="QC Plan" value={product.quality.qcPlanName || '-'} />
+            <DetailField label="Final Inspection Plan" value={product.quality.finalInspectionPlanName || '-'} />
             <DetailField label="Test Certificate Template" value={product.quality.testCertificateTemplate} />
             <DetailField label="Customer Approval Required" value={product.quality.customerApprovalRequired ? 'Yes' : 'No'} />
           </DetailGrid>

@@ -250,8 +250,8 @@ export const useWorkOrderStore = create<WorkOrderState>()(
       releasedBom,
       bomLines,
       master.items,
-      (id) => master.uoms.find((u) => u.id === id)?.uomCode ?? '—',
-      (id) => master.warehouses.find((w) => w.id === id)?.warehouseCode ?? '—',
+      (id) => master.uoms.find((u) => u.id === id)?.uomCode ?? '-',
+      (id) => master.warehouses.find((w) => w.id === id)?.warehouseCode ?? '-',
     )
 
     const drafts = buildWoDraftsFromMrp(

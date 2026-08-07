@@ -222,7 +222,7 @@ export function AdminCompaniesPage() {
                                 ) : null}
                               </td>
                               <td className="px-4 py-2.5 text-erp-muted">{row.tradeName}</td>
-                              <td className="px-4 py-2.5 font-mono text-xs">{row.gstNumber ?? '—'}</td>
+                              <td className="px-4 py-2.5 font-mono text-xs">{row.gstNumber ?? '-'}</td>
                               <td className="px-4 py-2.5">
                                 <Badge color={row.status === 'ACTIVE' ? 'green' : 'gray'}>{row.status}</Badge>
                               </td>

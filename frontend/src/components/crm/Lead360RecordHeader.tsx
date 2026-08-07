@@ -96,7 +96,7 @@ export function Lead360RecordHeader({
 
   const stageLabel = leadStageLabel(lead.stage)
   const priorityLabel = leadPriorityLabel(lead.priority)
-  const ownerName = lead.leadOwnerName?.trim() || '—'
+  const ownerName = lead.leadOwnerName?.trim() || '-'
   const canQuote = !isConverted
   const canQuoteViaOpp = Boolean(quoteOpportunityId)
   const convertPrimary = canConvert

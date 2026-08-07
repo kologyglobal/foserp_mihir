@@ -6,7 +6,7 @@ import {
 } from '../../utils/purchase/purchaseFieldErrorLabels'
 import { getStoredSession } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
-import { resolveUomCode } from '../../utils/purchaseLineUom'
+import { resolveUomCode, toUomQuantityFromBase } from '../../utils/purchaseLineUom'
 import {
   aggregatePurchasePoGstTotals,
   computePurchasePoLineTax,
@@ -15,7 +15,7 @@ import {
   mapEngineeringProductTypeToPurchaseCategory,
   normalizeEngineeringProductType,
 } from '../../utils/purchaseProductType'
-import { prDepartmentLabel } from '../../utils/purchaseRequisitionValidation'
+import { resolvePrDepartmentDisplay } from '../../utils/purchaseRequisitionValidation'
 import {
   purchaseDeliveryPlaceOfSupplyLabel,
   purchaseSetupPlaceState,
@@ -74,6 +74,7 @@ import type {
   GoodsReceiptNote,
   GoodsReceiptLine,
   GrnDomainStatus,
+  GrnLineInspectionStatus,
   GrnInput,
   GrnListRow,
   PurchaseInvoice,
@@ -180,12 +181,12 @@ export function isBackendMissingError(err: unknown): boolean {
 function mapPrStatus(status: string): PurchaseRequisitionStatus {
   const s = status.toLowerCase()
   if (s === 'submitted') return 'pending_approval'
-  if (s === 'partially_converted') return 'converted_to_po'
   if (
     s === 'draft' ||
     s === 'pending_approval' ||
     s === 'approved' ||
     s === 'rejected' ||
+    s === 'partially_converted' ||
     s === 'converted_to_rfq' ||
     s === 'converted_to_po' ||
     s === 'closed' ||
@@ -302,7 +303,7 @@ function resolveRequesterDisplayName(
   }
   // Never prefer UUID as a "name" in registers — blank is clearer than a technical id.
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
-    return '—'
+    return '-'
   }
   return id
 }
@@ -337,7 +338,7 @@ function resolveWarehouseFromMaster(warehouseId: string | null | undefined): {
   return {
     id,
     code: warehouse?.warehouseCode?.trim() || '',
-    name: warehouse?.warehouseName?.trim() || warehouse?.warehouseCode?.trim() || '—',
+    name: warehouse?.warehouseName?.trim() || warehouse?.warehouseCode?.trim() || '-',
     state: pos.state,
     city: pos.city,
   }
@@ -464,7 +465,7 @@ export function mapApiRequisitionToDomain(dto: ApiPurchaseRequisition): Purchase
     documentDate: dto.requisitionDate,
     status: mapPrStatus(dto.status),
     location: resolveWarehouseFromMaster(dto.warehouseId),
-    department: prDepartmentLabel(dto.departmentId ?? ''),
+    department: resolvePrDepartmentDisplay(dto.departmentId, dto.departmentName),
     requester: {
       id: dto.requestedById ?? '',
       code: '',
@@ -618,7 +619,7 @@ export function mapApiPlanningRowToDomain(row: ApiPurchasePlanningRow): Purchase
     purchaseRequisitionId: row.purchaseRequisitionId,
     purchaseRequisitionNumber: row.purchaseRequisitionNumber,
     purchaseRequisitionLineId: row.purchaseRequisitionLineId,
-    department: prDepartmentLabel(row.departmentId ?? ''),
+    department: resolvePrDepartmentDisplay(row.departmentId, row.departmentName),
     requestedById: row.requestedById ?? '',
     requestedByName: resolveRequesterDisplayName(row.requestedById, row.requestedByName),
     itemId: row.itemId ?? '',
@@ -878,8 +879,8 @@ export function mapApiRfqToListRow(api: ApiRequestForQuotation): RfqListRow {
     documentNumber: domain.documentNumber,
     documentDate: domain.documentDate,
     bidDueDate: domain.bidDueDate,
-    buyerName: domain.buyer.name || '—',
-    locationName: domain.location.name || '—',
+    buyerName: domain.buyer.name || '-',
+    locationName: domain.location.name || '-',
     vendorCount: domain.vendors.length,
     itemCount: domain.lines.length,
     estimatedValue: domain.estimatedValue,
@@ -1144,7 +1145,7 @@ export function mapApiComparisonToDomain(
   if (byItem.size === 0 && vendors.length) {
     byItem.set('_summary', {
       itemId: '_summary',
-      itemCode: '—',
+      itemCode: '-',
       itemName: 'Vendor totals',
       quantity: 1,
       uom: '',
@@ -1275,18 +1276,20 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
   const amount = Number(line.amount) || uomQuantity * rate
   const received = Number(line.receivedQuantity) || 0
   const invoiced = Number(line.invoicedQuantity) || 0
+  const receivedUomQty =
+    Number((line as { receivedUomQty?: number }).receivedUomQty) ||
+    (factor > 1 ? toUomQuantityFromBase(received, factor) : received)
+  const invoicedUomQty =
+    Number((line as { invoicedUomQty?: number }).invoicedUomQty) ||
+    (factor > 1 ? toUomQuantityFromBase(invoiced, factor) : invoiced)
   const outstandingQtyBase =
     Number((line as { outstandingQtyBase?: number }).outstandingQtyBase) ||
     Math.max(0, qty - received)
-  const receivedUomQty =
-    Number((line as { receivedUomQty?: number }).receivedUomQty) ||
-    (factor > 0 ? received * factor : received)
-  const invoicedUomQty =
-    Number((line as { invoicedUomQty?: number }).invoicedUomQty) ||
-    (factor > 0 ? invoiced * factor : invoiced)
   const outstandingQty =
     Number((line as { outstandingQty?: number }).outstandingQty) ||
-    Math.max(0, uomQuantity - receivedUomQty)
+    (factor > 1
+      ? toUomQuantityFromBase(outstandingQtyBase, factor)
+      : Math.max(0, uomQuantity - receivedUomQty))
   const requiredDate = line.requiredDate ?? new Date().toISOString().slice(0, 10)
   const lineTax = computePurchasePoLineTax({
     amount,
@@ -1454,7 +1457,7 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
       ? {
           id: api.createdById ?? '',
           code: '',
-          name: (api.createdByName ?? '').trim() || '—',
+          name: (api.createdByName ?? '').trim() || '-',
         }
       : { ...EMPTY_PARTY }
 
@@ -1594,8 +1597,8 @@ export function mapApiPurchaseOrderToListRow(api: ApiPurchaseOrder): PurchaseOrd
     documentDate: domain.documentDate,
     vendorName: domain.vendor.name,
     vendorGstin: domain.vendor.gstin,
-    locationName: domain.purchaseLocation.name || domain.deliveryLocation.name || '—',
-    createdByName: domain.createdBy || '—',
+    locationName: domain.purchaseLocation.name || domain.deliveryLocation.name || '-',
+    createdByName: domain.createdBy || '-',
     currency: domain.currency,
     expectedDeliveryDate: domain.expectedDeliveryDate,
     basicAmount: domain.subtotal,
@@ -1712,6 +1715,25 @@ function mapApiGrnStatus(status: string): GrnDomainStatus {
   }
 }
 
+/** Derive GRN line Inspection column from QC outcome — not a hard-coded Pending. */
+function deriveGrnLineInspectionStatus(input: {
+  qcRequired: boolean
+  acceptedQty: number
+  rejectedQty: number
+  pendingInspectionQty: number
+  receivedQty: number
+}): GrnLineInspectionStatus {
+  const decided = input.acceptedQty > 0 || input.rejectedQty > 0
+  // QI may decide a line even when line.qcRequired was false (header QC / multi-line QI).
+  if (decided) {
+    if (input.rejectedQty > 0 && input.acceptedQty <= 0) return 'rejected'
+    if (input.acceptedQty > 0 && input.rejectedQty <= 0) return 'accepted'
+    return 'completed'
+  }
+  if (!input.qcRequired) return 'not_required'
+  return 'pending'
+}
+
 export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNote {
   const status = mapApiGrnStatus(String(api.status))
   return {
@@ -1788,7 +1810,9 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       receivedUomQty: Number(l.receivedUomQuantity) || 0,
       uomConversionFactor: Number(l.uomConversionFactor) || 1,
       acceptedQty: Number(l.acceptedQuantity) || 0,
+      acceptedUomQty: Number(l.acceptedUomQuantity) || Number(l.acceptedQuantity) || 0,
       rejectedQty: Number(l.rejectedQuantity) || 0,
+      rejectedUomQty: Number(l.rejectedUomQuantity) || Number(l.rejectedQuantity) || 0,
       returnedQty: Number(l.returnedQuantity) || 0,
       returnableQty: Number(l.returnableQuantity) || 0,
       reversedQty: Number(l.reversedQuantity) || 0,
@@ -1817,7 +1841,13 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       binId: l.binId ?? null,
       locationId: l.storageLocationId || api.storageLocationId || '',
       locationName: api.storageLocationName || '',
-      inspectionStatus: l.qcRequired ? 'pending' : 'not_required',
+      inspectionStatus: deriveGrnLineInspectionStatus({
+        qcRequired: Boolean(l.qcRequired),
+        acceptedQty: Number(l.acceptedQuantity) || 0,
+        rejectedQty: Number(l.rejectedQuantity) || 0,
+        pendingInspectionQty: Number(l.acceptedForQcQuantity) || 0,
+        receivedQty: Number(l.receivedQuantity) || 0,
+      }),
       allowExcess: api.allowExcess,
       batchControlled: false,
       serialControlled: false,
@@ -1832,6 +1862,8 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       shortCloseReason: l.shortCloseReason ?? null,
       receivingCondition: (l.receivingCondition as GoodsReceiptLine['receivingCondition']) ?? 'NORMAL',
       receivingConditionReason: l.receivingConditionReason ?? null,
+      maximumAllowedUnitQuantity:
+        l.maximumAllowedUnitQuantity == null ? null : Number(l.maximumAllowedUnitQuantity),
       receivedWeight: l.receivedWeight == null ? null : Number(l.receivedWeight),
       expectedWeight: l.expectedWeight == null ? null : Number(l.expectedWeight),
       maximumAllowedWeight:
@@ -1950,11 +1982,12 @@ function mapApiInvoiceStatus(status: string): PurchaseInvoiceStatus {
     case 'POSTED':
       return 'posted'
     case 'CLOSED':
-      return 'paid'
+      return 'closed'
+    case 'REJECTED':
+      return 'rejected'
     case 'CANCELLED':
       return 'cancelled'
     case 'DRAFT':
-    case 'REJECTED':
     default:
       return 'draft'
   }
@@ -2259,11 +2292,13 @@ export function mapApiQualityInspectionToListRow(
     batchLotNo: api.batchLotNo || '',
     receivedQty: Number(api.totals?.inspected) || 0,
     sampleQty: Number(api.totals?.inspected) || 0,
+    acceptedQty: Number(api.totals?.accepted) || 0,
+    rejectedQty: Number(api.totals?.rejected) || 0,
     inspectorName: api.inspectedByName || '',
     status,
     statusLabel: QUALITY_INSPECTION_STATUS_LABELS[status],
     result,
-    resultLabel: result ? QUALITY_INSPECTION_RESULT_LABELS[result] : '—',
+    resultLabel: result ? QUALITY_INSPECTION_RESULT_LABELS[result] : '-',
   }
 }
 

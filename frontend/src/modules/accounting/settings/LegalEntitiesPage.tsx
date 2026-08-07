@@ -163,8 +163,8 @@ export function LegalEntitiesPage() {
                 <div className="font-medium text-erp-text">{row.displayName}</div>
                 <div className="text-[11px] text-erp-muted">{row.legalName}</div>
               </td>
-              <td className="px-3 py-2">{row.gstin ?? '—'}</td>
-              <td className="px-3 py-2 font-mono text-[11px]">{row.stateCode ?? '—'}</td>
+              <td className="px-3 py-2">{row.gstin ?? '-'}</td>
+              <td className="px-3 py-2 font-mono text-[11px]">{row.stateCode ?? '-'}</td>
               <td className="px-3 py-2">Month {row.fiscalYearStartMonth}</td>
               <td className="px-3 py-2">{row.isDefault ? 'Yes' : 'No'}</td>
               <td className="px-3 py-2">{row.isActive ? 'Active' : 'Inactive'}</td>

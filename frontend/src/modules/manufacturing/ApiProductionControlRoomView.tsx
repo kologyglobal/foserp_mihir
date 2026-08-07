@@ -200,7 +200,7 @@ function CompactWoCard({
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-erp-muted">
               <span className="tabular-nums">Qty {wo.plannedQuantity}</span>
               <span className="tabular-nums font-medium text-erp-text">{pct}%</span>
-              <span>Due {wo.requiredCompletionDate ? formatDate(wo.requiredCompletionDate) : '—'}</span>
+              <span>Due {wo.requiredCompletionDate ? formatDate(wo.requiredCompletionDate) : '-'}</span>
               <span className="truncate">{stage}</span>
               {wo.salesOrderNo ? <span className="font-mono">SO {wo.salesOrderNo}</span> : null}
               {wo.priority ? <span className="uppercase tracking-wide">{wo.priority}</span> : null}
@@ -245,7 +245,7 @@ function CompactWoCard({
         </div>
         <ProgressBar pct={pct} />
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-erp-muted">
-          <span>Due {wo.requiredCompletionDate ? formatDate(wo.requiredCompletionDate) : '—'}</span>
+          <span>Due {wo.requiredCompletionDate ? formatDate(wo.requiredCompletionDate) : '-'}</span>
           {wo.salesOrderNo ? <span className="font-mono">SO {wo.salesOrderNo}</span> : null}
           {wo.priority ? <span className="uppercase tracking-wide">{wo.priority}</span> : null}
         </div>

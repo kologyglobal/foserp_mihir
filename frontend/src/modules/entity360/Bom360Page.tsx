@@ -139,11 +139,11 @@ export function Bom360Page() {
         <>
           <FactBox title="BOM Overview" fields={[
             { label: 'BOM No', value: bom.bomNo },
-            { label: 'Product', value: product ? <TableLink to={`/masters/products/${product.id}`}>{product.productName}</TableLink> : '—' },
+            { label: 'Product', value: product ? <TableLink to={`/masters/products/${product.id}`}>{product.productName}</TableLink> : '-' },
             { label: 'Revision', value: bom.revision },
             { label: 'Status', value: <StatusBadge status={bom.status} /> },
             { label: 'Effective Date', value: formatDate(bom.effectiveFrom) },
-            { label: 'Released By', value: bom.approvedBy ?? '—' },
+            { label: 'Released By', value: bom.approvedBy ?? '-' },
           ]} />
           <FactBox title="Cost & Risk" fields={[
             { label: 'Total Components', value: data.leafLines.length },
@@ -157,11 +157,11 @@ export function Bom360Page() {
       {tab === 'overview' && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <KpiTile label="BOM No" value={bom.bomNo} />
-          <KpiTile label="Product" value={product?.productCode ?? '—'} />
+          <KpiTile label="Product" value={product?.productCode ?? '-'} />
           <KpiTile label="Revision" value={bom.revision} />
           <KpiTile label="Status" value={<StatusBadge status={bom.status} />} />
           <KpiTile label="Effective Date" value={formatDate(bom.effectiveFrom)} />
-          <KpiTile label="Released By" value={bom.approvedBy ?? '—'} />
+          <KpiTile label="Released By" value={bom.approvedBy ?? '-'} />
           <KpiTile label="Total Components" value={data.leafLines.length} />
           <KpiTile label="Total Cost" value={formatCurrency(data.standardCost)} />
           <KpiTile label="Long Lead Items" value={data.longLead.length} />
@@ -315,7 +315,7 @@ export function Bom360Page() {
               </p>
               <div className="grid gap-4 lg:grid-cols-2">
                 <FactBox title="Affected Entities" fields={[
-                  { label: 'Products', value: product?.productName ?? '—' },
+                  { label: 'Products', value: product?.productName ?? '-' },
                   { label: 'Sales Orders', value: data.sosUsing.length },
                   { label: 'Work Orders', value: data.wosUsing.length },
                   { label: 'Purchase Requirements', value: data.purchaseRequirements.length },

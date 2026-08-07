@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ClipboardList, Download, GitBranch, Pencil, Printer, Send, ShoppingCart } from 'lucide-react'
-import { isApiMode } from '@/config/apiConfig'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import {
   PurchaseDocumentFactBox,
@@ -162,9 +161,9 @@ export function PurchaseRequisitionDomainDetailPage({
     if (!pr) return []
     return [
       { label: 'Requester', value: pr.requester.name },
-      { label: 'Department', value: pr.department || '—' },
+      { label: 'Department', value: pr.department || '-' },
       { label: 'PR Date', value: formatDate(pr.documentDate) },
-      { label: 'Required By', value: requiredBy ? formatDate(requiredBy) : '—' },
+      { label: 'Required By', value: requiredBy ? formatDate(requiredBy) : '-' },
     ]
   }, [pr, requiredBy])
 
@@ -231,7 +230,7 @@ export function PurchaseRequisitionDomainDetailPage({
       <PurchaseCardFormShell
         title="Purchase Requisition"
         description="Not found"
-        status="—"
+        status="-"
         favoritePath="/purchase/requisitions"
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
@@ -298,7 +297,6 @@ export function PurchaseRequisitionDomainDetailPage({
     (pr.status === 'draft' || pr.status === 'rejected') &&
     perms.canSubmitRequisition
   const canRevisePr =
-    isApiMode() &&
     mode === 'view' &&
     (pr.status === 'approved' || pr.status === 'partially_converted') &&
     perms.canEditRequisition &&
@@ -480,12 +478,12 @@ export function PurchaseRequisitionDomainDetailPage({
                   onChange={(e) => setDepartment(e.target.value)}
                 />
               ) : (
-                pr.department || '—'
+                pr.department || '-'
               )
             }
           />
           <ErpViewField label="Requested By" value={pr.requester.name} />
-          <ErpViewField label="Required By Date" value={requiredBy ? formatDate(requiredBy) : '—'} />
+          <ErpViewField label="Required By Date" value={requiredBy ? formatDate(requiredBy) : '-'} />
           <ErpViewField label="Warehouse" value={pr.location.name} />
           <ErpViewField label="Priority" value={PURCHASE_REQUISITION_PRIORITY_LABELS[pr.priority]} />
           <ErpViewField label="Source" value={PURCHASE_REQUISITION_SOURCE_LABELS[pr.source]} />
@@ -499,14 +497,14 @@ export function PurchaseRequisitionDomainDetailPage({
           />
           <ErpViewField label="Process path" value={prProcurementPathLabel(pr)} />
           <ErpViewField label="Estimated Value" value={formatCurrency(pr.totalAmount)} />
-          <ErpViewField label="Purchase Purpose" value={pr.purpose || '—'} colSpan={3} />
+          <ErpViewField label="Purchase Purpose" value={pr.purpose || '-'} colSpan={3} />
           <ErpViewField
             label="Linked RFQ"
             value={
               linkedRfqNo && pr.convertedRfqId ? (
                 <TableLink to={`/purchase/rfqs/${pr.convertedRfqId}`}>{linkedRfqNo}</TableLink>
               ) : (
-                '—'
+                '-'
               )
             }
           />
@@ -516,7 +514,7 @@ export function PurchaseRequisitionDomainDetailPage({
               linkedPoNo && pr.convertedPoId ? (
                 <TableLink to={`/purchase/orders/${pr.convertedPoId}`}>{linkedPoNo}</TableLink>
               ) : (
-                '—'
+                '-'
               )
             }
           />
@@ -554,7 +552,7 @@ export function PurchaseRequisitionDomainDetailPage({
               }
             />
           ) : (
-            <ErpViewField label="Remarks" value={pr.remarks || '—'} colSpan={3} />
+            <ErpViewField label="Remarks" value={pr.remarks || '-'} colSpan={3} />
           )}
           {pr.status === 'cancelled' ? (
             <div className="col-span-full">

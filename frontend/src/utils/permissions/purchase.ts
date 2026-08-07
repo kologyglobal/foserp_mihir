@@ -5,9 +5,8 @@
  */
 
 import { useMemo } from 'react'
-import { isApiMode } from '../../config/apiConfig'
 import { getStoredSession, type AuthSession } from '../../services/api/client'
-import { getSessionUser, type ErpRole } from './index'
+import { getSessionUser } from './index'
 
 /**
  * Soft-guard only: Tenant Admin / Admin / Administrator / Super Admin open purchase UI
@@ -105,157 +104,6 @@ const PURCHASE_PERMISSION_ALIASES: Record<string, PurchasePermission> = {
   'purchase.quality.inspect': 'purchase.qi.complete',
 }
 
-const ALL = [...PURCHASE_PERMISSIONS]
-
-/** Persona permission packs used by demo RBAC (mapped onto ErpRole below). */
-const REQUESTER: PurchasePermission[] = [
-  'purchase.view',
-  'purchase.dashboard.view',
-  'purchase.pr.view',
-  'purchase.pr.create',
-  'purchase.pr.edit',
-  'purchase.pr.submit',
-]
-
-const DEPARTMENT_MANAGER: PurchasePermission[] = [
-  ...REQUESTER,
-  'purchase.pr.approve',
-  'purchase.pr.reject',
-  'purchase.reports.view',
-]
-
-const PURCHASE_EXECUTIVE: PurchasePermission[] = [
-  'purchase.view',
-  'purchase.dashboard.view',
-  'purchase.pr.view',
-  'purchase.pr.create',
-  'purchase.pr.edit',
-  'purchase.pr.submit',
-  'purchase.planning.view',
-  'purchase.planning.edit',
-  'purchase.planning.assign_buyer',
-  'purchase.planning.select_vendor',
-  'purchase.planning.create_po',
-  'purchase.rfq.view',
-  'purchase.rfq.create',
-  'purchase.rfq.send',
-  'purchase.rfq.enter_quote',
-  'purchase.rfq.compare',
-  'purchase.po.view',
-  'purchase.po.create',
-  'purchase.po.edit',
-  'purchase.grn.view',
-  'purchase.quality.view',
-  'purchase.invoice.view',
-  'purchase.return.view',
-  'purchase.reports.view',
-]
-
-/** Broad purchase ops; setup reserved for Administrator. */
-const PURCHASE_MANAGER: PurchasePermission[] = ALL.filter(
-  (p) => p !== 'purchase.setup.manage' && p !== 'purchase.setup.view',
-)
-
-const STORE_EXECUTIVE: PurchasePermission[] = [
-  'purchase.view',
-  'purchase.dashboard.view',
-  'purchase.po.view',
-  'purchase.grn.view',
-  'purchase.grn.create',
-  'purchase.grn.post',
-  'purchase.quality.view',
-  'purchase.return.view',
-  'purchase.return.create',
-  'purchase.return.post',
-  'purchase.reports.view',
-]
-
-const QUALITY_INSPECTOR: PurchasePermission[] = [
-  'purchase.view',
-  'purchase.dashboard.view',
-  'purchase.grn.view',
-  'purchase.quality.view',
-  'purchase.quality.inspect',
-  'purchase.return.view',
-]
-
-const FINANCE_EXECUTIVE: PurchasePermission[] = [
-  'purchase.view',
-  'purchase.dashboard.view',
-  'purchase.po.view',
-  'purchase.grn.view',
-  'purchase.invoice.view',
-  'purchase.invoice.create',
-  'purchase.invoice.verify',
-  'purchase.return.view',
-  'purchase.reports.view',
-]
-
-const FINANCE_MANAGER: PurchasePermission[] = [
-  ...FINANCE_EXECUTIVE,
-  'purchase.invoice.approve',
-  'purchase.invoice.post',
-]
-
-const MANAGEMENT: PurchasePermission[] = [
-  'purchase.view',
-  'purchase.dashboard.view',
-  'purchase.pr.view',
-  'purchase.pr.approve',
-  'purchase.pr.reject',
-  'purchase.planning.view',
-  'purchase.planning.approve',
-  'purchase.rfq.view',
-  'purchase.rfq.compare',
-  'purchase.rfq.award',
-  'purchase.po.view',
-  'purchase.po.approve',
-  'purchase.po.send',
-  'purchase.po.cancel',
-  'purchase.grn.view',
-  'purchase.quality.view',
-  'purchase.invoice.view',
-  'purchase.invoice.approve',
-  'purchase.return.view',
-  'purchase.reports.view',
-]
-
-/**
- * Demo-mode role → purchase permission map.
- * Api mode uses JWT `user.permissions` instead (see `canPurchasePermission`).
- */
-export const DEMO_PURCHASE_ROLE_PERMISSIONS: Record<ErpRole, PurchasePermission[] | '*'> = {
-  admin: '*',
-  ceo: MANAGEMENT,
-  director: MANAGEMENT,
-  management: MANAGEMENT,
-  engineering_head: DEPARTMENT_MANAGER,
-  planning_manager: DEPARTMENT_MANAGER,
-  planning: DEPARTMENT_MANAGER,
-  engineering: DEPARTMENT_MANAGER,
-  sales_manager: REQUESTER,
-  sales: REQUESTER,
-  purchase_head: PURCHASE_MANAGER,
-  purchase_user: PURCHASE_EXECUTIVE,
-  purchase: PURCHASE_EXECUTIVE,
-  store_manager: STORE_EXECUTIVE,
-  store_user: STORE_EXECUTIVE,
-  stores: STORE_EXECUTIVE,
-  production_head: REQUESTER,
-  production_supervisor: REQUESTER,
-  shop_floor: ['purchase.pr.view'],
-  production: REQUESTER,
-  quality_head: QUALITY_INSPECTOR,
-  quality_inspector: QUALITY_INSPECTOR,
-  quality: QUALITY_INSPECTOR,
-  dispatch_manager: ['purchase.view', 'purchase.dashboard.view', 'purchase.po.view'],
-  dispatch_user: ['purchase.view', 'purchase.po.view'],
-  dispatch: ['purchase.view', 'purchase.dashboard.view', 'purchase.po.view'],
-  accounts_head: FINANCE_MANAGER,
-  accounts_user: FINANCE_EXECUTIVE,
-  accounts: FINANCE_MANAGER,
-}
-
 /** Longest-prefix wins — used by soft route guards and Access Denied labels. */
 export const PURCHASE_ROUTE_VIEW_PERMISSIONS: Array<{
   prefix: string
@@ -302,12 +150,6 @@ export const PURCHASE_NAV_ITEM_PERMISSIONS: Record<string, PurchasePermission> =
   '/purchase/masters': 'purchase.setup.view',
 }
 
-function demoPermissionsForRole(role: ErpRole): Set<string> | '*' {
-  const pack = DEMO_PURCHASE_ROLE_PERMISSIONS[role]
-  if (pack === '*') return '*'
-  return new Set(pack)
-}
-
 function permissionSetIncludes(granted: readonly string[], required: string): boolean {
   if (granted.includes(required)) return true
   for (const g of granted) {
@@ -324,18 +166,10 @@ function permissionSetIncludes(granted: readonly string[], required: string): bo
  * SECURITY: Enforced in the UI as a soft gate — backend must validate the same keys.
  */
 export function canPurchasePermission(permission: PurchasePermission | string): boolean {
-  if (isApiMode()) {
-    const session = getStoredSession()
-    const perms = session?.user.permissions ?? []
-    if (permissionSetIncludes(perms, permission)) return true
-    return hasPurchaseAdminRoleFallback(session)
-  }
-  const pack = demoPermissionsForRole(getSessionUser().role)
-  if (pack === '*') return true
-  if (pack instanceof Set) {
-    return permissionSetIncludes([...pack], permission)
-  }
-  return false
+  const session = getStoredSession()
+  const perms = session?.user.permissions ?? []
+  if (permissionSetIncludes(perms, permission)) return true
+  return hasPurchaseAdminRoleFallback(session)
 }
 
 /** Any purchase view access — controls Purchase shell / sidebar category. */

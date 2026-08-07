@@ -323,13 +323,13 @@ export function CustomerFormPage() {
   const documentStrip = [
     { label: 'Code', value: watched.customerCode?.trim() || 'Auto', highlight: Boolean(watched.customerCode?.trim()) },
     { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
-    { label: 'Company', value: watched.customerName?.trim() || '—', highlight: Boolean(watched.customerName?.trim()) },
+    { label: 'Company', value: watched.customerName?.trim() || '-', highlight: Boolean(watched.customerName?.trim()) },
     { label: 'Type', value: watched.customerType ?? 'corporate' },
     { label: 'Territory', value: watched.salesTerritory ?? 'West' },
-    { label: 'GSTIN', value: watched.gstin?.length === 15 ? watched.gstin : '—', highlight: watched.gstin?.length === 15 },
-    { label: 'Location', value: watched.city && watched.state ? `${watched.city}, ${watched.state}` : '—', highlight: Boolean(watched.city && watched.state) },
+    { label: 'GSTIN', value: watched.gstin?.length === 15 ? watched.gstin : '-', highlight: watched.gstin?.length === 15 },
+    { label: 'Location', value: watched.city && watched.state ? `${watched.city}, ${watched.state}` : '-', highlight: Boolean(watched.city && watched.state) },
     { label: 'Country', value: watched.country?.trim() || DEFAULT_CUSTOMER_COUNTRY, highlight: Boolean(watched.country?.trim()) },
-    { label: 'Credit', value: watched.creditLimit ? `₹${Number(watched.creditLimit).toLocaleString('en-IN')}` : '—' },
+    { label: 'Credit', value: watched.creditLimit ? `₹${Number(watched.creditLimit).toLocaleString('en-IN')}` : '-' },
   ]
 
   const recordAudit = existing ?? {}
@@ -969,7 +969,7 @@ export function CustomerFormPage() {
                   <div className="rounded-lg border border-erp-border/60 bg-erp-surface-alt/40 px-3 py-2 text-[12px] text-erp-muted">
                     <span className="font-medium text-erp-text">Registered:</span>
                     {' '}
-                    {existing?.createdAt ? formatDate(existing.createdAt) : '—'}
+                    {existing?.createdAt ? formatDate(existing.createdAt) : '-'}
                     {existing?.createdByName ? ` · ${existing.createdByName}` : ''}
                     {existing?.modifiedAt ? (
                       <>
@@ -1047,11 +1047,11 @@ export function CustomerDetailPage() {
           <DetailField label="Code" value={<span className="font-mono">{customer.customerCode}</span>} />
           <DetailField label="Type" value={<TypeBadge value={customer.customerType} color="blue" />} />
           <DetailField label="GSTIN" value={customer.gstin} />
-          <DetailField label="PAN" value={customer.pan ?? '—'} />
+          <DetailField label="PAN" value={customer.pan ?? '-'} />
           <DetailField label="Territory" value={customer.salesTerritory} />
           <DetailField label="Country" value={customer.country ?? DEFAULT_CUSTOMER_COUNTRY} />
           <DetailField label="Credit Days" value={`${customer.creditDays} days`} />
-          <DetailField label="Credit Limit" value={customer.creditLimit ? `₹${customer.creditLimit.toLocaleString('en-IN')}` : '—'} />
+          <DetailField label="Credit Limit" value={customer.creditLimit ? `₹${customer.creditLimit.toLocaleString('en-IN')}` : '-'} />
           <DetailField label="Billing" value={formatCustomerBillingAddress(customer)} />
           <DetailField label="Shipping" value={hasCustomShippingAddress(customer) ? resolveCustomerShippingAddress(customer) : 'Same as billing'} />
           <DetailField label="Contact" value={customer.contactPerson} />

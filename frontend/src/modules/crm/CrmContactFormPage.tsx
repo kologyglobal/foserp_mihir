@@ -158,14 +158,14 @@ export function CrmContactFormPage() {
 
   const documentStrip = [
     { label: 'Contact', value: watched.name?.trim() || 'New', highlight: Boolean(watched.name?.trim()) },
-    { label: 'Code', value: watched.contactCode?.trim() || '—', highlight: Boolean(watched.contactCode?.trim()) },
-    { label: 'Company', value: customer?.customerName || '—', highlight: Boolean(customer) },
-    { label: 'Company Code', value: customer?.customerCode || '—' },
-    { label: 'Territory', value: customer?.salesTerritory || '—' },
-    { label: 'Designation', value: watched.designation?.trim() || '—' },
-    { label: 'Department', value: watched.department?.trim() || '—' },
-    { label: 'Phone', value: watched.phone?.trim() || '—' },
-    { label: 'Email', value: watched.email?.trim() || '—' },
+    { label: 'Code', value: watched.contactCode?.trim() || '-', highlight: Boolean(watched.contactCode?.trim()) },
+    { label: 'Company', value: customer?.customerName || '-', highlight: Boolean(customer) },
+    { label: 'Company Code', value: customer?.customerCode || '-' },
+    { label: 'Territory', value: customer?.salesTerritory || '-' },
+    { label: 'Designation', value: watched.designation?.trim() || '-' },
+    { label: 'Department', value: watched.department?.trim() || '-' },
+    { label: 'Phone', value: watched.phone?.trim() || '-' },
+    { label: 'Email', value: watched.email?.trim() || '-' },
   ]
 
   function scrollToSection(sectionId: string) {

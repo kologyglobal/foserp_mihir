@@ -61,7 +61,7 @@ export function CandidateTable({ title, candidates, selected, onToggle, onAmount
                   </td>
                   <td className="px-2 py-1.5 whitespace-nowrap">{formatDate(c.postingDate)}</td>
                   <td className="max-w-[14rem] truncate px-2 py-1.5" title={c.narration ?? undefined}>
-                    {c.partyNameSnapshot ?? c.narration ?? c.referenceNumber ?? '—'}
+                    {c.partyNameSnapshot ?? c.narration ?? c.referenceNumber ?? '-'}
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{formatCurrency(parseDecimal(c.unreconciledAmount))}</td>
                   <td className="px-2 py-1.5 text-right">

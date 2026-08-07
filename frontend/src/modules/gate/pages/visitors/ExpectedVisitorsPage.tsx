@@ -201,7 +201,7 @@ export function ExpectedVisitorsPage() {
                     </td>
                     <td className="font-medium">{row.visitorName}</td>
                     <td className="tabular-nums">{row.mobile}</td>
-                    <td>{row.company ?? '—'}</td>
+                    <td>{row.company ?? '-'}</td>
                     <td>{formatDate(row.visitDate)}</td>
                     <td>{row.expectedArrival}</td>
                     <td>{row.hostName}</td>

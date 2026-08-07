@@ -481,7 +481,7 @@ export function ErpProductPricingPanel({
                             ? (line.productOrItem?.trim() && line.productOrItem !== line.itemCode
                               ? `${line.itemCode} — ${line.productOrItem}`
                               : line.itemCode)
-                            : (line.productOrItem || '—'))}
+                            : (line.productOrItem || '-'))}
                       </p>
                     ) : (
                       <ErpSmartSelect
@@ -528,7 +528,7 @@ export function ErpProductPricingPanel({
                     ) : null}
                   </td>
                   <td className="so-pricing-td tabular-nums text-[12px] text-erp-muted">
-                    {line.hsnCode || item?.hsnCode || '—'}
+                    {line.hsnCode || item?.hsnCode || '-'}
                         {line.taxScheme ? (
                       <div className="text-[10px] uppercase tracking-wide">
                         {line.taxScheme === 'igst' ? 'IGST' : line.taxScheme === 'utgst_pair' ? 'CGST+UTGST' : 'CGST+SGST'}

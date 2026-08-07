@@ -65,7 +65,7 @@ export function EnterpriseDocumentHeader({
                   fact.emphasize && 'ent-ws-doc-header__fact-value--emphasize',
                 )}
               >
-                {fact.value || '—'}
+                {fact.value || '-'}
               </dd>
             </div>
           ))}

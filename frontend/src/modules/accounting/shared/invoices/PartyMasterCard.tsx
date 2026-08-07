@@ -131,16 +131,16 @@ export function PartyMasterCard({
       </div>
       <dl className="mt-1.5 grid gap-1 text-erp-muted sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          GSTIN: <span className="text-erp-text">{master.gstin ?? '—'}</span>
+          GSTIN: <span className="text-erp-text">{master.gstin ?? '-'}</span>
         </div>
         <div>
-          PAN: <span className="text-erp-text">{master.pan ?? '—'}</span>
+          PAN: <span className="text-erp-text">{master.pan ?? '-'}</span>
         </div>
         <div>
-          Location: <span className="text-erp-text">{master.location ?? '—'}</span>
+          Location: <span className="text-erp-text">{master.location ?? '-'}</span>
         </div>
         <div>
-          Terms: <span className="text-erp-text">{master.terms ?? '—'}</span>
+          Terms: <span className="text-erp-text">{master.terms ?? '-'}</span>
         </div>
       </dl>
       {snapshot?.name && snapshot.name !== master.name && (

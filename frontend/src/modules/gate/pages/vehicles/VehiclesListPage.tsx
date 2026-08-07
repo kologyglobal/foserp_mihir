@@ -169,10 +169,10 @@ export function VehiclesListPage({ initialTab }: { initialTab?: string }) {
                     </td>
                     <td>{v.vehicleType}</td>
                     <td className="max-w-[180px] truncate">{v.purpose}</td>
-                    <td className="max-w-[160px] truncate">{v.companyName ?? '—'}</td>
+                    <td className="max-w-[160px] truncate">{v.companyName ?? '-'}</td>
                     <td>{v.driverName}</td>
-                    <td className="whitespace-nowrap">{v.entryTime ? formatDateTime(v.entryTime) : '—'}</td>
-                    <td>{v.currentLocation ?? '—'}</td>
+                    <td className="whitespace-nowrap">{v.entryTime ? formatDateTime(v.entryTime) : '-'}</td>
+                    <td>{v.currentLocation ?? '-'}</td>
                     <td>
                       {v.status === 'exited' ? (
                         <InsideDuration from={v.entryTime} to={v.exitTime} />

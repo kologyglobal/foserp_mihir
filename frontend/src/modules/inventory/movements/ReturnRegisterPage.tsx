@@ -71,7 +71,7 @@ export function ReturnRegisterPage() {
       { accessorKey: 'returnDate', header: 'Date', cell: ({ row }) => formatDate(row.original.returnDate) },
       { accessorKey: 'returnType', header: 'Type', cell: ({ row }) => RETURN_TYPE_LABELS[row.original.returnType] },
       { accessorKey: 'sourceDocumentNo', header: 'Source Document' },
-      { accessorKey: 'partyOrDepartment', header: 'Party / Dept', cell: ({ row }) => row.original.partyOrDepartment ?? '—' },
+      { accessorKey: 'partyOrDepartment', header: 'Party / Dept', cell: ({ row }) => row.original.partyOrDepartment ?? '-' },
       { accessorKey: 'warehouseName', header: 'Warehouse' },
       { accessorKey: 'itemCount', header: 'Items', cell: ({ row }) => formatNumber(row.original.itemCount) },
       { accessorKey: 'returnQty', header: 'Return Qty', cell: ({ row }) => formatNumber(row.original.returnQty) },

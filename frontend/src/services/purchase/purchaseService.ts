@@ -1,16 +1,16 @@
 /**
- * Purchase Module mock service — Promise API ready for future Node/MySQL swap.
+ * Purchase Module mock service — in-memory store that always starts empty.
  *
- * When `VITE_USE_API=true`, this store stays **empty** (no seed documents) so
- * dual-mode pages never mix demo and API data. Demo seed is used only when
- * `VITE_USE_API=false`.
- *
- * Pages should depend on these functions (not Zustand) when migrating to the
- * domain models in `types/purchaseDomain`. Existing store-backed screens are
- * unchanged until explicitly wired.
+ * The live app (frontend/src/services/purchase/purchaseApiFacade.ts) no longer
+ * reads from this file. A handful of functions here are still used directly by
+ * `PurchaseOrderEditorPage`/`PurchasePlanningCreatePoModal` and by the standalone
+ * smoke scripts under `frontend/scripts/smoke-purchase-*.ts` — those are kept.
  */
-import { isApiMode } from '../../config/apiConfig'
 import { evaluateGrnLineTolerance } from './grnTolerance'
+import {
+  billableGrnVendorQtyForInvoiceMatch,
+  pctDiff,
+} from '../../utils/purchaseInvoiceMatching'
 import type {
   GoodsReceiptLine,
   GoodsReceiptNote,
@@ -119,20 +119,7 @@ import {
   PURCHASE_DEMO_LOCATION,
   PURCHASE_DOMAIN_ACTORS,
   PURCHASE_DOMAIN_APPROVAL_HISTORY,
-  PURCHASE_DOMAIN_APPROVALS,
   PURCHASE_DOMAIN_ATTACHMENTS,
-  PURCHASE_DOMAIN_BLANKET_ORDERS,
-  PURCHASE_DOMAIN_COMPARISONS,
-  PURCHASE_DOMAIN_GRNS,
-  PURCHASE_DOMAIN_INVOICES,
-  PURCHASE_DOMAIN_ITEMS,
-  PURCHASE_DOMAIN_ORDERS,
-  PURCHASE_DOMAIN_QUALITY,
-  PURCHASE_DOMAIN_REQUISITIONS,
-  PURCHASE_DOMAIN_RETURNS,
-  PURCHASE_DOMAIN_RFQS,
-  PURCHASE_DOMAIN_VENDOR_QUOTATIONS,
-  PURCHASE_DOMAIN_VENDORS,
 } from '../../data/purchase/purchaseDomainSeed'
 import { DEFAULT_PURCHASE_SETUP } from '../../data/purchase/purchaseSetupSeed'
 import { determinePurchaseGstSupply } from '../../utils/gstSupply'
@@ -263,47 +250,12 @@ function emptyApiModeState(): PurchaseMockState {
 }
 
 function cloneSeed(): PurchaseMockState {
-  // Never hydrate demo documents when the app is talking to the real API.
-  if (isApiMode()) return emptyApiModeState()
-  return {
-    vendors: structuredClone(PURCHASE_DOMAIN_VENDORS),
-    items: structuredClone(PURCHASE_DOMAIN_ITEMS),
-    requisitions: structuredClone(PURCHASE_DOMAIN_REQUISITIONS),
-    planningSheet: [],
-    approvals: structuredClone(PURCHASE_DOMAIN_APPROVALS),
-    approvalHistory: structuredClone(PURCHASE_DOMAIN_APPROVAL_HISTORY),
-    attachments: structuredClone(PURCHASE_DOMAIN_ATTACHMENTS),
-    rfqs: structuredClone(PURCHASE_DOMAIN_RFQS),
-    vendorQuotations: structuredClone(PURCHASE_DOMAIN_VENDOR_QUOTATIONS),
-    comparisons: structuredClone(PURCHASE_DOMAIN_COMPARISONS),
-    blanketOrders: structuredClone(PURCHASE_DOMAIN_BLANKET_ORDERS),
-    orders: structuredClone(PURCHASE_DOMAIN_ORDERS),
-    grns: structuredClone(PURCHASE_DOMAIN_GRNS),
-    qualityInspections: structuredClone(PURCHASE_DOMAIN_QUALITY),
-    invoices: structuredClone(PURCHASE_DOMAIN_INVOICES),
-    returns: structuredClone(PURCHASE_DOMAIN_RETURNS),
-    setup: structuredClone(DEFAULT_PURCHASE_SETUP),
-    seq: {
-      pr: 1004,
-      rfq: 2003,
-      vq: 4003,
-      cmp: 3002,
-      po: 5004,
-      grn: 6003,
-      qi: 6103,
-      inv: 7003,
-      ret: 8003,
-      appr: 20,
-      dn: 9002,
-      pps: 100,
-    },
-  }
+  // This in-memory store backs only the handful of not-yet-live-wired helpers below;
+  // it never hydrates demo documents.
+  return emptyApiModeState()
 }
 
 let state = cloneSeed()
-if (!isApiMode()) {
-  seedPlanningSheetFromApprovedDirectPrs()
-}
 
 function delay(ms = LATENCY_MS): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -411,12 +363,6 @@ function syncPlanningSheetFromPr(pr: PurchaseRequisition): void {
     if (exists) continue
     if (!line.itemId && !line.itemCode.trim() && !line.itemName.trim()) continue
     state.planningSheet.unshift(buildPlanningRowFromPrLine(pr, line))
-  }
-}
-
-function seedPlanningSheetFromApprovedDirectPrs(): void {
-  for (const pr of state.requisitions) {
-    syncPlanningSheetFromPr(pr)
   }
 }
 
@@ -971,7 +917,7 @@ function toPurchaseOrderListRow(po: PurchaseOrder): PurchaseOrderListRow {
     vendorName: po.vendor.name,
     vendorGstin: po.vendor.gstin,
     locationName: po.purchaseLocation?.name ?? po.location.name,
-    createdByName: po.createdBy || '—',
+    createdByName: po.createdBy || '-',
     currency: po.currency,
     expectedDeliveryDate: po.expectedDeliveryDate,
     basicAmount: po.subtotal,
@@ -1018,13 +964,10 @@ function assertPoRevisable(po: PurchaseOrder) {
 /* Public API                                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** Reset mock DB to seed (tests / story demos). */
+/** Reset mock DB to seed (tests). */
 export async function resetPurchaseMockData(): Promise<void> {
   await delay(0)
   state = cloneSeed()
-  if (!isApiMode()) {
-    seedPlanningSheetFromApprovedDirectPrs()
-  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -4833,6 +4776,8 @@ function toQiListRow(q: QualityInspection): QualityInspectionListRow {
     batchLotNo: q.batchLotNo,
     receivedQty: q.receivedQty,
     sampleQty: q.sampleQty,
+    acceptedQty: q.acceptedQty,
+    rejectedQty: q.rejectedQty,
     inspectorName: q.inspector.name,
     status: q.status,
     statusLabel: QUALITY_INSPECTION_STATUS_LABELS[q.status],
@@ -5509,11 +5454,6 @@ function applyInvoiceTotals(lines: PurchaseInvoiceLine[], vendor: Vendor, freigh
   }
 }
 
-function pctDiff(a: number, b: number): number {
-  if (b === 0) return a === 0 ? 0 : 100
-  return (Math.abs(a - b) / Math.abs(b)) * 100
-}
-
 function computeMatchingForInvoice(inv: PurchaseInvoice): InvoiceMatchingResult {
   const tolerances: PurchaseInvoiceMatchTolerances = {
     ...state.setup.invoiceMatchTolerances,
@@ -5543,7 +5483,18 @@ function computeMatchingForInvoice(inv: PurchaseInvoice): InvoiceMatchingResult 
       : grn?.lines.find((l) => l.itemId === line.itemId)
 
     const poQty = poLine?.quantity ?? null
-    const grnQty = grnLine?.receivedQty ?? null
+    const grnReceivedQty = grnLine?.receivedQty ?? null
+    const grnBillableQty = grnLine
+      ? billableGrnVendorQtyForInvoiceMatch({
+          receivedQty: grnLine.receivedQty,
+          receivedUomQty: grnLine.receivedUomQty,
+          acceptedQty: grnLine.acceptedQty,
+          acceptedUomQty: grnLine.acceptedUomQty,
+          rejectedQty: grnLine.rejectedQty,
+          rejectedUomQty: grnLine.rejectedUomQty,
+          uomConversionFactor: grnLine.uomConversionFactor,
+        })
+      : null
     const poRate = poLine?.rate ?? null
     const poTaxPct = poLine?.gstRatePct ?? null
     const poLineTotal = poLine?.lineTotal ?? null
@@ -5551,7 +5502,7 @@ function computeMatchingForInvoice(inv: PurchaseInvoice): InvoiceMatchingResult 
     const flags: InvoiceMatchingResultStatus[] = []
     let withinTolerance = true
 
-    const refQty = grnQty ?? poQty
+    const refQty = grnBillableQty ?? poQty
     if (refQty != null) {
       const qtyDeltaPct = pctDiff(line.quantity, refQty)
       if (qtyDeltaPct > tolerances.quantityTolerancePct) {
@@ -5600,7 +5551,8 @@ function computeMatchingForInvoice(inv: PurchaseInvoice): InvoiceMatchingResult 
       itemCode: line.itemCode,
       itemName: line.itemName,
       poQty,
-      grnReceivedQty: grnQty,
+      grnReceivedQty,
+      grnBillableQty,
       invoiceQty: line.quantity,
       poRate,
       invoiceRate: line.rate,
@@ -5615,7 +5567,10 @@ function computeMatchingForInvoice(inv: PurchaseInvoice): InvoiceMatchingResult 
 
   const summary = {
     poQty: lineResults.reduce((s, l) => s + (l.poQty ?? 0), 0),
-    grnQty: lineResults.reduce((s, l) => s + (l.grnReceivedQty ?? 0), 0),
+    grnQty: lineResults.reduce(
+      (s, l) => s + (l.grnBillableQty ?? l.grnReceivedQty ?? 0),
+      0,
+    ),
     invoiceQty: lineResults.reduce((s, l) => s + l.invoiceQty, 0),
     poTotal: po?.totalAmount ?? 0,
     invoiceTotal: inv.totalAmount,

@@ -99,7 +99,7 @@ export function HolidayListPage() {
                   <td className="font-medium text-erp-primary">{c.code}</td>
                   <td>{c.name}</td>
                   <td>{c.year}</td>
-                  <td>{c.legalEntity?.displayName ?? '—'}</td>
+                  <td>{c.legalEntity?.displayName ?? '-'}</td>
                   <td>{c.branch?.name ?? 'All branches'}</td>
                   <td>{c.days?.length ?? 0}</td>
                 </tr>

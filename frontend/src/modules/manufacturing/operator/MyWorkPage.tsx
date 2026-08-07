@@ -133,7 +133,7 @@ export function MyWorkPage() {
             <OperatorTaskCard
               key={assignment.id}
               assignment={assignment}
-              productLabel={productByWo[assignment.productionOrderId] ?? '—'}
+              productLabel={productByWo[assignment.productionOrderId] ?? '-'}
               busy={busy}
               onAccept={() => void runAction(() => acceptAssignment(assignment.id), 'Assignment accepted')}
               onStart={() => void runAction(() => startAssignment(assignment.id), 'Work started')}

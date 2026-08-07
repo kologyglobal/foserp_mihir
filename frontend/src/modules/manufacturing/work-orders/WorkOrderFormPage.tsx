@@ -447,7 +447,7 @@ export function WorkOrderFormPage() {
     },
     {
       label: 'Expected production cost',
-      value: estimatedCost > 0 ? formatCurrency(estimatedCost) : '—',
+      value: estimatedCost > 0 ? formatCurrency(estimatedCost) : '-',
       ok: estimatedCost > 0,
     },
   ]), [autoConsumption, bomNumber, bomVersion, estimatedCost, materialReady, previewMaterials, previewRoute, qualityRequired])
@@ -671,7 +671,7 @@ export function WorkOrderFormPage() {
               <dl className="mb-3 grid gap-2 text-[13px] sm:grid-cols-3">
                 <div>
                   <dt className="text-erp-muted">BOM (auto)</dt>
-                  <dd className="font-semibold text-erp-text">{bomNumber || '—'} {bomVersion}</dd>
+                  <dd className="font-semibold text-erp-text">{bomNumber || '-'} {bomVersion}</dd>
                 </div>
                 <div>
                   <dt className="text-erp-muted">Production Method</dt>
@@ -822,10 +822,10 @@ export function WorkOrderFormPage() {
                             <td className="font-semibold">{op.operationName}</td>
                             <td>{op.workCenter}</td>
                             <td className="tabular-nums">{op.plannedTimeMinutes} min</td>
-                            <td>{op.qcRequired ? 'Yes' : '—'}</td>
-                            <td>{op.jobWorkRequired ? 'Yes' : '—'}</td>
-                            <td>{op.defaultVendorName || '—'}</td>
-                            <td className="text-erp-muted">{op.remarks || '—'}</td>
+                            <td>{op.qcRequired ? 'Yes' : '-'}</td>
+                            <td>{op.jobWorkRequired ? 'Yes' : '-'}</td>
+                            <td>{op.defaultVendorName || '-'}</td>
+                            <td className="text-erp-muted">{op.remarks || '-'}</td>
                           </tr>
                         ))}
                     </tbody>

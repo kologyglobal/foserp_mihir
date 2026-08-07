@@ -159,7 +159,7 @@ export function CorrectionsRegisterPage() {
               {row.original.productionOrderNumber ?? row.original.productionOrderId.slice(0, 8)}
             </TableLink>
           ) : (
-            <span className="text-erp-muted">—</span>
+            <span className="text-erp-muted">-</span>
           ),
       },
       {
@@ -181,7 +181,7 @@ export function CorrectionsRegisterPage() {
         header: 'Reason',
         cell: ({ row }) => (
           <span className="max-w-[240px] truncate text-[12px]" title={row.original.reason}>
-            {row.original.reason || '—'}
+            {row.original.reason || '-'}
           </span>
         ),
       },
@@ -190,7 +190,7 @@ export function CorrectionsRegisterPage() {
         header: 'Requested',
         cell: ({ row }) => (
           <span className="whitespace-nowrap text-[12px] text-erp-muted">
-            {row.original.requestedAt ? formatDateTime(row.original.requestedAt) : '—'}
+            {row.original.requestedAt ? formatDateTime(row.original.requestedAt) : '-'}
           </span>
         ),
       },

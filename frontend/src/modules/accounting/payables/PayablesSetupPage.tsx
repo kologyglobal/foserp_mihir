@@ -830,7 +830,7 @@ export function PayablesSetupPage() {
 
           {setup.lastUpdatedAt ? (
             <p className="text-[11px] text-erp-muted">
-              Last updated by {setup.lastUpdatedBy ?? '—'} · {setup.lastUpdatedAt}
+              Last updated by {setup.lastUpdatedBy ?? '-'} · {setup.lastUpdatedAt}
             </p>
           ) : null}
         </div>

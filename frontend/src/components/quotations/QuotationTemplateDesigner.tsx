@@ -451,7 +451,7 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
       <div className="quo-template-workspace">
         <EnterpriseDocumentStrip
           fields={[
-            { label: 'Product family', value: meta.productFamily || '—' },
+            { label: 'Product family', value: meta.productFamily || '-' },
             { label: 'Sections', value: String(sorted.length), highlight: true },
             { label: 'Spec tables', value: String(specTableCount) },
             { label: 'Page size', value: printLayout.pageSize },

@@ -116,8 +116,8 @@ function ShopfloorWoCard({
 }) {
   const status = statusOf(wo)
   const progress = progressOf(wo)
-  const planned = wo.plannedQty ?? '—'
-  const completed = wo.completedQty ?? '—'
+  const planned = wo.plannedQty ?? '-'
+  const completed = wo.completedQty ?? '-'
 
   return (
     <button
@@ -131,8 +131,8 @@ function ShopfloorWoCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-[14px] font-semibold text-erp-primary">{wo.orderNumber || '—'}</p>
-          <p className="mt-0.5 truncate font-mono text-[11px] font-medium text-erp-text">{wo.itemCode ?? '—'}</p>
+          <p className="truncate text-[14px] font-semibold text-erp-primary">{wo.orderNumber || '-'}</p>
+          <p className="mt-0.5 truncate font-mono text-[11px] font-medium text-erp-text">{wo.itemCode ?? '-'}</p>
           <p className="mt-0.5 line-clamp-1 text-[11px] text-erp-muted">{wo.itemName || 'No item name'}</p>
         </div>
         <ShopfloorStatusChip status={status as never} />
@@ -160,14 +160,14 @@ function ShopfloorWoCard({
             <Factory className="h-3 w-3 shrink-0" aria-hidden />
             Work centre
           </dt>
-          <dd className="truncate font-medium text-erp-text">{wo.workCentreName ?? '—'}</dd>
+          <dd className="truncate font-medium text-erp-text">{wo.workCentreName ?? '-'}</dd>
         </div>
         <div className="min-w-0">
           <dt className="flex items-center gap-1 text-erp-muted">
             <UserRound className="h-3 w-3 shrink-0" aria-hidden />
             Operator
           </dt>
-          <dd className="truncate font-medium text-erp-text">{wo.operatorName ?? '—'}</dd>
+          <dd className="truncate font-medium text-erp-text">{wo.operatorName ?? '-'}</dd>
         </div>
         <div>
           <dt className="text-erp-muted">Planned</dt>
@@ -326,7 +326,7 @@ export function ShopfloorLivePage() {
             to={`/manufacturing/work-orders/${row.original.id}`}
             className="font-mono font-semibold"
           >
-            {row.original.orderNumber || '—'}
+            {row.original.orderNumber || '-'}
           </TableLink>
         ),
       },
@@ -336,9 +336,9 @@ export function ShopfloorLivePage() {
         cell: ({ row }) => (
           <div className="min-w-0 max-w-[220px]">
             <p className="truncate font-mono text-[12px] font-medium text-erp-text">
-              {row.original.itemCode ?? '—'}
+              {row.original.itemCode ?? '-'}
             </p>
-            <p className="truncate text-[11px] text-erp-muted">{row.original.itemName || '—'}</p>
+            <p className="truncate text-[11px] text-erp-muted">{row.original.itemName || '-'}</p>
           </div>
         ),
       },
@@ -351,7 +351,7 @@ export function ShopfloorLivePage() {
           return (
             <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-erp-text">
               <span className={cn('h-2 w-2 shrink-0 rounded-full', lane?.barClass)} aria-hidden />
-              {lane?.title ?? '—'}
+              {lane?.title ?? '-'}
             </span>
           )
         },
@@ -389,21 +389,21 @@ export function ShopfloorLivePage() {
         id: 'workCentre',
         header: 'Work centre',
         cell: ({ row }) => (
-          <span className="text-[12px] text-erp-text">{row.original.workCentreName ?? '—'}</span>
+          <span className="text-[12px] text-erp-text">{row.original.workCentreName ?? '-'}</span>
         ),
       },
       {
         id: 'operator',
         header: 'Operator',
         cell: ({ row }) => (
-          <span className="text-[12px] text-erp-text">{row.original.operatorName ?? '—'}</span>
+          <span className="text-[12px] text-erp-text">{row.original.operatorName ?? '-'}</span>
         ),
       },
       {
         id: 'machine',
         header: 'Machine',
         cell: ({ row }) => (
-          <span className="text-[12px] text-erp-text">{row.original.machineName ?? '—'}</span>
+          <span className="text-[12px] text-erp-text">{row.original.machineName ?? '-'}</span>
         ),
       },
       {
@@ -411,7 +411,7 @@ export function ShopfloorLivePage() {
         header: 'Qty',
         cell: ({ row }) => (
           <span className="tabular-nums text-[12px] text-erp-text">
-            {row.original.completedQty ?? 0} / {row.original.plannedQty ?? '—'}
+            {row.original.completedQty ?? 0} / {row.original.plannedQty ?? '-'}
           </span>
         ),
       },
@@ -420,7 +420,7 @@ export function ShopfloorLivePage() {
         header: 'Due',
         cell: ({ row }) => (
           <span className="tabular-nums text-[12px] text-erp-text">
-            {row.original.dueDate ? String(row.original.dueDate).slice(0, 10) : '—'}
+            {row.original.dueDate ? String(row.original.dueDate).slice(0, 10) : '-'}
           </span>
         ),
       },

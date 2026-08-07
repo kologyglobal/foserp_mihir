@@ -265,10 +265,10 @@ export function getEntityApprovalSummary(
     return { request, pendingLabel: null }
   }
   if (request.status === 'rejected') {
-    return { request, pendingLabel: `Rejected: ${request.rejectionReason ?? '—'}` }
+    return { request, pendingLabel: `Rejected: ${request.rejectionReason ?? '-'}` }
   }
   if (request.status === 'returned') {
-    return { request, pendingLabel: `Returned: ${request.rejectionReason ?? '—'}` }
+    return { request, pendingLabel: `Returned: ${request.rejectionReason ?? '-'}` }
   }
   return { request, pendingLabel: step ? `${step.approverLabel} (${step.ruleLabel})` : null }
 }

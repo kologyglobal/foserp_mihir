@@ -107,8 +107,8 @@ export function VendorListPage() {
                   </td>
                   <td className="py-2 pr-2 text-right tabular-nums">{r.openItemCount}</td>
                   <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(parseDecimal(r.outstandingAmount))}</td>
-                  <td className="py-2 pr-2 tabular-nums">{r.oldestDueDate ?? '—'}</td>
-                  <td className="py-2 pr-2 text-right tabular-nums">{r.maxDaysOverdue ?? '—'}</td>
+                  <td className="py-2 pr-2 tabular-nums">{r.oldestDueDate ?? '-'}</td>
+                  <td className="py-2 pr-2 text-right tabular-nums">{r.maxDaysOverdue ?? '-'}</td>
                 </tr>
               ))}
             </tbody>

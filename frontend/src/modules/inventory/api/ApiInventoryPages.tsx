@@ -15,6 +15,11 @@ import { SearchInput } from '../../../components/ui/SearchInput'
 import { LoadingState } from '../../../design-system/components/LoadingState'
 import { FormField } from '../../../components/forms/FormField'
 import { Input, Select, Textarea } from '../../../components/forms/Inputs'
+import {
+  ErpCardFormPage,
+  ErpCardSection,
+  ErpStickySaveBar,
+} from '../../../components/erp/card-form'
 import { notify } from '../../../store/toastStore'
 import { appPromptNote } from '../../../store/confirmDialogStore'
 import { fetchLookup } from '../../../services/api/masterApi'
@@ -690,7 +695,7 @@ export function ApiReservationsPage() {
                             Cancel
                           </button>
                         ) : (
-                          <span className="text-erp-muted">—</span>
+                          <span className="text-erp-muted">-</span>
                         )}
                       </td>
                     </tr>
@@ -718,6 +723,8 @@ const MOVEMENT_CONFIG: Record<
     postFn: typeof postOpeningStock
     showRate: boolean
     signed: boolean
+    path: string
+    cancelTo: string
   }
 > = {
   opening: {
@@ -726,6 +733,8 @@ const MOVEMENT_CONFIG: Record<
     postFn: postOpeningStock,
     showRate: true,
     signed: false,
+    path: '/inventory/opening-stock',
+    cancelTo: '/inventory',
   },
   inward: {
     title: 'Material Inward',
@@ -733,6 +742,8 @@ const MOVEMENT_CONFIG: Record<
     postFn: postInwardStock,
     showRate: true,
     signed: false,
+    path: '/inventory/inward',
+    cancelTo: '/inventory',
   },
   issue: {
     title: 'Material Issue',
@@ -740,6 +751,8 @@ const MOVEMENT_CONFIG: Record<
     postFn: postIssueStock,
     showRate: false,
     signed: false,
+    path: '/inventory/issue',
+    cancelTo: '/inventory',
   },
   adjustment: {
     title: 'Stock Adjustment',
@@ -747,6 +760,8 @@ const MOVEMENT_CONFIG: Record<
     postFn: postStockAdjustment,
     showRate: false,
     signed: true,
+    path: '/inventory/adjustment',
+    cancelTo: '/inventory',
   },
 }
 
@@ -824,16 +839,33 @@ export function ApiMovementPostPage({ kind }: { kind: MovementKind }) {
   if (!allowed) return <AccessDenied title={cfg.title} />
 
   return (
-    <div className="erp-page">
-      <PageHeader
-        title={cfg.title}
-        description={cfg.description}
-        breadcrumbs={[{ label: 'Store' }, { label: cfg.title }]}
-      />
-
+    <ErpCardFormPage
+      variant="dynamics"
+      badge="Store"
+      title={cfg.title}
+      description={cfg.description}
+      favoritePath={cfg.path}
+      backLink={{ to: cfg.cancelTo, label: 'Back to Store' }}
+      breadcrumbs={[
+        { label: 'Store', to: '/inventory' },
+        { label: cfg.title },
+      ]}
+      stickyFooter
+      footer={(
+        <ErpStickySaveBar
+          sticky
+          submitLabel="Save"
+          isSubmitting={busy}
+          onSave={() => void submit()}
+          cancelTo={cfg.cancelTo}
+          cancelLabel="Cancel"
+        />
+      )}
+      onSaveShortcut={() => void submit()}
+    >
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SectionCard title="Movement">
+          <ErpCardSection title="Movement">
             <div className="grid gap-3 sm:grid-cols-2">
               <FormField label="Item" required>
                 <Select value={form.itemId} onChange={(e) => setForm((f) => ({ ...f, itemId: e.target.value }))}>
@@ -859,7 +891,7 @@ export function ApiMovementPostPage({ kind }: { kind: MovementKind }) {
                   onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
                 />
               </FormField>
-              {cfg.showRate && (
+              {cfg.showRate ? (
                 <FormField label="Rate (₹, optional)">
                   <Input
                     type="number"
@@ -869,7 +901,7 @@ export function ApiMovementPostPage({ kind }: { kind: MovementKind }) {
                     onChange={(e) => setForm((f) => ({ ...f, rate: e.target.value }))}
                   />
                 </FormField>
-              )}
+              ) : null}
               <FormField label="Movement Date">
                 <Input
                   type="date"
@@ -884,16 +916,11 @@ export function ApiMovementPostPage({ kind }: { kind: MovementKind }) {
                 <Textarea rows={2} value={form.remarks} onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))} />
               </FormField>
             </div>
-            <div className="mt-3 flex justify-end">
-              <Button disabled={busy} onClick={() => void submit()}>
-                {busy ? 'Posting…' : `Post ${cfg.title}`}
-              </Button>
-            </div>
-          </SectionCard>
+          </ErpCardSection>
         </div>
 
-        <div className="space-y-3">
-          <SectionCard title="Current Position">
+        <div className="space-y-4">
+          <ErpCardSection title="Current Position">
             {position ? (
               <dl className="space-y-1 text-[13px]">
                 <div className="flex justify-between"><dt className="text-erp-muted">On hand</dt><dd className="tabular-nums font-semibold">{fmtQty(position.onHandQty)}</dd></div>
@@ -903,9 +930,9 @@ export function ApiMovementPostPage({ kind }: { kind: MovementKind }) {
             ) : (
               <p className="text-[12px] text-erp-muted">Select an item and warehouse to see the live position.</p>
             )}
-          </SectionCard>
-          {lastMovement && (
-            <SectionCard title="Last Posted">
+          </ErpCardSection>
+          {lastMovement ? (
+            <ErpCardSection title="Last Posted">
               <p className="text-[13px]">
                 <span className="font-mono">{lastMovement.movementNumber}</span> · {fmtQty(lastMovement.quantity)} on{' '}
                 {formatDate(lastMovement.movementDate)}
@@ -913,11 +940,11 @@ export function ApiMovementPostPage({ kind }: { kind: MovementKind }) {
               <Link to="/inventory/ledger" className="mt-1 inline-block text-[12px] font-semibold text-erp-primary hover:underline">
                 Open Stock Ledger →
               </Link>
-            </SectionCard>
-          )}
+            </ErpCardSection>
+          ) : null}
         </div>
       </div>
-    </div>
+    </ErpCardFormPage>
   )
 }
 
@@ -1223,7 +1250,7 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
                 {rows.map((row) => (
                   <tr key={row.id}>
                     <td className="font-mono">{cfg.number(row)}</td>
-                    <td>{cfg.date(row) ? formatDate(cfg.date(row)!) : '—'}</td>
+                    <td>{cfg.date(row) ? formatDate(cfg.date(row)!) : '-'}</td>
                     <td>{row.status}</td>
                     <td className="text-right tabular-nums">{row.lines?.length ?? 0}</td>
                     <td className="text-right space-x-2">
@@ -1243,7 +1270,7 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
                       ) : null}
                       {!cfg.postable.includes(row.status)
                         && !(kind === 'transfers' && ['DRAFT', 'SUBMITTED', 'IN_TRANSIT', 'PARTIALLY_RECEIVED'].includes(row.status))
-                        ? <span className="text-erp-muted">—</span>
+                        ? <span className="text-erp-muted">-</span>
                         : null}
                     </td>
                   </tr>

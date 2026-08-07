@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { listPutAwayQueue, type PutAwayCard } from '@/services/inventory/putAwayService'
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
-import { isApiMode } from '@/config/apiConfig'
+import { cn } from '@/utils/cn'
 
 function PutAwayCardView({
   card,
@@ -23,7 +23,9 @@ function PutAwayCardView({
   return (
     <div className={isReady ? 'store-action-card' : 'store-action-card store-action-card--warning'}>
       <div className="store-action-card__top">
-        <span className="store-action-card__severity">{isReady ? 'PUT AWAY' : 'POST STOCK'}</span>
+        <span className={cn('inv-hub-badge', isReady ? 'inv-hub-badge--info' : 'inv-hub-badge--warning')}>
+          {isReady ? 'PUT AWAY' : 'POST STOCK'}
+        </span>
         <span className="store-action-card__domain">{card.status}</span>
       </div>
       <div className="store-action-card__title font-mono">{card.grnNumber}</div>
@@ -126,7 +128,6 @@ export function PutAwayWorkbenchPage() {
       badge="Store"
       title="Put Away"
       description="Complete GRN stock post first, then move to storage with the transfer/scan engine. No second put-away ledger."
-      backLink={{ to: '/inventory', label: 'Store Dashboard' }}
       breadcrumbs={[
         { label: 'Store', to: '/inventory' },
         { label: 'Put Away' },
@@ -144,16 +145,8 @@ export function PutAwayWorkbenchPage() {
             onClick: () => setToken((n) => n + 1),
           }}
           secondaryActions={[
-            {
-              id: 'transfer',
-              label: 'New transfer',
-              onClick: () => navigate('/inventory/movements/transfers?create=1'),
-            },
-            {
-              id: 'scan',
-              label: 'Scan transfer',
-              onClick: () => navigate('/inventory/scan/transfer'),
-            },
+            { id: 'transfer', label: 'New transfer', onClick: () => navigate('/inventory/movements/transfers?create=1') },
+            { id: 'scan', label: 'Scan transfer', icon: ScanLine, onClick: () => navigate('/inventory/scan/transfer') },
           ]}
         />
       )}
@@ -161,7 +154,6 @@ export function PutAwayWorkbenchPage() {
       <p className="mb-3 text-[12px] text-erp-muted">
         Flow: <strong>GRN post</strong> (inventory ledger) → <strong>Transfer / scan</strong> into storage bin.
         Serials and bins stay on the GRN/transfer documents.
-        {!isApiMode() ? ' Demo GRNs appear when purchase demo data is loaded.' : ''}
       </p>
 
       {loading ? <LoadingState variant="dashboard" /> : null}

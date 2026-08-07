@@ -190,7 +190,7 @@ function Field({ label, value, children }: { label: string; value?: string; chil
   return (
     <div>
       <dt className="text-erp-muted">{label}</dt>
-      <dd className="font-medium text-erp-text">{children ?? value ?? '—'}</dd>
+      <dd className="font-medium text-erp-text">{children ?? value ?? '-'}</dd>
     </div>
   )
 }

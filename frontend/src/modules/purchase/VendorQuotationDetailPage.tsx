@@ -13,6 +13,7 @@ import {
   Truck,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { PurchaseStockDualQtyCell } from '@/components/purchase/PurchaseStockDualQtyCell'
 import { PurchaseTaxTotalsPanel } from '@/components/purchase/PurchaseTaxTotalsPanel'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import {
@@ -76,7 +77,9 @@ function LineExpandRow({ line }: { line: VendorQuotationLine }) {
             </p>
           ) : null}
         </td>
-        <td className="num tabular-nums">{line.quantity}</td>
+        <td className="num">
+          <PurchaseStockDualQtyCell baseQty={line.quantity} itemId={line.itemId} bareWhenSingle />
+        </td>
         <td>{line.uom}</td>
         <td className="num tabular-nums">{formatCurrency(line.rate)}</td>
         <td className="num tabular-nums">{line.discountPct}%</td>
@@ -103,7 +106,7 @@ function LineExpandRow({ line }: { line: VendorQuotationLine }) {
             <div className="grid gap-x-4 gap-y-2 text-[12px] sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-erp-muted">HSN</p>
-                <p className="font-mono">{line.hsnCode || '—'}</p>
+                <p className="font-mono">{line.hsnCode || '-'}</p>
               </div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-erp-muted">
@@ -154,7 +157,7 @@ function LineExpandRow({ line }: { line: VendorQuotationLine }) {
                   Promised
                 </p>
                 <p>
-                  {line.promisedDeliveryDate ? formatDate(line.promisedDeliveryDate) : '—'}
+                  {line.promisedDeliveryDate ? formatDate(line.promisedDeliveryDate) : '-'}
                 </p>
               </div>
               <div>
@@ -167,13 +170,13 @@ function LineExpandRow({ line }: { line: VendorQuotationLine }) {
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-erp-muted">
                   Make / brand
                 </p>
-                <p>{line.makeBrand || '—'}</p>
+                <p>{line.makeBrand || '-'}</p>
               </div>
               <div className="sm:col-span-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-erp-muted">
                   Remarks
                 </p>
-                <p>{line.remarks || '—'}</p>
+                <p>{line.remarks || '-'}</p>
               </div>
             </div>
           </td>
@@ -395,8 +398,8 @@ export function VendorQuotationDetailPage() {
           </Link>
         </ErpViewField>
         <ErpViewField label="Vendor Code" value={quote.vendor.code} />
-        <ErpViewField label="Vendor GSTIN" value={quote.vendor.gstin || '—'} />
-        <ErpViewField label="Vendor Reference" value={quote.vendorReferenceNumber || '—'} />
+        <ErpViewField label="Vendor GSTIN" value={quote.vendor.gstin || '-'} />
+        <ErpViewField label="Vendor Reference" value={quote.vendorReferenceNumber || '-'} />
         <ErpViewField label="Currency" value={quote.currency} />
         <ErpViewField
           label="GST Scheme"
@@ -417,12 +420,12 @@ export function VendorQuotationDetailPage() {
       >
         <ErpViewField label="Payment Terms" value={quote.paymentTerms} />
         <ErpViewField label="Delivery Terms" value={quote.deliveryTerms} />
-        <ErpViewField label="Freight Terms" value={quote.freightTerms || '—'} />
-        <ErpViewField label="Warranty" value={quote.warranty || '—'} />
+        <ErpViewField label="Freight Terms" value={quote.freightTerms || '-'} />
+        <ErpViewField label="Warranty" value={quote.warranty || '-'} />
         <ErpViewField
           label="Expected Delivery"
           value={
-            quote.expectedDeliveryDate ? formatDate(quote.expectedDeliveryDate) : '—'
+            quote.expectedDeliveryDate ? formatDate(quote.expectedDeliveryDate) : '-'
           }
         />
         {quote.remarks ? (

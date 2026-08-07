@@ -106,11 +106,11 @@ export function buildCompanyAiInsight(input: CompanySmartOverviewInput): string 
 
 export function buildCompanyKeyDetails(input: CompanySmartOverviewInput): CrmSmartKeyDetail[] {
   const parts = [input.city.trim(), input.state.trim()].filter(Boolean)
-  const location = parts.length > 0 ? parts.join(', ') : '—'
+  const location = parts.length > 0 ? parts.join(', ') : '-'
   return [
-    { label: 'Code', value: input.customerCode.trim() || '—', muted: !input.customerCode.trim() },
-    { label: 'Type', value: input.customerType || '—' },
-    { label: 'Location', value: location, muted: location === '—' },
+    { label: 'Code', value: input.customerCode.trim() || '-', muted: !input.customerCode.trim() },
+    { label: 'Type', value: input.customerType || '-' },
+    { label: 'Location', value: location, muted: location === '-' },
     {
       label: 'Credit',
       value: input.creditLimit > 0
@@ -137,6 +137,6 @@ export function companyContextLine(input: CompanySmartOverviewInput): string {
   const type = input.customerType
     ? input.customerType.charAt(0).toUpperCase() + input.customerType.slice(1)
     : 'Corporate'
-  const territory = input.salesTerritory.trim() || '—'
+  const territory = input.salesTerritory.trim() || '-'
   return `${status} · ${type} · ${territory}`
 }

@@ -130,16 +130,16 @@ export function StockLedgerPage() {
     const wh = whMap.get(row.warehouseId)
     openDetailPanel({
       title: row.movementNo,
-      subtitle: `${formatStatusLabel(row.movementType)} · ${item?.itemCode ?? '—'}`,
+      subtitle: `${formatStatusLabel(row.movementType)} · ${item?.itemCode ?? '-'}`,
       fields: [
         { label: 'Date', value: formatDate(row.movementDate) },
         { label: 'Type', value: formatStatusLabel(row.movementType) },
-        { label: 'Item', value: `${item?.itemCode ?? '—'} — ${item?.itemName ?? ''}` },
-        { label: 'Warehouse', value: wh?.warehouseCode ?? '—' },
+        { label: 'Item', value: `${item?.itemCode ?? '-'} — ${item?.itemName ?? ''}` },
+        { label: 'Warehouse', value: wh?.warehouseCode ?? '-' },
         { label: 'Qty', value: `${row.qty >= 0 ? '+' : ''}${formatNumber(row.qty)}` },
         { label: 'Value', value: formatCurrency(row.value) },
         { label: 'On Hand After', value: formatNumber(row.balanceAfter) },
-        { label: 'Reference', value: row.referenceNo || '—' },
+        { label: 'Reference', value: row.referenceNo || '-' },
         { label: 'Created By', value: row.createdBy },
       ],
       timeline: [
@@ -186,7 +186,7 @@ export function StockLedgerPage() {
         )
       },
     },
-    { id: 'warehouse', header: 'Warehouse', cell: ({ row }) => whMap.get(row.original.warehouseId)?.warehouseCode ?? '—' },
+    { id: 'warehouse', header: 'Warehouse', cell: ({ row }) => whMap.get(row.original.warehouseId)?.warehouseCode ?? '-' },
     {
       accessorKey: 'qty',
       header: 'Qty',

@@ -260,12 +260,12 @@ export function ApiTreasuryTransactionsPage() {
                     </td>
                     <td className="px-3 py-2">{row.treasuryAccountType}</td>
                     <td className="px-3 py-2">
-                      {row.partyName || '—'}
-                      <p className="max-w-[260px] truncate text-[11px] text-erp-muted">{row.narration || row.sourceDocumentType || '—'}</p>
+                      {row.partyName || '-'}
+                      <p className="max-w-[260px] truncate text-[11px] text-erp-muted">{row.narration || row.sourceDocumentType || '-'}</p>
                     </td>
-                    <td className="px-3 py-2 font-mono text-[12px]">{row.reference || '—'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{Number(row.debitAmount) ? `${formatCurrency(Number(row.debitAmount))} ${row.currencyCode}` : '—'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{Number(row.creditAmount) ? `${formatCurrency(Number(row.creditAmount))} ${row.currencyCode}` : '—'}</td>
+                    <td className="px-3 py-2 font-mono text-[12px]">{row.reference || '-'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{Number(row.debitAmount) ? `${formatCurrency(Number(row.debitAmount))} ${row.currencyCode}` : '-'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{Number(row.creditAmount) ? `${formatCurrency(Number(row.creditAmount))} ${row.currencyCode}` : '-'}</td>
                     <td className="px-3 py-2">
                       {row.reconciliationStatus ? row.reconciliationStatus.replaceAll('_', ' ') : row.treasuryAccountType === 'CASH' ? 'Not applicable' : 'Not positioned'}
                     </td>

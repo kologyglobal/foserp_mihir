@@ -166,7 +166,7 @@ export function PurchaseMasterListPage() {
       header: 'In Use',
       cell: ({ row }: { row: { original: PurchaseMasterEntry } }) => {
         const n = countPurchaseMasterUsage(row.original)
-        return n > 0 ? <span className="font-semibold text-amber-700">{n}</span> : '—'
+        return n > 0 ? <span className="font-semibold text-amber-700">{n}</span> : '-'
       },
     }] : []),
     ...buildMasterAuditListColumns<PurchaseMasterEntry>(),
@@ -467,7 +467,7 @@ export function PurchaseMasterFormPage() {
 
   const documentStrip = [
     { label: 'Master', value: catalog.title, highlight: true },
-    { label: 'Code', value: code.trim() || '—' },
+    { label: 'Code', value: code.trim() || '-' },
     { label: 'Status', value: status === 'active' ? 'Active' : 'Inactive', highlight: status === 'active' },
     { label: 'Created by', value: existing?.createdBy ?? session.name },
   ]

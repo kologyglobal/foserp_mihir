@@ -99,14 +99,14 @@ function useMasterLabels() {
   const items = useMasterStore((s) => s.items)
   const customerName = useCallback(
     (id: string | null | undefined, snapshot?: string | null) => {
-      if (!id && !snapshot) return '—'
-      return customers.find((c) => c.id === id)?.customerName ?? (snapshot?.trim() || id || '—')
+      if (!id && !snapshot) return '-'
+      return customers.find((c) => c.id === id)?.customerName ?? (snapshot?.trim() || id || '-')
     },
     [customers],
   )
   const productName = useCallback(
     (id: string | null | undefined) =>
-      id ? resolveCatalogProductLabel(id, { items, products }) : '—',
+      id ? resolveCatalogProductLabel(id, { items, products }) : '-',
     [items, products],
   )
   return { customerName, productName, customers, products, items }
@@ -236,7 +236,7 @@ function DashboardQuotationTable({
     {
       id: 'opportunityNo',
       header: 'Opportunity',
-      cell: ({ row }) => row.original.opportunityNo ?? row.original.inquiryNo ?? '—',
+      cell: ({ row }) => row.original.opportunityNo ?? row.original.inquiryNo ?? '-',
     },
     { accessorKey: 'customerId', header: 'Company', cell: ({ row }) => customerName(row.original.customerId, row.original.customerName) },
     { accessorKey: 'productId', header: 'Product', cell: ({ row }) => productName(row.original.productId) },
@@ -334,7 +334,7 @@ export function ApprovalQueuePage() {
                   </div>
                   <div>
                     <dt className="text-erp-muted">Opportunity</dt>
-                    <dd>{q.opportunityNo ?? q.inquiryNo ?? '—'}</dd>
+                    <dd>{q.opportunityNo ?? q.inquiryNo ?? '-'}</dd>
                   </div>
                 </dl>
                 <div className="flex flex-wrap gap-2">
@@ -423,7 +423,7 @@ export function QuotationListPage() {
       title: quotationNoWithRevision(quotation.quotationNo, quotation.revisionNo),
       subtitle: customerName(quotation.customerId, quotation.customerName),
       fields: [
-        { label: 'Opportunity', value: quotation.opportunityNo ?? quotation.inquiryNo ?? '—' },
+        { label: 'Opportunity', value: quotation.opportunityNo ?? quotation.inquiryNo ?? '-' },
         { label: 'Product', value: productName(quotation.productId) },
         { label: 'Grand Total', value: formatCurrency(quotation.pricing.grandTotal) },
         { label: 'Valid Until', value: formatDate(quotation.validityDate) },
@@ -957,9 +957,9 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
           { label: 'Company', value: customerName(so.customerId, so.customerName) },
           { label: 'Product', value: productName(so.productId) },
           { label: 'Qty', value: formatNumber(so.qty) },
-          { label: 'Value', value: value > 0 ? formatCurrency(value) : '—' },
+          { label: 'Value', value: value > 0 ? formatCurrency(value) : '-' },
           { label: 'Source', value: 'Won / approved quotation' },
-          { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
+          { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '-' },
         ],
         links: [
           ...(so.quotationId

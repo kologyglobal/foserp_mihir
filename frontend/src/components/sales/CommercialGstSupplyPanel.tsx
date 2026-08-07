@@ -94,7 +94,7 @@ function supplyTypeDisplay(
   if (supplyType === 'INTER_STATE') {
     return { primary: 'Inter-state', scheme: 'IGST' }
   }
-  return { primary: 'Unresolved', scheme: '—' }
+  return { primary: 'Unresolved', scheme: '-' }
 }
 
 export function CommercialGstSupplyPanel({
@@ -400,7 +400,7 @@ export function CommercialGstSupplyReadOnly({
         <div className="commercial-gst-supply__tile">
           <div className="commercial-gst-supply__tile-label">Supplier state</div>
           <div className="commercial-gst-supply__tile-value">
-            {formatPlaceOfSupplyLabel(supplierStateCode) || supplierStateCode || '—'}
+            {formatPlaceOfSupplyLabel(supplierStateCode) || supplierStateCode || '-'}
           </div>
         </div>
         <div className="commercial-gst-supply__tile">

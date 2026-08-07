@@ -11,9 +11,7 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 import { Select } from '@/components/forms/Inputs'
 import {
-  createProductionRequestDraftDemo,
   createPurchaseRequisitionDraftDemo,
-  createTransferDraftFromPlanningDemo,
   getInventoryPlanning,
   ignorePlanningSuggestion,
   INVENTORY_SAVED_VIEW_PRESETS,
@@ -25,11 +23,9 @@ import { useInventoryPermissions } from '@/utils/permissions/inventory'
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
-import { useMasterStore } from '@/store/masterStore'
 import { useSavedViews } from '@/hooks/useSavedViews'
 import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
 import { cn } from '@/utils/cn'
-import { isApiMode } from '@/config/apiConfig'
 import { fetchLookup } from '@/services/api/masterApi'
 
 const SOURCE_LABELS: Record<PlanningSuggestedSource, string> = {
@@ -44,31 +40,24 @@ type LoadState = 'loading' | 'ready' | 'error' | 'empty'
 export function InventoryPlanningPage() {
   const navigate = useNavigate()
   const perms = useInventoryPermissions()
-  const demoWarehouses = useMasterStore((s) => s.warehouses)
-  const [apiWarehouses, setApiWarehouses] = useState<Array<{ id: string; label: string }>>([])
-  const live = isApiMode()
+  const [warehouses, setWarehouses] = useState<Array<{ id: string; label: string }>>([])
 
   useEffect(() => {
-    if (!live) return
     let cancelled = false
     fetchLookup('warehouses')
       .then((res) => {
         if (cancelled) return
-        setApiWarehouses(
+        setWarehouses(
           res.data.map((w) => ({ id: w.id, label: w.code ? `${w.code} — ${w.name}` : w.name })),
         )
       })
       .catch(() => {
-        if (!cancelled) setApiWarehouses([])
+        if (!cancelled) setWarehouses([])
       })
     return () => {
       cancelled = true
     }
-  }, [live])
-
-  const warehouses = live
-    ? apiWarehouses
-    : demoWarehouses.filter((w) => w.isActive).map((w) => ({ id: w.id, label: w.warehouseName }))
+  }, [])
 
   const [search, setSearch] = useState('')
   const [warehouseId, setWarehouseId] = useState('')
@@ -139,42 +128,21 @@ export function InventoryPlanningPage() {
   async function handleCreatePr(row: InventoryPlanningRow) {
     try {
       const draft = await createPurchaseRequisitionDraftDemo(row)
-      notify.success(live ? `PR ${draft.documentNumber} created` : `PR draft ${draft.documentNumber} created (demo)`)
-      if (live) navigate(`/purchase/requisitions/${draft.id}`)
-      else void load()
+      notify.success(`PR ${draft.documentNumber} created`)
+      navigate(`/purchase/requisitions/${draft.id}`)
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to create PR draft')
     }
   }
 
-  async function handleCreateProd(row: InventoryPlanningRow) {
-    try {
-      if (live) {
-        navigate('/manufacturing/work-orders/new')
-        notify.info('Open Work Orders to create production replenishment')
-        return
-      }
-      const draft = await createProductionRequestDraftDemo(row)
-      notify.success(`Production request ${draft.documentNumber} created (demo)`)
-      void load()
-    } catch (e) {
-      notify.error(e instanceof Error ? e.message : 'Failed')
-    }
+  function handleCreateProd() {
+    navigate('/manufacturing/work-orders/new')
+    notify.info('Open Work Orders to create production replenishment')
   }
 
-  async function handleCreateTransfer(row: InventoryPlanningRow) {
-    try {
-      if (live) {
-        navigate('/inventory/movements/transfers/new')
-        notify.info('Open Transfers to move stock between warehouses')
-        return
-      }
-      const draft = await createTransferDraftFromPlanningDemo(row)
-      notify.success(`Transfer draft ${draft.documentNumber} created (demo)`)
-      void load()
-    } catch (e) {
-      notify.error(e instanceof Error ? e.message : 'Failed')
-    }
+  function handleCreateTransfer() {
+    navigate('/inventory/movements/transfers/new')
+    notify.info('Open Transfers to move stock between warehouses')
   }
 
   if (!perms.canViewPlanning) {
@@ -191,11 +159,7 @@ export function InventoryPlanningPage() {
       layout="enterprise"
       badge="Store"
       title="Inventory Planning"
-      description={
-        live
-          ? 'Reorder suggestions from live stock balances and item reorder levels. Open PO / production projections are not included yet.'
-          : 'Simple replenishment suggestions — no advanced MRP. Projected Stock = Available + Expected Receipts − Reserved − Planned Consumption.'
-      }
+      description="Reorder suggestions from live stock balances and item reorder levels. Open PO / production projections are not included yet."
       breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Planning' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/planning"
@@ -245,9 +209,7 @@ export function InventoryPlanningPage() {
       </div>
 
       <p className="mb-3 text-[12px] text-erp-muted">
-        {live
-          ? 'Suggested when free stock is below reorder level. Create PR posts a live purchase requisition; production/transfer open those workspaces.'
-          : 'Suggested Qty = Maximum Stock − Projected Stock. Demo drafts only — no live posting.'}
+        Suggested when free stock is below reorder level. Create PR posts a live purchase requisition; production/transfer open those workspaces.
       </p>
 
       {loadState === 'loading' ? <LoadingState variant="table" /> : null}
@@ -352,13 +314,13 @@ export function InventoryPlanningPage() {
                       {menuId === row.id ? (
                         <div className="absolute right-0 z-20 mt-1 min-w-[200px] rounded border border-erp-border bg-white py-1 shadow-lg" role="menu">
                           {row.suggestedSource === 'purchase' ? (
-                            <MenuBtn label={live ? 'Create Purchase Requisition' : 'Create PR Draft'} onClick={() => { setMenuId(null); void handleCreatePr(row) }} />
+                            <MenuBtn label="Create Purchase Requisition" onClick={() => { setMenuId(null); void handleCreatePr(row) }} />
                           ) : null}
                           {row.suggestedSource === 'production' ? (
-                            <MenuBtn label={live ? 'Open Work Orders' : 'Create Production Request'} onClick={() => { setMenuId(null); void handleCreateProd(row) }} />
+                            <MenuBtn label="Open Work Orders" onClick={() => { setMenuId(null); handleCreateProd() }} />
                           ) : null}
                           {row.suggestedSource === 'transfer' ? (
-                            <MenuBtn label={live ? 'Open Transfers' : 'Create Transfer Draft'} onClick={() => { setMenuId(null); void handleCreateTransfer(row) }} />
+                            <MenuBtn label="Open Transfers" onClick={() => { setMenuId(null); handleCreateTransfer() }} />
                           ) : null}
                           <MenuBtn label="Change Quantity" onClick={() => { setEditQtyId(row.id); setEditQtyValue(String(row.suggestedQuantity)); setMenuId(null) }} />
                           <MenuBtn label="Change Date" onClick={() => { setEditDateId(row.id); setEditDateValue(row.requiredDate); setMenuId(null) }} />

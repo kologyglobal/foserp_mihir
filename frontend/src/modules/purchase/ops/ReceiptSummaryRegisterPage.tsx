@@ -125,7 +125,7 @@ export function ReceiptSummaryRegisterPage() {
                   <div className="ops-summary-card__metric">
                     <span className="ops-summary-card__metric-label">Last date</span>
                     <span className="ops-summary-card__metric-value">
-                      {r.lastPurchaseDate ? formatDate(r.lastPurchaseDate) : '—'}
+                      {r.lastPurchaseDate ? formatDate(r.lastPurchaseDate) : '-'}
                     </span>
                   </div>
                   <div className="ops-summary-card__metric">

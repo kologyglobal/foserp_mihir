@@ -229,7 +229,7 @@ export function CrmLeadListPage() {
     [enrichedRows],
   )
   const industryOptions = useMemo(
-    () => [...new Set(enrichedRows.map((r) => r.industryDisplay).filter((i) => i !== '—'))].sort(),
+    () => [...new Set(enrichedRows.map((r) => r.industryDisplay).filter((i) => i !== '-'))].sort(),
     [enrichedRows],
   )
 

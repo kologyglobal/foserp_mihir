@@ -17,7 +17,7 @@ export function formatMasterMultiSelectValue(
   options: MasterMultiSelectOption[],
 ): string {
   const selected = parseMultiSelectValue(String(value ?? ''))
-  if (selected.length === 0) return '—'
+  if (selected.length === 0) return '-'
   const labels = selected.map((token) => {
     const match = options.find(
       (opt) => opt.value === token || opt.label.toLowerCase().replace(/\s+/g, '_') === token,

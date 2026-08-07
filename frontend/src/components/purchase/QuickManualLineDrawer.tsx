@@ -342,10 +342,10 @@ export function QuickManualLineDrawer({
             {isCatalog ? (
               <div className="sm:col-span-2 rounded-md border border-erp-border bg-erp-surface-alt/50 px-3 py-2 text-[12px]">
                 <span className="font-medium text-erp-text">
-                  {initial?.itemCode || '—'}
+                  {initial?.itemCode || '-'}
                 </span>
                 <span className="mx-1.5 text-erp-muted">·</span>
-                <span className="text-erp-text">{initial?.itemName || '—'}</span>
+                <span className="text-erp-text">{initial?.itemName || '-'}</span>
               </div>
             ) : null}
 

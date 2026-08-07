@@ -46,7 +46,7 @@ export function ReconciliationSummaryCards({ summary }: { summary: SessionSummar
       <Card label="Pending suggestions" value={String(summary.pendingSuggestionCount)} />
       <Card
         label="Reconciliation difference"
-        value={difference != null ? formatCurrency(difference) : '—'}
+        value={difference != null ? formatCurrency(difference) : '-'}
         tone={difference != null && Math.abs(difference) > 0.005 ? 'warning' : 'default'}
       />
     </div>

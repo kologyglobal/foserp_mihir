@@ -1,7 +1,7 @@
 import type { HrLoanRecoverySchedule } from '@/services/api/hrmsApi'
 
 export function money(n: number | null | undefined) {
-  if (n == null) return '—'
+  if (n == null) return '-'
   return `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 }
 
@@ -23,5 +23,5 @@ export function nextRecoveryLabel(loan: {
   if ((loan.status === 'RECOVERING' || loan.status === 'DISBURSED') && loan.recoveryStartYear && loan.recoveryStartMonth) {
     return monthYearLabel(loan.recoveryStartMonth, loan.recoveryStartYear)
   }
-  return '—'
+  return '-'
 }

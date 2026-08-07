@@ -332,7 +332,7 @@ export function StoreWorkbenchPage() {
                           {status ? (
                             <StatusDot label={status.replace(/_/g, ' ')} tone={statusToneFromLabel(status)} />
                           ) : (
-                            <span className="text-erp-muted">—</span>
+                            <span className="text-erp-muted">-</span>
                           )}
                         </td>
                         <td className="text-right">

@@ -125,7 +125,7 @@ export function GstPaymentChallansPage() {
                       <td className="px-3 py-2 text-right">{formatCurrency(Number(r.netTaxPayable))}</td>
                       <td className="px-3 py-2 text-right">{formatCurrency(Number(r.interestAmount))}</td>
                       <td className="px-3 py-2 text-right font-semibold">{formatCurrency(Number(r.totalPayable))}</td>
-                      <td className="px-3 py-2 font-mono text-[11px]">{r.cpin || r.challanNumber || '—'}</td>
+                      <td className="px-3 py-2 font-mono text-[11px]">{r.cpin || r.challanNumber || '-'}</td>
                       <td className="px-3 py-2 space-x-2 whitespace-nowrap">
                         {perms.isApiMode && (r.status === 'PROPOSED' || r.status === 'DRAFT') ? (
                           <button

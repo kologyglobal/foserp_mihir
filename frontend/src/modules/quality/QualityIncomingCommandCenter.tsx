@@ -1,6 +1,6 @@
 /** Incoming Quality command center — operational UI for supplier QC (Purchase QI under the hood). */
 import { useCallback, useEffect, useMemo, useState, type ComponentPropsWithoutRef, type ElementType, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ClipboardCheck,
   Package,
@@ -93,6 +93,7 @@ function QueueRowAction<T extends ElementType = 'button'>({
 }
 
 export function IncomingQcQueuePage() {
+  const navigate = useNavigate()
   const inspections = useIncomingPendingInspections()
   const [queue, setQueue] = useState<IncomingQualityReadiness | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
@@ -228,17 +229,17 @@ export function IncomingQcQueuePage() {
             <Button size="sm" variant="secondary" onClick={() => void load()} disabled={busy}>
               Refresh
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => { window.location.href = '/purchase/quality-inspections' }}>
+            <Button size="sm" variant="secondary" onClick={() => navigate('/purchase/quality-inspections')}>
               QI register
             </Button>
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => { window.location.href = '/purchase/quality-inspections?status=completed' }}
+              onClick={() => navigate('/purchase/quality-inspections?status=completed')}
             >
               Completed QC
             </Button>
-            <Button size="sm" onClick={() => { window.location.href = '/purchase/grn' }}>
+            <Button size="sm" onClick={() => navigate('/purchase/grn')}>
               GRN
             </Button>
           </div>
@@ -248,10 +249,10 @@ export function IncomingQcQueuePage() {
       <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
         {[
           { label: 'Open work', value: summary?.total ?? workItems.length },
-          { label: 'Open QI', value: summary?.openQi ?? '—' },
-          { label: 'Awaiting QI', value: summary?.grnAwaitingQi ?? '—' },
-          { label: 'Hot ageing (4d+)', value: summary?.ageingHot ?? '—' },
-          { label: 'QC hold qty', value: summary?.qcHoldQty ?? '—' },
+          { label: 'Open QI', value: summary?.openQi ?? '-' },
+          { label: 'Awaiting QI', value: summary?.grnAwaitingQi ?? '-' },
+          { label: 'Hot ageing (4d+)', value: summary?.ageingHot ?? '-' },
+          { label: 'QC hold qty', value: summary?.qcHoldQty ?? '-' },
         ].map((k) => (
           <div key={k.label} className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{k.label}</div>
@@ -272,7 +273,7 @@ export function IncomingQcQueuePage() {
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px]">
             <div className="font-semibold text-slate-700">Avg turnaround</div>
             <div className="mt-1 tabular-nums text-slate-600">
-              {reports.avgTurnaroundHours != null ? `${reports.avgTurnaroundHours} h` : '—'} (
+              {reports.avgTurnaroundHours != null ? `${reports.avgTurnaroundHours} h` : '-'} (
               {reports.turnaroundSampleSize} done)
             </div>
           </div>
@@ -357,9 +358,9 @@ export function IncomingQcQueuePage() {
                         {row.goodsReceiptNumber}
                       </Link>
                     </td>
-                    <td className="max-w-[140px] truncate">{row.vendorName ?? '—'}</td>
+                    <td className="max-w-[140px] truncate">{row.vendorName ?? '-'}</td>
                     <td>
-                      <div className="font-medium">{row.itemCode || '—'}</div>
+                      <div className="font-medium">{row.itemCode || '-'}</div>
                       <div className="max-w-[160px] truncate text-[11px] text-slate-500">{row.itemName}</div>
                     </td>
                     <td className="text-right tabular-nums">{row.receivedQuantity}</td>
@@ -370,15 +371,15 @@ export function IncomingQcQueuePage() {
                           {row.qualityInspectionNumber}
                         </Link>
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
                     <td>
                       <StatusChip status={row.inspectionStatus} />
                     </td>
                     <td>{row.priority}</td>
-                    <td className="max-w-[100px] truncate">{row.inspectorName ?? '—'}</td>
-                    <td>{row.result ?? '—'}</td>
+                    <td className="max-w-[100px] truncate">{row.inspectorName ?? '-'}</td>
+                    <td>{row.result ?? '-'}</td>
                     <td className="qi-queue-actions-cell">
                       <div className="qi-queue-actions" role="group" aria-label="Row actions">
                         {!row.qualityInspectionId ? (

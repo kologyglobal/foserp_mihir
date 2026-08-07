@@ -124,7 +124,7 @@ export function AccountFactBox({
 
           <FactSection title="Account Summary">
             <FactRow label="Category" value={account.category} />
-            <FactRow label="Parent" value={parentName ?? '—'} />
+            <FactRow label="Parent" value={parentName ?? '-'} />
             <FactRow label="Normal balance" value={account.normalBalance} />
             <FactRow label="Child accounts" value={childCount} />
             {canViewBalance ? (

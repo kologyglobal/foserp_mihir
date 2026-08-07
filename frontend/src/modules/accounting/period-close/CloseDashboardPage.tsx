@@ -276,7 +276,7 @@ export function CloseDashboardPage() {
                       <td className="py-1.5 pr-2">
                         <LockStatusBadge status={l.status} />
                       </td>
-                      <td className="py-1.5 text-erp-muted">{l.lockedBy ?? '—'}</td>
+                      <td className="py-1.5 text-erp-muted">{l.lockedBy ?? '-'}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -99,7 +99,7 @@ export function Opportunity360Hero({
               <User className="h-4 w-4" />
               Primary contact
             </p>
-            <p className="opp-360-hero__contact-name">{contact?.name ?? customer?.contactPerson ?? '—'}</p>
+            <p className="opp-360-hero__contact-name">{contact?.name ?? customer?.contactPerson ?? '-'}</p>
             <div className="opp-360-hero__contact-lines">
               {(contact?.phone ?? customer?.contactPhone) ? (
                 <button

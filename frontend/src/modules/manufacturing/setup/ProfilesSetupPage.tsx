@@ -28,7 +28,7 @@ export function ProfilesSetupPage() {
   const itemLabel = useCallback(
     (id: string) => {
       const item = items.find((i) => i.id === id)
-      return item?.label ?? '—'
+      return item?.label ?? '-'
     },
     [items],
   )

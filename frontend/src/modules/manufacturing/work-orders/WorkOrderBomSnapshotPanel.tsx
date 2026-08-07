@@ -534,7 +534,7 @@ export function WorkOrderBomSnapshotPanel({
                     {formatQty(node.perUnitQuantity)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-erp-muted">
-                    {Number(node.scrapPercent) > 0 ? `${formatQty(node.scrapPercent)}%` : '—'}
+                    {Number(node.scrapPercent) > 0 ? `${formatQty(node.scrapPercent)}%` : '-'}
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums font-semibold text-erp-text">
                     {formatQty(node.requiredQuantity)}
@@ -552,7 +552,7 @@ export function WorkOrderBomSnapshotPanel({
                   <td className="px-3 py-1.5">
                     <LineBadge label={meta.label} className={meta.className} />
                   </td>
-                  <td className="px-3 py-1.5 text-erp-muted">{node.isOptional ? 'Yes' : '—'}</td>
+                  <td className="px-3 py-1.5 text-erp-muted">{node.isOptional ? 'Yes' : '-'}</td>
                   {canEdit ? (
                     <td className="px-3 py-1.5 text-right">
                       <div className="inline-flex items-center justify-end gap-0.5 opacity-80 group-hover:opacity-100">

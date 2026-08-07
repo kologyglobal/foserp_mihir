@@ -308,7 +308,7 @@ export function PurchaseItemCodeCell({
                         const effectiveType = resolveCatalogItemProductType(item)
                         const productTypeLabel = effectiveType
                           ? ENGINEERING_PRODUCT_TYPE_LABELS[effectiveType]
-                          : '—'
+                          : '-'
                         return (
                           <tr
                             key={item.id}

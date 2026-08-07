@@ -12,6 +12,11 @@ import {
   XCircle,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import {
+  PurchaseDocumentFactBox,
+  buildPurchaseRelatedLinks,
+  purchaseDocumentApprovalFact,
+} from '@/components/purchase/PurchaseDocumentFactBox'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpViewField } from '@/components/erp/card-form'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
@@ -24,7 +29,6 @@ import {
   cancelQualityInspection,
   getQualityInspectionById,
   holdQualityInspection,
-  postGRN,
   PurchaseServiceError,
   QUALITY_INSPECTION_RESULT_LABELS,
   QUALITY_INSPECTION_STATUS_LABELS,
@@ -42,7 +46,6 @@ import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
-import { isApiMode } from '@/config/apiConfig'
 import { appConfirm } from '@/store/confirmDialogStore'
 import { getPurchaseLineBaseUomCode, purchaseLineHasDualUom, toUomQuantityFromBase } from '@/utils/purchaseLineUom'
 
@@ -147,7 +150,7 @@ export function QualityInspectionDetailPage() {
       <PurchaseCardFormShell
         title="Quality Inspection"
         description="Loading…"
-        status="—"
+        status="-"
         favoritePath="/purchase/quality-inspections"
         breadcrumbs={[
           { label: 'Quality Inspections', to: '/purchase/quality-inspections' },
@@ -167,7 +170,7 @@ export function QualityInspectionDetailPage() {
 
   const canEdit = editable(qi.status)
   const statusLabel = QUALITY_INSPECTION_STATUS_LABELS[qi.status]
-  const resultLabel = qi.result ? QUALITY_INSPECTION_RESULT_LABELS[qi.result] : '—'
+  const resultLabel = qi.result ? QUALITY_INSPECTION_RESULT_LABELS[qi.result] : '-'
 
   // Dual-UOM display: qi.*Qty are base/stock qty (authoritative); the vendor/
   // purchase UOM equivalents use the same conversion factor snapshot the GRN
@@ -186,8 +189,39 @@ export function QualityInspectionDetailPage() {
     )
   }
 
+  const headerFacts = [
+    { label: 'Vendor', value: qi.vendor.name || '-' },
+    { label: 'GRN', value: qi.goodsReceiptNumber || '-' },
+    { label: 'PO', value: qi.purchaseOrderNumber || '-' },
+    { label: 'Inspection Date', value: formatDate(qi.documentDate) },
+  ]
+
+  const documentFactBox = (
+    <PurchaseDocumentFactBox
+      vendor={{
+        id: qi.vendor.id,
+        code: qi.vendor.code,
+        name: qi.vendor.name,
+      }}
+      documentStatus={{
+        statusLabel,
+        ...purchaseDocumentApprovalFact(qi.status, qi.inspector.name || null),
+        createdBy: qi.createdBy || qi.inspector.name || null,
+        modifiedBy: qi.updatedBy,
+        modifiedDate: qi.updatedAt ? formatDate(qi.updatedAt.slice(0, 10)) : null,
+      }}
+      related={buildPurchaseRelatedLinks({
+        purchaseOrderId: qi.purchaseOrderId || null,
+        purchaseOrderNumber: qi.purchaseOrderNumber || null,
+        goodsReceiptId: qi.goodsReceiptId || null,
+        goodsReceiptNumber: qi.goodsReceiptNumber || null,
+      })}
+    />
+  )
+
   return (
     <PurchaseCardFormShell
+      className="purchase-qi-form-page"
       title={qi.documentNumber}
       description={`${qi.itemCode} · ${qi.goodsReceiptNumber}`}
       recordNo={qi.documentNumber}
@@ -197,12 +231,17 @@ export function QualityInspectionDetailPage() {
         'Quality Inspection'
       }
       status={statusLabel}
+      statusKey={qi.status}
       statusTone={purchaseStatusTone(qi.status)}
       favoritePath={`/purchase/quality-inspections/${qi.id}`}
       breadcrumbs={[
         { label: 'Quality Inspections', to: '/purchase/quality-inspections' },
         { label: qi.documentNumber },
       ]}
+      backLink={{ to: '/purchase/quality-inspections', label: 'Back to Quality Inspections' }}
+      recordHeaderFacts={headerFacts}
+      factBox={documentFactBox}
+      collapsibleFactBox
       detailMode={!canEdit}
       commandBar={
         <ErpCommandBar
@@ -226,23 +265,14 @@ export function QualityInspectionDetailPage() {
                     ),
                   disabled: saving,
                 }
-              : !canEdit && perms.canPostGrn
+              : !canEdit
                 ? {
-                    id: 'post',
-                    label: 'Post GRN',
+                    // Completing the inspection already posts GRN inventory,
+                    // so guide the user to the GRN instead of a dead Post action.
+                    id: 'view-grn',
+                    label: 'View GRN',
                     icon: PackageCheck,
-                    onClick: async () => {
-                      setSaving(true)
-                      try {
-                        const posted = await postGRN(qi.goodsReceiptId)
-                        notify.success(`${posted.documentNumber} posted`)
-                        setInventoryMsgOpen(true)
-                      } catch (err) {
-                        notify.error(err instanceof PurchaseServiceError ? err.message : 'Post failed')
-                      } finally {
-                        setSaving(false)
-                      }
-                    },
+                    onClick: () => navigate(`/purchase/grn/${qi.goodsReceiptId}`),
                     disabled: saving,
                   }
                 : undefined
@@ -300,7 +330,7 @@ export function QualityInspectionDetailPage() {
                   )
                 })()
               },
-              hidden: !isApiMode() || !perms.canCancelQuality || !canEdit,
+              hidden: !perms.canCancelQuality || !canEdit,
               disabled: saving,
             },
             {
@@ -344,7 +374,7 @@ export function QualityInspectionDetailPage() {
       }
     >
       <ErpCardSection title="Header" defaultOpen columns={1}>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <ErpViewField label="Inspection Number" value={qi.documentNumber} />
           <ErpViewField label="Inspection Date" value={formatDate(qi.documentDate)} />
           <ErpViewField
@@ -356,7 +386,7 @@ export function QualityInspectionDetailPage() {
             }
           />
           <ErpViewField label="Item" value={`${qi.itemCode} — ${qi.itemName}`} />
-          <ErpViewField label="Batch / Lot" value={qi.batchLotNo || '—'} />
+          <ErpViewField label="Batch / Lot" value={qi.batchLotNo || '-'} />
           <ErpViewField
             label="Received Qty"
             value={
@@ -430,19 +460,19 @@ export function QualityInspectionDetailPage() {
               <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} />
             </ErpFieldRow>
           ) : (
-            <ErpViewField label="Remarks" value={qi.remarks || '—'} />
+            <ErpViewField label="Remarks" value={qi.remarks || '-'} />
           )}
         </div>
       </ErpCardSection>
 
-      <ErpCardSection title="Parameters" defaultOpen columns={1}>
+      <ErpCardSection title="Parameters" defaultOpen columns={1} className="purchase-qi-parameters-section">
         {parameters.length === 0 ? (
           <p className="text-sm text-erp-muted">
             No parameter checklist on this inspection yet. Save after create seeds Visual / Documentation defaults.
           </p>
         ) : (
-        <div className="w-full min-w-0 overflow-x-auto rounded-md border border-erp-border">
-          <table className="erp-table w-full min-w-[52rem] text-[12px]">
+        <div className="purchase-qi-parameters-scroll w-full min-w-0 max-w-full overflow-x-auto rounded-md border border-erp-border">
+          <table className="erp-table w-full min-w-[40rem] text-[12px]">
             <thead>
               <tr>
                 <th className="min-w-[8rem] text-left">Parameter</th>
@@ -473,7 +503,7 @@ export function QualityInspectionDetailPage() {
                         }}
                       />
                     ) : (
-                      p.minValue ?? '—'
+                      p.minValue ?? '-'
                     )}
                   </td>
                   <td className="num">
@@ -489,7 +519,7 @@ export function QualityInspectionDetailPage() {
                         }}
                       />
                     ) : (
-                      p.maxValue ?? '—'
+                      p.maxValue ?? '-'
                     )}
                   </td>
                   <td className="num">
@@ -505,10 +535,10 @@ export function QualityInspectionDetailPage() {
                         }}
                       />
                     ) : (
-                      p.observedValue ?? '—'
+                      p.observedValue ?? '-'
                     )}
                   </td>
-                  <td>{p.unit || '—'}</td>
+                  <td>{p.unit || '-'}</td>
                   <td>
                     {canEdit ? (
                       <Select
@@ -543,7 +573,7 @@ export function QualityInspectionDetailPage() {
                         }}
                       />
                     ) : (
-                      p.remarks || '—'
+                      p.remarks || '-'
                     )}
                   </td>
                 </tr>

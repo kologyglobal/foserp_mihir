@@ -175,7 +175,7 @@ export function ReconciliationMatchDetailPage() {
             {match.ledgerAllocations.map((a) => (
               <tr key={a.id} className="border-t border-erp-border">
                 <td className="px-2 py-1.5 font-mono text-[11px]">{a.generalLedgerEntryId}</td>
-                <td className="px-2 py-1.5">{a.sourceDocumentNumber ?? a.sourceDocumentType ?? '—'}</td>
+                <td className="px-2 py-1.5">{a.sourceDocumentNumber ?? a.sourceDocumentType ?? '-'}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{formatCurrency(parseDecimal(a.matchedAmount))}</td>
               </tr>
             ))}

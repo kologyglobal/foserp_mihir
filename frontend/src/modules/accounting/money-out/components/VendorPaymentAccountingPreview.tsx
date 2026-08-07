@@ -40,15 +40,15 @@ export function VendorPaymentAccountingPreviewTable({
             <tr key={l.sequence} className="border-b border-erp-border/60">
               <td className="py-2 pr-2">{l.sequence}</td>
               <td className="py-2 pr-2">
-                <div className="font-medium">{l.accountCode ?? '—'}</div>
+                <div className="font-medium">{l.accountCode ?? '-'}</div>
                 <div className="text-erp-muted">{l.accountName ?? l.component}</div>
               </td>
               <td className="py-2 pr-2">{l.narration}</td>
               <td className="py-2 pr-2 text-right tabular-nums">
-                {parseDecimal(l.debitAmount) > 0 ? formatCurrency(parseDecimal(l.debitAmount)) : '—'}
+                {parseDecimal(l.debitAmount) > 0 ? formatCurrency(parseDecimal(l.debitAmount)) : '-'}
               </td>
               <td className="py-2 text-right tabular-nums">
-                {parseDecimal(l.creditAmount) > 0 ? formatCurrency(parseDecimal(l.creditAmount)) : '—'}
+                {parseDecimal(l.creditAmount) > 0 ? formatCurrency(parseDecimal(l.creditAmount)) : '-'}
               </td>
             </tr>
           ))}

@@ -288,8 +288,8 @@ export function PoCreateDocumentPage() {
   const documentStrip = [
     { label: 'Document', value: 'New PO', highlight: true },
     { label: 'Source', value: mode === 'manual' ? 'Manual' : 'From PR' },
-    { label: 'PR Ref', value: mode === 'pr' ? (pr?.prNo ?? '—') : '—' },
-    { label: 'Vendor', value: vendorId ? getVendor(vendorId)?.vendorName ?? '—' : '—', highlight: Boolean(vendorId) },
+    { label: 'PR Ref', value: mode === 'pr' ? (pr?.prNo ?? '-') : '-' },
+    { label: 'Vendor', value: vendorId ? getVendor(vendorId)?.vendorName ?? '-' : '-', highlight: Boolean(vendorId) },
     { label: 'Lines', value: String(mode === 'manual' ? manualValidLines.length : poPreview.length) },
     { label: 'Amount', value: formatCurrency(totalAmount), highlight: totalAmount > 0 },
     { label: 'Buyer', value: session.name },
@@ -323,8 +323,8 @@ export function PoCreateDocumentPage() {
       metrics={formMetrics}
       summary={[
         { label: 'Source', value: mode === 'manual' ? 'Manual PO' : 'From PR' },
-        { label: 'PR', value: pr ? <TableLink to={`/purchase/requisitions/${pr.id}`}>{pr.prNo}</TableLink> : '—' },
-        { label: 'Vendor', value: vendorId ? getVendor(vendorId)?.vendorName ?? '—' : '—', highlight: Boolean(vendorId) },
+        { label: 'PR', value: pr ? <TableLink to={`/purchase/requisitions/${pr.id}`}>{pr.prNo}</TableLink> : '-' },
+        { label: 'Vendor', value: vendorId ? getVendor(vendorId)?.vendorName ?? '-' : '-', highlight: Boolean(vendorId) },
         { label: 'Payment', value: paymentTerms },
         { label: 'Delivery', value: deliveryTerms },
         { label: 'Amount', value: formatCurrency(totalAmount), highlight: true },

@@ -744,8 +744,8 @@ function LineRow({
         <span className="font-mono text-[12px]">{line.itemCode}</span>
         <span className="block text-[11px] text-erp-muted">{line.itemName}</span>
       </td>
-      {!quickCountMode && <td className="text-[12px]">{line.batchNo ?? '—'}</td>}
-      {!quickCountMode && <td className="text-[12px]">{line.binCode ?? '—'}</td>}
+      {!quickCountMode && <td className="text-[12px]">{line.batchNo ?? '-'}</td>}
+      {!quickCountMode && <td className="text-[12px]">{line.binCode ?? '-'}</td>}
       {!quickCountMode && showSystemQty ? (
         <td className="num">{formatNumber(line.snapshotSystemQty)}</td>
       ) : null}
@@ -786,12 +786,12 @@ function LineRow({
           />
         )}
       </td>
-      {!quickCountMode && <td className={cn('num', diff !== 0 && 'text-amber-800 font-semibold')}>{counted !== null ? formatNumber(diff) : '—'}</td>}
+      {!quickCountMode && <td className={cn('num', diff !== 0 && 'text-amber-800 font-semibold')}>{counted !== null ? formatNumber(diff) : '-'}</td>}
       {!quickCountMode && canViewCost ? <td className="num">{formatCurrency(diff * line.unitCost)}</td> : null}
       {!quickCountMode && (
         <td>
           {readOnly ? (
-            line.reason || '—'
+            line.reason || '-'
           ) : (
             <Input
               className="min-w-[140px] text-[12px]"
@@ -804,9 +804,9 @@ function LineRow({
       )}
       {!quickCountMode && supervisorMode ? (
         <td className="text-[11px] text-erp-muted">
-          {line.movementAfterSnapshot !== 0 ? `${line.movementAfterSnapshot > 0 ? '+' : ''}${line.movementAfterSnapshot}` : '—'}
+          {line.movementAfterSnapshot !== 0 ? `${line.movementAfterSnapshot > 0 ? '+' : ''}${line.movementAfterSnapshot}` : '-'}
           {line.previousCountQty !== null ? (
-            <span className="block">Prev: {line.previousCountQty} ({line.previousCountDate ? formatDate(line.previousCountDate) : '—'})</span>
+            <span className="block">Prev: {line.previousCountQty} ({line.previousCountDate ? formatDate(line.previousCountDate) : '-'})</span>
           ) : null}
         </td>
       ) : null}

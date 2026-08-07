@@ -41,4 +41,11 @@ describe('uom-conversion', () => {
     expect(dual.quantity).toBe(10)
     expect(dual.uomQuantity).toBe(50)
   })
+
+  it('KG rod: 16 NOS base → 800 KG vendor (factor 50)', () => {
+    const dual = resolveDualQuantities({ quantity: 16, uomConversionFactor: 50 })
+    expect(dual.quantity).toBe(16)
+    expect(dual.uomQuantity).toBe(800)
+    expect(lineAmountFromVendor(3, dual.uomQuantity)).toBe(2400)
+  })
 })

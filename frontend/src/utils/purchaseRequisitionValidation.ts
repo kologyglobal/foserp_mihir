@@ -59,6 +59,24 @@ export function prDepartmentLabel(code: string): string {
   return byLabel?.label ?? code
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Prefer API departmentName; fall back to legacy codes; never show raw UUID when avoidable. */
+export function resolvePrDepartmentDisplay(
+  departmentId: string | null | undefined,
+  departmentName?: string | null,
+): string {
+  const name = departmentName?.trim()
+  if (name) return name
+  const raw = (departmentId ?? '').trim()
+  if (!raw) return ''
+  const legacy = prDepartmentLabel(raw)
+  if (legacy !== raw) return legacy
+  if (UUID_RE.test(raw)) return '-'
+  return legacy
+}
+
 export function normalizePrDepartmentCode(value: string): string {
   const v = value.trim()
   if (!v) return ''

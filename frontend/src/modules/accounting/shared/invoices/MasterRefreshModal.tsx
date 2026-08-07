@@ -40,12 +40,12 @@ const FIELD_LABELS: Record<string, string> = {
 }
 
 function formatValue(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—'
+  if (value === null || value === undefined || value === '') return '-'
   if (typeof value === 'object') {
     const parts = Object.values(value as Record<string, unknown>)
       .filter((v) => v !== null && v !== undefined && v !== '')
       .map(String)
-    return parts.length > 0 ? parts.join(', ') : '—'
+    return parts.length > 0 ? parts.join(', ') : '-'
   }
   return String(value)
 }
@@ -141,7 +141,7 @@ export function MasterRefreshModal({
     if (!live) return null
     const fields: DiffRow[] = []
     const push = (label: string, from?: string | null, to?: string | null) => {
-      if ((from || '—') !== (to || '—')) fields.push({ label, from: from || '—', to: to || '—' })
+      if ((from || '-') !== (to || '-')) fields.push({ label, from: from || '-', to: to || '-' })
     }
     push('Name', snapshot.name, live.name)
     push('Code', snapshot.code, live.code)

@@ -18,7 +18,7 @@ describe('GRN UOM conversion helpers', () => {
 
   it('formats conversion label', () => {
     expect(formatGrnUomConversionLabel(3, 'NOS', 'MTR')).toBe('1 NOS = 3 MTR')
-    expect(formatGrnUomConversionLabel(1, 'NOS', 'NOS')).toBe('—')
+    expect(formatGrnUomConversionLabel(1, 'NOS', 'NOS')).toBe('-')
   })
 
   it('purchaseQtyToBaseQty matches plan formula', () => {

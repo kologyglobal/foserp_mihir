@@ -74,12 +74,12 @@ function contactInitials(name: string) {
 }
 
 function formatTableDate(iso: string | null | undefined) {
-  if (!iso) return '—'
+  if (!iso) return '-'
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
 }
 
 function formatCustomerType(type: string) {
-  if (!type || type === '—') return '—'
+  if (!type || type === '-') return '-'
   return type.charAt(0).toUpperCase() + type.slice(1)
 }
 
@@ -200,7 +200,7 @@ export function CrmContactsTable({
         enableSorting: true,
         meta: { columnLabel: 'Designation', cellClass: 'crm-contacts-table__text' },
         cell: ({ row }) => (
-          <span className="crm-contacts-table__text">{row.original.contact.designation || '—'}</span>
+          <span className="crm-contacts-table__text">{row.original.contact.designation || '-'}</span>
         ),
       },
       {
@@ -211,11 +211,11 @@ export function CrmContactsTable({
         meta: { columnLabel: 'City & Territory' },
         cell: ({ row }) => {
           const { city, state, territory } = row.original
-          const location = city !== '—' ? `${city}${state && state !== '—' ? `, ${state}` : ''}` : '—'
+          const location = city !== '-' ? `${city}${state && state !== '-' ? `, ${state}` : ''}` : '-'
           return (
             <div className="min-w-0">
               <span className="crm-contacts-table__text">{location}</span>
-              {territory !== '—' ? (
+              {territory !== '-' ? (
                 <p className="crm-contacts-table__sub">{territory} territory</p>
               ) : null}
             </div>
@@ -241,7 +241,7 @@ export function CrmContactsTable({
         meta: { columnLabel: 'Email' },
         cell: ({ row }) => {
           const email = row.original.contact.email
-          if (!email) return <span className="crm-contacts-table__muted">—</span>
+          if (!email) return <span className="crm-contacts-table__muted">-</span>
           return (
             <a
               href={`mailto:${email}`}
@@ -262,7 +262,7 @@ export function CrmContactsTable({
         meta: { columnLabel: 'Phone' },
         cell: ({ row }) => {
           const phone = row.original.contact.phone
-          if (!phone) return <span className="crm-contacts-table__muted">—</span>
+          if (!phone) return <span className="crm-contacts-table__muted">-</span>
           return (
             <a
               href={`tel:${phone}`}
@@ -318,7 +318,7 @@ export function CrmContactsTable({
         meta: { columnLabel: 'Next Follow-up' },
         cell: ({ row }) => {
           const nextFu = row.original.nextFu
-          if (!nextFu) return <span className="crm-contacts-table__muted">—</span>
+          if (!nextFu) return <span className="crm-contacts-table__muted">-</span>
           const overdue = nextFu.status === 'overdue'
           return (
             <div className="min-w-0">

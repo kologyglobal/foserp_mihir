@@ -186,7 +186,7 @@ export function InventoryOverviewPage() {
                   {data.pendingActions.map((row) => (
                     <tr key={row.id} className="cursor-pointer hover:bg-erp-bg-subtle" onClick={() => navigate(row.href)}>
                       <td>{row.label}</td>
-                      <td className="text-right font-mono">{row.count > 0 ? row.count : '—'}</td>
+                      <td className="text-right font-mono">{row.count > 0 ? row.count : '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -208,7 +208,7 @@ export function InventoryOverviewPage() {
                     <tr key={`out-${row.itemId}`} className="cursor-pointer hover:bg-erp-bg-subtle" onClick={() => navigate(row.href)}>
                       <td><span className="font-mono text-xs">{row.itemCode}</span> {row.itemName}</td>
                       <td className="text-right font-mono">0</td>
-                      <td className="text-right font-mono">—</td>
+                      <td className="text-right font-mono">-</td>
                     </tr>
                   ))}
                 </tbody>

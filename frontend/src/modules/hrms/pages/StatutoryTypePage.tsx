@@ -148,13 +148,13 @@ export function StatutoryTypePage() {
   const rateSummary = (r: HrStatutoryRule) => {
     if (type === 'PROFESSIONAL_TAX') {
       const n = r.ptSlabs?.length ?? 0
-      return `${r.stateCode ?? '—'} · ${n} slab(s)`
+      return `${r.stateCode ?? '-'} · ${n} slab(s)`
     }
     if (type === 'TDS') return 'Foundation / review'
     if (type === 'LWF') {
-      return `Emp ₹${r.employeeFixedAmount ?? r.employeeRatePct ?? '—'} · ${r.frequency ?? '—'}`
+      return `Emp ₹${r.employeeFixedAmount ?? r.employeeRatePct ?? '-'} · ${r.frequency ?? '-'}`
     }
-    return `Emp ${r.employeeRatePct ?? '—'}% · Er ${r.employerRatePct ?? '—'}% · Cap ${r.wageCeiling ?? '—'}`
+    return `Emp ${r.employeeRatePct ?? '-'}% · Er ${r.employerRatePct ?? '-'}% · Cap ${r.wageCeiling ?? '-'}`
   }
 
   return (

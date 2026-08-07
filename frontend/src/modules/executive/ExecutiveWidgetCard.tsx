@@ -11,7 +11,7 @@ import { queryWidgetDemo } from './queryWidgetDemo'
 import { cn } from '../../utils/cn'
 
 function formatValue(value: number | null | undefined, unit?: string | null) {
-  if (value == null || Number.isNaN(value)) return '—'
+  if (value == null || Number.isNaN(value)) return '-'
   if (unit === 'INR') return formatCurrency(value)
   return String(value)
 }

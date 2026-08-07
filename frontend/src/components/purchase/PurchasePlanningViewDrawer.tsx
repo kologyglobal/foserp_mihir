@@ -65,9 +65,9 @@ export function PurchasePlanningViewDrawer({ open, row, onClose, onEdit }: Props
               </TableLink>
             }
           />
-          <ErpViewField label="PR Line" value={row.purchaseRequisitionLineId || '—'} />
-          <ErpViewField label="Department" value={row.department || '—'} />
-          <ErpViewField label="Requested By" value={row.requestedByName || '—'} />
+          <ErpViewField label="PR Line" value={row.purchaseRequisitionLineId || '-'} />
+          <ErpViewField label="Department" value={row.department || '-'} />
+          <ErpViewField label="Requested By" value={row.requestedByName || '-'} />
           <ErpViewField label="Planning Date" value={formatDate(row.planningDate)} />
           <ErpViewField
             label="Status"
@@ -76,10 +76,10 @@ export function PurchasePlanningViewDrawer({ open, row, onClose, onEdit }: Props
         </Section>
 
         <Section title="Item Details">
-          <ErpViewField label="Item Code" value={row.itemCode || '—'} />
-          <ErpViewField label="Item Name" value={row.itemName || '—'} />
-          <ErpViewField label="Specification" value={row.specification || '—'} />
-          <ErpViewField label="UOM" value={row.uom || '—'} />
+          <ErpViewField label="Item Code" value={row.itemCode || '-'} />
+          <ErpViewField label="Item Name" value={row.itemName || '-'} />
+          <ErpViewField label="Specification" value={row.specification || '-'} />
+          <ErpViewField label="UOM" value={row.uom || '-'} />
         </Section>
 
         <Section title="Quantity Planning">
@@ -92,17 +92,17 @@ export function PurchasePlanningViewDrawer({ open, row, onClose, onEdit }: Props
           <ErpViewField label="Qty to order in PO" value={String(row.remainingQuantity)} />
           <ErpViewField
             label="Required Date"
-            value={row.requiredByDate ? formatDate(row.requiredByDate) : '—'}
+            value={row.requiredByDate ? formatDate(row.requiredByDate) : '-'}
           />
         </Section>
 
         <Section title="Vendor and Rate">
-          <ErpViewField label="Selected Vendor" value={row.preferredVendorName || '—'} />
-          <ErpViewField label="Vendor Code" value={row.preferredVendorCode || '—'} />
+          <ErpViewField label="Selected Vendor" value={row.preferredVendorName || '-'} />
+          <ErpViewField label="Vendor Code" value={row.preferredVendorCode || '-'} />
           <ErpViewField label="Expected Rate" value={formatCurrency(row.expectedRate)} />
           <ErpViewField
             label="Negotiated Rate"
-            value={row.negotiatedRate == null ? '—' : formatCurrency(row.negotiatedRate)}
+            value={row.negotiatedRate == null ? '-' : formatCurrency(row.negotiatedRate)}
           />
           <ErpViewField label="Estimated Amount" value={formatCurrency(row.estimatedAmount)} />
           <ErpViewField
@@ -116,7 +116,7 @@ export function PurchasePlanningViewDrawer({ open, row, onClose, onEdit }: Props
             label="Priority"
             value={PURCHASE_PLANNING_PRIORITY_LABELS[row.priority] ?? row.priority}
           />
-          <ErpViewField label="Remarks" value={row.remarks || '—'} />
+          <ErpViewField label="Remarks" value={row.remarks || '-'} />
         </Section>
 
         <Section title="PO Conversion">
@@ -128,7 +128,7 @@ export function PurchasePlanningViewDrawer({ open, row, onClose, onEdit }: Props
                   {row.purchaseOrderNumber}
                 </TableLink>
               ) : (
-                '—'
+                '-'
               )
             }
           />

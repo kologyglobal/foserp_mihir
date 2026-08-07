@@ -494,7 +494,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                   hint={companyLocked ? 'Company is locked on revised quotations' : 'Linked from the quotation customer'}
                 >
                   <Input
-                    value={customer?.customerName ?? '—'}
+                    value={customer?.customerName ?? '-'}
                     readOnly
                     className="erp-input"
                   />

@@ -139,7 +139,7 @@ export function CrmOpportunitiesTable({
           return (
             <TableLink to={entity360CustomerPath(row.original.customerId)}>
               <EnterpriseRecordCell
-                primary={c?.customerName ?? '—'}
+                primary={c?.customerName ?? '-'}
                 location={c?.city}
                 industry={c?.industry}
                 subtitle={c?.isCustomer ? 'Customer' : 'Prospect'}
@@ -234,7 +234,7 @@ export function CrmOpportunitiesTable({
         meta: { columnLabel: 'Next Follow-up' },
         cell: ({ row }) => {
           const { nextFollowUpDate } = row.original
-          if (!nextFollowUpDate) return <span className="text-[13px] text-erp-muted">—</span>
+          if (!nextFollowUpDate) return <span className="text-[13px] text-erp-muted">-</span>
           const overdue = nextFollowUpDate.slice(0, 10) < new Date().toISOString().slice(0, 10)
           return (
             <span className={cn('text-[13px] text-erp-text', overdue && 'font-semibold text-erp-critical')}>

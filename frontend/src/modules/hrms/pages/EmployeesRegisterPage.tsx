@@ -213,10 +213,10 @@ export function EmployeesRegisterPage() {
                     <HrEmployeeCell name={e.displayName} size="sm" />
                   </td>
                   <td>{e.employeeCode}</td>
-                  <td>{e.department?.name ?? '—'}</td>
-                  <td>{e.designation?.name ?? '—'}</td>
-                  <td>{e.branch?.name ?? '—'}</td>
-                  <td>{e.reportingManager?.displayName ?? '—'}</td>
+                  <td>{e.department?.name ?? '-'}</td>
+                  <td>{e.designation?.name ?? '-'}</td>
+                  <td>{e.branch?.name ?? '-'}</td>
+                  <td>{e.reportingManager?.displayName ?? '-'}</td>
                   <td>{EMPLOYMENT_TYPE_LABELS[e.employmentType] ?? e.employmentType}</td>
                   <td>
                     <HrStatusChip status={e.status} domain="employee" />

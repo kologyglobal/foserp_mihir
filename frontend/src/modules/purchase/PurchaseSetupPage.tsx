@@ -9,10 +9,8 @@ import { FormField } from '@/components/forms/FormField'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { TabStrip } from '@/components/ui/TabStrip'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { isApiMode } from '@/config/apiConfig'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
-  useBuyerOptions,
   useDeliveryTermOptions,
   usePaymentTermOptions,
 } from '@/hooks/usePurchaseMasters'
@@ -175,7 +173,6 @@ export function PurchaseSetupPage() {
   const perms = usePurchasePermissions()
   const paymentTermOptions = usePaymentTermOptions()
   const deliveryTermOptions = useDeliveryTermOptions()
-  const buyerOptions = useBuyerOptions()
   const storeLocations = useMasterStore((s) => s.locations)
 
   const [setup, setSetup] = useState<PurchaseSetup | null>(null)
@@ -206,7 +203,7 @@ export function PurchaseSetupPage() {
       const fromStore = storeLocations.filter(
         (l) => l.isActive && l.warehouseId === warehouseId,
       )
-      if (fromStore.length > 0 || !isApiMode()) {
+      if (fromStore.length > 0) {
         setWarehouseLocationOptions(
           fromStore.map((l) => ({
             id: l.id,
@@ -249,36 +246,31 @@ export function PurchaseSetupPage() {
         })),
       )
 
-      if (isApiMode()) {
-        try {
-          const plants = await fetchMasterPlants()
-          setPlantOptions(
-            plants
-              .filter((p) => p.status === 'ACTIVE')
-              .map((p) => ({
-                id: p.id,
-                label: p.code ? `${p.name} (${p.code})` : p.name,
-              })),
-          )
-        } catch {
-          setPlantOptions([])
-        }
-
-        // Backend validates defaultBuyerId as an active tenant user UUID — offer
-        // real users, not demo buyer-master codes. Requires `user.view`; swallow 403.
-        try {
-          const users = await fetchAdminUsersApi({ status: 'ACTIVE' })
-          setBuyerUserOptions(
-            users.map((u) => ({
-              id: u.id,
-              label: `${u.firstName} ${u.lastName}`.trim() || u.email,
+      try {
+        const plants = await fetchMasterPlants()
+        setPlantOptions(
+          plants
+            .filter((p) => p.status === 'ACTIVE')
+            .map((p) => ({
+              id: p.id,
+              label: p.code ? `${p.name} (${p.code})` : p.name,
             })),
-          )
-        } catch {
-          setBuyerUserOptions([])
-        }
-      } else {
+        )
+      } catch {
         setPlantOptions([])
+      }
+
+      // Backend validates defaultBuyerId as an active tenant user UUID — offer
+      // real users, not demo buyer-master codes. Requires `user.view`; swallow 403.
+      try {
+        const users = await fetchAdminUsersApi({ status: 'ACTIVE' })
+        setBuyerUserOptions(
+          users.map((u) => ({
+            id: u.id,
+            label: `${u.firstName} ${u.lastName}`.trim() || u.email,
+          })),
+        )
+      } catch {
         setBuyerUserOptions([])
       }
 
@@ -502,17 +494,14 @@ export function PurchaseSetupPage() {
   }, [deliveryTermOptions, setup?.general.defaultDeliveryTerms])
 
   const buyerSelectOptions = useMemo(() => {
-    // API mode: buyer must be a tenant user UUID (backend validates it).
-    // Demo mode: buyer-master codes from the demo store.
-    const rows = isApiMode()
-      ? buyerUserOptions.map((o) => ({ id: o.id, label: o.label }))
-      : buyerOptions.map((o) => ({ id: o.value, label: o.label }))
+    // Buyer must be a tenant user UUID (backend validates it).
+    const rows = buyerUserOptions.map((o) => ({ id: o.id, label: o.label }))
     const currentId = setup?.general.defaultBuyerId
     if (currentId && !rows.some((o) => o.id === currentId)) {
       rows.unshift({ id: currentId, label: currentId })
     }
     return rows
-  }, [buyerOptions, buyerUserOptions, setup?.general.defaultBuyerId])
+  }, [buyerUserOptions, setup?.general.defaultBuyerId])
 
   const tabItems = useMemo(
     () => SETUP_TABS.map((id) => ({ id, label: PURCHASE_SETUP_TAB_LABELS[id] })),
@@ -552,11 +541,7 @@ export function PurchaseSetupPage() {
         />
       }
     >
-      {!isApiMode() ? (
-        <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-          Demo mode — Purchase Setup is saved in browser memory only until the purchase API is wired.
-        </p>
-      ) : setup && !setup.isConfigured ? (
+      {setup && !setup.isConfigured ? (
         <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
           Using server defaults — not yet configured.
         </p>
@@ -1091,7 +1076,7 @@ export function PurchaseSetupPage() {
                         <p className="text-[11px] text-erp-muted lg:col-span-8">
                           Level {index + 1}:{' '}
                           {tier.requiredRoles.map((r) => PURCHASE_APPROVAL_ROLE_LABELS[r]).join(' → ') ||
-                            '—'}
+                            '-'}
                           {' · '}
                           {formatCurrency(tier.minAmount)}
                           {' – '}

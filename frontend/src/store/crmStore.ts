@@ -1648,7 +1648,7 @@ export const useCrmStore = create<CrmState>()(
           })
           const sections = populateDocumentFromOpportunity(tplSections, {
             customerName: customer?.customerName ?? opp.customerId,
-            contactName: contact?.name ?? customer?.contactPerson ?? '—',
+            contactName: contact?.name ?? customer?.contactPerson ?? '-',
             productRequirement: requirementText,
             technicalNotes: requirementText,
             commercialNotes,
@@ -1722,7 +1722,7 @@ export const useCrmStore = create<CrmState>()(
         const createdDoc = get().getQuotationDocument(docResult.documentId)!
         const sections = populateDocumentFromOpportunity(createdDoc.sections, {
           customerName: customer?.customerName ?? opp.customerId,
-          contactName: contact?.name ?? customer?.contactPerson ?? '—',
+          contactName: contact?.name ?? customer?.contactPerson ?? '-',
           productRequirement: requirementText,
           technicalNotes: requirementText,
           commercialNotes,
@@ -1839,7 +1839,7 @@ export const useCrmStore = create<CrmState>()(
           })
           const sections = populateDocumentFromOpportunity(tplSections, {
             customerName: customer.customerName,
-            contactName: customer.contactPerson ?? '—',
+            contactName: customer.contactPerson ?? '-',
             productRequirement,
             technicalNotes: productRequirement,
             commercialNotes: commercialNotes ?? '',
@@ -1893,7 +1893,7 @@ export const useCrmStore = create<CrmState>()(
         const createdDoc = get().getQuotationDocument(docResult.documentId)!
         const sections = populateDocumentFromOpportunity(createdDoc.sections, {
           customerName: customer.customerName,
-          contactName: customer.contactPerson ?? '—',
+          contactName: customer.contactPerson ?? '-',
           productRequirement,
           technicalNotes: productRequirement,
           commercialNotes: commercialNotes ?? '',

@@ -239,7 +239,7 @@ export function AnnualBudgetPage() {
           <dl className="grid gap-2 sm:grid-cols-2 text-[12px]">
             <div>
               <dt className="text-erp-muted">Company</dt>
-              <dd className="font-medium">{version?.companyName ?? '—'}</dd>
+              <dd className="font-medium">{version?.companyName ?? '-'}</dd>
             </div>
             <div>
               <dt className="text-erp-muted">Financial year</dt>
@@ -251,7 +251,7 @@ export function AnnualBudgetPage() {
             </div>
             <div>
               <dt className="text-erp-muted">Status</dt>
-              <dd className="font-medium">{version?.status ?? '—'}</dd>
+              <dd className="font-medium">{version?.status ?? '-'}</dd>
             </div>
           </dl>
           <BudgetingCollapsedSection title="Assumptions">

@@ -41,8 +41,8 @@ export function formatTaxSchemeLabel(scheme?: string | null): string {
   if (s === 'igst') return 'IGST'
   if (s === 'utgst_pair' || s === 'cgst_utgst') return 'CGST+UTGST'
   if (s === 'cgst_sgst' || s === 'intra') return 'CGST+SGST'
-  if (s === 'unresolved' || !s) return '—'
-  return scheme ?? '—'
+  if (s === 'unresolved' || !s) return '-'
+  return scheme ?? '-'
 }
 
 export function taxFieldsFromLineTaxSnapshot(snap: LineTaxSnapshot): CommercialLineTaxFields {

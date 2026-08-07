@@ -80,7 +80,7 @@ export function DailyProductionGrid({ batch, readOnly, busy, onLineChange, onRem
               ))}
               <td>
                 {readOnly ? (
-                  <span className="text-erp-muted">{line.remarks || '—'}</span>
+                  <span className="text-erp-muted">{line.remarks || '-'}</span>
                 ) : (
                   <Input
                     className="h-8 min-h-8"

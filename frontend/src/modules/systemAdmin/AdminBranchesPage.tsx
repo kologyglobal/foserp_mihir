@@ -182,7 +182,7 @@ export function AdminBranchesPage() {
                             ) : null}
                           </td>
                           <td className="px-4 py-2.5 text-erp-muted">{row.branchType.replace(/_/g, ' ')}</td>
-                          <td className="px-4 py-2.5 font-mono text-xs">{row.gstin ?? '—'}</td>
+                          <td className="px-4 py-2.5 font-mono text-xs">{row.gstin ?? '-'}</td>
                           <td className="px-4 py-2.5">
                             <Badge color={row.isActive ? 'green' : 'gray'}>{row.isActive ? 'ACTIVE' : 'INACTIVE'}</Badge>
                           </td>

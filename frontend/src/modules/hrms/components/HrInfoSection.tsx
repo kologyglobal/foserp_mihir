@@ -25,7 +25,7 @@ export function HrInfoSection({ title, fields, actions, className }: HrInfoSecti
         {fields.map((f) => (
           <div key={f.label} className="hr-info-section__row">
             <dt className="hr-info-section__label">{f.label}</dt>
-            <dd className="hr-info-section__value">{f.value ?? '—'}</dd>
+            <dd className="hr-info-section__value">{f.value ?? '-'}</dd>
           </div>
         ))}
       </dl>

@@ -188,7 +188,7 @@ export function UpcomingInvoicesPage() {
                           {approvingId === row.id ? 'Approving…' : 'Approve'}
                         </ErpButton>
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
                   </tr>

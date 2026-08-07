@@ -140,7 +140,7 @@ export function MaterialIssueDrawer({ open, onClose, material, workOrderNo, busy
           </div>
           <div>
             <p className="text-erp-muted">Available</p>
-            <p className="font-semibold tabular-nums">{position.free != null ? fmt(position.free) : '—'}</p>
+            <p className="font-semibold tabular-nums">{position.free != null ? fmt(position.free) : '-'}</p>
           </div>
         </div>
 

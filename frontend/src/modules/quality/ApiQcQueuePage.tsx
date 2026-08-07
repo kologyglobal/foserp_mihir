@@ -91,7 +91,7 @@ export function ApiQcQueuePage() {
                         {row.productionOrderNumber || 'Open work order'}
                       </Link>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </td>
                   <td className="px-4 py-2">{row.title}</td>

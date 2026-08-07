@@ -238,7 +238,7 @@ function ReadonlyField({ label, value, hint }: { label: string; value: string; h
   return (
     <FormField label={label} hint={hint}>
       <div className="erp-input flex min-h-[34px] items-center bg-erp-surface-alt/70 text-erp-text">
-        {value || '—'}
+        {value || '-'}
       </div>
     </FormField>
   )
@@ -1000,8 +1000,8 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const customerDisplayName = customerStore?.customerName || customerLookup?.name || 'Customer'
   const customerCode = customerStore?.customerCode || customerLookup?.code || null
   const customerGstin = customerLookup?.gstin ?? customerStore?.gstin ?? null
-  const billingAddress = customerStore ? formatCustomerBillingAddress(customerStore) : '—'
-  const shippingAddress = customerStore ? formatCustomerShippingAddress(customerStore) : '—'
+  const billingAddress = customerStore ? formatCustomerBillingAddress(customerStore) : '-'
+  const shippingAddress = customerStore ? formatCustomerShippingAddress(customerStore) : '-'
 
   return (
     <MoneyInWorkspaceShell title={mode === 'create' ? 'New Invoice' : 'Edit Invoice'}>
@@ -1078,7 +1078,7 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
               <div className="mi-create-source-chips">
                 <span className="mi-create-source-chip">
                   <span className="mi-create-source-chip__label">Dispatch</span>
-                  {dispatchSourceDocumentId ?? '—'}
+                  {dispatchSourceDocumentId ?? '-'}
                 </span>
                 <span className="mi-create-source-chip">
                   <span className="mi-create-source-chip__label">Lines</span>
@@ -1097,7 +1097,7 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
               <div className="mi-create-source-chips">
                 <span className="mi-create-source-chip">
                   <span className="mi-create-source-chip__label">Proforma</span>
-                  {proformaSource.proformaNo ?? '—'}
+                  {proformaSource.proformaNo ?? '-'}
                 </span>
                 <span className="mi-create-source-chip">
                   <span className="mi-create-source-chip__label">Lines</span>
@@ -1134,7 +1134,7 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 {selectedSo && (
                   <>
                     <ReadonlyField label="SO status" value={selectedSo.status.replace(/_/g, ' ')} />
-                    <ReadonlyField label="SO customer PO" value={selectedSo.customerPoNumber ?? '—'} />
+                    <ReadonlyField label="SO customer PO" value={selectedSo.customerPoNumber ?? '-'} />
                   </>
                 )}
               </div>
@@ -1181,7 +1181,7 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   <div className="mi-create-party__chips">
                     <span className="mi-create-party__chip">
                       <span className="mi-create-party__chip-label">GSTIN</span>
-                      {customerGstin || '—'}
+                      {customerGstin || '-'}
                     </span>
                     <span className="mi-create-party__chip">
                       <span className="mi-create-party__chip-label">Place of supply</span>
@@ -1189,7 +1189,7 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                         ? formatPlaceOfSupplyLabel(watched.placeOfSupply)
                         : customerPlaceOfSupply
                           ? formatPlaceOfSupplyLabel(customerPlaceOfSupply)
-                          : '—'}
+                          : '-'}
                     </span>
                     {customerCreditDays ? (
                       <span className="mi-create-party__chip">
@@ -1206,11 +1206,11 @@ export function InvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
               <div className="mi-create-addresses">
                 <div className="mi-create-address">
                   <p className="mi-create-address__label">Bill to</p>
-                  <p className="mi-create-address__body">{billingAddress || '—'}</p>
+                  <p className="mi-create-address__body">{billingAddress || '-'}</p>
                 </div>
                 <div className="mi-create-address">
                   <p className="mi-create-address__label">Ship to</p>
-                  <p className="mi-create-address__body">{shippingAddress || '—'}</p>
+                  <p className="mi-create-address__body">{shippingAddress || '-'}</p>
                 </div>
               </div>
             )}

@@ -114,8 +114,8 @@ export function PaymentPostingPreviewModal({
                   {preview.lines.map((line, i) => (
                     <tr key={`${line.account}-${i}`}>
                       <td>{line.account}</td>
-                      <td className="text-right tabular-nums">{line.debit > 0 ? formatCurrency(line.debit) : '—'}</td>
-                      <td className="text-right tabular-nums">{line.credit > 0 ? formatCurrency(line.credit) : '—'}</td>
+                      <td className="text-right tabular-nums">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</td>
+                      <td className="text-right tabular-nums">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</td>
                       <td className="text-erp-muted">{line.narration}</td>
                     </tr>
                   ))}

@@ -359,7 +359,7 @@ export function AdminAuditLogPage() {
                                       </span>
                                     )
                                   ) : (
-                                    <span className="text-xs text-erp-muted">—</span>
+                                    <span className="text-xs text-erp-muted">-</span>
                                   )}
                                 </td>
                                 <td className="px-3 py-2.5">
@@ -380,7 +380,7 @@ export function AdminAuditLogPage() {
                                   )}
                                 </td>
                                 <td className="px-3 py-2.5 whitespace-nowrap font-mono text-[12px] text-erp-muted">
-                                  {row.ipAddress ?? '—'}
+                                  {row.ipAddress ?? '-'}
                                 </td>
                               </tr>
                             )

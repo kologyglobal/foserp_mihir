@@ -406,7 +406,7 @@ export function LoginPage() {
           <p className="login-brand-panel__footer-tagline">
             <span className="login-brand-panel__footer-sanskrit">सरलम् एव श्रेष्ठम्</span>
             <span className="login-brand-panel__footer-sep" aria-hidden>
-              —
+              -
             </span>
             <span className="login-brand-panel__footer-english">Simplicity is Excellence</span>
           </p>

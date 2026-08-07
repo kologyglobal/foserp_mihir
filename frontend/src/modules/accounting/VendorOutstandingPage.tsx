@@ -69,7 +69,7 @@ function CreditUtilBar({ used, limit }: { used: number; limit: number }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-[10px] text-erp-muted">{limit > 0 ? `${pct}%` : '—'}</span>
+      <span className="text-[10px] text-erp-muted">{limit > 0 ? `${pct}%` : '-'}</span>
     </div>
   )
 }

@@ -135,10 +135,10 @@ export function PaymentMethodFormPage() {
       subtitle={existing?.description ?? 'Payment method card — Business Central'}
       breadcrumbs={buildMasterBreadcrumbs('procurement', isEdit ? 'Edit Payment Method' : 'New Payment Method')}
       documentStrip={[
-        { label: 'Code', value: watched.code?.trim() || '—', highlight: Boolean(watched.code?.trim()) },
-        { label: 'Description', value: watched.description?.trim() || '—' },
-        { label: 'Bal. Account Type', value: watched.balAccountType ? PAYMENT_BAL_ACCOUNT_TYPE_LABELS[watched.balAccountType] : '—' },
-        { label: 'Bal. Account No.', value: watched.balAccountNo?.trim() || '—' },
+        { label: 'Code', value: watched.code?.trim() || '-', highlight: Boolean(watched.code?.trim()) },
+        { label: 'Description', value: watched.description?.trim() || '-' },
+        { label: 'Bal. Account Type', value: watched.balAccountType ? PAYMENT_BAL_ACCOUNT_TYPE_LABELS[watched.balAccountType] : '-' },
+        { label: 'Bal. Account No.', value: watched.balAccountNo?.trim() || '-' },
         { label: 'Direct Debit', value: watched.directDebit ? 'Yes' : 'No' },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
       ]}
@@ -160,16 +160,16 @@ export function PaymentMethodFormPage() {
       activeSection={activeSection}
       onSectionSelect={setActiveSection}
       formMetrics={[
-        { label: 'Account Type', value: watched.balAccountType ? PAYMENT_BAL_ACCOUNT_TYPE_LABELS[watched.balAccountType] : '—', accent: 'blue' as const },
-        { label: 'Account No.', value: watched.balAccountNo ?? '—', accent: 'violet' as const },
+        { label: 'Account Type', value: watched.balAccountType ? PAYMENT_BAL_ACCOUNT_TYPE_LABELS[watched.balAccountType] : '-', accent: 'blue' as const },
+        { label: 'Account No.', value: watched.balAccountNo ?? '-', accent: 'violet' as const },
         { label: 'Direct Debit', value: watched.directDebit ? 'Yes' : 'No', accent: 'amber' as const },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive', accent: watched.isActive ? ('green' as const) : ('amber' as const) },
       ]}
       factBoxTitle="Payment method"
       factBoxSummary={[
         { label: 'Used on', value: 'Vendor, Purchase Invoice, Payments' },
-        { label: 'Code', value: watched.code || '—' },
-        { label: 'Posting', value: watched.balAccountType && watched.balAccountNo ? `${PAYMENT_BAL_ACCOUNT_TYPE_LABELS[watched.balAccountType]} · ${watched.balAccountNo}` : '—' },
+        { label: 'Code', value: watched.code || '-' },
+        { label: 'Posting', value: watched.balAccountType && watched.balAccountNo ? `${PAYMENT_BAL_ACCOUNT_TYPE_LABELS[watched.balAccountType]} · ${watched.balAccountNo}` : '-' },
         { label: 'Modified', value: existing ? formatDate(existing.updatedAt.slice(0, 10)) : 'New' },
       ]}
       stickyFooter={(

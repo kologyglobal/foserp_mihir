@@ -118,19 +118,144 @@ export function getPurchaseLineBaseUomCode(itemId: string | null | undefined): s
   return resolveUomCode(master.baseUomId, '')
 }
 
-/** True when purchase unit differs from base (e.g. MTR vs NOS). */
+/** Purchase / vendor UOM code from Item Master (KG, MTR, etc.). */
+export function getPurchaseLinePurchaseUomCode(itemId: string | null | undefined): string {
+  if (!itemId) return ''
+  const master = useMasterStore.getState().items.find((i) => i.id === itemId)
+  if (!master) return ''
+  const purchaseId = master.purchaseUomId || master.baseUomId
+  return resolveUomCode(purchaseId, '')
+}
+
+export function resolvePurchaseLineFactor(line: {
+  itemId?: string | null
+  uomConversionFactor?: number | null
+}): number {
+  const lineFactor = Number(line.uomConversionFactor ?? 0)
+  if (lineFactor > 0) return lineFactor
+  if (!line.itemId) return 1
+  const master = useMasterStore.getState().items.find((i) => i.id === line.itemId)
+  return Number(master?.uomConversionFactor ?? master?.purchaseQtyPerUom ?? 1) || 1
+}
+
+/** Item has distinct purchase + stock UOM on this document line (uses line factor + UOM, not item master alone). */
 export function purchaseLineHasDualUom(line: {
   itemId?: string | null
+  uom?: string | null
+  uomQuantity?: number | null
+  quantity?: number | null
   uomConversionFactor?: number | null
   uomId?: string | null
 }): boolean {
-  const factor = Number(line.uomConversionFactor ?? 1)
-  if (factor !== 1) return true
-  if (!line.itemId) return false
-  const master = useMasterStore.getState().items.find((i) => i.id === line.itemId)
-  if (!master) return false
-  if (line.uomId && line.uomId !== master.baseUomId) return true
-  return Boolean(master.purchaseUomId && master.purchaseUomId !== master.baseUomId)
+  const factor = resolvePurchaseLineFactor(line)
+  if (!(factor > 1)) return false
+  const baseUom = getPurchaseLineBaseUomCode(line.itemId).trim().toUpperCase()
+  const lineUom = (line.uom || resolveUomCode(line.uomId ?? null, '')).trim().toUpperCase()
+  if (!baseUom || !lineUom) return true
+  return lineUom !== baseUom
+}
+
+/** @deprecated alias — prefer purchaseLineHasDualUom */
+export function purchaseLineHasMuomItem(itemId: string | null | undefined): boolean {
+  if (!itemId) return false
+  const master = useMasterStore.getState().items.find((i) => i.id === itemId)
+  if (!master?.purchaseUomId || !master.baseUomId) return false
+  if (master.purchaseUomId === master.baseUomId) return false
+  const purchaseCode = resolveUomCode(master.purchaseUomId, '').trim().toUpperCase()
+  const baseCode = resolveUomCode(master.baseUomId, '').trim().toUpperCase()
+  return Boolean(purchaseCode && baseCode && purchaseCode !== baseCode)
+}
+
+export type PurchaseLineQtyPresentation = {
+  dual: boolean
+  purchaseQty: number
+  purchaseUom: string
+  baseQty: number
+  baseUom: string
+}
+
+/** Resolve PO/GRN line qty labels — vendor UOM on top, stock/base UOM beneath when MUOM applies. */
+export function resolvePurchaseLineQtyPresentation(line: {
+  itemId?: string | null
+  uom?: string | null
+  uomQuantity?: number | null
+  quantity?: number | null
+  uomConversionFactor?: number | null
+  uomId?: string | null
+}): PurchaseLineQtyPresentation {
+  const factor = resolvePurchaseLineFactor(line)
+  const baseUom = getPurchaseLineBaseUomCode(line.itemId) || (line.uom || '-').trim()
+  const lineUom =
+    (line.uom || resolveUomCode(line.uomId ?? null, '')).trim() || baseUom
+  const baseQty = Number(line.quantity ?? 0) || 0
+  const dual = purchaseLineHasDualUom(line)
+
+  if (!dual) {
+    const qty = baseQty || Number(line.uomQuantity ?? 0) || 0
+    const uom = lineUom || baseUom || '-'
+    return { dual: false, purchaseQty: qty, purchaseUom: uom, baseQty: qty, baseUom: uom }
+  }
+
+  let purchaseQty = Number(line.uomQuantity ?? 0) || 0
+  const expectedPurchaseQty = toUomQuantityFromBase(baseQty, factor)
+  if (
+    !(purchaseQty > 0) ||
+    (Math.abs(purchaseQty - baseQty) < 1e-6 && factor > 1) ||
+    Math.abs(purchaseQty - expectedPurchaseQty) > Math.max(expectedPurchaseQty * 0.01, 0.05)
+  ) {
+    purchaseQty = expectedPurchaseQty
+  }
+
+  return {
+    dual: true,
+    purchaseQty,
+    purchaseUom: lineUom,
+    baseQty: baseQty || purchaseQtyToBaseQty(purchaseQty, factor),
+    baseUom,
+  }
+}
+
+/** Tracking columns (outstanding / received / invoiced) — derive vendor qty from base when needed. */
+export function resolvePurchaseLineTrackingPresentation(
+  line: {
+    itemId?: string | null
+    uom?: string | null
+    uomConversionFactor?: number | null
+    uomId?: string | null
+  },
+  purchaseQtyInput: number,
+  baseQtyInput: number,
+): PurchaseLineQtyPresentation {
+  const factor = resolvePurchaseLineFactor(line)
+  const baseUom = getPurchaseLineBaseUomCode(line.itemId) || (line.uom || '-').trim()
+  const lineUom =
+    (line.uom || resolveUomCode(line.uomId ?? null, '')).trim() || baseUom
+  const baseQty = baseQtyInput || purchaseQtyInput
+  const dual = purchaseLineHasDualUom({ ...line, quantity: baseQty, uomQuantity: purchaseQtyInput })
+
+  if (!dual) {
+    const qty = baseQty
+    const uom = lineUom || baseUom || '-'
+    return { dual: false, purchaseQty: qty, purchaseUom: uom, baseQty: qty, baseUom: uom }
+  }
+
+  const expectedPurchaseQty = toUomQuantityFromBase(baseQty, factor)
+  let purchaseQty = purchaseQtyInput
+  if (
+    !(purchaseQty > 0) ||
+    (Math.abs(purchaseQty - baseQty) < 1e-6 && factor > 1) ||
+    Math.abs(purchaseQty - expectedPurchaseQty) > Math.max(expectedPurchaseQty * 0.01, 0.05)
+  ) {
+    purchaseQty = expectedPurchaseQty
+  }
+
+  return {
+    dual: true,
+    purchaseQty,
+    purchaseUom: lineUom,
+    baseQty,
+    baseUom,
+  }
 }
 
 /** GRN conversion hint — e.g. "1 NOS = 3 MTR". */
@@ -140,7 +265,7 @@ export function formatGrnUomConversionLabel(
   purchaseUom: string,
 ): string {
   const f = Number(factor) || 1
-  if (f === 1 || !baseUom || !purchaseUom || baseUom === purchaseUom) return '—'
+  if (f === 1 || !baseUom || !purchaseUom || baseUom === purchaseUom) return '-'
   return `1 ${baseUom} = ${formatPurchaseQty(f)} ${purchaseUom}`
 }
 

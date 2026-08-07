@@ -154,7 +154,7 @@ export function GstExportSezLutPage() {
                   {luts.map((l) => (
                     <tr key={l.id} className="border-b border-erp-border/60">
                       <td className="py-1.5 pr-2 font-medium">{l.lutNumber}</td>
-                      <td className="py-1.5 pr-2">{l.companyGstin || '—'}</td>
+                      <td className="py-1.5 pr-2">{l.companyGstin || '-'}</td>
                       <td className="py-1.5 pr-2">
                         {l.validFrom} → {l.validTo || 'open'}
                       </td>
@@ -198,8 +198,8 @@ export function GstExportSezLutPage() {
                     <tr key={r.documentId} className="border-b border-erp-border/60">
                       <td className="py-1.5 pr-2 font-medium">{r.documentNumber}</td>
                       <td className="py-1.5 pr-2">{r.documentDate}</td>
-                      <td className="py-1.5 pr-2">{r.taxTreatment || r.supplyType || '—'}</td>
-                      <td className="py-1.5 pr-2">{r.zeroRatedMode || '—'}</td>
+                      <td className="py-1.5 pr-2">{r.taxTreatment || r.supplyType || '-'}</td>
+                      <td className="py-1.5 pr-2">{r.zeroRatedMode || '-'}</td>
                       <td className="py-1.5 pr-2">{formatCurrency(r.taxableValue)}</td>
                       <td className="py-1.5 pr-2">{formatCurrency(r.totalTax)}</td>
                     </tr>
@@ -233,7 +233,7 @@ export function GstExportSezLutPage() {
                       <td className="py-1.5 pr-2">{r.claimType}</td>
                       <td className="py-1.5 pr-2">{r.igstAmount}</td>
                       <td className="py-1.5 pr-2">{r.status}</td>
-                      <td className="py-1.5 pr-2">{r.externalArn || '—'}</td>
+                      <td className="py-1.5 pr-2">{r.externalArn || '-'}</td>
                     </tr>
                   ))}
                 </tbody>

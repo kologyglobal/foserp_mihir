@@ -169,7 +169,7 @@ export function PurchaseApprovalReviewDrawer({
               </div>
               <div>
                 <span className="text-erp-muted">Department</span>
-                <p className="font-medium">{detail.row.department || '—'}</p>
+                <p className="font-medium">{detail.row.department || '-'}</p>
               </div>
               <div>
                 <span className="text-erp-muted">Location</span>
@@ -266,7 +266,7 @@ export function PurchaseApprovalReviewDrawer({
             <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
               Requester remarks
             </p>
-            <p>{detail.requesterRemarks || '—'}</p>
+            <p>{detail.requesterRemarks || '-'}</p>
           </section>
 
           <section>

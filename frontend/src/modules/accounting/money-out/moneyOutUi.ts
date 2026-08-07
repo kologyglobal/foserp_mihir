@@ -125,21 +125,21 @@ export function vendorInvoiceDisplayNumber(inv: {
   vendorInvoiceNumber: string | null
   draftReference: string | null
 }) {
-  return inv.vendorInvoiceNumber ?? inv.draftReference ?? '—'
+  return inv.vendorInvoiceNumber ?? inv.draftReference ?? '-'
 }
 
 export function vendorPaymentDisplayNumber(pmt: {
   vendorPaymentNumber: string | null
   draftReference: string | null
 }) {
-  return pmt.vendorPaymentNumber ?? pmt.draftReference ?? '—'
+  return pmt.vendorPaymentNumber ?? pmt.draftReference ?? '-'
 }
 
 export function vendorAdjustmentDisplayNumber(adj: {
   vendorAdjustmentNumber: string | null
   draftReference: string | null
 }) {
-  return adj.vendorAdjustmentNumber ?? adj.draftReference ?? '—'
+  return adj.vendorAdjustmentNumber ?? adj.draftReference ?? '-'
 }
 
 export const ADJUSTMENT_TYPE_LABELS: Record<'VENDOR_DEBIT_NOTE' | 'VENDOR_CREDIT_ADJUSTMENT', string> = {

@@ -9,20 +9,20 @@ export function formatCustomerDetailsFromMap(
   salesOwnerName?: string | null,
 ): string {
   const lines: string[] = []
-  if (map.customer_name && map.customer_name !== '—') {
+  if (map.customer_name && map.customer_name !== '-') {
     lines.push(map.customer_name)
   }
-  if (map.customer_address && map.customer_address !== '—') {
+  if (map.customer_address && map.customer_address !== '-') {
     lines.push(map.customer_address)
   }
-  if (lines.length === 0) lines.push(map.customer_name || '—')
+  if (lines.length === 0) lines.push(map.customer_name || '-')
 
   lines.push('')
   lines.push(`Contact: ${map.contact_person}`)
-  if (map.contact_mobile && map.contact_mobile !== '—') {
+  if (map.contact_mobile && map.contact_mobile !== '-') {
     lines.push(`Mobile: ${map.contact_mobile}`)
   }
-  if (map.contact_email && map.contact_email !== '—') {
+  if (map.contact_email && map.contact_email !== '-') {
     lines.push(`Email: ${map.contact_email}`)
   }
   if (salesOwnerName?.trim()) {

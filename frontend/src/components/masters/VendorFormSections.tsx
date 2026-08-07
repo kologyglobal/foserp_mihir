@@ -271,12 +271,12 @@ export function VendorFormPreview({
         <dl className="space-y-2 text-[12px]">
           <div className="flex justify-between gap-2 py-1">
             <dt className="text-erp-muted">GSTIN</dt>
-            <dd className="font-mono font-medium text-erp-text">{values.gstin || '—'}</dd>
+            <dd className="font-mono font-medium text-erp-text">{values.gstin || '-'}</dd>
           </div>
           <div className="flex justify-between gap-2 py-1">
             <dt className="text-erp-muted">Location</dt>
             <dd className="text-right font-medium text-erp-text">
-              {values.city ? `${values.city}${values.state ? `, ${values.state}` : ''}` : '—'}
+              {values.city ? `${values.city}${values.state ? `, ${values.state}` : ''}` : '-'}
             </dd>
           </div>
           <div className="flex justify-between gap-2 py-1">

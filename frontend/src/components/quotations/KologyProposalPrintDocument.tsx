@@ -159,11 +159,11 @@ export function KologyProposalPrintDocument({
   const summary = calcPriceSummary(lines, 0, doc.installationAmount, doc.customCharges)
   const hasLivePrice = lines.some((l) => l.qty > 0 && l.unitPrice > 0)
   const feeDisplay = hasLivePrice ? formatCrmCurrency(summary.grandTotal) : 'INR 60K'
-  const client = map.customer_name !== '—' ? map.customer_name : 'Client'
-  const contact = map.contact_person !== '—' ? map.contact_person : client
-  const preparedBy = map.authorized_person !== '—' ? map.authorized_person : 'Mihir Bhatt'
-  const designation = map.designation !== '—' ? map.designation : 'CEO'
-  const validity = map.validity_days !== '—' ? `${map.validity_days} days` : '30 days'
+  const client = map.customer_name !== '-' ? map.customer_name : 'Client'
+  const contact = map.contact_person !== '-' ? map.contact_person : client
+  const preparedBy = map.authorized_person !== '-' ? map.authorized_person : 'Mihir Bhatt'
+  const designation = map.designation !== '-' ? map.designation : 'CEO'
+  const validity = map.validity_days !== '-' ? `${map.validity_days} days` : '30 days'
   const layoutClass = printLayoutClassNames(printLayout)
   const addressLines = (company.address || '')
     .split(/\n|;/)

@@ -148,7 +148,7 @@ export function ManufacturingOverheadPage() {
                   <td className="px-3 py-2 text-right tabular-nums">{row.basisQuantity}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.ratePerUnit)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.totalOverhead)}</td>
-                  <td className="px-3 py-2">{row.productionOrderNumber ?? '—'}</td>
+                  <td className="px-3 py-2">{row.productionOrderNumber ?? '-'}</td>
                   <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(row.allocatedAmount)}</td>
                   <td className="px-3 py-2"><ManufacturingGenericStatusBadge status={row.status} /></td>
                 </tr>

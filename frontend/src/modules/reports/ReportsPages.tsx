@@ -197,7 +197,7 @@ export function SlowMovingReportPage() {
     {
       accessorKey: 'lastIssueDate',
       header: 'Last Issue',
-      cell: ({ row }) => (row.original.lastIssueDate ? formatDate(row.original.lastIssueDate) : '—'),
+      cell: ({ row }) => (row.original.lastIssueDate ? formatDate(row.original.lastIssueDate) : '-'),
     },
     { accessorKey: 'stockValue', header: 'Value', cell: ({ row }) => formatCurrency(row.original.stockValue), meta: { align: 'right' } },
   ]
@@ -326,7 +326,7 @@ export function WipAgingReportPage() {
     {
       accessorKey: 'daysOverdue',
       header: 'Days Overdue',
-      cell: ({ row }) => (row.original.daysOverdue > 0 ? row.original.daysOverdue : '—'),
+      cell: ({ row }) => (row.original.daysOverdue > 0 ? row.original.daysOverdue : '-'),
       meta: { align: 'right' },
     },
   ]
@@ -419,7 +419,7 @@ export function PendingDispatchReportPage() {
               <td><TableLink to={`/dispatch/${r.dispatchId}`}>{r.dispatchNo}</TableLink></td>
               <td>{r.salesOrderNo}</td>
               <td>{r.customerName}</td>
-              <td>{r.trailerNo ?? '—'}</td>
+              <td>{r.trailerNo ?? '-'}</td>
               <td>{dispatchStatusLabel(r.status)}</td>
               <td>{formatDate(r.plannedDate)}</td>
             </tr>
@@ -452,7 +452,7 @@ export function PodPendingReportPage() {
               <td>{r.salesOrderNo}</td>
               <td>{r.customerName}</td>
               <td><Badge color={statusColor(r.status)}>{dispatchStatusLabel(r.status)}</Badge></td>
-              <td>{r.plannedDate ? formatDate(r.plannedDate) : '—'}</td>
+              <td>{r.plannedDate ? formatDate(r.plannedDate) : '-'}</td>
             </tr>
           ))}
           {data.length === 0 && <EmptyRow colSpan={5} message="No POD-pending dispatches." />}
@@ -496,7 +496,7 @@ export function OpenOrdersReportPage() {
     {
       accessorKey: 'grandTotal',
       header: 'Value',
-      cell: ({ row }) => (row.original.grandTotal != null ? formatCurrency(row.original.grandTotal) : '—'),
+      cell: ({ row }) => (row.original.grandTotal != null ? formatCurrency(row.original.grandTotal) : '-'),
       meta: { align: 'right' },
     },
   ]
@@ -583,7 +583,7 @@ export function ObsoleteProductReportPage() {
         <thead><tr><th>Code</th><th>Product</th><th>Obsolete Date</th><th>Owner</th></tr></thead>
         <tbody>
           {data.map((r) => (
-            <tr key={r.productId}><td>{r.productCode}</td><td>{r.productName}</td><td>{r.effectiveTo ? formatDate(r.effectiveTo) : '—'}</td><td>{r.engineeringOwner}</td></tr>
+            <tr key={r.productId}><td>{r.productCode}</td><td>{r.productName}</td><td>{r.effectiveTo ? formatDate(r.effectiveTo) : '-'}</td><td>{r.engineeringOwner}</td></tr>
           ))}
           {data.length === 0 && <EmptyRow colSpan={4} message="No obsolete products." />}
         </tbody>

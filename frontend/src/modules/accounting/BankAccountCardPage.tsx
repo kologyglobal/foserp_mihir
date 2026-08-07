@@ -45,7 +45,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -245,11 +245,11 @@ export function BankAccountCardPage() {
             <Field label="Unreconciled Amount" value={formatCurrency(account.unreconciledAmount)} />
             <Field label="Payments in Transit" value={formatCurrency(account.paymentsInTransit)} />
             <Field label="Deposits in Transit" value={formatCurrency(account.depositsInTransit)} />
-            <Field label="Overdraft Limit" value={account.overdraftLimit != null ? formatCurrency(account.overdraftLimit) : '—'} />
-            <Field label="Minimum Balance" value={account.minimumBalance != null ? formatCurrency(account.minimumBalance) : '—'} />
+            <Field label="Overdraft Limit" value={account.overdraftLimit != null ? formatCurrency(account.overdraftLimit) : '-'} />
+            <Field label="Minimum Balance" value={account.minimumBalance != null ? formatCurrency(account.minimumBalance) : '-'} />
             <Field label="Reconciliation Frequency" value={account.reconciliationFrequency} />
-            <Field label="Last Reconciled" value={account.lastReconciledDate ? formatDate(account.lastReconciledDate) : '—'} />
-            <Field label="Last Statement" value={account.lastStatementDate ? formatDate(account.lastStatementDate) : '—'} />
+            <Field label="Last Reconciled" value={account.lastReconciledDate ? formatDate(account.lastReconciledDate) : '-'} />
+            <Field label="Last Statement" value={account.lastStatementDate ? formatDate(account.lastStatementDate) : '-'} />
             <Field label="Custodian" value={account.custodian} />
             <Field label="Location" value={account.location} />
             <Field label="Payment Account" value={account.isPaymentAccount ? 'Yes' : 'No'} />
@@ -281,9 +281,9 @@ export function BankAccountCardPage() {
                       <td className="px-3 py-2">{formatDate(t.transactionDate)}</td>
                       <td className="px-3 py-2 font-mono">{t.transactionNumber}</td>
                       <td className="px-3 py-2">{t.transactionType}</td>
-                      <td className="px-3 py-2">{t.counterpartyName ?? '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{t.debitAmount > 0 ? formatCurrency(t.debitAmount) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{t.creditAmount > 0 ? formatCurrency(t.creditAmount) : '—'}</td>
+                      <td className="px-3 py-2">{t.counterpartyName ?? '-'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.debitAmount > 0 ? formatCurrency(t.debitAmount) : '-'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.creditAmount > 0 ? formatCurrency(t.creditAmount) : '-'}</td>
                       <td className="px-3 py-2">{t.isReconciled ? 'Yes' : 'No'}</td>
                     </tr>
                   ))}

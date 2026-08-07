@@ -91,18 +91,18 @@ export function buildQuotationMergeMap(ctx: QuotationMergeContext): Record<Quota
   return {
     quotation_no: quotation?.quotationNo ?? document.quotationId,
     quotation_date: fmtDate(quotationDate),
-    reference_no: opportunity?.opportunityNo ?? quotation?.inquiryNo ?? '—',
-    customer_name: customer?.customerName ?? '—',
-    customer_address: customer ? [customer.addressLine1, customer.city, customer.state, customer.pincode].filter(Boolean).join(', ') : '—',
-    contact_person: contactName ?? contact?.name ?? customer?.contactPerson ?? '—',
-    contact_mobile: contact?.phone?.trim() || customer?.contactPhone || '—',
-    contact_email: contact?.email?.trim() || customer?.contactEmail || '—',
-    opportunity_no: opportunity?.opportunityNo ?? '—',
-    product_name: primary?.productOrItem ?? opportunity?.opportunityName ?? '—',
+    reference_no: opportunity?.opportunityNo ?? quotation?.inquiryNo ?? '-',
+    customer_name: customer?.customerName ?? '-',
+    customer_address: customer ? [customer.addressLine1, customer.city, customer.state, customer.pincode].filter(Boolean).join(', ') : '-',
+    contact_person: contactName ?? contact?.name ?? customer?.contactPerson ?? '-',
+    contact_mobile: contact?.phone?.trim() || customer?.contactPhone || '-',
+    contact_email: contact?.email?.trim() || customer?.contactEmail || '-',
+    opportunity_no: opportunity?.opportunityNo ?? '-',
+    product_name: primary?.productOrItem ?? opportunity?.opportunityName ?? '-',
     product_capacity:
       opportunityRequirementDisplay(opportunity?.productRequirement)?.split('\n')[0]
       || primary?.description
-      || '—',
+      || '-',
     quantity: primary ? String(primary.qty) : '1',
     basic_price: fmtMoney(summary.basicAmount),
     gst_rate: primary ? `${primary.taxPct}%` : '',
@@ -152,6 +152,6 @@ export function findUnresolvedPlaceholders(text: string): string[] {
 
 export function findMissingPlaceholderValues(map: Record<string, string>): string[] {
   return Object.entries(map)
-    .filter(([, v]) => v === '—' || !v?.trim())
+    .filter(([, v]) => v === '-' || !v?.trim())
     .map(([k]) => k)
 }

@@ -35,7 +35,7 @@ export function formatPoLineGstLabel(
   isInterstate: boolean,
 ): string {
   const rate = Number(line.gstRatePct) || 0
-  if (rate <= 0) return '—'
+  if (rate <= 0) return '-'
   if (isInterstate) {
     return `${rate}% · IGST ${rate}%`
   }
@@ -67,7 +67,7 @@ export function formatPoDiscountDisplay(line: PoDiscountLike): string {
   const amt = Number(line.discountAmount) || 0
   if (pct > 0) return `${pct}%`
   if (amt > 0) return String(amt)
-  return '—'
+  return '-'
 }
 
 export function isPoFreeTextLine(line: PoCompactHsnLike & { manualEntry?: boolean }): boolean {
@@ -112,7 +112,7 @@ export function lineItemDescription(line: {
   const name = (line.itemName || line.description || '').trim()
   const code = (line.itemCode || '').trim()
   if (code && name) return `${code} — ${name}`
-  return name || code || '—'
+  return name || code || '-'
 }
 
 export type PoMoreDetailsVisibility = {

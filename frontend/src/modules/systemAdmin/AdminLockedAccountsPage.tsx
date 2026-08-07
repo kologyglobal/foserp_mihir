@@ -148,7 +148,7 @@ export function AdminLockedAccountsPage() {
                       <p className="text-xs text-erp-muted">{row.email}</p>
                       <p className="text-xs text-erp-muted">
                         Failed attempts: {row.failedLoginCount} · locked{' '}
-                        {row.lockedAt ? new Date(row.lockedAt).toLocaleString() : '—'}
+                        {row.lockedAt ? new Date(row.lockedAt).toLocaleString() : '-'}
                       </p>
                     </div>
                     {canManage ? (

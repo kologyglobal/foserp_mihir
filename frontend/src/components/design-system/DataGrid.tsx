@@ -118,6 +118,13 @@ export interface DataGridProps<T> {
    * order is not overridden by a prior column-header sort.
    */
   sortResetToken?: string | number
+  /**
+   * When page Sort selects a document-number order (e.g. PR A→Z), mirror it on the column header.
+   * Used with sortResetToken when enableColumnSorting is false.
+   */
+  pinnedHeaderSort?: { columnId: string; desc: boolean } | null
+  /** Fired when the user toggles document-number header sort (page-level Sort off). */
+  onDocumentHeaderSortChange?: (sort: { columnId: string; desc: boolean } | null) => void
   /** Search / filters / sort / view row rendered inside the table shell above column headers */
   registerBar?: ReactNode
 }
@@ -170,6 +177,8 @@ export function DataGrid<T>({
   enableColumnSorting = true,
   columnLayoutKey,
   sortResetToken,
+  pinnedHeaderSort = null,
+  onDocumentHeaderSortChange,
   registerBar,
 }: DataGridProps<T>) {
   const densityClass = useDensityClass()
@@ -274,15 +283,37 @@ export function DataGrid<T>({
     })
   }, [resolvedLayoutKey, columnVisibility, columnOrder])
 
+  const handleSortingChange: OnChangeFn<SortingState> = (updater) => {
+    setSorting((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      if (onDocumentHeaderSortChange && !enableColumnSorting) {
+        const active = next[0]
+        if (active && isDocumentNumberColumnId(active.id)) {
+          onDocumentHeaderSortChange({ columnId: active.id, desc: active.desc })
+        } else if (next.length === 0) {
+          onDocumentHeaderSortChange(null)
+        }
+      }
+      return next
+    })
+  }
+
   // Page-level Sort dropdown should win over a previous Document Number header click.
   useEffect(() => {
     if (sortResetToken === undefined) return
     if (!sortResetSeen.current) {
       sortResetSeen.current = true
+      if (pinnedHeaderSort) {
+        setSorting([{ id: pinnedHeaderSort.columnId, desc: pinnedHeaderSort.desc }])
+      }
       return
     }
-    setSorting([])
-  }, [sortResetToken])
+    if (pinnedHeaderSort) {
+      setSorting([{ id: pinnedHeaderSort.columnId, desc: pinnedHeaderSort.desc }])
+    } else {
+      setSorting([])
+    }
+  }, [sortResetToken, pinnedHeaderSort])
 
   const table = useReactTable({
     data: filteredData,
@@ -293,7 +324,7 @@ export function DataGrid<T>({
       columnOrder,
       ...(selectable ? { rowSelection: rowSelection ?? {} } : {}),
     },
-    onSortingChange: setSorting,
+    onSortingChange: handleSortingChange,
     onColumnVisibilityChange: setColumnVisibility,
     onColumnOrderChange: setColumnOrder,
     onRowSelectionChange: selectable ? setRowSelection : undefined,

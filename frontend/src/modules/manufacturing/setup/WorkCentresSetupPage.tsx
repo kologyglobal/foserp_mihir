@@ -135,7 +135,7 @@ export function WorkCentresSetupPage() {
                     <tr key={row.id}>
                       <td className="font-mono text-[11px] font-medium">{row.code}</td>
                       <td className="font-medium">{row.name}</td>
-                      <td>{row.plantCode ?? '—'}</td>
+                      <td>{row.plantCode ?? '-'}</td>
                       <td>
                         <DynamicsStatusChip
                           label={row.isActive ? 'Active' : 'Inactive'}

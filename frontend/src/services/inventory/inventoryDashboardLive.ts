@@ -75,8 +75,8 @@ export async function getLiveInventoryDashboard(): Promise<InventoryDashboardDat
     cur.value += value
     warehouseMap.set(bal.warehouseId, cur)
 
-    const code = item?.code ?? bal.item?.code ?? '—'
-    const name = item?.name ?? bal.item?.name ?? '—'
+    const code = item?.code ?? bal.item?.code ?? '-'
+    const name = item?.name ?? bal.item?.name ?? '-'
     if (onHand <= 0) {
       outOfStock += 1
       if (outOfStockItems.length < 8) {
@@ -120,7 +120,7 @@ export async function getLiveInventoryDashboard(): Promise<InventoryDashboardDat
   const recentMovements = (ledgerRes.data ?? []).slice(0, 10).map((m) => ({
     id: m.id,
     movementNo: m.movementNumber,
-    itemCode: m.item?.code ?? itemById.get(m.itemId)?.code ?? '—',
+    itemCode: m.item?.code ?? itemById.get(m.itemId)?.code ?? '-',
     type: m.referenceType,
     qty: num(m.quantity),
     date: m.movementDate,

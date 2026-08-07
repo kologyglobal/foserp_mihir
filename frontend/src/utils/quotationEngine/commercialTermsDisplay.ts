@@ -47,7 +47,7 @@ export function formatQuotationCurrencyDisplay(code?: string | null): string {
 function isMeaningfulText(value: string | null | undefined): value is string {
   const t = value?.trim() ?? ''
   if (!t) return false
-  if (t === '—' || t === '-') return false
+  if (t === '-' || t === '-') return false
   if (GENERIC_TERMS.has(t.toLowerCase())) return false
   return true
 }

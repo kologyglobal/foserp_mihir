@@ -248,8 +248,8 @@ export function TaxSetupPage() {
                   <tr key={r.id} className="border-t border-erp-border/70">
                     <td className="py-1">{r.code}</td>
                     <td className="py-1">{r.label}</td>
-                    <td className="py-1">{r.ratePercent ?? '—'}</td>
-                    <td className="py-1">{r.thresholdAmount != null ? formatCurrency(r.thresholdAmount) : '—'}</td>
+                    <td className="py-1">{r.ratePercent ?? '-'}</td>
+                    <td className="py-1">{r.thresholdAmount != null ? formatCurrency(r.thresholdAmount) : '-'}</td>
                     <td className="py-1">{r.effectiveFrom}</td>
                   </tr>
                 ))}

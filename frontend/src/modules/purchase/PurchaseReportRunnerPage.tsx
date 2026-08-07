@@ -60,10 +60,10 @@ function formatCell(
   value: string | number | null | undefined,
   format?: 'text' | 'number' | 'currency' | 'date',
 ): string {
-  if (value == null || value === '') return '—'
+  if (value == null || value === '') return '-'
   if (format === 'currency') return formatCurrency(Number(value))
   if (format === 'date') {
-    if (typeof value === 'string' && value !== '—') return formatDate(value)
+    if (typeof value === 'string' && value !== '-') return formatDate(value)
     return String(value)
   }
   if (format === 'number') return String(value)

@@ -255,7 +255,7 @@ export function UserAdminListPage() {
       header: 'Branch',
       cell: ({ row }) => (
         <span className="text-xs">
-          {row.original.primaryBranchName || row.original.department || '—'}
+          {row.original.primaryBranchName || row.original.department || '-'}
         </span>
       ),
     },
@@ -273,7 +273,7 @@ export function UserAdminListPage() {
         row.original.sensitiveAccess ? (
           <Badge color="red">Yes</Badge>
         ) : (
-          <span className="text-xs text-erp-muted">—</span>
+          <span className="text-xs text-erp-muted">-</span>
         ),
     },
     {
@@ -287,7 +287,7 @@ export function UserAdminListPage() {
       id: 'sessions',
       header: 'Sessions',
       cell: ({ row }) => (
-        <span className="text-xs tabular-nums">{row.original.activeSessionCount ?? '—'}</span>
+        <span className="text-xs tabular-nums">{row.original.activeSessionCount ?? '-'}</span>
       ),
     },
     {
@@ -719,7 +719,7 @@ function CreateUserForm({
             <p><span className="text-erp-muted">Name:</span> {values.firstName} {values.lastName}</p>
             <p><span className="text-erp-muted">Email:</span> {values.email}</p>
             <p><span className="text-erp-muted">Roles:</span> {selectedRoleNames.join(', ') || 'None'}</p>
-            <p><span className="text-erp-muted">Department:</span> {deptName || '—'}</p>
+            <p><span className="text-erp-muted">Department:</span> {deptName || '-'}</p>
             <p><span className="text-erp-muted">Data scope level:</span> {dataAccessLevel}</p>
             <p className="text-xs text-erp-muted">
               Full effective permission list is available after invite on the user detail Effective Access panel
@@ -1127,11 +1127,11 @@ export function UserAdminDetailPage() {
             <DetailField label="Mobile" value={user.mobile} />
             <DetailField label="Designation" value={user.designation} />
             <DetailField label="Department" value={user.department} />
-            <DetailField label="Branch" value={user.primaryBranchName ?? '—'} />
+            <DetailField label="Branch" value={user.primaryBranchName ?? '-'} />
             <DetailField label="Data access level" value={user.dataAccessLevel ?? dataAccessLevel} />
             <DetailField label="Email Verified" value={user.emailVerified ? 'Yes' : 'No'} />
             <DetailField label="Last Login" value={user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'} />
-            <DetailField label="Overrides" value={String(user.overrideCount ?? '—')} />
+            <DetailField label="Overrides" value={String(user.overrideCount ?? '-')} />
             <DetailField label="Active sessions" value={String(user.activeSessionCount ?? sessions.length)} />
           </DetailGrid>
           {user.status === 'INVITED' && canInvite ? (
@@ -1316,7 +1316,7 @@ export function UserAdminDetailPage() {
                   <li key={s.id} className="px-3 py-2 text-sm">
                     <p className="font-medium text-erp-text">{s.userAgent ?? 'Unknown device'}</p>
                     <p className="text-xs text-erp-muted">
-                      {s.ipAddress ?? '—'} · started {new Date(s.createdAt).toLocaleString()} · expires{' '}
+                      {s.ipAddress ?? '-'} · started {new Date(s.createdAt).toLocaleString()} · expires{' '}
                       {new Date(s.expiresAt).toLocaleString()}
                     </p>
                   </li>

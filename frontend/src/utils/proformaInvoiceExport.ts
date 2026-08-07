@@ -35,16 +35,16 @@ export function exportProformaExcelTsv(proforma: ProformaInvoice): string {
     ['Valid Until', proforma.validUntil],
     ['Status', formatStatus(proforma.status)],
     ['Customer', proforma.customerName],
-    ['Customer GSTIN', proforma.customerGstin || '—'],
+    ['Customer GSTIN', proforma.customerGstin || '-'],
     ['Place of Supply', proforma.placeOfSupply],
-    ['Sales Order', proforma.salesOrderNo ?? '—'],
-    ['Quotation', proforma.quotationNo ?? '—'],
-    ['Customer PO', proforma.customerPoNumber ?? '—'],
+    ['Sales Order', proforma.salesOrderNo ?? '-'],
+    ['Quotation', proforma.quotationNo ?? '-'],
+    ['Customer PO', proforma.customerPoNumber ?? '-'],
     ['Payment Terms', proforma.paymentTerms],
     ['Delivery Terms', proforma.deliveryTerms],
     ['Billing Address', proforma.billingAddress ?? proforma.customerAddress],
     ['Shipping Address', proforma.shippingAddress ?? proforma.customerAddress],
-    ['Remarks', proforma.remarks || '—'],
+    ['Remarks', proforma.remarks || '-'],
     [],
     ['Line', 'Item Code', 'Description', 'HSN', 'Qty', 'UOM', 'Rate', 'Disc %', 'GST %', 'Taxable', 'GST Amt', 'Line Total'],
   ]
@@ -154,7 +154,7 @@ const PI_PRINT_CSS = `
 
 function buildBankDetailsHtml(bank: CompanyBankDetails): string {
   const row = (label: string, value: string) =>
-    `<div class="doc-print-bank__row"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || '—')}</dd></div>`
+    `<div class="doc-print-bank__row"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || '-')}</dd></div>`
   return `
     <div class="doc-print-bank">
       <p class="doc-print-bank__title">Bank details</p>
@@ -172,7 +172,7 @@ function buildProformaPrintBodyHtml(proforma: ProformaInvoice): string {
   const { gst } = proforma
   const company = getActiveCompanyProfile()
   const isServices = useTenantProfileStore.getState().isServices()
-  const billToRaw = proforma.billingAddress?.trim() || proforma.customerAddress || '—'
+  const billToRaw = proforma.billingAddress?.trim() || proforma.customerAddress || '-'
   const shipToRaw = proforma.shippingAddress?.trim() || proforma.customerAddress || billToRaw
   const billTo = escapeHtml(billToRaw)
   const shipTo = escapeHtml(shipToRaw)
@@ -186,7 +186,7 @@ function buildProformaPrintBodyHtml(proforma: ProformaInvoice): string {
           <span class="pi-print-table__desc">${escapeHtml(l.description)}</span>
           ${l.itemCode ? `<span class="pi-print-table__code">${escapeHtml(l.itemCode)}</span>` : ''}
         </td>
-        <td>${escapeHtml(l.hsnCode || '—')}</td>
+        <td>${escapeHtml(l.hsnCode || '-')}</td>
         <td class="num">${formatNumber(l.qty)}</td>
         <td>${escapeHtml(l.uom || 'Nos')}</td>
         <td class="num">${formatCurrency(l.unitPrice)}</td>
@@ -241,19 +241,19 @@ function buildProformaPrintBodyHtml(proforma: ProformaInvoice): string {
           <p class="pi-print-party__label">Bill to</p>
           <p class="pi-print-party__name">${escapeHtml(proforma.customerName)}</p>
           <p class="pi-print-party__line">${billTo}</p>
-          <p class="pi-print-party__line">GSTIN: ${escapeHtml(proforma.customerGstin || '—')}</p>
-          <p class="pi-print-party__line">State: ${escapeHtml(proforma.customerState || '—')}</p>
-          <p class="pi-print-party__line">Place of supply: ${escapeHtml(proforma.placeOfSupply || '—')}</p>
+          <p class="pi-print-party__line">GSTIN: ${escapeHtml(proforma.customerGstin || '-')}</p>
+          <p class="pi-print-party__line">State: ${escapeHtml(proforma.customerState || '-')}</p>
+          <p class="pi-print-party__line">Place of supply: ${escapeHtml(proforma.placeOfSupply || '-')}</p>
         </section>
         ${
           isServices && bank
             ? `<section class="pi-print-party">
           <p class="pi-print-party__label">Bank details</p>
-          <p class="pi-print-party__name">${escapeHtml(bank.accountName || '—')}</p>
-          <p class="pi-print-party__line"><span>Bank</span> ${escapeHtml(bank.bankName || '—')}</p>
-          <p class="pi-print-party__line"><span>A/C No.</span> ${escapeHtml(bank.accountNumber || '—')}</p>
-          <p class="pi-print-party__line"><span>IFSC</span> ${escapeHtml(bank.ifscCode || '—')}</p>
-          <p class="pi-print-party__line"><span>Branch</span> ${escapeHtml(bank.branch || '—')}</p>
+          <p class="pi-print-party__name">${escapeHtml(bank.accountName || '-')}</p>
+          <p class="pi-print-party__line"><span>Bank</span> ${escapeHtml(bank.bankName || '-')}</p>
+          <p class="pi-print-party__line"><span>A/C No.</span> ${escapeHtml(bank.accountNumber || '-')}</p>
+          <p class="pi-print-party__line"><span>IFSC</span> ${escapeHtml(bank.ifscCode || '-')}</p>
+          <p class="pi-print-party__line"><span>Branch</span> ${escapeHtml(bank.branch || '-')}</p>
         </section>`
             : `<section class="pi-print-party">
           <p class="pi-print-party__label">Ship to</p>
@@ -263,11 +263,11 @@ function buildProformaPrintBodyHtml(proforma: ProformaInvoice): string {
         }
         <section class="pi-print-party pi-print-party--meta">
           <p class="pi-print-party__label">Commercial</p>
-          <p class="pi-print-party__line"><span>Payment</span> ${escapeHtml(proforma.paymentTerms || '—')}</p>
-          <p class="pi-print-party__line"><span>Delivery</span> ${escapeHtml(proforma.deliveryTerms || '—')}</p>
-          <p class="pi-print-party__line"><span>Customer PO</span> ${escapeHtml(proforma.customerPoNumber || '—')}</p>
-          <p class="pi-print-party__line"><span>Sales order</span> ${escapeHtml(proforma.salesOrderNo || '—')}</p>
-          <p class="pi-print-party__line"><span>Quotation</span> ${escapeHtml(proforma.quotationNo || '—')}</p>
+          <p class="pi-print-party__line"><span>Payment</span> ${escapeHtml(proforma.paymentTerms || '-')}</p>
+          <p class="pi-print-party__line"><span>Delivery</span> ${escapeHtml(proforma.deliveryTerms || '-')}</p>
+          <p class="pi-print-party__line"><span>Customer PO</span> ${escapeHtml(proforma.customerPoNumber || '-')}</p>
+          <p class="pi-print-party__line"><span>Sales order</span> ${escapeHtml(proforma.salesOrderNo || '-')}</p>
+          <p class="pi-print-party__line"><span>Quotation</span> ${escapeHtml(proforma.quotationNo || '-')}</p>
           <p class="pi-print-party__line"><span>GST</span> ${escapeHtml(gstSchemeLabel(gst.scheme))}</p>
         </section>
       </div>

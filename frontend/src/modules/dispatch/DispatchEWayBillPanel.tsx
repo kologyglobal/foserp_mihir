@@ -172,7 +172,7 @@ export function DispatchEWayBillPanel({
             </div>
             <div className="md:col-span-2">
               <span className="text-muted-foreground">Reason:</span>{' '}
-              {panel?.reason ?? '—'}
+              {panel?.reason ?? '-'}
             </div>
             {ewb?.ewbNumber ? (
               <>
@@ -182,23 +182,23 @@ export function DispatchEWayBillPanel({
                 </div>
                 <div>
                   <span className="text-muted-foreground">Valid upto:</span>{' '}
-                  {ewb.validUpto ? new Date(ewb.validUpto).toLocaleString() : '—'}
+                  {ewb.validUpto ? new Date(ewb.validUpto).toLocaleString() : '-'}
                 </div>
                 <div>
                   <span className="text-muted-foreground">Generated:</span>{' '}
-                  {ewb.generatedAt ? new Date(ewb.generatedAt).toLocaleString() : '—'}
+                  {ewb.generatedAt ? new Date(ewb.generatedAt).toLocaleString() : '-'}
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Vehicle:</span> {ewb.vehicleNumber ?? '—'}
+                  <span className="text-muted-foreground">Vehicle:</span> {ewb.vehicleNumber ?? '-'}
                 </div>
                 <div>
                   <span className="text-muted-foreground">Transporter:</span>{' '}
-                  {ewb.transporterName ?? '—'}
+                  {ewb.transporterName ?? '-'}
                   {ewb.transporterId ? ` (${ewb.transporterId})` : ''}
                 </div>
                 <div>
                   <span className="text-muted-foreground">API ref:</span>{' '}
-                  <span className="font-mono text-[11px]">{ewb.providerRef ?? '—'}</span>
+                  <span className="font-mono text-[11px]">{ewb.providerRef ?? '-'}</span>
                 </div>
               </>
             ) : null}

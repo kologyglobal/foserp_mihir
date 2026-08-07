@@ -275,7 +275,7 @@ export async function getManufacturingReports(
               'Required Qty': m.requiredQty,
               'Consumed Qty': m.consumedQty,
               Variance: variance,
-              Warehouse: m.warehouseName || w.materialWarehouseName || '—',
+              Warehouse: m.warehouseName || w.materialWarehouseName || '-',
             },
           })
         }

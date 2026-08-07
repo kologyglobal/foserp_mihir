@@ -84,10 +84,10 @@ export function BankAccountListPage() {
 
   const columns: ColumnDef<BankAccount, unknown>[] = [
     { accessorKey: 'code', header: 'Code', cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.code}</span> },
-    { id: 'bank', header: 'Bank Name', cell: ({ row }) => getBank(row.original.bankId)?.name ?? '—' },
+    { id: 'bank', header: 'Bank Name', cell: ({ row }) => getBank(row.original.bankId)?.name ?? '-' },
     { accessorKey: 'bankAccountName', header: 'Bank Account Name' },
     { accessorKey: 'bankAccountNo', header: 'Account No.', cell: ({ row }) => <span className="font-mono text-xs">{row.original.bankAccountNo}</span> },
-    { accessorKey: 'ifscCode', header: 'IFSC', cell: ({ row }) => <span className="font-mono text-xs">{row.original.ifscCode || '—'}</span> },
+    { accessorKey: 'ifscCode', header: 'IFSC', cell: ({ row }) => <span className="font-mono text-xs">{row.original.ifscCode || '-'}</span> },
     { accessorKey: 'currencyCode', header: 'Currency' },
     { accessorKey: 'isActive', header: 'Status', cell: ({ row }) => <ActiveBadge isActive={row.original.isActive} /> },
     { id: 'actions', header: 'Actions', enableSorting: false, cell: ({ row }) => <RowActions viewTo={`/masters/bank-accounts/${row.original.id}`} editTo={`/masters/bank-accounts/${row.original.id}/edit`} /> },
@@ -201,12 +201,12 @@ export function BankAccountFormPage() {
       subtitle={bank ? `${bank.code} — ${watched.bankAccountName || 'Bank account'}` : 'Bank account card'}
       breadcrumbs={buildMasterBreadcrumbs('procurement', isEdit ? 'Edit Bank Account' : 'New Bank Account')}
       documentStrip={[
-        { label: 'Code', value: watched.code?.trim() || '—' },
-        { label: 'Bank', value: bank?.code ?? '—', highlight: Boolean(bank) },
-        { label: 'Account Name', value: watched.bankAccountName?.trim() || '—' },
-        { label: 'Account No.', value: watched.bankAccountNo?.trim() || '—' },
-        { label: 'IFSC', value: watched.ifscCode?.trim() || '—' },
-        { label: 'Currency', value: watched.currencyCode || '—' },
+        { label: 'Code', value: watched.code?.trim() || '-' },
+        { label: 'Bank', value: bank?.code ?? '-', highlight: Boolean(bank) },
+        { label: 'Account Name', value: watched.bankAccountName?.trim() || '-' },
+        { label: 'Account No.', value: watched.bankAccountNo?.trim() || '-' },
+        { label: 'IFSC', value: watched.ifscCode?.trim() || '-' },
+        { label: 'Currency', value: watched.currencyCode || '-' },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
       ]}
       commandBar={(
@@ -228,17 +228,17 @@ export function BankAccountFormPage() {
       activeSection={activeSection}
       onSectionSelect={setActiveSection}
       formMetrics={[
-        { label: 'Bank', value: bank?.code ?? '—', accent: 'blue' as const },
-        { label: 'Currency', value: watched.currencyCode || '—', accent: 'violet' as const },
-        { label: 'IFSC', value: watched.ifscCode || '—', accent: 'amber' as const },
+        { label: 'Bank', value: bank?.code ?? '-', accent: 'blue' as const },
+        { label: 'Currency', value: watched.currencyCode || '-', accent: 'violet' as const },
+        { label: 'IFSC', value: watched.ifscCode || '-', accent: 'amber' as const },
         { label: 'Active', value: watched.isActive ? 'Yes' : 'No', accent: watched.isActive ? ('green' as const) : ('amber' as const) },
       ]}
       factBoxTitle="Bank account"
       factBoxSummary={[
         { label: 'Used on', value: 'Payment Method, Vendor, Treasury' },
-        { label: 'Bank', value: bank?.name ?? '—' },
-        { label: 'Branch', value: watched.bankBranchCode || '—' },
-        { label: 'Phone', value: watched.phone || '—' },
+        { label: 'Bank', value: bank?.name ?? '-' },
+        { label: 'Branch', value: watched.bankBranchCode || '-' },
+        { label: 'Phone', value: watched.phone || '-' },
         { label: 'Modified', value: existing ? formatDate(existing.updatedAt.slice(0, 10)) : 'New' },
       ]}
       stickyFooter={(
@@ -359,14 +359,14 @@ export function BankAccountDetailPage() {
       backLabel="Bank Accounts"
       masterGroupId="procurement"
       title={`${record.code} — ${record.bankAccountName}`}
-      subtitle={bank ? `${bank.code} · ${bank.name}` : '—'}
+      subtitle={bank ? `${bank.code} · ${bank.name}` : '-'}
       editTo={`/masters/bank-accounts/${record.id}/edit`}
       badges={<ActiveBadge isActive={record.isActive} />}
     >
       <DetailSection title="General">
         <DetailGrid>
           <DetailField label="Code" value={<span className="font-mono">{record.code}</span>} />
-          <DetailField label="Bank Name" value={bank ? <Link to={`/masters/banks/${bank.id}`} className="text-erp-primary hover:underline">{bank.name}</Link> : '—'} />
+          <DetailField label="Bank Name" value={bank ? <Link to={`/masters/banks/${bank.id}`} className="text-erp-primary hover:underline">{bank.name}</Link> : '-'} />
           <DetailField label="Currency code" value={record.currencyCode} />
           <DetailField label="Bank Account Name" value={record.bankAccountName} />
         </DetailGrid>
@@ -378,15 +378,15 @@ export function BankAccountDetailPage() {
       </DetailSection>
       <DetailSection title="Contact">
         <DetailGrid>
-          <DetailField label="Phone no" value={record.phone || '—'} />
-          <DetailField label="Email id" value={record.email || '—'} />
+          <DetailField label="Phone no" value={record.phone || '-'} />
+          <DetailField label="Email id" value={record.email || '-'} />
         </DetailGrid>
       </DetailSection>
       <DetailSection title="Banking Details">
         <DetailGrid>
           <DetailField label="Bank Account No" value={<span className="font-mono">{record.bankAccountNo}</span>} />
-          <DetailField label="Bank Branch code" value={record.bankBranchCode || '—'} />
-          <DetailField label="Bank IFSC code" value={record.ifscCode || '—'} />
+          <DetailField label="Bank Branch code" value={record.bankBranchCode || '-'} />
+          <DetailField label="Bank IFSC code" value={record.ifscCode || '-'} />
         </DetailGrid>
       </DetailSection>
     </DetailLayout>

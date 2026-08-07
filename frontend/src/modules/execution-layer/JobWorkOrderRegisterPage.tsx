@@ -72,7 +72,7 @@ export function JobWorkOrderRegisterPage() {
                   <td className="num">{formatNumber(j.sentQty)}</td>
                   <td className="num">{formatNumber(j.receivedQty)}</td>
                   <td className="num">{formatNumber(j.balanceQty)}</td>
-                  <td>{j.expectedReturnDate ? formatDate(j.expectedReturnDate) : '—'}</td>
+                  <td>{j.expectedReturnDate ? formatDate(j.expectedReturnDate) : '-'}</td>
                   <td><Badge color={statusColor(j.status)}>{formatStatus(j.status)}</Badge></td>
                   <td>{formatStatus(j.qcStatus)}</td>
                   <td className="num">{formatCurrency(j.amount)}</td>

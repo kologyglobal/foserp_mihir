@@ -36,7 +36,7 @@ function Field({ label, value }: { label: string; value?: string | number | null
   return (
     <div>
       <dt className="text-[12px] text-erp-muted">{label}</dt>
-      <dd className="text-[13px] font-medium text-erp-text">{value ?? '—'}</dd>
+      <dd className="text-[13px] font-medium text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -201,7 +201,7 @@ export function VisitorDetailPage() {
                           <InsideDuration from={visit.entryTime} to={visit.exitTime} warnAfterMinutes={240} />
                         </dd>
                       </div>
-                      <Field label="Badge returned" value={visit.badgeReturned == null ? '—' : visit.badgeReturned ? 'Yes' : 'No'} />
+                      <Field label="Badge returned" value={visit.badgeReturned == null ? '-' : visit.badgeReturned ? 'Yes' : 'No'} />
                       <Field label="Exit remarks" value={visit.exitRemarks} />
                     </dl>
                   </section>
@@ -262,11 +262,11 @@ export function VisitorDetailPage() {
                         </div>
                         <div className="flex justify-between">
                           <dt className="text-erp-muted">Last visit</dt>
-                          <dd className="font-medium text-erp-text">{profile.lastVisitAt ? formatDate(profile.lastVisitAt) : '—'}</dd>
+                          <dd className="font-medium text-erp-text">{profile.lastVisitAt ? formatDate(profile.lastVisitAt) : '-'}</dd>
                         </div>
                         <div className="flex justify-between">
                           <dt className="text-erp-muted">Usual host</dt>
-                          <dd className="font-medium text-erp-text">{profile.lastHost ?? '—'}</dd>
+                          <dd className="font-medium text-erp-text">{profile.lastHost ?? '-'}</dd>
                         </div>
                         {profile.isBlacklisted ? (
                           <p className="rounded-md bg-rose-50 px-2 py-1.5 text-[12px] font-medium text-rose-700">
@@ -283,7 +283,7 @@ export function VisitorDetailPage() {
                   <section className="rounded-md border border-erp-border bg-white p-4">
                     <h3 className="mb-2 text-[13px] font-semibold text-erp-text">Notes & attachments</h3>
                     <p className="text-[12.5px] text-erp-muted">
-                      Remarks: {visit.remarks || '—'}
+                      Remarks: {visit.remarks || '-'}
                     </p>
                     <p className="mt-2 text-[11.5px] text-erp-muted">
                       Shared entity notes/attachments hook up to the gate backend when it ships — gate records keep

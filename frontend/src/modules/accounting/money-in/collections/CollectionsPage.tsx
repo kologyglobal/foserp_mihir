@@ -118,10 +118,10 @@ export function CollectionsPage() {
                         to={moneyInPath(`invoices/${r.salesInvoiceId}`)}
                         className="font-medium text-erp-accent hover:underline"
                       >
-                        {r.invoiceNumber ?? '—'}
+                        {r.invoiceNumber ?? '-'}
                       </Link>
                     ) : (
-                      r.invoiceNumber ?? '—'
+                      r.invoiceNumber ?? '-'
                     )}
                   </td>
                   <td className="py-2 pr-2">
@@ -129,13 +129,13 @@ export function CollectionsPage() {
                       {r.customerName}
                     </Link>
                   </td>
-                  <td className="py-2 pr-2 tabular-nums">{r.dueDate ?? '—'}</td>
+                  <td className="py-2 pr-2 tabular-nums">{r.dueDate ?? '-'}</td>
                   <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(parseDecimal(r.outstandingAmount))}</td>
                   <td className="py-2 pr-2 text-right tabular-nums">
                     {(r.daysOverdue ?? 0) > 0 ? (
                       <span className="font-medium text-rose-600">{r.daysOverdue}d</span>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </td>
                   <td className="py-2 pr-2">

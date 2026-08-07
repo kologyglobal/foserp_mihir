@@ -413,13 +413,13 @@ export function AdminDocumentGovernanceDateControlsPage() {
                     </Badge>
                   </td>
                   <td className="px-3 py-2">{modeLabel(r.futureDateMode)}</td>
-                  <td className="px-3 py-2">{r.maxFutureDays ?? '—'}</td>
+                  <td className="px-3 py-2">{r.maxFutureDays ?? '-'}</td>
                   <td className="px-3 py-2">{modeLabel(r.pastDateMode)}</td>
-                  <td className="px-3 py-2">{r.maxBackDateDays ?? '—'}</td>
+                  <td className="px-3 py-2">{r.maxBackDateDays ?? '-'}</td>
                   <td className="px-3 py-2">{r.approvalRequired ? 'Yes' : 'No'}</td>
                   <td className="px-3 py-2">{r.allowEmergencyOverride ? 'Yes' : 'No'}</td>
                   <td className="px-3 py-2">
-                    {r.effectiveFrom ? r.effectiveFrom.slice(0, 10) : '—'}
+                    {r.effectiveFrom ? r.effectiveFrom.slice(0, 10) : '-'}
                   </td>
                   <td className="px-3 py-2">
                     <Badge color={r.active ? 'blue' : 'gray'}>{r.active ? 'Active' : 'Inactive'}</Badge>

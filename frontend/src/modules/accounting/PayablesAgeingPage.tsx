@@ -345,7 +345,7 @@ export function PayablesAgeingPage() {
                               {formatCurrency(amt)}
                             </button>
                           ) : (
-                            '—'
+                            '-'
                           )}
                         </td>
                       ))}
@@ -388,7 +388,7 @@ export function PayablesAgeingPage() {
                         </button>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(inv.outstandingBalance)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{inv.overdueDays > 0 ? inv.overdueDays : '—'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{inv.overdueDays > 0 ? inv.overdueDays : '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -432,7 +432,7 @@ export function PayablesAgeingPage() {
                         ] as const
                       ).map((amt, idx) => (
                         <td key={idx} className="px-3 py-2 text-right tabular-nums">
-                          {amt > 0 ? formatCurrency(amt) : '—'}
+                          {amt > 0 ? formatCurrency(amt) : '-'}
                         </td>
                       ))}
                       <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(row.totalOutstanding)}</td>

@@ -15,7 +15,7 @@ export function PayableOpenItemSummary({ invoice }: { invoice: VendorInvoiceDto 
       <dl className="grid gap-1.5 sm:grid-cols-2">
         <div>
           <dt className="text-erp-muted">Document</dt>
-          <dd className="font-medium">{invoice.vendorInvoiceNumber ?? '—'}</dd>
+          <dd className="font-medium">{invoice.vendorInvoiceNumber ?? '-'}</dd>
         </div>
         <div>
           <dt className="text-erp-muted">Status</dt>
@@ -37,7 +37,7 @@ export function PayableOpenItemSummary({ invoice }: { invoice: VendorInvoiceDto 
         </div>
         <div>
           <dt className="text-erp-muted">Due date</dt>
-          <dd className="tabular-nums">{invoice.dueDate ?? '—'}</dd>
+          <dd className="tabular-nums">{invoice.dueDate ?? '-'}</dd>
         </div>
       </dl>
       <p className="mt-2 text-[11px] text-erp-muted">

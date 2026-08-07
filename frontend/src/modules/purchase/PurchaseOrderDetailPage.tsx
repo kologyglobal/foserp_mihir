@@ -37,7 +37,6 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/design-system/components/Modal'
 import { Textarea } from '@/components/forms/Inputs'
 import {
-  approvalActivitySummary,
   attachmentsSummary,
   hasMeaningfulTaxTotals,
   notesSummary,
@@ -59,7 +58,6 @@ import {
   sendPurchaseOrderToVendor,
   submitPurchaseOrder,
   PurchaseServiceError,
-  PURCHASE_ORDER_APPROVAL_STATUS_LABELS,
   PURCHASE_ORDER_DOMAIN_STATUS_LABELS,
   PURCHASE_ORDER_LINE_STATUS_LABELS,
   PURCHASE_ORDER_TYPE_LABELS,
@@ -204,28 +202,7 @@ function PurchaseOrderDetailSkeleton() {
       {collapsedSection('Terms & Notes')}
       {collapsedSection('Attachments')}
 
-      <ErpCardSection
-        title="Audit Timeline"
-        subtitle="Purchase order lifecycle events"
-        columns={1}
-        collapsible
-        defaultOpen
-      >
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="flex items-start gap-3">
-              <div className="erp-skeleton h-8 w-8 shrink-0 rounded-full" />
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="erp-skeleton h-3 w-40 max-w-full rounded" />
-                <div className="erp-skeleton h-3 w-64 max-w-full rounded" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </ErpCardSection>
-
-      {collapsedSection('Approval History')}
-      {collapsedSection('Change History')}
+      {collapsedSection('History', 'Lifecycle history')}
       {collapsedSection('Linked Documents', 'Upstream and downstream references')}
     </div>
   )
@@ -303,13 +280,6 @@ export function PurchaseOrderDetailPage() {
       setBusy(false)
     }
   }
-
-  const changeHistoryPeek = useMemo(() => {
-    if (!po) return ''
-    return po.changeHistory.length > 0
-      ? `${po.changeHistory.length} revision${po.changeHistory.length === 1 ? '' : 's'}`
-      : ''
-  }, [po])
 
   const documentFactBox = useMemo(() => {
     if (!po) return null
@@ -415,7 +385,6 @@ export function PurchaseOrderDetailPage() {
 
   const statusLabel = PURCHASE_ORDER_DOMAIN_STATUS_LABELS[po.status]
   const orderTypeLabel = PURCHASE_ORDER_TYPE_LABELS[po.orderType]
-  const approvalLabel = PURCHASE_ORDER_APPROVAL_STATUS_LABELS[po.approvalStatus]
 
   // Prefer backend-provided eligibility (API mode); fall back to local status rules (demo).
   const aa = po.allowedActions
@@ -474,10 +443,6 @@ export function PurchaseOrderDetailPage() {
   })
   const notesPeek = notesSummary(po.termsAndConditions, po.internalNotes, po.remarks)
   const attachmentsPeek = attachmentsSummary(po.attachmentIds.length)
-  const approvalPeek = approvalActivitySummary({
-    statusLabel: approvalLabel,
-    historyCount: history.length,
-  })
 
   return (
     <>
@@ -696,26 +661,26 @@ export function PurchaseOrderDetailPage() {
           <ErpViewField label="Currency" value={po.currency} />
           <ErpViewField label="Vendor" value={`${po.vendor.code} — ${po.vendor.name}`} />
           <ErpViewField label="Vendor GST Number" value={po.vendor.gstin} />
-          <ErpViewField label="Place of Supply" value={po.placeOfSupply || '—'} />
+          <ErpViewField label="Place of Supply" value={po.placeOfSupply || '-'} />
           <ErpViewField label="Buyer" value={po.buyer.name} />
           <ErpViewField label="Purchase Location" value={po.purchaseLocation.name} />
           <ErpViewField label="Delivery Location" value={po.deliveryLocation.name} />
           <ErpViewField label="Expected Delivery Date" value={formatDate(po.expectedDeliveryDate)} />
-          <ErpViewField label="Validity Date" value={po.validityDate ? formatDate(po.validityDate) : '—'} />
-          <ErpViewField label="Price Basis" value={po.priceBasis || '—'} />
+          <ErpViewField label="Validity Date" value={po.validityDate ? formatDate(po.validityDate) : '-'} />
+          <ErpViewField label="Price Basis" value={po.priceBasis || '-'} />
           <ErpViewField label="Payment Terms" value={po.paymentTerms} />
           <ErpViewField label="Delivery Terms" value={po.deliveryTerms} />
-          <ErpViewField label="Freight Terms" value={po.freightTerms || '—'} />
-          <ErpViewField label="Packing Terms" value={po.packingTerms || '—'} />
-          <ErpViewField label="Insurance Terms" value={po.insuranceTerms || '—'} />
-          <ErpViewField label="Warranty" value={po.warranty || '—'} />
-          <ErpViewField label="Inspection Requirement" value={po.inspectionRequirement || '—'} />
+          <ErpViewField label="Freight Terms" value={po.freightTerms || '-'} />
+          <ErpViewField label="Packing Terms" value={po.packingTerms || '-'} />
+          <ErpViewField label="Insurance Terms" value={po.insuranceTerms || '-'} />
+          <ErpViewField label="Warranty" value={po.warranty || '-'} />
+          <ErpViewField label="Inspection Requirement" value={po.inspectionRequirement || '-'} />
           <ErpViewField
             label="Sent to Vendor"
-            value={po.sentToVendorAt ? formatDate(po.sentToVendorAt.slice(0, 10)) : '—'}
+            value={po.sentToVendorAt ? formatDate(po.sentToVendorAt.slice(0, 10)) : '-'}
           />
-          <ErpViewField label="Released At" value={po.releasedAt ? formatDate(po.releasedAt.slice(0, 10)) : '—'} />
-          <ErpViewField label="Vendor Address" value={po.vendor.address || '—'} colSpan={3} />
+          <ErpViewField label="Released At" value={po.releasedAt ? formatDate(po.releasedAt.slice(0, 10)) : '-'} />
+          <ErpViewField label="Vendor Address" value={po.vendor.address || '-'} colSpan={3} />
           <ErpViewField label="Source PR" hideIfEmpty>
             {po.purchaseRequisitionId ? (
               <Link className="text-erp-primary font-mono" to={`/purchase/requisitions/${po.purchaseRequisitionId}`}>
@@ -765,7 +730,6 @@ export function PurchaseOrderDetailPage() {
                 <colgroup>
                   <col className="purchase-order-detail-lines__col-line" />
                   <col className="purchase-order-detail-lines__col-item" />
-                  <col className="purchase-order-detail-lines__col-uom" />
                   <col className="purchase-order-detail-lines__col-qty" />
                   <col className="purchase-order-detail-lines__col-money" />
                   <col className="purchase-order-detail-lines__col-money" />
@@ -793,7 +757,6 @@ export function PurchaseOrderDetailPage() {
                   <tr>
                     <th className="purchase-order-detail-lines__col-line">#</th>
                     <th className="purchase-order-detail-lines__col-item">Item</th>
-                    <th className="purchase-order-detail-lines__col-uom">UOM</th>
                     <th className="num purchase-order-detail-lines__col-qty">Qty</th>
                     <th className="num purchase-order-detail-lines__col-money">Rate</th>
                     <th className="num purchase-order-detail-lines__col-money">Taxable</th>
@@ -850,7 +813,6 @@ export function PurchaseOrderDetailPage() {
                           </details>
                         ) : null}
                       </td>
-                      <td className="purchase-order-detail-lines__col-uom">{l.uom}</td>
                       <td className="num purchase-order-detail-lines__col-qty">
                         <PurchaseLineQtyCell line={l} />
                       </td>
@@ -901,10 +863,10 @@ export function PurchaseOrderDetailPage() {
                       </td>
                       <td className="purchase-order-detail-lines__col-flag">{l.qcRequired ? 'Yes' : 'No'}</td>
                       <td className="font-mono text-[12px] purchase-order-detail-lines__col-code-wide">
-                        {l.qualityTestGroupCode || '—'}
+                        {l.qualityTestGroupCode || '-'}
                       </td>
                       <td className="font-mono text-[12px] purchase-order-detail-lines__col-code">
-                        {l.binCode || '—'}
+                        {l.binCode || '-'}
                       </td>
                       <td className="purchase-order-detail-lines__col-status">
                         <Badge color={lineStatusBadgeColor(l.lineStatus)}>
@@ -915,7 +877,7 @@ export function PurchaseOrderDetailPage() {
                         {formatDate(l.expectedDeliveryDate || l.requiredDate)}
                       </td>
                       <td className="font-mono text-[12px] purchase-order-detail-lines__col-code">
-                        {l.requisitionNo || '—'}
+                        {l.requisitionNo || '-'}
                       </td>
                     </tr>
                   ))}
@@ -951,20 +913,9 @@ export function PurchaseOrderDetailPage() {
                   padding-right: 8px !important;
                   white-space: normal;
                 }
-                .purchase-order-detail-lines__col-uom {
-                  width: 3rem;
-                  min-width: 3rem;
-                  max-width: 3rem;
-                  padding: 6px 4px !important;
-                  text-align: center;
-                  white-space: nowrap;
-                }
-                .purchase-order-detail-lines thead .purchase-order-detail-lines__col-uom {
-                  padding: 8px 4px !important;
-                }
                 .purchase-order-detail-lines__col-qty {
-                  min-width: 7rem;
-                  width: 7rem;
+                  min-width: 9.5rem;
+                  width: 9.5rem;
                   white-space: nowrap;
                 }
                 .purchase-order-detail-lines__col-money {
@@ -982,8 +933,8 @@ export function PurchaseOrderDetailPage() {
                   padding-right: 10px !important;
                 }
                 .purchase-order-detail-lines__col-tracking {
-                  min-width: 7.5rem;
-                  width: 7.5rem;
+                  min-width: 8.5rem;
+                  width: 8.5rem;
                   padding-left: 8px !important;
                   padding-right: 10px !important;
                   vertical-align: middle;
@@ -1041,9 +992,15 @@ export function PurchaseOrderDetailPage() {
             <ErpViewField label="Insurance Charges" value={formatCurrency(po.insuranceCharges)} />
             <ErpViewField label="Other Charges" value={formatCurrency(po.otherCharges)} />
             <ErpViewField label="Taxable Amount" value={formatCurrency(po.taxableAmount)} />
-            <ErpViewField label="CGST" value={formatCurrency(po.cgst)} />
-            <ErpViewField label="SGST" value={formatCurrency(po.sgst)} />
-            <ErpViewField label="IGST" value={formatCurrency(po.igst)} />
+            {lineTaxCols.showCgst ? (
+              <ErpViewField label="CGST" value={formatCurrency(po.cgst)} />
+            ) : null}
+            {lineTaxCols.showSgst ? (
+              <ErpViewField label="SGST" value={formatCurrency(po.sgst)} />
+            ) : null}
+            {lineTaxCols.showIgst ? (
+              <ErpViewField label="IGST" value={formatCurrency(po.igst)} />
+            ) : null}
             <ErpViewField label="TCS" value={formatCurrency(po.tcsAmount)} />
             <ErpViewField label="Round Off" value={formatCurrency(po.roundOff)} />
             <ErpViewField label="Grand Total" value={formatCurrency(po.totalAmount)} />
@@ -1080,15 +1037,15 @@ export function PurchaseOrderDetailPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <ErpViewField label="Terms and Conditions">
               <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-erp-text">
-                {po.termsAndConditions || '—'}
+                {po.termsAndConditions || '-'}
               </p>
             </ErpViewField>
             <ErpViewField label="Internal Notes">
               <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-erp-text">
-                {po.internalNotes || '—'}
+                {po.internalNotes || '-'}
               </p>
             </ErpViewField>
-            <ErpViewField label="Remarks" value={po.remarks || '—'} className="sm:col-span-2" />
+            <ErpViewField label="Remarks" value={po.remarks || '-'} className="sm:col-span-2" />
           </div>
         </ErpCardSection>
 
@@ -1107,13 +1064,7 @@ export function PurchaseOrderDetailPage() {
           />
         </ErpCardSection>
 
-        <ErpCardSection
-          title="Audit Timeline"
-          subtitle="Purchase order lifecycle events"
-          columns={1}
-          collapsible
-          defaultOpen
-        >
+        <ErpCardSection title="History" subtitle="Lifecycle history" columns={1} collapsible defaultOpen={false}>
           <PurchaseAuditTimeline
             entityType="purchase-order"
             entityId={po.id}
@@ -1127,89 +1078,26 @@ export function PurchaseOrderDetailPage() {
               updatedAt: po.updatedAt,
               updatedBy: po.updatedBy,
               statusLabel: po.status,
-              extra: history.map((h) => ({
-                action: h.action,
-                actionLabel: h.action.replace(/_/g, ' '),
-                timestamp: h.actedAt,
-                actor: h.actorName,
-              })),
+              extra: [
+                ...history.map((h) => ({
+                  action: h.action,
+                  actionLabel: `${h.action.replace(/_/g, ' ')} (${h.fromStatus} → ${h.toStatus})`,
+                  timestamp: h.actedAt,
+                  actor: h.actorName,
+                })),
+                ...po.changeHistory.map((c) => ({
+                  action: `CHANGE_${c.id}`,
+                  actionLabel: `Changed ${c.fieldLabel}${
+                    c.previousValue || c.newValue
+                      ? `: ${c.previousValue || '-'} → ${c.newValue || '-'}`
+                      : ''
+                  }`,
+                  timestamp: c.changedAt,
+                  actor: c.changedBy,
+                })),
+              ],
             })}
           />
-        </ErpCardSection>
-
-        <ErpCardSection
-          title="Approval History"
-          columns={1}
-          collapsedSummary={approvalPeek || undefined}
-          collapsible
-          defaultOpen={false}
-        >
-          {history.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No approval activity yet.</p>
-          ) : (
-            <ul className="divide-y divide-erp-border rounded-md border border-erp-border">
-              {history.map((h) => (
-                <li key={h.id} className="flex justify-between gap-3 px-3 py-2.5 text-[13px]">
-                  <span className="min-w-0">
-                    <span className="font-medium capitalize text-erp-text">
-                      {h.action.replace(/_/g, ' ')}
-                    </span>
-                    <span className="text-erp-muted"> · {h.actorName}</span>
-                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-erp-muted">
-                      <StatusDot label={h.fromStatus} tone={statusToneFromLabel(h.fromStatus)} className="text-[12px]" />
-                      <span aria-hidden>→</span>
-                      <StatusDot label={h.toStatus} tone={statusToneFromLabel(h.toStatus)} className="text-[12px]" />
-                    </span>
-                    {h.remarks ? <span className="mt-1 block text-erp-muted">{h.remarks}</span> : null}
-                  </span>
-                  <span className="shrink-0 tabular-nums text-erp-muted">
-                    {formatDate(h.actedAt.slice(0, 10))}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </ErpCardSection>
-
-        <ErpCardSection
-          title="Change History"
-          columns={1}
-          collapsedSummary={changeHistoryPeek || undefined}
-          collapsible
-          defaultOpen={false}
-        >
-          {po.changeHistory.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No revisions recorded yet.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border border-erp-border">
-              <table className="erp-table min-w-[720px] text-[12px]">
-                <thead>
-                  <tr>
-                    <th>Revision</th>
-                    <th>Field</th>
-                    <th>Previous</th>
-                    <th>New</th>
-                    <th>Reason</th>
-                    <th>Changed By</th>
-                    <th>Changed At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {po.changeHistory.map((c) => (
-                    <tr key={c.id}>
-                      <td className="num tabular-nums">{c.revisionNo}</td>
-                      <td>{c.fieldLabel}</td>
-                      <td>{c.previousValue || '—'}</td>
-                      <td>{c.newValue || '—'}</td>
-                      <td>{c.reason || '—'}</td>
-                      <td>{c.changedBy}</td>
-                      <td className="whitespace-nowrap">{formatDate(c.changedAt.slice(0, 10))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </ErpCardSection>
 
         <ErpCardSection
@@ -1229,7 +1117,7 @@ export function PurchaseOrderDetailPage() {
                   {linked.purchaseRequisition.documentNumber}
                 </Link>
               ) : (
-                '—'
+                '-'
               )}
             </ErpViewField>
             <ErpViewField label="RFQ">
@@ -1238,7 +1126,7 @@ export function PurchaseOrderDetailPage() {
                   {linked.rfq.documentNumber}
                 </Link>
               ) : (
-                '—'
+                '-'
               )}
             </ErpViewField>
             <ErpViewField label="Vendor Quotation">
@@ -1250,11 +1138,11 @@ export function PurchaseOrderDetailPage() {
                   {linked.vendorQuotation.documentNumber}
                 </Link>
               ) : (
-                '—'
+                '-'
               )}
             </ErpViewField>
-            <ErpViewField label="Comparison" value={linked?.comparison?.documentNumber ?? '—'} />
-            <ErpViewField label="Blanket Order" value={linked?.blanketOrder?.documentNumber ?? '—'} />
+            <ErpViewField label="Comparison" value={linked?.comparison?.documentNumber ?? '-'} />
+            <ErpViewField label="Blanket Order" value={linked?.blanketOrder?.documentNumber ?? '-'} />
           </div>
 
           <div className="mt-1 space-y-4">

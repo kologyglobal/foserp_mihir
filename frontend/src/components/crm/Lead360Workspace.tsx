@@ -486,7 +486,7 @@ export function Lead360Workspace() {
     }
   }
 
-  const territory = customer?.salesTerritory ?? '—'
+  const territory = customer?.salesTerritory ?? '-'
   const convertedRecords = [
     linkedOpportunity
       ? { id: linkedOpportunity.id, label: linkedOpportunity.opportunityNo, href: `/crm/opportunities/${linkedOpportunity.id}`, meta: linkedOpportunity.opportunityName }

@@ -13,7 +13,7 @@ import { buildQuotationCommercialFields } from '@/utils/quotationEngine/commerci
 import { quotationStatusLabel } from './QuotationCrmCard'
 import { quotationRevisionLabel } from '@/utils/quotationEngine/revisionLabels'
 
-const EMPTY = '—'
+const EMPTY = '-'
 
 export interface QuotationSummaryCardProps {
   quotation: Quotation

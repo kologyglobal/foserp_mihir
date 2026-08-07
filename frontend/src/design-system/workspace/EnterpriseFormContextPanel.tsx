@@ -33,7 +33,7 @@ export function EnterpriseFormContextPanel({
             <div key={item.label} className="ent-ws-context__row">
               <dt>{item.label}</dt>
               <dd className={cn('ent-ws-context__value', item.highlight && 'ent-ws-context__value--highlight')}>
-                {item.value || '—'}
+                {item.value || '-'}
               </dd>
             </div>
           ))}

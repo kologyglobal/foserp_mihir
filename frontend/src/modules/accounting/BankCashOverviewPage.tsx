@@ -537,8 +537,8 @@ export function BankCashOverviewPage() {
                         <td className="px-2 py-1.5 font-mono">{t.transactionNumber}</td>
                         <td className="px-2 py-1.5">{t.accountName}</td>
                         <td className="px-2 py-1.5">{t.transactionType}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums">{t.debitAmount > 0 ? formatCurrency(t.debitAmount) : '—'}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums">{t.creditAmount > 0 ? formatCurrency(t.creditAmount) : '—'}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{t.debitAmount > 0 ? formatCurrency(t.debitAmount) : '-'}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{t.creditAmount > 0 ? formatCurrency(t.creditAmount) : '-'}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -73,7 +73,7 @@ export function GstAnnualCompliancePage() {
     metrics?: Record<string, number | boolean>
   } | null
 
-  const status = String(annual?.item?.status ?? '—')
+  const status = String(annual?.item?.status ?? '-')
   const canMutate = perms.isApiMode && (perms.canGstPrepareReturn || perms.canSetup)
 
   const run = async (label: string, fn: () => Promise<unknown>) => {
@@ -127,7 +127,7 @@ export function GstAnnualCompliancePage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">FY compliance cockpit</h2>
             <p className="mt-1 text-sm">
-              Score <strong>{health?.score ?? '—'}</strong> · Grade <strong>{health?.grade ?? '—'}</strong>
+              Score <strong>{health?.score ?? '-'}</strong> · Grade <strong>{health?.grade ?? '-'}</strong>
             </p>
             <p className="mt-1 text-xs text-erp-muted">{String(cockpit?.disclaimer ?? '')}</p>
             <ul className="mt-3 divide-y divide-erp-border text-sm">
@@ -149,7 +149,7 @@ export function GstAnnualCompliancePage() {
             {annual?.livePreview && !annual.item && (
               <p className="mt-2 text-xs text-erp-muted">
                 Live rollup not yet prepared. Outward tax preview:{' '}
-                {String((annual.livePreview as { outward?: { totalTax?: number } }).outward?.totalTax ?? '—')}
+                {String((annual.livePreview as { outward?: { totalTax?: number } }).outward?.totalTax ?? '-')}
               </p>
             )}
             {canMutate && (
@@ -215,7 +215,7 @@ export function GstAnnualCompliancePage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">Capability matrix</h2>
             <p className="mt-1 text-xs text-erp-muted">
-              Verdict: {String(matrix?.verdict ?? '—')} · Full GST compliant?{' '}
+              Verdict: {String(matrix?.verdict ?? '-')} · Full GST compliant?{' '}
               {matrix?.notFullGstCompliant === false ? 'Yes' : 'No (honest label)'}
             </p>
             <ul className="mt-3 divide-y divide-erp-border text-sm">

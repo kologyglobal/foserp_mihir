@@ -30,15 +30,15 @@ export function VendorInvoiceAccountingPreviewTable({ preview }: { preview: Vend
             <tr key={l.lineNumber} className="border-b border-erp-border/60">
               <td className="py-2 pr-2">{l.lineNumber}</td>
               <td className="py-2 pr-2">
-                <div className="font-medium">{l.accountCode ?? '—'}</div>
+                <div className="font-medium">{l.accountCode ?? '-'}</div>
                 <div className="text-erp-muted">{l.accountName ?? l.component}</div>
               </td>
               <td className="py-2 pr-2">{l.description}</td>
               <td className="py-2 pr-2 text-right tabular-nums">
-                {parseDecimal(l.debitAmount) > 0 ? formatCurrency(parseDecimal(l.debitAmount)) : '—'}
+                {parseDecimal(l.debitAmount) > 0 ? formatCurrency(parseDecimal(l.debitAmount)) : '-'}
               </td>
               <td className="py-2 text-right tabular-nums">
-                {parseDecimal(l.creditAmount) > 0 ? formatCurrency(parseDecimal(l.creditAmount)) : '—'}
+                {parseDecimal(l.creditAmount) > 0 ? formatCurrency(parseDecimal(l.creditAmount)) : '-'}
               </td>
             </tr>
           ))}

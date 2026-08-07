@@ -328,18 +328,18 @@ export function JournalDetailPage() {
       <div className="mb-4 grid gap-3 md:grid-cols-3 text-[12px]">
         <div><span className="text-erp-muted">Posting date</span><div className="font-medium">{journal.postingDate}</div></div>
         <div><span className="text-erp-muted">Document date</span><div className="font-medium">{journal.documentDate}</div></div>
-        <div><span className="text-erp-muted">Draft reference</span><div className="font-medium">{journal.referenceNumber ?? '—'}</div></div>
+        <div><span className="text-erp-muted">Draft reference</span><div className="font-medium">{journal.referenceNumber ?? '-'}</div></div>
         <div><span className="text-erp-muted">Total debit</span><div className="font-medium tabular-nums">{journal.totalDebit}</div></div>
         <div><span className="text-erp-muted">Total credit</span><div className="font-medium tabular-nums">{journal.totalCredit}</div></div>
         <div><span className="text-erp-muted">Approval required</span><div className="font-medium">{journal.approvalRequired ? `Yes (level ${journal.currentApprovalLevel})` : 'No'}</div></div>
         {journal.status === 'POSTED' || journal.status === 'REVERSED' ? (
           <>
-            <div><span className="text-erp-muted">Posted at</span><div className="font-medium">{journal.postedAt ? new Date(journal.postedAt).toLocaleString() : '—'}</div></div>
+            <div><span className="text-erp-muted">Posted at</span><div className="font-medium">{journal.postedAt ? new Date(journal.postedAt).toLocaleString() : '-'}</div></div>
             <div><span className="text-erp-muted">Ledger entries</span><div className="font-medium">{journal.ledgerEntryCount ?? ledgerRows.length}</div></div>
             {journal.status === 'REVERSED' ? (
               <>
-                <div><span className="text-erp-muted">Reversed at</span><div className="font-medium">{journal.reversedAt ? new Date(journal.reversedAt).toLocaleString() : '—'}</div></div>
-                <div><span className="text-erp-muted">Reversal reason</span><div className="font-medium">{journal.reversalReason ?? '—'}</div></div>
+                <div><span className="text-erp-muted">Reversed at</span><div className="font-medium">{journal.reversedAt ? new Date(journal.reversedAt).toLocaleString() : '-'}</div></div>
+                <div><span className="text-erp-muted">Reversal reason</span><div className="font-medium">{journal.reversalReason ?? '-'}</div></div>
               </>
             ) : null}
           </>
@@ -378,7 +378,7 @@ export function JournalDetailPage() {
                 <td className="px-2 py-2 font-mono text-[11px]">{line.accountId.slice(0, 8)}…</td>
                 <td className="px-2 py-2 text-right tabular-nums">{line.debitAmount}</td>
                 <td className="px-2 py-2 text-right tabular-nums">{line.creditAmount}</td>
-                <td className="px-2 py-2">{line.lineNarration ?? '—'}</td>
+                <td className="px-2 py-2">{line.lineNarration ?? '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -465,7 +465,7 @@ export function JournalDetailPage() {
                     <td className="px-2 py-2 font-mono text-[11px]">{row.accountId.slice(0, 8)}…</td>
                     <td className="px-2 py-2 text-right tabular-nums">{row.debitAmount}</td>
                     <td className="px-2 py-2 text-right tabular-nums">{row.creditAmount}</td>
-                    <td className="px-2 py-2">{row.voucherNumber ?? journal.voucherNumber ?? '—'}</td>
+                    <td className="px-2 py-2">{row.voucherNumber ?? journal.voucherNumber ?? '-'}</td>
                   </tr>
                 ))}
               </tbody>

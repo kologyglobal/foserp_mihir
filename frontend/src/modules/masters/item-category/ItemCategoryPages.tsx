@@ -79,7 +79,7 @@ export function ItemCategoryListPage() {
       id: 'parent',
       header: 'Parent',
       cell: ({ row }) =>
-        row.original.parentId ? getCategoryName(row.original.parentId) : '—',
+        row.original.parentId ? getCategoryName(row.original.parentId) : '-',
     },
     { accessorKey: 'level', header: 'Level' },
     {
@@ -93,7 +93,7 @@ export function ItemCategoryListPage() {
       cell: ({ row }) =>
         row.original.defaultWarehouseId
           ? getWarehouseName(row.original.defaultWarehouseId)
-          : '—',
+          : '-',
     },
     {
       id: 'items',
@@ -314,7 +314,7 @@ export function ItemCategoryDetailPage() {
             <DetailField label="Code" value={<span className="font-mono">{category.categoryCode}</span>} />
             <DetailField label="Parent" value={category.parentId ? getCategoryName(category.parentId) : 'Root'} />
             <DetailField label="Level" value={category.level} />
-            <DetailField label="Default Warehouse" value={category.defaultWarehouseId ? getWarehouseName(category.defaultWarehouseId) : '—'} />
+            <DetailField label="Default Warehouse" value={category.defaultWarehouseId ? getWarehouseName(category.defaultWarehouseId) : '-'} />
             <DetailField label="Stock policy" value={category.stockPolicy ?? 'REQUIRED'} />
             <DetailField label="Default stockable" value={category.defaultIsStockable === false ? 'No' : 'Yes'} />
             <DetailField label="Default inventory type" value={category.defaultInventoryType ?? 'inventory'} />

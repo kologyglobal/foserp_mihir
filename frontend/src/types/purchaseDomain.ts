@@ -292,9 +292,11 @@ export type PurchaseInvoiceStatus =
   | 'mismatch'
   | 'pending_approval'
   | 'approved'
+  | 'rejected'
   | 'on_hold'
   | 'posted'
   | 'paid'
+  | 'closed'
   | 'cancelled'
 
 export const PURCHASE_INVOICE_STATUSES: readonly PurchaseInvoiceStatus[] = [
@@ -304,9 +306,11 @@ export const PURCHASE_INVOICE_STATUSES: readonly PurchaseInvoiceStatus[] = [
   'mismatch',
   'pending_approval',
   'approved',
+  'rejected',
   'on_hold',
   'posted',
   'paid',
+  'closed',
   'cancelled',
 ] as const
 
@@ -317,9 +321,11 @@ export const PURCHASE_INVOICE_STATUS_LABELS: Record<PurchaseInvoiceStatus, strin
   mismatch: 'Mismatch',
   pending_approval: 'Pending Approval',
   approved: 'Approved',
+  rejected: 'Rejected',
   on_hold: 'On Hold',
   posted: 'Posted',
   paid: 'Paid',
+  closed: 'Closed',
   cancelled: 'Cancelled',
 }
 
@@ -2143,7 +2149,9 @@ export interface GoodsReceiptLine {
   uomConversionFactor?: number
   unitCostPrimary?: number
   acceptedQty: number
+  acceptedUomQty?: number
   rejectedQty: number
+  rejectedUomQty?: number
   /** Qty sent back via completed material returns (PRT). */
   returnedQty?: number
   /** Qty still eligible for material return. */
@@ -2199,6 +2207,8 @@ export interface GoodsReceiptLine {
     | 'REJECTED'
     | 'QUALITY_HOLD'
   receivingConditionReason?: string | null
+  /** Snapshot max receivable qty (stock/base UOM) = open qty + tolerance band at receive time. */
+  maximumAllowedUnitQuantity?: number | null
   receivedWeight?: number | null
   expectedWeight?: number | null
   maximumAllowedWeight?: number | null
@@ -2358,6 +2368,8 @@ export interface QualityInspectionListRow {
   batchLotNo: string
   receivedQty: number
   sampleQty: number
+  acceptedQty: number
+  rejectedQty: number
   inspectorName: string
   status: QualityInspectionStatus
   statusLabel: string
@@ -2411,6 +2423,8 @@ export interface InvoiceMatchingLineResult {
   itemName: string
   poQty: number | null
   grnReceivedQty: number | null
+  /** QC-accepted / payable GRN qty used for match baseline (when different from received). */
+  grnBillableQty?: number | null
   invoiceQty: number
   poRate: number | null
   invoiceRate: number

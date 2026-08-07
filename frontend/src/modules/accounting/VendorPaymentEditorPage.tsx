@@ -255,7 +255,7 @@ export function VendorPaymentEditorPage({ mode }: { mode: 'new' | 'edit' }) {
   const allocationStatus =
     allocatedTotal <= 0 ? 'Unallocated' : unallocated <= 0.01 ? 'Fully Allocated' : 'Partially Allocated'
 
-  const vendorName = lookups?.vendors.find((v) => v.id === form.vendorId)?.name ?? existing?.vendorName ?? '—'
+  const vendorName = lookups?.vendors.find((v) => v.id === form.vendorId)?.name ?? existing?.vendorName ?? '-'
 
   const workspaceTabs = useMemo(
     () =>
@@ -385,7 +385,7 @@ export function VendorPaymentEditorPage({ mode }: { mode: 'new' | 'edit' }) {
           </div>
           <div>
             <span className="text-[11px] font-semibold uppercase text-erp-muted">Amount</span>
-            <p className="font-semibold tabular-nums">{paymentAmount > 0 ? formatCurrency(paymentAmount) : '—'}</p>
+            <p className="font-semibold tabular-nums">{paymentAmount > 0 ? formatCurrency(paymentAmount) : '-'}</p>
           </div>
           <div>
             <span className="text-[11px] font-semibold uppercase text-erp-muted">Allocation</span>
@@ -533,7 +533,7 @@ export function VendorPaymentEditorPage({ mode }: { mode: 'new' | 'edit' }) {
                     <div>
                       <label className="mb-1 block text-[11px] font-semibold uppercase text-erp-muted">TDS section</label>
                       <Select value={form.tdsSection} onChange={(e) => setField('tdsSection', e.target.value)}>
-                        <option value="">—</option>
+                        <option value="">-</option>
                         {lookups?.tdsSections.map((s) => (
                           <option key={s} value={s}>
                             {s}

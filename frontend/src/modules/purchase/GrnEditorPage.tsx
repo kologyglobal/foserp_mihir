@@ -21,6 +21,7 @@ import {
   PurchaseStatusChip,
   purchaseStatusTone,
 } from '@/components/purchase/purchaseCardFormShared'
+import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import { ErpCardSection, ErpFieldRow, ErpFormSpan } from '@/components/erp/card-form'
 import { ErpSmartSelect } from '@/components/erp/ErpSmartSelect'
 import { FormActionBar } from '@/components/erp/FormActionBar'
@@ -48,7 +49,6 @@ import {
 import {
   evaluateGrnDocumentTolerance,
   evaluateGrnLineTolerance,
-  GRN_TOLERANCE_STATUS_LABELS,
 } from '@/services/purchase/grnTolerance'
 import {
   buildItemReceiptControls,
@@ -75,10 +75,12 @@ import {
   toUomQuantityFromBase,
 } from '@/utils/purchaseLineUom'
 import { notify } from '@/store/toastStore'
-import { systemConfirm } from '@/utils/systemConfirm'
+import { appPromptNote } from '@/store/confirmDialogStore'
 import { useActiveWarehouses, useActiveLocations } from '@/hooks/useMasterLists'
 import { useMasterStore } from '@/store/masterStore'
 import { useBinOptions } from '@/hooks/useBinOptions'
+import { resolveBinSelection, resolveItemDefaultBin } from '@/utils/itemDefaultBin'
+import { usePurchasePermissions } from '@/utils/permissions'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
 /**
@@ -111,6 +113,31 @@ function warehouseFromPoDelivery(
 
 function today() {
   return new Date().toISOString().slice(0, 10)
+}
+
+type ToleranceChipTone = 'success' | 'warning' | 'critical' | 'info' | 'neutral'
+
+/** Tone + label for a tolerance status — shared by the qty and weight tolerance chips. */
+function toleranceChipTone(
+  status: string,
+  hasOverrideReason: boolean,
+): { tone: ToleranceChipTone; label: string } {
+  switch (status) {
+    case 'NOT_RECEIVED':
+      return { tone: 'neutral', label: 'Not received' }
+    case 'PARTIAL':
+      return { tone: 'warning', label: 'Partial' }
+    case 'EXACT':
+      return { tone: 'success', label: 'Exact' }
+    case 'EXCESS_WITHIN_TOLERANCE':
+      return { tone: 'info', label: 'Within tolerance' }
+    case 'EXCESS_OUTSIDE_TOLERANCE':
+      return hasOverrideReason
+        ? { tone: 'warning', label: 'Excess — override recorded' }
+        : { tone: 'critical', label: 'Exceeds tolerance' }
+    default:
+      return { tone: 'neutral', label: status }
+  }
 }
 
 /** Resolve storage location id from id, code, or name (GRN editor stores id in state). */
@@ -152,6 +179,7 @@ export function GrnEditorPage() {
   const [searchParams] = useSearchParams()
   const isNew = !id
   const navigate = useNavigate()
+  const perms = usePurchasePermissions()
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -187,7 +215,7 @@ export function GrnEditorPage() {
 
   const warehouses = useActiveWarehouses()
   const storageLocations = useActiveLocations()
-  const bins = useBinOptions()
+  const bins = useBinOptions(warehouseId || undefined)
 
   const warehouseLocations = useMemo(
     () => storageLocations.filter((l) => !warehouseId || l.warehouseId === warehouseId),
@@ -210,17 +238,57 @@ export function GrnEditorPage() {
 
   const selectedPo = useMemo(() => orders.find((o) => o.id === poId), [orders, poId])
 
+  /** Match PO editor: scope by warehouse / storage location; never leave dropdown empty when bins exist. */
   const warehouseBins = useMemo(() => {
-    const byWarehouse = bins.filter(
-      (b) => !warehouseId || !b.warehouseId || b.warehouseId === warehouseId,
+    const selectedIds = new Set(lines.map((l) => l.binId).filter(Boolean) as string[])
+    const selectedCodes = new Set(lines.map((l) => l.bin?.trim()).filter((c): c is string => Boolean(c)))
+    const keepSelected = (b: (typeof bins)[number]) =>
+      selectedIds.has(b.id) ||
+      selectedCodes.has(b.code) ||
+      [...selectedIds].some(
+        (id) => b.code.localeCompare(id, undefined, { sensitivity: 'accent' }) === 0,
+      )
+
+    const deliveryRef = receivingLocation || selectedPo?.deliveryLocation?.id
+    if (!warehouseId && !deliveryRef) return bins
+
+    const scoped = bins.filter(
+      (b) =>
+        !b.warehouseId ||
+        b.warehouseId === warehouseId ||
+        (deliveryRef && b.storageLocationId === deliveryRef) ||
+        (deliveryRef && b.warehouseId === deliveryRef) ||
+        keepSelected(b),
     )
-    const storageLocationId = receivingLocation || selectedPo?.deliveryLocation?.id
-    if (!storageLocationId) return byWarehouse
-    const byLocation = byWarehouse.filter(
-      (b) => !b.storageLocationId || b.storageLocationId === storageLocationId,
-    )
-    return byLocation.length ? byLocation : byWarehouse
-  }, [bins, warehouseId, receivingLocation, selectedPo?.deliveryLocation?.id])
+    return scoped.length > 0 ? scoped : bins
+  }, [bins, warehouseId, receivingLocation, selectedPo?.deliveryLocation?.id, lines])
+
+  /** When bins load after PO lines, resolve item default bin + code-only snapshots to ids. */
+  useEffect(() => {
+    if (!bins.length || !lines.length) return
+    const catalog = warehouseBins.length ? warehouseBins : bins
+    setLines((prev) => {
+      let changed = false
+      const next = prev.map((line) => {
+        const resolved = resolveBinSelection(line.binId, line.bin, catalog)
+        if (resolved.binId || resolved.binCode) {
+          if (resolved.binId !== line.binId || resolved.binCode !== line.bin) {
+            changed = true
+            return { ...line, binId: resolved.binId, bin: resolved.binCode }
+          }
+          return line
+        }
+        const master = useMasterStore.getState().items.find((i) => i.id === line.itemId)
+        const def = resolveItemDefaultBin(master, catalog)
+        if ((def.binId || def.binCode) && (def.binId !== line.binId || def.binCode !== line.bin)) {
+          changed = true
+          return { ...line, binId: def.binId, bin: def.binCode }
+        }
+        return line
+      })
+      return changed ? next : prev
+    })
+  }, [bins, warehouseBins, poId, lines.length])
 
   const receivableVendors = useMemo(() => {
     const map = new Map<string, { id: string; name: string; code: string }>()
@@ -585,6 +653,60 @@ export function GrnEditorPage() {
     markDirty()
   }
 
+  /**
+   * Override tolerance — records a mandatory reason so the excess is not silently accepted.
+   * Does not bypass approval: the GRN still routes to Purchase Manager tolerance approval
+   * before posting (see GrnDetailPage "Approve/Reject Tolerance"). Gated to canPostGrn —
+   * same permission used for that approval action.
+   */
+  const overrideLineTolerance = async (index: number) => {
+    const line = lines[index]
+    if (!line) return
+    const reason = await appPromptNote({
+      title: 'Override tolerance',
+      description: `${line.itemName} — received qty is beyond the allowed tolerance band. Record why this excess is accepted; a Purchase Manager will still need to approve tolerance before this GRN posts to stock.`,
+      confirmLabel: 'Record override',
+      note: {
+        required: true,
+        label: 'Reason',
+        placeholder: 'e.g. Casting weight variation on this batch',
+      },
+    })
+    if (reason == null) return
+    updateLine(index, {
+      receivingCondition: 'EXCESS',
+      receivingConditionReason: reason,
+      allowExcess: true,
+    })
+  }
+
+  /**
+   * Reject excess — caps this GRN line's entry back down to the allowed maximum (qty and/or
+   * weight). Only corrects what this receipt claims; it does not create a vendor return for
+   * material physically received beyond that — use Override tolerance + a Purchase Return for that.
+   */
+  const reduceLineToAllowed = (index: number) => {
+    const line = lines[index]
+    if (!line) return
+    const patch: Partial<GrnLineDraft> = { receivingConditionReason: '' }
+    const notes: string[] = []
+    if (line.toleranceStatus === 'EXCESS_OUTSIDE_TOLERANCE') {
+      const factor = Number(line.uomConversionFactor) || 1
+      const maxUom = toUomQuantityFromBase(line.maximumAllowedQty, factor)
+      patch.receivedUomQty = maxUom
+      patch.receivedQty = line.maximumAllowedQty
+      notes.push(`qty to ${formatPurchaseQty(maxUom)} ${line.uom}`)
+    }
+    if (line.weightToleranceStatus === 'EXCESS_OUTSIDE_TOLERANCE' && line.maximumAllowedWeight != null) {
+      patch.receivedWeight = line.maximumAllowedWeight
+      notes.push(`weight to ${formatNumber(line.maximumAllowedWeight)} ${line.weightUomCode}`)
+    }
+    updateLine(index, patch)
+    notify.info(
+      `Capped ${line.itemCode || line.itemName} — ${notes.join(' and ')} — excess rejected on this receipt.`,
+    )
+  }
+
   const requestShortClose = (index: number, checked: boolean) => {
     if (!checked) {
       updateLine(index, { closeOpenQuantity: false, shortCloseReason: '' })
@@ -694,7 +816,9 @@ export function GrnEditorPage() {
       if (received < 0) {
         push(`line-${i}-qty`, `Received quantity cannot be negative for ${itemLabel}.`)
       }
-      // Hard max = open PO qty + item/setup over-receipt tolerance (never save beyond band).
+      // Beyond tolerance band: require a recorded override reason (Override tolerance) or
+      // a reduced qty — never silently accept, but never hard-block once a reason is on file
+      // (the GRN still routes to Purchase Manager tolerance approval before posting).
       const tol = evaluateGrnLineTolerance({
         openQuantity: open,
         receivedQuantity: received,
@@ -702,15 +826,26 @@ export function GrnEditorPage() {
         setupTolerancePct,
         allowOverReceipt: allowExcess || l.allowExcess,
       })
-      if (received > tol.upperBound + 1e-9) {
-        const maxLabel = Number(tol.upperBound.toFixed(4))
+      if (received > tol.upperBound + 1e-9 && !l.receivingConditionReason.trim()) {
+        const unit = l.uom ? ` ${l.uom}` : ''
         push(
           `line-${i}-excess`,
-          `Received quantity (${received}) for ${itemLabel} exceeds maximum allowed (${maxLabel}). ` +
-            `Open PO quantity is ${open}` +
-            (tol.tolerancePercentage > 0
-              ? ` with over-receipt tolerance ${tol.tolerancePercentage}%.`
-              : ' (no over-receipt tolerance).'),
+          `${itemLabel}: received (${formatPurchaseQty(received)}${unit}) exceeds the allowed qty ` +
+            `(${formatPurchaseQty(tol.upperBound)}${unit}` +
+            `${tol.tolerancePercentage > 0 ? ` incl. ${tol.tolerancePercentage}% tolerance` : ''}). ` +
+            `Use "Override tolerance" to accept with a reason, or reduce the qty.`,
+        )
+      }
+      if (
+        l.weightToleranceStatus === 'EXCESS_OUTSIDE_TOLERANCE' &&
+        !l.receivingConditionReason.trim()
+      ) {
+        const wUnit = l.weightUomCode ? ` ${l.weightUomCode}` : ''
+        push(
+          `line-${i}-weight`,
+          `${itemLabel}: received weight (${formatNumber(l.receivedWeight ?? 0)}${wUnit}) exceeds the ` +
+            `allowed weight (${l.maximumAllowedWeight != null ? formatNumber(l.maximumAllowedWeight) : '-'}${wUnit}). ` +
+            `Use "Override tolerance" to accept with a reason, or reduce the weight.`,
         )
       }
       if (l.batchControlled && received > 0 && !l.batchNumber.trim()) {
@@ -738,41 +873,28 @@ export function GrnEditorPage() {
     setSaving(true)
     try {
       const input = buildInput()
+      const saveMessage = (status: string, documentNumber: string) =>
+        status === 'pending_tolerance_approval'
+          ? `Saved · ${documentNumber} — awaiting Purchase Manager tolerance approval`
+          : `Saved · ${documentNumber}`
       if (recordId) {
         const updated = await updateGRN(recordId, input)
         setDocumentNumber(updated.documentNumber)
         setStatus(updated.status)
         setLines(linesFromGrn(updated, itemControls, receiptSetup, inspectionRequired))
-        notify.success(`Saved · ${updated.documentNumber}`)
+        notify.success(saveMessage(updated.status, updated.documentNumber))
       } else {
         const created = await createGRNFromPo(input)
         setRecordId(created.id)
         setDocumentNumber(created.documentNumber)
         setStatus(created.status)
         setLines(linesFromGrn(created, itemControls, receiptSetup, inspectionRequired))
-        notify.success(`Saved · ${created.documentNumber}`)
+        notify.success(saveMessage(created.status, created.documentNumber))
       }
       resetDirty()
       navigate(PURCHASE_FORM_ROUTES.grn.list, { replace: true })
     } catch (err) {
-      if (err instanceof PurchaseServiceError && err.code === 'EXCESS_QTY_REQUIRES_PERMISSION') {
-        const ok = await systemConfirm({
-          title: 'Allow excess receipt?',
-          description: `${err.message}\n\nAllow excess receipt for this GRN?`,
-          confirmLabel: 'Allow excess',
-          cancelLabel: 'Cancel',
-          variant: 'danger',
-        })
-        if (ok) {
-          setAllowExcess(true)
-          setLines((prev) => prev.map((l) => ({ ...l, allowExcess: true })))
-          notify.info('Allow Excess enabled — save again to confirm')
-        }
-      } else if (err instanceof PurchaseServiceError && err.code === 'GRN_QTY_EXCEEDS') {
-        notify.error(err.message)
-      } else {
-        notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
-      }
+      notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
     } finally {
       setSaving(false)
     }
@@ -970,14 +1092,14 @@ export function GrnEditorPage() {
         {!showPoPicker ? (
           <ErpFieldRow label="Purchase Order" readOnly>
             <Input
-              value={selectedPo ? `${selectedPo.documentNumber} — ${selectedPo.vendor.name}` : '—'}
+              value={selectedPo ? `${selectedPo.documentNumber} — ${selectedPo.vendor.name}` : '-'}
               readOnly
               className="bg-erp-surface-alt"
             />
           </ErpFieldRow>
         ) : null}
         <ErpFieldRow label="Vendor" readOnly>
-          <Input value={selectedPo?.vendor.name ?? '—'} readOnly className="bg-erp-surface-alt" />
+          <Input value={selectedPo?.vendor.name ?? '-'} readOnly className="bg-erp-surface-alt" />
         </ErpFieldRow>
         <ErpFieldRow label="Vendor Challan Number">
           <Input
@@ -1291,20 +1413,23 @@ export function GrnEditorPage() {
                   <span className="block text-[10px] font-normal text-erp-muted">(stock UOM · set by QC if required)</span>
                 </th>
                 {showWeightCol ? <th className="num">Weight</th> : null}
-                <th className="num">Qty Tol %</th>
-                {showWeightCol ? <th className="num">Wt Tol %</th> : null}
-                <th className="num" title={GRN_LINES_RECEIVING_GUIDE.columns[6].meaning}>
-                  Var %
+                <th
+                  className="grn-lines-grid__tolerance-col"
+                  title={GRN_LINES_RECEIVING_GUIDE.columns[6].meaning}
+                >
+                  Tolerance
+                  <span className="block text-[10px] font-normal text-erp-muted">
+                    Allowed qty · variance · status
+                  </span>
                 </th>
                 <th title="Why qty differs from PO — not the same as tolerance %">
                   Condition
                   <span className="block text-[10px] font-normal text-erp-muted">Short / Excess / Dmg</span>
                 </th>
-                <th title="Tolerance result on quantity (and weight when applicable)">Status</th>
                 <th title={GRN_LINES_RECEIVING_GUIDE.columns[7].meaning}>Close open</th>
                 {showBatchSerialCol ? <th>Batch / Lot / Serial</th> : null}
                 {showExpiryCol ? <th>Mfg / Expiry</th> : null}
-                <th>Bin</th>
+                <th className="grn-lines-grid__bin-col">Bin</th>
                 <th>Remarks</th>
               </tr>
             </thead>
@@ -1403,7 +1528,7 @@ export function GrnEditorPage() {
                     })()}
                   </td>
                   <td className="purchase-doc-lines-grid__uom-col text-[11px] font-semibold uppercase">
-                    {l.uom || '—'}
+                    {l.uom || '-'}
                   </td>
                   <td className="num grn-lines-grid__accepted-col">
                     <DecimalInput
@@ -1452,7 +1577,7 @@ export function GrnEditorPage() {
                   {showWeightCol ? (
                     <td className="num">
                       {l.receiptEntryMode === 'UNIT_ONLY' ? (
-                        '—'
+                        '-'
                       ) : (
                         <>
                           <DecimalInput
@@ -1471,17 +1596,102 @@ export function GrnEditorPage() {
                       )}
                     </td>
                   ) : null}
-                  <td className="num">{formatNumber(l.quantityTolerancePct)}</td>
-                  {showWeightCol ? (
-                    <td className="num">{formatNumber(l.weightTolerancePct)}</td>
-                  ) : null}
-                  <td className="num">
-                    {l.variancePercentage == null ? '—' : `${formatNumber(l.variancePercentage)}%`}
-                    {l.weightVariancePercentage != null ? (
-                      <p className="text-[10px] text-erp-muted">
-                        Wt {formatNumber(l.weightVariancePercentage)}%
-                      </p>
-                    ) : null}
+                  <td className="grn-lines-grid__tolerance-col">
+                    {(() => {
+                      const factor = Number(l.uomConversionFactor) || 1
+                      const unit = l.uom || ''
+                      const maxUom = toUomQuantityFromBase(l.maximumAllowedQty, factor)
+                      const excessUom = toUomQuantityFromBase(l.excessQty, factor)
+                      const receivedUom = Number(l.receivedUomQty ?? l.receivedQty) || 0
+                      const hasOverrideReason = Boolean(l.receivingConditionReason.trim())
+                      const weightApplicable =
+                        showWeightCol && l.weightToleranceStatus && l.weightToleranceStatus !== 'NOT_APPLICABLE'
+                      const qtyOutside = l.toleranceStatus === 'EXCESS_OUTSIDE_TOLERANCE'
+                      const weightOutside = weightApplicable && l.weightToleranceStatus === 'EXCESS_OUTSIDE_TOLERANCE'
+                      const outsideTolerance = qtyOutside || weightOutside
+                      const qtyChip = toleranceChipTone(l.toleranceStatus, hasOverrideReason)
+                      const weightChip = weightApplicable
+                        ? toleranceChipTone(l.weightToleranceStatus, hasOverrideReason)
+                        : null
+                      return (
+                        <div className="grn-tolerance-cell">
+                          {l.toleranceStatus !== 'NOT_RECEIVED' ? (
+                            <p className="grn-tolerance-cell__band">
+                              Tol {formatNumber(l.quantityTolerancePct)}% · Allowed ≤{' '}
+                              <span className="tabular-nums">{formatPurchaseQty(maxUom)}</span> {unit}
+                            </p>
+                          ) : null}
+                          <div className="grn-tolerance-cell__status">
+                            <DynamicsStatusChip label={qtyChip.label} tone={qtyChip.tone} />
+                            {l.variancePercentage != null ? (
+                              <span className="grn-tolerance-cell__variance tabular-nums">
+                                {l.variancePercentage > 0 ? '+' : ''}
+                                {formatNumber(l.variancePercentage)}%
+                              </span>
+                            ) : null}
+                          </div>
+                          {weightApplicable && weightChip ? (
+                            <p className="grn-tolerance-cell__weight">
+                              Wt tol {formatNumber(l.weightTolerancePct)}%
+                              {l.maximumAllowedWeight != null
+                                ? ` · Allowed ≤ ${formatNumber(l.maximumAllowedWeight)}${
+                                    l.weightUomCode ? ` ${l.weightUomCode}` : ''
+                                  }`
+                                : ''}{' '}
+                              <DynamicsStatusChip label={weightChip.label} tone={weightChip.tone} />
+                            </p>
+                          ) : null}
+                          {outsideTolerance ? (
+                            <div className="grn-tolerance-cell__alert">
+                              {qtyOutside ? (
+                                <p>
+                                  ⚠ Qty exceeds tolerance — Allowed{' '}
+                                  <span className="tabular-nums">{formatPurchaseQty(maxUom)}</span> {unit},
+                                  Received{' '}
+                                  <span className="tabular-nums">{formatPurchaseQty(receivedUom)}</span>{' '}
+                                  {unit}, Extra{' '}
+                                  <span className="tabular-nums">{formatPurchaseQty(excessUom)}</span> {unit}
+                                </p>
+                              ) : null}
+                              {weightOutside ? (
+                                <p>
+                                  ⚠ Weight exceeds tolerance — Allowed ≤{' '}
+                                  <span className="tabular-nums">
+                                    {l.maximumAllowedWeight != null ? formatNumber(l.maximumAllowedWeight) : '-'}
+                                  </span>{' '}
+                                  {l.weightUomCode}, Received{' '}
+                                  <span className="tabular-nums">{formatNumber(l.receivedWeight ?? 0)}</span>{' '}
+                                  {l.weightUomCode}
+                                </p>
+                              ) : null}
+                              {hasOverrideReason ? (
+                                <p className="grn-tolerance-cell__reason">
+                                  Override reason: {l.receivingConditionReason}
+                                </p>
+                              ) : null}
+                              <div className="grn-tolerance-cell__actions">
+                                {perms.canPostGrn ? (
+                                  <button
+                                    type="button"
+                                    className="grn-tolerance-cell__action"
+                                    onClick={() => void overrideLineTolerance(i)}
+                                  >
+                                    {hasOverrideReason ? 'Edit override' : 'Override tolerance'}
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="grn-tolerance-cell__action grn-tolerance-cell__action--muted"
+                                  onClick={() => reduceLineToAllowed(i)}
+                                >
+                                  Reject excess
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })()}
                   </td>
                   <td>
                     <Select
@@ -1505,15 +1715,6 @@ export function GrnEditorPage() {
                     <p className="mt-1 max-w-[9rem] text-[10px] leading-snug text-erp-muted">
                       {GRN_RECEIVING_CONDITION_DESCRIPTIONS[l.receivingCondition]}
                     </p>
-                  </td>
-                  <td>
-                    {GRN_TOLERANCE_STATUS_LABELS[
-                      l.toleranceStatus as keyof typeof GRN_TOLERANCE_STATUS_LABELS
-                    ] ?? l.toleranceStatus}
-                    {l.weightToleranceStatus &&
-                    l.weightToleranceStatus !== 'NOT_APPLICABLE' ? (
-                      <p className="text-[10px] text-erp-muted">Wt: {l.weightToleranceStatus}</p>
-                    ) : null}
                   </td>
                   <td>
                     <label className="inline-flex items-center gap-1.5">
@@ -1556,7 +1757,7 @@ export function GrnEditorPage() {
                         />
                       ) : null}
                       {!l.batchControlled && !l.serialControlled ? (
-                        <span className="text-[11px] text-erp-muted">—</span>
+                        <span className="text-[11px] text-erp-muted">-</span>
                       ) : null}
                       {fieldErrors[`line-${i}-batch`] || fieldErrors[`line-${i}-serial`] ? (
                         <p className="mt-1 text-xs text-erp-danger-fg">
@@ -1584,29 +1785,56 @@ export function GrnEditorPage() {
                       ) : null}
                     </td>
                   ) : null}
-                  <td>
-                    <Select
-                      className="min-w-[7rem] text-[11px]"
-                      value={l.binId ?? ''}
-                      onChange={(e) => {
-                        const nextBinId = e.target.value || null
-                        const bin = warehouseBins.find((b) => b.id === nextBinId)
-                        updateLine(i, { binId: nextBinId, bin: bin?.code ?? '' })
-                      }}
-                    >
-                      <option value="">{SELECT_PLACEHOLDER}</option>
-                      {warehouseBins.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.code}
-                        </option>
-                      ))}
-                      {l.binId && !warehouseBins.some((b) => b.id === l.binId) && l.bin ? (
-                        <option value={l.binId}>{l.bin}</option>
-                      ) : null}
-                    </Select>
-                    {!warehouseBins.length && warehouseId ? (
-                      <p className="mt-1 text-[10px] text-erp-muted">No bins for this warehouse</p>
-                    ) : null}
+                  <td className="grn-lines-grid__bin-col">
+                    {(() => {
+                      const resolvedBinId =
+                        l.binId ||
+                        (l.bin
+                          ? warehouseBins.find(
+                              (b) =>
+                                b.code.localeCompare(l.bin, undefined, { sensitivity: 'accent' }) ===
+                                0,
+                            )?.id
+                          : undefined) ||
+                        ''
+                      return (
+                        <>
+                          <Select
+                            className="w-full text-[11px]"
+                            value={resolvedBinId}
+                            onChange={(e) => {
+                              const nextBinId = e.target.value || null
+                              const bin = warehouseBins.find((b) => b.id === nextBinId)
+                              updateLine(i, { binId: nextBinId, bin: bin?.code ?? '' })
+                            }}
+                            title={
+                              !warehouseBins.length
+                                ? 'Create bins under Masters → BIN or Inventory setup'
+                                : undefined
+                            }
+                          >
+                            <option value="">{SELECT_PLACEHOLDER}</option>
+                            {warehouseBins.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.code}
+                              </option>
+                            ))}
+                            {resolvedBinId &&
+                            !warehouseBins.some((b) => b.id === resolvedBinId) &&
+                            l.bin ? (
+                              <option value={resolvedBinId}>{l.bin}</option>
+                            ) : null}
+                          </Select>
+                          {!warehouseBins.length ? (
+                            <p className="mt-1 text-[10px] text-erp-muted">
+                              {warehouseId
+                                ? 'No bins for this warehouse — add BIN master for the delivery warehouse'
+                                : 'Select warehouse / PO first'}
+                            </p>
+                          ) : null}
+                        </>
+                      )
+                    })()}
                   </td>
                   <td>
                     <Input

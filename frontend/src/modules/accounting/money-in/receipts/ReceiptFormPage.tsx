@@ -301,7 +301,7 @@ export function ReceiptFormPage({ mode }: { mode: 'create' | 'edit' }) {
               <div className="mi-receipt-context__chips">
                 <span className="mi-receipt-chip">
                   <span className="mi-receipt-chip__label">GSTIN</span>
-                  {selectedCustomer?.gstin || '—'}
+                  {selectedCustomer?.gstin || '-'}
                 </span>
                 {selectedCustomer?.creditDays ? (
                   <span className="mi-receipt-chip">

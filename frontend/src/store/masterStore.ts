@@ -562,16 +562,16 @@ export const useMasterStore = create<MasterState>()(
   isFgItemLinkedToProduct: (fgItemId) => get().products.some((p) => p.fgItemId === fgItemId),
 
   getUomByCode: (code) => get().uoms.find((u) => u.uomCode === code),
-  getCategoryName: (id) => get().categories.find((c) => c.id === id)?.categoryName ?? '—',
+  getCategoryName: (id) => get().categories.find((c) => c.id === id)?.categoryName ?? '-',
   getUomName: (id) => {
     const u = get().uoms.find((u) => u.id === id)
-    return u ? `${u.uomCode} (${u.uomName})` : '—'
+    return u ? `${u.uomCode} (${u.uomName})` : '-'
   },
   getWarehouseName: (id) =>
-    get().warehouses.find((w) => w.id === id)?.warehouseName ?? '—',
+    get().warehouses.find((w) => w.id === id)?.warehouseName ?? '-',
   getLocationName: (id) => {
     const loc = get().locations.find((l) => l.id === id)
-    return loc ? `${loc.locationCode} — ${loc.locationName}` : '—'
+    return loc ? `${loc.locationCode} — ${loc.locationName}` : '-'
   },
   getLocationByCode: (code) => get().locations.find((l) => l.locationCode === code),
   getItemCountByCategory: (categoryId) =>

@@ -194,7 +194,7 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
     () => contacts.filter((c) => c.customerId === opportunity?.customerId),
     [contacts, opportunity?.customerId],
   )
-  const owner = ownerOptions.find((o) => o.value === ownerId) ?? { value: ownerId, label: opportunity?.ownerName ?? '—' }
+  const owner = ownerOptions.find((o) => o.value === ownerId) ?? { value: ownerId, label: opportunity?.ownerName ?? '-' }
   const summary = calcOpportunityLinesSummary(syncOpportunityLines(lines))
   const dealValue = summary.grandTotal
   const weighted = calcWeightedValue(dealValue, Number(probability) || 0)

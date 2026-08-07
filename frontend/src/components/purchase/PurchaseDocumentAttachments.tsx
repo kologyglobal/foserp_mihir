@@ -46,7 +46,7 @@ export function purchaseAttachmentRowsFromIds(
     id,
     fileName: id,
     type: 'Other',
-    uploadedBy: opts?.uploadedBy ?? '—',
+    uploadedBy: opts?.uploadedBy ?? '-',
     uploadedAt: '',
     sizeBytes: null,
   }))
@@ -73,9 +73,9 @@ function stubRowsFromFiles(
 }
 
 function formatUploadedDate(iso: string): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   const day = iso.slice(0, 10)
-  return formatDate(day) || '—'
+  return formatDate(day) || '-'
 }
 
 /**
@@ -218,12 +218,12 @@ export function PurchaseDocumentAttachments({
                     {file.fileName}
                   </td>
                   <td className="whitespace-nowrap px-2.5 py-1.5 text-erp-muted">{file.type}</td>
-                  <td className="whitespace-nowrap px-2.5 py-1.5 text-erp-muted">{file.uploadedBy || '—'}</td>
+                  <td className="whitespace-nowrap px-2.5 py-1.5 text-erp-muted">{file.uploadedBy || '-'}</td>
                   <td className="whitespace-nowrap px-2.5 py-1.5 tabular-nums text-erp-muted">
                     {formatUploadedDate(file.uploadedAt)}
                   </td>
                   <td className="whitespace-nowrap px-2.5 py-1.5 tabular-nums text-erp-muted">
-                    {file.sizeBytes != null ? formatFileSize(file.sizeBytes) : '—'}
+                    {file.sizeBytes != null ? formatFileSize(file.sizeBytes) : '-'}
                   </td>
                   {!disabled ? (
                     <td className="px-2.5 py-1.5 text-right">

@@ -187,7 +187,7 @@ export function CapexRequestDetailPage() {
                         {row.purchaseOrderNo}
                       </Link>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </dd>
                 </div>

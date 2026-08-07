@@ -174,7 +174,7 @@ export const useCostingStore = create<CostingState>()(
             const grossMargin = revenue - totals.totalActual
             const marginPct = revenue > 0 ? (grossMargin / revenue) * 100 : 0
             return {
-              salesOrderNo: sheet.salesOrderNo ?? '—',
+              salesOrderNo: sheet.salesOrderNo ?? '-',
               fgWoNo: sheet.woNo,
               productCode: product?.productCode ?? sheet.itemCode,
               qty: sheet.qty,

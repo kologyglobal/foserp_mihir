@@ -214,7 +214,7 @@ export function ManufacturingCostSummaryPage() {
                     <td className={DENSE_TD_CLASS}>{r.category}</td>
                     <td className={`${DENSE_TD_CLASS} font-mono text-[10px]`}>{r.productionOrder}</td>
                     <td className={DENSE_TD_CLASS}>{r.plant}</td>
-                    <td className={`${DENSE_TD_CLASS} text-right`}>{r.qty || '—'}</td>
+                    <td className={`${DENSE_TD_CLASS} text-right`}>{r.qty || '-'}</td>
                     <td className={`${DENSE_TD_CLASS} text-right`}>{formatCurrency(r.revenue)}</td>
                     <td className={`${DENSE_TD_CLASS} text-right`}>{formatCurrency(r.materialCost)}</td>
                     <td className={`${DENSE_TD_CLASS} text-right`}>{formatCurrency(r.labourCost)}</td>

@@ -168,8 +168,8 @@ export function mapMatchStatusForBadge(status: MatchStatus): PayableMatchStatus 
 export function mapThreeWayMatchForDrawer(result: ThreeWayMatchResult): DrawerThreeWayMatchResult {
   return {
     invoiceNumber: result.invoiceNumber,
-    poNumber: result.poNumber ?? '—',
-    grnNumber: result.grnNumber ?? '—',
+    poNumber: result.poNumber ?? '-',
+    grnNumber: result.grnNumber ?? '-',
     vendorName: result.vendorName,
     matchStatus: mapMatchStatusForBadge(result.overallStatus),
     lines: result.lines.flatMap((line) => [

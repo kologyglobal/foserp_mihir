@@ -9,7 +9,6 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/forms/Inputs'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
-import { isApiMode } from '@/config/apiConfig'
 import {
   fetchValuationReconciliation,
   runValuationReconciliation,
@@ -18,10 +17,9 @@ import {
 import { formatCurrency } from '@/utils/formatters/currency'
 import { InventoryCostingShell } from './InventoryCostingShell'
 import { inventoryCostingPaths } from './inventoryCostingPaths'
-import { DEMO_RECON, methodLabel } from './costingDemoData'
+import { methodLabel } from './costingDemoData'
 
 export function InventoryValuationReconPage() {
-  const api = isApiMode()
   const [data, setData] = useState<ValuationReconciliationDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -33,10 +31,6 @@ export function InventoryValuationReconPage() {
     setLoading(true)
     setError(null)
     try {
-      if (!api) {
-        setData(DEMO_RECON)
-        return
-      }
       const res = await fetchValuationReconciliation({ mismatchesOnly })
       setData(res.data)
     } catch (e) {
@@ -44,13 +38,9 @@ export function InventoryValuationReconPage() {
     } finally {
       setLoading(false)
     }
-  }, [api, mismatchesOnly])
+  }, [mismatchesOnly])
 
   const runRecon = useCallback(async () => {
-    if (!api) {
-      setError('Run Reconciliation requires API mode')
-      return
-    }
     setBusy(true)
     setError(null)
     try {
@@ -61,7 +51,7 @@ export function InventoryValuationReconPage() {
     } finally {
       setBusy(false)
     }
-  }, [api, mismatchesOnly])
+  }, [mismatchesOnly])
 
   useEffect(() => {
     void load()
@@ -113,52 +103,70 @@ export function InventoryValuationReconPage() {
         />
       }
     >
-      <div className="flex flex-wrap items-center gap-3 border-b border-erp-border bg-erp-surface/40 px-3 py-2.5 text-[13px]">
+      <div className="flex flex-wrap items-center gap-4 border-b border-erp-border bg-erp-surface/40 px-3 py-2.5">
         {data ? (
-          <>
-            <span>
-              Method: <strong>{methodLabel(String(data.valuationMethod))}</strong>
-            </span>
-            <span>
-              Rows: <strong className="tabular-nums">{data.total}</strong>
-            </span>
-            <span className={data.mismatched > 0 ? 'text-rose-700' : 'text-emerald-700'}>
-              Mismatches: <strong className="tabular-nums">{data.mismatched}</strong>
-            </span>
+          <div className="ops-summary-card__metrics min-w-0 flex-1">
+            <div className="ops-summary-card__metric">
+              <span className="ops-summary-card__metric-label">Method</span>
+              <span className="ops-summary-card__metric-value">{methodLabel(String(data.valuationMethod))}</span>
+            </div>
+            <div className="ops-summary-card__metric">
+              <span className="ops-summary-card__metric-label">Rows</span>
+              <span className="ops-summary-card__metric-value tabular-nums">{data.total}</span>
+            </div>
+            <div className="ops-summary-card__metric">
+              <span className="ops-summary-card__metric-label">Mismatches</span>
+              <span
+                className={
+                  data.mismatched > 0
+                    ? 'ops-summary-card__metric-value tabular-nums text-rose-700'
+                    : 'ops-summary-card__metric-value tabular-nums text-emerald-700'
+                }
+              >
+                {data.mismatched}
+              </span>
+            </div>
             {data.summary ? (
               <>
-                <span>Stock qty: <strong className="tabular-nums">{data.summary.stockQuantity.toLocaleString()}</strong></span>
-                <span>
-                  Inventory value:{' '}
-                  <strong className="tabular-nums">{formatCurrency(data.summary.inventoryCostValue)}</strong>
-                </span>
-                <span>
-                  Uncosted:{' '}
-                  <strong className="tabular-nums">{data.summary.uncostedMovements}</strong>
-                </span>
-                <span>
-                  GL reconciliation:{' '}
-                  <strong>
+                <div className="ops-summary-card__metric">
+                  <span className="ops-summary-card__metric-label">Stock qty</span>
+                  <span className="ops-summary-card__metric-value tabular-nums">
+                    {data.summary.stockQuantity.toLocaleString()}
+                  </span>
+                </div>
+                <div className="ops-summary-card__metric">
+                  <span className="ops-summary-card__metric-label">Inventory value</span>
+                  <span className="ops-summary-card__metric-value tabular-nums">
+                    {formatCurrency(data.summary.inventoryCostValue)}
+                  </span>
+                </div>
+                <div className="ops-summary-card__metric">
+                  <span className="ops-summary-card__metric-label">Uncosted</span>
+                  <span className="ops-summary-card__metric-value tabular-nums">{data.summary.uncostedMovements}</span>
+                </div>
+                <div className="ops-summary-card__metric">
+                  <span className="ops-summary-card__metric-label">GL reconciliation</span>
+                  <span className="ops-summary-card__metric-value">
                     {(data.summary as { glReconciliation?: string }).glReconciliation ??
                       (data.summary.glInventoryValue == null
                         ? 'Not Available'
                         : formatCurrency(data.summary.glInventoryValue))}
-                  </strong>
-                  {data.summary.glInventoryValue != null ? (
-                    <span className="ml-1 tabular-nums text-erp-muted">
-                      ({formatCurrency(data.summary.glInventoryValue)}
-                      {data.summary.difference != null
-                        ? ` · Δ ${formatCurrency(data.summary.difference)}`
-                        : ''}
-                      )
-                    </span>
-                  ) : null}
-                </span>
+                    {data.summary.glInventoryValue != null ? (
+                      <span className="ml-1 tabular-nums text-erp-muted">
+                        ({formatCurrency(data.summary.glInventoryValue)}
+                        {data.summary.difference != null
+                          ? ` · Δ ${formatCurrency(data.summary.difference)}`
+                          : ''}
+                        )
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
               </>
             ) : null}
-          </>
+          </div>
         ) : null}
-        <div className="ml-auto min-w-[160px]">
+        <div className="min-w-[160px]">
           <Select
             value={mismatchesOnly ? 'yes' : 'no'}
             onChange={(e) => setMismatchesOnly(e.target.value === 'yes')}
@@ -222,7 +230,7 @@ export function InventoryValuationReconPage() {
                     {formatCurrency(Number(r.valueDifference))}
                   </td>
                   <td className="max-w-[200px] text-[11px] text-erp-muted">
-                    {(r.reasonCodes ?? []).map(reasonLabel).join('; ') || '—'}
+                    {(r.reasonCodes ?? []).map(reasonLabel).join('; ') || '-'}
                   </td>
                   <td className="text-right">
                     <Link

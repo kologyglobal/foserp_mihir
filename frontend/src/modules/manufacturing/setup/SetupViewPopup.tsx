@@ -64,7 +64,7 @@ export function SetupViewPopup({
                 field.mono && 'font-mono text-[12px]',
               )}
             >
-              {field.value == null || field.value === '' ? '—' : field.value}
+              {field.value == null || field.value === '' ? '-' : field.value}
             </dd>
           </div>
         ))}

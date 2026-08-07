@@ -107,7 +107,7 @@ export function resolveLedgerDateRange(
 }
 
 export function formatDisplayDate(iso: string): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   const [y, m, d] = iso.split('-').map(Number)
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   return `${pad(d)} ${months[(m ?? 1) - 1]} ${y}`

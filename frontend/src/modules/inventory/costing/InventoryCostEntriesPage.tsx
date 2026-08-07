@@ -10,7 +10,6 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { Select } from '@/components/forms/Inputs'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
-import { isApiMode } from '@/config/apiConfig'
 import {
   fetchInventoryCostEntries,
   fetchInventoryCostEntry,
@@ -20,15 +19,14 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { InventoryCostingShell } from './InventoryCostingShell'
 import { inventoryCostingPaths } from './inventoryCostingPaths'
-import { DEMO_COST_ENTRIES, methodLabel } from './costingDemoData'
+import { methodLabel } from './costingDemoData'
 
 function shortId(id: string | null | undefined): string {
-  if (!id) return '—'
+  if (!id) return '-'
   return id.length > 10 ? `${id.slice(0, 8)}…` : id
 }
 
 export function InventoryCostEntriesPage() {
-  const api = isApiMode()
   const [params] = useSearchParams()
   const [rows, setRows] = useState<InventoryCostEntryDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,16 +48,6 @@ export function InventoryCostEntriesPage() {
     setLoading(true)
     setError(null)
     try {
-      if (!api) {
-        let demo = DEMO_COST_ENTRIES
-        if (movementId) demo = demo.filter((r) => r.inventoryMovementId === movementId)
-        if (workOrderId) demo = demo.filter((r) => r.workOrderId === workOrderId)
-        if (itemId) demo = demo.filter((r) => r.itemId === itemId)
-        if (entryType) demo = demo.filter((r) => r.entryType === entryType)
-        if (method) demo = demo.filter((r) => r.valuationMethod === method)
-        setRows(demo)
-        return
-      }
       const res = await fetchInventoryCostEntries({
         limit: 100,
         entryType: entryType || undefined,
@@ -74,7 +62,7 @@ export function InventoryCostEntriesPage() {
     } finally {
       setLoading(false)
     }
-  }, [api, entryType, method, movementId, workOrderId, itemId])
+  }, [entryType, method, movementId, workOrderId, itemId])
 
   useEffect(() => {
     void load()
@@ -221,7 +209,6 @@ export function InventoryCostEntriesPage() {
 
 export function InventoryCostEntryDetailPage() {
   const { id } = useParams()
-  const api = isApiMode()
   const [row, setRow] = useState<InventoryCostEntryDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -232,11 +219,6 @@ export function InventoryCostEntryDetailPage() {
     setLoading(true)
     ;(async () => {
       try {
-        if (!api) {
-          const demo = DEMO_COST_ENTRIES.find((e) => e.id === id) ?? null
-          if (!cancelled) setRow(demo)
-          return
-        }
         const res = await fetchInventoryCostEntry(id)
         if (!cancelled) setRow(res.data)
       } catch (e) {
@@ -248,7 +230,7 @@ export function InventoryCostEntryDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [api, id])
+  }, [id])
 
   return (
     <InventoryCostingShell
@@ -417,14 +399,14 @@ export function InventoryCostEntryDetailPage() {
                           {c.layer?.layerNo ?? shortId(c.layerId)}
                         </Link>
                       </td>
-                      <td>{c.layer?.receiptDate ? formatDate(c.layer.receiptDate) : '—'}</td>
+                      <td>{c.layer?.receiptDate ? formatDate(c.layer.receiptDate) : '-'}</td>
                       <td className="text-right tabular-nums">{c.quantityConsumed}</td>
                       <td className="text-right tabular-nums">{formatCurrency(Number(c.unitCost))}</td>
                       <td className="text-right tabular-nums">{formatCurrency(Number(c.totalCost))}</td>
                       <td className="font-mono text-[11px]">
                         {c.layer?.serialId ? `S ${shortId(c.layer.serialId)}` : ''}
                         {c.layer?.lotId ? `L ${shortId(c.layer.lotId)}` : ''}
-                        {!c.layer?.serialId && !c.layer?.lotId ? '—' : ''}
+                        {!c.layer?.serialId && !c.layer?.lotId ? '-' : ''}
                       </td>
                     </tr>
                   ))}

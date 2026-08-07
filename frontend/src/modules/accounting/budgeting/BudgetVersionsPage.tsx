@@ -159,7 +159,7 @@ export function BudgetVersionsPage() {
                     <StatusBadge status={r.status} isPrimary={r.isPrimary} />
                   </td>
                   <td className="px-2 py-2">{r.preparedBy}</td>
-                  <td className="px-2 py-2">{r.approvedBy ?? '—'}</td>
+                  <td className="px-2 py-2">{r.approvedBy ?? '-'}</td>
                   <td className="px-2 py-2">{formatDate(r.lastUpdated)}</td>
                   <td className="px-2 py-2">
                     <div className="flex flex-wrap gap-1">

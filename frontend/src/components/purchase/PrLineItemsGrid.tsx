@@ -172,7 +172,7 @@ export function PrLineItemsGrid({
                 const locationLabel =
                   locationOptions.find((o) => o.value === line.locationId)?.label
                   ?? warehouseOptions.find((o) => o.value === line.warehouseId)?.label
-                  ?? '—'
+                  ?? '-'
 
                 return (
                   <Fragment key={line.key}>
@@ -192,7 +192,7 @@ export function PrLineItemsGrid({
                       <td className="erp-line-items-grid__sticky-product">
                         <div className="erp-line-items-grid__product-stack">
                           {readOnly ? (
-                            <p className="erp-line-items-grid__product-name">{itemCode ?? '—'}</p>
+                            <p className="erp-line-items-grid__product-name">{itemCode ?? '-'}</p>
                           ) : (
                             <ItemLookupSelect
                               compact
@@ -217,7 +217,7 @@ export function PrLineItemsGrid({
                         </div>
                       </td>
                       <td className="erp-line-items-grid__col-desc erp-line-items-grid__col--desktop">
-                        <p className="erp-line-items-grid__desc-text">{itemName || '—'}</p>
+                        <p className="erp-line-items-grid__desc-text">{itemName || '-'}</p>
                       </td>
                       <td className="text-right erp-line-items-grid__col-qty">
                         {readOnly ? (
@@ -235,7 +235,7 @@ export function PrLineItemsGrid({
                         )}
                       </td>
                       <td className="erp-line-items-grid__col-unit erp-line-items-grid__col--desktop">
-                        <span className="erp-line-items-grid__unit-badge">{line.uomName || '—'}</span>
+                        <span className="erp-line-items-grid__unit-badge">{line.uomName || '-'}</span>
                       </td>
                       <td className="erp-line-items-grid__col--desktop">
                         {readOnly ? (
@@ -257,7 +257,7 @@ export function PrLineItemsGrid({
                         'text-right tabular-nums erp-line-items-grid__col--desktop',
                         stockLow && 'text-erp-danger-fg font-semibold',
                       )}>
-                        {line.itemId ? stock : '—'}
+                        {line.itemId ? stock : '-'}
                       </td>
                       <td className="erp-line-items-grid__col--desktop">
                         {readOnly ? (
@@ -318,11 +318,11 @@ export function PrLineItemsGrid({
                           <div className="erp-line-items-grid__detail-grid">
                             <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
                               <span>Description</span>
-                              <p>{itemName || '—'}</p>
+                              <p>{itemName || '-'}</p>
                             </label>
                             <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
                               <span>Unit</span>
-                              <p>{line.uomName || '—'}</p>
+                              <p>{line.uomName || '-'}</p>
                             </label>
                             <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
                               <span>Location</span>
@@ -344,7 +344,7 @@ export function PrLineItemsGrid({
                             <div className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
                               <span>Stock on hand</span>
                               <p className={cn(stockLow && 'text-erp-danger-fg font-semibold')}>
-                                {line.itemId ? stock : '—'}
+                                {line.itemId ? stock : '-'}
                               </p>
                             </div>
                             <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
@@ -362,12 +362,12 @@ export function PrLineItemsGrid({
                             </label>
                             <div className="erp-line-items-grid__detail-field">
                               <span>Material / grade</span>
-                              <p>{item?.materialGrade || '—'}</p>
+                              <p>{item?.materialGrade || '-'}</p>
                             </div>
                             <label className="erp-line-items-grid__detail-field">
                               <span>Preferred vendor</span>
                               {readOnly ? (
-                                <p>{line.vendorName ?? line.vendorCode ?? '—'}</p>
+                                <p>{line.vendorName ?? line.vendorCode ?? '-'}</p>
                               ) : (
                                 <VendorLookupSelect
                                   compact
@@ -386,7 +386,7 @@ export function PrLineItemsGrid({
                             <label className="erp-line-items-grid__detail-field">
                               <span>Line remarks</span>
                               {readOnly ? (
-                                <p>{line.remarks?.trim() || '—'}</p>
+                                <p>{line.remarks?.trim() || '-'}</p>
                               ) : (
                                 <input
                                   className="quo-editor-price__input"

@@ -76,8 +76,8 @@ export const mrpPlans: MRPPlan[] = [
     projectedOnHand: 12,
     netRequirement: 0,
     plannedOrderQty: 0,
-    plannedOrderDate: '—',
-    supplier: '—',
+    plannedOrderDate: '-',
+    supplier: '-',
   },
   {
     id: 'MRP-007',
@@ -89,7 +89,7 @@ export const mrpPlans: MRPPlan[] = [
     projectedOnHand: 15,
     netRequirement: 0,
     plannedOrderQty: 0,
-    plannedOrderDate: '—',
-    supplier: '—',
+    plannedOrderDate: '-',
+    supplier: '-',
   },
 ]

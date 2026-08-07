@@ -110,7 +110,7 @@ export function DetailLayout({
       factBoxSummary={
         factBoxSummary ?? [
           { label: 'Register', value: backLabel.replace(/^Back to /i, '') },
-          { label: 'Code', value: recordNo ?? subtitle ?? '—' },
+          { label: 'Code', value: recordNo ?? subtitle ?? '-' },
         ]
       }
       sectionNavItems={sectionNavItems}
@@ -167,7 +167,7 @@ export function DetailField({
   return (
     <div className="masters-detail-field">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">{label}</dt>
-      <dd className="mt-1 text-[13px] font-medium text-erp-text">{value ?? '—'}</dd>
+      <dd className="mt-1 text-[13px] font-medium text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }

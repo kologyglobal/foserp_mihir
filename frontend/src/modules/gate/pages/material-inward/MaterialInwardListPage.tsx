@@ -120,13 +120,13 @@ export function MaterialInwardListPage() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td className="tabular-nums"><TableLink to={`/gate/material-inward/${r.id}`}>{r.entryNumber}</TableLink></td>
-                    <td className="whitespace-nowrap">{r.arrivalTime ? formatDateTime(r.arrivalTime) : '—'}</td>
-                    <td className="max-w-[150px] truncate">{r.vendorName ?? '—'}</td>
-                    <td className="tabular-nums">{r.poNumber ?? r.challanNumber ?? '—'}</td>
-                    <td className="tabular-nums">{r.vehicleNumber ?? '—'}</td>
+                    <td className="whitespace-nowrap">{r.arrivalTime ? formatDateTime(r.arrivalTime) : '-'}</td>
+                    <td className="max-w-[150px] truncate">{r.vendorName ?? '-'}</td>
+                    <td className="tabular-nums">{r.poNumber ?? r.challanNumber ?? '-'}</td>
+                    <td className="tabular-nums">{r.vehicleNumber ?? '-'}</td>
                     <td className="max-w-[220px] truncate font-medium">{r.materialSummary}</td>
                     <td className="tabular-nums">{r.packages}</td>
-                    <td>{r.warehouse ?? '—'}</td>
+                    <td>{r.warehouse ?? '-'}</td>
                     <td><GateStatusBadge status={r.status} /></td>
                     <td><InsideDuration from={r.arrivalTime} warnAfterMinutes={60} /></td>
                     <td><ErpButton size="sm" variant="ghost" onClick={() => navigate(`/gate/material-inward/${r.id}`)}>View</ErpButton></td>

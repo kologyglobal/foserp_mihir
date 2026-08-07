@@ -23,7 +23,7 @@ import { addDaysIso, startOfWeekIso, HrEmptyState, HrRegisterShell } from '../co
 import '../hrms-ui.css'
 
 function badgeCode(shift: { code: string } | null | undefined): string {
-  if (!shift) return '—'
+  if (!shift) return '-'
   return shift.code.length > 6 ? shift.code.slice(0, 6) : shift.code
 }
 

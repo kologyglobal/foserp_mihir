@@ -211,7 +211,7 @@ export function AdminApprovalAuthorityPage() {
                       </td>
                       <td className="px-3 py-2">
                         {roleName ??
-                          (userName ? `${userName.firstName} ${userName.lastName}` : '—')}
+                          (userName ? `${userName.firstName} ${userName.lastName}` : '-')}
                       </td>
                       <td className="px-3 py-2">{r.selfApprovalAllowed ? 'Yes' : 'No'}</td>
                       <td className="px-3 py-2 text-right">

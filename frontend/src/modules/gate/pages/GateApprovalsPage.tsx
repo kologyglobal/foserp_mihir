@@ -38,7 +38,7 @@ function Field({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <dt className="text-[12px] text-erp-muted">{label}</dt>
-      <dd className="text-[13px] font-medium text-erp-text">{value ?? '—'}</dd>
+      <dd className="text-[13px] font-medium text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }

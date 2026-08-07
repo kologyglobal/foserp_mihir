@@ -12,6 +12,7 @@ import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
 import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
 import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
 import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
+import { amountInWords } from '@/utils/amountInWords'
 
 export function PurchaseInvoicePrintPage() {
   const { id } = useParams()
@@ -70,7 +71,7 @@ export function PurchaseInvoicePrintPage() {
           docNumber={inv.documentNumber}
           meta={[
             { label: 'Date', value: formatDate(inv.documentDate) },
-            { label: 'Vendor inv', value: inv.vendorInvoiceNumber || '—' },
+            { label: 'Vendor inv', value: inv.vendorInvoiceNumber || '-' },
             { label: 'Status', value: formatStatus(inv.status) },
           ]}
         />
@@ -85,11 +86,11 @@ export function PurchaseInvoicePrintPage() {
           </section>
           <section className="po-print-box">
             <p className="po-print-box__label">References</p>
-            <p>PO: {inv.purchaseOrderNumber ?? '—'}</p>
-            <p>GRN: {inv.goodsReceiptNumber ?? '—'}</p>
-            <p>Place of supply: {inv.placeOfSupply || '—'}</p>
-            <p>Due: {inv.dueDate ? formatDate(inv.dueDate) : '—'}</p>
-            <p>E-Invoice: {inv.eInvoiceReference ?? '—'}</p>
+            <p>PO: {inv.purchaseOrderNumber ?? '-'}</p>
+            <p>GRN: {inv.goodsReceiptNumber ?? '-'}</p>
+            <p>Place of supply: {inv.placeOfSupply || '-'}</p>
+            <p>Due: {inv.dueDate ? formatDate(inv.dueDate) : '-'}</p>
+            <p>E-Invoice: {inv.eInvoiceReference ?? '-'}</p>
           </section>
         </div>
 
@@ -101,9 +102,9 @@ export function PurchaseInvoicePrintPage() {
               <th>HSN</th>
               <th className="num">Qty</th>
               <th className="num">Rate</th>
-              <th>Taxable</th>
-              <th>GST%</th>
-              <th>Total</th>
+              <th className="num">Taxable</th>
+              <th className="num">GST%</th>
+              <th className="num">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -124,12 +125,12 @@ export function PurchaseInvoicePrintPage() {
                   <br />
                   <span className="text-muted">{l.description || l.itemName}</span>
                 </td>
-                <td>{l.hsnCode || l.sacCode || '—'}</td>
+                <td>{l.hsnCode || l.sacCode || '-'}</td>
                 <PurchasePrintDualQtyCell {...dual} />
-                <td>{formatCurrency(l.rate)}</td>
-                <td>{formatCurrency(l.taxableAmount)}</td>
-                <td>{l.gstRatePct}%</td>
-                <td>{formatCurrency(l.lineTotal)}</td>
+                <td className="num">{formatCurrency(l.rate)}</td>
+                <td className="num">{formatCurrency(l.taxableAmount)}</td>
+                <td className="num">{l.gstRatePct}%</td>
+                <td className="num">{formatCurrency(l.lineTotal)}</td>
               </tr>
               )
             })}
@@ -138,12 +139,20 @@ export function PurchaseInvoicePrintPage() {
 
         <div className="po-print-totals">
           <p>Taxable: {formatCurrency(inv.taxableAmount)}</p>
-          <p>
-            CGST: {formatCurrency(inv.cgst)} · SGST: {formatCurrency(inv.sgst)} · IGST:{' '}
-            {formatCurrency(inv.igst)}
-          </p>
+          {Number(inv.igst) > 0 ? (
+            <p>IGST: {formatCurrency(inv.igst)}</p>
+          ) : (
+            <p>
+              CGST: {formatCurrency(inv.cgst)} · SGST: {formatCurrency(inv.sgst)}
+            </p>
+          )}
+          {Number(inv.roundOff) ? <p>Round Off: {formatCurrency(inv.roundOff)}</p> : null}
           <p className="po-print-totals__grand">Grand Total: {formatCurrency(inv.totalAmount)}</p>
         </div>
+
+        <p className="po-print-words">
+          Amount in words: {amountInWords(Number(inv.totalAmount) || 0)}
+        </p>
 
         {inv.remarks ? (
           <section className="po-print-box mt-4">

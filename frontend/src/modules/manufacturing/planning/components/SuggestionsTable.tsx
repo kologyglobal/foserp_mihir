@@ -54,8 +54,8 @@ export function SuggestionsTable({ suggestions, canReview, busyId, onAccept, onR
                     <td className="text-right tabular-nums font-semibold">
                       {s.suggestedQuantity} {s.uomCode}
                     </td>
-                    <td className="whitespace-nowrap">{s.suggestedStartDate ? formatDate(s.suggestedStartDate) : '—'}</td>
-                    <td className="whitespace-nowrap">{s.suggestedDueDate ? formatDate(s.suggestedDueDate) : '—'}</td>
+                    <td className="whitespace-nowrap">{s.suggestedStartDate ? formatDate(s.suggestedStartDate) : '-'}</td>
+                    <td className="whitespace-nowrap">{s.suggestedDueDate ? formatDate(s.suggestedDueDate) : '-'}</td>
                     <td>
                       <DynamicsStatusChip label={meta.label} tone={meta.tone} />
                     </td>
@@ -73,7 +73,7 @@ export function SuggestionsTable({ suggestions, canReview, busyId, onAccept, onR
                             </>
                           ) : (
                             <span className="text-[11px] text-erp-muted">
-                              {s.decidedAt ? formatDate(s.decidedAt) : '—'}
+                              {s.decidedAt ? formatDate(s.decidedAt) : '-'}
                             </span>
                           )}
                         </div>

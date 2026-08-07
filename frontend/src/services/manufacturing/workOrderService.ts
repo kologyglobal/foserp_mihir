@@ -350,7 +350,7 @@ export async function getManufacturingControlDashboard(): Promise<ManufacturingC
         requiredQty: m.requiredQty,
         availableQty: m.availableQty,
         shortageQty: m.shortageQty,
-        workOrderNo: wo?.woNumber ?? '—',
+        workOrderNo: wo?.woNumber ?? '-',
         workOrderId: m.workOrderId,
         suggestedAction: suggested,
         href: `/manufacturing/work-orders/${m.workOrderId}?tab=materials`,
@@ -565,7 +565,7 @@ export async function getManufacturingControlDashboard(): Promise<ManufacturingC
       return {
         id: q.id,
         workOrderId: q.workOrderId,
-        woNumber: wo?.woNumber ?? '—',
+        woNumber: wo?.woNumber ?? '-',
         finishedItem: `${q.finishedItemCode} — ${q.finishedItemName}`,
         pendingQty: q.producedQty - q.acceptedQty,
         href: `/manufacturing/work-orders/${q.workOrderId}?action=quality`,

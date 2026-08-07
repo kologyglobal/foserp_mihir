@@ -590,7 +590,7 @@ export function WorkOrderDetailPage() {
   }
 
   const editable = isWoEditable(wo.status)
-  const uomCode = (uomId: string) => getUomCode.find((u) => u.id === uomId)?.uomCode ?? '—'
+  const uomCode = (uomId: string) => getUomCode.find((u) => u.id === uomId)?.uomCode ?? '-'
 
   const materialColumns: ColumnDef<WorkOrderMaterialLine, unknown>[] = [
     { accessorKey: 'itemCode', header: 'Item', cell: ({ row }) => <span className="font-mono text-xs">{row.original.itemCode}</span> },
@@ -635,7 +635,7 @@ export function WorkOrderDetailPage() {
       header: 'Issue',
       cell: ({ row }) => {
         const pending = row.original.reservedQty - row.original.issuedQty
-        if (pending <= 0 || wo.status === 'closed') return '—'
+        if (pending <= 0 || wo.status === 'closed') return '-'
         return (
           <Button
             size="sm"
@@ -654,7 +654,7 @@ export function WorkOrderDetailPage() {
 
   const shipmentColumns: ColumnDef<SubcontractShipment, unknown>[] = [
     { accessorKey: 'challanNo', header: 'Challan No' },
-    { accessorKey: 'vendorId', header: 'Vendor', cell: ({ row }) => vendors.find((v) => v.id === row.original.vendorId)?.vendorName ?? '—' },
+    { accessorKey: 'vendorId', header: 'Vendor', cell: ({ row }) => vendors.find((v) => v.id === row.original.vendorId)?.vendorName ?? '-' },
     { accessorKey: 'itemId', header: 'Item', cell: ({ row }) => getItem(row.original.itemId)?.itemCode },
     { accessorKey: 'sentQty', header: 'Sent', cell: ({ row }) => formatNumber(row.original.sentQty) },
     { accessorKey: 'receivedQty', header: 'Received', cell: ({ row }) => formatNumber(row.original.receivedQty) },
@@ -668,7 +668,7 @@ export function WorkOrderDetailPage() {
     { accessorKey: 'itemId', header: 'FG Item', cell: ({ row }) => getItem(row.original.itemId)?.itemCode },
     { accessorKey: 'warehouseId', header: 'Warehouse', cell: ({ row }) => getWarehouse(row.original.warehouseId)?.warehouseCode },
     { accessorKey: 'qty', header: 'Qty', cell: ({ row }) => formatNumber(row.original.qty) },
-    { accessorKey: 'movementNo', header: 'Movement', cell: ({ row }) => row.original.movementNo ?? '—' },
+    { accessorKey: 'movementNo', header: 'Movement', cell: ({ row }) => row.original.movementNo ?? '-' },
   ]
 
   const saColumns: ColumnDef<SaReceipt, unknown>[] = [
@@ -676,9 +676,9 @@ export function WorkOrderDetailPage() {
     { accessorKey: 'itemCode', header: 'Output Item', cell: ({ row }) => <span className="font-mono text-xs">{row.original.itemCode}</span> },
     { accessorKey: 'warehouseCode', header: 'Receipt WH' },
     { accessorKey: 'qty', header: 'Qty', cell: ({ row }) => formatNumber(row.original.qty) },
-    { accessorKey: 'parentWoNo', header: 'Parent WO', cell: ({ row }) => row.original.parentWoNo ?? '—' },
+    { accessorKey: 'parentWoNo', header: 'Parent WO', cell: ({ row }) => row.original.parentWoNo ?? '-' },
     { accessorKey: 'status', header: 'Status', cell: ({ row }) => <Badge color={row.original.status === 'posted' ? 'green' : 'gray'}>{formatStatus(row.original.status)}</Badge> },
-    { accessorKey: 'movementNo', header: 'Movement', cell: ({ row }) => row.original.movementNo ?? '—' },
+    { accessorKey: 'movementNo', header: 'Movement', cell: ({ row }) => row.original.movementNo ?? '-' },
   ]
 
   const timelineColumns: ColumnDef<WorkOrderActivity, unknown>[] = [
@@ -954,7 +954,7 @@ export function WorkOrderDetailPage() {
                 </div>
                 <div>
                   <p className="text-xs uppercase text-slate-500">Parent WO</p>
-                  <p className="font-mono text-sm">{parentWo?.woNo ?? '—'}</p>
+                  <p className="font-mono text-sm">{parentWo?.woNo ?? '-'}</p>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -1010,13 +1010,13 @@ export function WorkOrderDetailPage() {
             <FactBox
               title="Details"
               fields={[
-                { label: 'Product', value: getProduct(wo.productId)?.productName ?? '—' },
+                { label: 'Product', value: getProduct(wo.productId)?.productName ?? '-' },
                 { label: 'Output Item', value: wo.outputItemCode },
                 { label: 'Qty', value: formatNumber(wo.qty) },
                 { label: 'Planned Start', value: formatDate(wo.plannedStartDate) },
                 { label: 'Planned Finish', value: formatDate(wo.plannedFinishDate) },
                 { label: 'BOM Rev', value: wo.bomRevision },
-                { label: 'Routing Rev', value: wo.routingRevision ?? '—' },
+                { label: 'Routing Rev', value: wo.routingRevision ?? '-' },
               ]}
             />
             <FactBox
@@ -1028,7 +1028,7 @@ export function WorkOrderDetailPage() {
                 { label: 'Issued', value: formatNumber(materialIssued) },
                 {
                   label: 'Issue Progress',
-                  value: materialRequired > 0 ? `${Math.round((materialIssued / materialRequired) * 100)}%` : '—',
+                  value: materialRequired > 0 ? `${Math.round((materialIssued / materialRequired) * 100)}%` : '-',
                 },
               ]}
             />

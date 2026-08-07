@@ -168,7 +168,7 @@ export function formatDuration(minutes: number): string {
 }
 
 export function durationSince(fromIso?: string | null, toIso?: string | null): string {
-  if (!fromIso) return '—'
+  if (!fromIso) return '-'
   return formatDuration(minutesBetween(fromIso, toIso))
 }
 

@@ -71,8 +71,8 @@ function whMeta(warehouseId: string) {
   const wh = getMaster().getWarehouse(warehouseId)
   return {
     warehouseId,
-    warehouseName: wh?.warehouseName ?? '—',
-    plantCode: wh?.plantCode ?? '—',
+    warehouseName: wh?.warehouseName ?? '-',
+    plantCode: wh?.plantCode ?? '-',
   }
 }
 
@@ -230,7 +230,7 @@ export async function getReceiptSourceDocuments(sourceType: ReceiptSourceType): 
       sourceType,
       partyName: null,
       warehouseId: master.warehouses[0]?.id ?? '',
-      warehouseName: master.warehouses[0]?.warehouseName ?? '—',
+      warehouseName: master.warehouses[0]?.warehouseName ?? '-',
       pendingLineCount: 0,
       pendingQty: 0,
       isOpen: true,
@@ -275,7 +275,7 @@ export async function getIssueSourceDocuments(sourceType: IssueSourceType): Prom
       sourceType,
       partyName: null,
       warehouseId: master.warehouses[0]?.id ?? '',
-      warehouseName: master.warehouses[0]?.warehouseName ?? '—',
+      warehouseName: master.warehouses[0]?.warehouseName ?? '-',
       pendingLineCount: 0,
       pendingQty: 0,
       isOpen: true,

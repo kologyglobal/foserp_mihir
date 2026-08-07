@@ -473,16 +473,16 @@ export function InvoiceDetailPage() {
             <SideCard title="Invoice details">
               <dl className="mi-receipt-detail-meta-list">
                 <SideMeta label="Invoice date">{formatDate(invoice.invoiceDate)}</SideMeta>
-                <SideMeta label="Posting date">{invoice.postingDate ? formatDate(invoice.postingDate) : '—'}</SideMeta>
-                <SideMeta label="Due date">{invoice.dueDate ? formatDate(invoice.dueDate) : '—'}</SideMeta>
+                <SideMeta label="Posting date">{invoice.postingDate ? formatDate(invoice.postingDate) : '-'}</SideMeta>
+                <SideMeta label="Due date">{invoice.dueDate ? formatDate(invoice.dueDate) : '-'}</SideMeta>
                 <SideMeta label="Payment terms">
-                  {invoice.paymentTermsDays != null ? `${invoice.paymentTermsDays} days` : invoice.paymentTerms ?? '—'}
+                  {invoice.paymentTermsDays != null ? `${invoice.paymentTermsDays} days` : invoice.paymentTerms ?? '-'}
                 </SideMeta>
-                <SideMeta label="Customer PO">{invoice.customerPoNumber ?? '—'}</SideMeta>
+                <SideMeta label="Customer PO">{invoice.customerPoNumber ?? '-'}</SideMeta>
                 <SideMeta label="Currency">
                   {invoice.currencyCode} @ {invoice.exchangeRate}
                 </SideMeta>
-                <SideMeta label="Place of supply">{invoice.placeOfSupply ?? '—'}</SideMeta>
+                <SideMeta label="Place of supply">{invoice.placeOfSupply ?? '-'}</SideMeta>
               </dl>
             </SideCard>
 

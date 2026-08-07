@@ -156,13 +156,13 @@ export function MastersIndexTable({
                   <span className={cn('masters-index-category-pill', ACCENT_DOT[row.groupAccent])}>{row.groupTitle}</span>
                 </td>
                 {!compact ? (
-                  <td className="masters-index-desc">{row.description || '—'}</td>
+                  <td className="masters-index-desc">{row.description || '-'}</td>
                 ) : null}
                 <td className="masters-index-td-num">
                   {typeof row.count === 'number' ? (
                     <span className="masters-index-count">{row.count.toLocaleString()}</span>
                   ) : (
-                    <span className="masters-index-count-muted">—</span>
+                    <span className="masters-index-count-muted">-</span>
                   )}
                 </td>
                 <td className="masters-index-td-action">

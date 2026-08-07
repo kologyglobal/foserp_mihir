@@ -81,10 +81,10 @@ export function OutstandingPage() {
                   <td className="py-2 pr-2">
                     {r.salesInvoiceId ? (
                       <Link to={`/accounting/money-in/invoices/${r.salesInvoiceId}`} className="text-erp-accent hover:underline">
-                        {r.invoiceNumber ?? '—'}
+                        {r.invoiceNumber ?? '-'}
                       </Link>
                     ) : (
-                      r.invoiceNumber ?? '—'
+                      r.invoiceNumber ?? '-'
                     )}
                   </td>
                   <td className="py-2 pr-2">
@@ -92,10 +92,10 @@ export function OutstandingPage() {
                       {r.customerName}
                     </Link>
                   </td>
-                  <td className="py-2 pr-2 tabular-nums">{r.dueDate ?? '—'}</td>
+                  <td className="py-2 pr-2 tabular-nums">{r.dueDate ?? '-'}</td>
                   <td className="py-2 pr-2">{String(r.dueDateBucket).replace(/_/g, ' ')}</td>
                   <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(parseDecimal(r.outstandingAmount))}</td>
-                  <td className="py-2 pr-2 text-right tabular-nums">{r.daysOverdue ?? '—'}</td>
+                  <td className="py-2 pr-2 text-right tabular-nums">{r.daysOverdue ?? '-'}</td>
                 </tr>
               ))}
             </tbody>

@@ -12,6 +12,7 @@ import {
   Truck,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { PurchaseStockDualQtyCell } from '@/components/purchase/PurchaseStockDualQtyCell'
 import {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,
@@ -43,7 +44,6 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
-import { isApiMode } from '@/config/apiConfig'
 
 export function PurchaseReturnDetailPage() {
   const { id } = useParams()
@@ -110,16 +110,11 @@ export function PurchaseReturnDetailPage() {
   const canEdit = doc.status === 'draft' || doc.status === 'pending_approval'
   const canSubmit = doc.status === 'draft'
   const canApprove = doc.status === 'pending_approval'
-  const canShip = isApiMode() && doc.status === 'approved'
+  const canShip = doc.status === 'approved'
   const canPost = doc.status === 'approved' || doc.status === 'shipped'
-  const canDebit =
-    !isApiMode()
-    && (doc.status === 'approved' || doc.status === 'posted')
-    && !doc.linkedDebitNoteId
-  const canReplacement =
-    !isApiMode()
-    && (doc.status === 'approved' || doc.status === 'posted')
-    && !doc.linkedReplacementPoId
+  // Debit note / replacement PO from return are not implemented against the live API yet.
+  const canDebit = false
+  const canReplacement = false
   const canCancel = !['posted', 'closed', 'cancelled', 'shipped'].includes(doc.status)
   const accountingStatus = (doc.accountingStatus || 'NONE').toUpperCase()
   const accountingLabel =
@@ -215,7 +210,7 @@ export function PurchaseReturnDetailPage() {
               },
               {
                 id: 'submit',
-                label: isApiMode() ? 'Submit' : 'Submit for Approval',
+                label: 'Submit',
                 icon: Send,
                 onClick: () => void runAction(() => submitPurchaseReturn(doc.id), 'Submitted'),
                 hidden: !perms.canCreateReturn || !canSubmit,
@@ -243,14 +238,12 @@ export function PurchaseReturnDetailPage() {
               },
               {
                 id: 'post',
-                label: isApiMode() ? 'Complete Return' : 'Post Return',
+                label: 'Complete Return',
                 icon: CheckCircle2,
                 onClick: () =>
                   void runAction(
                     () => postPurchaseReturn(doc.id),
-                    isApiMode()
-                      ? 'Return completed — stock issued to vendor'
-                      : 'Return posted',
+                    'Return completed — stock issued to vendor',
                   ),
                 hidden: !perms.canPostReturn || !canPost,
                 disabled: busy,
@@ -273,7 +266,6 @@ export function PurchaseReturnDetailPage() {
                   else navigate('/accounting/money-out/vendor-adjustments')
                 },
                 hidden:
-                  !isApiMode() ||
                   doc.status !== 'posted' ||
                   (accountingStatus === 'NONE' && !moneyOutHref),
                 disabled: busy,
@@ -315,13 +307,13 @@ export function PurchaseReturnDetailPage() {
         }
         footer={null}
       >
-        {isApiMode() && doc.status === 'posted' && accountingStatus === 'NONE' ? (
+        {doc.status === 'posted' && accountingStatus === 'NONE' ? (
           <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
             <strong>Accounting:</strong> stock issue complete. No vendor adjustment draft yet — usually
             requires a posted purchase invoice covering returned lines. Purchase does not post GL.
           </div>
         ) : null}
-        {isApiMode() && doc.status === 'posted' && accountingStatus === 'DRAFT' && moneyOutHref ? (
+        {doc.status === 'posted' && accountingStatus === 'DRAFT' && moneyOutHref ? (
           <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-950">
             <strong>Vendor adjustment draft</strong> created in Money Out (AP owns liability).{' '}
             <Link to={moneyOutHref} className="font-semibold text-erp-primary underline">
@@ -348,7 +340,7 @@ export function PurchaseReturnDetailPage() {
                     {doc.purchaseOrderNumber}
                   </Link>
                 ) : (
-                  '—'
+                  '-'
                 )
               }
             />
@@ -360,13 +352,13 @@ export function PurchaseReturnDetailPage() {
                     {doc.goodsReceiptNumber}
                   </Link>
                 ) : (
-                  '—'
+                  '-'
                 )
               }
             />
-            <ErpViewField label="Purchase Invoice" value={doc.purchaseInvoiceNumber || '—'} />
+            <ErpViewField label="Purchase Invoice" value={doc.purchaseInvoiceNumber || '-'} />
             <ErpViewField label="Warehouse" value={doc.warehouseName} />
-            <ErpViewField label="Transport" value={doc.transportDetails || '—'} />
+            <ErpViewField label="Transport" value={doc.transportDetails || '-'} />
             <ErpViewField
               label="Debit Note Required"
               value={doc.debitNoteRequired ? 'Yes' : 'No'}
@@ -375,7 +367,7 @@ export function PurchaseReturnDetailPage() {
               label="Replacement Required"
               value={doc.replacementRequired ? 'Yes' : 'No'}
             />
-            <ErpViewField label="Remarks" value={doc.remarks || '—'} />
+            <ErpViewField label="Remarks" value={doc.remarks || '-'} />
           </div>
         </ErpCardSection>
 
@@ -392,7 +384,7 @@ export function PurchaseReturnDetailPage() {
                     {doc.linkedReplacementPoNumber}
                   </Link>
                 ) : (
-                  '—'
+                  '-'
                 )
               }
             />
@@ -404,7 +396,7 @@ export function PurchaseReturnDetailPage() {
                     {doc.linkedDebitNoteNumber || 'Open in Money Out'}
                   </Link>
                 ) : (
-                  doc.linkedDebitNoteNumber || '—'
+                  doc.linkedDebitNoteNumber || '-'
                 )
               }
             />
@@ -419,7 +411,7 @@ export function PurchaseReturnDetailPage() {
                     {doc.qualityInspectionNumber || 'View QI'}
                   </Link>
                 ) : (
-                  doc.qualityInspectionNumber || '—'
+                  doc.qualityInspectionNumber || '-'
                 )
               }
             />
@@ -434,13 +426,13 @@ export function PurchaseReturnDetailPage() {
                     View GRN
                   </Link>
                 ) : (
-                  '—'
+                  '-'
                 )
               }
             />
             <ErpViewField
               label="Completed At"
-              value={doc.postedAt ? formatDate(doc.postedAt.slice(0, 10)) : '—'}
+              value={doc.postedAt ? formatDate(doc.postedAt.slice(0, 10)) : '-'}
             />
             <ErpViewField label="Total Amount" value={formatCurrency(doc.totalAmount)} />
           </div>
@@ -474,13 +466,19 @@ export function PurchaseReturnDetailPage() {
                       <div className="font-medium text-erp-text">{l.description || l.itemName}</div>
                     </td>
                     <td>
-                      {l.batchLotNo || '—'}
+                      {l.batchLotNo || '-'}
                       {l.serialNumber ? ` / ${l.serialNumber}` : ''}
                     </td>
-                    <td className="num tabular-nums">{l.receivedQty}</td>
-                    <td className="num tabular-nums">{l.availableReturnQty}</td>
-                    <td className="num tabular-nums">{l.returnQty}</td>
-                    <td>{l.uom || '—'}</td>
+                    <td className="num">
+                      <PurchaseStockDualQtyCell baseQty={l.receivedQty} itemId={l.itemId} bareWhenSingle />
+                    </td>
+                    <td className="num">
+                      <PurchaseStockDualQtyCell baseQty={l.availableReturnQty} itemId={l.itemId} bareWhenSingle />
+                    </td>
+                    <td className="num">
+                      <PurchaseStockDualQtyCell baseQty={l.returnQty} itemId={l.itemId} bareWhenSingle />
+                    </td>
+                    <td>{l.uom || '-'}</td>
                     <td className="num tabular-nums">{formatCurrency(l.unitCost)}</td>
                     <td className="num tabular-nums">
                       {formatCurrency(l.cgst + l.sgst + l.igst)}

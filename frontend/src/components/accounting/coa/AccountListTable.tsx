@@ -384,7 +384,7 @@ export function AccountListTable({
                     </td>
                     <td className="px-2 py-2 text-erp-muted">{row.category}</td>
                     <td className="max-w-[140px] truncate px-2 py-2 text-erp-muted">
-                      {row.parentId ? parentMap[row.parentId] ?? '—' : '—'}
+                      {row.parentId ? parentMap[row.parentId] ?? '-' : '-'}
                     </td>
                     <td className="px-2 py-2">{row.normalBalance}</td>
                     <td className="px-2 py-2">
@@ -394,7 +394,7 @@ export function AccountListTable({
                       <YesNoCell value={row.posting.isControlAccount} />
                     </td>
                     {optionalSet.has('alias') ? (
-                      <td className="max-w-[120px] truncate px-2 py-2 text-erp-muted">{row.alias || '—'}</td>
+                      <td className="max-w-[120px] truncate px-2 py-2 text-erp-muted">{row.alias || '-'}</td>
                     ) : null}
                     {optionalSet.has('gstRelevant') ? (
                       <td className="px-2 py-2">

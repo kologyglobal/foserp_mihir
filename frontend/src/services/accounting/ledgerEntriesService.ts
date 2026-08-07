@@ -447,8 +447,8 @@ function buildProjectLedgerSummary(
     projectId,
     projectCode: meta?.code ?? projectId,
     projectName: meta?.name ?? 'Project',
-    customer: meta?.customer ?? '—',
-    projectManager: meta?.projectManager ?? '—',
+    customer: meta?.customer ?? '-',
+    projectManager: meta?.projectManager ?? '-',
     status: meta?.status ?? 'Active',
     revenue,
     materialCost,
@@ -725,7 +725,7 @@ function mapApiVoucherLedgerToEntries(payload: AccountingVoucherLedgerResponse):
             partyType: mapApiPartyType(line.partyType),
             partyId: line.partyId ?? '',
             partyCode: '',
-            partyName: line.partyNameSnapshot ?? '—',
+            partyName: line.partyNameSnapshot ?? '-',
             gstNumber: null,
           }
         : null
@@ -741,7 +741,7 @@ function mapApiVoucherLedgerToEntries(payload: AccountingVoucherLedgerResponse):
               header.externalReference ||
               header.voucherNumber ||
               line.voucherNumber ||
-              '—',
+              '-',
             documentDate: dateOnlyStr(line.documentDate ?? header.documentDate),
             partyName: party?.partyName ?? null,
             amount,
@@ -767,7 +767,7 @@ function mapApiVoucherLedgerToEntries(payload: AccountingVoucherLedgerResponse):
       postingDate: dateOnlyStr(line.postingDate ?? header.postingDate),
       documentDate: dateOnlyStr(line.documentDate ?? header.documentDate),
       voucherId: line.voucherId || header.id,
-      voucherNumber: line.voucherNumber || header.voucherNumber || '—',
+      voucherNumber: line.voucherNumber || header.voucherNumber || '-',
       voucherType,
       referenceNumber: header.referenceNumber ?? '',
       externalDocumentNumber: header.externalReference ?? '',
@@ -779,7 +779,7 @@ function mapApiVoucherLedgerToEntries(payload: AccountingVoucherLedgerResponse):
       status: line.isReversal ? 'Reversal Entry' : status,
       account: {
         accountId: account?.id ?? line.accountId,
-        code: account?.code ?? '—',
+        code: account?.code ?? '-',
         name: account?.name ?? 'Account',
         category: mapApiCategory(account?.category),
         accountType: account?.isGroup ? 'Group' : 'Posting',

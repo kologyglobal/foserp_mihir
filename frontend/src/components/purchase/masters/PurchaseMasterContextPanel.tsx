@@ -60,7 +60,7 @@ export function PurchaseMasterContextPanel({
               </div>
               <div className="purchase-ai-panel__metric">
                 <dt>Created by</dt>
-                <dd>{entry?.createdBy ?? pendingCreatedBy ?? '—'}</dd>
+                <dd>{entry?.createdBy ?? pendingCreatedBy ?? '-'}</dd>
               </div>
               {entry?.updatedAt ? (
                 <div className="purchase-ai-panel__metric">

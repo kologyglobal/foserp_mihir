@@ -107,7 +107,7 @@ export function CodeSeriesListPage() {
       try {
         return <span className="font-mono text-xs">{previewNextCode(row.original.entityType)}</span>
       } catch {
-        return '—'
+        return '-'
       }
     } },
     { id: 'reset', header: 'Reset Rule', cell: ({ row }) => RESET_FREQUENCY_LABELS[row.original.resetFrequency] },
@@ -271,8 +271,8 @@ export function CodeSeriesFormPage() {
       subtitle={watched.seriesName || 'Centralized numbering configuration'}
       breadcrumbs={buildMasterBreadcrumbs('administration', isEdit ? 'Edit Code Series' : 'New Code Series')}
       documentStrip={[
-        { label: 'Series', value: watched.seriesCode || '—', highlight: Boolean(watched.seriesCode) },
-        { label: 'Entity', value: watched.entityType ? CODE_SERIES_ENTITY_LABELS[watched.entityType as CodeSeriesEntityType] : '—' },
+        { label: 'Series', value: watched.seriesCode || '-', highlight: Boolean(watched.seriesCode) },
+        { label: 'Entity', value: watched.entityType ? CODE_SERIES_ENTITY_LABELS[watched.entityType as CodeSeriesEntityType] : '-' },
         { label: 'Preview', value: livePreview },
         { label: 'Next', value: nextPreview },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
@@ -300,14 +300,14 @@ export function CodeSeriesFormPage() {
       formMetrics={[
         { label: 'Current', value: String(watched.currentNumber ?? 0), accent: 'blue' as const },
         { label: 'Next Preview', value: nextPreview, accent: 'violet' as const },
-        { label: 'Reset', value: RESET_FREQUENCY_LABELS[watched.resetFrequency as keyof typeof RESET_FREQUENCY_LABELS] ?? '—', accent: 'amber' as const },
+        { label: 'Reset', value: RESET_FREQUENCY_LABELS[watched.resetFrequency as keyof typeof RESET_FREQUENCY_LABELS] ?? '-', accent: 'amber' as const },
         { label: 'Active', value: watched.isActive ? 'Yes' : 'No', accent: watched.isActive ? ('green' as const) : ('amber' as const) },
       ]}
       factBoxTitle="Code series"
       factBoxSummary={[
-        { label: 'Module', value: watched.module ? CODE_SERIES_MODULE_LABELS[watched.module as CodeSeriesModule] : '—' },
-        { label: 'Last Used', value: existing?.lastUsedNumber ? String(existing.lastUsedNumber) : '—' },
-        { label: 'Last Used Date', value: existing?.lastUsedDate ?? '—' },
+        { label: 'Module', value: watched.module ? CODE_SERIES_MODULE_LABELS[watched.module as CodeSeriesModule] : '-' },
+        { label: 'Last Used', value: existing?.lastUsedNumber ? String(existing.lastUsedNumber) : '-' },
+        { label: 'Last Used Date', value: existing?.lastUsedDate ?? '-' },
         { label: 'Modified', value: existing ? formatDate(existing.updatedAt.slice(0, 10)) : 'New' },
       ]}
       stickyFooter={(
@@ -417,10 +417,10 @@ export function CodeSeriesFormPage() {
               </Select>
             </FormField>
             <FormField label="Last Reset Date">
-              <Input value={existing?.lastResetDate ?? '—'} readOnly />
+              <Input value={existing?.lastResetDate ?? '-'} readOnly />
             </FormField>
             <FormField label="Next Reset Date">
-              <Input value={existing?.nextResetDate ?? '—'} readOnly />
+              <Input value={existing?.nextResetDate ?? '-'} readOnly />
             </FormField>
             {isEdit && canCodeSeriesPermission('codeSeries.reset') ? (
               <div className="md:col-span-2">
@@ -487,7 +487,7 @@ export function CodeSeriesFormPage() {
                     <td>{a.action}</td>
                     <td>{formatDate(a.at.slice(0, 10))}</td>
                     <td>{a.by}</td>
-                    <td>{a.detail ?? a.reason ?? '—'}</td>
+                    <td>{a.detail ?? a.reason ?? '-'}</td>
                   </tr>
                 )) : (
                   <tr><td colSpan={4} className="text-erp-muted">No audit entries yet</td></tr>
@@ -520,7 +520,7 @@ export function CodeSeriesDetailPage() {
   )
   if (!record) return <MasterNotFound message="Code series not found." />
 
-  let nextCode = '—'
+  let nextCode = '-'
   try {
     nextCode = previewNextCode(record.entityType)
   } catch {
@@ -553,8 +553,8 @@ export function CodeSeriesDetailPage() {
           <DetailField label="Created Date" value={formatDate(record.createdAt.slice(0, 10))} />
           <DetailField label="Modified By" value={record.modifiedBy} />
           <DetailField label="Modified Date" value={formatDate(record.updatedAt.slice(0, 10))} />
-          <DetailField label="Last Used Number" value={record.lastUsedNumber ? String(record.lastUsedNumber) : '—'} />
-          <DetailField label="Last Used Date" value={record.lastUsedDate ?? '—'} />
+          <DetailField label="Last Used Number" value={record.lastUsedNumber ? String(record.lastUsedNumber) : '-'} />
+          <DetailField label="Last Used Date" value={record.lastUsedDate ?? '-'} />
         </DetailGrid>
       </DetailSection>
       {auditLog.length > 0 ? (

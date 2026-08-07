@@ -417,7 +417,7 @@ export function resolveOpportunitySalesOrderPrefill(
     convertDisabledReason: validation?.disabledReason ?? null,
     salesOrderId: existingSoId,
     quotationLineCount: quotationSummary?.lineCount ?? 1,
-    quotationItemsSummary: doc ? quotationLineItemsSummary(doc) : product?.productName ?? '—',
+    quotationItemsSummary: doc ? quotationLineItemsSummary(doc) : product?.productName ?? '-',
     quotationGrandTotal: quotationSummary?.summary.grandTotal ?? salesQuo?.pricing.grandTotal ?? opportunity.value,
   }
 }

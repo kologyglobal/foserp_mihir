@@ -228,7 +228,7 @@ export function PurchaseOrdersTable({
         header: 'Location',
         meta: { columnLabel: 'Location' },
         cell: ({ row }) => (
-          <span className="whitespace-nowrap">{row.original.locationName || '—'}</span>
+          <span className="whitespace-nowrap">{row.original.locationName || '-'}</span>
         ),
       },
       {
@@ -236,7 +236,7 @@ export function PurchaseOrdersTable({
         header: 'Created By',
         meta: { columnLabel: 'Created By' },
         cell: ({ row }) => (
-          <span className="whitespace-nowrap">{row.original.createdByName || '—'}</span>
+          <span className="whitespace-nowrap">{row.original.createdByName || '-'}</span>
         ),
       },
       {

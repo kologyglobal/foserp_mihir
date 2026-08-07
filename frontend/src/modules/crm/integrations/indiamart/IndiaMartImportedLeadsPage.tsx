@@ -55,11 +55,11 @@ export function IndiaMartImportedLeadsPage() {
             rows.map((row) => (
               <tr key={row.id} className="border-t border-erp-border">
                 <td className="px-3 py-2 text-[12px]">
-                  {row.enquiryDate ? new Date(row.enquiryDate).toLocaleString() : '—'}
+                  {row.enquiryDate ? new Date(row.enquiryDate).toLocaleString() : '-'}
                 </td>
-                <td className="px-3 py-2">{row.buyerName ?? '—'}</td>
-                <td className="px-3 py-2">{row.buyerCompanyName ?? '—'}</td>
-                <td className="px-3 py-2">{row.productName ?? '—'}</td>
+                <td className="px-3 py-2">{row.buyerName ?? '-'}</td>
+                <td className="px-3 py-2">{row.buyerCompanyName ?? '-'}</td>
+                <td className="px-3 py-2">{row.productName ?? '-'}</td>
                 <td className="px-3 py-2">{row.importStatus}</td>
                 <td className="px-3 py-2">
                   {row.createdLeadId ? (
@@ -71,7 +71,7 @@ export function IndiaMartImportedLeadsPage() {
                       Open lead
                     </button>
                   ) : (
-                    '—'
+                    '-'
                   )}
                 </td>
               </tr>

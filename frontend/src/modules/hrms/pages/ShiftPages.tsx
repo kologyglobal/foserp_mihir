@@ -107,7 +107,7 @@ export function ShiftListPage() {
                     {s.startTime} → {s.endTime}
                   </td>
                   <td>{s.breakMinutes}m</td>
-                  <td>{WEEKDAYS.find((w) => w.value === String(s.weeklyOffDay ?? ''))?.label ?? '—'}</td>
+                  <td>{WEEKDAYS.find((w) => w.value === String(s.weeklyOffDay ?? ''))?.label ?? '-'}</td>
                   <td>
                     <DynamicsStatusChip label={s.isActive ? 'Active' : 'Inactive'} tone={s.isActive ? 'success' : 'neutral'} />
                   </td>

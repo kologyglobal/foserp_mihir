@@ -128,8 +128,8 @@ export function SalesInvoiceDocument({
               {line}
             </p>
           ))}
-          <p className="pi-print-party__line">GSTIN: {invoice.customerGstinSnapshot ?? '—'}</p>
-          <p className="pi-print-party__line">State: {invoice.customerStateCodeSnapshot ?? '—'}</p>
+          <p className="pi-print-party__line">GSTIN: {invoice.customerGstinSnapshot ?? '-'}</p>
+          <p className="pi-print-party__line">State: {invoice.customerStateCodeSnapshot ?? '-'}</p>
         </section>
 
         <section className="pi-print-party">
@@ -149,7 +149,7 @@ export function SalesInvoiceDocument({
           <dl className="mi-si-print-doc__kv">
             <div>
               <dt>Place of supply</dt>
-              <dd>{invoice.placeOfSupply ?? '—'}</dd>
+              <dd>{invoice.placeOfSupply ?? '-'}</dd>
             </div>
             <div>
               <dt>Supply type</dt>
@@ -203,12 +203,12 @@ export function SalesInvoiceDocument({
               <tr key={l.id}>
                 <td className="mi-si-print-doc__col-num">{l.lineNumber}</td>
                 <td>
-                  <span className="mi-si-print-doc__item-code">{l.itemCodeSnapshot ?? '—'}</span>
+                  <span className="mi-si-print-doc__item-code">{l.itemCodeSnapshot ?? '-'}</span>
                   <span className="mi-si-print-doc__item-desc">
-                    {l.description || l.itemNameSnapshot || '—'}
+                    {l.description || l.itemNameSnapshot || '-'}
                   </span>
                 </td>
-                <td className="mi-si-print-doc__mono">{l.hsnCodeSnapshot ?? '—'}</td>
+                <td className="mi-si-print-doc__mono">{l.hsnCodeSnapshot ?? '-'}</td>
                 <td className="mi-si-print-doc__col-qty">{formatQty(l.quantity, l.uomSnapshot)}</td>
                 <td className="mi-si-print-doc__col-amt">{formatCurrency(parseDecimal(l.unitRate))}</td>
                 <td className="mi-si-print-doc__col-amt">{formatCurrency(parseDecimal(l.taxableAmount))}</td>

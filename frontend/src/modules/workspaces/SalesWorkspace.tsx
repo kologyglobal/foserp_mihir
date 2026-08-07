@@ -545,7 +545,7 @@ export function SalesWorkspacePage() {
                           <td>{customerName(so.customerId)}</td>
                           <td>{productName(so.productId)}</td>
                           <td>{formatDate(so.requiredDate)}</td>
-                          <td className="num">{so.grandTotal != null ? formatCurrency(so.grandTotal) : '—'}</td>
+                          <td className="num">{so.grandTotal != null ? formatCurrency(so.grandTotal) : '-'}</td>
                         </tr>
                       ))}
                       {pendingMrp.length === 0 && (
@@ -649,10 +649,10 @@ export function SalesWorkspacePage() {
                     <td><TableLink to={`/sales/orders/${so.id}`}>{so.salesOrderNo}</TableLink></td>
                     <td>{customerName(so.customerId)}</td>
                     <td>{productName(so.productId)}</td>
-                    <td>{so.salesOwnerName ?? '—'}</td>
+                    <td>{so.salesOwnerName ?? '-'}</td>
                     <td className="num">{so.qty}</td>
                     <td>{formatDate(so.requiredDate)}</td>
-                    <td className="num">{so.grandTotal != null ? formatCurrency(so.grandTotal) : '—'}</td>
+                    <td className="num">{so.grandTotal != null ? formatCurrency(so.grandTotal) : '-'}</td>
                     <td><StatusDot label={so.status === 'open' ? 'Draft SO' : so.status} tone={statusToneFromLabel(so.status)} /></td>
                   </tr>
                 ))}

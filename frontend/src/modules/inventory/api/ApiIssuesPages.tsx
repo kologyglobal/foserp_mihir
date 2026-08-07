@@ -206,7 +206,7 @@ function parseAssignRows(raw: Record<string, unknown>[]): AssignQueueRow[] {
       itemCode: item?.code ?? '',
       itemName: item?.name ?? '',
       warehouseId: (row.warehouseId as string | null) ?? null,
-      warehouseLabel: warehouse ? `${warehouse.code} — ${warehouse.name}` : '—',
+      warehouseLabel: warehouse ? `${warehouse.code} — ${warehouse.name}` : '-',
       requiredQty: num(row.requiredQty as string | number),
       reservedQty: num(row.reservedQty as string | number),
       issuedQty: num(row.issuedQty as string | number),
@@ -639,7 +639,7 @@ export function ApiIssuesRegisterPage() {
           const noStock = free != null && free <= 0
           return (
             <span className={cn('tabular-nums font-semibold', noStock ? 'text-rose-700' : 'text-erp-text')}>
-              {free == null ? '—' : fmtQty(free)}
+              {free == null ? '-' : fmtQty(free)}
             </span>
           )
         },
@@ -662,7 +662,7 @@ export function ApiIssuesRegisterPage() {
         meta: { align: 'right' },
         cell: ({ row }) => (
           <span className="tabular-nums text-amber-900">
-            {row.original.shortageQty > 0 ? fmtQty(row.original.shortageQty) : '—'}
+            {row.original.shortageQty > 0 ? fmtQty(row.original.shortageQty) : '-'}
           </span>
         ),
       },
@@ -705,7 +705,7 @@ export function ApiIssuesRegisterPage() {
               {row.original.purchaseRequisitionNumber ?? row.original.purchaseRequisitionId.slice(0, 8)}
             </Link>
           ) : (
-            <span className="text-erp-muted">—</span>
+            <span className="text-erp-muted">-</span>
           ),
       },
       {
@@ -1080,7 +1080,7 @@ export function ApiIssuesRegisterPage() {
                       </td>
                       <td>{formatDate(pr.requisitionDate)}</td>
                       <td className="max-w-[20rem] truncate" title={pr.purchasePurpose ?? ''}>
-                        {pr.purchasePurpose ?? '—'}
+                        {pr.purchasePurpose ?? '-'}
                       </td>
                       <td className="uppercase">{pr.priority}</td>
                       <td>
@@ -1088,7 +1088,7 @@ export function ApiIssuesRegisterPage() {
                           {pr.status}
                         </span>
                       </td>
-                      <td className="text-right tabular-nums">{pr.lines?.length ?? '—'}</td>
+                      <td className="text-right tabular-nums">{pr.lines?.length ?? '-'}</td>
                       <td className="text-right">
                         <Button size="sm" variant="ghost" onClick={() => navigate(`/purchase/requisitions/${pr.id}`)}>
                           Open PR
@@ -1777,7 +1777,7 @@ export function ApiIssuePostPage() {
                                   free != null && free <= 0 ? 'text-rose-700' : 'text-erp-muted',
                                 )}
                               >
-                                {free == null ? '—' : fmtQty(free)}
+                                {free == null ? '-' : fmtQty(free)}
                               </td>
                               <td className="px-1 py-1">
                                 <Input
@@ -2018,7 +2018,7 @@ export function ApiIssueDetailPage() {
             <div><dt className="text-erp-muted">Value</dt><dd className="font-mono">{fmtQty(row.value)}</dd></div>
             <div><dt className="text-erp-muted">Reference</dt><dd>{row.referenceType}{row.referenceNo ? ` · ${row.referenceNo}` : ''}</dd></div>
             <div><dt className="text-erp-muted">Posted at</dt><dd>{formatDate(row.createdAt)}</dd></div>
-            <div className="sm:col-span-2"><dt className="text-erp-muted">Remarks</dt><dd>{row.remarks?.trim() || '—'}</dd></div>
+            <div className="sm:col-span-2"><dt className="text-erp-muted">Remarks</dt><dd>{row.remarks?.trim() || '-'}</dd></div>
           </dl>
         </SectionCard>
         <SectionCard title="Links">

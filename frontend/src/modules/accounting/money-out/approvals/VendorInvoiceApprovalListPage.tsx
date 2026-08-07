@@ -113,7 +113,7 @@ export function VendorInvoiceApprovalListPage() {
                     <td className="py-2 pr-3">{inv.supplierInvoiceNumber}</td>
                     <td className="py-2 pr-3">{inv.vendorNameSnapshot}</td>
                     <td className="py-2 pr-3 tabular-nums">
-                      {inv.submittedAt ? new Date(inv.submittedAt).toLocaleString() : '—'}
+                      {inv.submittedAt ? new Date(inv.submittedAt).toLocaleString() : '-'}
                     </td>
                     <td className="py-2 pr-3 text-right tabular-nums">
                       {formatCurrency(parseDecimal(inv.invoiceGrandTotal))}
@@ -124,7 +124,7 @@ export function VendorInvoiceApprovalListPage() {
                     <td className="py-2 pr-3">
                       {inv.approvalRequest
                         ? `${inv.approvalRequest.currentLevel}/${inv.approvalRequest.totalLevels}`
-                        : '—'}
+                        : '-'}
                     </td>
                     <td className="py-2 pr-3">
                       <ErpStatusChip

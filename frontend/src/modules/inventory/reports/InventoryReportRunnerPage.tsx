@@ -47,7 +47,7 @@ const DEFAULT_FILTERS: InventoryReportFilters = {
 }
 
 function formatCell(value: string | number | null | undefined, format?: string): string {
-  if (value == null || value === '') return '—'
+  if (value == null || value === '') return '-'
   if (format === 'currency') return formatCurrency(Number(value))
   if (format === 'date' && typeof value === 'string') return formatDate(value)
   return String(value)

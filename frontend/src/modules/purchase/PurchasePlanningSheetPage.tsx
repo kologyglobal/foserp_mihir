@@ -41,6 +41,7 @@ import {
   type PlanningSummaryFilterKey,
 } from '@/components/purchase/PurchasePlanningSummaryCards'
 import { PurchasePlanningViewDrawer } from '@/components/purchase/PurchasePlanningViewDrawer'
+import { PurchaseStockDualQtyCell } from '@/components/purchase/PurchaseStockDualQtyCell'
 import { PurchasePlanningEditDrawer } from '@/components/purchase/PurchasePlanningEditDrawer'
 import {
   PurchasePlanningCreatePoModal,
@@ -126,6 +127,16 @@ const HIDDEN_FROM_PENDING_VIEW: PurchasePlanningStatus[] = [
   'po_created',
   'completed',
   'cancelled',
+]
+
+const PLANNING_SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
+  { value: 'planningDate', label: 'Planning date' },
+  { value: 'requiredByDate', label: 'Required by' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'status', label: 'Status' },
+  { value: 'planningNumber', label: 'Planning no.' },
+  { value: 'prNumberAsc', label: 'PR number (A→Z)' },
+  { value: 'prNumberDesc', label: 'PR number (Z→A)' },
 ]
 
 function todayIso() {
@@ -284,7 +295,7 @@ function sortRows(rows: PurchasePlanningSheetRow[], sortBy: SortKey) {
 }
 
 function Truncate({ text, className }: { text: string; className?: string }) {
-  const value = text.trim() || '—'
+  const value = text.trim() || '-'
   return (
     <span className={cn('block max-w-[14rem] truncate', className)} title={value}>
       {value}
@@ -516,6 +527,30 @@ export function PurchasePlanningSheetPage() {
   })
 
   const filtered = useMemo(() => sortRows(filterRows(rows, filters), sortBy), [rows, filters, sortBy])
+
+  const prHeaderSort = useMemo(() => {
+    if (sortBy === 'prNumberAsc') return { columnId: 'prNumber', desc: false }
+    if (sortBy === 'prNumberDesc') return { columnId: 'prNumber', desc: true }
+    return null
+  }, [sortBy])
+
+  const handleDocumentHeaderSort = useCallback(
+    (sort: { columnId: string; desc: boolean } | null) => {
+      if (!sort) {
+        setSortBy('planningDate')
+        return
+      }
+      if (sort.columnId !== 'prNumber') return
+      setSortBy(sort.desc ? 'prNumberDesc' : 'prNumberAsc')
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (sortBy === 'prNumberAsc' || sortBy === 'prNumberDesc') {
+      setViewMode('document')
+    }
+  }, [sortBy])
 
   const summary = useMemo(() => summarizePlanningRows(rows), [rows])
 
@@ -934,7 +969,9 @@ export function PurchasePlanningSheetPage() {
       },
       {
         id: 'prNumber',
+        accessorKey: 'purchaseRequisitionNumber',
         header: 'PR Number',
+        enableSorting: true,
         meta: { columnLabel: 'PR Number' },
         cell: ({ row }) => (
           <TableLink to={`/purchase/requisitions/${row.original.purchaseRequisitionId}`}>
@@ -955,7 +992,7 @@ export function PurchasePlanningSheetPage() {
         header: 'Item Code',
         meta: { columnLabel: 'Item Code' },
         cell: ({ row }) => (
-          <span className="font-mono text-[12px]">{row.original.itemCode || '—'}</span>
+          <span className="font-mono text-[12px]">{row.original.itemCode || '-'}</span>
         ),
       },
       {
@@ -971,7 +1008,11 @@ export function PurchasePlanningSheetPage() {
         header: 'Required Quantity',
         meta: { columnLabel: 'Required Quantity', align: 'right' },
         cell: ({ row }) => (
-          <span className="tabular-nums">{row.original.requiredQuantity}</span>
+          <PurchaseStockDualQtyCell
+            baseQty={row.original.requiredQuantity}
+            itemId={row.original.itemId}
+            bareWhenSingle
+          />
         ),
       },
       {
@@ -1012,7 +1053,12 @@ export function PurchasePlanningSheetPage() {
         header: 'Qty to order in PO',
         meta: { columnLabel: 'Qty to order in PO', align: 'right' },
         cell: ({ row }) => (
-          <span className="tabular-nums font-medium">{row.original.remainingQuantity}</span>
+          <PurchaseStockDualQtyCell
+            baseQty={row.original.remainingQuantity}
+            itemId={row.original.itemId}
+            className="font-medium"
+            bareWhenSingle
+          />
         ),
       },
       {
@@ -1021,7 +1067,12 @@ export function PurchasePlanningSheetPage() {
         header: 'Net Purchase Quantity',
         meta: { columnLabel: 'Net Purchase Quantity', align: 'right' },
         cell: ({ row }) => (
-          <span className="tabular-nums font-medium">{row.original.netPurchaseQuantity}</span>
+          <PurchaseStockDualQtyCell
+            baseQty={row.original.netPurchaseQuantity}
+            itemId={row.original.itemId}
+            className="font-medium"
+            bareWhenSingle
+          />
         ),
       },
       {
@@ -1029,7 +1080,7 @@ export function PurchasePlanningSheetPage() {
         accessorKey: 'uom',
         header: 'UOM',
         meta: { columnLabel: 'UOM' },
-        cell: ({ row }) => row.original.uom || '—',
+        cell: ({ row }) => row.original.uom || '-',
       },
       {
         id: 'requiredByDate',
@@ -1040,7 +1091,7 @@ export function PurchasePlanningSheetPage() {
           const overdue = isOverdue(row.original)
           return (
             <span className={cn('tabular-nums', overdue && 'font-semibold text-red-700')}>
-              {row.original.requiredByDate ? formatDate(row.original.requiredByDate) : '—'}
+              {row.original.requiredByDate ? formatDate(row.original.requiredByDate) : '-'}
             </span>
           )
         },
@@ -1344,6 +1395,14 @@ export function PurchasePlanningSheetPage() {
                     }}
                     className="crm-list-filter-bar--embedded !border-0 !bg-transparent !p-0"
                     showCommandPaletteHint={false}
+                    sort={
+                      <CrmListSortSelect
+                        value={sortBy}
+                        onChange={(v) => setSortBy(v as SortKey)}
+                        aria-label="Sort planning sheet"
+                        options={PLANNING_SORT_OPTIONS}
+                      />
+                    }
                   />
                 </div>
                 <div className="overflow-x-auto">
@@ -1436,7 +1495,7 @@ export function PurchasePlanningSheetPage() {
                                 <td>
                                   <div className="purchase-planning-demand-table__item">
                                     <span className="purchase-planning-demand-table__code">
-                                      {g.itemCode || '—'}
+                                      {g.itemCode || '-'}
                                     </span>
                                     <span className="purchase-planning-demand-table__name">
                                       {g.itemName}
@@ -1458,7 +1517,7 @@ export function PurchasePlanningSheetPage() {
                                         : 'Any location'}
                                     </span>
                                     <span className="font-medium text-erp-text">
-                                      {g.uomId || '—'}
+                                      {g.uomId || '-'}
                                     </span>
                                   </div>
                                 </td>
@@ -1501,7 +1560,7 @@ export function PurchasePlanningSheetPage() {
                                   >
                                     {g.earliestRequiredDate
                                       ? formatDate(g.earliestRequiredDate)
-                                      : '—'}
+                                      : '-'}
                                   </span>
                                 </td>
                                 <td>
@@ -1522,7 +1581,7 @@ export function PurchasePlanningSheetPage() {
                                       ) : null}
                                     </div>
                                   ) : (
-                                    <span className="text-erp-muted">—</span>
+                                    <span className="text-erp-muted">-</span>
                                   )}
                                 </td>
                                 <td className="text-right">
@@ -1580,7 +1639,7 @@ export function PurchasePlanningSheetPage() {
                                                 </TableLink>
                                               </td>
                                               <td className="font-mono text-[12px]">
-                                                {m.planningNumber || '—'}
+                                                {m.planningNumber || '-'}
                                               </td>
                                               <td className="text-right tabular-nums">
                                                 {m.requiredQuantity}
@@ -1599,7 +1658,7 @@ export function PurchasePlanningSheetPage() {
                                               <td className="text-right tabular-nums">
                                                 {m.expectedRate != null && m.expectedRate > 0
                                                   ? formatCurrency(m.expectedRate)
-                                                  : '—'}
+                                                  : '-'}
                                               </td>
                                             </tr>
                                             )
@@ -1625,7 +1684,11 @@ export function PurchasePlanningSheetPage() {
                   columns={columns}
                   getRowId={(r) => r.id}
                   showCompactSearch={false}
-                  enableColumnSorting
+                  enableColumnSorting={false}
+                  sortResetToken={sortBy}
+                  pinnedHeaderSort={prHeaderSort}
+                  onDocumentHeaderSortChange={handleDocumentHeaderSort}
+                  columnLayoutKey="purchase-planning-document-lines"
                   stickyFirstColumn
                   selectable
                   getRowCanSelect={(r) => !isSelectionDisabled(r)}
@@ -1671,15 +1734,7 @@ export function PurchasePlanningSheetPage() {
                           value={sortBy}
                           onChange={(v) => setSortBy(v as SortKey)}
                           aria-label="Sort planning sheet"
-                          options={[
-                            { value: 'planningDate', label: 'Planning date' },
-                            { value: 'requiredByDate', label: 'Required by' },
-                            { value: 'priority', label: 'Priority' },
-                            { value: 'status', label: 'Status' },
-                            { value: 'planningNumber', label: 'Planning no.' },
-                            { value: 'prNumberAsc', label: 'PR number (A→Z)' },
-                            { value: 'prNumberDesc', label: 'PR number (Z→A)' },
-                          ]}
+                          options={PLANNING_SORT_OPTIONS}
                         />
                       }
                     />

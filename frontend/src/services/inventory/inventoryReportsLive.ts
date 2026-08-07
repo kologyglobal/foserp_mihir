@@ -98,9 +98,9 @@ function enrichBalance(
   return {
     itemId: bal.itemId,
     warehouseId: bal.warehouseId,
-    itemCode: item?.code ?? bal.item?.code ?? '—',
-    itemName: item?.name ?? bal.item?.name ?? '—',
-    warehouseName: wh?.warehouseName ?? bal.warehouse?.name ?? '—',
+    itemCode: item?.code ?? bal.item?.code ?? '-',
+    itemName: item?.name ?? bal.item?.name ?? '-',
+    warehouseName: wh?.warehouseName ?? bal.warehouse?.name ?? '-',
     onHand: num(bal.onHandQty),
     available: num(bal.freeQty),
     reserved: num(bal.reservedQty),
@@ -250,10 +250,10 @@ export async function runLiveInventoryReport(
         .map((m) => ({
           movementNo: m.movementNumber,
           type: m.referenceType,
-          itemCode: m.item?.code ?? itemById.get(m.itemId)?.code ?? '—',
+          itemCode: m.item?.code ?? itemById.get(m.itemId)?.code ?? '-',
           qty: num(m.quantity),
           date: m.movementDate,
-          warehouseName: m.warehouse?.name ?? whById.get(m.warehouseId)?.warehouseName ?? '—',
+          warehouseName: m.warehouse?.name ?? whById.get(m.warehouseId)?.warehouseName ?? '-',
         }))
       break
     }
@@ -273,10 +273,10 @@ export async function runLiveInventoryReport(
         .map((t) => ({
           movementNo: t.transferNumber ?? t.id,
           type: t.status,
-          itemCode: `${whById.get(t.fromWarehouseId ?? '')?.warehouseName ?? '—'} → ${whById.get(t.toWarehouseId ?? '')?.warehouseName ?? '—'}`,
+          itemCode: `${whById.get(t.fromWarehouseId ?? '')?.warehouseName ?? '-'} → ${whById.get(t.toWarehouseId ?? '')?.warehouseName ?? '-'}`,
           qty: t.lines?.length ?? 0,
           date: t.transferDate ?? t.createdAt,
-          warehouseName: whById.get(t.fromWarehouseId ?? '')?.warehouseName ?? '—',
+          warehouseName: whById.get(t.fromWarehouseId ?? '')?.warehouseName ?? '-',
         }))
       break
     }
@@ -297,10 +297,10 @@ export async function runLiveInventoryReport(
         .map((a) => ({
           movementNo: a.adjustmentNumber ?? a.id,
           type: a.status,
-          itemCode: a.reason ?? '—',
+          itemCode: a.reason ?? '-',
           qty: a.lines?.length ?? 0,
           date: a.adjustmentDate ?? a.createdAt,
-          warehouseName: whById.get(a.warehouseId ?? '')?.warehouseName ?? '—',
+          warehouseName: whById.get(a.warehouseId ?? '')?.warehouseName ?? '-',
         }))
       break
     }
@@ -416,9 +416,9 @@ export async function runLiveInventoryReport(
       rows = lots
         .filter((l) => reportId !== 'expiry' || Boolean(l.expiryDate))
         .map((l) => ({
-          itemCode: itemById.get(l.itemId)?.code ?? '—',
+          itemCode: itemById.get(l.itemId)?.code ?? '-',
           batchNo: l.lotNumber,
-          warehouseName: whById.get(l.warehouseId ?? '')?.warehouseName ?? '—',
+          warehouseName: whById.get(l.warehouseId ?? '')?.warehouseName ?? '-',
           qty: num(l.quantityOnHand),
           expiryDate: l.expiryDate,
           status: l.status,
@@ -436,9 +436,9 @@ export async function runLiveInventoryReport(
         { key: 'status', label: 'Status' },
       ]
       rows = serials.map((s) => ({
-        itemCode: itemById.get(s.itemId)?.code ?? '—',
+        itemCode: itemById.get(s.itemId)?.code ?? '-',
         batchNo: s.serialNumber,
-        warehouseName: whById.get(s.warehouseId ?? '')?.warehouseName ?? '—',
+        warehouseName: whById.get(s.warehouseId ?? '')?.warehouseName ?? '-',
         qty: 1,
         status: s.status,
       }))
@@ -483,7 +483,7 @@ export async function runLiveInventoryReport(
         const net = varianceLines.reduce((sum, l) => sum + num(l.varianceQty), 0)
         return {
           itemCode: c.countNumber ?? c.id,
-          warehouseName: whById.get(c.warehouseId ?? '')?.warehouseName ?? '—',
+          warehouseName: whById.get(c.warehouseId ?? '')?.warehouseName ?? '-',
           systemQty: lines.length,
           countedQty: varianceLines.length,
           variance: net,

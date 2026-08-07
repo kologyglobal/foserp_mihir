@@ -37,7 +37,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -319,7 +319,7 @@ export function CustomerReceiptDetailPage() {
             {receipt.voucherStatus === 'Pending Approval'
               ? 'Awaiting approval — demo workflow only.'
               : receipt.voucherStatus === 'Posted'
-                ? `Posted by ${receipt.postedBy ?? '—'}`
+                ? `Posted by ${receipt.postedBy ?? '-'}`
                 : 'No approval history yet.'}
           </p>
         ) : null}

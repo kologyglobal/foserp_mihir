@@ -101,7 +101,7 @@ export function DocumentInfoPanel({
                 {section.fields.map((f) => (
                   <div key={f.label} className="flex items-baseline justify-between gap-3 text-[12px]">
                     <dt className="shrink-0 text-erp-muted">{f.label}</dt>
-                    <dd className="min-w-0 text-right font-medium text-erp-text">{f.value ?? '—'}</dd>
+                    <dd className="min-w-0 text-right font-medium text-erp-text">{f.value ?? '-'}</dd>
                   </div>
                 ))}
               </dl>

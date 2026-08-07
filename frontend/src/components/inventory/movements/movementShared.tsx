@@ -33,13 +33,13 @@ export function MovementDocumentHeader({
       <div><dt className="text-erp-muted">Document Date</dt><dd>{formatDate(doc.documentDate)}</dd></div>
       <div><dt className="text-erp-muted">Posting Date</dt><dd>{formatDate(doc.postingDate)}</dd></div>
       <div><dt className="text-erp-muted">Source Type</dt><dd>{sourceLabels[doc.sourceType as keyof typeof sourceLabels]}</dd></div>
-      <div><dt className="text-erp-muted">Source Document</dt><dd>{doc.sourceDocumentNo ?? '—'}</dd></div>
+      <div><dt className="text-erp-muted">Source Document</dt><dd>{doc.sourceDocumentNo ?? '-'}</dd></div>
       <div><dt className="text-erp-muted">Warehouse</dt><dd>{doc.warehouseName}</dd></div>
       <div><dt className="text-erp-muted">Plant</dt><dd>{doc.plantCode}</dd></div>
       <div><dt className="text-erp-muted">Status</dt><dd>{statusLabels[doc.status as keyof typeof statusLabels]}</dd></div>
       <div><dt className="text-erp-muted">Created By</dt><dd>{doc.createdBy}</dd></div>
-      <div><dt className="text-erp-muted">Approved By</dt><dd>{doc.approvedBy ?? '—'}</dd></div>
-      <div><dt className="text-erp-muted">Posted By</dt><dd>{doc.postedBy ?? '—'}</dd></div>
+      <div><dt className="text-erp-muted">Approved By</dt><dd>{doc.approvedBy ?? '-'}</dd></div>
+      <div><dt className="text-erp-muted">Posted By</dt><dd>{doc.postedBy ?? '-'}</dd></div>
     </dl>
   )
 }
@@ -116,7 +116,7 @@ export function MovementLineGrid({ lines, mode, editable, batchMethod = 'fefo', 
                     onChange={(batchNo) => onLineChange(line.id, { batchNo })}
                   />
                 ) : (
-                  <span className="font-mono text-xs">{line.batchNo ?? '—'}</span>
+                  <span className="font-mono text-xs">{line.batchNo ?? '-'}</span>
                 )}
               </td>
               <td className="min-w-[180px]">
@@ -129,7 +129,7 @@ export function MovementLineGrid({ lines, mode, editable, batchMethod = 'fefo', 
                     onChange={(serials) => onLineChange(line.id, { serialNo: serials[0] ?? null })}
                   />
                 ) : (
-                  <span className="font-mono text-xs">{line.serialNo ?? '—'}</span>
+                  <span className="font-mono text-xs">{line.serialNo ?? '-'}</span>
                 )}
               </td>
               <td>
@@ -140,7 +140,7 @@ export function MovementLineGrid({ lines, mode, editable, batchMethod = 'fefo', 
                     value={line.expiryDate ?? ''}
                     onChange={(e) => onLineChange(line.id, { expiryDate: e.target.value })}
                   />
-                ) : (line.expiryDate ?? '—')}
+                ) : (line.expiryDate ?? '-')}
               </td>
             </tr>
           )})}

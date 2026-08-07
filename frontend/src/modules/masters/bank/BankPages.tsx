@@ -64,7 +64,7 @@ export function BankListPage() {
             {count} account{count === 1 ? '' : 's'}
           </Link>
         ) : (
-          <span className="text-erp-muted">—</span>
+          <span className="text-erp-muted">-</span>
         )
       },
     },
@@ -149,9 +149,9 @@ export function BankFormPage() {
       subtitle={watched.name?.trim() || 'Bank master card — Business Central'}
       breadcrumbs={buildMasterBreadcrumbs('procurement', isEdit ? 'Edit Bank' : 'New Bank')}
       documentStrip={[
-        { label: 'Code', value: watched.code?.trim() || '—', highlight: Boolean(watched.code?.trim()) },
-        { label: 'Name', value: watched.name?.trim() || '—' },
-        { label: 'Accounts', value: linkedAccounts.length > 0 ? String(linkedAccounts.length) : '—' },
+        { label: 'Code', value: watched.code?.trim() || '-', highlight: Boolean(watched.code?.trim()) },
+        { label: 'Name', value: watched.name?.trim() || '-' },
+        { label: 'Accounts', value: linkedAccounts.length > 0 ? String(linkedAccounts.length) : '-' },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
       ]}
       commandBar={(
@@ -172,15 +172,15 @@ export function BankFormPage() {
       activeSection={activeSection}
       onSectionSelect={setActiveSection}
       formMetrics={[
-        { label: 'Code', value: watched.code || '—', accent: 'blue' as const },
-        { label: 'Accounts', value: linkedAccounts.length > 0 ? String(linkedAccounts.length) : '—', accent: 'violet' as const },
+        { label: 'Code', value: watched.code || '-', accent: 'blue' as const },
+        { label: 'Accounts', value: linkedAccounts.length > 0 ? String(linkedAccounts.length) : '-', accent: 'violet' as const },
         { label: 'Active', value: watched.isActive ? 'Yes' : 'No', accent: watched.isActive ? ('green' as const) : ('amber' as const) },
       ]}
       factBoxTitle="Bank"
       factBoxSummary={[
         { label: 'Used on', value: 'Bank Account, Vendor, Payments' },
-        { label: 'Code', value: watched.code || '—' },
-        { label: 'Name', value: watched.name || '—' },
+        { label: 'Code', value: watched.code || '-' },
+        { label: 'Name', value: watched.name || '-' },
         { label: 'Modified', value: existing ? formatDate(existing.updatedAt.slice(0, 10)) : 'New' },
       ]}
       stickyFooter={(
@@ -296,7 +296,7 @@ export function BankDetailPage() {
                   ))}
                 </span>
               ) : (
-                '—'
+                '-'
               )
             }
           />

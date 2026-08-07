@@ -119,13 +119,13 @@ export function MaterialOutwardListPage() {
                   <tr key={r.id}>
                     <td className="tabular-nums"><TableLink to={`/gate/material-outward/${r.id}`}>{r.entryNumber}</TableLink></td>
                     <td>{r.documentType}</td>
-                    <td className="max-w-[160px] truncate">{r.partyName ?? '—'}</td>
-                    <td className="tabular-nums">{r.vehicleNumber ?? '—'}</td>
+                    <td className="max-w-[160px] truncate">{r.partyName ?? '-'}</td>
+                    <td className="tabular-nums">{r.vehicleNumber ?? '-'}</td>
                     <td className="max-w-[220px] truncate font-medium">{r.materialSummary}</td>
                     <td className="tabular-nums">{r.packagesExpected}</td>
                     <td><GateStatusBadge status={r.approvalStatus} /></td>
                     <td><GateStatusBadge status={r.status} /></td>
-                    <td className="whitespace-nowrap">{r.plannedTime ? formatDateTime(r.plannedTime) : '—'}</td>
+                    <td className="whitespace-nowrap">{r.plannedTime ? formatDateTime(r.plannedTime) : '-'}</td>
                     <td>
                       <div className="flex items-center gap-1.5">
                         <ErpButton size="sm" variant="ghost" onClick={() => navigate(`/gate/material-outward/${r.id}`)}>View</ErpButton>

@@ -73,7 +73,7 @@ export function GstRateListPage() {
 
   const columns: ColumnDef<GstRate, unknown>[] = [
     { accessorKey: 'code', header: 'Code', cell: ({ row }) => <span className="font-mono text-xs font-semibold">{row.original.code}</span> },
-    { id: 'group', header: 'GST Group Code', cell: ({ row }) => getGstGroup(row.original.gstGroupId)?.code ?? '—' },
+    { id: 'group', header: 'GST Group Code', cell: ({ row }) => getGstGroup(row.original.gstGroupId)?.code ?? '-' },
     { accessorKey: 'fromState', header: 'From State' },
     { accessorKey: 'locationStateCode', header: 'Location State Code' },
     { accessorKey: 'dateFrom', header: 'Date From', cell: ({ row }) => formatDate(row.original.dateFrom) },
@@ -197,11 +197,11 @@ export function GstRateFormPage() {
       breadcrumbs={buildMasterBreadcrumbs('inventory', isEdit ? 'Edit GST Rate' : 'New GST Rate')}
       validationErrors={validationErrors}
       documentStrip={[
-        { label: 'Code', value: watched.code?.trim() || '—', highlight: Boolean(watched.code?.trim()) },
-        { label: 'GST Group', value: getGstGroup(gstGroupId)?.code ?? '—', highlight: Boolean(gstGroupId) },
-        { label: 'From', value: fromState || '—' },
-        { label: 'Location', value: locationStateCode || '—' },
-        { label: 'IGST', value: watched.igst != null ? `${watched.igst}%` : '—' },
+        { label: 'Code', value: watched.code?.trim() || '-', highlight: Boolean(watched.code?.trim()) },
+        { label: 'GST Group', value: getGstGroup(gstGroupId)?.code ?? '-', highlight: Boolean(gstGroupId) },
+        { label: 'From', value: fromState || '-' },
+        { label: 'Location', value: locationStateCode || '-' },
+        { label: 'IGST', value: watched.igst != null ? `${watched.igst}%` : '-' },
       ]}
       commandBar={<MasterForm listPath="/masters/gst-rates" isEdit={isEdit} onSave={() => save('default')} onSaveClose={() => save('close')} onSaveNew={() => save('new')} onCancel={cancelForm} />}
       sectionNavItems={[{ id: 'general', label: 'Rate Slab', icon: Percent, done: Boolean(watched.code?.trim() && gstGroupId && watched.dateFrom) }]}
@@ -213,8 +213,8 @@ export function GstRateFormPage() {
       ]}
       factBoxTitle="Rate insight"
       factBoxSummary={[
-        { label: 'GST Group', value: getGstGroup(gstGroupId)?.code ?? '—' },
-        { label: 'Valid from', value: watched.dateFrom ? formatDate(watched.dateFrom) : '—' },
+        { label: 'GST Group', value: getGstGroup(gstGroupId)?.code ?? '-' },
+        { label: 'Valid from', value: watched.dateFrom ? formatDate(watched.dateFrom) : '-' },
         { label: 'Used in', value: 'Sales, Purchase, Proforma, Tax Invoice' },
       ]}
       stickyFooter={<MasterStickyFooter isEdit={isEdit} isSubmitting={isSubmitting} onSave={() => save('default')} onSaveClose={() => save('close')} onSaveNew={() => save('new')} onCancel={cancelForm} />}
@@ -283,7 +283,7 @@ export function GstRateDetailPage() {
       <DetailSection title="Rate Slab">
         <DetailGrid>
           <DetailField label="Code" value={record.code} />
-          <DetailField label="GST Group" value={getGstGroup(record.gstGroupId)?.code ?? '—'} />
+          <DetailField label="GST Group" value={getGstGroup(record.gstGroupId)?.code ?? '-'} />
           <DetailField label="From State" value={record.fromState} />
           <DetailField label="Location State" value={record.locationStateCode} />
           <DetailField label="Date From" value={formatDate(record.dateFrom)} />

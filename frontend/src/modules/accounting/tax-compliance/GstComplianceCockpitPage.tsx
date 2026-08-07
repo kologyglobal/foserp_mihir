@@ -79,7 +79,7 @@ export function GstComplianceCockpitPage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">Capability matrix</h2>
             <p className="mt-1 text-xs text-erp-muted">
-              Verdict: {payload.matrix?.verdict ?? '—'} · Full GST compliant? No · Mode:{' '}
+              Verdict: {payload.matrix?.verdict ?? '-'} · Full GST compliant? No · Mode:{' '}
               {perms.isApiMode ? 'API' : 'Demo'}
             </p>
             <ul className="mt-3 divide-y divide-erp-border text-sm">
@@ -96,8 +96,8 @@ export function GstComplianceCockpitPage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">Multi-period health</h2>
             <p className="mt-1 text-xs text-erp-muted">
-              Overall: {payload.health?.overallGrade ?? payload.cockpit?.multiPeriod?.overallGrade ?? '—'} · avg score{' '}
-              {payload.health?.averageScore ?? payload.cockpit?.multiPeriod?.averageScore ?? '—'}
+              Overall: {payload.health?.overallGrade ?? payload.cockpit?.multiPeriod?.overallGrade ?? '-'} · avg score{' '}
+              {payload.health?.averageScore ?? payload.cockpit?.multiPeriod?.averageScore ?? '-'}
             </p>
             <div className="mt-3 overflow-x-auto">
               <table className="min-w-full text-left text-sm">
@@ -116,7 +116,7 @@ export function GstComplianceCockpitPage() {
                       <td className="py-1.5 pr-3">{p.grade}</td>
                       <td className="py-1.5 pr-3">{p.score}</td>
                       <td className="py-1.5 text-xs text-erp-muted">
-                        {(p.issues ?? []).slice(0, 2).map((i) => i.message).join('; ') || '—'}
+                        {(p.issues ?? []).slice(0, 2).map((i) => i.message).join('; ') || '-'}
                       </td>
                     </tr>
                   ))}

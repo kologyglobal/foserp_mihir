@@ -170,7 +170,7 @@ export function VoucherLedgerPage() {
           ) : null}
           {header.reversal ? (
             <p className="text-erp-muted">
-              Reversal: {header.reversal.reversalVoucherNumber || header.reversal.originalVoucherNumber || '—'}
+              Reversal: {header.reversal.reversalVoucherNumber || header.reversal.originalVoucherNumber || '-'}
             </p>
           ) : null}
         </div>

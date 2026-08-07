@@ -74,7 +74,7 @@ function parts(code: string, name: string): CatalogProductDisplay {
   return {
     code,
     name,
-    label: formatCodeNameLabel(code, name) ?? (code || name || '—'),
+    label: formatCodeNameLabel(code, name) ?? (code || name || '-'),
   }
 }
 

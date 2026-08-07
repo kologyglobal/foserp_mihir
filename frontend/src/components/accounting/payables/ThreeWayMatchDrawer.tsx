@@ -100,10 +100,10 @@ export function ThreeWayMatchDrawer({
                         !line.withinTolerance && 'font-semibold text-rose-700',
                       )}
                     >
-                      {line.difference == null ? '—' : formatCell(line.difference)}
+                      {line.difference == null ? '-' : formatCell(line.difference)}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-erp-muted">
-                      {line.tolerance == null ? '—' : formatCell(line.tolerance)}
+                      {line.tolerance == null ? '-' : formatCell(line.tolerance)}
                     </td>
                     <td className="px-3 py-2">
                       <span

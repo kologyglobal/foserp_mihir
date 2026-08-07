@@ -144,6 +144,10 @@ export function OperationalPageShell({
     Boolean(!kpiStrip?.length && insights?.length) ||
     Boolean(!isEnterprise && !mergeHeader && commandBar)
 
+  // Header breadcrumbs already provide navigation back to the parent — an
+  // in-page Back link would duplicate it. Only show Back when no crumb is navigable.
+  const headerHasNav = Boolean(crumbItems?.some((c) => c.to))
+
   const isPurchaseSurface = badge === 'Purchase' || isPurchasePath(pathname)
   const isStoreSurface =
     badge === 'Store' ||
@@ -227,7 +231,7 @@ export function OperationalPageShell({
       ) : null}
 
       <div className="erp-page-content">
-        {backLink ? <PageBackLink to={backLink.to} label={backLink.label} /> : null}
+        {backLink && !headerHasNav ? <PageBackLink to={backLink.to} label={backLink.label} /> : null}
         {guide ? <ErpPageGuide purpose={guide.purpose} nextStep={guide.nextStep} className="mb-2" /> : null}
         {children}
       </div>

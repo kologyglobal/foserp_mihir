@@ -897,26 +897,26 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
         summaryTitle="Invoice preview"
         actionsTitle="Quick actions"
         summary={[
-          { label: 'Customer', value: prefill?.customerName ?? '—' },
+          { label: 'Customer', value: prefill?.customerName ?? '-' },
           {
             label: 'Document',
             value:
               invoiceMeta?.invoiceNo ??
               prefill?.salesOrderNo ??
               prefill?.proformaNo ??
-              (isDirect && prefill ? 'Direct' : '—'),
+              (isDirect && prefill ? 'Direct' : '-'),
           },
           { label: 'Active lines', value: String(activeLines.length) },
           {
             label: 'Grand total',
             value: prefill
               ? formatCurrency(orderPricing?.summary.grandTotal ?? prefill.gst.grandTotal)
-              : '—',
+              : '-',
             highlight: true,
           },
           {
             label: 'Tax scheme',
-            value: prefill ? gstSchemeLabel(prefill.gst.scheme) : '—',
+            value: prefill ? gstSchemeLabel(prefill.gst.scheme) : '-',
           },
         ]}
         actions={[
@@ -1086,7 +1086,7 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
         {isEdit ? (
           <>
             <ErpFieldRow label="Invoice No." colSpan={2} horizontal={false} readOnly>
-              {invoiceMeta?.invoiceNo ?? '—'}
+              {invoiceMeta?.invoiceNo ?? '-'}
             </ErpFieldRow>
             <ErpFieldRow label="Source" colSpan={2} horizontal={false} readOnly>
               {sourceType === 'sales_order'
@@ -1260,11 +1260,11 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                   <div className="ti-create-party__chips">
                     <span className="ti-create-party__chip">
                       <span className="ti-create-party__chip-label">GSTIN</span>
-                      {prefill.customerGstin || '—'}
+                      {prefill.customerGstin || '-'}
                     </span>
                     <span className="ti-create-party__chip">
                       <span className="ti-create-party__chip-label">Place of supply</span>
-                      {prefill.customerState || '—'}
+                      {prefill.customerState || '-'}
                     </span>
                     {prefill.salesOrderNo ? (
                       <span className="ti-create-party__chip">
@@ -1328,15 +1328,15 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                   <>
                     <div className="ti-create-field ti-create-field--readonly">
                       <span className="ti-create-field__label">Payment terms</span>
-                      <span className="ti-create-field__value">{prefill.paymentTerms || '—'}</span>
+                      <span className="ti-create-field__value">{prefill.paymentTerms || '-'}</span>
                     </div>
                     <div className="ti-create-field ti-create-field--readonly">
                       <span className="ti-create-field__label">Delivery terms</span>
-                      <span className="ti-create-field__value">{prefill.deliveryTerms || '—'}</span>
+                      <span className="ti-create-field__value">{prefill.deliveryTerms || '-'}</span>
                     </div>
                     <div className="ti-create-field ti-create-field--readonly">
                       <span className="ti-create-field__label">Customer PO</span>
-                      <span className="ti-create-field__value">{prefill.customerPoNumber || '—'}</span>
+                      <span className="ti-create-field__value">{prefill.customerPoNumber || '-'}</span>
                     </div>
                   </>
                 )}
@@ -1346,13 +1346,13 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                 <div className="ti-create-address">
                   <p className="ti-create-address__label">Bill to</p>
                   <p className="ti-create-address__body">
-                    {prefill.billingAddress || prefill.customerAddress || '—'}
+                    {prefill.billingAddress || prefill.customerAddress || '-'}
                   </p>
                 </div>
                 <div className="ti-create-address">
                   <p className="ti-create-address__label">Ship to</p>
                   <p className="ti-create-address__body">
-                    {prefill.shippingAddress || prefill.customerAddress || '—'}
+                    {prefill.shippingAddress || prefill.customerAddress || '-'}
                   </p>
                 </div>
               </div>
@@ -1443,7 +1443,7 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                             />
                           </td>
                           <td className="so-pricing-td tabular-nums text-[12px] text-erp-muted">
-                            {hsn.code || '—'}
+                            {hsn.code || '-'}
                             {!hsn.fromSnapshot && hsn.code ? (
                               <span className="ml-1 text-[10px] text-amber-700" title="From item master">
                                 live
@@ -1593,11 +1593,11 @@ export function CrmInvoiceCreatePage({ mode = 'create' }: { mode?: 'create' | 'e
                       return (
                       <tr key={line.id} className="border-b border-erp-border/60">
                         <td className="px-2 py-2">
-                          <div className="font-medium text-erp-text">{line.itemCode || '—'}</div>
+                          <div className="font-medium text-erp-text">{line.itemCode || '-'}</div>
                           <div className="text-[11px] text-erp-muted">{line.description}</div>
                         </td>
                         <td className="px-2 py-2 font-mono text-[11px] text-erp-muted">
-                          {hsn.code || '—'}
+                          {hsn.code || '-'}
                         </td>
                         <td className="px-2 py-2 text-[11px] text-erp-muted">
                           {formatTaxSchemeLabel(line.taxScheme)}
@@ -2053,9 +2053,9 @@ export function CrmReceiptDetailPage() {
             <TableLink to={`/sales/proforma-invoices/${receipt.proformaInvoiceId}`}>{receipt.proformaNo}</TableLink>
           </ErpFieldRow>
         ) : null}
-        <ErpFieldRow label="Transaction ref" readOnly>{receipt.transactionRef || '—'}</ErpFieldRow>
-        <ErpFieldRow label="Remarks" readOnly>{receipt.remarks || '—'}</ErpFieldRow>
-        <ErpFieldRow label="Attachment" readOnly>{receipt.attachmentName || '—'}</ErpFieldRow>
+        <ErpFieldRow label="Transaction ref" readOnly>{receipt.transactionRef || '-'}</ErpFieldRow>
+        <ErpFieldRow label="Remarks" readOnly>{receipt.remarks || '-'}</ErpFieldRow>
+        <ErpFieldRow label="Attachment" readOnly>{receipt.attachmentName || '-'}</ErpFieldRow>
       </ErpCardSection>
       <ErpCardSection title="Accounting handoff" className="mt-4">
         <ErpFieldRow label="Migration status" readOnly>
@@ -2067,11 +2067,11 @@ export function CrmReceiptDetailPage() {
               {receipt.accountingReceiptId}
             </TableLink>
           ) : (
-            '—'
+            '-'
           )}
         </ErpFieldRow>
         <ErpFieldRow label="Migration error" readOnly>
-          {receipt.accountingMigrationError || '—'}
+          {receipt.accountingMigrationError || '-'}
         </ErpFieldRow>
       </ErpCardSection>
       <ErpCardSection title="Allocations" className="mt-4">

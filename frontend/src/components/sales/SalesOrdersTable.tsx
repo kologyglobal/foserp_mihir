@@ -191,7 +191,7 @@ export function SalesOrdersTable({
             row.original,
             products.find((p) => p.id === row.original.productId),
           )
-          return <EnterpriseNumericCell value={v > 0 ? formatCurrency(v) : '—'} className="font-semibold text-erp-primary" />
+          return <EnterpriseNumericCell value={v > 0 ? formatCurrency(v) : '-'} className="font-semibold text-erp-primary" />
         },
       },
       {
@@ -209,7 +209,7 @@ export function SalesOrdersTable({
             ? 'Direct'
             : row.original.quotationId || row.original.source === 'quotation'
               ? 'Quotation'
-              : '—',
+              : '-',
       },
       {
         accessorKey: 'quotationNo',
@@ -226,7 +226,7 @@ export function SalesOrdersTable({
                 )
                 : `${row.original.quotationNo} Rev ${row.original.quotationRevisionNo ?? 1}`
               )
-            : '—',
+            : '-',
       },
       {
         id: 'wo',

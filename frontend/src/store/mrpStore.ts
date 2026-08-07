@@ -149,8 +149,8 @@ function computeDemandForInput(
     inv.reservations,
     master.itemVendorMaps,
     master.vendors,
-    (id) => master.uoms.find((u) => u.id === id)?.uomCode ?? '—',
-    (id) => master.warehouses.find((w) => w.id === id)?.warehouseCode ?? '—',
+    (id) => master.uoms.find((u) => u.id === id)?.uomCode ?? '-',
+    (id) => master.warehouses.find((w) => w.id === id)?.warehouseCode ?? '-',
   )
 
   const result = runMrpForSalesOrder(ctx)
@@ -391,8 +391,8 @@ export const useMrpStore = create<MrpState>()(
         inv.reservations,
         master.itemVendorMaps,
         master.vendors,
-        (id) => master.uoms.find((u) => u.id === id)?.uomCode ?? '—',
-        (id) => master.warehouses.find((w) => w.id === id)?.warehouseCode ?? '—',
+        (id) => master.uoms.find((u) => u.id === id)?.uomCode ?? '-',
+        (id) => master.warehouses.find((w) => w.id === id)?.warehouseCode ?? '-',
       )
 
       const result = runMrpForSalesOrder(ctx)

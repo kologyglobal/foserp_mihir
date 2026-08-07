@@ -237,7 +237,7 @@ export function VendorAdvancesPage() {
                         {r.vendorName}
                       </button>
                     </td>
-                    <td className="px-3 py-2">{r.poNumber ?? '—'}</td>
+                    <td className="px-3 py-2">{r.poNumber ?? '-'}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(r.originalAmount)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(r.remainingAmount)}</td>
                     <td className="px-3 py-2">
@@ -253,7 +253,7 @@ export function VendorAdvancesPage() {
                           Apply to invoice
                         </button>
                       ) : (
-                        <span className="text-erp-muted">—</span>
+                        <span className="text-erp-muted">-</span>
                       )}
                     </td>
                   </tr>

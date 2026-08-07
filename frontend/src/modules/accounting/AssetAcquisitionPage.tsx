@@ -217,7 +217,7 @@ export function AssetAcquisitionPage() {
                           <p className="text-[11px] text-erp-muted">{r.categoryName}</p>
                         </td>
                         <td className="px-3 py-2">{r.acquisitionType}</td>
-                        <td className="px-3 py-2">{r.vendorName ?? '—'}</td>
+                        <td className="px-3 py-2">{r.vendorName ?? '-'}</td>
                         <td className="px-3 py-2">{formatDate(r.acquisitionDate)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(r.totalAmount)}</td>
                         <td className="px-3 py-2"><AssetStatusBadge status={r.status} /></td>

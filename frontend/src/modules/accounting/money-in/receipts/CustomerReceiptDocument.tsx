@@ -118,7 +118,7 @@ export function CustomerReceiptDocument({
               {line}
             </p>
           ))}
-          <p className="pi-print-party__line">GSTIN: {receipt.customerGstinSnapshot || '—'}</p>
+          <p className="pi-print-party__line">GSTIN: {receipt.customerGstinSnapshot || '-'}</p>
           {receipt.customerStateCodeSnapshot ? (
             <p className="pi-print-party__line">State code: {receipt.customerStateCodeSnapshot}</p>
           ) : null}
@@ -130,15 +130,15 @@ export function CustomerReceiptDocument({
             <span>Mode</span> {modeLabel}
           </p>
           <p className="pi-print-party__line">
-            <span>UTR / Ref</span> {receipt.transactionReference || receipt.referenceNumber || '—'}
+            <span>UTR / Ref</span> {receipt.transactionReference || receipt.referenceNumber || '-'}
           </p>
           {receipt.paymentMethod === 'CHEQUE' ? (
             <>
               <p className="pi-print-party__line">
-                <span>Cheque no.</span> {receipt.chequeNumber || '—'}
+                <span>Cheque no.</span> {receipt.chequeNumber || '-'}
               </p>
               <p className="pi-print-party__line">
-                <span>Cheque date</span> {receipt.chequeDate ? formatDate(receipt.chequeDate) : '—'}
+                <span>Cheque date</span> {receipt.chequeDate ? formatDate(receipt.chequeDate) : '-'}
               </p>
             </>
           ) : null}
@@ -156,7 +156,7 @@ export function CustomerReceiptDocument({
             <span>Currency</span> {receipt.currencyCode}
           </p>
           <p className="pi-print-party__line">
-            <span>Received by</span> {receipt.createdBy || '—'}
+            <span>Received by</span> {receipt.createdBy || '-'}
           </p>
         </section>
       </div>

@@ -277,7 +277,7 @@ export function ApiBankDepositsPage() {
                     <td className="px-3 py-2">{row.kind === 'CASH' ? 'Cash deposit' : 'Cheque deposit'}</td>
                     <td className="px-3 py-2">{row.bankAccount}</td>
                     <td className="px-3 py-2">{row.source}</td>
-                    <td className="px-3 py-2 font-mono text-[12px]">{row.reference || '—'}</td>
+                    <td className="px-3 py-2 font-mono text-[12px]">{row.reference || '-'}</td>
                     <td className="px-3 py-2 text-right font-semibold tabular-nums">{formatCurrency(row.amount)} {row.currencyCode}</td>
                     <td className="px-3 py-2">{row.status.replaceAll('_', ' ')}</td>
                   </tr>

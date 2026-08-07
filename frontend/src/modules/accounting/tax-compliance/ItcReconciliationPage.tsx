@@ -113,8 +113,8 @@ export function ItcReconciliationPage() {
                     onClick={() => setSelectedId(r.id)}
                   >
                     <td className="px-2 py-1.5"><TaxStatusBadge status={r.matchStatus} /></td>
-                    <td className="px-2 py-1.5">{r.books?.docNo ?? '—'}</td>
-                    <td className="px-2 py-1.5">{r.gstr2b?.invoiceNo ?? '—'}</td>
+                    <td className="px-2 py-1.5">{r.books?.docNo ?? '-'}</td>
+                    <td className="px-2 py-1.5">{r.gstr2b?.invoiceNo ?? '-'}</td>
                     <td className="px-2 py-1.5">{r.confidence}</td>
                     <td className="px-2 py-1.5 text-right">{formatCurrency(r.varianceTax)}</td>
                   </tr>

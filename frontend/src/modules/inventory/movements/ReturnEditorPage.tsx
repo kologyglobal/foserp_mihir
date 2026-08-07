@@ -195,7 +195,7 @@ export function ReturnEditorPage() {
                 <option value="">Select source…</option>
                 {sourceDocs.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.documentNo} — {d.partyOrDepartment ?? '—'} ({d.eligibleQty} eligible)
+                    {d.documentNo} — {d.partyOrDepartment ?? '-'} ({d.eligibleQty} eligible)
                   </option>
                 ))}
               </Select>
@@ -251,7 +251,7 @@ export function ReturnEditorPage() {
                 </td>
                 <td>
                   {readOnly || !isNew ? (
-                    <span className="font-mono text-xs">{l.batchNo ?? '—'}</span>
+                    <span className="font-mono text-xs">{l.batchNo ?? '-'}</span>
                   ) : l.batchTracking && l.returnQty > 0 ? (
                     <BatchSelector
                       itemId={l.itemId}
@@ -262,12 +262,12 @@ export function ReturnEditorPage() {
                       onChange={(batchNo) => updateLine(l._key, { batchNo })}
                     />
                   ) : (
-                    <span className="font-mono text-xs">{l.batchNo ?? '—'}</span>
+                    <span className="font-mono text-xs">{l.batchNo ?? '-'}</span>
                   )}
                 </td>
                 <td>
                   {readOnly || !isNew ? (
-                    <span className="font-mono text-xs">{l.serialNo ?? '—'}</span>
+                    <span className="font-mono text-xs">{l.serialNo ?? '-'}</span>
                   ) : l.serialTracking && l.returnQty > 0 ? (
                     <SerialSelector
                       itemId={l.itemId}
@@ -277,12 +277,12 @@ export function ReturnEditorPage() {
                       onChange={(serials) => updateLine(l._key, { serialNo: serials[0] ?? null })}
                     />
                   ) : (
-                    <span className="font-mono text-xs">{l.serialNo ?? '—'}</span>
+                    <span className="font-mono text-xs">{l.serialNo ?? '-'}</span>
                   )}
                 </td>
                 {returnType === 'sales_return' ? (
                   <td>
-                    {readOnly || !isNew ? (l.condition ? SALES_RETURN_CONDITION_LABELS[l.condition] : '—') : (
+                    {readOnly || !isNew ? (l.condition ? SALES_RETURN_CONDITION_LABELS[l.condition] : '-') : (
                       <select
                         className="erp-input h-8"
                         value={l.condition ?? ''}
@@ -295,7 +295,7 @@ export function ReturnEditorPage() {
                   </td>
                 ) : null}
                 <td>
-                  {readOnly || !isNew ? (l.reason ?? '—') : (
+                  {readOnly || !isNew ? (l.reason ?? '-') : (
                     <input
                       className="erp-input h-8 w-full"
                       value={l.reason ?? ''}

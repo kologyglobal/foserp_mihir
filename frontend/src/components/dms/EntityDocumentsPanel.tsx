@@ -166,7 +166,7 @@ export function EntityDocumentsPanel({
             {
               accessorKey: 'uploadedByName',
               header: 'Uploaded by',
-              cell: ({ row }) => row.original.uploadedByName ?? '—',
+              cell: ({ row }) => row.original.uploadedByName ?? '-',
             },
             {
               accessorKey: 'uploadedAt',

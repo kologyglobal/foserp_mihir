@@ -326,7 +326,7 @@ export function AdminInvitationsPage() {
                               Resend
                             </button>
                           ) : (
-                            '—'
+                            '-'
                           )}
                         </td>
                       </tr>

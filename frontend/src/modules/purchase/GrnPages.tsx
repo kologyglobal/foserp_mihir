@@ -253,14 +253,14 @@ export function GrnRegisterPage() {
       fields: [
         { label: 'Status', value: formatStatus(grn.status) },
         { label: 'PO', value: grn.poNo },
-        { label: 'Vendor', value: getVendor(grn.vendorId)?.vendorName ?? '—' },
-        { label: 'Warehouse', value: getWarehouse(grn.warehouseId)?.warehouseName ?? '—' },
+        { label: 'Vendor', value: getVendor(grn.vendorId)?.vendorName ?? '-' },
+        { label: 'Warehouse', value: getWarehouse(grn.warehouseId)?.warehouseName ?? '-' },
         { label: 'GRN Date', value: formatDate(grn.grnDate) },
         { label: 'Lines', value: String(grn.lines.length) },
         { label: 'Received Qty', value: formatNumber(grnTotalQty(grn)) },
         { label: 'Value', value: formatCurrency(grnTotalValue(grn)) },
         { label: 'QC', value: grn.qcRequired ? 'Required' : 'No' },
-        { label: 'Posted', value: grn.postedAt ? formatDate(grn.postedAt.slice(0, 10)) : '—' },
+        { label: 'Posted', value: grn.postedAt ? formatDate(grn.postedAt.slice(0, 10)) : '-' },
       ],
       links: [
         { label: 'Open GRN', href: `/purchase/grn/${grn.id}` },
@@ -307,13 +307,13 @@ export function GrnRegisterPage() {
         accessorKey: 'vendorId',
         header: 'Vendor',
         meta: { columnLabel: 'Vendor' },
-        cell: ({ row }) => getVendor(row.original.vendorId)?.vendorName ?? '—',
+        cell: ({ row }) => getVendor(row.original.vendorId)?.vendorName ?? '-',
       },
       {
         accessorKey: 'warehouseId',
         header: 'Warehouse',
         meta: { columnLabel: 'Warehouse' },
-        cell: ({ row }) => getWarehouse(row.original.warehouseId)?.warehouseCode ?? '—',
+        cell: ({ row }) => getWarehouse(row.original.warehouseId)?.warehouseCode ?? '-',
       },
       {
         accessorKey: 'grnDate',
@@ -337,7 +337,7 @@ export function GrnRegisterPage() {
         accessorKey: 'qcRequired',
         header: 'QC',
         meta: { columnLabel: 'QC' },
-        cell: ({ row }) => (row.original.qcRequired ? 'Required' : '—'),
+        cell: ({ row }) => (row.original.qcRequired ? 'Required' : '-'),
       },
       {
         id: 'lines',
@@ -349,7 +349,7 @@ export function GrnRegisterPage() {
         accessorKey: 'postedAt',
         header: 'Posted',
         meta: { columnLabel: 'Posted' },
-        cell: ({ row }) => (row.original.postedAt ? formatDate(row.original.postedAt.slice(0, 10)) : '—'),
+        cell: ({ row }) => (row.original.postedAt ? formatDate(row.original.postedAt.slice(0, 10)) : '-'),
       },
       {
         accessorKey: 'createdByName',
@@ -376,7 +376,7 @@ export function GrnRegisterPage() {
         accessorKey: 'vendorId',
         header: 'Vendor',
         meta: { columnLabel: 'Vendor' },
-        cell: ({ row }) => getVendor(row.original.vendorId)?.vendorName ?? '—',
+        cell: ({ row }) => getVendor(row.original.vendorId)?.vendorName ?? '-',
       },
       {
         accessorKey: 'itemId',
@@ -384,7 +384,7 @@ export function GrnRegisterPage() {
         meta: { columnLabel: 'Item' },
         cell: ({ row }) => {
           const item = getItem(row.original.itemId)
-          return <span className="font-mono text-[13px]">{item?.itemCode ?? '—'}</span>
+          return <span className="font-mono text-[13px]">{item?.itemCode ?? '-'}</span>
         },
       },
       {
@@ -395,7 +395,7 @@ export function GrnRegisterPage() {
           const item = getItem(row.original.itemId)
           return (
             <span className="block max-w-[160px] truncate" title={item?.itemName}>
-              {item?.itemName ?? '—'}
+              {item?.itemName ?? '-'}
             </span>
           )
         },
@@ -404,7 +404,7 @@ export function GrnRegisterPage() {
         accessorKey: 'warehouseId',
         header: 'Warehouse',
         meta: { columnLabel: 'Warehouse' },
-        cell: ({ row }) => getWarehouse(row.original.warehouseId)?.warehouseCode ?? '—',
+        cell: ({ row }) => getWarehouse(row.original.warehouseId)?.warehouseCode ?? '-',
       },
       {
         accessorKey: 'orderedQty',

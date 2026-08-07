@@ -22,7 +22,7 @@ function AmountButton({
   onDrillDown?: (accountId: string, column: TrialBalanceDrilldownColumn) => void
 }) {
   if (value === 0) {
-    return <span className="tabular-nums text-erp-muted">—</span>
+    return <span className="tabular-nums text-erp-muted">-</span>
   }
   const clickable = Boolean(onDrillDown)
   const className = 'tabular-nums text-right text-[12px]'

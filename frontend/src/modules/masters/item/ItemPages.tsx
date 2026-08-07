@@ -384,9 +384,9 @@ export function ItemListPage() {
   const columns: ColumnDef<Item, unknown>[] = [
     { accessorKey: 'itemCode', header: 'Item Code', cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.itemCode}</span> },
     { accessorKey: 'itemName', header: 'Name' },
-    { id: 'productType', header: 'Product Type', cell: ({ row }) => row.original.productType ? ENGINEERING_PRODUCT_TYPE_LABELS[row.original.productType] : '—' },
+    { id: 'productType', header: 'Product Type', cell: ({ row }) => row.original.productType ? ENGINEERING_PRODUCT_TYPE_LABELS[row.original.productType] : '-' },
     { id: 'category', header: 'Category', cell: ({ row }) => getCategoryName(row.original.categoryId) },
-    { id: 'hsn', header: 'HSN', cell: ({ row }) => (row.original.hsnId ? getHsn(row.original.hsnId)?.code : row.original.hsnCode) ?? '—' },
+    { id: 'hsn', header: 'HSN', cell: ({ row }) => (row.original.hsnId ? getHsn(row.original.hsnId)?.code : row.original.hsnCode) ?? '-' },
     { id: 'uom', header: 'UOM', cell: ({ row }) => getUomName(row.original.baseUomId).split(' ')[0] },
     { accessorKey: 'standardRate', header: 'Std Rate', cell: ({ row }) => formatCurrency(row.original.standardRate) },
     { accessorKey: 'isActive', header: 'Status', cell: ({ row }) => <ActiveBadge isActive={row.original.isActive} /> },
@@ -579,7 +579,7 @@ export function ItemFormPage() {
   const baseUomId = watch('baseUomId')
   const quantityPerUom = watch('quantityPerUom')
 
-  const baseUomCode = uoms.find((u) => u.id === baseUomId)?.uomCode ?? '—'
+  const baseUomCode = uoms.find((u) => u.id === baseUomId)?.uomCode ?? '-'
 
   /** General → Quantity drives purchase conversion factor (PO/GRN multi-unit). */
   function syncPurchaseQtyFromGeneral(raw: number) {
@@ -810,8 +810,8 @@ export function ItemFormPage() {
       factBoxTitle="Item insight"
       factBoxSummary={[
         { label: 'Used in', value: 'BOM, Purchase, Inventory, Production, Sales' },
-        { label: 'Category', value: leafCategories.find((c) => c.id === watched.categoryId)?.categoryName ?? '—' },
-        { label: 'UOM', value: uoms.find((u) => u.id === baseUomId)?.uomCode ?? '—' },
+        { label: 'Category', value: leafCategories.find((c) => c.id === watched.categoryId)?.categoryName ?? '-' },
+        { label: 'UOM', value: uoms.find((u) => u.id === baseUomId)?.uomCode ?? '-' },
         { label: 'Modified', value: existing ? existing.updatedAt.slice(0, 10) : 'New' },
       ]}
       stickyFooter={
@@ -959,7 +959,7 @@ export function ItemFormPage() {
             baseUomCode={baseUomCode}
             rows={uomConversionRows}
             onChange={handleUomConversionRowsChange}
-            uomCodeOf={(uomId) => uoms.find((u) => u.id === uomId)?.uomCode ?? '—'}
+            uomCodeOf={(uomId) => uoms.find((u) => u.id === uomId)?.uomCode ?? '-'}
             defaultConversionFactor={Number(quantityPerUom) > 0 ? Number(quantityPerUom) : 1}
           />
           <FormField label="Standard Rate">
@@ -1011,6 +1011,11 @@ export function ItemFormPage() {
               <option value="WEIGHT_ONLY">Weight only</option>
               <option value="UNIT_AND_WEIGHT">Unit and weight</option>
             </Select>
+            <p className="mt-1 text-xs text-erp-muted">
+              This is the GRN tolerance type. Unit only checks piece/qty tolerance; Weight only
+              checks weight tolerance and ignores qty variance (e.g. casting, where piece weight
+              naturally varies); Unit and weight checks both.
+            </p>
           </FormField>
           <FormField label="Standard weight per base unit">
             <Input type="number" step="0.0001" min={0} {...register('standardWeightPerBaseUnit')} />
@@ -1284,7 +1289,7 @@ export function ItemDetailPage() {
 
   const defaultBinLabel = (() => {
     if (item.defaultBinCode) return item.defaultBinCode
-    if (!item.defaultBinId) return '—'
+    if (!item.defaultBinId) return '-'
     const hit = bins.find((b) => b.id === item.defaultBinId)
     return hit ? `${hit.code} — ${hit.name}` : item.defaultBinId
   })()
@@ -1293,22 +1298,22 @@ export function ItemDetailPage() {
     <DetailLayout backTo="/masters/items" backLabel="Item Master" title={`${item.itemCode} — ${item.itemName}`} editTo={`/masters/items/${item.id}/edit`}>
       <DetailSection title="General">
         <DetailGrid>
-          <DetailField label="Product Type" value={item.productType ? ENGINEERING_PRODUCT_TYPE_LABELS[item.productType] : '—'} />
-          <DetailField label="Type" value={item.inventoryType ? INVENTORY_POSTING_TYPE_LABELS[item.inventoryType] : '—'} />
+          <DetailField label="Product Type" value={item.productType ? ENGINEERING_PRODUCT_TYPE_LABELS[item.productType] : '-'} />
+          <DetailField label="Type" value={item.inventoryType ? INVENTORY_POSTING_TYPE_LABELS[item.inventoryType] : '-'} />
           <DetailField label="Category" value={getCategoryName(item.categoryId)} />
           <DetailField label="UOM" value={getUomName(item.baseUomId)} />
           <DetailField label="Blocked" value={item.isBlocked ? 'Yes' : 'No'} />
           <DetailField label="Std Rate" value={formatCurrency(item.standardRate)} />
           <DetailField label="Sales allowed" value={item.salesAllowed ? 'Yes' : 'No'} />
           <DetailField label="Default sales rate" value={formatCurrency(item.defaultSalesRate ?? 0)} />
-          <DetailField label="Fulfilment" value={item.defaultFulfilmentMethod ?? '—'} />
+          <DetailField label="Fulfilment" value={item.defaultFulfilmentMethod ?? '-'} />
           <DetailField label="Sales lead days" value={String(item.salesLeadDays ?? 0)} />
         </DetailGrid>
       </DetailSection>
       <DetailSection title="Tax">
         <DetailGrid>
           <DetailField label="HSN" value={item.hsnId ? getHsn(item.hsnId)?.code ?? item.hsnCode : item.hsnCode} />
-          <DetailField label="GST Group" value={item.gstGroupId ? getGstGroup(item.gstGroupId)?.code ?? '—' : '—'} />
+          <DetailField label="GST Group" value={item.gstGroupId ? getGstGroup(item.gstGroupId)?.code ?? '-' : '-'} />
         </DetailGrid>
       </DetailSection>
       <DetailSection title="Inventory Snapshot">
@@ -1325,9 +1330,9 @@ export function ItemDetailPage() {
           <DetailField label="QC Required" value={item.qcRequired ? 'Yes' : 'No'} />
           <DetailField label="Batch tracking" value={item.batchTracked ? 'Yes' : 'No'} />
           <DetailField label="Serial tracking" value={item.serialTracked ? 'Yes' : 'No'} />
-          <DetailField label="Test Group" value={item.qualityTestGroupCode ?? '—'} />
-          <DetailField label="Routing No" value={item.routingNo ?? '—'} />
-          <DetailField label="Drawing No" value={item.drawingNo ?? '—'} />
+          <DetailField label="Test Group" value={item.qualityTestGroupCode ?? '-'} />
+          <DetailField label="Routing No" value={item.routingNo ?? '-'} />
+          <DetailField label="Drawing No" value={item.drawingNo ?? '-'} />
         </DetailGrid>
       </DetailSection>
       <DetailSection title="Attachments">

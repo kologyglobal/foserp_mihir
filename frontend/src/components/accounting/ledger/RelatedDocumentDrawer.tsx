@@ -9,7 +9,7 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -62,14 +62,14 @@ export function RelatedDocumentDrawer({
         <Field label="Document type" value={sourceDocument.documentType} />
         <Field label="Document number" value={sourceDocument.documentNumber} />
         <Field label="Document date" value={sourceDocument.documentDate} />
-        <Field label="Party" value={sourceDocument.partyName ?? '—'} />
+        <Field label="Party" value={sourceDocument.partyName ?? '-'} />
         <Field
           label="Amount"
           value={
             sourceDocument.amount != null ? (
               <span className="tabular-nums">{formatCurrency(sourceDocument.amount)}</span>
             ) : (
-              '—'
+              '-'
             )
           }
         />

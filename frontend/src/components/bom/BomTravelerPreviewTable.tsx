@@ -2,7 +2,7 @@ import { cn } from '@/utils/cn'
 import type { BomTravelerDocument, BomTravelerRow } from '@/types/bomTravelerPreview'
 
 function fmtWt(n: number | null | undefined): string {
-  if (n == null) return '—'
+  if (n == null) return '-'
   return n.toLocaleString('en-IN', { maximumFractionDigits: 1 })
 }
 
@@ -88,7 +88,7 @@ export function BomTravelerPreviewTable({ document }: { document: BomTravelerDoc
                   </td>
                   <td className="border border-slate-100 px-2 py-1.5 font-mono text-[10px]">{row.bomNo}</td>
                   <td className="border border-slate-100 px-2 py-1.5 font-mono text-[10px] text-slate-600">
-                    {row.parentBomNo ?? '—'}
+                    {row.parentBomNo ?? '-'}
                   </td>
                   <td className="border border-slate-100 px-2 py-1.5 font-mono">{row.itemNo}</td>
                   <td className="border border-slate-100 px-2 py-1.5" style={{ paddingLeft: 8 + indent }}>
@@ -96,7 +96,7 @@ export function BomTravelerPreviewTable({ document }: { document: BomTravelerDoc
                   </td>
                   <td className="border border-slate-100 px-2 py-1.5">{row.materialGrade}</td>
                   <td className="border border-slate-100 px-2 py-1.5 text-right tabular-nums">
-                    {row.qty == null ? '—' : row.qty}
+                    {row.qty == null ? '-' : row.qty}
                   </td>
                   <td className="border border-slate-100 px-2 py-1.5">{row.unit}</td>
                   <td className="border border-slate-100 px-2 py-1.5 text-right tabular-nums">
@@ -106,9 +106,9 @@ export function BomTravelerPreviewTable({ document }: { document: BomTravelerDoc
                     {fmtWt(row.totalWeightKg)}
                   </td>
                   <td className="border border-slate-100 px-2 py-1.5 text-slate-700">{row.dimensionsSpec}</td>
-                  <td className="border border-slate-100 px-2 py-1.5 text-slate-700">{row.productionProcess || '—'}</td>
-                  <td className="border border-slate-100 px-2 py-1.5 text-slate-700">{row.machineTool || '—'}</td>
-                  <td className="border border-slate-100 px-2 py-1.5 text-slate-700">{row.qcInspection || '—'}</td>
+                  <td className="border border-slate-100 px-2 py-1.5 text-slate-700">{row.productionProcess || '-'}</td>
+                  <td className="border border-slate-100 px-2 py-1.5 text-slate-700">{row.machineTool || '-'}</td>
+                  <td className="border border-slate-100 px-2 py-1.5 text-slate-700">{row.qcInspection || '-'}</td>
                 </tr>
               )
             })}

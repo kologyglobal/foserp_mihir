@@ -94,7 +94,7 @@ export function Customer360ProformaRegister({
         meta: { columnLabel: 'Payment' },
         cell: ({ row }) => {
           const status = getPaymentStatus(row.original.id)
-          if (!status) return <span className="text-erp-muted">—</span>
+          if (!status) return <span className="text-erp-muted">-</span>
           const label =
             status === 'fully_paid'
               ? 'Fully Paid'
@@ -245,7 +245,7 @@ export function Customer360TaxInvoiceRegister({
           if (status === 'pending_review') {
             return <EnterpriseStatusChip label="Pending Accounting" status="pending" />
           }
-          return <span className="text-erp-muted">—</span>
+          return <span className="text-erp-muted">-</span>
         },
       },
       {
@@ -417,10 +417,10 @@ export function Customer360PaymentReceiptRegister({ rows }: { rows: CrmPaymentRe
         cell: ({ row }) =>
           row.original.proformaInvoiceId ? (
             <TableLink to={`/sales/proforma-invoices/${row.original.proformaInvoiceId}`}>
-              <EnterpriseIdCell id={row.original.proformaNo || '—'} />
+              <EnterpriseIdCell id={row.original.proformaNo || '-'} />
             </TableLink>
           ) : (
-            <span className="text-erp-muted">—</span>
+            <span className="text-erp-muted">-</span>
           ),
       },
       {
@@ -691,7 +691,7 @@ export function Customer360LedgerRegister({
           row.original.debit ? (
             <EnterpriseNumericCell value={formatCurrency(row.original.debit)} />
           ) : (
-            <span className="block text-right text-erp-muted">—</span>
+            <span className="block text-right text-erp-muted">-</span>
           ),
       },
       {
@@ -703,7 +703,7 @@ export function Customer360LedgerRegister({
           row.original.credit ? (
             <EnterpriseNumericCell value={formatCurrency(row.original.credit)} />
           ) : (
-            <span className="block text-right text-erp-muted">—</span>
+            <span className="block text-right text-erp-muted">-</span>
           ),
       },
       {

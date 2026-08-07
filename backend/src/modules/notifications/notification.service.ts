@@ -29,14 +29,8 @@ export async function create(input: CreateNotificationInput): Promise<Notificati
   try {
     if (!input.recipientUserId?.trim()) return null
     const ok = await repo.assertUserInTenant(input.tenantId, input.recipientUserId)
-    if (!ok) {
-      logger.warn('notification skipped — invalid recipient', {
-        tenantId: input.tenantId,
-        recipientUserId: input.recipientUserId,
-        type: input.type,
-      })
-      return null
-    }
+    // Invalid recipient (stale/removed user) — skip silently, no log noise.
+    if (!ok) return null
 
     // Anti-noise: skip optional self-alerts for the actor
     if (

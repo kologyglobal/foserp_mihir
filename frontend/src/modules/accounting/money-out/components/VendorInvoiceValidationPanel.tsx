@@ -104,7 +104,7 @@ export function VendorInvoiceValidationPanel({
                       {a.lineNumber != null ? ` (line ${a.lineNumber})` : ''}
                     </span>
                     <span className={a.isValid ? 'text-emerald-700' : 'text-rose-700'}>
-                      {a.isValid ? `${a.accountCode ?? a.accountId ?? '—'}` : a.issueMessage ?? 'Missing'}
+                      {a.isValid ? `${a.accountCode ?? a.accountId ?? '-'}` : a.issueMessage ?? 'Missing'}
                     </span>
                   </li>
                 ))}

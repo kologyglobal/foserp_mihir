@@ -11,6 +11,7 @@ import {
   ThumbsUp,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { PurchaseStockDualQtyCell } from '@/components/purchase/PurchaseStockDualQtyCell'
 import {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,
@@ -161,7 +162,7 @@ function buildVendorColumns(
         'Vendor',
       quotationId: sample?.vendorQuotationId || quotation?.id || '',
       quotationNumber:
-        sample?.vendorQuotationNumber || quotation?.documentNumber || '—',
+        sample?.vendorQuotationNumber || quotation?.documentNumber || '-',
       basicTotal,
       landedTotal,
       bestLeadDays,
@@ -577,7 +578,7 @@ export function QuotationComparisonPage() {
       <PurchaseCardFormShell
         title="Quotation Comparison"
         description="Loading…"
-        status="—"
+        status="-"
         favoritePath="/purchase/comparison"
         breadcrumbs={purchaseBreadcrumbs('Loading', {
           label: 'Comparison',
@@ -597,7 +598,7 @@ export function QuotationComparisonPage() {
       <PurchaseCardFormShell
         title="Quotation Comparison"
         description="RFQ not found"
-        status="—"
+        status="-"
         favoritePath="/purchase/comparison"
         breadcrumbs={purchaseBreadcrumbs('Not Found', {
           label: 'Comparison',
@@ -646,7 +647,7 @@ export function QuotationComparisonPage() {
         },
         {
           label: 'Lines',
-          value: comparison ? String(comparison.rows.length) : '—',
+          value: comparison ? String(comparison.rows.length) : '-',
         },
       ]}
       recordHeaderFacts={[
@@ -951,7 +952,7 @@ export function QuotationComparisonPage() {
                         <div>
                           <p className="text-erp-muted">Lead</p>
                           <p className="tabular-nums text-erp-ink">
-                            {v.bestLeadDays != null ? `${v.bestLeadDays}d` : '—'}
+                            {v.bestLeadDays != null ? `${v.bestLeadDays}d` : '-'}
                           </p>
                         </div>
                       </div>
@@ -1062,14 +1063,18 @@ export function QuotationComparisonPage() {
                       <tr key={row.itemId} className="hover:bg-erp-surface-alt/40">
                         <td className="sticky left-0 z-10 border-r border-erp-border bg-white">
                           <div className="font-mono text-[11px] font-medium">
-                            {row.itemCode || '—'}
+                            {row.itemCode || '-'}
                           </div>
                           <div className="max-w-[200px] truncate text-erp-muted">
                             {row.itemName || 'Line item'}
                           </div>
                         </td>
                         <td className="sticky left-[160px] z-10 border-r border-erp-border bg-white num whitespace-nowrap">
-                          {row.quantity} {row.uom}
+                          <PurchaseStockDualQtyCell
+                            baseQty={row.quantity}
+                            stockUom={row.uom}
+                            itemId={row.itemId}
+                          />
                         </td>
                         {vendorMetas.map((v) => {
                           const q = row.quotes.find((x) => x.vendorId === v.vendorId)
@@ -1081,16 +1086,16 @@ export function QuotationComparisonPage() {
                                   cellHighlightClass(q),
                                 )}
                               >
-                                {q ? formatCurrency(q.rate) : '—'}
+                                {q ? formatCurrency(q.rate) : '-'}
                               </td>
                               <td className={cn('num', cellHighlightClass(q))}>
-                                {q ? formatCurrency(q.landedRate) : '—'}
+                                {q ? formatCurrency(q.landedRate) : '-'}
                               </td>
                               <td className={cn('num', cellHighlightClass(q))}>
-                                {q ? `${q.leadTimeDays}d` : '—'}
+                                {q ? `${q.leadTimeDays}d` : '-'}
                               </td>
                               <td className={cellHighlightClass(q)}>
-                                {q ? complianceChip(q) : '—'}
+                                {q ? complianceChip(q) : '-'}
                               </td>
                             </Fragment>
                           )
@@ -1152,7 +1157,7 @@ export function QuotationComparisonPage() {
                     {comparison.recommendedVendorName ??
                       vendorMetas.find((v) => v.vendorId === comparison.recommendedVendorId)
                         ?.vendorName ??
-                      '—'}
+                      '-'}
                     {approvedByLabel ? ` · Approved by ${approvedByLabel}` : ''}
                   </span>
                 </div>

@@ -36,11 +36,11 @@ export function buildBomTree(
 
     return {
       ...line,
-      itemCode: item?.itemCode ?? '—',
-      itemName: item?.itemName ?? '—',
+      itemCode: item?.itemCode ?? '-',
+      itemName: item?.itemName ?? '-',
       itemType: item?.itemType ?? 'raw',
       subAssemblyRule: item?.subAssemblyRule ?? null,
-      specification: item?.materialGrade ?? item?.itemDescription ?? '—',
+      specification: item?.materialGrade ?? item?.itemDescription ?? '-',
       uomCode: getUomCode(line.uomId),
       issueWarehouseCode: getWarehouseCode(line.issueWarehouseId),
       qtyPerProduct,
@@ -141,9 +141,9 @@ export function compareBomRevisions(
     const a = codesA.get(code)
     const b = codesB.get(code)
     if (!a && b) {
-      rows.push({ field: `${code} — Added`, revA: '—', revB: b.qtyPerProduct, changed: true })
+      rows.push({ field: `${code} — Added`, revA: '-', revB: b.qtyPerProduct, changed: true })
     } else if (a && !b) {
-      rows.push({ field: `${code} — Removed`, revA: a.qtyPerProduct, revB: '—', changed: true })
+      rows.push({ field: `${code} — Removed`, revA: a.qtyPerProduct, revB: '-', changed: true })
     } else if (a && b) {
       const qtyChanged = a.qtyPerProduct !== b.qtyPerProduct
       const costChanged = a.totalCost !== b.totalCost
@@ -175,7 +175,7 @@ export function exportBomCsv(
         l.itemCode,
         `"${l.itemName}"`,
         l.nodeLevel,
-        l.subAssemblyRule ?? '—',
+        l.subAssemblyRule ?? '-',
         l.qtyPerProduct,
         l.uomCode,
         l.issueWarehouseCode,

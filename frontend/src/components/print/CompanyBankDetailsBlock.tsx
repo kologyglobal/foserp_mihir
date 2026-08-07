@@ -18,7 +18,7 @@ export function CompanyBankDetailsBlock({ bank, className }: CompanyBankDetailsB
       <dl className="doc-print-bank__grid">
         <div className="doc-print-bank__row">
           <dt>Company Name</dt>
-          <dd>{bank.accountName || '—'}</dd>
+          <dd>{bank.accountName || '-'}</dd>
         </div>
         <div className="doc-print-bank__row">
           <dt>Bank Name</dt>
@@ -26,15 +26,15 @@ export function CompanyBankDetailsBlock({ bank, className }: CompanyBankDetailsB
         </div>
         <div className="doc-print-bank__row">
           <dt>Account No</dt>
-          <dd>{bank.accountNumber || '—'}</dd>
+          <dd>{bank.accountNumber || '-'}</dd>
         </div>
         <div className="doc-print-bank__row">
           <dt>IFSC Code</dt>
-          <dd>{bank.ifscCode || '—'}</dd>
+          <dd>{bank.ifscCode || '-'}</dd>
         </div>
         <div className="doc-print-bank__row">
           <dt>Branch</dt>
-          <dd>{bank.branch || '—'}</dd>
+          <dd>{bank.branch || '-'}</dd>
         </div>
       </dl>
     </div>

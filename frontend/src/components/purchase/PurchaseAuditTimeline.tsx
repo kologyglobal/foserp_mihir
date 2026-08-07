@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Clock, FileText } from 'lucide-react'
-import { isApiMode } from '@/config/apiConfig'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import {
   getPurchaseTimelineApi,
@@ -136,7 +135,6 @@ export function PurchaseAuditTimeline({
   entityId,
   title = 'Audit Timeline',
   showTitle = true,
-  demoEvents,
   className,
 }: {
   entityType: PurchaseTimelineEntityType
@@ -144,7 +142,7 @@ export function PurchaseAuditTimeline({
   title?: string
   /** When embedded in an ErpCardSection that already has a title. */
   showTitle?: boolean
-  /** Demo-mode fallback events when API is off. */
+  /** @deprecated no longer used now that the timeline always loads from the live API. */
   demoEvents?: PurchaseTimelineEvent[]
   className?: string
 }) {
@@ -155,10 +153,6 @@ export function PurchaseAuditTimeline({
   const load = useCallback(async () => {
     if (!entityId) {
       setEvents([])
-      return
-    }
-    if (!isApiMode()) {
-      setEvents(dedupePurchaseTimelineEvents(demoEvents ?? []))
       return
     }
     setLoading(true)
@@ -172,7 +166,7 @@ export function PurchaseAuditTimeline({
     } finally {
       setLoading(false)
     }
-  }, [demoEvents, entityId, entityType])
+  }, [entityId, entityType])
 
   useEffect(() => {
     void load()

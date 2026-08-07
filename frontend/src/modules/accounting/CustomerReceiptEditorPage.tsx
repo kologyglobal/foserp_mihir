@@ -198,7 +198,7 @@ export function CustomerReceiptEditorPage({ mode }: { mode: 'new' | 'edit' }) {
   const allocationStatus =
     allocatedTotal <= 0 ? 'Unallocated' : unallocated <= 0.01 ? 'Fully Allocated' : 'Partially Allocated'
 
-  const customerName = lookups?.customers.find((c) => c.id === form.customerId)?.name ?? existing?.customerName ?? '—'
+  const customerName = lookups?.customers.find((c) => c.id === form.customerId)?.name ?? existing?.customerName ?? '-'
 
   const workspaceTabs = useMemo(
     () =>
@@ -335,7 +335,7 @@ export function CustomerReceiptEditorPage({ mode }: { mode: 'new' | 'edit' }) {
           </div>
           <div>
             <span className="text-[11px] font-semibold uppercase text-erp-muted">Amount</span>
-            <p className="font-semibold tabular-nums">{receiptAmount > 0 ? formatCurrency(receiptAmount) : '—'}</p>
+            <p className="font-semibold tabular-nums">{receiptAmount > 0 ? formatCurrency(receiptAmount) : '-'}</p>
           </div>
           <div>
             <span className="text-[11px] font-semibold uppercase text-erp-muted">Allocation</span>

@@ -1,3 +1,19 @@
+## 2026-08-07 — Dual UOM (vendor + stock qty) across entire purchase flow
+
+### Delivered
+- **`PurchaseStockDualQtyCell`** (new shared component): stacked vendor qty (top) + stock qty (bottom) for documents that store base quantities; derives factor/vendor UOM from item master via `resolveDualQtyForPrint`.
+- Dual qty added to: Planning sheet (Required / Qty to order / Net Purchase), Return detail + editor hint + print, Invoice detail lines, RFQ detail + print, Vendor Quotation detail, Quotation Comparison. (PR/PO/GRN detail+print, GRN editor, QI detail, Invoice print already had it.)
+- Removed `Purchase` / `Stock` caption labels from PO detail dual qty (values-only stacked display per user request).
+- Return/RFQ print pages now hydrate item masters so UOM codes resolve on direct print loads.
+- **Data repair** (`backend/scripts/fix-stale-muom-po-grn.ts`, verified via `probe-stale-muom-docs.ts`, no invoices/cost layers affected): PO-000086 ROD-MUOM-KG uomId Nos→KG (completes prior fix); PO-000087 PIPE-MUOM-MTR factor 1→3 (uomQty 9→27); PO-000088 MS-PIPE-DN25-KG factor 1→50 (uomQty 4→200); linked GRN-000057/58/59 lines + PO header totals recomputed from per-line GST snapshots.
+- Fixed pre-existing typecheck errors in `purchaseMappers.ts` / `purchaseApiTypes.ts` (`departmentName`, `acceptedUomQuantity`, `rejectedUomQuantity`).
+- Invoice 3-way matching panel intentionally left base-only (common comparison unit). Stock ledger / Item 360 remain base-only by design.
+
+### Tests
+`npm run typecheck` — PASS. `npx vitest run src/utils/purchaseLineUom.presentation.test.ts src/utils/purchasePrintDualQty.test.ts src/utils/purchaseTimelineDedup.test.ts src/utils/purchaseRequisitionValidation.test.ts` — **14/14 PASS**.
+
+---
+
 ## 2026-08-05 — Commercial PoS override, supply-type chrome, UTGST/cess, SO header tax
 
 ### Delivered

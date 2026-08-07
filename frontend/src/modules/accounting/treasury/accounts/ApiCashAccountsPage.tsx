@@ -247,9 +247,9 @@ export function ApiCashAccountsPage() {
                       <TableLink to={`/accounting/bank-cash/cash-accounts/${row.id}`}>{row.name}</TableLink>
                       <p className="text-[11px] text-erp-muted">{row.description || 'Treasury cash account'}</p>
                     </td>
-                    <td className="px-3 py-2">{row.cashProfile?.locationDescription || '—'}</td>
-                    <td className="px-3 py-2">{row.cashProfile?.custodianName || '—'}</td>
-                    <td className="px-3 py-2 tabular-nums">{row.cashProfile?.imprestLimit || '—'}</td>
+                    <td className="px-3 py-2">{row.cashProfile?.locationDescription || '-'}</td>
+                    <td className="px-3 py-2">{row.cashProfile?.custodianName || '-'}</td>
+                    <td className="px-3 py-2 tabular-nums">{row.cashProfile?.imprestLimit || '-'}</td>
                     <td className="px-3 py-2">{row.currencyCode}</td>
                     <td className="px-3 py-2"><StatusChip status={row.status} /></td>
                   </tr>

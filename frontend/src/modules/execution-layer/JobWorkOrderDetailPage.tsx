@@ -179,12 +179,12 @@ export function JobWorkOrderDetailPage() {
               woShipments.map((s) => (
                 <tr key={s.id}>
                   <td><Link to={`/job-work/${id}/print`}>{s.challanNo}</Link></td>
-                  <td>{matLines.find((l) => l.itemId === s.itemId)?.itemCode ?? '—'}</td>
+                  <td>{matLines.find((l) => l.itemId === s.itemId)?.itemCode ?? '-'}</td>
                   <td className="num">{s.sentQty}</td>
                   <td className="num">{s.receivedQty}</td>
                   <td className="num">{s.rejectedQty}</td>
                   <td className="num">{shipmentBalance(s)}</td>
-                  <td>{s.vehicleNo ?? '—'}</td>
+                  <td>{s.vehicleNo ?? '-'}</td>
                   <td>{formatDate(s.expectedReturnDate)}</td>
                   <td><Badge color={statusColor(s.status)}>{formatStatus(s.status)}</Badge></td>
                 </tr>

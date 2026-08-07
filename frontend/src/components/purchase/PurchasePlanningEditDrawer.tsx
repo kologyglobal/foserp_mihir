@@ -137,7 +137,7 @@ export function PurchasePlanningEditDrawer({
               </TableLink>
             }
           />
-          <ErpViewField label="PR Line" value={row.purchaseRequisitionLineId || '—'} />
+          <ErpViewField label="PR Line" value={row.purchaseRequisitionLineId || '-'} />
           <ErpViewField label="Item" value={`${row.itemCode} — ${row.itemName}`} />
           <ErpViewField label="Required Quantity" value={String(row.requiredQuantity)} />
           <ErpViewField label="Allocated" value={String(row.allocatedQuantity || row.netPurchaseQuantity)} />
@@ -147,7 +147,7 @@ export function PurchasePlanningEditDrawer({
           <ErpViewField label="Open PO Quantity" value={String(row.openPoQuantity)} />
           <ErpViewField
             label="PO Reference"
-            value={row.purchaseOrderNumber || '—'}
+            value={row.purchaseOrderNumber || '-'}
           />
         </div>
 

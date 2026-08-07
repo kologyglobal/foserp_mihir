@@ -345,7 +345,7 @@ function ApiAccountingDashboardPage() {
                 <tr key={v.id}>
                   <td>
                     <TableLink to={`/accounting/entries/journals/${v.id}`}>
-                      {v.voucherNumber ?? v.draftReference ?? '—'}
+                      {v.voucherNumber ?? v.draftReference ?? '-'}
                     </TableLink>
                   </td>
                   <td>Journal</td>

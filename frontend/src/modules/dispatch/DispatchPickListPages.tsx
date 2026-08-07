@@ -151,7 +151,7 @@ export function DispatchPickListRegisterPage() {
             {
               accessorKey: 'assignedTo',
               header: 'Assigned',
-              cell: ({ row }) => row.original.assignedTo ?? '—',
+              cell: ({ row }) => row.original.assignedTo ?? '-',
             },
             {
               id: 'lines',
@@ -328,7 +328,7 @@ export function DispatchPickListDetailPage() {
           </div>
           <div>
             <dt className="text-muted-foreground">Assigned</dt>
-            <dd>{row.assignedTo ?? '—'}</dd>
+            <dd>{row.assignedTo ?? '-'}</dd>
           </div>
         </dl>
       </DetailSection>

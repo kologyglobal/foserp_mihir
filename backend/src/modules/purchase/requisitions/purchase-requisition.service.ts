@@ -76,13 +76,44 @@ async function loadOrThrow(tenantId: string, id: string) {
 
 type PrWithLines = NonNullable<Awaited<ReturnType<typeof repo.findPurchaseRequisitionById>>>
 
+const PR_DEPARTMENT_LEGACY_LABELS: Record<string, string> = {
+  PROD_PLAN: 'Production Planning',
+  STORES: 'Stores',
+  MAINT: 'Maintenance',
+  DISPATCH: 'Dispatch',
+  PURCHASE: 'Purchase',
+  QUALITY: 'Quality',
+}
+
+async function resolveDepartmentDisplayName(
+  tenantId: string,
+  departmentId: string | null | undefined,
+): Promise<string | null> {
+  const raw = (departmentId ?? '').trim()
+  if (!raw) return null
+  const legacy = PR_DEPARTMENT_LEGACY_LABELS[raw.toUpperCase()]
+  if (legacy) return legacy
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw)
+  const dept = await prisma.crmMaster.findFirst({
+    where: {
+      tenantId,
+      kind: 'departments',
+      deletedAt: null,
+      ...(isUuid ? { id: raw } : { OR: [{ id: raw }, { code: raw }] }),
+    },
+    select: { name: true },
+  })
+  return dept?.name?.trim() || (isUuid ? null : raw)
+}
+
 async function mapPrToDto(tenantId: string, pr: PrWithLines) {
   const userNames = await resolveUserNames(
     [pr.requestedById, pr.createdById, pr.updatedById],
     tenantId,
     prisma,
   )
-  return mapPurchaseRequisitionToDto(pr, userNames)
+  const departmentName = await resolveDepartmentDisplayName(tenantId, pr.departmentId)
+  return mapPurchaseRequisitionToDto(pr, userNames, departmentName)
 }
 
 async function mapPrListToDto(tenantId: string, items: PrWithLines[]) {

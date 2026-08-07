@@ -217,11 +217,11 @@ export function VoucherDetailPage() {
         </div>
         <div>
           <p className="text-[11px] uppercase text-erp-muted">Party</p>
-          <p className="font-medium">{voucher.partyName ?? '—'}</p>
+          <p className="font-medium">{voucher.partyName ?? '-'}</p>
         </div>
         <div>
           <p className="text-[11px] uppercase text-erp-muted">Reference</p>
-          <p className="font-medium">{voucher.referenceNo ?? '—'}</p>
+          <p className="font-medium">{voucher.referenceNo ?? '-'}</p>
         </div>
         {voucher.paymentMode ? (
           <div>

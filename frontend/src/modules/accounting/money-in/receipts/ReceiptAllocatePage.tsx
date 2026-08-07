@@ -244,7 +244,7 @@ export function ReceiptAllocatePage() {
                     const overOutstanding = rowVal > outstanding + 0.0001
                     return (
                       <tr key={item.openItemId} className={rowVal > 0 ? 'mi-allocate-table__row--active' : undefined}>
-                        <td className="mi-allocate-table__invoice">{item.invoiceNumber ?? '—'}</td>
+                        <td className="mi-allocate-table__invoice">{item.invoiceNumber ?? '-'}</td>
                         <td className="mi-allocate-table__date tabular-nums">{item.invoiceDate}</td>
                         <td className="mi-allocate-table__num tabular-nums">{formatCurrency(outstanding)}</td>
                         <td className="mi-allocate-table__alloc">

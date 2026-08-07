@@ -60,7 +60,7 @@ export function CrmLeadFormFactBox({
           <div className="crm-lead-factbox__content">
             <p className="crm-lead-factbox__value">{prospectName}</p>
             <p className="crm-lead-factbox__line">{contactPerson || 'No contact person'}</p>
-            <p className="crm-lead-factbox__line">{mobile || '—'}</p>
+            <p className="crm-lead-factbox__line">{mobile || '-'}</p>
             {customerId ? (
               <Link to={entity360CustomerPath(customerId)} className="crm-lead-factbox__link">
                 Open Company Master <ExternalLink className="h-3 w-3" />

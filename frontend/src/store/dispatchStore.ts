@@ -150,8 +150,8 @@ function toReportRow(d: DispatchPlan): DispatchReportRow {
     customerName: d.customerName,
     status: d.status,
     plannedDate: d.plannedDate,
-    trailerNo: line?.trailerNo ?? '—',
-    chassisNo: line?.chassisNo ?? '—',
+    trailerNo: line?.trailerNo ?? '-',
+    chassisNo: line?.chassisNo ?? '-',
   }
 }
 
@@ -207,7 +207,7 @@ export const useDispatchStore = create<DispatchState>()(
             salesOrderId: so.id,
             salesOrderNo: so.salesOrderNo,
             customerId: so.customerId,
-            customerName: cust?.customerName ?? '—',
+            customerName: cust?.customerName ?? '-',
             productId: wo.productId,
             productCode: product?.productCode ?? wo.outputItemCode,
             productName: product?.productName ?? wo.outputItemCode,
@@ -217,7 +217,7 @@ export const useDispatchStore = create<DispatchState>()(
             workOrderNo: wo.woNo,
             woQty: wo.qty,
             fgOnHand,
-            destination: so.deliveryLocation ?? (loc ? locationDisplayLabel(loc) : (cust ? `${cust.city}, ${cust.state}` : '—')),
+            destination: so.deliveryLocation ?? (loc ? locationDisplayLabel(loc) : (cust ? `${cust.city}, ${cust.state}` : '-')),
             locationId: so.locationId ?? null,
             requiredDate: so.requiredDate,
             finalQcPassed: true,
@@ -676,7 +676,7 @@ export const useDispatchStore = create<DispatchState>()(
           .getReadyCandidates()
           .map((c) => ({
             dispatchId: '',
-            dispatchNo: '—',
+            dispatchNo: '-',
             salesOrderNo: c.salesOrderNo,
             customerName: c.customerName,
             status: 'ready' as DispatchStatus,

@@ -181,7 +181,7 @@ export function RouteFormPage() {
             <Input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="v1" />
           </FormField>
           <FormField label="Default BOM (auto from item)">
-            <Input value={item ? `${item.bomNumber}` : '—'} disabled />
+            <Input value={item ? `${item.bomNumber}` : '-'} disabled />
           </FormField>
         </div>
         <FormField label="Remarks">

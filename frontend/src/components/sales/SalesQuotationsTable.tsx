@@ -71,7 +71,7 @@ export function SalesQuotationsTable({
         meta: { columnLabel: 'Opportunity' },
         cell: ({ row }) => {
           const no = row.original.opportunityNo ?? row.original.inquiryNo
-          if (!no) return '—'
+          if (!no) return '-'
           const path = row.original.opportunityId ? `/crm/opportunities/${row.original.opportunityId}` : undefined
           return path ? (
             <TableLink to={path}>

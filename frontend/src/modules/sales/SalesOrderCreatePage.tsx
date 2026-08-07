@@ -332,7 +332,7 @@ export function SalesOrderNewPage() {
           value: doc.id,
           label: quotationNoWithRevision(quotationNo, doc.revisionNo),
           subtitle: companyBits.join(' · '),
-          trailing: total > 0 ? formatCurrency(total) : '—',
+          trailing: total > 0 ? formatCurrency(total) : '-',
           badge: owner ? `Pending SO · ${owner}` : 'Pending SO',
           searchText: [
             quotationNo,
@@ -370,7 +370,7 @@ export function SalesOrderNewPage() {
     () => lines.map((line) => {
       const totals = computeLineTotals(line)
       const item = line.itemId ? getItem(line.itemId) : undefined
-      return { ...line, ...totals, productName: item?.itemName ?? '—' }
+      return { ...line, ...totals, productName: item?.itemName ?? '-' }
     }),
     [lines, getItem],
   )
@@ -845,7 +845,7 @@ export function SalesOrderNewPage() {
   const opportunityQuotationNo = opportunityPrefill?.quotationId
     ? getQuotation(opportunityPrefill.quotationId)?.quotationNo
     : undefined
-  const quotationDisplayNo = linkedQuotationNo ?? opportunityQuotationNo ?? '—'
+  const quotationDisplayNo = linkedQuotationNo ?? opportunityQuotationNo ?? '-'
 
   const recordTitle = fromOpportunity && opportunityPrefill
     ? opportunityPrefill.opportunityName
@@ -951,7 +951,7 @@ export function SalesOrderNewPage() {
         createMode === 'quotation' ? 'Mode: From quotation' : 'Mode: Direct sales order',
         customer?.customerName ? `Customer: ${customer.customerName}` : 'No customer',
         opportunityPrefill ? `Deal: ${opportunityPrefill.opportunityNo}` : 'No opportunity',
-        quotationDisplayNo !== '—' ? `Quote: ${quotationDisplayNo}` : 'No quotation',
+        quotationDisplayNo !== '-' ? `Quote: ${quotationDisplayNo}` : 'No quotation',
       ]}
       progressLabel="Order readiness"
       progressPercent={completionPercent}
@@ -998,10 +998,10 @@ export function SalesOrderNewPage() {
       keyDetails={[
         { label: 'Status', value: 'Draft SO' },
         { label: 'Create mode', value: modeBadgeLabel },
-        { label: 'Customer', value: customer?.customerName ?? '—' },
-        { label: 'Customer PO', value: customerPoNumber.trim() || '—' },
+        { label: 'Customer', value: customer?.customerName ?? '-' },
+        { label: 'Customer PO', value: customerPoNumber.trim() || '-' },
         { label: 'Quotation', value: quotationDisplayNo },
-        { label: 'Opportunity', value: opportunityPrefill?.opportunityNo ?? '—' },
+        { label: 'Opportunity', value: opportunityPrefill?.opportunityNo ?? '-' },
         { label: 'Lines', value: String(lines.length) },
         { label: 'Grand Total', value: formatCurrency(orderSummary.grandTotal) },
         ...(expectedDeliveryDate ? [{ label: 'Delivery', value: formatDate(expectedDeliveryDate) }] : []),
@@ -1119,7 +1119,7 @@ export function SalesOrderNewPage() {
                     ) : null}
                   </td>
                   <td className="so-pricing-td tabular-nums text-[12px] text-erp-muted">
-                    {(draft.hsnCode ?? '').trim() || (item?.hsnCode ?? '').trim() || '—'}
+                    {(draft.hsnCode ?? '').trim() || (item?.hsnCode ?? '').trim() || '-'}
                     {draft.taxScheme === 'igst' ? (
                       <div className="text-[10px] uppercase tracking-wide">IGST</div>
                     ) : draft.taxScheme === 'cgst_sgst' ? (
@@ -1276,7 +1276,7 @@ export function SalesOrderNewPage() {
             <dl className="so-customer-card__facts">
               <div className="so-customer-card__fact">
                 <dt>GSTIN</dt>
-                <dd className="tabular-nums">{customer.gstin?.trim() || '—'}</dd>
+                <dd className="tabular-nums">{customer.gstin?.trim() || '-'}</dd>
               </div>
               <div className="so-customer-card__fact">
                 <dt>Credit days</dt>
@@ -1293,7 +1293,7 @@ export function SalesOrderNewPage() {
               <div className="so-customer-card__fact">
                 <dt>Primary contact</dt>
                 <dd>
-                  {customer.contactPerson?.trim() || '—'}
+                  {customer.contactPerson?.trim() || '-'}
                   {customer.contactPerson && customer.contactPhone ? (
                     <span className="so-customer-card__contact-meta"> · {customer.contactPhone}</span>
                   ) : null}
@@ -1584,7 +1584,7 @@ export function SalesOrderNewPage() {
         </div>
         <div>
           <p className="crm-quotation-new__opp-label">Customer</p>
-          <p className="crm-quotation-new__opp-value">{customer?.customerName ?? '—'}</p>
+          <p className="crm-quotation-new__opp-value">{customer?.customerName ?? '-'}</p>
         </div>
         <div>
           <p className="crm-quotation-new__opp-label">Quotation</p>

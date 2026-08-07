@@ -18,7 +18,6 @@ import {
   type QualityInspectionPlan,
 } from '@/services/api/qualityApi'
 import type { GoodsReceiptNote } from '@/types/purchaseDomain'
-import { isApiMode } from '@/config/apiConfig'
 import { notify } from '@/store/toastStore'
 import { formatDate } from '@/utils/dates/format'
 
@@ -80,44 +79,39 @@ export function QualityInspectionCreatePage() {
           row.lines.find((l) => l.itemId)?.itemId ||
           null
 
-        if (isApiMode()) {
-          try {
-            const res = await listInspectionPlans({
-              status: 'ACTIVE',
-              category: 'INCOMING',
-              limit: 200,
-            })
-            if (cancelled) return
-            const activeIncoming = (res.data ?? []).filter(
-              (p) => p.status === 'ACTIVE' && p.category === 'INCOMING',
-            )
-            setPlans(activeIncoming)
+        try {
+          const res = await listInspectionPlans({
+            status: 'ACTIVE',
+            category: 'INCOMING',
+            limit: 200,
+          })
+          if (cancelled) return
+          const activeIncoming = (res.data ?? []).filter(
+            (p) => p.status === 'ACTIVE' && p.category === 'INCOMING',
+          )
+          setPlans(activeIncoming)
 
-            // Prefer item-specific → category-scoped → fully generic INCOMING plan.
-            let suggested: string | null = null
-            if (firstItemId) {
-              const byItem = activeIncoming.find((p) => p.itemId === firstItemId)
-              if (byItem) suggested = byItem.id
-            }
-            if (!suggested) {
-              const byCategoryOnly = activeIncoming.find(
-                (p) => !p.itemId && Boolean(p.itemCategoryId),
-              )
-              const fullyGeneric = activeIncoming.find((p) => !p.itemId && !p.itemCategoryId)
-              suggested = fullyGeneric?.id ?? byCategoryOnly?.id ?? activeIncoming[0]?.id ?? null
-            }
-            setSuggestedPlanId(suggested)
-            if (!planFromQuery && suggested) {
-              setSelectedPlanId(suggested)
-            } else if (planFromQuery) {
-              setSelectedPlanId(planFromQuery)
-            }
-          } catch {
-            // Plans optional — backend can still auto-resolve or use defaults.
-            setPlans([])
+          // Prefer item-specific → category-scoped → fully generic INCOMING plan.
+          let suggested: string | null = null
+          if (firstItemId) {
+            const byItem = activeIncoming.find((p) => p.itemId === firstItemId)
+            if (byItem) suggested = byItem.id
           }
-        } else {
-          // Demo: no plan master list — create still works with free-text / defaults.
+          if (!suggested) {
+            const byCategoryOnly = activeIncoming.find(
+              (p) => !p.itemId && Boolean(p.itemCategoryId),
+            )
+            const fullyGeneric = activeIncoming.find((p) => !p.itemId && !p.itemCategoryId)
+            suggested = fullyGeneric?.id ?? byCategoryOnly?.id ?? activeIncoming[0]?.id ?? null
+          }
+          setSuggestedPlanId(suggested)
+          if (!planFromQuery && suggested) {
+            setSelectedPlanId(suggested)
+          } else if (planFromQuery) {
+            setSelectedPlanId(planFromQuery)
+          }
+        } catch {
+          // Plans optional — backend can still auto-resolve or use defaults.
           setPlans([])
         }
       } catch (err) {
@@ -238,11 +232,11 @@ export function QualityInspectionCreatePage() {
             <span className="text-[13px] font-semibold">{grn.documentNumber}</span>
           </ErpFieldRow>
           <ErpFieldRow label="Vendor">
-            <span className="text-[13px]">{grn.vendor?.name ?? '—'}</span>
+            <span className="text-[13px]">{grn.vendor?.name ?? '-'}</span>
           </ErpFieldRow>
           <ErpFieldRow label="Receipt date">
             <span className="text-[13px]">
-              {grn.documentDate ? formatDate(grn.documentDate) : '—'}
+              {grn.documentDate ? formatDate(grn.documentDate) : '-'}
             </span>
           </ErpFieldRow>
           <ErpFieldRow label="QC lines">
@@ -250,9 +244,9 @@ export function QualityInspectionCreatePage() {
               {qcLines.length > 0
                 ? `${qcLines.length} line${qcLines.length === 1 ? '' : 's'} · ${qcLines
                     .slice(0, 3)
-                    .map((l) => l.itemCode || '—')
+                    .map((l) => l.itemCode || '-')
                     .join(', ')}${qcLines.length > 3 ? '…' : ''}`
-                : '—'}
+                : '-'}
             </span>
           </ErpFieldRow>
         </div>
@@ -299,7 +293,7 @@ export function QualityInspectionCreatePage() {
               <li className="text-erp-muted">…and more</li>
             ) : null}
           </ul>
-        ) : plans.length === 0 && isApiMode() ? (
+        ) : plans.length === 0 ? (
           <p className="mt-2 text-[12px] text-amber-800">
             No ACTIVE <span className="font-mono">INCOMING</span> plans found. Create one under
             Quality → Inspection Plans, or create this QI without a plan (default parameters).

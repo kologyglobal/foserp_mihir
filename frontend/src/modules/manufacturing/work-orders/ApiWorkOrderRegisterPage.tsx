@@ -343,7 +343,7 @@ export function ApiWorkOrderRegisterPage() {
         meta: { columnLabel: 'Customer', cellClass: 'min-w-[230px]' },
         cell: ({ row }) => (
           <EnterpriseRecordCell
-            primary={row.original.customerName?.trim() || '—'}
+            primary={row.original.customerName?.trim() || '-'}
             subtitle={row.original.customerCode || undefined}
             className="max-w-[320px]"
           />
@@ -355,7 +355,7 @@ export function ApiWorkOrderRegisterPage() {
         meta: { columnLabel: 'Order Date', cellClass: 'min-w-[120px]' },
         cell: ({ row }) => (
           <span className="whitespace-nowrap tabular-nums">
-            {row.original.orderDate ? formatDate(row.original.orderDate) : '—'}
+            {row.original.orderDate ? formatDate(row.original.orderDate) : '-'}
           </span>
         ),
       },
@@ -365,7 +365,7 @@ export function ApiWorkOrderRegisterPage() {
         meta: { columnLabel: 'Required Date', cellClass: 'min-w-[130px]' },
         cell: ({ row }) => (
           <span className="whitespace-nowrap tabular-nums">
-            {row.original.requiredDate ? formatDate(row.original.requiredDate) : '—'}
+            {row.original.requiredDate ? formatDate(row.original.requiredDate) : '-'}
           </span>
         ),
       },
@@ -393,7 +393,7 @@ export function ApiWorkOrderRegisterPage() {
           cellClass: 'min-w-[125px]',
         },
         cell: ({ row }) => (
-          <EnterpriseNumericCell value={row.original.remainingQuantity ?? '—'} />
+          <EnterpriseNumericCell value={row.original.remainingQuantity ?? '-'} />
         ),
       },
       {
@@ -476,7 +476,7 @@ export function ApiWorkOrderRegisterPage() {
                 {sourceLabel(wo)}
                 {soNo ? ` · ${soNo}` : ''}
               </p>
-              <p className="truncate text-[11px] text-erp-muted">{customer || '—'}</p>
+              <p className="truncate text-[11px] text-erp-muted">{customer || '-'}</p>
             </div>
           )
         },
@@ -502,7 +502,7 @@ export function ApiWorkOrderRegisterPage() {
           const name = row.original.currentStageName?.trim()
           const code = row.original.currentStageCode?.trim()
           if (!name && !code) {
-            return <span className="text-[12px] text-erp-muted">—</span>
+            return <span className="text-[12px] text-erp-muted">-</span>
           }
           return (
             <div className="min-w-0 max-w-[160px]">
@@ -522,7 +522,7 @@ export function ApiWorkOrderRegisterPage() {
         header: 'Due',
         cell: ({ row }) => (
           <span className="tabular-nums text-[12px] text-erp-text">
-            {row.original.requiredCompletionDate ? formatDate(row.original.requiredCompletionDate) : '—'}
+            {row.original.requiredCompletionDate ? formatDate(row.original.requiredCompletionDate) : '-'}
           </span>
         ),
       },
@@ -530,7 +530,7 @@ export function ApiWorkOrderRegisterPage() {
         id: 'supervisor',
         header: 'Supervisor',
         cell: ({ row }) => (
-          <span className="text-[12px] text-erp-text">{row.original.supervisorName?.trim() || '—'}</span>
+          <span className="text-[12px] text-erp-text">{row.original.supervisorName?.trim() || '-'}</span>
         ),
       },
       {

@@ -52,7 +52,7 @@ export function MaintenanceDashboardPage() {
               currency: 'INR',
               maximumFractionDigits: 0,
             }).format(data.maintenanceCostThisMonth)
-          : '—',
+          : '-',
     },
     { label: 'PM Due Today', value: String(data?.pmDueToday ?? 0) },
     { label: 'PM Due This Week', value: String(data?.pmDueThisWeek ?? 0) },
@@ -146,7 +146,7 @@ export function MaintenanceDashboardPage() {
                           </Link>
                           <div className="text-[12px]">{p.name}</div>
                         </td>
-                        <td className="px-3 py-2">{p.machine?.code ?? '—'}</td>
+                        <td className="px-3 py-2">{p.machine?.code ?? '-'}</td>
                         <td className="px-3 py-2 tabular-nums">{p.nextDueDate}</td>
                         <td className="px-3 py-2">{p.dueStatus}</td>
                       </tr>
@@ -202,15 +202,15 @@ function TicketMiniTable({ rows }: { rows: MaintenanceDashboard['needsAttention'
                   {row.ticketNumber}
                 </Link>
               </td>
-              <td className="px-3 py-2">{row.machine?.code ?? '—'}</td>
+              <td className="px-3 py-2">{row.machine?.code ?? '-'}</td>
               <td className="max-w-[240px] truncate px-3 py-2" title={row.problem}>
                 {row.problem}
               </td>
               <td className="px-3 py-2">
                 <StatusDot label={formatStatusLabel(row.status)} tone={maintenanceStatusTone(row.status)} />
               </td>
-              <td className="px-3 py-2 tabular-nums">{row.downtimeLabel ?? '—'}</td>
-              <td className="px-3 py-2">{row.technicianName ?? row.contractor?.name ?? '—'}</td>
+              <td className="px-3 py-2 tabular-nums">{row.downtimeLabel ?? '-'}</td>
+              <td className="px-3 py-2">{row.technicianName ?? row.contractor?.name ?? '-'}</td>
             </tr>
           ))}
         </tbody>

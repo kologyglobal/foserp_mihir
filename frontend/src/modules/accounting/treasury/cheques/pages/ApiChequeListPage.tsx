@@ -209,7 +209,7 @@ export function ApiChequeListPage() {
                         <ChequeDirectionChip direction={c.direction} />
                       </td>
                       <td className="px-2 py-1.5">{c.payeeOrDrawerName}</td>
-                      <td className="px-2 py-1.5">{c.isPdc ? formatChequeDate(c.pdcMaturityDate) : '—'}</td>
+                      <td className="px-2 py-1.5">{c.isPdc ? formatChequeDate(c.pdcMaturityDate) : '-'}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{formatChequeAmount(c.amount)}</td>
                       <td className="px-2 py-1.5">
                         <ChequeStatusChip status={c.status} />

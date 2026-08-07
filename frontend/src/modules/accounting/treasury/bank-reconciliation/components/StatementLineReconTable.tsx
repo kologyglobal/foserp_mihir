@@ -58,7 +58,7 @@ export function StatementLineReconTable({
             </div>
             <p className="mt-1 text-erp-muted">{formatDate(line.transactionDate)}</p>
             <p className="mt-1 truncate text-erp-text" title={line.description ?? undefined}>
-              {line.description ?? '—'}
+              {line.description ?? '-'}
             </p>
             <div className="mt-2 flex items-center justify-between">
               <DirectionLabel direction={line.direction} />
@@ -136,9 +136,9 @@ export function StatementLineReconTable({
                 {formatCurrency(parseDecimal(line.remainingAmount))}
               </td>
               <td className="max-w-[16rem] truncate px-2 py-1.5" title={line.description ?? undefined}>
-                {line.description ?? '—'}
+                {line.description ?? '-'}
               </td>
-              <td className="px-2 py-1.5">{line.referenceNumber ?? line.utrReference ?? line.chequeNumber ?? '—'}</td>
+              <td className="px-2 py-1.5">{line.referenceNumber ?? line.utrReference ?? line.chequeNumber ?? '-'}</td>
               <td className="px-2 py-1.5">
                 <LineMatchStatusChip status={line.matchStatus} />
               </td>

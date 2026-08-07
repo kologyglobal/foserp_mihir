@@ -270,7 +270,7 @@ export function ContractorListPage() {
                       <td>{r.supervisor}</td>
                       <td className="max-w-[150px] truncate">{r.workLocation}</td>
                       <td className="whitespace-nowrap">{formatDate(r.validUntil)}</td>
-                      <td className="whitespace-nowrap">{r.entryTime ? formatDateTime(r.entryTime) : '—'}</td>
+                      <td className="whitespace-nowrap">{r.entryTime ? formatDateTime(r.entryTime) : '-'}</td>
                       <td>
                         <InsideDuration from={r.entryTime} to={r.exitTime} />
                       </td>

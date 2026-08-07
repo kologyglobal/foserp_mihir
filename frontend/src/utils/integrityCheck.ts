@@ -56,7 +56,7 @@ export function validateManufacturingIntegrity(input: IntegrityInput): Integrity
       issues.push({
         severity: 'error',
         code: 'WO_ORPHAN_ROUTING',
-        message: `Work order ${wo.woNo} references missing routing ${wo.routingHeaderId} (${wo.routingRevision ?? '—'})`,
+        message: `Work order ${wo.woNo} references missing routing ${wo.routingHeaderId} (${wo.routingRevision ?? '-'})`,
         entityType: 'WorkOrder',
         entityId: wo.id,
         referenceId: wo.routingHeaderId,

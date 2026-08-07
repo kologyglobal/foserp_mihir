@@ -81,10 +81,10 @@ export function SerialNumberMasterPage() {
             ),
           },
           { accessorKey: 'serialType', header: 'Type', cell: ({ row }) => SERIAL_TYPE_LABELS[row.original.serialType] },
-          { accessorKey: 'itemCode', header: 'Item', cell: ({ row }) => row.original.itemCode ?? '—' },
-          { accessorKey: 'woNo', header: 'WO', cell: ({ row }) => row.original.woNo ?? '—' },
-          { accessorKey: 'grnNo', header: 'GRN', cell: ({ row }) => row.original.grnNo ?? '—' },
-          { accessorKey: 'customerName', header: 'Customer', cell: ({ row }) => row.original.customerName ?? '—' },
+          { accessorKey: 'itemCode', header: 'Item', cell: ({ row }) => row.original.itemCode ?? '-' },
+          { accessorKey: 'woNo', header: 'WO', cell: ({ row }) => row.original.woNo ?? '-' },
+          { accessorKey: 'grnNo', header: 'GRN', cell: ({ row }) => row.original.grnNo ?? '-' },
+          { accessorKey: 'customerName', header: 'Customer', cell: ({ row }) => row.original.customerName ?? '-' },
           {
             accessorKey: 'status',
             header: 'Status',
@@ -130,13 +130,13 @@ export function SerialDetailPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-lg border bg-white p-4 text-sm">
           <dl className="grid gap-2">
-            <div className="flex justify-between"><dt className="text-slate-500">Item</dt><dd>{serial.itemCode ?? '—'}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">WO</dt><dd>{serial.woNo ?? '—'}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">GRN</dt><dd>{serial.grnNo ?? '—'}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Vendor</dt><dd>{serial.vendorName ?? '—'}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Customer</dt><dd>{serial.customerName ?? '—'}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Installed Trailer</dt><dd>{serial.installedTrailerNo ?? '—'}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Created By</dt><dd>{serial.createdBy ?? '—'}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Item</dt><dd>{serial.itemCode ?? '-'}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">WO</dt><dd>{serial.woNo ?? '-'}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">GRN</dt><dd>{serial.grnNo ?? '-'}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Vendor</dt><dd>{serial.vendorName ?? '-'}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Customer</dt><dd>{serial.customerName ?? '-'}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Installed Trailer</dt><dd>{serial.installedTrailerNo ?? '-'}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Created By</dt><dd>{serial.createdBy ?? '-'}</dd></div>
           </dl>
           {serial.qrCode && (
             <div className="mt-4">
@@ -205,12 +205,12 @@ export function TrailerGenealogyPage() {
       {result && (
         <div className="space-y-4">
           <div className="grid gap-3 rounded-lg border bg-white p-4 text-sm md:grid-cols-3">
-            <div>Trailer: {result.trailerNo ?? '—'}</div>
-            <div>Chassis: {result.chassisNo ?? '—'}</div>
-            <div>WO: {result.woNo ?? '—'}</div>
-            <div>SO: {result.salesOrderNo ?? '—'}</div>
-            <div>Customer: {result.customerName ?? '—'}</div>
-            <div>QR: {result.qrCode ?? '—'}</div>
+            <div>Trailer: {result.trailerNo ?? '-'}</div>
+            <div>Chassis: {result.chassisNo ?? '-'}</div>
+            <div>WO: {result.woNo ?? '-'}</div>
+            <div>SO: {result.salesOrderNo ?? '-'}</div>
+            <div>Customer: {result.customerName ?? '-'}</div>
+            <div>QR: {result.qrCode ?? '-'}</div>
           </div>
           {trailerQr && (
             <div className="rounded-lg border bg-white p-4">
@@ -265,7 +265,7 @@ export function ComponentGenealogyPage() {
   if (!result) {
     return (
       <OperationalPageShell title="Component Not Found" description="">
-        <p className="text-sm text-slate-600">No serial record found for {decoded || '—'}.</p>
+        <p className="text-sm text-slate-600">No serial record found for {decoded || '-'}.</p>
       </OperationalPageShell>
     )
   }
@@ -277,11 +277,11 @@ export function ComponentGenealogyPage() {
       badge={SERIAL_STATUS_LABELS[result.serial.status]}
     >
       <div className="mb-4 grid gap-3 rounded-lg border bg-white p-4 text-sm md:grid-cols-2">
-        <div>Vendor: {result.serial.vendorName ?? '—'}</div>
-        <div>GRN: {result.serial.grnNo ?? '—'}</div>
-        <div>WO: {result.serial.woNo ?? '—'}</div>
-        <div>Installed Trailer: {result.installedTrailerNo ?? '—'}</div>
-        <div>Customer: {result.customerName ?? '—'}</div>
+        <div>Vendor: {result.serial.vendorName ?? '-'}</div>
+        <div>GRN: {result.serial.grnNo ?? '-'}</div>
+        <div>WO: {result.serial.woNo ?? '-'}</div>
+        <div>Installed Trailer: {result.installedTrailerNo ?? '-'}</div>
+        <div>Customer: {result.customerName ?? '-'}</div>
       </div>
       <div className="rounded-lg border bg-white p-4">
         <Timeline
@@ -320,10 +320,10 @@ export function WarrantyInvestigationPage() {
         <div className="space-y-4">
           <div className="grid gap-3 rounded-lg border bg-white p-4 text-sm md:grid-cols-3">
             <div>Trailer: {result.trailerNo}</div>
-            <div>Chassis: {result.chassisNo ?? '—'}</div>
-            <div>Customer: {result.customerName ?? '—'}</div>
-            <div>Dispatch: {result.dispatchDate ? formatDate(result.dispatchDate) : '—'}</div>
-            <div>Invoice: {result.invoiceNo ?? '—'}</div>
+            <div>Chassis: {result.chassisNo ?? '-'}</div>
+            <div>Customer: {result.customerName ?? '-'}</div>
+            <div>Dispatch: {result.dispatchDate ? formatDate(result.dispatchDate) : '-'}</div>
+            <div>Invoice: {result.invoiceNo ?? '-'}</div>
           </div>
           <Section title="Components" rows={result.components.map((c) => `${c.serialNo} (${SERIAL_TYPE_LABELS[c.serialType]})`)} />
           <Section title="QC Records" rows={result.qcRecords.map((r) => `${r.refNo} — ${r.details}`)} />

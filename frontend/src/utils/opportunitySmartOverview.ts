@@ -347,7 +347,7 @@ export function buildOpportunityKeyDetails(input: OpportunitySmartOverviewInput)
     },
     {
       label: 'Weighted',
-      value: input.weightedValue > 0 ? formatCurrency(input.weightedValue) : '—',
+      value: input.weightedValue > 0 ? formatCurrency(input.weightedValue) : '-',
       muted: input.weightedValue <= 0,
     },
     {

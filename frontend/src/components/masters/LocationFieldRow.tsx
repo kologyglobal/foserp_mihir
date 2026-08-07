@@ -40,7 +40,7 @@ export function LocationFieldRow({
       horizontal={horizontal}
     >
       {readOnly ? (
-        <span className="text-sm text-erp-text">{value ? getLocationName(value) : '—'}</span>
+        <span className="text-sm text-erp-text">{value ? getLocationName(value) : '-'}</span>
       ) : (
         <LocationSelect
           compact

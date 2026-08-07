@@ -37,7 +37,7 @@ function formatPodStatus(status: string | null | undefined): string {
 function formatBlockers(row: DispatchLineInvoiceReadyDto): string {
   if (row.blockers && row.blockers.length > 0) return row.blockers.join('; ')
   if (row.podBlocksInvoice) return 'Waiting on POD'
-  return '—'
+  return '-'
 }
 
 export function InvoiceReadyPage() {
@@ -305,10 +305,10 @@ export function InvoiceReadyPage() {
                           {row.salesOrderNo ?? row.salesOrderId.slice(0, 8)}
                         </Link>
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
-                    <td className="px-3 py-2">{row.customerName ?? '—'}</td>
+                    <td className="px-3 py-2">{row.customerName ?? '-'}</td>
                     <td className="px-3 py-2">
                       {row.itemCode ? `${row.itemCode} — ` : ''}
                       {row.itemName ?? row.itemId.slice(0, 8)}
@@ -324,7 +324,7 @@ export function InvoiceReadyPage() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-[11px]">{formatBlockers(row)}</td>
-                    <td className="px-3 py-2">{row.deliveryChallanNumber ?? '—'}</td>
+                    <td className="px-3 py-2">{row.deliveryChallanNumber ?? '-'}</td>
                   </tr>
                 )
               })}

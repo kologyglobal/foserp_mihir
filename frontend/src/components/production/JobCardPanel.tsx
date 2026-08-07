@@ -123,13 +123,13 @@ export function JobCardPanel({
             {isCompleted ? (
               <>
                 <dl className="grid gap-3 sm:grid-cols-2">
-                  <JobField icon={Users} label="Assigned" value={jobCard.assignedTeam ?? '—'} />
-                  <JobField icon={Clock} label="Start" value={jobCard.startTime ?? '—'} />
-                  <JobField icon={Clock} label="End" value={jobCard.endTime ?? '—'} />
-                  <JobField icon={Clock} label="Hours" value={jobCard.actualHours?.toFixed(1) ?? '—'} />
+                  <JobField icon={Users} label="Assigned" value={jobCard.assignedTeam ?? '-'} />
+                  <JobField icon={Clock} label="Start" value={jobCard.startTime ?? '-'} />
+                  <JobField icon={Clock} label="End" value={jobCard.endTime ?? '-'} />
+                  <JobField icon={Clock} label="Hours" value={jobCard.actualHours?.toFixed(1) ?? '-'} />
                   <div className="sm:col-span-2">
                     <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Remarks</dt>
-                    <dd className="mt-1 text-[13px] text-erp-text">{jobCard.remarks || '—'}</dd>
+                    <dd className="mt-1 text-[13px] text-erp-text">{jobCard.remarks || '-'}</dd>
                   </div>
                 </dl>
                 {jobCard.qcChecks?.length > 0 && (

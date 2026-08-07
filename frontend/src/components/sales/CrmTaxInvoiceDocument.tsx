@@ -24,7 +24,7 @@ export function CrmTaxInvoiceDocument({ invoice, className }: CrmTaxInvoiceDocum
   const { gst } = invoice
   const company = useCompanyProfile()
   const bank = company.bankDetails
-  const billTo = invoice.billingAddress?.trim() || invoice.customerAddress || '—'
+  const billTo = invoice.billingAddress?.trim() || invoice.customerAddress || '-'
   const shipTo = invoice.shippingAddress?.trim() || invoice.customerAddress || billTo
 
   return (
@@ -93,9 +93,9 @@ export function CrmTaxInvoiceDocument({ invoice, className }: CrmTaxInvoiceDocum
           <p className="so-print-party__label">Bill to</p>
           <p className="so-print-party__name">{invoice.customerName}</p>
           <p className="so-print-party__line">{billTo}</p>
-          <p className="so-print-party__line">GSTIN: {invoice.customerGstin || '—'}</p>
-          <p className="so-print-party__line">State: {invoice.customerState || '—'}</p>
-          <p className="so-print-party__line">Place of supply: {invoice.placeOfSupply || '—'}</p>
+          <p className="so-print-party__line">GSTIN: {invoice.customerGstin || '-'}</p>
+          <p className="so-print-party__line">State: {invoice.customerState || '-'}</p>
+          <p className="so-print-party__line">Place of supply: {invoice.placeOfSupply || '-'}</p>
         </section>
 
         <section className="so-print-party">
@@ -133,7 +133,7 @@ export function CrmTaxInvoiceDocument({ invoice, className }: CrmTaxInvoiceDocum
                 <span className="pi-print-table__desc">{line.description || line.itemCode}</span>
                 {line.itemCode ? <span className="pi-print-table__code">{line.itemCode}</span> : null}
               </td>
-              <td>{line.hsnCode || '—'}</td>
+              <td>{line.hsnCode || '-'}</td>
               <td className="num">{formatNumber(line.qty)}</td>
               <td>{line.uom || 'Nos'}</td>
               <td className="num">{formatCurrency(line.unitPrice)}</td>

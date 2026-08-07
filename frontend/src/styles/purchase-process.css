@@ -615,6 +615,41 @@ a.purchase-process-map__step:hover {
   max-width: 100%;
 }
 
+/*
+ * Quality Inspection parameters table — same minmax(0) trap as doc lines:
+ * wide checklist must scroll inside the section, not expand the whole page.
+ */
+.enterprise-workspace--purchase.purchase-qi-form-page .purchase-qi-parameters-section {
+  overflow: visible;
+}
+
+.enterprise-workspace--purchase.purchase-qi-form-page .purchase-qi-parameters-section .erp-card-section__body {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.enterprise-workspace--purchase.purchase-qi-form-page .purchase-qi-parameters-section .erp-card-section__grid,
+.enterprise-workspace--purchase.purchase-qi-form-page .purchase-qi-parameters-section .erp-card-section__grid--cols-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.enterprise-workspace--purchase.purchase-qi-form-page .purchase-qi-parameters-section .erp-card-section__grid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.enterprise-workspace--purchase.purchase-qi-form-page .purchase-qi-parameters-scroll {
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.enterprise-workspace--purchase.purchase-qi-form-page .erp-card-form-page__main,
+.enterprise-workspace--purchase.purchase-qi-form-page .erp-card-form-page__content,
+.enterprise-workspace--purchase.purchase-qi-form-page .erp-card-form-page__sections {
+  min-width: 0;
+  max-width: 100%;
+}
+
 /* PR form cards use overflow:hidden for rounded corners — disable on line grid section so sticky columns work. */
 .enterprise-workspace--purchase.purchase-pr-form-page .erp-card-section.purchase-doc-lines-section,
 .enterprise-workspace--purchase.purchase-pr-form-page .erp-card-section.purchase-pr-lines-section {
@@ -855,6 +890,121 @@ a.purchase-process-map__step:hover {
   min-width: 5.5rem;
 }
 
+/* Receive UOM — vertically center against the received-qty input's height (fixes
+   misaligned unit text vs the taller input cell that broke visually on wide grids). */
+.grn-lines-grid .purchase-doc-lines-grid__uom-col {
+  min-height: 2.5rem;
+  vertical-align: middle;
+  padding-top: 8px !important;
+}
+
+/* Bin column — explicit width so codes like "AHMD-PLT-B04" don't get clipped. */
+.grn-lines-grid__bin-col {
+  width: 10rem !important;
+  min-width: 10rem !important;
+  max-width: 11rem !important;
+  padding: 6px 8px !important;
+  vertical-align: top;
+}
+
+.grn-lines-grid__bin-col .erp-input,
+.grn-lines-grid__bin-col select {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Tolerance column — merged allowed-qty / variance / status (replaces 3 cramped columns). */
+.grn-lines-grid__tolerance-col {
+  width: 15rem !important;
+  min-width: 15rem !important;
+  max-width: 17rem !important;
+  padding: 8px !important;
+  vertical-align: top;
+  white-space: normal;
+}
+
+.grn-tolerance-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.grn-tolerance-cell__band {
+  margin: 0;
+  font-size: 11px;
+  color: var(--erp-muted, #64748b);
+}
+
+.grn-tolerance-cell__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.grn-tolerance-cell__variance {
+  font-size: 11px;
+  color: var(--erp-muted, #64748b);
+}
+
+.grn-tolerance-cell__alert {
+  margin-top: 2px;
+  border-radius: 6px;
+  border: 1px solid var(--erp-danger-border, #fecaca);
+  background: var(--erp-danger-bg, #fef2f2);
+  padding: 6px 8px;
+}
+
+.grn-tolerance-cell__alert p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--erp-danger-fg, #b91c1c);
+}
+
+.grn-tolerance-cell__reason {
+  margin-top: 4px !important;
+  font-style: italic;
+  color: var(--erp-text, #0f172a) !important;
+}
+
+.grn-tolerance-cell__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.grn-tolerance-cell__action {
+  border-radius: 4px;
+  border: 1px solid var(--erp-border-strong, #cbd5e1);
+  background: #fff;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--erp-text, #0f172a);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.grn-tolerance-cell__action:hover {
+  background: var(--erp-surface-alt, #f8fafc);
+}
+
+.grn-tolerance-cell__action--muted {
+  color: var(--erp-muted, #64748b);
+}
+
+.grn-tolerance-cell__weight {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--erp-muted, #64748b);
+}
+
 /* PI lines: sticky # then Item (no Product Type column like PO) */
 .purchase-invoice-lines-grid .purchase-doc-lines-grid__sticky-item {
   left: 2.5rem;
@@ -898,6 +1048,61 @@ a.purchase-process-map__step:hover {
 .purchase-doc-lines-grid__qty-col {
   min-width: 11rem;
   width: 11rem;
+}
+
+/** PO/GRN line qty — vendor UOM primary, stock UOM secondary (matches 12px doc table body). */
+.purchase-dual-qty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  min-height: 2.25rem;
+}
+
+.purchase-dual-qty__primary {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--erp-text, #0f172a);
+  white-space: nowrap;
+}
+
+.purchase-dual-qty__secondary {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--erp-muted, #64748b);
+  white-space: nowrap;
+}
+
+.purchase-dual-qty__label {
+  display: block;
+  margin-bottom: 1px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--erp-muted, #64748b);
+  line-height: 1.2;
+}
+
+.purchase-dual-qty--single .purchase-dual-qty__primary {
+  font-weight: 500;
+}
+
+.purchase-order-detail-lines .purchase-dual-qty {
+  min-height: 2.5rem;
+}
+
+.purchase-order-detail-lines__col-qty,
+.purchase-order-detail-lines__col-tracking {
+  font-size: 12px;
+}
+
+.purchase-order-detail-lines__col-qty .purchase-dual-qty,
+.purchase-order-detail-lines__col-tracking .purchase-dual-qty {
+  width: 100%;
 }
 
 .purchase-doc-lines-grid {

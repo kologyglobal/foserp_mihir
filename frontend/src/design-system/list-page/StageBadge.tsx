@@ -17,13 +17,13 @@ const OPP_STAGE_TONE: Record<string, 'success' | 'warning' | 'critical' | 'info'
 
 /** Standard stage badge for lead + opportunity pipeline stages (Dynamics chip family). */
 export function StageBadge({ stage, label }: { stage?: string; label?: string }) {
-  if (!stage && !label) return <DynamicsStatusChip label="—" tone="neutral" />
+  if (!stage && !label) return <DynamicsStatusChip label="-" tone="neutral" />
   const oppTone = stage ? OPP_STAGE_TONE[stage] : undefined
   if (oppTone) {
     return <DynamicsStatusChip label={label ?? stage!} tone={oppTone} />
   }
   const leadStage = stage ? migrateLeadStage(stage as LeadStage) : undefined
-  const text = label ?? (leadStage ? leadStageLabel(leadStage) : '—')
+  const text = label ?? (leadStage ? leadStageLabel(leadStage) : '-')
   const tone = leadStage ? leadStageChipTone(leadStage) : 'neutral'
   return <DynamicsStatusChip label={text} tone={tone} />
 }

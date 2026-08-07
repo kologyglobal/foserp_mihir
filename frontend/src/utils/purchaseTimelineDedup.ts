@@ -34,15 +34,21 @@ function mergeTimelinePair(
   }
 }
 
+function lifecycleDedupeTimeKey(timestamp: string, bucket: string | null): string {
+  if (bucket) return timestamp.slice(0, 16)
+  return timestamp.slice(0, 19)
+}
+
 /** Collapse audit + status_history pairs that describe the same lifecycle moment. */
 export function dedupePurchaseTimelineEvents(events: PurchaseTimelineEvent[]): PurchaseTimelineEvent[] {
   const byKey = new Map<string, PurchaseTimelineEvent>()
 
   for (const event of events) {
     const bucket = lifecycleBucket(event.action)
+    const timeKey = lifecycleDedupeTimeKey(event.timestamp, bucket)
     const key = bucket
-      ? `lc:${bucket}|${event.timestamp.slice(0, 19)}|${event.actorId ?? ''}`
-      : `raw:${event.source}|${event.action}|${event.timestamp.slice(0, 19)}|${event.id}`
+      ? `lc:${bucket}|${timeKey}|${event.actorId ?? ''}`
+      : `raw:${event.source}|${event.action}|${timeKey}|${event.id}`
 
     const existing = byKey.get(key)
     byKey.set(key, existing ? mergeTimelinePair(existing, event) : event)

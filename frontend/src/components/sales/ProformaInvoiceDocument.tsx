@@ -25,7 +25,7 @@ export function ProformaInvoiceDocument({ proforma, className }: ProformaInvoice
   const company = useCompanyProfile()
   const isServices = useTenantProfileStore((s) => s.isServices())
   const bank = company.bankDetails
-  const billTo = proforma.billingAddress?.trim() || proforma.customerAddress || '—'
+  const billTo = proforma.billingAddress?.trim() || proforma.customerAddress || '-'
   const shipTo = proforma.shippingAddress?.trim() || proforma.customerAddress || billTo
 
   return (
@@ -78,19 +78,19 @@ export function ProformaInvoiceDocument({ proforma, className }: ProformaInvoice
           <p className="so-print-party__label">Bill to</p>
           <p className="so-print-party__name">{proforma.customerName}</p>
           <p className="so-print-party__line">{billTo}</p>
-          <p className="so-print-party__line">GSTIN: {proforma.customerGstin || '—'}</p>
-          <p className="so-print-party__line">State: {proforma.customerState || '—'}</p>
-          <p className="so-print-party__line">Place of supply: {proforma.placeOfSupply || '—'}</p>
+          <p className="so-print-party__line">GSTIN: {proforma.customerGstin || '-'}</p>
+          <p className="so-print-party__line">State: {proforma.customerState || '-'}</p>
+          <p className="so-print-party__line">Place of supply: {proforma.placeOfSupply || '-'}</p>
         </section>
 
         {isServices && bank ? (
           <section className="so-print-party">
             <p className="so-print-party__label">Bank details</p>
-            <p className="so-print-party__name">{bank.accountName || '—'}</p>
-            <p className="so-print-party__line"><span>Bank</span> {bank.bankName || '—'}</p>
-            <p className="so-print-party__line"><span>A/C No.</span> {bank.accountNumber || '—'}</p>
-            <p className="so-print-party__line"><span>IFSC</span> {bank.ifscCode || '—'}</p>
-            <p className="so-print-party__line"><span>Branch</span> {bank.branch || '—'}</p>
+            <p className="so-print-party__name">{bank.accountName || '-'}</p>
+            <p className="so-print-party__line"><span>Bank</span> {bank.bankName || '-'}</p>
+            <p className="so-print-party__line"><span>A/C No.</span> {bank.accountNumber || '-'}</p>
+            <p className="so-print-party__line"><span>IFSC</span> {bank.ifscCode || '-'}</p>
+            <p className="so-print-party__line"><span>Branch</span> {bank.branch || '-'}</p>
           </section>
         ) : (
           <section className="so-print-party">
@@ -125,7 +125,7 @@ export function ProformaInvoiceDocument({ proforma, className }: ProformaInvoice
                 <span className="pi-print-table__desc">{line.description}</span>
                 {line.itemCode ? <span className="pi-print-table__code">{line.itemCode}</span> : null}
               </td>
-              <td>{line.hsnCode || '—'}</td>
+              <td>{line.hsnCode || '-'}</td>
               <td className="num">{formatNumber(line.qty)}</td>
               <td>{line.uom || 'Nos'}</td>
               <td className="num">{formatCurrency(line.unitPrice)}</td>
@@ -194,11 +194,11 @@ export function ProformaInvoiceDocument({ proforma, className }: ProformaInvoice
 
       <section className="so-print-party so-print-party--meta so-print-commercial">
         <p className="so-print-party__label">Commercial</p>
-        <p className="so-print-party__line"><span>Payment</span> {proforma.paymentTerms || '—'}</p>
-        <p className="so-print-party__line"><span>Delivery</span> {proforma.deliveryTerms || '—'}</p>
-        <p className="so-print-party__line"><span>Customer PO</span> {proforma.customerPoNumber || '—'}</p>
-        <p className="so-print-party__line"><span>Sales order</span> {proforma.salesOrderNo || '—'}</p>
-        <p className="so-print-party__line"><span>Quotation</span> {proforma.quotationNo || '—'}</p>
+        <p className="so-print-party__line"><span>Payment</span> {proforma.paymentTerms || '-'}</p>
+        <p className="so-print-party__line"><span>Delivery</span> {proforma.deliveryTerms || '-'}</p>
+        <p className="so-print-party__line"><span>Customer PO</span> {proforma.customerPoNumber || '-'}</p>
+        <p className="so-print-party__line"><span>Sales order</span> {proforma.salesOrderNo || '-'}</p>
+        <p className="so-print-party__line"><span>Quotation</span> {proforma.quotationNo || '-'}</p>
         <p className="so-print-party__line"><span>GST</span> {gstSchemeLabel(gst.scheme)}</p>
       </section>
 

@@ -32,8 +32,8 @@ function inventoryApi() {
 
 function logWipMovementActivity(woId: string, result: WipMovementResult, operationName: string) {
   if (!result.ok || result.skipped) return
-  const from = result.fromWarehouseCode ?? '—'
-  const to = result.toWarehouseCode ?? '—'
+  const from = result.fromWarehouseCode ?? '-'
+  const to = result.toWarehouseCode ?? '-'
   const type = result.referenceType ?? 'WIP_TRANSFER'
   useWorkOrderStore.getState().appendActivity(
     woId,

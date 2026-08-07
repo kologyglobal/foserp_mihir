@@ -49,6 +49,8 @@ function baseDraft(overrides: Partial<GrnLineDraft> = {}): GrnLineDraft {
     tolerancePercentage: 0,
     variancePercentage: null,
     toleranceStatus: 'EXACT',
+    maximumAllowedQty: 100,
+    maximumAllowedWeight: null,
     receivingCondition: 'NORMAL',
     receivingConditionReason: '',
     closeOpenQuantity: false,

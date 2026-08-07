@@ -63,7 +63,7 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px] text-erp-text">{value || '—'}</dd>
+      <dd className="mt-0.5 text-[13px] text-erp-text">{value || '-'}</dd>
     </div>
   )
 }
@@ -151,7 +151,7 @@ export function AccountCardPage() {
   )
 
   const dimLabel = (id: string | null, list: { id: string; code: string; name: string }[]) => {
-    if (!id) return '—'
+    if (!id) return '-'
     const found = list.find((d) => d.id === id)
     return found ? `${found.code} — ${found.name}` : id
   }
@@ -336,13 +336,13 @@ export function AccountCardPage() {
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Account Code" value={account.code} />
             <Field label="Account Name" value={account.name} />
-            <Field label="Alias" value={account.alias || '—'} />
+            <Field label="Alias" value={account.alias || '-'} />
             <Field label="Type" value={account.accountType} />
             <Field label="Category" value={account.category} />
             <Field label="Normal Balance" value={account.normalBalance} />
             <Field label="Active" value={account.active ? 'Yes' : 'No'} />
             <Field label="System Account" value={account.systemAccount ? 'Yes' : 'No'} />
-            <Field label="Description" value={account.description || '—'} />
+            <Field label="Description" value={account.description || '-'} />
           </dl>
         ) : null}
 
@@ -391,7 +391,7 @@ export function AccountCardPage() {
             <Field label="Manual Journal Posting" value={account.posting.allowManualJournalPosting ? 'Yes' : 'No'} />
             <Field label="Reconciliation Required" value={account.posting.reconciliationRequired ? 'Yes' : 'No'} />
             <Field label="Control Account" value={account.posting.isControlAccount ? 'Yes' : 'No'} />
-            <Field label="Control Account Type" value={account.posting.controlAccountType ?? '—'} />
+            <Field label="Control Account Type" value={account.posting.controlAccountType ?? '-'} />
             <Field label="Allow Opening Balance" value={account.posting.allowOpeningBalance ? 'Yes' : 'No'} />
             <Field label="Cost Centre Required" value={account.posting.costCentreRequired ? 'Yes' : 'No'} />
             <Field label="Project Required" value={account.posting.projectRequired ? 'Yes' : 'No'} />
@@ -411,7 +411,7 @@ export function AccountCardPage() {
             <Field label="TCS Relevant" value={account.tax.tcsRelevant ? 'Yes' : 'No'} />
             <Field label="Reverse Charge" value={account.tax.reverseChargeApplicable ? 'Yes' : 'No'} />
             <Field label="Statutory Account" value={account.tax.statutoryAccount ? 'Yes' : 'No'} />
-            <Field label="Compliance Notes" value={account.tax.complianceNotes || '—'} />
+            <Field label="Compliance Notes" value={account.tax.complianceNotes || '-'} />
           </dl>
         ) : null}
 
@@ -428,7 +428,7 @@ export function AccountCardPage() {
             <Field label="Production Variance" value={account.manufacturing.productionVarianceAccount ? 'Yes' : 'No'} />
             <Field label="Scrap" value={account.manufacturing.scrapAccount ? 'Yes' : 'No'} />
             <Field label="Overhead" value={account.manufacturing.overheadAccount ? 'Yes' : 'No'} />
-            <Field label="Cost Element" value={account.manufacturing.costElementType ?? '—'} />
+            <Field label="Cost Element" value={account.manufacturing.costElementType ?? '-'} />
           </dl>
         ) : null}
 

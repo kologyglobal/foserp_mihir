@@ -6,7 +6,6 @@ import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Package } from 'lucide-react'
-import { isApiMode } from '@/config/apiConfig'
 import { listInventoryLedger, type InventoryStockMovement } from '@/services/api/inventoryApi'
 import type { ItemTimelineEvent } from '@/types/operationalStockViews'
 import { formatDate } from '@/utils/dates/format'
@@ -45,11 +44,6 @@ export function InventoryTimelinePage() {
     void token
     setLoading(true)
     try {
-      if (!isApiMode()) {
-        // Demo: seed a few placeholder timeline events from a known path if any stock 360 has timeline
-        setEvents([])
-        return
-      }
       const res = await listInventoryLedger({ page: 1, limit: 100 })
       const rows = (res.data ?? []).map(mapMovement)
       rows.sort((a, b) => b.at.localeCompare(a.at))
@@ -77,7 +71,6 @@ export function InventoryTimelinePage() {
       badge="Store"
       title="Inventory Timeline"
       description="Chronological ledger activity — GRNs and documents stay unmerged; each row is an immutable movement."
-      backLink={{ to: '/inventory', label: 'Store Dashboard' }}
       breadcrumbs={[
         { label: 'Store', to: '/inventory' },
         { label: 'Timeline' },
@@ -100,7 +93,7 @@ export function InventoryTimelinePage() {
         />
       )}
     >
-      <div className="store-chip-row mb-3">
+      <div className="mb-3 store-chip-row">
         {(['all', 'receipt', 'grn', 'issue', 'other'] as const).map((f) => (
           <button
             key={f}
@@ -118,11 +111,7 @@ export function InventoryTimelinePage() {
         <EmptyState
           icon={Package}
           title="No timeline events"
-          description={
-            isApiMode()
-              ? 'Post receipts, issues, or GRNs to populate the inventory ledger.'
-              : 'Demo mode shows empty timeline — use API mode for live ledger events.'
-          }
+          description="Post receipts, issues, or GRNs to populate the inventory ledger."
         />
       ) : null}
       {!loading && visible.length > 0 ? (

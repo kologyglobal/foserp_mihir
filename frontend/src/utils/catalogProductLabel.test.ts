@@ -52,7 +52,7 @@ describe('catalogProductLabel', () => {
   })
 
   it('never returns raw UUID when masters miss', () => {
-    expect(resolveCatalogProductLabel(item.id, { items: [], products: [] })).toBe('—')
+    expect(resolveCatalogProductLabel(item.id, { items: [], products: [] })).toBe('-')
   })
 
   it('uses line productOrItem only when not a UUID', () => {
@@ -74,7 +74,7 @@ describe('catalogProductLabel', () => {
         },
         { items: [], products: [] },
       ),
-    ).toBe('—')
+    ).toBe('-')
   })
 
   it('uses itemCodeSnapshot when present', () => {

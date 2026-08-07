@@ -613,7 +613,7 @@ export function PurchaseOrderLinesTable({
                             <input
                               className="erp-input h-8 w-full px-0.5 text-center text-[10px] uppercase"
                               disabled={!editable}
-                              value={line.uom || '—'}
+                              value={line.uom || '-'}
                               placeholder="UOM"
                               onChange={(e) =>
                                 onPatchLine(line.key, {
@@ -628,11 +628,11 @@ export function PurchaseOrderLinesTable({
                         }
                         const uomOptions = getPurchaseLineUomOptions(line.itemId)
                         const multi = uomOptions.length > 1
-                        const uomCode = uomOptions[0]?.code || line.uom || '—'
+                        const uomCode = uomOptions[0]?.code || line.uom || '-'
                         if (!editable || !line.itemId) {
                           return (
                             <span className="block text-center text-[11px] font-medium uppercase text-erp-text">
-                              {line.uom || '—'}
+                              {line.uom || '-'}
                             </span>
                           )
                         }

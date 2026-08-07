@@ -23,7 +23,7 @@ export function formatChequeDateTime(value: string | null | undefined): string {
 
 /** Best-effort masking when the backend does not supply a pre-masked account number. */
 export function maskAccountNumber(raw: string | null | undefined): string {
-  if (!raw) return '—'
+  if (!raw) return '-'
   const digits = raw.replace(/\s+/g, '')
   if (digits.length <= 4) return digits
   return `••••${digits.slice(-4)}`
@@ -31,9 +31,9 @@ export function maskAccountNumber(raw: string | null | undefined): string {
 
 /** "CODE — Name (••••1234)" account label used across selector / summary panels. */
 export function formatChequeAccountLabel(account: ChequeAccountSnapshot | undefined | null): string {
-  if (!account) return '—'
+  if (!account) return '-'
   const masked = maskAccountNumber(account.maskedNumber)
-  return [`${account.code} — ${account.name}`, masked && masked !== '—' ? `(${masked})` : null].filter(Boolean).join(' ')
+  return [`${account.code} — ${account.name}`, masked && masked !== '-' ? `(${masked})` : null].filter(Boolean).join(' ')
 }
 
 export function toIsoDateInput(value: string | null | undefined): string {

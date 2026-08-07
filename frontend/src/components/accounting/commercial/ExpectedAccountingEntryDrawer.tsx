@@ -46,18 +46,18 @@ export function ExpectedAccountingEntryDrawer({
             <tbody>
               <tr className="border-t border-erp-border">
                 <td className="py-1.5">Customer Receivable</td>
-                <td className="py-1.5 text-right">{showIllustrativeAmounts ? 'Illustrative' : '—'}</td>
-                <td className="py-1.5 text-right">—</td>
+                <td className="py-1.5 text-right">{showIllustrativeAmounts ? 'Illustrative' : '-'}</td>
+                <td className="py-1.5 text-right">-</td>
               </tr>
               <tr className="border-t border-erp-border">
                 <td className="py-1.5">Sales Revenue</td>
-                <td className="py-1.5 text-right">—</td>
-                <td className="py-1.5 text-right">{showIllustrativeAmounts ? 'Illustrative' : '—'}</td>
+                <td className="py-1.5 text-right">-</td>
+                <td className="py-1.5 text-right">{showIllustrativeAmounts ? 'Illustrative' : '-'}</td>
               </tr>
               <tr className="border-t border-erp-border">
                 <td className="py-1.5">Output CGST / SGST / IGST</td>
-                <td className="py-1.5 text-right">—</td>
-                <td className="py-1.5 text-right">{showIllustrativeAmounts ? 'Illustrative' : '—'}</td>
+                <td className="py-1.5 text-right">-</td>
+                <td className="py-1.5 text-right">{showIllustrativeAmounts ? 'Illustrative' : '-'}</td>
               </tr>
             </tbody>
           </table>

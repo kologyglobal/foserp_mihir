@@ -49,7 +49,7 @@ function computeKpis(inspections: QualityInspection[], ncrs: QualityNcr[]): Kpi[
     if (Number.isFinite(iq) && iq > 0) inspected += iq
     if (Number.isFinite(aq) && aq > 0) accepted += aq
   }
-  const fpy = inspected > 0 ? ((accepted / inspected) * 100).toFixed(1) : '—'
+  const fpy = inspected > 0 ? ((accepted / inspected) * 100).toFixed(1) : '-'
 
   return [
     { label: 'Open inspections', value: pending, tone: pending > 0 ? 'warn' : 'ok' },
@@ -57,7 +57,7 @@ function computeKpis(inspections: QualityInspection[], ncrs: QualityNcr[]): Kpi[
     { label: 'Rejected', value: rejected, tone: rejected > 0 ? 'bad' : 'neutral' },
     { label: 'Rework', value: rework, tone: rework > 0 ? 'warn' : 'neutral' },
     { label: 'Open NCRs', value: openNcrs, tone: openNcrs > 0 ? 'bad' : 'ok' },
-    { label: 'First-pass yield', value: fpy === '—' ? '—' : `${fpy}%`, hint: 'Accepted ÷ inspected qty', tone: 'neutral' },
+    { label: 'First-pass yield', value: fpy === '-' ? '-' : `${fpy}%`, hint: 'Accepted ÷ inspected qty', tone: 'neutral' },
   ]
 }
 
@@ -303,8 +303,8 @@ export function ApiQualityReportsPage() {
                       <td className="max-w-[14rem] truncate px-4 py-2" title={row.title}>
                         {row.title}
                       </td>
-                      <td className="px-4 py-2">{row.decision?.replace(/_/g, ' ') ?? '—'}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{row.inspectedQty ?? '—'}</td>
+                      <td className="px-4 py-2">{row.decision?.replace(/_/g, ' ') ?? '-'}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{row.inspectedQty ?? '-'}</td>
                       <td className="px-4 py-2 text-erp-muted">{formatDateTime(row.requestedAt)}</td>
                       <td className="px-4 py-2">
                         <StatusDot label={row.status.toLowerCase()} tone={statusTone(row.status)} />

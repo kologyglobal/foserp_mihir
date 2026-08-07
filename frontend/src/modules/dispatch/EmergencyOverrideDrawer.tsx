@@ -54,7 +54,7 @@ export function EmergencyOverrideDrawer({
   onSubmit,
 }: Props) {
   const hardBlocked = neverOverridableBlockers.length > 0
-  const primaryCode = blockers[0]?.code ?? '—'
+  const primaryCode = blockers[0]?.code ?? '-'
 
   const [businessReason, setBusinessReason] = useState('')
   const [urgency, setUrgency] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | ''>('HIGH')
@@ -161,7 +161,7 @@ export function EmergencyOverrideDrawer({
             <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Blockers</dt>
             <dd className="mt-1 space-y-1">
               {blockers.length === 0 ? (
-                <span className="text-erp-muted">—</span>
+                <span className="text-erp-muted">-</span>
               ) : (
                 blockers.map((b) => (
                   <div key={b.code} className="rounded border border-erp-border/80 bg-erp-surface/50 px-2 py-1">

@@ -333,7 +333,7 @@ export function DispatchPackingDetailPage() {
           </div>
           <div>
             <dt className="text-muted-foreground">Assigned</dt>
-            <dd>{row.assignedTo ?? '—'}</dd>
+            <dd>{row.assignedTo ?? '-'}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Picked</dt>
@@ -398,7 +398,7 @@ export function DispatchPackingDetailPage() {
             {
               accessorKey: 'packageReference',
               header: 'Reference',
-              cell: ({ row: r }) => r.original.packageReference ?? '—',
+              cell: ({ row: r }) => r.original.packageReference ?? '-',
             },
           ]}
         />

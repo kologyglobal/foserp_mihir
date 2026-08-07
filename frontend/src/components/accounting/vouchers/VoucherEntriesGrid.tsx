@@ -111,7 +111,7 @@ export function VoucherEntriesGrid({
                 </td>
                 <td className="px-2 py-1.5 text-right">
                   {readOnly ? (
-                    <span className="tabular-nums">{line.debit ? formatCurrency(line.debit) : '—'}</span>
+                    <span className="tabular-nums">{line.debit ? formatCurrency(line.debit) : '-'}</span>
                   ) : (
                     <Input
                       className="text-right"
@@ -127,7 +127,7 @@ export function VoucherEntriesGrid({
                 </td>
                 <td className="px-2 py-1.5 text-right">
                   {readOnly ? (
-                    <span className="tabular-nums">{line.credit ? formatCurrency(line.credit) : '—'}</span>
+                    <span className="tabular-nums">{line.credit ? formatCurrency(line.credit) : '-'}</span>
                   ) : (
                     <Input
                       className="text-right"
@@ -143,7 +143,7 @@ export function VoucherEntriesGrid({
                 </td>
                 <td className="px-2 py-1.5">
                   {readOnly ? (
-                    line.narration || '—'
+                    line.narration || '-'
                   ) : (
                     <Input
                       value={line.narration}
@@ -154,7 +154,7 @@ export function VoucherEntriesGrid({
                 </td>
                 <td className="px-2 py-1.5">
                   {readOnly ? (
-                    line.costCentreName || '—'
+                    line.costCentreName || '-'
                   ) : (
                     <Select
                       value={line.costCentreId ?? ''}
@@ -166,7 +166,7 @@ export function VoucherEntriesGrid({
                         })
                       }}
                     >
-                      <option value="">—</option>
+                      <option value="">-</option>
                       {costCentres.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.code} — {c.name}

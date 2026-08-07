@@ -324,7 +324,7 @@ export function Customer360Page() {
         id: 'quotation',
         header: 'Quotation',
         cell: ({ row }) => {
-          if (!row.original.quotationNo) return '—'
+          if (!row.original.quotationNo) return '-'
           const path = crmQuotationPath(row.original.quotationId)
           return path ? <TableLink to={path}>{row.original.quotationNo}</TableLink> : row.original.quotationNo
         },
@@ -334,7 +334,7 @@ export function Customer360Page() {
         header: 'Opportunity',
         cell: ({ row }) => {
           const opp = crmOpportunities.find((o) => o.id === row.original.opportunityId)
-          return opp ? <TableLink to={`/crm/opportunities/${opp.id}`}>{opp.opportunityNo}</TableLink> : '—'
+          return opp ? <TableLink to={`/crm/opportunities/${opp.id}`}>{opp.opportunityNo}</TableLink> : '-'
         },
       },
       {
@@ -693,15 +693,15 @@ export function Customer360Page() {
                 </div>
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">Industry</span>
-                  <span className="customer-360-fact__v">{customer.industry?.trim() || customer.customerType?.toUpperCase() || '—'}</span>
+                  <span className="customer-360-fact__v">{customer.industry?.trim() || customer.customerType?.toUpperCase() || '-'}</span>
                 </div>
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">Territory</span>
-                  <span className="customer-360-fact__v">{customer.salesTerritory || '—'}</span>
+                  <span className="customer-360-fact__v">{customer.salesTerritory || '-'}</span>
                 </div>
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">Owner</span>
-                  <span className="customer-360-fact__v">{customer.ownerName?.trim() || '—'}</span>
+                  <span className="customer-360-fact__v">{customer.ownerName?.trim() || '-'}</span>
                 </div>
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">Credit limit</span>
@@ -712,31 +712,31 @@ export function Customer360Page() {
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">Credit days</span>
                   <span className="customer-360-fact__v tabular-nums">
-                    {customer.creditDays != null ? `${customer.creditDays} days` : '—'}
+                    {customer.creditDays != null ? `${customer.creditDays} days` : '-'}
                   </span>
                 </div>
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">GSTIN</span>
                   <span className="customer-360-fact__v customer-360-fact__mono">
-                    {customer.gstin?.trim() || '—'}
+                    {customer.gstin?.trim() || '-'}
                   </span>
                 </div>
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">PAN</span>
                   <span className="customer-360-fact__v customer-360-fact__mono">
-                    {customer.pan?.trim() || '—'}
+                    {customer.pan?.trim() || '-'}
                   </span>
                 </div>
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">Contact</span>
-                  <span className="customer-360-fact__v">{customer.contactPerson || '—'}</span>
+                  <span className="customer-360-fact__v">{customer.contactPerson || '-'}</span>
                 </div>
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">Phone</span>
                   <span className="customer-360-fact__v tabular-nums">
                     {customer.contactPhone ? (
                       <a href={`tel:${customer.contactPhone}`} className="customer-360-fact__link">{customer.contactPhone}</a>
-                    ) : '—'}
+                    ) : '-'}
                   </span>
                 </div>
                 <div className="customer-360-fact customer-360-fact--wide">
@@ -744,7 +744,7 @@ export function Customer360Page() {
                   <span className="customer-360-fact__v">
                     {customer.contactEmail ? (
                       <a href={`mailto:${customer.contactEmail}`} className="customer-360-fact__link">{customer.contactEmail}</a>
-                    ) : '—'}
+                    ) : '-'}
                   </span>
                 </div>
                 <div className="customer-360-fact customer-360-fact--wide">
@@ -755,7 +755,7 @@ export function Customer360Page() {
                       customer.addressLine2,
                       [customer.city, customer.state, customer.pincode].filter(Boolean).join(', '),
                       customer.country,
-                    ].filter(Boolean).join(' · ') || '—'}
+                    ].filter(Boolean).join(' · ') || '-'}
                   </span>
                 </div>
                 {(customer.shippingAddress || customer.shippingCity) ? (
@@ -766,7 +766,7 @@ export function Customer360Page() {
                         customer.shippingAddress,
                         customer.shippingAddressLine2,
                         [customer.shippingCity, customer.shippingState, customer.shippingPincode].filter(Boolean).join(', '),
-                      ].filter(Boolean).join(' · ') || '—'}
+                      ].filter(Boolean).join(' · ') || '-'}
                     </span>
                   </div>
                 ) : null}
@@ -778,7 +778,7 @@ export function Customer360Page() {
                         customer.deliveryAddress,
                         customer.deliveryAddressLine2,
                         [customer.deliveryCity, customer.deliveryState, customer.deliveryPincode].filter(Boolean).join(', '),
-                      ].filter(Boolean).join(' · ') || '—'}
+                      ].filter(Boolean).join(' · ') || '-'}
                     </span>
                   </div>
                 ) : null}
@@ -800,25 +800,25 @@ export function Customer360Page() {
                 <div className="customer-360-money__cell customer-360-money__cell--primary">
                   <span className="customer-360-money__k">Outstanding</span>
                   <span className={`customer-360-money__v${financeOutstanding > 0 ? ' is-warn' : ''}`}>
-                    {financeMoneyVisible ? formatCurrency(financeOutstanding) : '—'}
+                    {financeMoneyVisible ? formatCurrency(financeOutstanding) : '-'}
                   </span>
                 </div>
                 <div className="customer-360-money__cell customer-360-money__cell--primary">
                   <span className="customer-360-money__k">Invoiced</span>
                   <span className="customer-360-money__v">
-                    {financeMoneyVisible ? formatCurrency(financeInvoiced) : '—'}
+                    {financeMoneyVisible ? formatCurrency(financeInvoiced) : '-'}
                   </span>
                 </div>
                 <div className="customer-360-money__cell customer-360-money__cell--primary">
                   <span className="customer-360-money__k">Collected</span>
                   <span className="customer-360-money__v">
-                    {financeMoneyVisible ? formatCurrency(financeCollected) : '—'}
+                    {financeMoneyVisible ? formatCurrency(financeCollected) : '-'}
                   </span>
                 </div>
                 <div className="customer-360-money__cell customer-360-money__cell--primary">
                   <span className="customer-360-money__k">Ordered</span>
                   <span className="customer-360-money__v">
-                    {financeMoneyVisible ? formatCurrency(financeOrdered) : '—'}
+                    {financeMoneyVisible ? formatCurrency(financeOrdered) : '-'}
                   </span>
                 </div>
                 <div className="customer-360-money__cell">
@@ -861,13 +861,13 @@ export function Customer360Page() {
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">Next follow-up</span>
                   <span className="customer-360-fact__v">
-                    {crmSummary?.nextFollowUpDate ? formatDate(crmSummary.nextFollowUpDate) : '—'}
+                    {crmSummary?.nextFollowUpDate ? formatDate(crmSummary.nextFollowUpDate) : '-'}
                   </span>
                 </div>
                 <div className="customer-360-fact">
                   <span className="customer-360-fact__k">Last activity</span>
                   <span className="customer-360-fact__v">
-                    {crmSummary?.lastActivityAt ? formatDate(crmSummary.lastActivityAt) : '—'}
+                    {crmSummary?.lastActivityAt ? formatDate(crmSummary.lastActivityAt) : '-'}
                   </span>
                 </div>
               </div>
@@ -913,7 +913,7 @@ export function Customer360Page() {
                     ),
                   },
                   { accessorKey: 'designation', header: 'Designation' },
-                  { accessorKey: 'department', header: 'Department', cell: ({ row }) => row.original.department || '—' },
+                  { accessorKey: 'department', header: 'Department', cell: ({ row }) => row.original.department || '-' },
                   { accessorKey: 'phone', header: 'Phone' },
                   { accessorKey: 'email', header: 'Email' },
                 ]}
@@ -1233,17 +1233,17 @@ export function Customer360Page() {
             <DynamicsKpiTile label="Dispatched" value={formatCurrency(financeDispatched)} tone="primary" />
             <DynamicsKpiTile
               label="Invoice Value"
-              value={financeMoneyVisible ? formatCurrency(financeInvoiced) : '—'}
+              value={financeMoneyVisible ? formatCurrency(financeInvoiced) : '-'}
               tone="primary"
             />
             <DynamicsKpiTile
               label="Paid Amount"
-              value={financeMoneyVisible ? formatCurrency(financeCollected) : '—'}
+              value={financeMoneyVisible ? formatCurrency(financeCollected) : '-'}
               tone="success"
             />
             <DynamicsKpiTile
               label="Outstanding"
-              value={financeMoneyVisible ? formatCurrency(financeOutstanding) : '—'}
+              value={financeMoneyVisible ? formatCurrency(financeOutstanding) : '-'}
               tone="warning"
             />
           </DynamicsKpiRow>

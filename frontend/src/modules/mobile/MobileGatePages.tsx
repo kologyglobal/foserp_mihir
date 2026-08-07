@@ -296,8 +296,8 @@ export function MobileGatePassPage() {
         <MobilePageTitle title="Gate Pass" subtitle={apiDispatch.dispatchNo} />
         <div className="mob-card">
           <div className="font-semibold">{apiDispatch.dispatchNo}</div>
-          <div className="text-sm">SO: {apiDispatch.salesOrderNo ?? '—'}</div>
-          <div className="text-sm">Ship-to: {apiDispatch.shipToAddress ?? '—'}</div>
+          <div className="text-sm">SO: {apiDispatch.salesOrderNo ?? '-'}</div>
+          <div className="text-sm">Ship-to: {apiDispatch.shipToAddress ?? '-'}</div>
           <MobileStatusChip label={apiDispatch.status} tone="blue" />
         </div>
         <Link to={`/dispatch/${apiDispatch.id}`} className="mob-btn mob-btn-secondary block text-center no-underline">
@@ -316,9 +316,9 @@ export function MobileGatePassPage() {
       <MobilePageTitle title="Gate Pass" subtitle={demoDispatch.dispatchNo} />
       <div className="mob-card">
         <div className="font-semibold">{demoDispatch.dispatchNo}</div>
-        <div className="text-sm">Vehicle: {demoDispatch.vehicleNo ?? '—'}</div>
-        <div className="text-sm">LR: {demoDispatch.lrNo ?? '—'}</div>
-        <div className="text-sm">Driver: {demoDispatch.driverName ?? '—'}</div>
+        <div className="text-sm">Vehicle: {demoDispatch.vehicleNo ?? '-'}</div>
+        <div className="text-sm">LR: {demoDispatch.lrNo ?? '-'}</div>
+        <div className="text-sm">Driver: {demoDispatch.driverName ?? '-'}</div>
         <MobileStatusChip label={demoDispatch.status} tone="blue" />
       </div>
       <Link to={`/dispatch/${demoDispatch.id}/gate-pass`} className="mob-btn mob-btn-secondary block text-center no-underline">

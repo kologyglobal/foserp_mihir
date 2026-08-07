@@ -67,7 +67,7 @@ export function MobileDispatchListPage() {
               onClick={() => navigate(`/m/dispatch/${d.id}`)}
             >
               <div className="font-semibold">{d.dispatchNo}</div>
-              <div className="text-sm">{d.salesOrderNo ?? d.customerId ?? '—'}</div>
+              <div className="text-sm">{d.salesOrderNo ?? d.customerId ?? '-'}</div>
               <MobileStatusChip label={d.status} tone="blue" />
             </button>
           ))
@@ -143,9 +143,9 @@ export function MobileDispatchDetailPage() {
       <>
         <MobilePageTitle title={apiDispatch.dispatchNo} subtitle="Confirm & post outbound" />
         <div className="mob-card">
-          <div className="text-sm">SO: {apiDispatch.salesOrderNo ?? '—'}</div>
+          <div className="text-sm">SO: {apiDispatch.salesOrderNo ?? '-'}</div>
           <div className="text-sm">Lines: {apiDispatch.lines.length}</div>
-          <div className="text-sm">Ship-to: {apiDispatch.shipToAddress ?? '—'}</div>
+          <div className="text-sm">Ship-to: {apiDispatch.shipToAddress ?? '-'}</div>
           <MobileStatusChip label={apiDispatch.status} tone="amber" />
         </div>
         <input
@@ -212,7 +212,7 @@ export function MobileDispatchDetailPage() {
       <MobilePageTitle title={demoDispatch.dispatchNo} subtitle="Loading checklist" />
       <div className="mob-card">
         <div className="text-sm">Final QC: {finalQcOk ? '✓ Pass' : '✗ Required'}</div>
-        <div className="text-sm">Serial: {line?.serialNo ?? line?.trailerNo ?? '—'}</div>
+        <div className="text-sm">Serial: {line?.serialNo ?? line?.trailerNo ?? '-'}</div>
         <MobileStatusChip label={demoDispatch.status} tone="amber" />
       </div>
       <input className="mob-scan-input mb-2" placeholder="Scan trailer QR" value={scan} onChange={(e) => setScan(e.target.value)} />

@@ -38,7 +38,7 @@ export function OperatorTaskCard({
   const woNo = assignment.productionOrder?.orderNumber ?? 'Work Order'
   const stageLabel = assignment.stage?.name ?? 'Stage'
   const opLabel = assignment.operation?.name
-  const machineLabel = assignment.machine ? `${assignment.machine.code ?? ''} ${assignment.machine.name}`.trim() : '—'
+  const machineLabel = assignment.machine ? `${assignment.machine.code ?? ''} ${assignment.machine.name}`.trim() : '-'
   const balance = qtyBalance(assignment.assignedQuantity, assignment.completedQuantity)
   const statusMeta = assignmentStatusMeta(assignment.status)
 

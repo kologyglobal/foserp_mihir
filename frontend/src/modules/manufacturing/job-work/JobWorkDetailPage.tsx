@@ -66,7 +66,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <div className="text-[11px] font-medium uppercase tracking-wide text-erp-muted">{label}</div>
-      <div className="mt-0.5 text-[13px] font-medium text-erp-text">{value ?? '—'}</div>
+      <div className="mt-0.5 text-[13px] font-medium text-erp-text">{value ?? '-'}</div>
     </div>
   )
 }
@@ -374,7 +374,7 @@ export function JobWorkDetailPage() {
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="Item" value={`${jobWork.itemCode} — ${jobWork.itemName}`} />
             <Field label="Expected Return" value={formatDate(jobWork.expectedReturnDate)} />
-            <Field label="Material Sent" value={jobWork.materialSentDate ? formatDate(jobWork.materialSentDate) : '—'} />
+            <Field label="Material Sent" value={jobWork.materialSentDate ? formatDate(jobWork.materialSentDate) : '-'} />
             <Field label="Plant" value={jobWork.plantName} />
           </div>
         </div>
@@ -469,9 +469,9 @@ export function JobWorkDetailPage() {
                 <Field label="Vendor" value={jobWork.vendorName} />
                 <Field label="Operation" value={jobWork.process} />
                 <Field label="Item" value={`${jobWork.itemCode} — ${jobWork.itemName}`} />
-                <Field label="Material to send" value={jobWork.materialToSend || materials[0]?.materialName || '—'} />
+                <Field label="Material to send" value={jobWork.materialToSend || materials[0]?.materialName || '-'} />
                 <Field label="Rate (placeholder)" value={formatCurrency(jobWork.rate)} />
-                <Field label="Remarks" value={jobWork.remarks || '—'} />
+                <Field label="Remarks" value={jobWork.remarks || '-'} />
               </div>
             </div>
             <div className="rounded-lg border border-erp-border bg-white p-4">
@@ -572,7 +572,7 @@ export function JobWorkDetailPage() {
                       <span>
                         {formatDateTime(d.dispatchAt)} · {d.userName}
                       </span>
-                      <span className="text-erp-muted">{d.remarks || '—'}</span>
+                      <span className="text-erp-muted">{d.remarks || '-'}</span>
                     </li>
                   ))}
                 </ul>
@@ -612,7 +612,7 @@ export function JobWorkDetailPage() {
                       <td className="tabular-nums text-right">{r.receivedQty}</td>
                       <td className="tabular-nums text-right">{r.acceptedQty}</td>
                       <td className="tabular-nums text-right">{r.rejectedQty}</td>
-                      <td>{r.vendorChallan || '—'}</td>
+                      <td>{r.vendorChallan || '-'}</td>
                       <td>{r.userName}</td>
                     </tr>
                   ))}
@@ -725,7 +725,7 @@ export function JobWorkDetailPage() {
               <Field label="Invoice No" value={jobWork.invoiceNo || 'Not linked'} />
               <Field
                 label="Invoice Amount"
-                value={jobWork.invoiceAmount != null ? formatCurrency(jobWork.invoiceAmount) : '—'}
+                value={jobWork.invoiceAmount != null ? formatCurrency(jobWork.invoiceAmount) : '-'}
               />
               <Field label="Expected service amount" value={formatCurrency(jobWork.expectedCost)} />
             </div>
@@ -766,7 +766,7 @@ export function JobWorkDetailPage() {
             <Field label="Remarks" value={jobWork.remarks || 'No remarks'} />
             <p className="mt-4 text-[13px] text-erp-muted">
               Attachments are demo-only until the manufacturing API ships. Vendor challan:{' '}
-              {jobWork.vendorChallan || '—'}.
+              {jobWork.vendorChallan || '-'}.
             </p>
           </section>
         ) : null}

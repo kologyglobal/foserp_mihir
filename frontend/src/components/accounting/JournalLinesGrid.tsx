@@ -99,7 +99,7 @@ export function JournalLinesGrid({
                 <td className="tabular-nums text-erp-muted erp-line-items-grid__sticky-sr">{idx + 1}</td>
                 <td className="erp-line-items-grid__sticky-product min-w-[220px]">
                   {readOnly ? (
-                    <span>{accounts.find((a) => a.id === line.accountId)?.name ?? '—'}</span>
+                    <span>{accounts.find((a) => a.id === line.accountId)?.name ?? '-'}</span>
                   ) : (
                     <ErpSmartSelect
                       options={accountOptions}
@@ -112,7 +112,7 @@ export function JournalLinesGrid({
                 </td>
                 <td className="min-w-[160px]">
                   {readOnly ? (
-                    line.narration || '—'
+                    line.narration || '-'
                   ) : (
                     <input
                       className="quo-editor-price__input"
@@ -125,14 +125,14 @@ export function JournalLinesGrid({
                 {departmentValues.length > 0 ? (
                   <td className="min-w-[140px]">
                     {readOnly ? (
-                      departmentValues.find((d) => d.id === line.dimension1)?.name ?? '—'
+                      departmentValues.find((d) => d.id === line.dimension1)?.name ?? '-'
                     ) : (
                       <select
                         className="quo-editor-price__input"
                         value={line.dimension1 ?? ''}
                         onChange={(e) => updateLine(line.id, { dimension1: e.target.value || null })}
                       >
-                        <option value="">—</option>
+                        <option value="">-</option>
                         {departmentValues.map((d) => (
                           <option key={d.id} value={d.id}>{d.name}</option>
                         ))}
@@ -142,7 +142,7 @@ export function JournalLinesGrid({
                 ) : null}
                 <td className="text-right">
                   {readOnly ? (
-                    <span className="tabular-nums">{line.debit > 0 ? formatCurrency(line.debit) : '—'}</span>
+                    <span className="tabular-nums">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</span>
                   ) : (
                     <FormattedCurrencyInput
                       className="erp-line-items-grid__input-num"
@@ -154,7 +154,7 @@ export function JournalLinesGrid({
                 </td>
                 <td className="text-right">
                   {readOnly ? (
-                    <span className="tabular-nums">{line.credit > 0 ? formatCurrency(line.credit) : '—'}</span>
+                    <span className="tabular-nums">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</span>
                   ) : (
                     <FormattedCurrencyInput
                       className="erp-line-items-grid__input-num"

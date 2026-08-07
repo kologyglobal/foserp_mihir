@@ -106,7 +106,7 @@ export function CommercialCommitmentTable({
                       permission="crm.opportunity.view"
                     />
                   ) : (
-                    '—'
+                    '-'
                   )}
                 </td>
                 <td className="px-2 py-2">
@@ -126,7 +126,7 @@ export function CommercialCommitmentTable({
                       {isQuotationFullyAccepted(r) ? null : null}
                     </div>
                   ) : (
-                    '—'
+                    '-'
                   )}
                 </td>
                 <td className="px-2 py-2">
@@ -147,12 +147,12 @@ export function CommercialCommitmentTable({
                       <SalesOrderPhaseBadge status={r.salesOrderStatus} />
                     </div>
                   ) : (
-                    '—'
+                    '-'
                   )}
                 </td>
                 <td className="px-2 py-2 whitespace-nowrap">{formatDate(r.documentDate)}</td>
                 <td className="px-2 py-2 whitespace-nowrap">
-                  {r.expectedCloseOrDelivery ? formatDate(r.expectedCloseOrDelivery) : '—'}
+                  {r.expectedCloseOrDelivery ? formatDate(r.expectedCloseOrDelivery) : '-'}
                 </td>
                 <td className="px-2 py-2 text-right font-semibold tabular-nums">
                   {formatCurrency(r.commercialValue)}
@@ -161,7 +161,7 @@ export function CommercialCommitmentTable({
                   {r.salesOrderStatus ? (
                     <SalesOrderPhaseBadge status={r.salesOrderStatus} />
                   ) : (
-                    r.quotationHeaderStatus ?? '—'
+                    r.quotationHeaderStatus ?? '-'
                   )}
                 </td>
                 <td className="px-2 py-2">

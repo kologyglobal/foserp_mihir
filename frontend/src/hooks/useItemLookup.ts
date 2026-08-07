@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { isApiMode } from '../config/apiConfig'
 import { searchItemLookups, type ItemLookupRow } from '../services/api/masterBatchApi'
 import { formatApiError } from '../services/api/apiErrors'
 import { useMasterStore } from '../store/masterStore'
@@ -64,7 +63,6 @@ export function useItemLookup(options?: {
   /** Load every matching item (paged). Default true so pickers are not truncated at 25. */
   fetchAll?: boolean
 }) {
-  const storeItems = useMasterStore((s) => s.items)
   const getItem = useMasterStore((s) => s.getItem)
   const getUomName = useMasterStore((s) => s.getUomName)
   const activeOnly = options?.activeOnly ?? true
@@ -82,35 +80,8 @@ export function useItemLookup(options?: {
   const [error, setError] = useState<string | null>(null)
   const [totalCount, setTotalCount] = useState<number | null>(null)
 
-  const matchesType = useCallback(
-    (type: string) => {
-      if (itemTypes && itemTypes.length > 0) return itemTypes.includes(type)
-      if (itemType) return type === itemType
-      return true
-    },
-    [itemType, itemTypes],
-  )
-
   const search = useCallback(
     async (q: string) => {
-      if (!isApiMode()) {
-        const needle = q.trim().toLowerCase()
-        const filtered = storeItems
-          .filter((i) => (activeOnly ? i.isActive : true))
-          .filter((i) => (salesAllowed === undefined ? true : Boolean(i.salesAllowed) === salesAllowed))
-          .filter((i) => matchesType(i.itemType))
-          .filter(
-            (i) =>
-              !needle ||
-              i.itemCode.toLowerCase().includes(needle) ||
-              i.itemName.toLowerCase().includes(needle),
-          )
-        const rows = (fetchAll ? filtered : filtered.slice(0, limit)).map((i) => mapStoreItem(i, getUomName))
-        setOptionsList(rows)
-        setTotalCount(filtered.length)
-        return rows
-      }
-
       setLoading(true)
       setError(null)
       try {
@@ -136,7 +107,7 @@ export function useItemLookup(options?: {
         setLoading(false)
       }
     },
-    [storeItems, getUomName, activeOnly, salesAllowed, itemType, itemTypes, itemTypesKey, matchesType, fetchAll, limit],
+    [activeOnly, salesAllowed, itemType, itemTypes, itemTypesKey, fetchAll, limit],
   )
 
   useEffect(() => {

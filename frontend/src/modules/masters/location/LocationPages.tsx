@@ -88,7 +88,7 @@ function UsageBadges({ loc }: { loc: Location }) {
   if (loc.allowPurchase) tags.push('Purchase')
   if (loc.allowProduction) tags.push('Production')
   if (loc.isDefault) tags.push('Default')
-  if (tags.length === 0) return <span className="text-erp-muted">—</span>
+  if (tags.length === 0) return <span className="text-erp-muted">-</span>
   return (
     <span className="flex flex-wrap gap-1">
       {tags.map((t) => (
@@ -287,7 +287,7 @@ export function LocationFormPage() {
     ? 'In-Transit'
     : watched.warehouseId
       ? getWarehouseName(watched.warehouseId)
-      : '—'
+      : '-'
 
   const formMetrics = useMemo(
     () => [
@@ -302,10 +302,10 @@ export function LocationFormPage() {
   const documentStrip = [
     { label: 'Code', value: watched.locationCode?.trim() || 'Auto', highlight: Boolean(watched.locationCode?.trim()) },
     { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
-    { label: 'Name', value: watched.locationName?.trim() || '—', highlight: Boolean(watched.locationName?.trim()) },
+    { label: 'Name', value: watched.locationName?.trim() || '-', highlight: Boolean(watched.locationName?.trim()) },
     { label: 'Warehouse', value: warehouseLabel },
-    { label: 'City', value: watched.city?.trim() || '—', highlight: Boolean(watched.city?.trim()) },
-    { label: 'State', value: watched.state?.trim() || '—' },
+    { label: 'City', value: watched.city?.trim() || '-', highlight: Boolean(watched.city?.trim()) },
+    { label: 'State', value: watched.state?.trim() || '-' },
     { label: 'Country', value: watched.country?.trim() || DEFAULT_CUSTOMER_COUNTRY },
     { label: 'Default', value: watched.isDefault ? 'Yes' : 'No' },
   ]
@@ -402,13 +402,13 @@ export function LocationFormPage() {
         summaryTitle="Location Summary"
         actionsTitle="Quick Actions"
         summary={[
-          { label: 'Code', value: watched.locationCode || '—' },
+          { label: 'Code', value: watched.locationCode || '-' },
           { label: 'Warehouse', value: warehouseLabel },
-          { label: 'City', value: watched.city && watched.state ? `${watched.city}, ${watched.state}` : '—' },
+          { label: 'City', value: watched.city && watched.state ? `${watched.city}, ${watched.state}` : '-' },
           { label: 'Country', value: watched.country ?? DEFAULT_CUSTOMER_COUNTRY },
-          { label: 'GSTIN', value: watched.gstin?.length === 15 ? watched.gstin : '—' },
-          { label: 'Registered Type', value: watched.registeredType ? LOCATION_REGISTERED_TYPE_LABELS[watched.registeredType] : '—' },
-          { label: 'Usage', value: [watched.allowPurchase && 'Purchase', watched.allowSales && 'Sales', watched.allowProduction && 'Production'].filter(Boolean).join(' · ') || '—' },
+          { label: 'GSTIN', value: watched.gstin?.length === 15 ? watched.gstin : '-' },
+          { label: 'Registered Type', value: watched.registeredType ? LOCATION_REGISTERED_TYPE_LABELS[watched.registeredType] : '-' },
+          { label: 'Usage', value: [watched.allowPurchase && 'Purchase', watched.allowSales && 'Sales', watched.allowProduction && 'Production'].filter(Boolean).join(' · ') || '-' },
           { label: 'Default', value: watched.isDefault ? 'Yes' : 'No', highlight: watched.isDefault },
         ]}
         actions={[
@@ -709,30 +709,30 @@ export function LocationDetailPage() {
         <DetailSection title="General">
           <DetailGrid>
             <DetailField label="Code" value={<span className="font-mono">{location.locationCode}</span>} />
-            <DetailField label="Name 2" value={location.name2 || '—'} />
-            <DetailField label="Warehouse" value={location.warehouseId ? getWarehouseName(location.warehouseId) : '—'} />
+            <DetailField label="Name 2" value={location.name2 || '-'} />
+            <DetailField label="Warehouse" value={location.warehouseId ? getWarehouseName(location.warehouseId) : '-'} />
             <DetailField label="Usage" value={<UsageBadges loc={location} />} />
           </DetailGrid>
         </DetailSection>
         <DetailSection title="Address">
           <DetailGrid>
-            <DetailField label="Address" value={<span className="whitespace-pre-line">{formatLocationAddress(location) || '—'}</span>} />
-            <DetailField label="Pincode" value={location.postCode || '—'} />
+            <DetailField label="Address" value={<span className="whitespace-pre-line">{formatLocationAddress(location) || '-'}</span>} />
+            <DetailField label="Pincode" value={location.postCode || '-'} />
           </DetailGrid>
         </DetailSection>
         <DetailSection title="Tax Registration">
           <DetailGrid>
-            <DetailField label="Registered Type" value={location.registeredType ? LOCATION_REGISTERED_TYPE_LABELS[location.registeredType] : '—'} />
-            <DetailField label="GST Number" value={location.gstin || '—'} />
-            <DetailField label="PAN Number" value={location.pan || '—'} />
-            <DetailField label="TIN Number" value={location.tin || '—'} />
+            <DetailField label="Registered Type" value={location.registeredType ? LOCATION_REGISTERED_TYPE_LABELS[location.registeredType] : '-'} />
+            <DetailField label="GST Number" value={location.gstin || '-'} />
+            <DetailField label="PAN Number" value={location.pan || '-'} />
+            <DetailField label="TIN Number" value={location.tin || '-'} />
           </DetailGrid>
         </DetailSection>
         <DetailSection title="Contact">
           <DetailGrid>
-            <DetailField label="Contact Person" value={location.contactName || '—'} />
-            <DetailField label="Phone" value={location.phone || '—'} />
-            <DetailField label="Email" value={location.email || '—'} />
+            <DetailField label="Contact Person" value={location.contactName || '-'} />
+            <DetailField label="Phone" value={location.phone || '-'} />
+            <DetailField label="Email" value={location.email || '-'} />
           </DetailGrid>
         </DetailSection>
         <DetailSection title="Document Rules">

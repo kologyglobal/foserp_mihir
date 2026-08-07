@@ -88,7 +88,7 @@ export function SIGenerateDraftsModal({
                   <tr key={`${o.standingInstructionId}-${i}`} className="border-t border-erp-border">
                     <td className="px-2 py-1.5">{o.dueDate}</td>
                     <td className="px-2 py-1.5">{o.status.replace(/_/g, ' ')}</td>
-                    <td className="px-2 py-1.5 text-erp-muted">{o.failureReason ?? (o.treasuryAdjustmentId ? 'Draft created' : '—')}</td>
+                    <td className="px-2 py-1.5 text-erp-muted">{o.failureReason ?? (o.treasuryAdjustmentId ? 'Draft created' : '-')}</td>
                   </tr>
                 ))}
               </tbody>

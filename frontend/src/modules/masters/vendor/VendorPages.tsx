@@ -110,10 +110,10 @@ export function VendorListPage() {
   const columns: ColumnDef<Vendor, unknown>[] = [
     { accessorKey: 'vendorCode', header: 'Code', cell: ({ row }) => <span className="font-mono text-xs">{row.original.vendorCode}</span> },
     { accessorKey: 'vendorName', header: 'Vendor Name' },
-    { accessorKey: 'searchName', header: 'Search Name', cell: ({ row }) => row.original.searchName ?? '—' },
+    { accessorKey: 'searchName', header: 'Search Name', cell: ({ row }) => row.original.searchName ?? '-' },
     { accessorKey: 'city', header: 'City' },
-    { id: 'gstType', header: 'GST Vendor Type', cell: ({ row }) => (row.original.gstVendorType ? GST_VENDOR_TYPE_LABELS[row.original.gstVendorType] : '—') },
-    { accessorKey: 'gstin', header: 'GST Reg. No.', cell: ({ row }) => row.original.gstin || '—' },
+    { id: 'gstType', header: 'GST Vendor Type', cell: ({ row }) => (row.original.gstVendorType ? GST_VENDOR_TYPE_LABELS[row.original.gstVendorType] : '-') },
+    { accessorKey: 'gstin', header: 'GST Reg. No.', cell: ({ row }) => row.original.gstin || '-' },
     {
       id: 'blocked',
       header: 'Blocked',
@@ -345,11 +345,11 @@ export function VendorFormPage() {
       pendingAuditUserName={session.name}
       validationErrors={validationErrors}
       documentStrip={[
-        { label: 'Code', value: watched.vendorCode?.trim() || '—', highlight: Boolean(watched.vendorCode?.trim()) },
-        { label: 'Vendor Name', value: watched.vendorName?.trim() || '—', highlight: Boolean(watched.vendorName?.trim()) },
-        { label: 'Search Name', value: watched.searchName?.trim() || '—' },
+        { label: 'Code', value: watched.vendorCode?.trim() || '-', highlight: Boolean(watched.vendorCode?.trim()) },
+        { label: 'Vendor Name', value: watched.vendorName?.trim() || '-', highlight: Boolean(watched.vendorName?.trim()) },
+        { label: 'Search Name', value: watched.searchName?.trim() || '-' },
         { label: 'Blocked', value: watched.isBlocked ? 'Yes' : 'No' },
-        { label: 'GST Type', value: watched.gstVendorType ? GST_VENDOR_TYPE_LABELS[watched.gstVendorType] : '—' },
+        { label: 'GST Type', value: watched.gstVendorType ? GST_VENDOR_TYPE_LABELS[watched.gstVendorType] : '-' },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
       ]}
       commandBar={(
@@ -372,19 +372,19 @@ export function VendorFormPage() {
       activeSection={activeSection}
       onSectionSelect={setActiveSection}
       formMetrics={[
-        { label: 'GST Type', value: watched.gstVendorType ? GST_VENDOR_TYPE_LABELS[watched.gstVendorType] : '—', accent: 'blue' as const },
-        { label: 'Payment', value: watched.paymentMethod ?? '—', accent: 'violet' as const },
-        { label: 'PAN Status', value: watched.panStatus ? PAN_STATUS_LABELS[watched.panStatus] : '—', accent: 'amber' as const },
+        { label: 'GST Type', value: watched.gstVendorType ? GST_VENDOR_TYPE_LABELS[watched.gstVendorType] : '-', accent: 'blue' as const },
+        { label: 'Payment', value: watched.paymentMethod ?? '-', accent: 'violet' as const },
+        { label: 'PAN Status', value: watched.panStatus ? PAN_STATUS_LABELS[watched.panStatus] : '-', accent: 'amber' as const },
         { label: 'Blocked', value: watched.isBlocked ? 'Yes' : 'No', accent: watched.isBlocked ? ('amber' as const) : ('green' as const) },
       ]}
       factBoxTitle="Vendor summary"
       factBoxSummary={[
         { label: 'Used in', value: 'Purchase, GRN, Payments' },
-        { label: 'Location', value: watched.city && watched.state ? `${watched.city}, ${watched.state}` : '—' },
-        { label: 'GSTIN', value: watched.gstin?.length === 15 ? watched.gstin : '—' },
-        { label: 'PAN', value: watched.pan || '—' },
-        { label: 'Email', value: watched.email || '—' },
-        { label: 'Mobile', value: watched.contactPhone || '—' },
+        { label: 'Location', value: watched.city && watched.state ? `${watched.city}, ${watched.state}` : '-' },
+        { label: 'GSTIN', value: watched.gstin?.length === 15 ? watched.gstin : '-' },
+        { label: 'PAN', value: watched.pan || '-' },
+        { label: 'Email', value: watched.email || '-' },
+        { label: 'Mobile', value: watched.contactPhone || '-' },
       ]}
       stickyFooter={(
         <MasterStickyFooter
@@ -583,7 +583,7 @@ export function VendorFormPage() {
                   <td>
                     {watched.paymentMethod ? (
                       <a href="/masters/payment-methods" className="text-erp-primary hover:underline">{watched.paymentMethod}</a>
-                    ) : '—'}
+                    ) : '-'}
                   </td>
                 </tr>
                 <tr>
@@ -701,29 +701,29 @@ export function VendorDetailPage() {
         <DetailSection title="General">
           <DetailGrid>
             <DetailField label="Code" value={<span className="font-mono">{vendor.vendorCode}</span>} />
-            <DetailField label="Search Name" value={vendor.searchName ?? '—'} />
+            <DetailField label="Search Name" value={vendor.searchName ?? '-'} />
             <DetailField label="Blocked" value={vendor.isBlocked ? 'Yes' : 'No'} />
           </DetailGrid>
         </DetailSection>
         <DetailSection title="Address & Contact">
           <DetailGrid>
-            <DetailField label="Address" value={<span className="whitespace-pre-line">{addressLines.join('\n') || '—'}</span>} />
-            <DetailField label="Mobile No" value={vendor.contactPhone || '—'} />
-            <DetailField label="Email id" value={vendor.email || '—'} />
+            <DetailField label="Address" value={<span className="whitespace-pre-line">{addressLines.join('\n') || '-'}</span>} />
+            <DetailField label="Mobile No" value={vendor.contactPhone || '-'} />
+            <DetailField label="Email id" value={vendor.email || '-'} />
           </DetailGrid>
         </DetailSection>
         <DetailSection title="Payments">
           <DetailGrid>
-            <DetailField label="Payment Method" value={vendor.paymentMethod ?? '—'} />
-            <DetailField label="Vendor Bank Details" value={vendor.bankDetails || '—'} />
+            <DetailField label="Payment Method" value={vendor.paymentMethod ?? '-'} />
+            <DetailField label="Vendor Bank Details" value={vendor.bankDetails || '-'} />
           </DetailGrid>
         </DetailSection>
         <DetailSection title="Tax Information">
           <DetailGrid>
-            <DetailField label="P.A.N. No" value={vendor.pan || '—'} />
-            <DetailField label="P.A.N. Status" value={vendor.panStatus ? PAN_STATUS_LABELS[vendor.panStatus] : '—'} />
-            <DetailField label="GST Registration No." value={vendor.gstin || '—'} />
-            <DetailField label="GST Vendor Type" value={vendor.gstVendorType ? GST_VENDOR_TYPE_LABELS[vendor.gstVendorType] : '—'} />
+            <DetailField label="P.A.N. No" value={vendor.pan || '-'} />
+            <DetailField label="P.A.N. Status" value={vendor.panStatus ? PAN_STATUS_LABELS[vendor.panStatus] : '-'} />
+            <DetailField label="GST Registration No." value={vendor.gstin || '-'} />
+            <DetailField label="GST Vendor Type" value={vendor.gstVendorType ? GST_VENDOR_TYPE_LABELS[vendor.gstVendorType] : '-'} />
           </DetailGrid>
         </DetailSection>
         {itemVendorMaps.length > 0 ? (

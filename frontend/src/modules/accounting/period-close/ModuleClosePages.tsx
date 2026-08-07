@@ -246,7 +246,7 @@ export function FixedAssetClosePage() {
             { label: 'Register vs GL Diff', value: formatCurrency(data.registerVsGlDiff) },
             {
               label: 'Last Depreciation Run',
-              value: data.lastDepreciationRun ? formatDate(data.lastDepreciationRun) : '—',
+              value: data.lastDepreciationRun ? formatDate(data.lastDepreciationRun) : '-',
             },
           ]}
           links={[{ label: 'Subledger Reconciliation', to: '/accounting/period-close/subledger-reconciliation' }]}

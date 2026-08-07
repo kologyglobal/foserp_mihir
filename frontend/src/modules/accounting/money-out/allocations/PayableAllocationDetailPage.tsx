@@ -172,17 +172,17 @@ export function PayableAllocationDetailPage() {
                       to={`/accounting/money-out/vendor-invoices/${t.vendorInvoiceId}`}
                       className="text-erp-accent hover:underline"
                     >
-                      {t.documentNumber ?? '—'}
+                      {t.documentNumber ?? '-'}
                     </Link>
                   ) : (
-                    (t.documentNumber ?? '—')
+                    (t.documentNumber ?? '-')
                   )}
                 </td>
                 <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(parseDecimal(t.amount))}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">
-                  {t.outstandingAmount != null ? formatCurrency(parseDecimal(t.outstandingAmount)) : '—'}
+                  {t.outstandingAmount != null ? formatCurrency(parseDecimal(t.outstandingAmount)) : '-'}
                 </td>
-                <td className="py-2">{t.status ?? '—'}</td>
+                <td className="py-2">{t.status ?? '-'}</td>
               </tr>
             ))}
           </tbody>

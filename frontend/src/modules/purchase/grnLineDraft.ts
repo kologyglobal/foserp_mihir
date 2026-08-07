@@ -10,6 +10,7 @@ import {
 import type { GoodsReceiptNote, PurchaseOrder } from '@/types/purchaseDomain'
 import type { Item } from '@/types/master'
 import { getPurchaseLineBaseUomCode, purchaseQtyToBaseQty, toUomQuantityFromBase } from '@/utils/purchaseLineUom'
+import { getCachedPurchaseBins } from '@/hooks/useBinOptions'
 import { resolveItemDefaultBin } from '@/utils/itemDefaultBin'
 import { useMasterStore } from '@/store/masterStore'
 
@@ -73,6 +74,10 @@ export type GrnLineDraft = {
   tolerancePercentage: number
   variancePercentage: number | null
   toleranceStatus: string
+  /** Max receivable qty (stock/base UOM) = pending + tolerance band. Convert with uomConversionFactor for display. */
+  maximumAllowedQty: number
+  /** Max receivable weight (weightUomCode) when receiptEntryMode uses weight — null when not applicable. */
+  maximumAllowedWeight: number | null
   receivingCondition: GrnReceivingCondition
   receivingConditionReason: string
   closeOpenQuantity: boolean
@@ -145,22 +150,28 @@ function weightPreview(input: {
   if (input.receiptEntryMode === 'UNIT_ONLY') {
     return {
       expectedWeight: null as number | null,
+      maximumAllowedWeight: null as number | null,
       weightVariancePercentage: null as number | null,
       weightToleranceStatus: 'NOT_APPLICABLE',
     }
   }
   const expected = input.receivedQty * input.standardWeightPerBaseUnit
   const receivedWeight = input.receivedWeight ?? 0
+  const maxAllowed = expected * (1 + input.weightTolerancePct / 100)
   if (expected <= 0 && receivedWeight <= 0) {
-    return { expectedWeight: 0, weightVariancePercentage: null, weightToleranceStatus: 'NOT_APPLICABLE' }
+    return {
+      expectedWeight: 0,
+      maximumAllowedWeight: maxAllowed,
+      weightVariancePercentage: null,
+      weightToleranceStatus: 'NOT_APPLICABLE',
+    }
   }
   const variancePct =
     expected > 0 ? Number((((receivedWeight - expected) / expected) * 100).toFixed(4)) : null
-  const maxAllowed = expected * (1 + input.weightTolerancePct / 100)
   let weightToleranceStatus = 'EXACT'
   if (receivedWeight > maxAllowed) weightToleranceStatus = 'EXCESS_OUTSIDE_TOLERANCE'
   else if (receivedWeight > expected) weightToleranceStatus = 'EXCESS_WITHIN_TOLERANCE'
-  return { expectedWeight: expected, weightVariancePercentage: variancePct, weightToleranceStatus }
+  return { expectedWeight: expected, maximumAllowedWeight: maxAllowed, weightVariancePercentage: variancePct, weightToleranceStatus }
 }
 
 export function recalcGrnLineDraft(
@@ -233,6 +244,8 @@ export function recalcGrnLineDraft(
     tolerancePercentage: tol.tolerancePercentage,
     variancePercentage: tol.variancePercentage,
     toleranceStatus: tol.toleranceStatus,
+    maximumAllowedQty: tol.upperBound,
+    maximumAllowedWeight: weight.maximumAllowedWeight,
     expectedWeight: weight.expectedWeight,
     weightVariancePercentage: weight.weightVariancePercentage,
     weightToleranceStatus: weight.weightToleranceStatus,
@@ -287,7 +300,7 @@ export function linesFromPo(
       let bin = l.binCode ?? ''
       if (!binId && !bin) {
         const master = useMasterStore.getState().items.find((i) => i.id === l.itemId)
-        const def = resolveItemDefaultBin(master)
+        const def = resolveItemDefaultBin(master, getCachedPurchaseBins())
         binId = def.binId
         bin = def.binCode
       }
@@ -336,6 +349,8 @@ export function linesFromPo(
         tolerancePercentage: resolvedTol,
         variancePercentage: null,
         toleranceStatus: 'EXACT',
+        maximumAllowedQty: 0,
+        maximumAllowedWeight: null,
         receivingCondition: 'NORMAL',
         receivingConditionReason: '',
         closeOpenQuantity: false,
@@ -406,6 +421,8 @@ export function linesFromGrn(
       tolerancePercentage: l.tolerancePercentage ?? 0,
       variancePercentage: l.variancePercentage ?? null,
       toleranceStatus: l.toleranceStatus ?? 'EXACT',
+      maximumAllowedQty: l.maximumAllowedUnitQuantity ?? 0,
+      maximumAllowedWeight: l.maximumAllowedWeight ?? null,
       receivingCondition: l.receivingCondition ?? 'NORMAL',
       receivingConditionReason: l.receivingConditionReason ?? '',
       closeOpenQuantity: Boolean(l.closeOpenQuantity ?? l.shortCloseRequested),

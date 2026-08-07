@@ -40,7 +40,7 @@ export function QuotationTechnicalSpecEditor({ rows, locked, onChange }: Quotati
             <span className="quo-spec-read__no">{r.sectionNo}</span>
             <div className="quo-spec-read__body">
               <strong>{r.label}</strong>
-              <p>{r.value || '—'}</p>
+              <p>{r.value || '-'}</p>
             </div>
           </div>
         ))}

@@ -43,7 +43,7 @@ const VENDORS = [
 type ApiOption = { id: string; label: string; code?: string; name?: string }
 
 function formatMoney(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return '—'
+  if (!Number.isFinite(value) || value <= 0) return '-'
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',

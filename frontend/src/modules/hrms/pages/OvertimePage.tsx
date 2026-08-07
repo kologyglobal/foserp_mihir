@@ -29,7 +29,7 @@ import {
 } from '../components'
 import '../hrms-ui.css'
 
-const DASH = '—'
+const DASH = '-'
 
 function monthStartIso(): string {
   const d = new Date()

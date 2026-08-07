@@ -122,7 +122,7 @@ export function VendorQuotationListPage() {
         accessorKey: 'vendorReferenceNumber',
         header: 'Vendor Ref',
         meta: { columnLabel: 'Vendor Ref' },
-        cell: ({ row }) => row.original.vendorReferenceNumber || '—',
+        cell: ({ row }) => row.original.vendorReferenceNumber || '-',
       },
       {
         accessorKey: 'validTill',

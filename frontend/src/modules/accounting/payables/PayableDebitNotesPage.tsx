@@ -249,11 +249,11 @@ export function PayableDebitNotesPage() {
                           {r.referenceInvoiceNumber ?? r.referenceInvoiceId}
                         </TableLink>
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
                     <td className="px-3 py-2">{r.reason}</td>
-                    <td className="px-3 py-2 text-[12px] text-erp-muted">{r.sourceDocument ?? '—'}</td>
+                    <td className="px-3 py-2 text-[12px] text-erp-muted">{r.sourceDocument ?? '-'}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(r.originalAmount)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(r.remainingAmount)}</td>
                     <td className="px-3 py-2">
@@ -269,7 +269,7 @@ export function PayableDebitNotesPage() {
                           Apply
                         </button>
                       ) : (
-                        <span className="text-erp-muted">—</span>
+                        <span className="text-erp-muted">-</span>
                       )}
                     </td>
                   </tr>

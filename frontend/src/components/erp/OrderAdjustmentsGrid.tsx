@@ -139,7 +139,7 @@ export function ChargeEditor({
         </label>
       ) : (
         <span className="so-pricing-charge__tax-na" title="Not taxable">
-          —
+          -
         </span>
       )}
 
@@ -160,7 +160,7 @@ export function ChargeEditor({
         </label>
       ) : (
         <span className="so-pricing-charge__tax-na" aria-hidden>
-          —
+          -
         </span>
       )}
 
@@ -177,7 +177,7 @@ export function ChargeEditor({
             ) : null}
           </>
         ) : (
-          <span className="so-pricing-charge__tax-na">—</span>
+          <span className="so-pricing-charge__tax-na">-</span>
         )}
       </div>
     </div>

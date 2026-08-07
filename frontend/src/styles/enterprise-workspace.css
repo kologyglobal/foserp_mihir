@@ -3746,17 +3746,19 @@
   max-width: 100%;
 }
 
-/* Consolidated operational views (inventory / purchase summary cards) */
+/* Consolidated operational views (inventory / purchase summary cards) —
+   auto-fit so a handful of cards stretch to the full row instead of leaving
+   empty reserved tracks (auto-fill) on wide screens. */
 .ops-summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 12px;
 }
 
 .ops-summary-card {
   border: 1px solid var(--erp-border, #edebe9);
   background: #fff;
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 12px 14px;
   box-shadow: none;
 }
@@ -3803,7 +3805,10 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  /* Grow only up to a sane max so it doesn't stretch edge-to-edge and strand
+     the Warehouse/Status/Apply controls with a large empty gap on wide screens. */
   flex: 1 1 220px;
+  max-width: 26rem;
   min-width: 0;
 }
 
@@ -4080,7 +4085,7 @@
   align-items: center;
   height: 20px;
   padding: 0 8px;
-  border-radius: 3px;
+  border-radius: 6px;
   border: 1px solid #e4e7ec;
   background: #f8fafc;
   font-size: 10px;
@@ -4114,7 +4119,7 @@
 .store-ops-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   width: 100%;
   max-width: none;
 }
@@ -4172,7 +4177,7 @@
   gap: 4px;
   min-height: 80px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--erp-border, #edebe9);
   background: #fff;
   text-align: left;
@@ -4188,7 +4193,7 @@
 }
 
 .store-kpi-card__value {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
@@ -4210,7 +4215,7 @@
 
 .store-section {
   border: 1px solid var(--erp-border, #edebe9);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fff;
   padding: 12px 14px;
 }
@@ -4242,7 +4247,7 @@
   width: 100%;
   text-align: left;
   border: 1px solid var(--erp-border, #edebe9);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #faf9f8;
   padding: 12px 14px;
   cursor: pointer;
@@ -4305,10 +4310,24 @@ button.store-action-card:hover,
   }
 }
 
+.store-op-hub__note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--erp-muted, #605e5c);
+}
+
+.store-op-hub__section {
+  padding: 14px 16px;
+}
+
 .store-op-choice-grid {
   display: grid;
+  /* auto-fit (not auto-fill) — collapses empty tracks so 1-3 cards stretch to
+     fill the row instead of leaving dead space on wide screens. */
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 10px;
-  max-width: 640px;
+  width: 100%;
+  max-width: none;
 }
 
 .store-op-choice {
@@ -4316,57 +4335,92 @@ button.store-action-card:hover,
   align-items: flex-start;
   gap: 12px;
   width: 100%;
-  min-height: 72px;
+  min-height: 88px;
   padding: 14px 16px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--erp-border, #edebe9);
   background: #fff;
   text-align: left;
   cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
 }
 
 .store-op-choice:hover {
-  border-color: #0078d4;
-  box-shadow: 0 0 0 1px #0078d4 inset;
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 45%, var(--erp-border, #edebe9));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 4%, #fff);
+}
+
+.store-op-choice--primary {
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 35%, var(--erp-border, #edebe9));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 5%, #fff);
 }
 
 .store-op-choice__icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: #f3f2f1;
-  color: #0078d4;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--erp-primary, #0078d4) 18%, var(--erp-border, #edebe9));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 6%, #fff);
+  color: var(--erp-primary, #0078d4);
   flex-shrink: 0;
 }
 
 .store-op-choice__body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+  flex: 1;
+}
+
+.store-op-choice__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
 }
 
 .store-op-choice__title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 650;
+  color: var(--erp-text, #242424);
 }
 
 .store-op-choice__desc {
   font-size: 12px;
+  line-height: 1.4;
   color: var(--erp-muted, #605e5c);
 }
 
 .store-op-choice__badge {
-  margin-top: 4px;
-  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--erp-primary, #0078d4) 22%, var(--erp-border, #edebe9));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 8%, #fff);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #0078d4;
+  letter-spacing: 0.03em;
+  color: var(--erp-primary, #0078d4);
+}
+
+.store-op-choice__chevron {
+  width: 16px;
+  height: 16px;
+  margin-top: 12px;
+  flex-shrink: 0;
+  color: var(--erp-muted, #605e5c);
+  opacity: 0.7;
+}
+
+.store-op-choice:hover .store-op-choice__chevron {
+  color: var(--erp-primary, #0078d4);
+  opacity: 1;
 }
 
 .store-chip-row {
@@ -4504,7 +4558,7 @@ button.store-action-card:hover,
   --stock-360-radius: 8px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   width: 100%;
   max-width: none;
   margin: 0;
@@ -4546,7 +4600,7 @@ button.store-action-card:hover,
   letter-spacing: 0.04em;
   color: var(--stock-360-muted);
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 6px;
   background: var(--stock-360-soft);
   border: 1px solid var(--stock-360-line);
 }
@@ -4649,26 +4703,16 @@ button.store-action-card:hover,
   white-space: nowrap;
 }
 
+/* auto-fit — tile count varies (e.g. equivalent-UOM tile appears/disappears),
+   so a fixed repeat() would leave a near-empty trailing row on wide screens. */
 .stock-360-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 8px;
 }
 
-@media (min-width: 720px) {
-  .stock-360-kpi-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1100px) {
-  .stock-360-kpi-grid {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-  }
-
-  .stock-360-kpi-grid--compact {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
+.stock-360-kpi-grid--compact {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .stock-360-kpi {

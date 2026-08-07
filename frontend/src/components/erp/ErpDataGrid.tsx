@@ -50,6 +50,9 @@ export interface ErpDataGridProps<T> {
    * and page-level order applies.
    */
   sortResetToken?: string | number
+  /** Mirror page Sort document-number order on the matching column header. */
+  pinnedHeaderSort?: { columnId: string; desc: boolean } | null
+  onDocumentHeaderSortChange?: (sort: { columnId: string; desc: boolean } | null) => void
   /** Search / filters / sort / view controls inside table shell */
   registerBar?: React.ReactNode
 }
@@ -64,6 +67,8 @@ export function ErpDataGrid<T>({
   enableColumnSorting = true,
   columnLayoutKey,
   sortResetToken,
+  pinnedHeaderSort,
+  onDocumentHeaderSortChange,
   registerBar,
   ...props
 }: ErpDataGridProps<T>) {
@@ -92,6 +97,8 @@ export function ErpDataGrid<T>({
         enableColumnSorting={enableColumnSorting}
         columnLayoutKey={columnLayoutKey}
         sortResetToken={sortResetToken}
+        pinnedHeaderSort={pinnedHeaderSort}
+        onDocumentHeaderSortChange={onDocumentHeaderSortChange}
         registerBar={registerBar}
       />
     </div>

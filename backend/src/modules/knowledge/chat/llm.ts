@@ -14,7 +14,7 @@ export type ChatStreamHandlers = {
 export type ChatCompletionResult = {
   content: string
   modelId: string
-  provider: 'openai-compatible' | 'local-extractive'
+  provider: 'openai-compatible' | 'gemini-native' | 'local-extractive'
   tokenIn: number | null
   tokenOut: number | null
 }
@@ -22,7 +22,13 @@ export type ChatCompletionResult = {
 function chatConfig() {
   const cfg = resolveKnowledgeChatLlmConfig()
   if (!cfg) return null
-  return { apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, model: cfg.model, provider: cfg.provider }
+  return {
+    apiKey: cfg.apiKey,
+    baseUrl: cfg.baseUrl,
+    model: cfg.model,
+    provider: cfg.provider,
+    transport: cfg.transport,
+  }
 }
 
 function friendlyChatApiError(status: number, body: string, provider: 'gemini' | 'openai'): string {
@@ -40,7 +46,7 @@ function friendlyChatApiError(status: number, body: string, provider: 'gemini' |
   return `Chat API ${status}: ${body.slice(0, 280)}`
 }
 
-/** Stream OpenAI-compatible chat completions; falls back to local extractive answer. */
+/** Stream chat completions (Gemini native or OpenAI-compatible); falls back to local extractive answer. */
 export async function streamChatCompletion(
   messages: ChatMessage[],
   handlers: ChatStreamHandlers,
@@ -51,82 +57,15 @@ export async function streamChatCompletion(
   }
 
   try {
-    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${cfg.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages,
-        stream: true,
-        temperature: 0.2,
-      }),
-      signal: handlers.signal,
-    })
-
-    if (!res.ok || !res.body) {
-      const body = await res.text().catch(() => '')
-      throw new Error(friendlyChatApiError(res.status, body, cfg.provider))
-    }
-
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let full = ''
-    let finished = false
-
-    while (!finished) {
-      if (handlers.signal?.aborted) {
-        try {
-          await reader.cancel()
-        } catch {
-          // ignore
-        }
-        break
-      }
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed.startsWith('data:')) continue
-        const data = trimmed.slice(5).trim()
-        if (data === '[DONE]') {
-          finished = true
-          break
-        }
-        try {
-          const json = JSON.parse(data) as {
-            choices?: Array<{ delta?: { content?: string } }>
-          }
-          const token = json.choices?.[0]?.delta?.content
-          if (token) {
-            full += token
-            handlers.onToken(token)
-          }
-        } catch {
-          // skip malformed SSE chunk
-        }
-      }
-    }
-
-    return {
-      content: full,
-      modelId: cfg.model,
-      provider: 'openai-compatible',
-      tokenIn: null,
-      tokenOut: null,
-    }
+    return cfg.transport === 'gemini-native'
+      ? await streamGeminiNative(cfg, messages, handlers)
+      : await streamOpenAiCompatible(cfg, messages, handlers)
   } catch (err) {
     if (handlers.signal?.aborted) {
       return {
         content: '',
         modelId: cfg.model,
-        provider: 'openai-compatible',
+        provider: cfg.transport === 'gemini-native' ? 'gemini-native' : 'openai-compatible',
         tokenIn: null,
         tokenOut: null,
       }
@@ -136,6 +75,190 @@ export async function streamChatCompletion(
       message: message.slice(0, 280),
     })
     return streamLocalExtractive(messages, handlers)
+  }
+}
+
+type ChatConfig = {
+  apiKey: string
+  baseUrl: string
+  model: string
+  provider: 'gemini' | 'openai'
+  transport: 'gemini-native' | 'openai-compatible'
+}
+
+async function streamOpenAiCompatible(
+  cfg: ChatConfig,
+  messages: ChatMessage[],
+  handlers: ChatStreamHandlers,
+): Promise<ChatCompletionResult> {
+  const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${cfg.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: cfg.model,
+      messages,
+      stream: true,
+      temperature: 0.2,
+    }),
+    signal: handlers.signal,
+  })
+
+  if (!res.ok || !res.body) {
+    const body = await res.text().catch(() => '')
+    throw new Error(friendlyChatApiError(res.status, body, cfg.provider))
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let full = ''
+  let finished = false
+
+  while (!finished) {
+    if (handlers.signal?.aborted) {
+      try {
+        await reader.cancel()
+      } catch {
+        // ignore
+      }
+      break
+    }
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const data = trimmed.slice(5).trim()
+      if (data === '[DONE]') {
+        finished = true
+        break
+      }
+      try {
+        const json = JSON.parse(data) as {
+          choices?: Array<{ delta?: { content?: string } }>
+        }
+        const token = json.choices?.[0]?.delta?.content
+        if (token) {
+          full += token
+          handlers.onToken(token)
+        }
+      } catch {
+        // skip malformed SSE chunk
+      }
+    }
+  }
+
+  return {
+    content: full,
+    modelId: cfg.model,
+    provider: 'openai-compatible',
+    tokenIn: null,
+    tokenOut: null,
+  }
+}
+
+/** Google's native generateContent API uses 'user'/'model' roles and a separate systemInstruction field. */
+function toGeminiRequestBody(messages: ChatMessage[], temperature: number) {
+  const systemParts: string[] = []
+  const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = []
+
+  for (const m of messages) {
+    if (m.role === 'system') {
+      systemParts.push(m.content)
+      continue
+    }
+    contents.push({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    })
+  }
+
+  return {
+    ...(systemParts.length ? { systemInstruction: { parts: [{ text: systemParts.join('\n\n') }] } } : {}),
+    contents,
+    generationConfig: { temperature },
+  }
+}
+
+type GeminiStreamChunk = {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+  error?: { message?: string; status?: string }
+}
+
+/** Stream via Google's native generateContent endpoint (works with both AIza… and AQ. keys). */
+async function streamGeminiNative(
+  cfg: ChatConfig,
+  messages: ChatMessage[],
+  handlers: ChatStreamHandlers,
+): Promise<ChatCompletionResult> {
+  const res = await fetch(`${cfg.baseUrl}/models/${cfg.model}:streamGenerateContent?alt=sse`, {
+    method: 'POST',
+    headers: {
+      'x-goog-api-key': cfg.apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(toGeminiRequestBody(messages, 0.2)),
+    signal: handlers.signal,
+  })
+
+  if (!res.ok || !res.body) {
+    const body = await res.text().catch(() => '')
+    throw new Error(friendlyChatApiError(res.status, body, 'gemini'))
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let full = ''
+
+  while (true) {
+    if (handlers.signal?.aborted) {
+      try {
+        await reader.cancel()
+      } catch {
+        // ignore
+      }
+      break
+    }
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const data = trimmed.slice(5).trim()
+      if (!data) continue
+      try {
+        const json = JSON.parse(data) as GeminiStreamChunk
+        if (json.error) {
+          throw new Error(`Chat API ${json.error.status ?? 'ERROR'}: ${json.error.message ?? 'unknown error'}`)
+        }
+        const token = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? ''
+        if (token) {
+          full += token
+          handlers.onToken(token)
+        }
+      } catch (parseErr) {
+        if (parseErr instanceof Error && parseErr.message.startsWith('Chat API')) throw parseErr
+        // skip malformed SSE chunk
+      }
+    }
+  }
+
+  return {
+    content: full,
+    modelId: cfg.model,
+    provider: 'gemini-native',
+    tokenIn: null,
+    tokenOut: null,
   }
 }
 

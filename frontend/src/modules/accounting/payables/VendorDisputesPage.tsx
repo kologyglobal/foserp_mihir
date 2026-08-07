@@ -274,7 +274,7 @@ export function VendorDisputesPage() {
                               <TableLink to={`/purchase/orders/${po.id}`}>{po.number}</TableLink>
                             </span>
                           ))
-                        : '—'}
+                        : '-'}
                     </td>
                     <td className="px-3 py-2">{r.disputeType}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(r.disputedAmount)}</td>

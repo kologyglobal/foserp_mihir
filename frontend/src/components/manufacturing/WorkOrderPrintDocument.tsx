@@ -84,8 +84,8 @@ export function WorkOrderPrintDocument({ model, className }: WorkOrderPrintDocum
       <section className="wo-print-product">
         <div>
           <p className="wo-print-kicker">Finished item</p>
-          <p className="wo-print-product__code">{model.productCode || '—'}</p>
-          <p className="wo-print-product__name">{model.productName || '—'}</p>
+          <p className="wo-print-product__code">{model.productCode || '-'}</p>
+          <p className="wo-print-product__name">{model.productName || '-'}</p>
         </div>
         <dl className="wo-print-qty">
           <div>
@@ -98,7 +98,7 @@ export function WorkOrderPrintDocument({ model, className }: WorkOrderPrintDocum
           </div>
           <div>
             <dt>Priority</dt>
-            <dd>{model.priority || '—'}</dd>
+            <dd>{model.priority || '-'}</dd>
           </div>
         </dl>
       </section>
@@ -106,19 +106,19 @@ export function WorkOrderPrintDocument({ model, className }: WorkOrderPrintDocum
       <div className="wo-print-meta-grid">
         <section className="wo-print-card">
           <p className="wo-print-kicker">Schedule</p>
-          <p><span>Plant</span> {model.plant || '—'}</p>
-          <p><span>Job</span> {model.jobNumber || '—'}</p>
+          <p><span>Plant</span> {model.plant || '-'}</p>
+          <p><span>Job</span> {model.jobNumber || '-'}</p>
           <p><span>Planned start</span> {formatDate(model.plannedStart)}</p>
           <p><span>Due</span> {formatDate(model.dueDate)}</p>
           <p><span>Actual start</span> {formatDate(model.actualStart)}</p>
         </section>
         <section className="wo-print-card">
           <p className="wo-print-kicker">Commercial link</p>
-          <p><span>Sales order</span> {model.salesOrderNo || '—'}</p>
-          <p><span>Customer</span> {model.customerName || '—'}</p>
-          <p><span>Supervisor</span> {model.supervisor || '—'}</p>
-          <p><span>Material</span> {(model.materialStatus || '—').replace(/_/g, ' ')}</p>
-          <p><span>Quality</span> {(model.qualityStatus || '—').replace(/_/g, ' ')}</p>
+          <p><span>Sales order</span> {model.salesOrderNo || '-'}</p>
+          <p><span>Customer</span> {model.customerName || '-'}</p>
+          <p><span>Supervisor</span> {model.supervisor || '-'}</p>
+          <p><span>Material</span> {(model.materialStatus || '-').replace(/_/g, ' ')}</p>
+          <p><span>Quality</span> {(model.qualityStatus || '-').replace(/_/g, ' ')}</p>
         </section>
         <section className="wo-print-card">
           <p className="wo-print-kicker">Output</p>
@@ -155,7 +155,7 @@ export function WorkOrderPrintDocument({ model, className }: WorkOrderPrintDocum
                   <td>{s.status.replace(/_/g, ' ')}</td>
                   <td className="num">{s.planned}</td>
                   <td className="num">{s.good}</td>
-                  <td>{s.qcRequired ? 'Required' : '—'}</td>
+                  <td>{s.qcRequired ? 'Required' : '-'}</td>
                 </tr>
               ))}
             </tbody>

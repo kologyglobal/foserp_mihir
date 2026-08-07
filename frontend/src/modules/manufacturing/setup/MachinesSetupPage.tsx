@@ -35,7 +35,7 @@ export function MachinesSetupPage() {
   const workCentreLabel = useCallback(
     (id: string) => {
       const wc = workCentres.find((w) => w.id === id)
-      return wc ? `${wc.code} — ${wc.name}` : '—'
+      return wc ? `${wc.code} — ${wc.name}` : '-'
     },
     [workCentres],
   )

@@ -12,8 +12,8 @@ function LineRow({ line }: { line: ChequeAccountingLine }) {
     <tr className="border-t border-erp-border">
       <td className="px-2 py-1.5">{line.accountCode ? `${line.accountCode} — ${line.accountName ?? ''}` : line.accountId.slice(0, 8)}</td>
       <td className="px-2 py-1.5 text-erp-muted">{line.role === 'BANK' ? 'Bank' : 'Counterpart'}</td>
-      <td className="px-2 py-1.5 text-right tabular-nums">{line.direction === 'DEBIT' ? formatChequeAmount(line.amount) : '—'}</td>
-      <td className="px-2 py-1.5 text-right tabular-nums">{line.direction === 'CREDIT' ? formatChequeAmount(line.amount) : '—'}</td>
+      <td className="px-2 py-1.5 text-right tabular-nums">{line.direction === 'DEBIT' ? formatChequeAmount(line.amount) : '-'}</td>
+      <td className="px-2 py-1.5 text-right tabular-nums">{line.direction === 'CREDIT' ? formatChequeAmount(line.amount) : '-'}</td>
     </tr>
   )
 }

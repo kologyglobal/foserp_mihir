@@ -220,13 +220,13 @@ export function CourierListPage() {
                       <TableLink to={`/gate/couriers/${r.id}`}>{r.entryNumber}</TableLink>
                     </td>
                     <td className="font-medium">{r.courierCompany}</td>
-                    <td className="tabular-nums">{r.trackingNumber ?? '—'}</td>
-                    <td>{r.senderName ?? '—'}</td>
-                    <td>{r.recipientEmployee ?? '—'}</td>
-                    <td>{r.department ?? '—'}</td>
-                    <td className="max-w-[160px] truncate">{r.parcelType ?? r.parcelDescription ?? '—'}</td>
+                    <td className="tabular-nums">{r.trackingNumber ?? '-'}</td>
+                    <td>{r.senderName ?? '-'}</td>
+                    <td>{r.recipientEmployee ?? '-'}</td>
+                    <td>{r.department ?? '-'}</td>
+                    <td className="max-w-[160px] truncate">{r.parcelType ?? r.parcelDescription ?? '-'}</td>
                     <td className="whitespace-nowrap">
-                      {r.receivedTime ? formatDateTime(r.receivedTime) : r.dispatchTime ? formatDateTime(r.dispatchTime) : '—'}
+                      {r.receivedTime ? formatDateTime(r.receivedTime) : r.dispatchTime ? formatDateTime(r.dispatchTime) : '-'}
                     </td>
                     <td>
                       <GateStatusBadge status={r.status} />

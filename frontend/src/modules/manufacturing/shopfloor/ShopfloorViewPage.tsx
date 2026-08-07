@@ -74,7 +74,7 @@ function laneFor(wo: WorkOrder): LaneId | null {
 
 function operatorLine(wo: WorkOrder): string {
   const parts = [wo.supervisor, wo.workstation].filter(Boolean)
-  return parts.length ? parts.join(' · ') : '—'
+  return parts.length ? parts.join(' · ') : '-'
 }
 
 function materialTone(status: WorkOrder['materialStatus']): string {
@@ -441,11 +441,11 @@ export function ShopfloorViewPage() {
         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[13px] sm:mt-2 sm:gap-y-1 sm:text-[11px]">
           <div>
             <dt className="text-erp-muted">Current Op</dt>
-            <dd className="font-semibold text-erp-text">{wo.currentOperationName || '—'}</dd>
+            <dd className="font-semibold text-erp-text">{wo.currentOperationName || '-'}</dd>
           </div>
           <div>
             <dt className="text-erp-muted">Next Op</dt>
-            <dd className="font-medium text-erp-text">{wo.nextOperationName || '—'}</dd>
+            <dd className="font-medium text-erp-text">{wo.nextOperationName || '-'}</dd>
           </div>
           <div>
             <dt className="text-erp-muted">Planned</dt>
@@ -703,7 +703,7 @@ export function ShopfloorViewPage() {
                         <dl className="mt-2 grid grid-cols-2 gap-2 text-[13px]">
                           <div>
                             <dt className="text-erp-muted">Operator</dt>
-                            <dd className="font-medium">{current.supervisor || '—'}</dd>
+                            <dd className="font-medium">{current.supervisor || '-'}</dd>
                           </div>
                           <div>
                             <dt className="text-erp-muted">Qty</dt>
@@ -782,16 +782,16 @@ export function ShopfloorViewPage() {
                               <p className="font-medium text-erp-text">{current.finishedItemCode}</p>
                               <p className="line-clamp-1 text-[11px] text-erp-muted">{current.finishedItemName}</p>
                             </div>
-                          ) : '—'}
+                          ) : '-'}
                         </td>
-                        <td className="px-3 py-3 text-erp-text">{current?.currentOperationName || '—'}</td>
-                        <td className="px-3 py-3 text-erp-muted">{current?.nextOperationName || '—'}</td>
-                        <td className="px-3 py-3 text-erp-text">{current?.supervisor || '—'}</td>
+                        <td className="px-3 py-3 text-erp-text">{current?.currentOperationName || '-'}</td>
+                        <td className="px-3 py-3 text-erp-muted">{current?.nextOperationName || '-'}</td>
+                        <td className="px-3 py-3 text-erp-text">{current?.supervisor || '-'}</td>
                         <td className="px-3 py-3">
-                          {current ? <ShopfloorStatusChip status={current.qualityHold ? 'quality_hold' : current.status} /> : '—'}
+                          {current ? <ShopfloorStatusChip status={current.qualityHold ? 'quality_hold' : current.status} /> : '-'}
                         </td>
-                        <td className="px-3 py-3 tabular-nums">{current?.plannedQty ?? '—'}</td>
-                        <td className="px-3 py-3 tabular-nums">{current?.producedQty ?? '—'}</td>
+                        <td className="px-3 py-3 tabular-nums">{current?.plannedQty ?? '-'}</td>
+                        <td className="px-3 py-3 tabular-nums">{current?.producedQty ?? '-'}</td>
                         <td className="px-3 py-3">
                           {next ? (
                             <button
@@ -802,13 +802,13 @@ export function ShopfloorViewPage() {
                               {next.woNumber}
                             </button>
                           ) : (
-                            <span className="text-erp-muted">—</span>
+                            <span className="text-erp-muted">-</span>
                           )}
                         </td>
                         <td className="px-3 py-3 text-erp-muted">
                           {current?.status === 'on_hold' && current.holdReason
                             ? HOLD_REASON_LABELS[current.holdReason]
-                            : '—'}
+                            : '-'}
                         </td>
                       </tr>
                     ))}

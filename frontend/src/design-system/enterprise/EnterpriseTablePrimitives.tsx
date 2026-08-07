@@ -221,7 +221,7 @@ export function ActivityIndicatorStrip({
     { key: 'followUps', label: 'F/U', count: counts.followUps ?? 0 },
   ].filter((x) => x.count > 0)
 
-  if (items.length === 0) return <span className="text-[12px] text-erp-muted">—</span>
+  if (items.length === 0) return <span className="text-[12px] text-erp-muted">-</span>
 
   return (
     <div className="ent-activity-strip">

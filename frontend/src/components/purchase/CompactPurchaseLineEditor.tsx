@@ -317,13 +317,13 @@ export function CompactPurchaseLineEditor({
                         {lineItemDescription(line)}
                       </p>
                       <p className="mt-0.5 text-[11px] text-erp-muted">
-                        HSN {(line.hsnCode || line.sacCode || '—').trim()} ·{' '}
+                        HSN {(line.hsnCode || line.sacCode || '-').trim()} ·{' '}
                         {formatPoLineGstLabel(line, isInterstate)}
                       </p>
                       <p className="mt-0.5 text-[11px] tabular-nums text-erp-muted">
                         {Number(line.uomQuantity ?? line.quantity) || 0} {line.uom} ×{' '}
                         {formatCurrency(line.rate)}
-                        {formatPoDiscountDisplay(line) !== '—'
+                        {formatPoDiscountDisplay(line) !== '-'
                           ? ` · Disc ${formatPoDiscountDisplay(line)}`
                           : ''}
                       </p>
@@ -449,7 +449,7 @@ export function CompactPurchaseLineEditor({
                           </div>
                         </td>
                         <td className="align-top font-mono text-[11px]">
-                          {(line.hsnCode || line.sacCode || '—').trim() || '—'}
+                          {(line.hsnCode || line.sacCode || '-').trim() || '-'}
                           {hsnErr ? (
                             <p className="font-sans text-[10px] text-erp-danger-fg">{hsnErr}</p>
                           ) : null}
@@ -460,7 +460,7 @@ export function CompactPurchaseLineEditor({
                             <p className="text-[10px] text-erp-danger-fg">{qtyErr}</p>
                           ) : null}
                         </td>
-                        <td className="align-top text-center uppercase">{line.uom || '—'}</td>
+                        <td className="align-top text-center uppercase">{line.uom || '-'}</td>
                         <td className="num align-top tabular-nums">
                           {formatCurrency(line.rate)}
                           {rateErr ? (
@@ -678,7 +678,7 @@ function MoreDetailsPanel({ line }: { line: CompactPoLinesEditorLine }) {
       {vis.showExpectedDelivery ? (
         <Detail
           term="Expected delivery"
-          value={line.expectedDeliveryDate || line.requiredDate || '—'}
+          value={line.expectedDeliveryDate || line.requiredDate || '-'}
         />
       ) : null}
       {vis.showPrRef ? (
@@ -687,15 +687,15 @@ function MoreDetailsPanel({ line }: { line: CompactPoLinesEditorLine }) {
           value={
             line.requisitionNo ||
             line.prSources?.map((s) => s.requisitionNumber).filter(Boolean).join(', ') ||
-            '—'
+            '-'
           }
         />
       ) : null}
       {vis.showWarehouse ? (
-        <Detail term="Warehouse" value={line.warehouseName || line.warehouseId || '—'} />
+        <Detail term="Warehouse" value={line.warehouseName || line.warehouseId || '-'} />
       ) : null}
       {vis.showGstGroup ? (
-        <Detail term="GST group" value={line.gstGroupCode || line.gstGroupId || '—'} />
+        <Detail term="GST group" value={line.gstGroupCode || line.gstGroupId || '-'} />
       ) : null}
       {vis.showQc ? (
         <Detail term="QC required" value={line.qcRequired ? 'Yes' : 'No'} />
@@ -716,7 +716,7 @@ function Detail({ term, value }: { term: string; value: string }) {
         {term}
       </dt>
       <dd className="truncate text-erp-text" title={value}>
-        {value || '—'}
+        {value || '-'}
       </dd>
     </div>
   )

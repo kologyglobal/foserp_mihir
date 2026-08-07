@@ -214,7 +214,7 @@ export function ItemLookupSelect({
                     >
                       <span className="erp-smart-select__option-label">{opt.label}</span>
                       <span className="erp-smart-select__option-meta text-xs text-erp-muted">
-                        {opt.uomName ?? '—'} · {opt.itemType}{!opt.isActive ? ' · Inactive' : ''}
+                        {opt.uomName ?? '-'} · {opt.itemType}{!opt.isActive ? ' · Inactive' : ''}
                       </span>
                     </button>
                   </li>

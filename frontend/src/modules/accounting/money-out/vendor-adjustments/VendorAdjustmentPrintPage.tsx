@@ -89,14 +89,14 @@ export function VendorAdjustmentPrintPage() {
             <p className="po-print-box__label">Vendor</p>
             <p className="po-print-box__name">{adj.vendorNameSnapshot}</p>
             <p>Code: {adj.vendorCodeSnapshot}</p>
-            <p>GSTIN: {adj.vendorGstinSnapshot ?? '—'}</p>
+            <p>GSTIN: {adj.vendorGstinSnapshot ?? '-'}</p>
           </section>
           <section className="po-print-box">
             <p className="po-print-box__label">References</p>
-            <p>Supplier ref: {adj.supplierReferenceNumber || '—'}</p>
+            <p>Supplier ref: {adj.supplierReferenceNumber || '-'}</p>
             <p>
               Supplier date:{' '}
-              {adj.supplierReferenceDate ? formatDate(adj.supplierReferenceDate) : '—'}
+              {adj.supplierReferenceDate ? formatDate(adj.supplierReferenceDate) : '-'}
             </p>
             <p>Reason: {ADJUSTMENT_REASON_LABELS[adj.reason] ?? adj.reason}</p>
             <p>Currency: {adj.currencyCode}</p>
@@ -120,7 +120,7 @@ export function VendorAdjustmentPrintPage() {
               <tr key={l.id}>
                 <td>{l.lineNumber}</td>
                 <td>{l.description}</td>
-                <td>{l.hsnSacCode ?? '—'}</td>
+                <td>{l.hsnSacCode ?? '-'}</td>
                 <td>
                   {l.quantity} {l.uomCodeSnapshot ?? ''}
                 </td>

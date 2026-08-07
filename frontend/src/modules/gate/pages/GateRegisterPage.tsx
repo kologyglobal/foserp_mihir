@@ -238,9 +238,9 @@ export function GateRegisterPage() {
                     <td className="whitespace-nowrap">{formatDateTime(row.time)}</td>
                     <td>{ENTRY_TYPE_LABELS[row.entryType]}</td>
                     <td className="max-w-[220px] truncate font-medium" title={row.subject}>{row.subject}</td>
-                    <td className="max-w-[160px] truncate">{row.company ?? '—'}</td>
-                    <td className="max-w-[180px] truncate">{row.purpose ?? '—'}</td>
-                    <td className="tabular-nums">{row.relatedDocument ?? '—'}</td>
+                    <td className="max-w-[160px] truncate">{row.company ?? '-'}</td>
+                    <td className="max-w-[180px] truncate">{row.purpose ?? '-'}</td>
+                    <td className="tabular-nums">{row.relatedDocument ?? '-'}</td>
                     <td>{row.gate}</td>
                     <td>
                       <GateStatusBadge status={row.status} />

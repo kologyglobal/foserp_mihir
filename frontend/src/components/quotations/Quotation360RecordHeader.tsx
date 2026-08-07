@@ -123,7 +123,7 @@ export function Quotation360RecordHeader({
   const fav = isFavorite(favoritePath)
 
   const statusLabel = quotationStatusLabel(documentStatus)
-  const owner = ownerName?.trim() || '—'
+  const owner = ownerName?.trim() || '-'
   const displayTitle = quotationNo
 
   const moreActions: CommandBarOverflowAction[] = [

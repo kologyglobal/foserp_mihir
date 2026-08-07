@@ -139,7 +139,7 @@ export function RfqDocumentPage() {
   const statusStrip: ErpCardFormStatusItem[] = [
     { label: 'RFQ No', value: rfq.rfqNo, tone: 'neutral' },
     { label: 'Status', value: rfqStatusLabel(rfq.status), tone: rfq.status === 'quoted' ? 'success' : rfq.status === 'sent' ? 'warning' : 'neutral' },
-    { label: 'PR Ref', value: pr?.prNo ?? '—', tone: 'neutral' },
+    { label: 'PR Ref', value: pr?.prNo ?? '-', tone: 'neutral' },
     { label: 'Vendors', value: String(rfq.vendorIds.length), tone: 'info' },
     { label: 'Quotes', value: String(quotesCount), tone: 'info' },
     { label: 'Created By', value: rfq.createdByName, tone: 'neutral' },
@@ -180,12 +180,12 @@ export function RfqDocumentPage() {
       summary={[
         { label: 'RFQ', value: rfq.rfqNo },
         { label: 'Status', value: rfqStatusLabel(rfq.status), highlight: rfq.status === 'quoted' },
-        { label: 'Next Action', value: rfqNextProcess[0]?.label ?? '—', highlight: Boolean(rfqNextProcess[0]) },
+        { label: 'Next Action', value: rfqNextProcess[0]?.label ?? '-', highlight: Boolean(rfqNextProcess[0]) },
         { label: 'Invited', value: rfq.vendorIds.length },
         { label: 'Responded', value: vendorsResponded },
-        { label: 'PR', value: pr ? <TableLink to={`/purchase/requisitions/${pr.id}`}>{pr.prNo}</TableLink> : '—' },
-        { label: 'Open PO', value: linkedPo ? <TableLink to={`/purchase/orders/${linkedPo.id}`}>{linkedPo.poNo}</TableLink> : '—' },
-        { label: 'Vendor Selected', value: rfq.recommendedVendorId ? getVendor(rfq.recommendedVendorId)?.vendorName ?? '—' : '—' },
+        { label: 'PR', value: pr ? <TableLink to={`/purchase/requisitions/${pr.id}`}>{pr.prNo}</TableLink> : '-' },
+        { label: 'Open PO', value: linkedPo ? <TableLink to={`/purchase/orders/${linkedPo.id}`}>{linkedPo.poNo}</TableLink> : '-' },
+        { label: 'Vendor Selected', value: rfq.recommendedVendorId ? getVendor(rfq.recommendedVendorId)?.vendorName ?? '-' : '-' },
       ]}
       actions={[
         { id: 'send', label: 'Send RFQ', icon: Send, primary: true, onClick: () => { const r = sendRfq(rfq.id); if (r.ok) show('RFQ sent to approved vendors'); else show(r.error ?? 'Failed') }, disabled: rfq.status !== 'draft' },
@@ -220,7 +220,7 @@ export function RfqDocumentPage() {
         </ErpCardSection>
         <p className="text-xs text-erp-muted">
           Created by {rfq.createdByName} on {formatDate(rfq.createdAt)}
-          {rfq.modifiedAt ? ` · Modified by ${rfq.modifiedByName ?? '—'} on ${formatDate(rfq.modifiedAt)}` : ''}
+          {rfq.modifiedAt ? ` · Modified by ${rfq.modifiedByName ?? '-'} on ${formatDate(rfq.modifiedAt)}` : ''}
         </p>
       </>
     ),
@@ -256,7 +256,7 @@ export function RfqDocumentPage() {
                     <td>{item?.itemName}</td>
                     <td className="num">{formatNumber(l.qty)}</td>
                     <td>{getWarehouse(l.warehouseId)?.warehouseCode}</td>
-                    <td className="num">{lowest != null ? formatCurrency(lowest) : '—'}</td>
+                    <td className="num">{lowest != null ? formatCurrency(lowest) : '-'}</td>
                   </tr>
                 )
               })}
@@ -298,12 +298,12 @@ export function RfqDocumentPage() {
                       {v?.vendorName ?? vid}
                       {rfq.recommendedVendorId === vid ? ' ★' : ''}
                     </td>
-                    <td>{v?.city ?? '—'}</td>
-                    <td>{v ? '★'.repeat(Math.round(v.rating)) : '—'}</td>
+                    <td>{v?.city ?? '-'}</td>
+                    <td>{v ? '★'.repeat(Math.round(v.rating)) : '-'}</td>
                     <td className="num">{vQuotes.length}</td>
                     <td className="num">{coverage}%</td>
-                    <td>{v ? `${v.paymentTermsDays} days` : '—'}</td>
-                    <td>{responded ? (coverage >= 100 ? 'Complete' : 'Partial') : rfq.status === 'sent' ? 'Pending' : '—'}</td>
+                    <td>{v ? `${v.paymentTermsDays} days` : '-'}</td>
+                    <td>{responded ? (coverage >= 100 ? 'Complete' : 'Partial') : rfq.status === 'sent' ? 'Pending' : '-'}</td>
                   </tr>
                 )
               })}
@@ -484,11 +484,11 @@ export function RfqDocumentPage() {
                       const isLowest = q && lowest != null && q.quotedRate === lowest
                       return (
                         <td key={vid} className={`num ${isLowest ? 'text-green-700 font-semibold' : ''}`}>
-                          {q ? formatCurrency(q.quotedRate) : '—'}
+                          {q ? formatCurrency(q.quotedRate) : '-'}
                         </td>
                       )
                     })}
-                    <td className="num font-semibold">{lowest != null ? formatCurrency(lowest) : '—'}</td>
+                    <td className="num font-semibold">{lowest != null ? formatCurrency(lowest) : '-'}</td>
                   </tr>
                 )
               })}
@@ -689,7 +689,7 @@ export function PurchaseOrderDocumentPage() {
   const statusStrip: ErpCardFormStatusItem[] = [
     { label: 'PO No', value: po.poNo, tone: 'neutral' },
     { label: 'Status', value: poStatusLabel(po.status), tone: po.status === 'approved' || po.status === 'released' ? 'success' : po.status === 'submitted' ? 'warning' : 'neutral' },
-    { label: 'Vendor', value: vendor?.vendorName ?? '—', tone: 'neutral' },
+    { label: 'Vendor', value: vendor?.vendorName ?? '-', tone: 'neutral' },
     { label: 'Value', value: formatCurrency(poValue), tone: 'info' },
     { label: 'Expected', value: formatDate(po.expectedDate), tone: 'neutral' },
     { label: 'Receipt', value: receiptPct, tone: 'info' },
@@ -723,11 +723,11 @@ export function PurchaseOrderDocumentPage() {
       summary={[
         { label: 'PO', value: po.poNo },
         { label: 'Status', value: poStatusLabel(po.status), highlight: po.status === 'approved' || po.status === 'released' },
-        { label: 'Vendor', value: vendor?.vendorName ?? '—' },
+        { label: 'Vendor', value: vendor?.vendorName ?? '-' },
         { label: 'Health', value: poHealth },
         { label: 'GRN Count', value: relatedGrns.length },
-        { label: 'PR Ref', value: sourcePr?.prNo ?? '—' },
-        { label: 'Next Action', value: poProcessNext[0]?.label ?? poNextActions[0]?.label ?? '—', highlight: Boolean(poProcessNext[0] ?? poNextActions[0]) },
+        { label: 'PR Ref', value: sourcePr?.prNo ?? '-' },
+        { label: 'Next Action', value: poProcessNext[0]?.label ?? poNextActions[0]?.label ?? '-', highlight: Boolean(poProcessNext[0] ?? poNextActions[0]) },
       ]}
       actions={[
         { id: 'grn', label: 'Gate Entry & GRN', icon: Package, primary: true, onClick: receiveAll, disabled: !['sent', 'partial', 'released'].includes(po.status) },
@@ -876,7 +876,7 @@ export function PurchaseOrderDocumentPage() {
                   <td>{formatDate(g.grnDate)}</td>
                   <td>{formatStatus(g.status)}</td>
                   <td className="num">{g.lines.length}</td>
-                  <td>{g.qcRequired ? 'Required' : '—'}</td>
+                  <td>{g.qcRequired ? 'Required' : '-'}</td>
                 </tr>
               ))}
               {relatedGrns.length === 0 && (
@@ -905,7 +905,7 @@ export function PurchaseOrderDocumentPage() {
           events={[
             { t: 'Created', d: po.createdAt, u: po.createdByName },
             { t: 'Approved', d: po.approvedAt, u: po.approvedByName },
-            { t: 'Sent', d: po.sentAt, u: '—' },
+            { t: 'Sent', d: po.sentAt, u: '-' },
             ...relatedGrns.map((g) => ({ t: `GRN ${g.grnNo}`, d: g.grnDate, u: g.createdByName })),
           ]}
         />
@@ -1056,7 +1056,7 @@ export function GrnDocumentPage() {
     { label: 'GRN No', value: grn.grnNo, tone: 'neutral' },
     { label: 'Status', value: grnStatusLabel(grn.status), tone: grn.status === 'posted' ? 'success' : grn.status === 'pending_qc' ? 'warning' : 'neutral' },
     { label: 'PO', value: grn.poNo, tone: 'neutral' },
-    { label: 'Vendor', value: getVendor(grn.vendorId)?.vendorName ?? '—', tone: 'neutral' },
+    { label: 'Vendor', value: getVendor(grn.vendorId)?.vendorName ?? '-', tone: 'neutral' },
     { label: 'Received', value: formatNumber(totalReceived), tone: 'info' },
     { label: 'Value', value: formatCurrency(grnValue), tone: 'success' },
     { label: 'QC', value: grn.qcRequired ? 'Required' : 'No', tone: grn.qcRequired ? 'warning' : 'neutral' },
@@ -1088,10 +1088,10 @@ export function GrnDocumentPage() {
         { label: 'GRN', value: grn.grnNo },
         { label: 'Status', value: grnStatusLabel(grn.status), highlight: grn.status === 'posted' },
         { label: 'PO', value: grn.poNo },
-        { label: 'Vendor', value: getVendor(grn.vendorId)?.vendorName ?? '—' },
+        { label: 'Vendor', value: getVendor(grn.vendorId)?.vendorName ?? '-' },
         { label: 'Accepted', value: formatNumber(totalAccepted) },
         { label: 'Rejected', value: formatNumber(totalRejected) },
-        { label: 'Next Action', value: grnProcessNext[0]?.label ?? grnNextActions[0]?.label ?? '—', highlight: Boolean(grnProcessNext[0] ?? grnNextActions[0]) },
+        { label: 'Next Action', value: grnProcessNext[0]?.label ?? grnNextActions[0]?.label ?? '-', highlight: Boolean(grnProcessNext[0] ?? grnNextActions[0]) },
       ]}
       actions={[
         { id: 'po', label: 'View PO', icon: Truck, primary: true, onClick: () => navigate(`/purchase/orders/${grn.poId}`) },

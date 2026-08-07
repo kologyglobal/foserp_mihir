@@ -333,9 +333,9 @@ export function PeriodLockingPage() {
                   <td className="py-1.5 pr-2">
                     <LockStatusBadge status={r.status} />
                   </td>
-                  <td className="py-1.5 pr-2 text-erp-muted">{r.lockedBy ?? '—'}</td>
+                  <td className="py-1.5 pr-2 text-erp-muted">{r.lockedBy ?? '-'}</td>
                   <td className="py-1.5 pr-2 text-erp-muted">
-                    {r.lockedDate ? formatDate(r.lockedDate) : '—'}
+                    {r.lockedDate ? formatDate(r.lockedDate) : '-'}
                   </td>
                   <td className="py-1.5 pr-2 text-erp-muted">{r.reopenAllowed ? 'Yes' : 'No'}</td>
                   <td className="py-1.5">

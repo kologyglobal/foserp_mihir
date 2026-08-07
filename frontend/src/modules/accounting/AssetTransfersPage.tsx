@@ -244,7 +244,7 @@ export function AssetTransfersPage() {
                               <Check className="mr-1 inline h-3.5 w-3.5" />Complete
                             </button>
                           ) : (
-                            <span className="text-erp-muted">—</span>
+                            <span className="text-erp-muted">-</span>
                           )}
                         </td>
                       </tr>

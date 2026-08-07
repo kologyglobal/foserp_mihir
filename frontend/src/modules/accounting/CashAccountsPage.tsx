@@ -152,7 +152,7 @@ export function CashAccountsPage() {
                     <td className={cn('px-3 py-2 text-right tabular-nums', c.variance !== 0 && 'text-amber-700')}>
                       {formatCurrency(c.variance)}
                     </td>
-                    <td className="px-3 py-2 tabular-nums">{c.lastCountDate ? formatDate(c.lastCountDate) : '—'}</td>
+                    <td className="px-3 py-2 tabular-nums">{c.lastCountDate ? formatDate(c.lastCountDate) : '-'}</td>
                     <td className="px-3 py-2">
                       <BankAccountStatusBadge status={c.status} />
                     </td>

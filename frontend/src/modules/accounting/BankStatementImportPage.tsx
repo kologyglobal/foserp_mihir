@@ -207,9 +207,9 @@ export function BankStatementImportPage() {
                     <tr key={r.rowNumber}>
                       <td>{r.lineDate}</td>
                       <td className="max-w-[16rem] truncate">{r.description}</td>
-                      <td>{r.reference || '—'}</td>
-                      <td className="text-right tabular-nums">{r.debitAmount > 0 ? formatCurrency(r.debitAmount) : '—'}</td>
-                      <td className="text-right tabular-nums">{r.creditAmount > 0 ? formatCurrency(r.creditAmount) : '—'}</td>
+                      <td>{r.reference || '-'}</td>
+                      <td className="text-right tabular-nums">{r.debitAmount > 0 ? formatCurrency(r.debitAmount) : '-'}</td>
+                      <td className="text-right tabular-nums">{r.creditAmount > 0 ? formatCurrency(r.creditAmount) : '-'}</td>
                     </tr>
                   ))}
                   {validRows.length === 0 ? <tr><td colSpan={5} className="py-6 text-center text-erp-muted">No valid rows found.</td></tr> : null}
@@ -237,7 +237,7 @@ export function BankStatementImportPage() {
                     {warningRows.map((r) => (
                       <tr key={r.rowNumber} className={r.status === 'Error' ? 'bg-rose-50' : 'bg-amber-50'}>
                         <td>{r.rowNumber}</td>
-                        <td>{r.lineDate || '—'}</td>
+                        <td>{r.lineDate || '-'}</td>
                         <td className="max-w-[16rem] truncate">{r.description}</td>
                         <td className="font-semibold">{r.status}</td>
                         <td>{r.message}</td>

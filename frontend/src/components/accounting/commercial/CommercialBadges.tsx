@@ -84,7 +84,7 @@ export function QuotationRevisionBadge({
   isLatest?: boolean
   superseded?: boolean
 }) {
-  if (revision == null) return <span className="text-erp-muted">—</span>
+  if (revision == null) return <span className="text-erp-muted">-</span>
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-800">
@@ -116,10 +116,10 @@ export function QuotationApprovalSummary({
     headerStatus === 'sent' && documentStatus === 'sent' && customerApproval === 'approved'
   return (
     <div className="flex flex-wrap gap-1 text-[11px]">
-      <span className="rounded border border-erp-border px-1.5 py-0.5">Header: {headerStatus ?? '—'}</span>
-      <span className="rounded border border-erp-border px-1.5 py-0.5">Document: {documentStatus ?? '—'}</span>
+      <span className="rounded border border-erp-border px-1.5 py-0.5">Header: {headerStatus ?? '-'}</span>
+      <span className="rounded border border-erp-border px-1.5 py-0.5">Document: {documentStatus ?? '-'}</span>
       <span className="rounded border border-erp-border px-1.5 py-0.5">
-        Customer: {customerApproval ?? '—'}
+        Customer: {customerApproval ?? '-'}
       </span>
       {fullyAccepted ? (
         <span className="rounded bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-800">Accepted</span>
@@ -132,7 +132,7 @@ export function QuotationApprovalSummary({
 }
 
 export function SalesOrderPhaseBadge({ status }: { status: string | null | undefined }) {
-  if (!status) return <span className="text-erp-muted">—</span>
+  if (!status) return <span className="text-erp-muted">-</span>
   const phase1 = status === 'open' || status === 'confirmed' || status === 'closed'
   const label =
     status === 'open'

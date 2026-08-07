@@ -63,7 +63,7 @@ export function PurchaseDocumentRecordHeader({
           {facts.map((fact) => (
             <span key={fact.label} className="crm-sticky-record-header__owner">
               <span className="crm-sticky-record-header__owner-label">{fact.label}</span>
-              {fact.value || '—'}
+              {fact.value || '-'}
             </span>
           ))}
         </div>

@@ -257,13 +257,13 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
     },
     {
       label: 'Est. Value',
-      value: estimatedValue > 0 ? formatCurrency(estimatedValue) : '—',
+      value: estimatedValue > 0 ? formatCurrency(estimatedValue) : '-',
       accent: 'violet' as const,
       hint: purposeLabel,
     },
     {
       label: 'Need by',
-      value: requiredDate ? formatDate(requiredDate) : '—',
+      value: requiredDate ? formatDate(requiredDate) : '-',
       accent: 'amber' as const,
       hint: department || 'Department',
     },
@@ -330,7 +330,7 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
     : [
         { label: 'PR No', value: docNo, tone: 'neutral' },
         { label: 'Status', value: prStatusLabel(status), tone: status === 'approved' ? 'success' : status === 'submitted' ? 'warning' : 'neutral' },
-        { label: 'Approval', value: status === 'submitted' ? 'Awaiting Requisition Approval' : status === 'approved' ? 'Requisition Approved' : '—', tone: status === 'submitted' ? 'warning' : status === 'approved' ? 'success' : 'neutral' },
+        { label: 'Approval', value: status === 'submitted' ? 'Awaiting Requisition Approval' : status === 'approved' ? 'Requisition Approved' : '-', tone: status === 'submitted' ? 'warning' : status === 'approved' ? 'success' : 'neutral' },
         { label: 'Created By', value: existing?.createdByName ?? session.name, tone: 'neutral' },
         { label: 'Created On', value: formatDate(existing?.createdAt ?? defaultDate), tone: 'neutral' },
         { label: 'Source', value: sourceLabel, tone: 'neutral' },
@@ -498,10 +498,10 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
         { label: 'PR No.', value: isCreate ? 'New' : docNo },
         { label: 'Status', value: isCreate ? 'Draft' : prStatusLabel(status) },
         { label: 'Lines', value: String(linesWithItems || lines.length) },
-        { label: 'Est. Value', value: estimatedValue > 0 ? formatCurrency(estimatedValue) : '—' },
+        { label: 'Est. Value', value: estimatedValue > 0 ? formatCurrency(estimatedValue) : '-' },
         { label: 'Need by', value: formatDate(requiredDate) },
-        { label: 'RFQ', value: linkedRfq?.rfqNo ?? '—', muted: !linkedRfq },
-        { label: 'PO', value: linkedPo?.poNo ?? '—', muted: !linkedPo },
+        { label: 'RFQ', value: linkedRfq?.rfqNo ?? '-', muted: !linkedRfq },
+        { label: 'PO', value: linkedPo?.poNo ?? '-', muted: !linkedPo },
       ]}
       aiInsight={
         hasValidLine
@@ -794,8 +794,8 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
           <ErpFieldRow label="Need By">
             <Input type="date" value={requiredDate} onChange={(e) => setRequiredDate(e.target.value)} />
           </ErpFieldRow>
-          <ErpFieldRow label="Work Order" readOnly>{purchaseReadonlyValue(existing?.workOrderNo ?? '—')}</ErpFieldRow>
-          <ErpFieldRow label="MRP" readOnly>{purchaseReadonlyValue(existing?.mrpRunId ?? '—')}</ErpFieldRow>
+          <ErpFieldRow label="Work Order" readOnly>{purchaseReadonlyValue(existing?.workOrderNo ?? '-')}</ErpFieldRow>
+          <ErpFieldRow label="MRP" readOnly>{purchaseReadonlyValue(existing?.mrpRunId ?? '-')}</ErpFieldRow>
           <ErpFieldRow label="Project">
             <Input value={project} onChange={(e) => setProject(e.target.value)} />
           </ErpFieldRow>
@@ -901,9 +901,9 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
       ) : (
         <>
           <ErpFieldRow label="Approval Status" readOnly>{purchaseReadonlyValue(status === 'submitted' ? 'Awaiting Requisition Approval' : prStatusLabel(status))}</ErpFieldRow>
-          <ErpFieldRow label="Pending With" readOnly>{purchaseReadonlyValue(status === 'submitted' ? 'Purchase Head' : '—')}</ErpFieldRow>
-          <ErpFieldRow label="Approved By" readOnly>{purchaseReadonlyValue(existing?.approvedByName ?? '—')}</ErpFieldRow>
-          <ErpFieldRow label="Approved Date" readOnly>{purchaseReadonlyValue(existing?.approvedAt ? formatDate(existing.approvedAt) : '—')}</ErpFieldRow>
+          <ErpFieldRow label="Pending With" readOnly>{purchaseReadonlyValue(status === 'submitted' ? 'Purchase Head' : '-')}</ErpFieldRow>
+          <ErpFieldRow label="Approved By" readOnly>{purchaseReadonlyValue(existing?.approvedByName ?? '-')}</ErpFieldRow>
+          <ErpFieldRow label="Approved Date" readOnly>{purchaseReadonlyValue(existing?.approvedAt ? formatDate(existing.approvedAt) : '-')}</ErpFieldRow>
         </>
       )}
     </ErpCardSection>
@@ -952,7 +952,7 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
           .map((e) => (
             <li key={e.t} className="border-l-2 border-erp-border pl-3">
               <strong className="text-erp-text">{e.t}</strong>
-              <div className="text-erp-muted">{formatDate(e.d!)} · {e.u ?? '—'}</div>
+              <div className="text-erp-muted">{formatDate(e.d!)} · {e.u ?? '-'}</div>
             </li>
           ))}
       </ul>

@@ -143,8 +143,8 @@ export function ManufacturingProductionLedgerPage() {
                     <span className="font-medium">{row.accountName}</span>
                     <span className="ml-1 text-erp-muted">({row.accountCode})</span>
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{row.debit > 0 ? formatCurrency(row.debit) : '—'}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{row.credit > 0 ? formatCurrency(row.credit) : '—'}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{row.debit > 0 ? formatCurrency(row.debit) : '-'}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{row.credit > 0 ? formatCurrency(row.credit) : '-'}</td>
                   <td className="px-3 py-2 text-erp-muted">{row.costCentre}</td>
                   <td className="px-3 py-2 text-erp-muted">{row.workCentre}</td>
                   <td className="px-3 py-2 text-erp-muted">{row.sourceDocument}</td>

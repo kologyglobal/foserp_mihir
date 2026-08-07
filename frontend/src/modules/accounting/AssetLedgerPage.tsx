@@ -149,8 +149,8 @@ export function AssetLedgerPage() {
                         <td className="px-3 py-2">{r.entryType}</td>
                         <td className="px-3 py-2 font-mono">{r.reference}</td>
                         <td className="px-3 py-2 text-erp-muted">{r.narration}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.debitAmount > 0 ? formatCurrency(r.debitAmount) : '—'}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.creditAmount > 0 ? formatCurrency(r.creditAmount) : '—'}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.debitAmount > 0 ? formatCurrency(r.debitAmount) : '-'}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.creditAmount > 0 ? formatCurrency(r.creditAmount) : '-'}</td>
                         <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(r.runningNBV)}</td>
                       </tr>
                     ))}

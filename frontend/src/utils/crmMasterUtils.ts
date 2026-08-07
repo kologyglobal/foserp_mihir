@@ -148,7 +148,7 @@ export function sortMasterEntries(entries: CrmMasterEntry[]): CrmMasterEntry[] {
   return [...entries].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
 }
 
-export function masterEntryLabel(entry: CrmMasterEntry | undefined, fallback = '—'): string {
+export function masterEntryLabel(entry: CrmMasterEntry | undefined, fallback = '-'): string {
   return entry?.name ?? fallback
 }
 

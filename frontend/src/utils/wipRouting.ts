@@ -390,7 +390,7 @@ export function toWipRoutingOpsFromRouting(
     sequenceNo: o.sequenceNo,
     operationName: o.operationName,
     workCenterId: o.workCenterId,
-    workCenterCode: workCenters.find((w) => w.id === o.workCenterId)?.workCenterCode ?? '—',
+    workCenterCode: workCenters.find((w) => w.id === o.workCenterId)?.workCenterCode ?? '-',
     outsourced: o.outsourced,
   }))
 }

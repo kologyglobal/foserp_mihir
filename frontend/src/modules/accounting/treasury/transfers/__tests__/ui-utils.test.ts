@@ -56,7 +56,7 @@ export function runTreasuryTransferUiUtilTests() {
 
   check('maskAccountNumber masks long numbers', maskAccountNumber('1234567890') === '••••7890')
   check('maskAccountNumber passes through short numbers', maskAccountNumber('123') === '123')
-  check('maskAccountNumber handles null', maskAccountNumber(null) === '—')
+  check('maskAccountNumber handles null', maskAccountNumber(null) === '-')
 
   check('deriveTransferType BANK/BANK', deriveTransferType('BANK', 'BANK') === 'BANK_TO_BANK')
   check('deriveTransferType BANK/CASH', deriveTransferType('BANK', 'CASH') === 'BANK_TO_CASH')

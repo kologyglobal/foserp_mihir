@@ -57,7 +57,7 @@ export function IndiaMartDashboardPage() {
     ['Failed', data.failedImports],
     ['Overdue', data.overdueEnquiries],
     ['Unread alerts', data.unreadAlerts ?? 0],
-    ['Avg first response (min)', data.averageFirstResponseMinutes ?? '—'],
+    ['Avg first response (min)', data.averageFirstResponseMinutes ?? '-'],
     ['Lead conversion %', data.conversionToLeadPercent ?? 0],
   ] as const
 

@@ -23,7 +23,7 @@ export function InsideDuration({
     return () => clearInterval(timer)
   }, [from, to])
 
-  if (!from) return <span className={cn('text-erp-muted', className)}>—</span>
+  if (!from) return <span className={cn('text-erp-muted', className)}>-</span>
   const minutes = minutesBetween(from, to)
   const over = warnAfterMinutes != null && !to && minutes > warnAfterMinutes
   return (

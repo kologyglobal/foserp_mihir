@@ -28,7 +28,7 @@ export function FailedParameterSummary({
             <div className="flex items-center gap-2">
               <StatusBadge status={r.severity} />
               <span className="text-erp-muted">
-                Actual: {r.actualValue === null || r.actualValue === '' ? '—' : String(r.actualValue)}
+                Actual: {r.actualValue === null || r.actualValue === '' ? '-' : String(r.actualValue)}
               </span>
             </div>
           </li>

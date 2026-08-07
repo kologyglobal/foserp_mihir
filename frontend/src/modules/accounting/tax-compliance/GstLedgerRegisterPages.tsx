@@ -23,7 +23,7 @@ async function loadDocKind(kind: GstRegisterKind, filter: PeriodFilterState): Pr
   const items = (data.items as Array<Record<string, unknown>>) ?? []
   return items.map((r, i) => ({
     id: String(r.documentId ?? r.hsnSacCode ?? r.placeOfSupply ?? i),
-    documentNumber: String(r.documentNumber ?? r.hsnSacCode ?? r.placeOfSupply ?? '—'),
+    documentNumber: String(r.documentNumber ?? r.hsnSacCode ?? r.placeOfSupply ?? '-'),
     documentDate: String(r.documentDate ?? ''),
     documentType: String(r.documentType ?? kind),
     partyGstin: (r.partyGstin as string | null) ?? null,
@@ -58,8 +58,8 @@ function DocRegister({
         { key: 'doc', header: 'Document', render: (r) => r.documentNumber },
         { key: 'date', header: 'Date', render: (r) => r.documentDate },
         { key: 'type', header: 'Type', render: (r) => r.documentType },
-        { key: 'gstin', header: 'Party GSTIN', render: (r) => r.partyGstin || '—' },
-        { key: 'pos', header: 'POS', render: (r) => r.placeOfSupply || '—' },
+        { key: 'gstin', header: 'Party GSTIN', render: (r) => r.partyGstin || '-' },
+        { key: 'pos', header: 'POS', render: (r) => r.placeOfSupply || '-' },
         { key: 'taxable', header: 'Taxable', render: (r) => formatCurrency(r.taxableValue) },
         { key: 'tax', header: 'Tax', render: (r) => formatCurrency(r.totalTax) },
       ]}

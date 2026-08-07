@@ -33,8 +33,8 @@ export function enrichRoutingOperations(
       const wc = wcMap.get(op.workCenterId)
       return {
         ...op,
-        workCenterCode: wc?.workCenterCode ?? '—',
-        workCenterName: wc?.workCenterName ?? '—',
+        workCenterCode: wc?.workCenterCode ?? '-',
+        workCenterName: wc?.workCenterName ?? '-',
       }
     })
 }

@@ -142,7 +142,7 @@ export async function getCloseCalendar(periodCode?: string): Promise<CloseCalend
       title: e.title,
       category: e.category.toLowerCase() as CloseCalendarEvent['category'],
       dueDate: e.dueDate,
-      owner: e.ownerLabel ?? '—',
+      owner: e.ownerLabel ?? '-',
       status: e.status.toLowerCase() as CloseCalendarEvent['status'],
     }))
   }
@@ -547,7 +547,7 @@ export async function getFxRevaluation(filter?: PeriodFilterState): Promise<{
         totalLoss: 0,
         exchangeGainAccount: '— map UNREALIZED_FX_GAIN —',
         exchangeLossAccount: '— map UNREALIZED_FX_LOSS —',
-        reversalPeriod: '—',
+        reversalPeriod: '-',
         voucherNumber: null,
       }
     }
@@ -567,9 +567,9 @@ export async function getFxRevaluation(filter?: PeriodFilterState): Promise<{
       })),
       totalGain: Number(run.totalGain),
       totalLoss: Number(run.totalLoss),
-      exchangeGainAccount: run.exchangeGainAccount ?? '—',
-      exchangeLossAccount: run.exchangeLossAccount ?? '—',
-      reversalPeriod: run.reversalPeriod?.name ?? '—',
+      exchangeGainAccount: run.exchangeGainAccount ?? '-',
+      exchangeLossAccount: run.exchangeLossAccount ?? '-',
+      reversalPeriod: run.reversalPeriod?.name ?? '-',
       voucherNumber: run.voucherNumber,
     }
   }
@@ -817,11 +817,11 @@ export async function getYearEndPreview(fiscalYear?: string): Promise<YearEndPre
         : setup.fiscalYears[0]?.code
     if (!fyId) {
       return {
-        fiscalYear: fiscalYear ?? '—',
+        fiscalYear: fiscalYear ?? '-',
         revenueToClose: 0,
         expenseToClose: 0,
         profitOrLoss: 0,
-        retainedEarningsAccount: '—',
+        retainedEarningsAccount: '-',
         exceptions: ['No financial year available for year-end preview.'],
         unresolvedDifferences: 1,
         readyToPost: false,

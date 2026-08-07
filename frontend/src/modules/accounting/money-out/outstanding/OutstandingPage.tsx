@@ -108,7 +108,7 @@ export function OutstandingPage() {
             <tbody>
               {rows.map((r) => {
                 const href = documentLink(r)
-                const label = r.documentNumber ?? r.supplierInvoiceNumber ?? '—'
+                const label = r.documentNumber ?? r.supplierInvoiceNumber ?? '-'
                 return (
                   <tr key={r.openItemId} className="border-b border-erp-border/60 hover:bg-slate-50">
                     <td className="py-2 pr-2">
@@ -125,12 +125,12 @@ export function OutstandingPage() {
                         {r.vendorName}
                       </Link>
                     </td>
-                    <td className="py-2 pr-2 tabular-nums">{r.dueDate ?? '—'}</td>
+                    <td className="py-2 pr-2 tabular-nums">{r.dueDate ?? '-'}</td>
                     <td className="py-2 pr-2">{String(r.dueDateBucket).replace(/_/g, ' ')}</td>
                     <td className="py-2 pr-2 text-right tabular-nums">
                       {formatCurrency(parseDecimal(r.outstandingAmount))}
                     </td>
-                    <td className="py-2 pr-2 text-right tabular-nums">{r.daysOverdue ?? '—'}</td>
+                    <td className="py-2 pr-2 text-right tabular-nums">{r.daysOverdue ?? '-'}</td>
                   </tr>
                 )
               })}

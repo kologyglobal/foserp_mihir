@@ -213,7 +213,7 @@ export function BankAccountsPage() {
                     <td className="px-3 py-2">
                       <ReconciliationStatusBadge status={b.reconciliationStatus} />
                     </td>
-                    <td className="px-3 py-2 tabular-nums">{b.lastReconciledDate ? formatDate(b.lastReconciledDate) : '—'}</td>
+                    <td className="px-3 py-2 tabular-nums">{b.lastReconciledDate ? formatDate(b.lastReconciledDate) : '-'}</td>
                     <td className="px-3 py-2">
                       <BankAccountStatusBadge status={b.status} />
                     </td>

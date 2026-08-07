@@ -121,7 +121,7 @@ export function ApiDispatchReportsPage() {
                       <tr key={r.id}>
                         <td className="font-mono">{r.requirementNumber}</td>
                         <td>{r.salesOrderNo}</td>
-                        <td>{r.customerName ?? '—'}</td>
+                        <td>{r.customerName ?? '-'}</td>
                         <td>{r.itemCode ? `${r.itemCode} — ${r.itemName ?? ''}` : r.productOrItem}</td>
                         <td className="text-right tabular-nums">{r.readyQty}</td>
                       </tr>
@@ -141,8 +141,8 @@ export function ApiDispatchReportsPage() {
                     {pendingDrafts.map((d) => (
                       <tr key={d.id}>
                         <td><TableLink to={`/dispatch/${d.id}`}>{d.dispatchNo}</TableLink></td>
-                        <td>{d.salesOrderNo ?? '—'}</td>
-                        <td>{d.plannedDispatchDate ? formatDate(d.plannedDispatchDate) : '—'}</td>
+                        <td>{d.salesOrderNo ?? '-'}</td>
+                        <td>{d.plannedDispatchDate ? formatDate(d.plannedDispatchDate) : '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -160,8 +160,8 @@ export function ApiDispatchReportsPage() {
                     {dispatchedMonth.map((d) => (
                       <tr key={d.id}>
                         <td><TableLink to={`/dispatch/${d.id}`}>{d.dispatchNo}</TableLink></td>
-                        <td>{d.salesOrderNo ?? '—'}</td>
-                        <td>{d.confirmedAt ? formatDate(d.confirmedAt) : '—'}</td>
+                        <td>{d.salesOrderNo ?? '-'}</td>
+                        <td>{d.confirmedAt ? formatDate(d.confirmedAt) : '-'}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -217,7 +217,7 @@ export function SalesOrderStatusPage() {
         meta: entNumericMeta('Value'),
         cell: ({ row }) => {
           const v = resolveSalesOrderValue(row.original, products.find((p) => p.id === row.original.productId))
-          return <EnterpriseNumericCell value={v > 0 ? formatCurrency(v) : '—'} />
+          return <EnterpriseNumericCell value={v > 0 ? formatCurrency(v) : '-'} />
         },
       },
       {
@@ -273,7 +273,7 @@ export function SalesOrderStatusPage() {
         meta: { columnLabel: 'Risk' },
         cell: ({ row }) => {
           const risk = atRiskMap.get(row.original.id)
-          if (!risk) return <span className="text-erp-muted">—</span>
+          if (!risk) return <span className="text-erp-muted">-</span>
           return (
             <DynamicsStatusChip
               label={risk.severity === 'critical' ? 'Overdue' : risk.severity === 'high' ? 'At risk' : 'Watch'}
@@ -300,7 +300,7 @@ export function SalesOrderStatusPage() {
           label: 'Value',
           value: (() => {
             const v = resolveSalesOrderValue(so, products.find((p) => p.id === so.productId))
-            return v > 0 ? formatCurrency(v) : '—'
+            return v > 0 ? formatCurrency(v) : '-'
           })(),
         },
         { label: 'Status', value: so.status === 'open' ? 'Draft SO' : formatStatus(so.status) },

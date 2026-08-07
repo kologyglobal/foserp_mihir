@@ -260,9 +260,9 @@ export function CompanyImportDialog({ open, onClose, onImported }: CompanyImport
                   {rows.slice(0, 50).map((row) => (
                     <tr key={row.rowNo}>
                       <td>{row.rowNo}</td>
-                      <td>{row.input.customerName || '—'}</td>
-                      <td>{row.input.city || '—'}</td>
-                      <td className="font-mono text-[11px]">{row.input.gstin || '—'}</td>
+                      <td>{row.input.customerName || '-'}</td>
+                      <td>{row.input.city || '-'}</td>
+                      <td className="font-mono text-[11px]">{row.input.gstin || '-'}</td>
                       <td>{row.input.salesTerritory}</td>
                       <td className={cn(row.errors.length ? 'text-red-700' : 'text-emerald-700')}>
                         {row.errors.length ? row.errors[0] : 'Ready'}

@@ -228,7 +228,7 @@ export function CrmQuotationListPage() {
         revisionCount: revCounts.get(document.quotationId) ?? 1,
         quotationDate: document.createdAt?.slice(0, 10) ?? q?.createdAt?.slice(0, 10) ?? '',
         expiryDate: q?.validityDate?.slice(0, 10) ?? '',
-        ownerName: document.salesOwnerName ?? opp?.ownerName ?? '—',
+        ownerName: document.salesOwnerName ?? opp?.ownerName ?? '-',
         currencyCode: q?.currencyCode ?? 'INR',
         taxAmount: q?.pricing?.gstAmount ?? null,
         subtotalAmount: q?.pricing?.subtotal ?? null,
@@ -278,7 +278,7 @@ export function CrmQuotationListPage() {
   }, [filtered, sortBy])
 
   const ownerOptions = useMemo(
-    () => [...new Set(enriched.map((e) => e.ownerName).filter((o) => o && o !== '—'))].sort(),
+    () => [...new Set(enriched.map((e) => e.ownerName).filter((o) => o && o !== '-'))].sort(),
     [enriched],
   )
 
@@ -366,7 +366,7 @@ export function CrmQuotationListPage() {
         },
         { label: 'Revision', value: `${quotationRevisionLabel(d.revisionNo)} (${item.revisionCount} total)` },
         { label: 'Total', value: formatCrmCurrency(d.totalAmount) },
-        { label: 'Last Modified', value: d.modifiedAt ? new Date(d.modifiedAt).toLocaleDateString('en-IN') : '—' },
+        { label: 'Last Modified', value: d.modifiedAt ? new Date(d.modifiedAt).toLocaleDateString('en-IN') : '-' },
       ],
       timeline: [
         {

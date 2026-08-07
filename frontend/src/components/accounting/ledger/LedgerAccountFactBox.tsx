@@ -110,7 +110,7 @@ export function LedgerAccountFactBox({
               />
               <FactRow
                 label="Last posting"
-                value={summary.lastPostingDate ?? '—'}
+                value={summary.lastPostingDate ?? '-'}
               />
               <FactRow label="Entry count" value={String(summary.entryCount)} />
             </FactSection>

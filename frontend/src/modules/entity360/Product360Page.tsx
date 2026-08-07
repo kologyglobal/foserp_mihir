@@ -78,11 +78,11 @@ export function Product360Page() {
           <FactBox title="Product Overview" fields={[
             { label: 'Family', value: product.productFamily },
             { label: 'Status', value: <Badge color="blue">{PRODUCT_STATUS_LABELS[product.status]}</Badge> },
-            { label: 'FG Item', value: data.fgItem?.itemCode ?? '—' },
+            { label: 'FG Item', value: data.fgItem?.itemCode ?? '-' },
             { label: 'FG Stock', value: formatNumber(data.fgOnHand) },
           ]} />
           <FactBox title="Manufacturing Links" fields={[
-            { label: 'Released BOM', value: data.releasedBom ? `${data.releasedBom.bomNo} Rev ${data.releasedBom.revision}` : '—' },
+            { label: 'Released BOM', value: data.releasedBom ? `${data.releasedBom.bomNo} Rev ${data.releasedBom.revision}` : '-' },
             { label: 'Routings', value: data.routings.length },
             { label: 'Revisions', value: data.revisions.length },
           ]} />
@@ -171,8 +171,8 @@ export function Product360Page() {
       {tab === 'quality' && (
         <Entity360Panel title="Quality Control">
           <div className="space-y-2 p-4 text-[13px]">
-            <p className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-erp-primary" /> Final inspection: {product.quality.finalInspectionPlanName ?? '—'}</p>
-            <p>QC plan: {product.quality.qcPlanName || '—'}</p>
+            <p className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-erp-primary" /> Final inspection: {product.quality.finalInspectionPlanName ?? '-'}</p>
+            <p>QC plan: {product.quality.qcPlanName || '-'}</p>
             <p>Customer approval: {product.quality.customerApprovalRequired ? 'Required' : 'Not required'}</p>
           </div>
         </Entity360Panel>

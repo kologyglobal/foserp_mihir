@@ -2,7 +2,6 @@
  * Consolidated operational views — FE aggregation only.
  * Balances = operational SoT; GRN/PO/ledger docs remain unmerged audit trails.
  */
-import { isApiMode } from '../../config/apiConfig'
 import * as inventoryApi from '../api/inventoryApi'
 import {
   getGRNs,
@@ -27,10 +26,8 @@ import type {
   WarehouseOpsSummary,
   WarehouseStockSlice,
 } from '../../types/operationalStockViews'
-import { getItemById, getItems, getStockAvailability } from './inventoryService'
+import { getItemById, getItems } from './inventoryService'
 import { inventoryApiFacade } from './inventoryApiFacade'
-import { getItemBatches, getItemSerials } from './traceabilityService'
-import { getIssues, getIssueById } from './movementService'
 import type { InventoryStockBalance } from '../api/inventoryApi'
 
 export type ConsolidatedStockFilter = {
@@ -97,9 +94,9 @@ function extractReceiptLines(
         grnNumber: grn.documentNumber,
         receiptDate: grn.documentDate,
         vendorId: grn.vendor?.id ?? '',
-        vendorName: grn.vendor?.name ?? '—',
+        vendorName: grn.vendor?.name ?? '-',
         warehouseId: line.warehouseId || grn.warehouseId || '',
-        warehouseName: line.warehouseName || grn.warehouseName || '—',
+        warehouseName: line.warehouseName || grn.warehouseName || '-',
         qty,
         rate: num(line.rate),
         amount: num(line.taxableAmount) || qty * num(line.rate),
@@ -240,95 +237,71 @@ async function loadBalancesRaw(filter: ConsolidatedStockFilter = {}): Promise<
     maxStock?: number
   }>
 > {
-  if (isApiMode()) {
-    // Load balances + item catalog in parallel (avoid N+1 getItemById and serial page waterfalls).
-    const itemsPromise = getItems({}).catch(() => [] as Awaited<ReturnType<typeof getItems>>)
+  // Load balances + item catalog in parallel (avoid N+1 getItemById and serial page waterfalls).
+  const itemsPromise = getItems({}).catch(() => [] as Awaited<ReturnType<typeof getItems>>)
 
-    const firstRes = await inventoryApi.listInventoryBalances({
-      page: 1,
-      limit: 200,
-      warehouseId: filter.warehouseId || undefined,
-      itemId: filter.itemId || undefined,
-    })
-    const firstChunk: InventoryStockBalance[] = Array.isArray(firstRes)
-      ? firstRes
-      : ((firstRes as { data?: InventoryStockBalance[] }).data ?? [])
-    const meta = (firstRes as { meta?: { totalPages?: number } }).meta
-    const totalPages = Math.min(meta?.totalPages ?? 1, 20)
+  const firstRes = await inventoryApi.listInventoryBalances({
+    page: 1,
+    limit: 200,
+    warehouseId: filter.warehouseId || undefined,
+    itemId: filter.itemId || undefined,
+  })
+  const firstChunk: InventoryStockBalance[] = Array.isArray(firstRes)
+    ? firstRes
+    : ((firstRes as { data?: InventoryStockBalance[] }).data ?? [])
+  const meta = (firstRes as { meta?: { totalPages?: number } }).meta
+  const totalPages = Math.min(meta?.totalPages ?? 1, 20)
 
-    const [restChunks, items] = await Promise.all([
-      totalPages > 1
-        ? Promise.all(
-            Array.from({ length: totalPages - 1 }, (_, i) =>
-              inventoryApi
-                .listInventoryBalances({
-                  page: i + 2,
-                  limit: 200,
-                  warehouseId: filter.warehouseId || undefined,
-                  itemId: filter.itemId || undefined,
-                })
-                .then((res) =>
-                  Array.isArray(res) ? res : ((res as { data?: InventoryStockBalance[] }).data ?? []),
-                )
-                .catch(() => [] as InventoryStockBalance[]),
-            ),
-          )
-        : Promise.resolve([] as InventoryStockBalance[][]),
-      itemsPromise,
-    ])
+  const [restChunks, items] = await Promise.all([
+    totalPages > 1
+      ? Promise.all(
+          Array.from({ length: totalPages - 1 }, (_, i) =>
+            inventoryApi
+              .listInventoryBalances({
+                page: i + 2,
+                limit: 200,
+                warehouseId: filter.warehouseId || undefined,
+                itemId: filter.itemId || undefined,
+              })
+              .then((res) =>
+                Array.isArray(res) ? res : ((res as { data?: InventoryStockBalance[] }).data ?? []),
+              )
+              .catch(() => [] as InventoryStockBalance[]),
+          ),
+        )
+      : Promise.resolve([] as InventoryStockBalance[][]),
+    itemsPromise,
+  ])
 
-    const pages = firstChunk.concat(...restChunks)
-    const reorderById = new Map<string, { reorder: number; max?: number }>()
-    for (const it of items) {
-      reorderById.set(it.id, { reorder: it.reorderLevel ?? 0, max: it.maximumStock })
-    }
-
-    return pages.map((b) => {
-      const reorderMeta = reorderById.get(b.itemId) ?? { reorder: 0, max: undefined as number | undefined }
-      const onHand = num(b.onHandQty)
-      const reserved = num(b.reservedQty)
-      const available = num(b.freeQty ?? b.unrestrictedQty ?? onHand - reserved)
-      const avgCost = num(b.avgRate)
-      const stockValue = num(b.stockValue) || onHand * avgCost
-      return {
-        itemId: b.itemId,
-        itemCode: b.item?.code ?? '',
-        itemName: b.item?.name ?? '',
-        warehouseId: b.warehouseId,
-        warehouseCode: b.warehouse?.code ?? '',
-        warehouseName: b.warehouse?.name ?? '',
-        onHand,
-        reserved,
-        available,
-        avgCost,
-        stockValue,
-        reorderLevel: reorderMeta.reorder,
-        maxStock: reorderMeta.max,
-      }
-    })
+  const pages = firstChunk.concat(...restChunks)
+  const reorderById = new Map<string, { reorder: number; max?: number }>()
+  for (const it of items) {
+    reorderById.set(it.id, { reorder: it.reorderLevel ?? 0, max: it.maximumStock })
   }
 
-  const stock = await getStockAvailability({
-    search: filter.search,
-    warehouseId: filter.warehouseId,
-    itemId: filter.itemId,
-    lowStock: filter.lowStock,
-    outOfStock: filter.outOfStock,
+  return pages.map((b) => {
+    const reorderMeta = reorderById.get(b.itemId) ?? { reorder: 0, max: undefined as number | undefined }
+    const onHand = num(b.onHandQty)
+    const reserved = num(b.reservedQty)
+    const available = num(b.freeQty ?? b.unrestrictedQty ?? onHand - reserved)
+    const avgCost = num(b.avgRate)
+    const stockValue = num(b.stockValue) || onHand * avgCost
+    return {
+      itemId: b.itemId,
+      itemCode: b.item?.code ?? '',
+      itemName: b.item?.name ?? '',
+      warehouseId: b.warehouseId,
+      warehouseCode: b.warehouse?.code ?? '',
+      warehouseName: b.warehouse?.name ?? '',
+      onHand,
+      reserved,
+      available,
+      avgCost,
+      stockValue,
+      reorderLevel: reorderMeta.reorder,
+      maxStock: reorderMeta.max,
+    }
   })
-  return stock.map((r) => ({
-    itemId: r.itemId,
-    itemCode: r.itemCode,
-    itemName: r.itemName,
-    warehouseId: r.warehouseId,
-    warehouseCode: r.warehouseCode,
-    warehouseName: r.warehouseName,
-    onHand: r.onHand,
-    reserved: r.reserved,
-    available: r.available,
-    avgCost: r.onHand > 0 ? r.stockValue / r.onHand : 0,
-    stockValue: r.stockValue,
-    reorderLevel: r.reorderLevel,
-  }))
 }
 
 /** Open POs only (incoming qty) — avoid loading every GRN + return on stock views. */
@@ -388,64 +361,42 @@ export async function listDashboardStockAlerts(limit = 12): Promise<{
     status: stockHealthStatus(b.onHand, b.available, b.reorderLevel, b.maxStock),
   })
 
-  let rows: ConsolidatedStockRow[] = []
-
-  if (isApiMode()) {
-    const [balRes, items] = await Promise.all([
-      inventoryApi.listInventoryBalances({ page: 1, limit: 200 }).catch(() => null),
-      getItems({}).catch(() => [] as Awaited<ReturnType<typeof getItems>>),
-    ])
-    const chunk: InventoryStockBalance[] = balRes
-      ? Array.isArray(balRes)
-        ? balRes
-        : ((balRes as { data?: InventoryStockBalance[] }).data ?? [])
-      : []
-    const reorderById = new Map<string, { reorder: number; max?: number }>()
-    for (const it of items) {
-      reorderById.set(it.id, { reorder: it.reorderLevel ?? 0, max: it.maximumStock })
-    }
-    rows = chunk.map((b) => {
-      const meta = reorderById.get(b.itemId) ?? { reorder: 0, max: undefined as number | undefined }
-      const onHand = num(b.onHandQty)
-      const reserved = num(b.reservedQty)
-      const available = num(b.freeQty ?? b.unrestrictedQty ?? onHand - reserved)
-      const avgCost = num(b.avgRate)
-      const stockValue = num(b.stockValue) || onHand * avgCost
-      return toRow({
-        itemId: b.itemId,
-        itemCode: b.item?.code ?? '',
-        itemName: b.item?.name ?? '',
-        warehouseId: b.warehouseId,
-        warehouseCode: b.warehouse?.code ?? '',
-        warehouseName: b.warehouse?.name ?? '',
-        onHand,
-        reserved,
-        available,
-        avgCost,
-        stockValue,
-        reorderLevel: meta.reorder,
-        maxStock: meta.max,
-      })
-    })
-  } else {
-    const stock = await getStockAvailability({}).catch(() => [])
-    rows = stock.map((r) =>
-      toRow({
-        itemId: r.itemId,
-        itemCode: r.itemCode,
-        itemName: r.itemName,
-        warehouseId: r.warehouseId,
-        warehouseCode: r.warehouseCode,
-        warehouseName: r.warehouseName,
-        onHand: r.onHand,
-        reserved: r.reserved,
-        available: r.available,
-        avgCost: r.onHand > 0 ? r.stockValue / r.onHand : 0,
-        stockValue: r.stockValue,
-        reorderLevel: r.reorderLevel,
-      }),
-    )
+  const [balRes, items] = await Promise.all([
+    inventoryApi.listInventoryBalances({ page: 1, limit: 200 }).catch(() => null),
+    getItems({}).catch(() => [] as Awaited<ReturnType<typeof getItems>>),
+  ])
+  const chunk: InventoryStockBalance[] = balRes
+    ? Array.isArray(balRes)
+      ? balRes
+      : ((balRes as { data?: InventoryStockBalance[] }).data ?? [])
+    : []
+  const reorderById = new Map<string, { reorder: number; max?: number }>()
+  for (const it of items) {
+    reorderById.set(it.id, { reorder: it.reorderLevel ?? 0, max: it.maximumStock })
   }
+  const rows: ConsolidatedStockRow[] = chunk.map((b) => {
+    const meta = reorderById.get(b.itemId) ?? { reorder: 0, max: undefined as number | undefined }
+    const onHand = num(b.onHandQty)
+    const reserved = num(b.reservedQty)
+    const available = num(b.freeQty ?? b.unrestrictedQty ?? onHand - reserved)
+    const avgCost = num(b.avgRate)
+    const stockValue = num(b.stockValue) || onHand * avgCost
+    return toRow({
+      itemId: b.itemId,
+      itemCode: b.item?.code ?? '',
+      itemName: b.item?.name ?? '',
+      warehouseId: b.warehouseId,
+      warehouseCode: b.warehouse?.code ?? '',
+      warehouseName: b.warehouse?.name ?? '',
+      onHand,
+      reserved,
+      available,
+      avgCost,
+      stockValue,
+      reorderLevel: meta.reorder,
+      maxStock: meta.max,
+    })
+  })
 
   const lowAll = rows.filter((r) => r.status === 'low' || r.status === 'out')
   const negAll = rows.filter((r) => r.status === 'negative')
@@ -565,7 +516,7 @@ export async function listItemPurchaseSummaries(search?: string): Promise<
   }
 
   let rows = [...itemIds].map((id) => {
-    const m = meta.get(id) ?? { itemCode: id, itemName: '—' }
+    const m = meta.get(id) ?? { itemCode: id, itemName: '-' }
     return {
       ...buildPurchaseSummary(id, pos, grns, returns),
       itemCode: m.itemCode,
@@ -584,13 +535,9 @@ export async function listItemPurchaseSummaries(search?: string): Promise<
 }
 
 export async function listWarehouseOpsSummaries(): Promise<WarehouseOpsSummary[]> {
-  const [stock, { pos }, issues] = await Promise.all([
-    listConsolidatedStock(),
-    loadDocs(),
-    isApiMode()
-      ? Promise.resolve([] as Array<{ qty?: number }>)
-      : getIssues().catch(() => []),
-  ])
+  const [stock, { pos }] = await Promise.all([listConsolidatedStock(), loadDocs()])
+  // Outgoing: list issue rows lack warehouse dims — leave 0 until warehouse-scoped issue API is wired.
+  const issues: Array<{ qty?: number }> = []
 
   const byWh = new Map<string, WarehouseOpsSummary>()
   for (const r of stock) {
@@ -620,7 +567,6 @@ export async function listWarehouseOpsSummaries(): Promise<WarehouseOpsSummary[]
     if (r.status === 'negative') row.negativeStockItems += 1
   }
 
-  // Outgoing: list issue rows lack warehouse dims — leave 0 until warehouse-scoped issue API is wired.
   void issues
   void pos
 
@@ -659,13 +605,13 @@ export async function listVendorOpsSummaries(): Promise<VendorOpsSummary[]> {
   }
 
   for (const v of vendors) {
-    ensure(v.id, v.vendorCode ?? '', v.vendorName ?? '—')
+    ensure(v.id, v.vendorCode ?? '', v.vendorName ?? '-')
   }
 
   for (const po of pos) {
     const vid = po.vendor?.id
     if (!vid) continue
-    const row = ensure(vid, po.vendor.code ?? '', po.vendor.name ?? '—')
+    const row = ensure(vid, po.vendor.code ?? '', po.vendor.name ?? '-')
     row.totalOrders += 1
     // Delayed if expected delivery date passed and still open
     for (const line of po.lines ?? []) {
@@ -680,7 +626,7 @@ export async function listVendorOpsSummaries(): Promise<VendorOpsSummary[]> {
   for (const grn of grns) {
     const vid = grn.vendor?.id ?? ''
     if (!vid) continue
-    const row = ensure(vid, grn.vendor?.code ?? '', grn.vendor?.name ?? '—')
+    const row = ensure(vid, grn.vendor?.code ?? '', grn.vendor?.name ?? '-')
     if (!grnIdsByVendor.has(vid)) grnIdsByVendor.set(vid, new Set())
     grnIdsByVendor.get(vid)!.add(grn.id)
     for (const line of grn.lines ?? []) {
@@ -712,7 +658,6 @@ export async function listVendorOpsSummaries(): Promise<VendorOpsSummary[]> {
 
 export async function getItemStock360(itemId: string, warehouseId?: string): Promise<ItemStock360 | null> {
   const item = await getItemById(itemId)
-  if (!item && !isApiMode()) return null
 
   const { grns, pos, returns } = await loadDocs()
   const balances = await loadBalancesRaw({ itemId })
@@ -760,68 +705,36 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
 
   // Batches
   let batches: BatchStockSlice[] = []
-  if (isApiMode()) {
-    try {
-      const lineageRes = await inventoryApi.getInventoryItemLineage(itemId)
-      const lineage = lineageRes.data
-      for (const batch of lineage.batches ?? []) {
-        for (const bal of batch.balances ?? []) {
-          if (warehouseId && bal.warehouseId !== warehouseId) continue
-          batches.push({
-            batchNo: batch.batchNumber,
-            warehouseName: warehouses.find((w) => w.warehouseId === bal.warehouseId)?.warehouseName ?? bal.warehouseId,
-            qty: num(bal.quantity),
-            status: bal.stockStatus,
-            expiryDate: batch.expiryDate,
-          })
-        }
-      }
-    } catch {
-      try {
-        const lotsRes = await inventoryApi.listInventoryLots({ itemId, limit: 200 })
-        const list = lotsRes.data ?? []
-        batches = list
-          .filter((l) => !warehouseId || l.warehouseId === warehouseId)
-          .map((l) => ({
-            batchNo: l.lotNumber,
-            warehouseName: warehouses.find((w) => w.warehouseId === l.warehouseId)?.warehouseName ?? '—',
-            qty: num(l.quantityOnHand),
-            status: l.status,
-            expiryDate: l.expiryDate,
-          }))
-      } catch {
-        batches = []
+  try {
+    const lineageRes = await inventoryApi.getInventoryItemLineage(itemId)
+    const lineage = lineageRes.data
+    for (const batch of lineage.batches ?? []) {
+      for (const bal of batch.balances ?? []) {
+        if (warehouseId && bal.warehouseId !== warehouseId) continue
+        batches.push({
+          batchNo: batch.batchNumber,
+          warehouseName: warehouses.find((w) => w.warehouseId === bal.warehouseId)?.warehouseName ?? bal.warehouseId,
+          qty: num(bal.quantity),
+          status: bal.stockStatus,
+          expiryDate: batch.expiryDate,
+        })
       }
     }
-  } else {
+  } catch {
     try {
-      const demoBatches = await getItemBatches(itemId, warehouseId ? { warehouseId } : {})
-      batches = demoBatches.map((b) => ({
-        batchNo: b.batchNo,
-        warehouseName: b.warehouseName || warehouses.find((w) => w.warehouseId === b.warehouseId)?.warehouseName || '—',
-        qty: b.availableQty + b.reservedQty,
-        status: b.qualityStatus ?? 'available',
-        expiryDate: b.expiryDate,
-      }))
+      const lotsRes = await inventoryApi.listInventoryLots({ itemId, limit: 200 })
+      const list = lotsRes.data ?? []
+      batches = list
+        .filter((l) => !warehouseId || l.warehouseId === warehouseId)
+        .map((l) => ({
+          batchNo: l.lotNumber,
+          warehouseName: warehouses.find((w) => w.warehouseId === l.warehouseId)?.warehouseName ?? '-',
+          qty: num(l.quantityOnHand),
+          status: l.status,
+          expiryDate: l.expiryDate,
+        }))
     } catch {
       batches = []
-    }
-    // If still empty, surface batch numbers from GRN lines without merging qty across GRNs
-    if (batches.length === 0) {
-      for (const grn of grns) {
-        for (const line of grn.lines ?? []) {
-          if (line.itemId !== itemId) continue
-          if (!line.batchNumber && !line.lotNumber) continue
-          if (warehouseId && line.warehouseId && line.warehouseId !== warehouseId) continue
-          batches.push({
-            batchNo: line.batchNumber || line.lotNumber,
-            warehouseName: line.warehouseName || grn.warehouseName || '—',
-            qty: num(line.receivedQty ?? line.acceptedQty),
-            status: String(grn.status),
-            expiryDate: line.expiryDate,
-          })
-        }
-      }
     }
   }
 
@@ -839,7 +752,7 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
       binKey.add(key)
       bins.push({
         binCode,
-        warehouseName: line.warehouseName || grn.warehouseName || '—',
+        warehouseName: line.warehouseName || grn.warehouseName || '-',
         qty: num(line.receivedQty ?? line.acceptedQty),
         note: 'From GRN line (document), not a bin balance table',
         sourceDocumentNo: grn.documentNumber,
@@ -850,42 +763,27 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
 
   // Serials — tracking masters + document references (never a fake consolidated balance)
   let serials: SerialStockSlice[] = []
-  if (isApiMode()) {
-    try {
-      const lineageRes = await inventoryApi.getInventoryItemLineage(itemId)
-      const linSerials = lineageRes.data?.serials ?? []
-      serials = linSerials
-        .filter((s) => !warehouseId || !s.warehouseId || s.warehouseId === warehouseId)
-        .map((s) => ({
-          serialNo: s.serialNumber,
-          warehouseName: warehouses.find((w) => w.warehouseId === s.warehouseId)?.warehouseName ?? (s.warehouseId ? '—' : '—'),
-          status: s.status,
-          source: 'master' as const,
-          sourceDocumentNo: null,
-        }))
-    } catch {
-      try {
-        const listRes = await inventoryApi.listInventorySerials({ itemId, limit: 200, warehouseId })
-        serials = (listRes.data ?? []).map((s) => ({
-          serialNo: s.serialNumber,
-          warehouseName: warehouses.find((w) => w.warehouseId === s.warehouseId)?.warehouseName ?? '—',
-          status: s.status,
-          source: 'master' as const,
-          sourceDocumentNo: s.sourceReferenceNo ?? null,
-        }))
-      } catch {
-        serials = []
-      }
-    }
-  } else {
-    try {
-      const demo = await getItemSerials(itemId, warehouseId ? { warehouseId } : {})
-      serials = demo.map((s) => ({
-        serialNo: s.serialNo,
-        warehouseName: s.warehouseName || warehouses.find((w) => w.warehouseId === s.warehouseId)?.warehouseName || '—',
+  try {
+    const lineageRes = await inventoryApi.getInventoryItemLineage(itemId)
+    const linSerials = lineageRes.data?.serials ?? []
+    serials = linSerials
+      .filter((s) => !warehouseId || !s.warehouseId || s.warehouseId === warehouseId)
+      .map((s) => ({
+        serialNo: s.serialNumber,
+        warehouseName: warehouses.find((w) => w.warehouseId === s.warehouseId)?.warehouseName ?? (s.warehouseId ? '-' : '-'),
         status: s.status,
         source: 'master' as const,
-        sourceDocumentNo: s.sourceDocumentNo ?? null,
+        sourceDocumentNo: null,
+      }))
+  } catch {
+    try {
+      const listRes = await inventoryApi.listInventorySerials({ itemId, limit: 200, warehouseId })
+      serials = (listRes.data ?? []).map((s) => ({
+        serialNo: s.serialNumber,
+        warehouseName: warehouses.find((w) => w.warehouseId === s.warehouseId)?.warehouseName ?? '-',
+        status: s.status,
+        source: 'master' as const,
+        sourceDocumentNo: s.sourceReferenceNo ?? null,
       }))
     } catch {
       serials = []
@@ -904,7 +802,7 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
       serialSeen.add(k)
       serials.push({
         serialNo: sn,
-        warehouseName: line.warehouseName || grn.warehouseName || '—',
+        warehouseName: line.warehouseName || grn.warehouseName || '-',
         status: String(grn.status),
         source: 'document',
         sourceDocumentNo: grn.documentNumber,
@@ -915,56 +813,27 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
 
   // Issues
   let issues: ItemStock360['issues'] = []
-  if (isApiMode()) {
-    try {
-      const ledgerRes = await inventoryApi.listInventoryLedger({
-        itemId,
-        limit: 100,
-        warehouseId: warehouseId || undefined,
-      })
-      const movements = Array.isArray(ledgerRes)
-        ? ledgerRes
-        : (ledgerRes as { data?: inventoryApi.InventoryStockMovement[] }).data ?? []
-      issues = movements
-        .filter((m) => m.movementType === 'ISSUE' || String(m.referenceType).includes('ISSUE'))
-        .map((m) => ({
-          id: m.id,
-          date: m.movementDate?.slice(0, 10) ?? m.createdAt?.slice(0, 10) ?? '',
-          number: m.movementNumber,
-          qty: num(m.quantity),
-          reference: m.referenceNo ?? m.referenceType,
-          href: `/inventory/ledger?itemId=${itemId}`,
-        }))
-    } catch {
-      issues = []
-    }
-  } else {
-    try {
-      const list = await getIssues()
-      const detailed: ItemStock360['issues'] = []
-      for (const row of list) {
-        try {
-          const full = await getIssueById(row.id)
-          if (!full) continue
-          for (const line of full.lines ?? []) {
-            if (line.itemId !== itemId) continue
-            detailed.push({
-              id: `${full.id}-${line.id}`,
-              date: full.documentDate,
-              number: full.documentNumber,
-              qty: num(line.issuedQty),
-              reference: full.sourceDocumentNo ?? full.sourceType ?? '',
-              href: `/inventory/movements/issues/${full.id}`,
-            })
-          }
-        } catch {
-          /* skip */
-        }
-      }
-      issues = detailed
-    } catch {
-      issues = []
-    }
+  try {
+    const ledgerRes = await inventoryApi.listInventoryLedger({
+      itemId,
+      limit: 100,
+      warehouseId: warehouseId || undefined,
+    })
+    const movements = Array.isArray(ledgerRes)
+      ? ledgerRes
+      : (ledgerRes as { data?: inventoryApi.InventoryStockMovement[] }).data ?? []
+    issues = movements
+      .filter((m) => m.movementType === 'ISSUE' || String(m.referenceType).includes('ISSUE'))
+      .map((m) => ({
+        id: m.id,
+        date: m.movementDate?.slice(0, 10) ?? m.createdAt?.slice(0, 10) ?? '',
+        number: m.movementNumber,
+        qty: num(m.quantity),
+        reference: m.referenceNo ?? m.referenceType,
+        href: `/inventory/ledger?itemId=${itemId}`,
+      }))
+  } catch {
+    issues = []
   }
 
   // Transfers
@@ -981,8 +850,8 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
         id: `${String(t.id)}-${idx}`,
         date: String(t.documentDate ?? t.transferDate ?? t.createdAt ?? '').slice(0, 10),
         number: String(t.documentNumber ?? t.transferNumber ?? t.id),
-        fromWh: String(t.fromWarehouseName ?? t.sourceWarehouseName ?? t.fromWarehouseId ?? '—'),
-        toWh: String(t.toWarehouseName ?? t.destinationWarehouseName ?? t.toWarehouseId ?? '—'),
+        fromWh: String(t.fromWarehouseName ?? t.sourceWarehouseName ?? t.fromWarehouseId ?? '-'),
+        toWh: String(t.toWarehouseName ?? t.destinationWarehouseName ?? t.toWarehouseId ?? '-'),
         qty: num((line as { qty?: number; quantity?: number; transferQty?: number }).transferQty
           ?? (line as { qty?: number }).qty
           ?? (line as { quantity?: number }).quantity),
@@ -1005,12 +874,12 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
         return {
           id: String(r.id),
           qty: num(typeof qtyRaw === 'number' || typeof qtyRaw === 'string' ? qtyRaw : null),
-          demandType: String(r.demandType ?? r.source ?? '—'),
-          referenceNo: String(r.referenceNo ?? r.demandId ?? '—'),
+          demandType: String(r.demandType ?? r.source ?? '-'),
+          referenceNo: String(r.referenceNo ?? r.demandId ?? '-'),
           warehouseName:
             warehouses.find((w) => w.warehouseId === r.warehouseId)?.warehouseName ??
-            String(r.warehouseName ?? r.warehouseId ?? '—'),
-          status: String(r.status ?? '—'),
+            String(r.warehouseName ?? r.warehouseId ?? '-'),
+          status: String(r.status ?? '-'),
         }
       })
   } catch {
@@ -1083,14 +952,19 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
   timeline.sort((a, b) => b.at.localeCompare(a.at))
 
   const itemCode = item?.itemCode ?? filtered[0]?.itemCode ?? receipts[0]?.grnNumber ?? itemId
-  const itemName = item?.itemName ?? filtered[0]?.itemName ?? '—'
-  const uom = item?.baseUomCode ?? '—'
+  const itemName = item?.itemName ?? filtered[0]?.itemName ?? '-'
+  const uom = item?.baseUomCode ?? '-'
+  const alternateUom =
+    item?.alternateUomCode && item.alternateUomFactor
+      ? { code: item.alternateUomCode, factor: item.alternateUomFactor }
+      : null
 
   return {
     itemId,
     itemCode,
     itemName,
     uom,
+    alternateUom,
     overview: {
       onHand: overviewOnHand,
       reserved: overviewReserved,
@@ -1165,7 +1039,7 @@ export async function getOperationalAnalytics(): Promise<OperationalAnalytics> {
     const vid = grn.vendor?.id ?? ''
     let vend = vendorMap.get(vid)
     if (!vend && vid) {
-      vend = { vendorId: vid, vendorName: grn.vendor?.name ?? '—', qty: 0, grnCount: new Set(), amount: 0 }
+      vend = { vendorId: vid, vendorName: grn.vendor?.name ?? '-', qty: 0, grnCount: new Set(), amount: 0 }
       vendorMap.set(vid, vend)
     }
     if (vend) vend.grnCount.add(grn.id)
@@ -1320,7 +1194,7 @@ export async function searchItemOpsSnapshot(query: string): Promise<ItemSearchSn
     const itemRows = stock.filter((r) => r.itemId === itemId)
     const itemMeta = items.find((i) => i.id === itemId)
     const code = itemRows[0]?.itemCode ?? itemMeta?.itemCode ?? itemId
-    const name = itemRows[0]?.itemName ?? itemMeta?.itemName ?? '—'
+    const name = itemRows[0]?.itemName ?? itemMeta?.itemName ?? '-'
     const currentStock = itemRows.reduce((s, r) => s + r.onHand, 0)
     const available = itemRows.reduce((s, r) => s + r.available, 0)
     const value = itemRows.reduce((s, r) => s + r.stockValue, 0)
@@ -1396,9 +1270,9 @@ export async function listItemReceiptSummaries(search?: string): Promise<
         grnNumber: grn.documentNumber,
         receiptDate: grn.documentDate,
         vendorId: grn.vendor?.id ?? '',
-        vendorName: grn.vendor?.name ?? '—',
+        vendorName: grn.vendor?.name ?? '-',
         warehouseId: line.warehouseId || grn.warehouseId || '',
-        warehouseName: line.warehouseName || grn.warehouseName || '—',
+        warehouseName: line.warehouseName || grn.warehouseName || '-',
         qty: num(line.receivedQty ?? line.acceptedQty),
         rate: num(line.rate),
         amount: num(line.taxableAmount) || num(line.receivedQty) * num(line.rate),

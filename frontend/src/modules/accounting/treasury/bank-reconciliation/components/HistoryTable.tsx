@@ -32,15 +32,15 @@ export function HistoryTable({ sessions }: { sessions: SessionDto[] }) {
                 </TableLink>
               </td>
               <td className="px-2 py-1.5 text-right tabular-nums">
-                {s.statementClosingBalance != null ? formatCurrency(parseDecimal(s.statementClosingBalance)) : '—'}
+                {s.statementClosingBalance != null ? formatCurrency(parseDecimal(s.statementClosingBalance)) : '-'}
               </td>
               <td className="px-2 py-1.5 text-right tabular-nums">
-                {s.reconciliationDifference != null ? formatCurrency(parseDecimal(s.reconciliationDifference)) : '—'}
+                {s.reconciliationDifference != null ? formatCurrency(parseDecimal(s.reconciliationDifference)) : '-'}
               </td>
               <td className="px-2 py-1.5">
                 <SessionStatusChip status={s.status} />
               </td>
-              <td className="px-2 py-1.5 whitespace-nowrap text-erp-muted">{s.finalizedAt ? formatDateTime(s.finalizedAt) : '—'}</td>
+              <td className="px-2 py-1.5 whitespace-nowrap text-erp-muted">{s.finalizedAt ? formatDateTime(s.finalizedAt) : '-'}</td>
             </tr>
           ))}
         </tbody>

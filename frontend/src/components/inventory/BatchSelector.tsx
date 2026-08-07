@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getAvailableBatches } from '@/services/inventory/traceabilityService'
 import { getInventoryItemLineage, listInventoryLots } from '@/services/api/inventoryApi'
-import { isApiMode } from '@/config/apiConfig'
 import type { BatchSelectionMethod, BatchSelectionPreviewLine } from '@/types/inventoryDomain'
 import { BATCH_METHOD_LABELS } from '@/utils/inventoryMovementLabels'
 import { formatDate } from '@/utils/dates/format'
@@ -79,10 +77,7 @@ export function BatchSelector({
     }
     let cancelled = false
     setLoading(true)
-    const request = isApiMode()
-      ? loadApiBatches(itemId, warehouseId, qty)
-      : getAvailableBatches(itemId, warehouseId, qty, method)
-    request
+    loadApiBatches(itemId, warehouseId, qty)
       .then((rows) => {
         if (!cancelled) {
           setPreview(rows)
@@ -142,7 +137,7 @@ export function BatchSelector({
               {preview.map((b) => (
                 <tr key={b.batchNo} className={cn(value === b.batchNo && 'font-semibold text-erp-primary')}>
                   <td className="font-mono">{b.batchNo}</td>
-                  <td>{b.expiryDate ? formatDate(b.expiryDate) : '—'}</td>
+                  <td>{b.expiryDate ? formatDate(b.expiryDate) : '-'}</td>
                   <td className="text-right font-mono">{formatNumber(b.selectedQty)}</td>
                 </tr>
               ))}

@@ -182,10 +182,10 @@ export function BankCashTransactionsPage() {
                     <td className="px-3 py-2 font-mono">{t.transactionNumber}</td>
                     <td className="px-3 py-2">{t.accountName}</td>
                     <td className="px-3 py-2">{t.transactionType}</td>
-                    <td className="px-3 py-2">{t.counterpartyName ?? '—'}</td>
+                    <td className="px-3 py-2">{t.counterpartyName ?? '-'}</td>
                     <td className="px-3 py-2 font-mono text-[12px]">{t.reference}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{t.debitAmount > 0 ? formatCurrency(t.debitAmount) : '—'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{t.creditAmount > 0 ? formatCurrency(t.creditAmount) : '—'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{t.debitAmount > 0 ? formatCurrency(t.debitAmount) : '-'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{t.creditAmount > 0 ? formatCurrency(t.creditAmount) : '-'}</td>
                     <td className="px-3 py-2">
                       <span className={t.isReconciled ? 'text-emerald-700' : 'text-amber-700'}>{t.isReconciled ? 'Yes' : 'No'}</span>
                     </td>

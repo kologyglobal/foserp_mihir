@@ -1,48 +1,54 @@
 import type { PurchaseOrderLine } from '@/types/purchaseDomain'
 import {
   formatPurchaseQty,
-  getPurchaseLineBaseUomCode,
-  purchaseLineHasDualUom,
+  resolvePurchaseLineTrackingPresentation,
 } from '@/utils/purchaseLineUom'
 import { cn } from '@/utils/cn'
 
-type LineUom = Pick<PurchaseOrderLine, 'itemId' | 'uom' | 'uomConversionFactor'>
+type LineUom = Pick<PurchaseOrderLine, 'itemId' | 'uom' | 'uomConversionFactor' | 'uomId'>
 
 type Props = {
   line: LineUom
-  /** Qty in purchase / vendor UOM (e.g. MTR). */
+  /** Qty in purchase / vendor UOM when already split; otherwise same as base. */
   purchaseQty: number
   /** Qty in base / stock UOM (e.g. NOS). */
   baseQty: number
   className?: string
+  showDualQtyLabels?: boolean
 }
 
 /**
  * Read-only tracking qty (outstanding / received / invoiced).
- * When MUOM applies, shows purchase UOM on top and base UOM beneath — same pattern as Qty column.
+ * MUOM: vendor UOM on top (KG/MTR), stock UOM below (NOS).
  */
-export function PurchaseLineTrackingQtyCell({ line, purchaseQty, baseQty, className }: Props) {
-  const dual = purchaseLineHasDualUom(line)
-  const purchaseUom = (line.uom || '—').trim()
-  const baseUom = getPurchaseLineBaseUomCode(line.itemId)
+export function PurchaseLineTrackingQtyCell({
+  line,
+  purchaseQty,
+  baseQty,
+  className,
+  showDualQtyLabels = false,
+}: Props) {
+  const pres = resolvePurchaseLineTrackingPresentation(line, purchaseQty, baseQty)
 
-  if (!dual || !baseUom) {
-    const qty = purchaseQty || baseQty
-    const uom = purchaseUom !== '—' ? purchaseUom : baseUom || '—'
+  if (!pres.dual) {
     return (
-      <div className={cn('whitespace-nowrap tabular-nums text-[11px]', className)}>
-        {formatPurchaseQty(qty)} {uom}
+      <div className={cn('purchase-dual-qty purchase-dual-qty--single text-right', className)}>
+        <div className="purchase-dual-qty__primary">
+          {formatPurchaseQty(pres.baseQty)} {pres.baseUom}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className={cn('tabular-nums text-right', className)}>
-      <div className="whitespace-nowrap text-[11px] font-medium text-erp-text">
-        {formatPurchaseQty(purchaseQty)} {purchaseUom}
+    <div className={cn('purchase-dual-qty text-right', className)}>
+      <div className="purchase-dual-qty__primary">
+        {showDualQtyLabels ? <span className="purchase-dual-qty__label">Purchase</span> : null}
+        {formatPurchaseQty(pres.purchaseQty)} {pres.purchaseUom}
       </div>
-      <div className="mt-0.5 whitespace-nowrap text-[10px] font-medium text-erp-muted">
-        {formatPurchaseQty(baseQty)} {baseUom}
+      <div className="purchase-dual-qty__secondary">
+        {showDualQtyLabels ? <span className="purchase-dual-qty__label">Stock</span> : null}
+        {formatPurchaseQty(pres.baseQty)} {pres.baseUom}
       </div>
     </div>
   )

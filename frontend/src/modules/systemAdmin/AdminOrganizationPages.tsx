@@ -35,7 +35,7 @@ function resolveCurrentTenantId(): string | null {
 }
 
 function formatWhen(iso: string | null | undefined): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   try {
     return new Date(iso).toLocaleString()
   } catch {
@@ -393,25 +393,25 @@ export function AdminTenantProfilePage() {
                 <DetailGrid>
                   <DetailField label="Name" value={tenant.name} />
                   <DetailField label="Slug" value={tenant.slug} />
-                  <DetailField label="Legal name" value={tenant.legalName ?? '—'} />
+                  <DetailField label="Legal name" value={tenant.legalName ?? '-'} />
                   <DetailField label="Email" value={tenant.email} />
-                  <DetailField label="Phone" value={tenant.phone ?? '—'} />
+                  <DetailField label="Phone" value={tenant.phone ?? '-'} />
                   <DetailField label="Status" value={tenant.status} />
                 </DetailGrid>
               </DetailSection>
               <DetailSection title="Location & locale">
                 <DetailGrid>
-                  <DetailField label="Country" value={tenant.country ?? '—'} />
-                  <DetailField label="State" value={tenant.state ?? '—'} />
-                  <DetailField label="City" value={tenant.city ?? '—'} />
+                  <DetailField label="Country" value={tenant.country ?? '-'} />
+                  <DetailField label="State" value={tenant.state ?? '-'} />
+                  <DetailField label="City" value={tenant.city ?? '-'} />
                   <DetailField label="Timezone" value={tenant.timezone} />
                   <DetailField label="Currency" value={tenant.currency} />
                 </DetailGrid>
               </DetailSection>
               <DetailSection title="Subscription (read-only)">
                 <DetailGrid>
-                  <DetailField label="Plan" value={tenant.subscriptionPlan ?? '—'} />
-                  <DetailField label="Subscription status" value={tenant.subscriptionStatus ?? '—'} />
+                  <DetailField label="Plan" value={tenant.subscriptionPlan ?? '-'} />
+                  <DetailField label="Subscription status" value={tenant.subscriptionStatus ?? '-'} />
                   <DetailField label="Created" value={formatWhen(tenant.createdAt)} />
                   <DetailField label="Updated" value={formatWhen(tenant.updatedAt)} />
                 </DetailGrid>

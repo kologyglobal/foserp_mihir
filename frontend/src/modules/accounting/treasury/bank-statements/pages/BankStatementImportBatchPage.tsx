@@ -148,7 +148,7 @@ export function BankStatementImportBatchPage() {
       <dl className="grid gap-2 rounded-lg border border-erp-border bg-white p-3 text-[12px] sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <dt className="text-erp-muted">File</dt>
-          <dd className="font-medium">{batch.originalFileName ?? '—'}</dd>
+          <dd className="font-medium">{batch.originalFileName ?? '-'}</dd>
         </div>
         <div>
           <dt className="text-erp-muted">Uploaded</dt>

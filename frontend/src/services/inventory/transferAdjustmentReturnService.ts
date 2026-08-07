@@ -64,8 +64,8 @@ function whMeta(warehouseId: string) {
   const wh = getMaster().getWarehouse(warehouseId)
   return {
     warehouseId,
-    warehouseName: wh?.warehouseName ?? '—',
-    plantCode: wh?.plantCode ?? '—',
+    warehouseName: wh?.warehouseName ?? '-',
+    plantCode: wh?.plantCode ?? '-',
   }
 }
 
@@ -720,7 +720,7 @@ export async function getReturnSourceDocuments(returnType: InventoryReturnType):
         returnType,
         partyOrDepartment: inv.customerName,
         warehouseId: whId,
-        warehouseName: getMaster().getWarehouse(whId)?.warehouseName ?? '—',
+        warehouseName: getMaster().getWarehouse(whId)?.warehouseName ?? '-',
         eligibleLineCount: inv.lines.length,
         eligibleQty: inv.lines.reduce((s, l) => s + l.qty, 0),
         isEligible: true,
@@ -739,7 +739,7 @@ export async function getReturnSourceDocuments(returnType: InventoryReturnType):
         returnType,
         partyOrDepartment: d.customerName,
         warehouseId: whId,
-        warehouseName: getMaster().getWarehouse(whId)?.warehouseName ?? '—',
+        warehouseName: getMaster().getWarehouse(whId)?.warehouseName ?? '-',
         eligibleLineCount: d.lines.length,
         eligibleQty: d.lines.reduce((s, l) => s + l.qty, 0),
         isEligible: true,
@@ -760,7 +760,7 @@ export async function getReturnSourceDocuments(returnType: InventoryReturnType):
         returnType,
         partyOrDepartment: wo.outputItemCode,
         warehouseId: mats[0]?.warehouseId ?? '',
-        warehouseName: getMaster().getWarehouse(mats[0]?.warehouseId ?? '')?.warehouseName ?? '—',
+        warehouseName: getMaster().getWarehouse(mats[0]?.warehouseId ?? '')?.warehouseName ?? '-',
         eligibleLineCount: mats.length,
         eligibleQty: mats.reduce((s, m) => s + m.issuedQty, 0),
         isEligible: true,
@@ -870,7 +870,7 @@ export async function getReturnSourceDetails(
         returnType,
         partyOrDepartment: inv.customerName,
         warehouseId: whId,
-        warehouseName: getMaster().getWarehouse(whId)?.warehouseName ?? '—',
+        warehouseName: getMaster().getWarehouse(whId)?.warehouseName ?? '-',
         lines,
       }
     }
@@ -907,7 +907,7 @@ export async function getReturnSourceDetails(
         returnType,
         partyOrDepartment: dispatch.customerName,
         warehouseId: whId,
-        warehouseName: getMaster().getWarehouse(whId)?.warehouseName ?? '—',
+        warehouseName: getMaster().getWarehouse(whId)?.warehouseName ?? '-',
         lines,
       }
     }
@@ -927,7 +927,7 @@ export async function getReturnSourceDetails(
         itemId: m.itemId,
         itemCode: m.itemCode,
         itemName: item.itemName,
-        uomCode: uom?.uomCode ?? '—',
+        uomCode: uom?.uomCode ?? '-',
         warehouseId: m.warehouseId,
         eligibleQty: m.issuedQty,
         returnQty: 0,
@@ -949,7 +949,7 @@ export async function getReturnSourceDetails(
       returnType,
       partyOrDepartment: wo.outputItemCode,
       warehouseId: whId,
-      warehouseName: getMaster().getWarehouse(whId)?.warehouseName ?? '—',
+      warehouseName: getMaster().getWarehouse(whId)?.warehouseName ?? '-',
       lines,
     }
   }

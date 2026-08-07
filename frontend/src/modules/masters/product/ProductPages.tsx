@@ -101,7 +101,7 @@ export function ProductListPage() {
       header: 'Category',
       cell: ({ row }) => {
         const cat = row.original.productCategory as ProductCategory | undefined
-        return cat ? (PRODUCT_CATEGORY_LABELS[cat] ?? cat) : '—'
+        return cat ? (PRODUCT_CATEGORY_LABELS[cat] ?? cat) : '-'
       },
     },
     {
@@ -112,12 +112,12 @@ export function ProductListPage() {
     {
       id: 'variant',
       header: 'Capacity / Variant',
-      cell: ({ row }) => row.original.capacity || (row.original.isConfigurableParent ? 'Configurable' : '—'),
+      cell: ({ row }) => row.original.capacity || (row.original.isConfigurableParent ? 'Configurable' : '-'),
     },
     {
       id: 'material',
       header: 'Material',
-      cell: ({ row }) => row.original.material || '—',
+      cell: ({ row }) => row.original.material || '-',
     },
     {
       accessorKey: 'status',
@@ -129,10 +129,10 @@ export function ProductListPage() {
       header: 'FG Item',
       cell: ({ row }) => {
         const fg = getItem(row.original.fgItemId)
-        return fg ? <Link to={`/masters/items/${fg.id}`} className="font-mono text-xs text-erp-accent hover:underline">{fg.itemCode}</Link> : '—'
+        return fg ? <Link to={`/masters/items/${fg.id}`} className="font-mono text-xs text-erp-accent hover:underline">{fg.itemCode}</Link> : '-'
       },
     },
-    { accessorKey: 'standardPrice', header: 'List Price', cell: ({ row }) => row.original.standardPrice > 0 ? formatCurrency(row.original.standardPrice) : '—' },
+    { accessorKey: 'standardPrice', header: 'List Price', cell: ({ row }) => row.original.standardPrice > 0 ? formatCurrency(row.original.standardPrice) : '-' },
     { accessorKey: 'isActive', header: 'Active', cell: ({ row }) => <ActiveBadge isActive={row.original.isActive} /> },
     { id: 'actions', header: 'Actions', enableSorting: false, cell: ({ row }) => <RowActions viewTo={`/masters/products/${row.original.id}`} editTo={`/masters/products/${row.original.id}/edit`} /> },
   ]

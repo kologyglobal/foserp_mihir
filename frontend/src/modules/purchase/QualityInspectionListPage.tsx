@@ -36,13 +36,29 @@ import { usePurchasePermissions } from '@/utils/permissions'
 export function QualityInspectionListPage() {
   const navigate = useNavigate()
   const perms = usePurchasePermissions()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const grnFilter = searchParams.get('grnId') ?? ''
   const statusParam = searchParams.get('status') ?? ''
   const [rows, setRows] = useState<QualityInspectionListRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState(statusParam)
+
+  const setStatusFilter = useCallback(
+    (next: string) => {
+      setStatus(next)
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev)
+          if (next) p.set('status', next)
+          else p.delete('status')
+          return p
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -90,7 +106,7 @@ export function QualityInspectionListPage() {
             to={`/purchase/quality-inspections/${row.original.id}`}
             className="font-mono"
           >
-            {row.original.documentNumber || '—'}
+            {row.original.documentNumber || '-'}
           </TableLink>
         ),
       },
@@ -98,7 +114,7 @@ export function QualityInspectionListPage() {
         accessorKey: 'documentDate',
         header: 'Date',
         meta: { columnLabel: 'Date' },
-        cell: ({ row }) => formatDate(row.original.documentDate) || '—',
+        cell: ({ row }) => formatDate(row.original.documentDate) || '-',
       },
       {
         accessorKey: 'goodsReceiptNumber',
@@ -110,7 +126,7 @@ export function QualityInspectionListPage() {
               {row.original.goodsReceiptNumber || 'Open GRN'}
             </TableLink>
           ) : (
-            '—'
+            '-'
           ),
       },
       {
@@ -119,7 +135,7 @@ export function QualityInspectionListPage() {
         meta: { columnLabel: 'Item' },
         cell: ({ row }) => (
           <div>
-            <div className="font-mono text-xs">{row.original.itemCode || '—'}</div>
+            <div className="font-mono text-xs">{row.original.itemCode || '-'}</div>
             <div className="text-erp-muted">{row.original.itemName || ''}</div>
           </div>
         ),
@@ -128,7 +144,7 @@ export function QualityInspectionListPage() {
         accessorKey: 'batchLotNo',
         header: 'Batch / Lot',
         meta: { columnLabel: 'Batch / Lot' },
-        cell: ({ row }) => row.original.batchLotNo || '—',
+        cell: ({ row }) => row.original.batchLotNo || '-',
       },
       {
         accessorKey: 'receivedQty',
@@ -143,10 +159,26 @@ export function QualityInspectionListPage() {
         cell: ({ row }) => formatNumber(row.original.sampleQty),
       },
       {
+        accessorKey: 'acceptedQty',
+        header: 'Accepted',
+        meta: { columnLabel: 'Accepted' },
+        cell: ({ row }) => formatNumber(row.original.acceptedQty),
+      },
+      {
+        accessorKey: 'rejectedQty',
+        header: 'Rejected',
+        meta: { columnLabel: 'Rejected' },
+        cell: ({ row }) => {
+          const qty = row.original.rejectedQty
+          if (!(qty > 0)) return formatNumber(qty)
+          return <span className="font-semibold text-red-700 tabular-nums">{formatNumber(qty)}</span>
+        },
+      },
+      {
         accessorKey: 'inspectorName',
         header: 'Inspector',
         meta: { columnLabel: 'Inspector' },
-        cell: ({ row }) => row.original.inspectorName || '—',
+        cell: ({ row }) => row.original.inspectorName || '-',
       },
       {
         accessorKey: 'status',
@@ -155,7 +187,7 @@ export function QualityInspectionListPage() {
         cell: ({ row }) => (
           <StatusDot
             tone={statusToneFromLabel(row.original.statusLabel)}
-            label={row.original.statusLabel || '—'}
+            label={row.original.statusLabel || '-'}
           />
         ),
       },
@@ -163,7 +195,7 @@ export function QualityInspectionListPage() {
         accessorKey: 'resultLabel',
         header: 'Result',
         meta: { columnLabel: 'Result' },
-        cell: ({ row }) => row.original.resultLabel ?? '—',
+        cell: ({ row }) => row.original.resultLabel ?? '-',
       },
       {
         id: 'actions',
@@ -246,7 +278,7 @@ export function QualityInspectionListPage() {
         onSearchChange={setSearch}
         searchPlaceholder="Search QI / GRN / item / batch"
         status={status}
-        onStatusChange={setStatus}
+        onStatusChange={setStatusFilter}
         statusAriaLabel="Filter quality inspections by status"
         statusOptions={[
           { value: 'completed', label: 'Completed (Accepted / Partial / Rejected)' },

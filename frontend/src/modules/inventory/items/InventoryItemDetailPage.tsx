@@ -6,17 +6,16 @@ import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { getItemById, getInventoryAuditTrail, getStockDetails, deactivateItem, duplicateItem } from '@/services/inventory'
+import { getItemById, getInventoryAuditTrail, getStockDetails, deactivateItem } from '@/services/inventory'
 import type { InventoryAuditEntry, InventoryItem, StockDetailsData } from '@/types/inventoryDomain'
 import { INVENTORY_ITEM_TYPE_LABELS, trackingLabel } from '@/utils/inventoryItemLabels'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
+import { appConfirm } from '@/store/confirmDialogStore'
 import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
-import { TraceabilityDrawer } from '@/components/inventory/TraceabilityDrawer'
 import { BATCH_STATUS_LABELS } from '@/utils/inventoryTraceabilityLabels'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
-import { isApiMode } from '@/config/apiConfig'
 
 type LoadState = 'loading' | 'ready' | 'error'
 
@@ -30,7 +29,6 @@ export function InventoryItemDetailPage() {
   const [audit, setAudit] = useState<InventoryAuditEntry[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [reloadToken, setReloadToken] = useState(0)
-  const [traceOpen, setTraceOpen] = useState(false)
 
   useEffect(() => {
     if (!perms.canViewItems || !recordId) return
@@ -72,6 +70,7 @@ export function InventoryItemDetailPage() {
           { label: 'Details' },
         ]}
         autoBreadcrumbs={false}
+        backLink={{ to: '/inventory/items', label: 'Back to Items' }}
       >
         <EmptyState
           icon={ShieldOff}
@@ -97,28 +96,20 @@ export function InventoryItemDetailPage() {
           { label: 'Details' },
         ]}
         autoBreadcrumbs={false}
+        backLink={{ to: '/inventory/items', label: 'Back to Items' }}
       >
         <EmptyState
           icon={Package}
           title="Could not load item"
           description="Something went wrong while loading this item. Try again or return to the items register."
           action={(
-            <div className="flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
-                onClick={() => setReloadToken((n) => n + 1)}
-              >
-                Retry
-              </button>
-              <button
-                type="button"
-                className="erp-btn erp-btn-secondary h-9 px-3 text-[13px]"
-                onClick={() => navigate('/inventory/items')}
-              >
-                Back to Items
-              </button>
-            </div>
+            <button
+              type="button"
+              className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
+              onClick={() => setReloadToken((n) => n + 1)}
+            >
+              Retry
+            </button>
           )}
         />
       </OperationalPageShell>
@@ -134,6 +125,7 @@ export function InventoryItemDetailPage() {
       description={`${item.itemCode} · ${INVENTORY_ITEM_TYPE_LABELS[item.itemType]}`}
       breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Items', to: '/inventory/items' }, { label: item.itemCode }]}
       autoBreadcrumbs={false}
+      backLink={{ to: '/inventory/items', label: 'Back to Items' }}
       favoritePath={`/inventory/items/${recordId}`}
       commandBar={(
         <ErpCommandBar
@@ -145,12 +137,7 @@ export function InventoryItemDetailPage() {
                   id: 'edit',
                   label: 'Edit',
                   icon: Pencil,
-                  onClick: () =>
-                    navigate(
-                      isApiMode()
-                        ? `/masters/items/${recordId}/edit`
-                        : `/inventory/items/${recordId}/edit`,
-                    ),
+                  onClick: () => navigate(`/masters/items/${recordId}/edit`),
                 }
               : undefined
           }
@@ -159,15 +146,9 @@ export function InventoryItemDetailPage() {
               ? [{
                   id: 'dup',
                   label: 'Duplicate',
-                  onClick: async () => {
-                    if (isApiMode()) {
-                      navigate(`/masters/items/${recordId}/edit`)
-                      notify.info('Open Masters → Items to create a copy in live mode')
-                      return
-                    }
-                    const d = await duplicateItem(recordId!)
-                    notify.success('Duplicated')
-                    navigate(`/inventory/items/${d.id}`)
+                  onClick: () => {
+                    navigate(`/masters/items/${recordId}/edit`)
+                    notify.info('Open Masters → Items to create a copy')
                   },
                 }]
               : []),
@@ -176,6 +157,12 @@ export function InventoryItemDetailPage() {
                   id: 'deact',
                   label: 'Deactivate',
                   onClick: async () => {
+                    const ok = await appConfirm({
+                      title: 'Deactivate item',
+                      description: `Deactivate ${item.itemCode} — ${item.itemName}? It will no longer be selectable on new documents.`,
+                      confirmLabel: 'Deactivate',
+                    })
+                    if (!ok) return
                     await deactivateItem(recordId!)
                     notify.success('Deactivated')
                     navigate('/inventory/items')
@@ -184,12 +171,7 @@ export function InventoryItemDetailPage() {
               : []),
             { id: 'stock', label: 'Stock Availability', onClick: () => navigate(`/inventory/stock?search=${encodeURIComponent(item.itemCode)}`) },
             ...(perms.canViewItemLedger ? [{ id: 'ledger', label: 'Item Ledger', onClick: () => navigate(`/inventory/items/${recordId}/ledger`) }] : []),
-            ...(perms.canViewTraceability && !isApiMode()
-              ? [{ id: 'trace', label: 'Traceability', onClick: () => setTraceOpen(true) }]
-              : []),
-            ...(isApiMode()
-              ? [{ id: 'master', label: 'Open in Masters', onClick: () => navigate(`/masters/items/${recordId}`) }]
-              : []),
+            { id: 'master', label: 'Open in Masters', onClick: () => navigate(`/masters/items/${recordId}`) },
           ]}
         />
       )}
@@ -200,7 +182,7 @@ export function InventoryItemDetailPage() {
           <dl className="grid gap-3 sm:grid-cols-2 text-[13px]">
             <div><dt className="text-erp-muted">Category</dt><dd>{item.categoryName}</dd></div>
             <div><dt className="text-erp-muted">UOM</dt><dd>{item.baseUomCode}</dd></div>
-            <div><dt className="text-erp-muted">Default Warehouse</dt><dd>{item.defaultWarehouseName ?? '—'}</dd></div>
+            <div><dt className="text-erp-muted">Default Warehouse</dt><dd>{item.defaultWarehouseName ?? '-'}</dd></div>
             <div><dt className="text-erp-muted">Status</dt><dd><StatusDot label={item.status} tone={statusToneFromLabel(item.status)} /></dd></div>
             <div><dt className="text-erp-muted">Tracking</dt><dd>{trackingLabel(item)}</dd></div>
             <div><dt className="text-erp-muted">HSN / GST</dt><dd>{item.hsnCode} / {item.gstRate}%</dd></div>
@@ -238,7 +220,7 @@ export function InventoryItemDetailPage() {
                 <tr key={b.id}>
                   <td className="font-mono">{b.batchNo}</td>
                   <td className="text-right font-mono">{b.qty}</td>
-                  <td>{b.expiryDate ?? '—'}</td>
+                  <td>{b.expiryDate ?? '-'}</td>
                   <td>{BATCH_STATUS_LABELS[b.status as keyof typeof BATCH_STATUS_LABELS] ?? b.status}</td>
                 </tr>
               ))}
@@ -276,7 +258,6 @@ export function InventoryItemDetailPage() {
           </table>
         </section>
       ) : null}
-      <TraceabilityDrawer open={traceOpen} entityType="item" entityId={recordId ?? null} onClose={() => setTraceOpen(false)} />
     </OperationalPageShell>
   )
 }

@@ -274,12 +274,12 @@ export function ApiBankAccountsPage() {
                       <p className="text-[11px] text-erp-muted">{row.description || 'Treasury bank account'}</p>
                     </td>
                     <td className="px-3 py-2">
-                      {row.bankProfile?.bankName || '—'}
-                      <p className="text-[11px] text-erp-muted">{row.bankProfile?.branchName || '—'}</p>
+                      {row.bankProfile?.bankName || '-'}
+                      <p className="text-[11px] text-erp-muted">{row.bankProfile?.branchName || '-'}</p>
                     </td>
-                    <td className="px-3 py-2 font-mono">{row.bankProfile?.accountNumberMasked || '—'}</td>
-                    <td className="px-3 py-2 font-mono">{row.bankProfile?.ifscCode || '—'}</td>
-                    <td className="px-3 py-2">{row.bankProfile?.bankAccountKind || '—'}</td>
+                    <td className="px-3 py-2 font-mono">{row.bankProfile?.accountNumberMasked || '-'}</td>
+                    <td className="px-3 py-2 font-mono">{row.bankProfile?.ifscCode || '-'}</td>
+                    <td className="px-3 py-2">{row.bankProfile?.bankAccountKind || '-'}</td>
                     <td className="px-3 py-2">{row.currencyCode}</td>
                     <td className="px-3 py-2"><StatusChip status={row.status} /></td>
                   </tr>

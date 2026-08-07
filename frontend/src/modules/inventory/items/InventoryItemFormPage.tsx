@@ -270,7 +270,7 @@ export function InventoryItemFormPage() {
           </FormField>
           <FormField label="Default Warehouse">
             <Select {...form.register('defaultWarehouseId', { setValueAs: (v) => (v === '' ? null : v) })}>
-              <option value="">—</option>
+              <option value="">-</option>
               {warehouses.map((w) => <option key={w.id} value={w.id}>{w.warehouseName}</option>)}
             </Select>
           </FormField>

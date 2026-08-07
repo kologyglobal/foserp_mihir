@@ -530,7 +530,7 @@ export function WorkOrderQuickSetupWizard({
                     />
                   </FormField>
                   <FormField label="Selected component">
-                    <Input value={componentLabel || '—'} readOnly />
+                    <Input value={componentLabel || '-'} readOnly />
                   </FormField>
                 </div>
                 {bomStatus === 'draft' ? (

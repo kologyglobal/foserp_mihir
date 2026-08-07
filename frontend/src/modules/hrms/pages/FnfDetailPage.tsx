@@ -385,13 +385,13 @@ export function FnfDetailPage() {
                       View
                     </Link>
                   ) : (
-                    '—'
+                    '-'
                   )}
                 </div>
               </div>
               <div>
                 <div className="text-xs text-erp-muted">Posted at</div>
-                <div>{settlement.postedAt ? new Date(settlement.postedAt).toLocaleString() : '—'}</div>
+                <div>{settlement.postedAt ? new Date(settlement.postedAt).toLocaleString() : '-'}</div>
               </div>
               <div>
                 <div className="text-xs text-erp-muted">Payment voucher</div>
@@ -401,13 +401,13 @@ export function FnfDetailPage() {
                       View
                     </Link>
                   ) : (
-                    '—'
+                    '-'
                   )}
                 </div>
               </div>
               <div>
                 <div className="text-xs text-erp-muted">Paid at</div>
-                <div>{settlement.paidAt ? new Date(settlement.paidAt).toLocaleString() : '—'}</div>
+                <div>{settlement.paidAt ? new Date(settlement.paidAt).toLocaleString() : '-'}</div>
               </div>
             </div>
           </div>

@@ -28,7 +28,7 @@ export function formatVendorStateLabel(vendor: PurchaseVendorGstRef | null | und
   if (state && stateCode) return formatPlaceOfSupplyLabel(stateCode, state)
   if (state) return state
   if (stateCode) return formatPlaceOfSupplyLabel(stateCode)
-  return '—'
+  return '-'
 }
 
 /** Delivery warehouse POS label — warehouse state, else Purchase Setup tax POS. */

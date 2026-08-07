@@ -44,7 +44,7 @@ export function getStageWiseOpportunityReport() {
 export function getFollowUpDueReport() {
   return useCrmStore.getState().followUps.map((f) => ({
     followUpType: f.followUpType,
-    customerName: f.customerId ? customerName(f.customerId) : '—',
+    customerName: f.customerId ? customerName(f.customerId) : '-',
     dueDate: f.dueDate,
     dueTime: f.dueTime,
     assignedToName: f.assignedToName,
@@ -58,10 +58,10 @@ export function getSalesActivityReport() {
   return useCrmStore.getState().activities.map((a) => ({
     type: a.type,
     subject: a.subject,
-    customerName: a.customerId ? customerName(a.customerId) : '—',
+    customerName: a.customerId ? customerName(a.customerId) : '-',
     ownerName: a.ownerName,
     activityDate: a.activityDate,
-    outcome: a.outcome ?? '—',
+    outcome: a.outcome ?? '-',
   }))
 }
 
@@ -77,7 +77,7 @@ export function getQuotationRevisionReport() {
       totalAmount: d.totalAmount,
       createdByName: d.createdByName,
       createdAt: d.createdAt,
-      revisionReason: d.revisionReason ?? '—',
+      revisionReason: d.revisionReason ?? '-',
       locked: d.locked ? 'Yes' : 'No',
     }
   })
@@ -101,7 +101,7 @@ export function getQuotationApprovalReport() {
         action: h.action,
         byName: h.byName,
         at: h.at,
-        remarks: h.remarks ?? '—',
+        remarks: h.remarks ?? '-',
       })
     }
   }
@@ -117,8 +117,8 @@ export function getWonLostReport() {
       status: o.status,
       value: o.value,
       stage: opportunityStageLabel(o.stage),
-      lostReason: o.lostReason ?? '—',
-      salesOrderId: o.salesOrderId ?? '—',
+      lostReason: o.lostReason ?? '-',
+      salesOrderId: o.salesOrderId ?? '-',
     }))
 }
 
@@ -156,8 +156,8 @@ export function getLeadRegisterReport() {
     return {
       leadNo: n.leadNo,
       companyProspect: n.prospectName,
-      contactPerson: n.contactPerson ?? '—',
-      mobile: n.mobile ?? '—',
+      contactPerson: n.contactPerson ?? '-',
+      mobile: n.mobile ?? '-',
       leadOwner: n.leadOwnerName,
       priority: leadPriorityLabel(n.priority),
       leadStage: leadStageLabel(n.stage),
@@ -166,8 +166,8 @@ export function getLeadRegisterReport() {
       createdDate: n.createdDate,
       activityStatus: n.activityStatus,
       lifecycleStatus: n.lifecycleStatus,
-      closedDate: n.closedDate ?? '—',
-      nextFollowUp: n.nextFollowUpDate ?? '—',
+      closedDate: n.closedDate ?? '-',
+      nextFollowUp: n.nextFollowUpDate ?? '-',
     }
   })
 }
@@ -205,8 +205,8 @@ export function getClosedLeadReport() {
       leadNo: l.leadNo,
       companyProspect: l.prospectName,
       leadOwner: l.leadOwnerName,
-      closedDate: l.closedDate ?? '—',
-      closedReason: l.closedReason ?? '—',
+      closedDate: l.closedDate ?? '-',
+      closedReason: l.closedReason ?? '-',
       expectedValue: l.expectedValue,
     }))
 }
@@ -244,7 +244,7 @@ export function getLeadActiveInactiveReport() {
       leadNo: n.leadNo,
       companyProspect: n.prospectName,
       activityStatus: n.activityStatus,
-      inactiveReason: n.inactiveReason ?? '—',
+      inactiveReason: n.inactiveReason ?? '-',
       lifecycleStatus: n.lifecycleStatus,
       leadOwner: n.leadOwnerName,
     }

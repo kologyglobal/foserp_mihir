@@ -25,7 +25,7 @@ const ISO_DATE_TOKEN = /\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z?)?
 /** Format bare / embedded ISO timestamps for sidebar display (en-IN short date). */
 function formatTermDisplayValue(value: string): string {
   const trimmed = value.trim()
-  if (!trimmed || trimmed === '—') return trimmed || '—'
+  if (!trimmed || trimmed === '-') return trimmed || '-'
   if (isValidTimestamp(trimmed) && /^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
     return formatDate(trimmed)
   }
@@ -55,9 +55,9 @@ export function QuotationDataSourcePanel({
   const completionTone = completion.missing.length ? 'warning' : 'success'
 
   const sources = [
-    { label: 'Customer', value: customer?.customerName ?? '—', source: 'CRM Customer Master' },
-    { label: 'Contact', value: contactName ?? customer?.contactPerson ?? '—', source: 'CRM Contact' },
-    { label: 'Opportunity', value: opportunity?.opportunityNo ?? '—', source: 'CRM Opportunity' },
+    { label: 'Customer', value: customer?.customerName ?? '-', source: 'CRM Customer Master' },
+    { label: 'Contact', value: contactName ?? customer?.contactPerson ?? '-', source: 'CRM Contact' },
+    { label: 'Opportunity', value: opportunity?.opportunityNo ?? '-', source: 'CRM Opportunity' },
     { label: 'Product', value: mergeMap.product_name, source: 'Product Master / Opp' },
     { label: 'Grand Total', value: formatCrmCurrency(doc.totalAmount), source: 'Price Table' },
     ...commercialFields.map((f) => ({
@@ -65,7 +65,7 @@ export function QuotationDataSourcePanel({
       value: f.value,
       source: 'Quotation commercial fields',
     })),
-    { label: 'Warranty Terms', value: commercialTerms.warrantyTerms || '—', source: 'Warranty Terms Master' },
+    { label: 'Warranty Terms', value: commercialTerms.warrantyTerms || '-', source: 'Warranty Terms Master' },
   ]
 
   return (

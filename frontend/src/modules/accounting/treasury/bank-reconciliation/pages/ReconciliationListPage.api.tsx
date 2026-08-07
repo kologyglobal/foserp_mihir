@@ -168,7 +168,7 @@ export function ApiReconciliationListPage() {
                     {formatDate(row.statementStartDate)} – {formatDate(row.statementEndDate)}
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums">
-                    {row.statementClosingBalance != null ? formatCurrency(parseDecimal(row.statementClosingBalance)) : '—'}
+                    {row.statementClosingBalance != null ? formatCurrency(parseDecimal(row.statementClosingBalance)) : '-'}
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{formatCurrency(parseDecimal(row.unmatchedStatementAmount))}</td>
                   <td className="px-2 py-1.5">

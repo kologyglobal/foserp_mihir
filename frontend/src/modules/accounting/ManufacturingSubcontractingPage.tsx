@@ -135,7 +135,7 @@ export function ManufacturingSubcontractingPage() {
                   <td className="px-3 py-2">{row.vendorName}</td>
                   <td className="px-3 py-2">{row.serviceDescription}</td>
                   <td className="px-3 py-2 text-erp-muted">{row.challanNumber}</td>
-                  <td className="px-3 py-2 text-erp-muted">{row.invoiceNumber ?? '—'}</td>
+                  <td className="px-3 py-2 text-erp-muted">{row.invoiceNumber ?? '-'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{row.qty} {row.uom}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.rate)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.amount)}</td>

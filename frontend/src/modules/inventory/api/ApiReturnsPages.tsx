@@ -303,7 +303,7 @@ export function ApiReturnsRegisterPage() {
                           {m.referenceNo ?? m.workOrderId.slice(0, 8)}
                         </Link>
                       ) : (
-                        m.referenceNo ?? '—'
+                        m.referenceNo ?? '-'
                       )}
                     </td>
                     <td>{refLabel(m.item, m.itemId)}</td>
@@ -612,12 +612,12 @@ export function ApiReturnDetailPage() {
                     {row.referenceNo ?? row.workOrderId.slice(0, 8)}
                   </Link>
                 ) : (
-                  row.referenceNo ?? '—'
+                  row.referenceNo ?? '-'
                 )}
               </dd>
             </div>
             <div><dt className="text-erp-muted">Posted at</dt><dd>{formatDate(row.createdAt)}</dd></div>
-            <div className="sm:col-span-2"><dt className="text-erp-muted">Remarks</dt><dd>{row.remarks?.trim() || '—'}</dd></div>
+            <div className="sm:col-span-2"><dt className="text-erp-muted">Remarks</dt><dd>{row.remarks?.trim() || '-'}</dd></div>
           </dl>
         </SectionCard>
         <SectionCard title="Links">

@@ -287,7 +287,7 @@ export function ProductionPlanDetailPage() {
                           Create WO
                         </button>
                       ) : (
-                        <span className="text-erp-muted">—</span>
+                        <span className="text-erp-muted">-</span>
                       )}
                     </td>
                   </tr>

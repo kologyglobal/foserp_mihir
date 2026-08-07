@@ -12,7 +12,7 @@ import { opportunityPriorityLabel } from '../../utils/opportunityUtils'
 import { cn } from '../../utils/cn'
 
 function safeItemSummary(rawSummary: string, requirementLabel: string): string {
-  if (isEncodedLeadRequirementPayload(rawSummary)) return requirementLabel || '—'
+  if (isEncodedLeadRequirementPayload(rawSummary)) return requirementLabel || '-'
   return rawSummary
 }
 

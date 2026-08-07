@@ -423,7 +423,7 @@ export function CityListPage() {
     {
       id: 'state',
       header: 'State',
-      cell: ({ row }) => stateNameById.get(row.original.stateId) ?? '—',
+      cell: ({ row }) => stateNameById.get(row.original.stateId) ?? '-',
     },
     { accessorKey: 'isActive', header: 'Status', cell: ({ row }) => <ActiveBadge isActive={row.original.isActive} /> },
     {

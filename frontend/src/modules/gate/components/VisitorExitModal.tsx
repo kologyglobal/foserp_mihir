@@ -72,7 +72,7 @@ export function VisitorExitModal({
         </div>
         <div>
           <dt className="text-erp-muted">Entry time</dt>
-          <dd className="font-medium text-erp-text">{visit.entryTime ? formatDateTime(visit.entryTime) : '—'}</dd>
+          <dd className="font-medium text-erp-text">{visit.entryTime ? formatDateTime(visit.entryTime) : '-'}</dd>
         </div>
         <div>
           <dt className="text-erp-muted">Visit duration</dt>

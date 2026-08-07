@@ -154,7 +154,7 @@ export function ItemUomConversionEditor({
           <tbody>
             {list.map((row, index) => {
               const isBase = row.uomId === baseUomId
-              const code = row.uomCode || uomCodeOf(row.uomId) || '—'
+              const code = row.uomCode || uomCodeOf(row.uomId) || '-'
               return (
                 <tr key={`${row.uomId || 'new'}-${index}`} className="border-b border-erp-border/60">
                   <td className="px-2 py-2 align-top">

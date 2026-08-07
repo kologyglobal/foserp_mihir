@@ -607,9 +607,9 @@ async function buildPrToPoConversion(filters: PurchaseReportFilters, entry: Purc
     documentHref: `/purchase/requisitions/${pr.id}`,
     documentDate: pr.documentDate,
     status: PURCHASE_REQUISITION_STATUS_LABELS[pr.status],
-    convertedPo: pr.convertedPoNumber ?? '—',
+    convertedPo: pr.convertedPoNumber ?? '-',
     convertedPoHref: pr.convertedPoId ? `/purchase/orders/${pr.convertedPoId}` : null,
-    convertedRfq: pr.convertedRfqNumber ?? '—',
+    convertedRfq: pr.convertedRfqNumber ?? '-',
     convertedRfqHref: pr.convertedRfqId ? `/purchase/rfqs/${pr.convertedRfqId}` : null,
     conversion:
       pr.status === 'converted_to_po'
@@ -765,7 +765,7 @@ async function buildRfqConversion(filters: PurchaseReportFilters, entry: Purchas
       documentHref: `/purchase/rfqs/${rfq.id}`,
       status: RFQ_DOMAIN_STATUS_LABELS[rfq.status],
       conversion: po ? 'Converted to PO' : 'Pending',
-      poNumber: po?.documentNumber ?? '—',
+      poNumber: po?.documentNumber ?? '-',
       poHref: po ? `/purchase/orders/${po.id}` : null,
     }
   })
@@ -888,7 +888,7 @@ async function buildPoAmendment(filters: PurchaseReportFilters, entry: PurchaseR
     vendorHref: masterVendorHref(po.vendor.id),
     revisionNo: po.revisionNo,
     changeCount: po.changeHistory.length,
-    lastChange: po.changeHistory[0]?.fieldLabel ?? '—',
+    lastChange: po.changeHistory[0]?.fieldLabel ?? '-',
     status: PURCHASE_ORDER_DOMAIN_STATUS_LABELS[po.status],
   }))
   return resultOf(entry, filters, [
@@ -909,7 +909,7 @@ async function buildPoClosure(filters: PurchaseReportFilters, entry: PurchaseRep
     vendorName: po.vendor.name,
     vendorHref: masterVendorHref(po.vendor.id),
     status: PURCHASE_ORDER_DOMAIN_STATUS_LABELS[po.status],
-    closedAt: po.closedAt?.slice(0, 10) ?? po.cancelledAt?.slice(0, 10) ?? '—',
+    closedAt: po.closedAt?.slice(0, 10) ?? po.cancelledAt?.slice(0, 10) ?? '-',
     totalAmount: money(po.totalAmount),
   }))
   return resultOf(entry, filters, [
@@ -1128,11 +1128,11 @@ async function buildGrnBatchReceipt(filters: PurchaseReportFilters, entry: Purch
         documentHref: `/purchase/grn/${grn.id}`,
         itemCode: line.itemCode,
         itemName: line.itemName,
-        batchNumber: line.batchNumber || '—',
-        lotNumber: line.lotNumber || '—',
+        batchNumber: line.batchNumber || '-',
+        lotNumber: line.lotNumber || '-',
         receivedQty: round2(line.receivedQty),
-        manufacturingDate: line.manufacturingDate ?? '—',
-        expiryDate: line.expiryDate ?? '—',
+        manufacturingDate: line.manufacturingDate ?? '-',
+        expiryDate: line.expiryDate ?? '-',
       })
     }
   }
@@ -1261,7 +1261,7 @@ async function buildInvRegister(filters: PurchaseReportFilters, entry: PurchaseR
     vendorInvoiceNumber: inv.vendorInvoiceNumber,
     vendorName: inv.vendor.name,
     vendorHref: masterVendorHref(inv.vendor.id),
-    poNumber: inv.purchaseOrderNumber ?? '—',
+    poNumber: inv.purchaseOrderNumber ?? '-',
     poHref: inv.purchaseOrderId ? `/purchase/orders/${inv.purchaseOrderId}` : null,
     status: PURCHASE_INVOICE_STATUS_LABELS[inv.status],
     matchStatus: inv.matchStatus,
@@ -1285,9 +1285,9 @@ async function buildInvMatching(filters: PurchaseReportFilters, entry: PurchaseR
     documentHref: invoiceHref(inv.id),
     vendorName: inv.vendor.name,
     vendorHref: masterVendorHref(inv.vendor.id),
-    poNumber: inv.purchaseOrderNumber ?? '—',
+    poNumber: inv.purchaseOrderNumber ?? '-',
     poHref: inv.purchaseOrderId ? `/purchase/orders/${inv.purchaseOrderId}` : null,
-    grnNumber: inv.goodsReceiptNumber ?? '—',
+    grnNumber: inv.goodsReceiptNumber ?? '-',
     grnHref: inv.goodsReceiptId ? `/purchase/grn/${inv.goodsReceiptId}` : null,
     matchStatus: inv.matchStatus,
     status: PURCHASE_INVOICE_STATUS_LABELS[inv.status],

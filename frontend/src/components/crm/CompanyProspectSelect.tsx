@@ -160,8 +160,8 @@ export function CompanyProspectSelect({
     selectMatch({
       customerId: exact.id,
       customerName: exact.customerName,
-      city: exact.city ?? '—',
-      industry: exact.industry ?? '—',
+      city: exact.city ?? '-',
+      industry: exact.industry ?? '-',
       contactPerson: exact.contactPerson ?? '',
       contactPhone: exact.contactPhone ?? '',
       contactEmail: exact.contactEmail ?? '',
@@ -219,8 +219,8 @@ export function CompanyProspectSelect({
     selectMatch({
       customerId: result.id,
       customerName: name,
-      city: c?.city ?? '—',
-      industry: c?.industry ?? '—',
+      city: c?.city ?? '-',
+      industry: c?.industry ?? '-',
       contactPerson: c?.contactPerson ?? '',
       contactPhone: c?.contactPhone ?? '',
       contactEmail: c?.contactEmail ?? '',

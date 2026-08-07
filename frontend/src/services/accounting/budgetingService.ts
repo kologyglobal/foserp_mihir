@@ -114,12 +114,12 @@ function mapVersionDto(row: BudgetVersionDto): BudgetVersion {
     startDate: row.fyStartDate,
     endDate: row.fyEndDate,
     status: mapApiStatus(row.status),
-    preparedBy: '—',
-    approvedBy: row.approvedAt ? '—' : null,
+    preparedBy: '-',
+    approvedBy: row.approvedAt ? '-' : null,
     lastUpdated: row.updatedAt,
     isPrimary: row.isPrimary,
     companyId: row.legalEntityId,
-    companyName: '—',
+    companyName: '-',
     notes: row.notes ?? '',
   }
 }

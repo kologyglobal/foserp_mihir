@@ -78,10 +78,10 @@ export function TraceabilityDrawer({ open, entityType, entityId, onClose }: Trac
                       <span className="font-mono">{e.documentNo}</span>
                     )}
                   </td>
-                  <td>{e.warehouseName ?? '—'}</td>
-                  <td className="text-right font-mono">{e.qty != null ? formatNumber(e.qty) : '—'}</td>
+                  <td>{e.warehouseName ?? '-'}</td>
+                  <td className="text-right font-mono">{e.qty != null ? formatNumber(e.qty) : '-'}</td>
                   <td>{e.userName}</td>
-                  <td>{e.status ?? '—'}</td>
+                  <td>{e.status ?? '-'}</td>
                 </tr>
               ))}
             </tbody>
