@@ -16,6 +16,10 @@ import { determinePurchaseGstSupply } from '../../utils/gstSupply'
 import { purchaseSetupGstDefaults } from '../../utils/purchasePlaceOfSupply'
 import { resolveLineTaxFromLocalMasters } from '../../utils/commercialLineTax'
 import { purchaseSetupPlaceState } from '../../utils/purchasePlaceOfSupply'
+import {
+  billableGrnVendorQtyForInvoiceMatch,
+  pctDiff,
+} from '../../utils/purchaseInvoiceMatching'
 import type {
   PurchaseApprovalDocumentType,
   PurchaseApprovalQueueFilters,
@@ -3070,14 +3074,19 @@ export async function computeInvoiceMatching(id: string): Promise<InvoiceMatchin
   if (!isApiMode()) return demo.computeInvoiceMatching(id)
   const inv = await getPurchaseInvoiceById(id)
   if (!inv) throw new PurchaseServiceError('INV_NOT_FOUND', `Invoice not found: ${id}`)
-  const overallStatus = inv.matchingResultStatus
-  const exceedsTolerance =
-    overallStatus === 'amount_mismatch'
-    || overallStatus === 'quantity_mismatch'
-    || overallStatus === 'rate_mismatch'
-    || overallStatus === 'tax_mismatch'
-    || overallStatus === 'missing_grn'
-    || inv.matchStatus === 'mismatch'
+
+  const setup = await getPurchaseSetup().catch(() => null)
+  const tolerances = setup?.invoiceMatchTolerances ?? {
+    requirePoMatch: true,
+    requireGrnMatch: true,
+    quantityTolerancePct: 0,
+    rateTolerancePct: 0,
+    amountToleranceInr: 0,
+    amountTolerancePct: 0,
+    taxToleranceInr: 0,
+    taxTolerancePct: 0,
+    allowAuthorizedOverride: true,
+  }
 
   const po = inv.purchaseOrderId ? await getPurchaseOrderById(inv.purchaseOrderId) : null
   const grn = inv.goodsReceiptId ? await getGRNById(inv.goodsReceiptId) : null
@@ -3095,64 +3104,137 @@ export async function computeInvoiceMatching(id: string): Promise<InvoiceMatchin
         ? grnLines.find((gl) => gl.id === l.goodsReceiptLineId)
         : undefined)
       ?? grnLines.find((gl) => gl.itemId === l.itemId || gl.itemCode === l.itemCode)
+
     const poQty = poLine?.quantity ?? null
-    const grnQty = grnLine?.receivedQty ?? grnLine?.acceptedQty ?? null
+    const grnReceivedQty = grnLine?.receivedQty ?? null
+    const grnBillableQty = grnLine
+      ? billableGrnVendorQtyForInvoiceMatch({
+          receivedQty: grnLine.receivedQty,
+          receivedUomQty: grnLine.receivedUomQty,
+          acceptedQty: grnLine.acceptedQty,
+          acceptedUomQty: grnLine.acceptedUomQty,
+          rejectedQty: grnLine.rejectedQty,
+          rejectedUomQty: grnLine.rejectedUomQty,
+          uomConversionFactor: grnLine.uomConversionFactor,
+        })
+      : null
     const poRate = poLine?.rate ?? null
+    const poTaxPct = poLine?.gstRatePct ?? null
+    const poLineTotal = poLine?.lineTotal ?? null
+
     const flags: InvoiceMatchingResult['lines'][number]['flags'] = []
     let withinTolerance = true
-    if (poQty != null && Math.abs(poQty - l.quantity) > 1e-6) {
-      flags.push('quantity_mismatch')
-      withinTolerance = false
+
+    const refQty = grnBillableQty ?? poQty
+    if (refQty != null) {
+      const qtyDeltaPct = pctDiff(l.quantity, refQty)
+      if (qtyDeltaPct > tolerances.quantityTolerancePct) {
+        flags.push('quantity_mismatch')
+        withinTolerance = false
+      } else if (qtyDeltaPct > 0) {
+        flags.push('within_tolerance')
+      }
     }
-    if (poRate != null && Math.abs(poRate - l.rate) > 0.01) {
-      flags.push('rate_mismatch')
-      withinTolerance = false
+
+    if (poRate != null) {
+      const rateDeltaPct = pctDiff(l.rate, poRate)
+      if (rateDeltaPct > tolerances.rateTolerancePct) {
+        flags.push('rate_mismatch')
+        withinTolerance = false
+      } else if (rateDeltaPct > 0 && !flags.includes('within_tolerance')) {
+        flags.push('within_tolerance')
+      }
     }
+
+    if (poTaxPct != null) {
+      const taxDeltaPct = Math.abs(l.gstRatePct - poTaxPct)
+      const lineTax = l.cgst + l.sgst + l.igst
+      const poTaxBase = poLine != null ? poLine.taxableAmount ?? poLine.quantity * poLine.rate : 0
+      const poTaxAmt = poLine != null ? Number(((poTaxBase * poTaxPct) / 100).toFixed(2)) : null
+      const taxAmtDelta = poTaxAmt != null ? Math.abs(lineTax - poTaxAmt) : 0
+      if (taxDeltaPct > tolerances.taxTolerancePct && taxAmtDelta > tolerances.taxToleranceInr) {
+        flags.push('tax_mismatch')
+        withinTolerance = false
+      }
+    }
+
+    if (poLineTotal != null) {
+      const amtDelta = Math.abs(l.lineTotal - poLineTotal)
+      const amtDeltaPct = pctDiff(l.lineTotal, poLineTotal)
+      if (amtDelta > tolerances.amountToleranceInr && amtDeltaPct > tolerances.amountTolerancePct) {
+        flags.push('amount_mismatch')
+        withinTolerance = false
+      }
+    }
+
+    if (flags.length === 0) flags.push('fully_matched')
+
     return {
       lineNo: l.lineNo,
       itemCode: l.itemCode,
       itemName: l.itemName,
       poQty,
-      grnReceivedQty: grnQty,
+      grnReceivedQty,
+      grnBillableQty,
       invoiceQty: l.quantity,
       poRate,
       invoiceRate: l.rate,
-      poTaxPct: poLine?.gstRatePct ?? null,
+      poTaxPct,
       invoiceTaxPct: l.gstRatePct,
-      poLineTotal: poLine?.lineTotal ?? null,
+      poLineTotal,
       invoiceLineTotal: l.lineTotal,
       flags,
-      withinTolerance: withinTolerance && !exceedsTolerance,
+      withinTolerance,
     }
   })
+
+  const missingGrn = Boolean(inv.purchaseOrderId) && !inv.goodsReceiptId
+  let overallStatus: InvoiceMatchingResult['overallStatus'] = 'fully_matched'
+  if (missingGrn) {
+    overallStatus = 'missing_grn'
+  } else {
+    const priority: InvoiceMatchingResult['overallStatus'][] = [
+      'quantity_mismatch',
+      'rate_mismatch',
+      'tax_mismatch',
+      'amount_mismatch',
+      'within_tolerance',
+      'fully_matched',
+    ]
+    for (const p of priority) {
+      if (lines.some((row) => row.flags.includes(p))) {
+        overallStatus = p
+        break
+      }
+    }
+  }
+
+  const exceedsTolerance =
+    missingGrn
+    || overallStatus === 'amount_mismatch'
+    || overallStatus === 'quantity_mismatch'
+    || overallStatus === 'rate_mismatch'
+    || overallStatus === 'tax_mismatch'
+    || inv.matchStatus === 'mismatch'
+    || lines.some((l) => !l.withinTolerance)
 
   return {
     overallStatus,
     overallStatusLabel: INVOICE_MATCHING_RESULT_STATUS_LABELS[overallStatus],
-    exceedsTolerance: exceedsTolerance || lines.some((l) => !l.withinTolerance),
+    exceedsTolerance,
     isDuplicateVendorInvoice: false,
-    missingGrn: !inv.goodsReceiptId,
+    missingGrn,
     lines,
     summary: {
       poQty: poLines.reduce((s, l) => s + (l.quantity ?? 0), 0),
-      grnQty: grnLines.reduce((s, l) => s + (l.receivedQty ?? l.acceptedQty ?? 0), 0),
+      grnQty: lines.reduce((s, l) => s + (l.grnBillableQty ?? l.grnReceivedQty ?? 0), 0),
       invoiceQty: inv.lines.reduce((s, l) => s + l.quantity, 0),
       poTotal: po?.totalAmount ?? 0,
       invoiceTotal: inv.totalAmount,
       poTax: po ? (po.cgst ?? 0) + (po.sgst ?? 0) + (po.igst ?? 0) : 0,
       invoiceTax: inv.cgst + inv.sgst + inv.igst,
     },
-    tolerancesApplied: {
-      requirePoMatch: Boolean(inv.purchaseOrderId),
-      requireGrnMatch: Boolean(inv.goodsReceiptId),
-      quantityTolerancePct: 0,
-      rateTolerancePct: 0,
-      amountToleranceInr: 0,
-      amountTolerancePct: 0,
-      taxToleranceInr: 0,
-      taxTolerancePct: 0,
-      allowAuthorizedOverride: true,
-    },
+    tolerancesApplied: tolerances,
   }
 }
 

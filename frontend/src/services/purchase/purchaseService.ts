@@ -11,6 +11,10 @@
  */
 import { isApiMode } from '../../config/apiConfig'
 import { evaluateGrnLineTolerance } from './grnTolerance'
+import {
+  billableGrnVendorQtyForInvoiceMatch,
+  pctDiff,
+} from '../../utils/purchaseInvoiceMatching'
 import type {
   GoodsReceiptLine,
   GoodsReceiptNote,
@@ -5509,11 +5513,6 @@ function applyInvoiceTotals(lines: PurchaseInvoiceLine[], vendor: Vendor, freigh
   }
 }
 
-function pctDiff(a: number, b: number): number {
-  if (b === 0) return a === 0 ? 0 : 100
-  return (Math.abs(a - b) / Math.abs(b)) * 100
-}
-
 function computeMatchingForInvoice(inv: PurchaseInvoice): InvoiceMatchingResult {
   const tolerances: PurchaseInvoiceMatchTolerances = {
     ...state.setup.invoiceMatchTolerances,
@@ -5543,7 +5542,18 @@ function computeMatchingForInvoice(inv: PurchaseInvoice): InvoiceMatchingResult 
       : grn?.lines.find((l) => l.itemId === line.itemId)
 
     const poQty = poLine?.quantity ?? null
-    const grnQty = grnLine?.receivedQty ?? null
+    const grnReceivedQty = grnLine?.receivedQty ?? null
+    const grnBillableQty = grnLine
+      ? billableGrnVendorQtyForInvoiceMatch({
+          receivedQty: grnLine.receivedQty,
+          receivedUomQty: grnLine.receivedUomQty,
+          acceptedQty: grnLine.acceptedQty,
+          acceptedUomQty: grnLine.acceptedUomQty,
+          rejectedQty: grnLine.rejectedQty,
+          rejectedUomQty: grnLine.rejectedUomQty,
+          uomConversionFactor: grnLine.uomConversionFactor,
+        })
+      : null
     const poRate = poLine?.rate ?? null
     const poTaxPct = poLine?.gstRatePct ?? null
     const poLineTotal = poLine?.lineTotal ?? null
@@ -5551,7 +5561,7 @@ function computeMatchingForInvoice(inv: PurchaseInvoice): InvoiceMatchingResult 
     const flags: InvoiceMatchingResultStatus[] = []
     let withinTolerance = true
 
-    const refQty = grnQty ?? poQty
+    const refQty = grnBillableQty ?? poQty
     if (refQty != null) {
       const qtyDeltaPct = pctDiff(line.quantity, refQty)
       if (qtyDeltaPct > tolerances.quantityTolerancePct) {
@@ -5600,7 +5610,8 @@ function computeMatchingForInvoice(inv: PurchaseInvoice): InvoiceMatchingResult 
       itemCode: line.itemCode,
       itemName: line.itemName,
       poQty,
-      grnReceivedQty: grnQty,
+      grnReceivedQty,
+      grnBillableQty,
       invoiceQty: line.quantity,
       poRate,
       invoiceRate: line.rate,
@@ -5615,7 +5626,10 @@ function computeMatchingForInvoice(inv: PurchaseInvoice): InvoiceMatchingResult 
 
   const summary = {
     poQty: lineResults.reduce((s, l) => s + (l.poQty ?? 0), 0),
-    grnQty: lineResults.reduce((s, l) => s + (l.grnReceivedQty ?? 0), 0),
+    grnQty: lineResults.reduce(
+      (s, l) => s + (l.grnBillableQty ?? l.grnReceivedQty ?? 0),
+      0,
+    ),
     invoiceQty: lineResults.reduce((s, l) => s + l.invoiceQty, 0),
     poTotal: po?.totalAmount ?? 0,
     invoiceTotal: inv.totalAmount,

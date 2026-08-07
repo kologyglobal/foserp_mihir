@@ -79,6 +79,7 @@ import { systemConfirm } from '@/utils/systemConfirm'
 import { useActiveWarehouses, useActiveLocations } from '@/hooks/useMasterLists'
 import { useMasterStore } from '@/store/masterStore'
 import { useBinOptions } from '@/hooks/useBinOptions'
+import { resolveBinSelection, resolveItemDefaultBin } from '@/utils/itemDefaultBin'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
 /**
@@ -187,7 +188,7 @@ export function GrnEditorPage() {
 
   const warehouses = useActiveWarehouses()
   const storageLocations = useActiveLocations()
-  const bins = useBinOptions()
+  const bins = useBinOptions(warehouseId || undefined)
 
   const warehouseLocations = useMemo(
     () => storageLocations.filter((l) => !warehouseId || l.warehouseId === warehouseId),
@@ -210,17 +211,57 @@ export function GrnEditorPage() {
 
   const selectedPo = useMemo(() => orders.find((o) => o.id === poId), [orders, poId])
 
+  /** Match PO editor: scope by warehouse / storage location; never leave dropdown empty when bins exist. */
   const warehouseBins = useMemo(() => {
-    const byWarehouse = bins.filter(
-      (b) => !warehouseId || !b.warehouseId || b.warehouseId === warehouseId,
+    const selectedIds = new Set(lines.map((l) => l.binId).filter(Boolean) as string[])
+    const selectedCodes = new Set(lines.map((l) => l.bin?.trim()).filter((c): c is string => Boolean(c)))
+    const keepSelected = (b: (typeof bins)[number]) =>
+      selectedIds.has(b.id) ||
+      selectedCodes.has(b.code) ||
+      [...selectedIds].some(
+        (id) => b.code.localeCompare(id, undefined, { sensitivity: 'accent' }) === 0,
+      )
+
+    const deliveryRef = receivingLocation || selectedPo?.deliveryLocation?.id
+    if (!warehouseId && !deliveryRef) return bins
+
+    const scoped = bins.filter(
+      (b) =>
+        !b.warehouseId ||
+        b.warehouseId === warehouseId ||
+        (deliveryRef && b.storageLocationId === deliveryRef) ||
+        (deliveryRef && b.warehouseId === deliveryRef) ||
+        keepSelected(b),
     )
-    const storageLocationId = receivingLocation || selectedPo?.deliveryLocation?.id
-    if (!storageLocationId) return byWarehouse
-    const byLocation = byWarehouse.filter(
-      (b) => !b.storageLocationId || b.storageLocationId === storageLocationId,
-    )
-    return byLocation.length ? byLocation : byWarehouse
-  }, [bins, warehouseId, receivingLocation, selectedPo?.deliveryLocation?.id])
+    return scoped.length > 0 ? scoped : bins
+  }, [bins, warehouseId, receivingLocation, selectedPo?.deliveryLocation?.id, lines])
+
+  /** When bins load after PO lines, resolve item default bin + code-only snapshots to ids. */
+  useEffect(() => {
+    if (!bins.length || !lines.length) return
+    const catalog = warehouseBins.length ? warehouseBins : bins
+    setLines((prev) => {
+      let changed = false
+      const next = prev.map((line) => {
+        const resolved = resolveBinSelection(line.binId, line.bin, catalog)
+        if (resolved.binId || resolved.binCode) {
+          if (resolved.binId !== line.binId || resolved.binCode !== line.bin) {
+            changed = true
+            return { ...line, binId: resolved.binId, bin: resolved.binCode }
+          }
+          return line
+        }
+        const master = useMasterStore.getState().items.find((i) => i.id === line.itemId)
+        const def = resolveItemDefaultBin(master, catalog)
+        if ((def.binId || def.binCode) && (def.binId !== line.binId || def.binCode !== line.bin)) {
+          changed = true
+          return { ...line, binId: def.binId, bin: def.binCode }
+        }
+        return line
+      })
+      return changed ? next : prev
+    })
+  }, [bins, warehouseBins, poId, lines.length])
 
   const receivableVendors = useMemo(() => {
     const map = new Map<string, { id: string; name: string; code: string }>()
@@ -1585,28 +1626,55 @@ export function GrnEditorPage() {
                     </td>
                   ) : null}
                   <td>
-                    <Select
-                      className="min-w-[7rem] text-[11px]"
-                      value={l.binId ?? ''}
-                      onChange={(e) => {
-                        const nextBinId = e.target.value || null
-                        const bin = warehouseBins.find((b) => b.id === nextBinId)
-                        updateLine(i, { binId: nextBinId, bin: bin?.code ?? '' })
-                      }}
-                    >
-                      <option value="">{SELECT_PLACEHOLDER}</option>
-                      {warehouseBins.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.code}
-                        </option>
-                      ))}
-                      {l.binId && !warehouseBins.some((b) => b.id === l.binId) && l.bin ? (
-                        <option value={l.binId}>{l.bin}</option>
-                      ) : null}
-                    </Select>
-                    {!warehouseBins.length && warehouseId ? (
-                      <p className="mt-1 text-[10px] text-erp-muted">No bins for this warehouse</p>
-                    ) : null}
+                    {(() => {
+                      const resolvedBinId =
+                        l.binId ||
+                        (l.bin
+                          ? warehouseBins.find(
+                              (b) =>
+                                b.code.localeCompare(l.bin, undefined, { sensitivity: 'accent' }) ===
+                                0,
+                            )?.id
+                          : undefined) ||
+                        ''
+                      return (
+                        <>
+                          <Select
+                            className="min-w-[7rem] text-[11px]"
+                            value={resolvedBinId}
+                            onChange={(e) => {
+                              const nextBinId = e.target.value || null
+                              const bin = warehouseBins.find((b) => b.id === nextBinId)
+                              updateLine(i, { binId: nextBinId, bin: bin?.code ?? '' })
+                            }}
+                            title={
+                              !warehouseBins.length
+                                ? 'Create bins under Masters → BIN or Inventory setup'
+                                : undefined
+                            }
+                          >
+                            <option value="">{SELECT_PLACEHOLDER}</option>
+                            {warehouseBins.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.code}
+                              </option>
+                            ))}
+                            {resolvedBinId &&
+                            !warehouseBins.some((b) => b.id === resolvedBinId) &&
+                            l.bin ? (
+                              <option value={resolvedBinId}>{l.bin}</option>
+                            ) : null}
+                          </Select>
+                          {!warehouseBins.length ? (
+                            <p className="mt-1 text-[10px] text-erp-muted">
+                              {warehouseId
+                                ? 'No bins for this warehouse — add BIN master for the delivery warehouse'
+                                : 'Select warehouse / PO first'}
+                            </p>
+                          ) : null}
+                        </>
+                      )
+                    })()}
                   </td>
                   <td>
                     <Input

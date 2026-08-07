@@ -13,6 +13,7 @@ import {
   assertInvoiceLines, assertInvoiceStatus, invoiceMoney, invoiceQty, parseInvoiceDate,
 } from './purchase-invoice.workflow.js'
 import { lineAmountFromVendor } from '../shared/uom-conversion.js'
+import { billableGrnVendorQtyForInvoiceMatch, pctDiff } from './purchase-invoice-matching.util.js'
 import { taxSnapshotFromGrnOrPoLine } from '../shared/purchase-tax-snapshot.js'
 
 type Defaults = Awaited<ReturnType<typeof resolveEffectivePurchaseDefaults>>
@@ -292,21 +293,19 @@ function evaluateMatching(
     const grnLine = line.goodsReceiptLineId ? grnLines.get(line.goodsReceiptLineId) : undefined
     const factor =
       Number(line.uomConversionFactorSnapshot ?? poLine?.uomConversionFactor ?? grnLine?.uomConversionFactor ?? 1) || 1
-    const qtyBase = invoiceQty(grnLine?.receivedQuantity ?? poLine?.quantity)
-    const expectedVendorQty = invoiceQty(
-      grnLine?.receivedUomQuantity ?? poLine?.uomQuantity ?? (factor === 1 ? qtyBase : qtyBase * factor),
-    )
+    const expectedVendorQty = grnLine
+      ? billableGrnVendorQtyForInvoiceMatch(grnLine)
+      : invoiceQty(
+          poLine?.uomQuantity ??
+            (factor === 1 ? poLine?.quantity : invoiceQty(poLine?.quantity) * factor),
+        )
     const invoiceVendorQty = invoiceQty(
       line.uomQuantitySnapshot ?? (factor === 1 ? line.quantity : invoiceQty(line.quantity) * factor),
     )
     const rate = invoiceQty(line.rate)
     const amount = invoiceQty(line.amount)
     const expectedAmount = invoiceMoney(lineAmountFromVendor(invoiceQty(poLine?.rate ?? line.rate), expectedVendorQty))
-    const qtyPct = expectedVendorQty
-      ? Math.abs(invoiceVendorQty - expectedVendorQty) / expectedVendorQty * 100
-      : invoiceVendorQty
-        ? Infinity
-        : 0
+    const qtyPct = pctDiff(invoiceVendorQty, expectedVendorQty)
     const rateBase = invoiceQty(poLine?.rate)
     const ratePct = rateBase ? Math.abs(rate - rateBase) / rateBase * 100 : rate ? Infinity : 0
     const amountDiff = Math.abs(amount - expectedAmount)

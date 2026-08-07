@@ -128,6 +128,16 @@ const HIDDEN_FROM_PENDING_VIEW: PurchasePlanningStatus[] = [
   'cancelled',
 ]
 
+const PLANNING_SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
+  { value: 'planningDate', label: 'Planning date' },
+  { value: 'requiredByDate', label: 'Required by' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'status', label: 'Status' },
+  { value: 'planningNumber', label: 'Planning no.' },
+  { value: 'prNumberAsc', label: 'PR number (A→Z)' },
+  { value: 'prNumberDesc', label: 'PR number (Z→A)' },
+]
+
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -516,6 +526,30 @@ export function PurchasePlanningSheetPage() {
   })
 
   const filtered = useMemo(() => sortRows(filterRows(rows, filters), sortBy), [rows, filters, sortBy])
+
+  const prHeaderSort = useMemo(() => {
+    if (sortBy === 'prNumberAsc') return { columnId: 'prNumber', desc: false }
+    if (sortBy === 'prNumberDesc') return { columnId: 'prNumber', desc: true }
+    return null
+  }, [sortBy])
+
+  const handleDocumentHeaderSort = useCallback(
+    (sort: { columnId: string; desc: boolean } | null) => {
+      if (!sort) {
+        setSortBy('planningDate')
+        return
+      }
+      if (sort.columnId !== 'prNumber') return
+      setSortBy(sort.desc ? 'prNumberDesc' : 'prNumberAsc')
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (sortBy === 'prNumberAsc' || sortBy === 'prNumberDesc') {
+      setViewMode('document')
+    }
+  }, [sortBy])
 
   const summary = useMemo(() => summarizePlanningRows(rows), [rows])
 
@@ -934,7 +968,9 @@ export function PurchasePlanningSheetPage() {
       },
       {
         id: 'prNumber',
+        accessorKey: 'purchaseRequisitionNumber',
         header: 'PR Number',
+        enableSorting: true,
         meta: { columnLabel: 'PR Number' },
         cell: ({ row }) => (
           <TableLink to={`/purchase/requisitions/${row.original.purchaseRequisitionId}`}>
@@ -1344,6 +1380,14 @@ export function PurchasePlanningSheetPage() {
                     }}
                     className="crm-list-filter-bar--embedded !border-0 !bg-transparent !p-0"
                     showCommandPaletteHint={false}
+                    sort={
+                      <CrmListSortSelect
+                        value={sortBy}
+                        onChange={(v) => setSortBy(v as SortKey)}
+                        aria-label="Sort planning sheet"
+                        options={PLANNING_SORT_OPTIONS}
+                      />
+                    }
                   />
                 </div>
                 <div className="overflow-x-auto">
@@ -1625,7 +1669,11 @@ export function PurchasePlanningSheetPage() {
                   columns={columns}
                   getRowId={(r) => r.id}
                   showCompactSearch={false}
-                  enableColumnSorting
+                  enableColumnSorting={false}
+                  sortResetToken={sortBy}
+                  pinnedHeaderSort={prHeaderSort}
+                  onDocumentHeaderSortChange={handleDocumentHeaderSort}
+                  columnLayoutKey="purchase-planning-document-lines"
                   stickyFirstColumn
                   selectable
                   getRowCanSelect={(r) => !isSelectionDisabled(r)}
@@ -1671,15 +1719,7 @@ export function PurchasePlanningSheetPage() {
                           value={sortBy}
                           onChange={(v) => setSortBy(v as SortKey)}
                           aria-label="Sort planning sheet"
-                          options={[
-                            { value: 'planningDate', label: 'Planning date' },
-                            { value: 'requiredByDate', label: 'Required by' },
-                            { value: 'priority', label: 'Priority' },
-                            { value: 'status', label: 'Status' },
-                            { value: 'planningNumber', label: 'Planning no.' },
-                            { value: 'prNumberAsc', label: 'PR number (A→Z)' },
-                            { value: 'prNumberDesc', label: 'PR number (Z→A)' },
-                          ]}
+                          options={PLANNING_SORT_OPTIONS}
                         />
                       }
                     />

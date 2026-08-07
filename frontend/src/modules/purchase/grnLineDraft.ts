@@ -10,6 +10,7 @@ import {
 import type { GoodsReceiptNote, PurchaseOrder } from '@/types/purchaseDomain'
 import type { Item } from '@/types/master'
 import { getPurchaseLineBaseUomCode, purchaseQtyToBaseQty, toUomQuantityFromBase } from '@/utils/purchaseLineUom'
+import { getCachedPurchaseBins } from '@/hooks/useBinOptions'
 import { resolveItemDefaultBin } from '@/utils/itemDefaultBin'
 import { useMasterStore } from '@/store/masterStore'
 
@@ -287,7 +288,7 @@ export function linesFromPo(
       let bin = l.binCode ?? ''
       if (!binId && !bin) {
         const master = useMasterStore.getState().items.find((i) => i.id === l.itemId)
-        const def = resolveItemDefaultBin(master)
+        const def = resolveItemDefaultBin(master, getCachedPurchaseBins())
         binId = def.binId
         bin = def.binCode
       }

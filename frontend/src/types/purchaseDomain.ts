@@ -2143,7 +2143,9 @@ export interface GoodsReceiptLine {
   uomConversionFactor?: number
   unitCostPrimary?: number
   acceptedQty: number
+  acceptedUomQty?: number
   rejectedQty: number
+  rejectedUomQty?: number
   /** Qty sent back via completed material returns (PRT). */
   returnedQty?: number
   /** Qty still eligible for material return. */
@@ -2411,6 +2413,8 @@ export interface InvoiceMatchingLineResult {
   itemName: string
   poQty: number | null
   grnReceivedQty: number | null
+  /** QC-accepted / payable GRN qty used for match baseline (when different from received). */
+  grnBillableQty?: number | null
   invoiceQty: number
   poRate: number | null
   invoiceRate: number

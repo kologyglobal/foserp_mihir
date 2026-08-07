@@ -659,7 +659,7 @@ export function PurchaseInvoiceDetailPage() {
                 </div>
                 <div className="rounded-md border border-erp-border bg-white px-3 py-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
-                    GRN qty
+                    GRN billable
                   </p>
                   <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-erp-text">
                     {matching.summary.grnQty}
@@ -688,7 +688,9 @@ export function PurchaseInvoiceDetailPage() {
                     <tr>
                       <th>Item</th>
                       <th className="num">PO Qty</th>
-                      <th className="num">GRN Qty</th>
+                      <th className="num" title="QC-accepted qty used for match (received shown when different)">
+                        GRN billable
+                      </th>
                       <th className="num">Inv Qty</th>
                       <th className="num">PO Rate</th>
                       <th className="num">Inv Rate</th>
@@ -706,7 +708,16 @@ export function PurchaseInvoiceDetailPage() {
                           <div className="font-medium text-erp-text">{l.itemName}</div>
                         </td>
                         <td className="num tabular-nums">{l.poQty ?? '—'}</td>
-                        <td className="num tabular-nums">{l.grnReceivedQty ?? '—'}</td>
+                        <td className="num tabular-nums">
+                          {l.grnBillableQty ?? l.grnReceivedQty ?? '—'}
+                          {l.grnBillableQty != null
+                            && l.grnReceivedQty != null
+                            && l.grnBillableQty !== l.grnReceivedQty ? (
+                              <div className="text-[10px] font-normal text-erp-muted">
+                                rcv {l.grnReceivedQty}
+                              </div>
+                            ) : null}
+                        </td>
                         <td className="num tabular-nums">{l.invoiceQty}</td>
                         <td className="num tabular-nums">
                           {l.poRate != null ? formatCurrency(l.poRate) : '—'}
