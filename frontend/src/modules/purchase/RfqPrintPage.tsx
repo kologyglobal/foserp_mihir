@@ -4,12 +4,15 @@ import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
 import { PurchaseDocumentLetterhead } from '@/components/purchase/PurchaseDocumentLetterhead'
 import { getRFQById } from '@/services/purchase'
 import type { RequestForQuotation } from '@/types/purchaseDomain'
-import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
+import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { formatStatus } from '@/components/ui/Badge'
 import { notify } from '@/store/toastStore'
 import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
 import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
+import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
+import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
+import { useMasterStore } from '@/store/masterStore'
 
 export function RfqPrintPage() {
   const { id } = useParams()
@@ -23,6 +26,16 @@ export function RfqPrintPage() {
     let cancelled = false
     ;(async () => {
       setLoading(true)
+      // Ensure item master is available so vendor UOM / factor resolve on print.
+      try {
+        const store = useMasterStore.getState()
+        if (!store.items.length || !store.uoms.length) {
+          const { syncBatchMastersFromApi } = await import('@/services/bridges/masterBatchApiBridge')
+          await syncBatchMastersFromApi()
+        }
+      } catch {
+        /* print still works with single qty fallback */
+      }
       const row = await getRFQById(id)
       if (cancelled) return
       if (!row) {
@@ -132,7 +145,9 @@ export function RfqPrintPage() {
                   ) : null}
                 </td>
                 <td>{l.hsnCode || l.sacCode || '—'}</td>
-                <td className="num">{formatNumber(l.quantity)}</td>
+                <PurchasePrintDualQtyCell
+                  {...resolveDualQtyForPrint({ stockQty: l.quantity, itemId: l.itemId })}
+                />
                 <td>{l.uom || '—'}</td>
                 <td className="num">{formatCurrency(l.targetPrice)}</td>
                 <td className="num">{formatCurrency(l.amount)}</td>

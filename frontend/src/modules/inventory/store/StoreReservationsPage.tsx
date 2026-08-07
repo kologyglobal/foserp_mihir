@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Package, RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { isApiMode } from '@/config/apiConfig'
@@ -88,23 +87,23 @@ export function StoreReservationsPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/store/reservations"
-      commandBar={(
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={{
-            id: 'refresh',
-            label: 'Refresh',
-            icon: RefreshCw,
-            onClick: () => setToken((n) => n + 1),
-          }}
-          secondaryActions={[
-            { id: 'pick', label: 'Picking', onClick: () => navigate('/inventory/store/picking') },
-            { id: 'classic', label: 'Full register', onClick: () => navigate('/inventory/reservations') },
-          ]}
-        />
-      )}
     >
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="erp-btn erp-btn--ghost erp-btn--sm inline-flex items-center gap-1.5"
+          onClick={() => setToken((n) => n + 1)}
+        >
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+          Refresh
+        </button>
+        <Link to="/inventory/store/picking" className="erp-btn erp-btn--secondary erp-btn--sm">
+          Picking
+        </Link>
+        <Link to="/inventory/reservations" className="erp-btn erp-btn--secondary erp-btn--sm">
+          Full register
+        </Link>
+      </div>
       {loading ? <LoadingState variant="card" /> : null}
       {!loading && rows.length === 0 ? (
         <EmptyState icon={Package} title="No active reservations" description="Production, sales, or manual reservations will appear here." />

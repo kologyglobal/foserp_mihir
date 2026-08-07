@@ -188,6 +188,7 @@ export function QualityInspectionDetailPage() {
 
   return (
     <PurchaseCardFormShell
+      className="purchase-qi-form-page"
       title={qi.documentNumber}
       description={`${qi.itemCode} · ${qi.goodsReceiptNumber}`}
       recordNo={qi.documentNumber}
@@ -203,6 +204,7 @@ export function QualityInspectionDetailPage() {
         { label: 'Quality Inspections', to: '/purchase/quality-inspections' },
         { label: qi.documentNumber },
       ]}
+      backLink={{ to: '/purchase/quality-inspections', label: 'Back to Quality Inspections' }}
       detailMode={!canEdit}
       commandBar={
         <ErpCommandBar
@@ -344,7 +346,7 @@ export function QualityInspectionDetailPage() {
       }
     >
       <ErpCardSection title="Header" defaultOpen columns={1}>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <ErpViewField label="Inspection Number" value={qi.documentNumber} />
           <ErpViewField label="Inspection Date" value={formatDate(qi.documentDate)} />
           <ErpViewField
@@ -435,14 +437,14 @@ export function QualityInspectionDetailPage() {
         </div>
       </ErpCardSection>
 
-      <ErpCardSection title="Parameters" defaultOpen columns={1}>
+      <ErpCardSection title="Parameters" defaultOpen columns={1} className="purchase-qi-parameters-section">
         {parameters.length === 0 ? (
           <p className="text-sm text-erp-muted">
             No parameter checklist on this inspection yet. Save after create seeds Visual / Documentation defaults.
           </p>
         ) : (
-        <div className="w-full min-w-0 overflow-x-auto rounded-md border border-erp-border">
-          <table className="erp-table w-full min-w-[52rem] text-[12px]">
+        <div className="purchase-qi-parameters-scroll w-full min-w-0 max-w-full overflow-x-auto rounded-md border border-erp-border">
+          <table className="erp-table w-full min-w-[40rem] text-[12px]">
             <thead>
               <tr>
                 <th className="min-w-[8rem] text-left">Parameter</th>

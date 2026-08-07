@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { PurchaseStockDualQtyCell } from '@/components/purchase/PurchaseStockDualQtyCell'
 import {
   PurchaseAuditTimeline,
   buildDemoPurchaseTimeline,
@@ -451,7 +452,9 @@ export function RfqDetailPage() {
                         </td>
                         <td className="max-w-[12rem] text-erp-muted">{l.specification || '—'}</td>
                         <td className="font-mono">{l.hsnCode || l.sacCode || '—'}</td>
-                        <td className="num tabular-nums">{l.quantity}</td>
+                        <td className="num">
+                          <PurchaseStockDualQtyCell baseQty={l.quantity} itemId={l.itemId} bareWhenSingle />
+                        </td>
                         <td>{l.uom}</td>
                         <td>{formatDate(l.requiredDate)}</td>
                         <td className="num tabular-nums">{formatCurrency(l.targetPrice)}</td>

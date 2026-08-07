@@ -1,9 +1,11 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
   ArrowDownToLine,
   ArrowLeftRight,
   ArrowUpFromLine,
+  ChevronRight,
   ClipboardList,
   Factory,
   Package,
@@ -14,6 +16,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { cn } from '@/utils/cn'
 
 export type StoreOpChoice = {
   id: string
@@ -22,6 +25,10 @@ export type StoreOpChoice = {
   href: string
   icon: LucideIcon
   badge?: string
+  /** Optional section heading; choices with the same group render together. */
+  group?: string
+  /** Highlight as the primary recommended path. */
+  primary?: boolean
 }
 
 export function StoreOpHub({
@@ -29,15 +36,32 @@ export function StoreOpHub({
   description,
   favoritePath,
   backTo = '/inventory',
+  backLabel = 'Back to Store',
   choices,
 }: {
   title: string
   description: string
   favoritePath: string
   backTo?: string
+  backLabel?: string
   choices: StoreOpChoice[]
 }) {
   const navigate = useNavigate()
+
+  const groups = useMemo(() => {
+    const order: string[] = []
+    const map = new Map<string, StoreOpChoice[]>()
+    for (const c of choices) {
+      const key = c.group?.trim() || 'Paths'
+      if (!map.has(key)) {
+        map.set(key, [])
+        order.push(key)
+      }
+      map.get(key)!.push(c)
+    }
+    return order.map((name) => ({ name, items: map.get(name)! }))
+  }, [choices])
+
   return (
     <OperationalPageShell
       variant="dynamics"
@@ -45,7 +69,8 @@ export function StoreOpHub({
       badge="Store"
       title={title}
       description={description}
-      backLink={{ to: backTo, label: 'Store Dashboard' }}
+      showDescription
+      backLink={{ to: backTo, label: backLabel }}
       breadcrumbs={[
         { label: 'Store', to: '/inventory' },
         { label: title },
@@ -53,30 +78,45 @@ export function StoreOpHub({
       autoBreadcrumbs={false}
       favoritePath={favoritePath}
     >
-      <p className="mb-3 text-[12px] text-erp-muted">
-        Posts through the existing Inventory Posting Engine · Ledger is source of truth · No duplicate stock tables.
-      </p>
-      <div className="store-op-choice-grid">
-        {choices.map((c) => {
-          const Icon = c.icon
-          return (
-            <button
-              key={c.id}
-              type="button"
-              className="store-op-choice"
-              onClick={() => navigate(c.href)}
-            >
-              <span className="store-op-choice__icon">
-                <Icon className="h-6 w-6" aria-hidden />
-              </span>
-              <span className="store-op-choice__body">
-                <span className="store-op-choice__title">{c.title}</span>
-                <span className="store-op-choice__desc">{c.description}</span>
-                {c.badge ? <span className="store-op-choice__badge">{c.badge}</span> : null}
-              </span>
-            </button>
-          )
-        })}
+      <div className="store-ops-page store-op-hub">
+        <p className="store-op-hub__note">
+          Posts through the Inventory Posting Engine · Ledger is source of truth · No duplicate stock tables.
+        </p>
+
+        {groups.map((g) => (
+          <section key={g.name} className="store-section store-op-hub__section">
+            <div className="store-section__head">
+              <h2 className="store-section__title">{g.name}</h2>
+              <span className="text-[12px] text-erp-muted">{g.items.length}</span>
+            </div>
+            <div className="store-op-choice-grid">
+              {g.items.map((c) => {
+                const Icon = c.icon
+                const isPrimary = Boolean(c.primary || c.badge === 'Recommended')
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={cn('store-op-choice', isPrimary && 'store-op-choice--primary')}
+                    onClick={() => navigate(c.href)}
+                  >
+                    <span className="store-op-choice__icon">
+                      <Icon className="h-5 w-5" aria-hidden />
+                    </span>
+                    <span className="store-op-choice__body">
+                      <span className="store-op-choice__title-row">
+                        <span className="store-op-choice__title">{c.title}</span>
+                        {c.badge ? <span className="store-op-choice__badge">{c.badge}</span> : null}
+                      </span>
+                      <span className="store-op-choice__desc">{c.description}</span>
+                    </span>
+                    <ChevronRight className="store-op-choice__chevron" aria-hidden />
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        ))}
       </div>
     </OperationalPageShell>
   )
@@ -86,7 +126,7 @@ export function MaterialReceiptHubPage() {
   return (
     <StoreOpHub
       title="Material Receipt"
-      description="Pick a receipt source. Every path posts through the live inventory / GRN engines."
+      description="Choose how stock enters the warehouse. Every path posts through the live inventory / GRN engines."
       favoritePath="/inventory/store/receive"
       choices={[
         {
@@ -96,6 +136,8 @@ export function MaterialReceiptHubPage() {
           href: '/purchase/grn/new',
           icon: Truck,
           badge: 'Recommended',
+          primary: true,
+          group: 'Inbound receipts',
         },
         {
           id: 'fg',
@@ -103,6 +145,7 @@ export function MaterialReceiptHubPage() {
           description: 'Finished goods from work orders (store workbench FG queue).',
           href: '/manufacturing/store-workbench',
           icon: Factory,
+          group: 'Inbound receipts',
         },
         {
           id: 'transfer-in',
@@ -110,6 +153,15 @@ export function MaterialReceiptHubPage() {
           description: 'Receive stock already in transit from another warehouse.',
           href: '/inventory/movements/transfers',
           icon: ArrowLeftRight,
+          group: 'Inbound receipts',
+        },
+        {
+          id: 'scan',
+          title: 'Scan to receive',
+          description: 'Barcode-assisted goods receipt movement.',
+          href: '/inventory/scan/receive',
+          icon: ScanLine,
+          group: 'Inbound receipts',
         },
         {
           id: 'opening',
@@ -117,6 +169,7 @@ export function MaterialReceiptHubPage() {
           description: 'Opening balance via inventory movement engine.',
           href: '/inventory/opening-stock',
           icon: PackageOpen,
+          group: 'Adjustments & other',
         },
         {
           id: 'inward',
@@ -124,6 +177,7 @@ export function MaterialReceiptHubPage() {
           description: 'Quick inward movement or stock adjustment increase.',
           href: '/inventory/movements/receipts/new',
           icon: ArrowDownToLine,
+          group: 'Adjustments & other',
         },
         {
           id: 'return-rev',
@@ -131,6 +185,15 @@ export function MaterialReceiptHubPage() {
           description: 'Purchase return documents and inventory returns register.',
           href: '/inventory/movements/returns',
           icon: Package,
+          group: 'Adjustments & other',
+        },
+        {
+          id: 'grn-list',
+          title: 'Open GRN register',
+          description: 'Review draft, posted, and pending goods receipts.',
+          href: '/purchase/grn',
+          icon: ClipboardList,
+          group: 'Adjustments & other',
         },
       ]}
     />
@@ -151,6 +214,8 @@ export function MaterialIssueHubPage() {
           href: '/manufacturing/store-workbench',
           icon: Factory,
           badge: 'WO materials',
+          primary: true,
+          group: 'Issue paths',
         },
         {
           id: 'maintenance',
@@ -158,6 +223,7 @@ export function MaterialIssueHubPage() {
           description: 'Spare issue linked to maintenance tickets.',
           href: '/maintenance',
           icon: Wrench,
+          group: 'Issue paths',
         },
         {
           id: 'sales',
@@ -165,6 +231,7 @@ export function MaterialIssueHubPage() {
           description: 'Dispatch readiness and requirement stock.',
           href: '/dispatch/workbench',
           icon: Truck,
+          group: 'Issue paths',
         },
         {
           id: 'general',
@@ -172,6 +239,7 @@ export function MaterialIssueHubPage() {
           description: 'Free-form material issue document (posts inventory ledger).',
           href: '/inventory/movements/issues/new',
           icon: ArrowUpFromLine,
+          group: 'Other',
         },
         {
           id: 'jobwork',
@@ -179,6 +247,7 @@ export function MaterialIssueHubPage() {
           description: 'Subcon-out style issues via inventory issue + reference.',
           href: '/inventory/movements/issues/new',
           icon: Settings2,
+          group: 'Other',
         },
         {
           id: 'quick',
@@ -186,6 +255,7 @@ export function MaterialIssueHubPage() {
           description: 'Immediate issue movement when simple qty issue is enough.',
           href: '/inventory/issue',
           icon: Package,
+          group: 'Other',
         },
       ]}
     />
@@ -206,6 +276,8 @@ export function StockTransferHubPage() {
           href: '/inventory/movements/transfers/new',
           icon: ArrowLeftRight,
           badge: 'Engine path',
+          primary: true,
+          group: 'Transfers',
         },
         {
           id: 'open',
@@ -213,6 +285,7 @@ export function StockTransferHubPage() {
           description: 'In progress, in transit, and receive pending.',
           href: '/inventory/movements/transfers',
           icon: ClipboardList,
+          group: 'Transfers',
         },
         {
           id: 'wip',
@@ -220,6 +293,7 @@ export function StockTransferHubPage() {
           description: 'Manufacturing WIP transfer queue.',
           href: '/manufacturing/store-workbench',
           icon: Factory,
+          group: 'Transfers',
         },
       ]}
     />
@@ -239,6 +313,8 @@ export function PutAwayHubPage() {
           description: 'Finish receiving / post inventory first, then bin move.',
           href: '/purchase/grn',
           icon: Truck,
+          primary: true,
+          group: 'Put-away',
         },
         {
           id: 'transfer',
@@ -247,6 +323,7 @@ export function PutAwayHubPage() {
           href: '/inventory/movements/transfers/new',
           icon: ArrowLeftRight,
           badge: 'Suggested path',
+          group: 'Put-away',
         },
         {
           id: 'scan',
@@ -254,6 +331,7 @@ export function PutAwayHubPage() {
           description: 'Barcode-assisted put-away move.',
           href: '/inventory/scan/transfer',
           icon: ScanLine,
+          group: 'Put-away',
         },
       ]}
     />
@@ -274,6 +352,8 @@ export function PickingHubPage() {
           href: '/inventory/store/reservations',
           icon: ClipboardList,
           badge: 'Source',
+          primary: true,
+          group: 'Pick queues',
         },
         {
           id: 'production',
@@ -281,6 +361,7 @@ export function PickingHubPage() {
           description: 'Production material queues.',
           href: '/manufacturing/store-workbench',
           icon: Factory,
+          group: 'Pick queues',
         },
         {
           id: 'sales',
@@ -288,6 +369,7 @@ export function PickingHubPage() {
           description: 'Dispatch workbench readiness.',
           href: '/dispatch/workbench',
           icon: Truck,
+          group: 'Pick queues',
         },
         {
           id: 'transfer',
@@ -295,6 +377,7 @@ export function PickingHubPage() {
           description: 'Dispatch outbound transfer lines.',
           href: '/inventory/movements/transfers',
           icon: ArrowLeftRight,
+          group: 'Pick queues',
         },
         {
           id: 'issue',
@@ -302,6 +385,7 @@ export function PickingHubPage() {
           description: 'Post material issue document.',
           href: '/inventory/movements/issues/new',
           icon: ArrowUpFromLine,
+          group: 'Pick queues',
         },
       ]}
     />
@@ -322,6 +406,8 @@ export function StockCountHubPage() {
           href: '/inventory/stock-count/new',
           icon: ClipboardList,
           badge: 'Cycle / physical',
+          primary: true,
+          group: 'Count',
         },
         {
           id: 'open',
@@ -329,6 +415,7 @@ export function StockCountHubPage() {
           description: 'Resume counting, approve, post variance.',
           href: '/inventory/stock-count',
           icon: Package,
+          group: 'Count',
         },
         {
           id: 'adjust',
@@ -336,6 +423,7 @@ export function StockCountHubPage() {
           description: 'Manual stock adjustment when count is not required.',
           href: '/inventory/movements/adjustments/new',
           icon: Settings2,
+          group: 'Count',
         },
         {
           id: 'scan',
@@ -343,6 +431,7 @@ export function StockCountHubPage() {
           description: 'Barcode scan to identify item then count.',
           href: '/inventory/store/scan',
           icon: ScanLine,
+          group: 'Count',
         },
       ]}
     />
@@ -362,6 +451,8 @@ export function BarcodeHubPage() {
           description: 'Global ops search (item, stock, recent receipts).',
           href: '/inventory/ops/search',
           icon: Package,
+          primary: true,
+          group: 'Scan actions',
         },
         {
           id: 'receive',
@@ -369,6 +460,7 @@ export function BarcodeHubPage() {
           description: 'Scan-assisted goods receipt movement.',
           href: '/inventory/scan/receive',
           icon: ArrowDownToLine,
+          group: 'Scan actions',
         },
         {
           id: 'issue',
@@ -376,6 +468,7 @@ export function BarcodeHubPage() {
           description: 'Scan-assisted material issue.',
           href: '/inventory/scan/issue',
           icon: ArrowUpFromLine,
+          group: 'Scan actions',
         },
         {
           id: 'transfer',
@@ -383,6 +476,7 @@ export function BarcodeHubPage() {
           description: 'Scan-assisted warehouse/bin transfer.',
           href: '/inventory/scan/transfer',
           icon: ArrowLeftRight,
+          group: 'Scan actions',
         },
       ]}
     />

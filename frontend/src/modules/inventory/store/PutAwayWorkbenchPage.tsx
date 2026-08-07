@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeftRight, Package, RefreshCw, ScanLine, Truck } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { listPutAwayQueue, type PutAwayCard } from '@/services/inventory/putAwayService'
@@ -133,36 +132,31 @@ export function PutAwayWorkbenchPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/store/put-away"
-      commandBar={(
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={{
-            id: 'refresh',
-            label: 'Refresh',
-            icon: RefreshCw,
-            onClick: () => setToken((n) => n + 1),
-          }}
-          secondaryActions={[
-            {
-              id: 'transfer',
-              label: 'New transfer',
-              onClick: () => navigate('/inventory/movements/transfers?create=1'),
-            },
-            {
-              id: 'scan',
-              label: 'Scan transfer',
-              onClick: () => navigate('/inventory/scan/transfer'),
-            },
-          ]}
-        />
-      )}
     >
-      <p className="mb-3 text-[12px] text-erp-muted">
-        Flow: <strong>GRN post</strong> (inventory ledger) → <strong>Transfer / scan</strong> into storage bin.
-        Serials and bins stay on the GRN/transfer documents.
-        {!isApiMode() ? ' Demo GRNs appear when purchase demo data is loaded.' : ''}
-      </p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="m-0 text-[12px] text-erp-muted">
+          Flow: <strong>GRN post</strong> (inventory ledger) → <strong>Transfer / scan</strong> into storage bin.
+          Serials and bins stay on the GRN/transfer documents.
+          {!isApiMode() ? ' Demo GRNs appear when purchase demo data is loaded.' : ''}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="erp-btn erp-btn--ghost erp-btn--sm inline-flex items-center gap-1.5"
+            onClick={() => setToken((n) => n + 1)}
+          >
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+            Refresh
+          </button>
+          <Link to="/inventory/movements/transfers?create=1" className="erp-btn erp-btn--secondary erp-btn--sm">
+            New transfer
+          </Link>
+          <Link to="/inventory/scan/transfer" className="erp-btn erp-btn--secondary erp-btn--sm inline-flex items-center gap-1.5">
+            <ScanLine className="h-3.5 w-3.5" aria-hidden />
+            Scan transfer
+          </Link>
+        </div>
+      </div>
 
       {loading ? <LoadingState variant="dashboard" /> : null}
 

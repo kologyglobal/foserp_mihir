@@ -764,7 +764,15 @@ export function GrnDetailPage() {
                         ] ?? l.toleranceStatus}
                       </td>
                       <td className="num tabular-nums">{formatNumber(l.acceptedQty)}</td>
-                      <td className="num tabular-nums">{formatNumber(l.rejectedQty)}</td>
+                      <td
+                        className={
+                          l.rejectedQty > 0
+                            ? 'num tabular-nums font-semibold text-red-700'
+                            : 'num tabular-nums'
+                        }
+                      >
+                        {formatNumber(l.rejectedQty)}
+                      </td>
                       <td className="font-mono text-[11px] whitespace-nowrap">{l.batchNumber || '—'}</td>
                       <td className="whitespace-nowrap">
                         {GRN_LINE_INSPECTION_STATUS_LABELS[l.inspectionStatus]}

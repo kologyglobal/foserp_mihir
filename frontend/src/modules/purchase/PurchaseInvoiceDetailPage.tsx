@@ -16,6 +16,7 @@ import {
   Stamp,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { PurchaseStockDualQtyCell } from '@/components/purchase/PurchaseStockDualQtyCell'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import {
   PurchaseDocumentFactBox,
@@ -849,8 +850,15 @@ export function PurchaseInvoiceDetailPage() {
                         </div>
                       </td>
                       <td className="font-mono">{l.hsnCode || l.sacCode || '—'}</td>
-                      <td className="num tabular-nums">
-                        {l.quantity} {l.uom}
+                      <td className="num">
+                        <PurchaseStockDualQtyCell
+                          baseQty={l.quantity}
+                          stockUom={l.uom}
+                          itemId={l.itemId}
+                          purchaseQty={l.uomQuantity}
+                          purchaseUom={l.purchaseUom}
+                          uomConversionFactor={l.uomConversionFactor}
+                        />
                       </td>
                       <td className="num tabular-nums">{formatCurrency(l.rate)}</td>
                       <td className="num tabular-nums">{formatCurrency(l.taxableAmount)}</td>
@@ -883,9 +891,14 @@ export function PurchaseInvoiceDetailPage() {
             <ErpViewField label="Freight" value={formatCurrency(inv.freight)} />
             <ErpViewField label="Other Charges" value={formatCurrency(inv.otherCharges)} />
             <ErpViewField label="Taxable Amount" value={formatCurrency(inv.taxableAmount)} />
-            <ErpViewField label="CGST" value={formatCurrency(inv.cgst)} />
-            <ErpViewField label="SGST" value={formatCurrency(inv.sgst)} />
-            <ErpViewField label="IGST" value={formatCurrency(inv.igst)} />
+            {inv.gstScheme === 'igst' ? (
+              <ErpViewField label="IGST" value={formatCurrency(inv.igst)} />
+            ) : (
+              <>
+                <ErpViewField label="CGST" value={formatCurrency(inv.cgst)} />
+                <ErpViewField label="SGST" value={formatCurrency(inv.sgst)} />
+              </>
+            )}
             <ErpViewField label="Round Off" value={formatCurrency(inv.roundOff)} />
             <ErpViewField label="Grand Total" value={formatCurrency(inv.totalAmount)} />
           </div>

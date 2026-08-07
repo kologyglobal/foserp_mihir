@@ -6,7 +6,7 @@ import {
 } from '../../utils/purchase/purchaseFieldErrorLabels'
 import { getStoredSession } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
-import { resolveUomCode } from '../../utils/purchaseLineUom'
+import { resolveUomCode, toUomQuantityFromBase } from '../../utils/purchaseLineUom'
 import {
   aggregatePurchasePoGstTotals,
   computePurchasePoLineTax,
@@ -15,7 +15,7 @@ import {
   mapEngineeringProductTypeToPurchaseCategory,
   normalizeEngineeringProductType,
 } from '../../utils/purchaseProductType'
-import { prDepartmentLabel } from '../../utils/purchaseRequisitionValidation'
+import { resolvePrDepartmentDisplay } from '../../utils/purchaseRequisitionValidation'
 import {
   purchaseDeliveryPlaceOfSupplyLabel,
   purchaseSetupPlaceState,
@@ -74,6 +74,7 @@ import type {
   GoodsReceiptNote,
   GoodsReceiptLine,
   GrnDomainStatus,
+  GrnLineInspectionStatus,
   GrnInput,
   GrnListRow,
   PurchaseInvoice,
@@ -464,7 +465,7 @@ export function mapApiRequisitionToDomain(dto: ApiPurchaseRequisition): Purchase
     documentDate: dto.requisitionDate,
     status: mapPrStatus(dto.status),
     location: resolveWarehouseFromMaster(dto.warehouseId),
-    department: prDepartmentLabel(dto.departmentId ?? ''),
+    department: resolvePrDepartmentDisplay(dto.departmentId, dto.departmentName),
     requester: {
       id: dto.requestedById ?? '',
       code: '',
@@ -618,7 +619,7 @@ export function mapApiPlanningRowToDomain(row: ApiPurchasePlanningRow): Purchase
     purchaseRequisitionId: row.purchaseRequisitionId,
     purchaseRequisitionNumber: row.purchaseRequisitionNumber,
     purchaseRequisitionLineId: row.purchaseRequisitionLineId,
-    department: prDepartmentLabel(row.departmentId ?? ''),
+    department: resolvePrDepartmentDisplay(row.departmentId, row.departmentName),
     requestedById: row.requestedById ?? '',
     requestedByName: resolveRequesterDisplayName(row.requestedById, row.requestedByName),
     itemId: row.itemId ?? '',
@@ -1275,18 +1276,20 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
   const amount = Number(line.amount) || uomQuantity * rate
   const received = Number(line.receivedQuantity) || 0
   const invoiced = Number(line.invoicedQuantity) || 0
+  const receivedUomQty =
+    Number((line as { receivedUomQty?: number }).receivedUomQty) ||
+    (factor > 1 ? toUomQuantityFromBase(received, factor) : received)
+  const invoicedUomQty =
+    Number((line as { invoicedUomQty?: number }).invoicedUomQty) ||
+    (factor > 1 ? toUomQuantityFromBase(invoiced, factor) : invoiced)
   const outstandingQtyBase =
     Number((line as { outstandingQtyBase?: number }).outstandingQtyBase) ||
     Math.max(0, qty - received)
-  const receivedUomQty =
-    Number((line as { receivedUomQty?: number }).receivedUomQty) ||
-    (factor > 0 ? received * factor : received)
-  const invoicedUomQty =
-    Number((line as { invoicedUomQty?: number }).invoicedUomQty) ||
-    (factor > 0 ? invoiced * factor : invoiced)
   const outstandingQty =
     Number((line as { outstandingQty?: number }).outstandingQty) ||
-    Math.max(0, uomQuantity - receivedUomQty)
+    (factor > 1
+      ? toUomQuantityFromBase(outstandingQtyBase, factor)
+      : Math.max(0, uomQuantity - receivedUomQty))
   const requiredDate = line.requiredDate ?? new Date().toISOString().slice(0, 10)
   const lineTax = computePurchasePoLineTax({
     amount,
@@ -1712,6 +1715,25 @@ function mapApiGrnStatus(status: string): GrnDomainStatus {
   }
 }
 
+/** Derive GRN line Inspection column from QC outcome — not a hard-coded Pending. */
+function deriveGrnLineInspectionStatus(input: {
+  qcRequired: boolean
+  acceptedQty: number
+  rejectedQty: number
+  pendingInspectionQty: number
+  receivedQty: number
+}): GrnLineInspectionStatus {
+  const decided = input.acceptedQty > 0 || input.rejectedQty > 0
+  // QI may decide a line even when line.qcRequired was false (header QC / multi-line QI).
+  if (decided) {
+    if (input.rejectedQty > 0 && input.acceptedQty <= 0) return 'rejected'
+    if (input.acceptedQty > 0 && input.rejectedQty <= 0) return 'accepted'
+    return 'completed'
+  }
+  if (!input.qcRequired) return 'not_required'
+  return 'pending'
+}
+
 export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNote {
   const status = mapApiGrnStatus(String(api.status))
   return {
@@ -1819,7 +1841,13 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       binId: l.binId ?? null,
       locationId: l.storageLocationId || api.storageLocationId || '',
       locationName: api.storageLocationName || '',
-      inspectionStatus: l.qcRequired ? 'pending' : 'not_required',
+      inspectionStatus: deriveGrnLineInspectionStatus({
+        qcRequired: Boolean(l.qcRequired),
+        acceptedQty: Number(l.acceptedQuantity) || 0,
+        rejectedQty: Number(l.rejectedQuantity) || 0,
+        pendingInspectionQty: Number(l.acceptedForQcQuantity) || 0,
+        receivedQty: Number(l.receivedQuantity) || 0,
+      }),
       allowExcess: api.allowExcess,
       batchControlled: false,
       serialControlled: false,
@@ -2261,6 +2289,8 @@ export function mapApiQualityInspectionToListRow(
     batchLotNo: api.batchLotNo || '',
     receivedQty: Number(api.totals?.inspected) || 0,
     sampleQty: Number(api.totals?.inspected) || 0,
+    acceptedQty: Number(api.totals?.accepted) || 0,
+    rejectedQty: Number(api.totals?.rejected) || 0,
     inspectorName: api.inspectedByName || '',
     status,
     statusLabel: QUALITY_INSPECTION_STATUS_LABELS[status],

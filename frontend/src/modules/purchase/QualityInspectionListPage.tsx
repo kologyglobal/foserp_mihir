@@ -36,13 +36,29 @@ import { usePurchasePermissions } from '@/utils/permissions'
 export function QualityInspectionListPage() {
   const navigate = useNavigate()
   const perms = usePurchasePermissions()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const grnFilter = searchParams.get('grnId') ?? ''
   const statusParam = searchParams.get('status') ?? ''
   const [rows, setRows] = useState<QualityInspectionListRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState(statusParam)
+
+  const setStatusFilter = useCallback(
+    (next: string) => {
+      setStatus(next)
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev)
+          if (next) p.set('status', next)
+          else p.delete('status')
+          return p
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -141,6 +157,22 @@ export function QualityInspectionListPage() {
         header: 'Sample',
         meta: { columnLabel: 'Sample' },
         cell: ({ row }) => formatNumber(row.original.sampleQty),
+      },
+      {
+        accessorKey: 'acceptedQty',
+        header: 'Accepted',
+        meta: { columnLabel: 'Accepted' },
+        cell: ({ row }) => formatNumber(row.original.acceptedQty),
+      },
+      {
+        accessorKey: 'rejectedQty',
+        header: 'Rejected',
+        meta: { columnLabel: 'Rejected' },
+        cell: ({ row }) => {
+          const qty = row.original.rejectedQty
+          if (!(qty > 0)) return formatNumber(qty)
+          return <span className="font-semibold text-red-700 tabular-nums">{formatNumber(qty)}</span>
+        },
       },
       {
         accessorKey: 'inspectorName',
@@ -246,7 +278,7 @@ export function QualityInspectionListPage() {
         onSearchChange={setSearch}
         searchPlaceholder="Search QI / GRN / item / batch"
         status={status}
-        onStatusChange={setStatus}
+        onStatusChange={setStatusFilter}
         statusAriaLabel="Filter quality inspections by status"
         statusOptions={[
           { value: 'completed', label: 'Completed (Accepted / Partial / Rejected)' },

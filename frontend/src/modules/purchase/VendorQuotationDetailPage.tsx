@@ -13,6 +13,7 @@ import {
   Truck,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { PurchaseStockDualQtyCell } from '@/components/purchase/PurchaseStockDualQtyCell'
 import { PurchaseTaxTotalsPanel } from '@/components/purchase/PurchaseTaxTotalsPanel'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import {
@@ -76,7 +77,9 @@ function LineExpandRow({ line }: { line: VendorQuotationLine }) {
             </p>
           ) : null}
         </td>
-        <td className="num tabular-nums">{line.quantity}</td>
+        <td className="num">
+          <PurchaseStockDualQtyCell baseQty={line.quantity} itemId={line.itemId} bareWhenSingle />
+        </td>
         <td>{line.uom}</td>
         <td className="num tabular-nums">{formatCurrency(line.rate)}</td>
         <td className="num tabular-nums">{line.discountPct}%</td>

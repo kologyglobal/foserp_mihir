@@ -70,6 +70,7 @@ export function formatPurchaseRequisitionUserName(user: {
 export function mapPurchaseRequisitionToDto(
   pr: PurchaseRequisition & { lines?: PurchaseRequisitionLine[] },
   userNames?: Map<string, string>,
+  departmentName?: string | null,
 ) {
   const requestedByName =
     (pr.requestedById && userNames?.get(pr.requestedById)?.trim()) || null
@@ -81,6 +82,7 @@ export function mapPurchaseRequisitionToDto(
     revisionNo: pr.revisionNo ?? 0,
     requisitionDate: toDateOnly(pr.requisitionDate),
     departmentId: pr.departmentId,
+    departmentName: departmentName?.trim() || null,
     requestedById: pr.requestedById,
     requestedByName,
     warehouseId: pr.warehouseId,

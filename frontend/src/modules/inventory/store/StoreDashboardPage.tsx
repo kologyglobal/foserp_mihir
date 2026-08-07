@@ -13,7 +13,6 @@ import {
 } from 'lucide-react'
 import { DynamicsDashboardGrid, DynamicsDashboardPanel } from '@/components/dynamics'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
@@ -112,31 +111,6 @@ export function StoreDashboardPage() {
       autoBreadcrumbs={false}
       favoritePath="/inventory"
       kpiStrip={!loading && data ? kpiStrip : undefined}
-      commandBar={(
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={{
-            id: 'receive',
-            label: 'Receive',
-            icon: ArrowDownToLine,
-            onClick: () => navigate('/inventory/store/receive'),
-          }}
-          secondaryActions={[
-            { id: 'issue', label: 'Issue', icon: ArrowUpFromLine, onClick: () => navigate('/inventory/store/issue') },
-            { id: 'transfer', label: 'Transfer', icon: ArrowLeftRight, onClick: () => navigate('/inventory/store/transfer') },
-            { id: 'stock', label: 'Stock', icon: Package, onClick: () => navigate('/inventory/stock') },
-            { id: 'timeline', label: 'Timeline', onClick: () => navigate('/inventory/store/timeline') },
-            { id: 'mfg', label: 'Production queue', onClick: () => navigate('/manufacturing/store-workbench') },
-            {
-              id: 'refresh',
-              label: 'Refresh',
-              icon: RefreshCw,
-              onClick: () => setToken((n) => n + 1),
-            },
-          ]}
-        />
-      )}
     >
       {loading ? <LoadingState variant="dashboard" /> : null}
 
@@ -158,8 +132,16 @@ export function StoreDashboardPage() {
             })}
           </nav>
 
-          <p className="inv-hub-meta">
-            Updated {formatDateTime(data.asOf) || formatDate(data.asOf)}
+          <p className="inv-hub-meta flex flex-wrap items-center gap-3">
+            <span>Updated {formatDateTime(data.asOf) || formatDate(data.asOf)}</span>
+            <button
+              type="button"
+              className="erp-btn erp-btn--ghost erp-btn--sm inline-flex items-center gap-1"
+              onClick={() => setToken((n) => n + 1)}
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+              Refresh
+            </button>
           </p>
 
           <DynamicsDashboardPanel

@@ -1,6 +1,6 @@
 /** Incoming Quality command center — operational UI for supplier QC (Purchase QI under the hood). */
 import { useCallback, useEffect, useMemo, useState, type ComponentPropsWithoutRef, type ElementType, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ClipboardCheck,
   Package,
@@ -93,6 +93,7 @@ function QueueRowAction<T extends ElementType = 'button'>({
 }
 
 export function IncomingQcQueuePage() {
+  const navigate = useNavigate()
   const inspections = useIncomingPendingInspections()
   const [queue, setQueue] = useState<IncomingQualityReadiness | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
@@ -228,17 +229,17 @@ export function IncomingQcQueuePage() {
             <Button size="sm" variant="secondary" onClick={() => void load()} disabled={busy}>
               Refresh
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => { window.location.href = '/purchase/quality-inspections' }}>
+            <Button size="sm" variant="secondary" onClick={() => navigate('/purchase/quality-inspections')}>
               QI register
             </Button>
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => { window.location.href = '/purchase/quality-inspections?status=completed' }}
+              onClick={() => navigate('/purchase/quality-inspections?status=completed')}
             >
               Completed QC
             </Button>
-            <Button size="sm" onClick={() => { window.location.href = '/purchase/grn' }}>
+            <Button size="sm" onClick={() => navigate('/purchase/grn')}>
               GRN
             </Button>
           </div>

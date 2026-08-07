@@ -41,6 +41,7 @@ import {
   type PlanningSummaryFilterKey,
 } from '@/components/purchase/PurchasePlanningSummaryCards'
 import { PurchasePlanningViewDrawer } from '@/components/purchase/PurchasePlanningViewDrawer'
+import { PurchaseStockDualQtyCell } from '@/components/purchase/PurchaseStockDualQtyCell'
 import { PurchasePlanningEditDrawer } from '@/components/purchase/PurchasePlanningEditDrawer'
 import {
   PurchasePlanningCreatePoModal,
@@ -1007,7 +1008,11 @@ export function PurchasePlanningSheetPage() {
         header: 'Required Quantity',
         meta: { columnLabel: 'Required Quantity', align: 'right' },
         cell: ({ row }) => (
-          <span className="tabular-nums">{row.original.requiredQuantity}</span>
+          <PurchaseStockDualQtyCell
+            baseQty={row.original.requiredQuantity}
+            itemId={row.original.itemId}
+            bareWhenSingle
+          />
         ),
       },
       {
@@ -1048,7 +1053,12 @@ export function PurchasePlanningSheetPage() {
         header: 'Qty to order in PO',
         meta: { columnLabel: 'Qty to order in PO', align: 'right' },
         cell: ({ row }) => (
-          <span className="tabular-nums font-medium">{row.original.remainingQuantity}</span>
+          <PurchaseStockDualQtyCell
+            baseQty={row.original.remainingQuantity}
+            itemId={row.original.itemId}
+            className="font-medium"
+            bareWhenSingle
+          />
         ),
       },
       {
@@ -1057,7 +1067,12 @@ export function PurchasePlanningSheetPage() {
         header: 'Net Purchase Quantity',
         meta: { columnLabel: 'Net Purchase Quantity', align: 'right' },
         cell: ({ row }) => (
-          <span className="tabular-nums font-medium">{row.original.netPurchaseQuantity}</span>
+          <PurchaseStockDualQtyCell
+            baseQty={row.original.netPurchaseQuantity}
+            itemId={row.original.itemId}
+            className="font-medium"
+            bareWhenSingle
+          />
         ),
       },
       {

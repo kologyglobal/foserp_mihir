@@ -139,6 +139,8 @@ export interface ApiPurchaseRequisition {
   revisionNo?: number
   requisitionDate: string
   departmentId: string | null
+  /** Resolved CRM department name when departmentId is a master UUID. */
+  departmentName?: string | null
   requestedById: string | null
   /** Resolved display name for requestedById (API). */
   requestedByName?: string | null
@@ -228,6 +230,8 @@ export interface ApiPurchasePlanningRow {
   purchaseRequisitionLineId: string
   purchaseRequisitionNumber: string
   departmentId: string | null
+  /** Resolved CRM department name when departmentId is a master UUID. */
+  departmentName?: string | null
   requestedById: string | null
   requestedByName?: string | null
   itemId: string | null
@@ -693,6 +697,8 @@ export interface ApiGoodsReceiptLine {
   receivedQuantity: number
   receivedUomQuantity?: number
   orderedUomQuantity?: number
+  acceptedUomQuantity?: number
+  rejectedUomQuantity?: number
   damagedQuantity: number
   shortQuantity: number
   excessQuantity: number

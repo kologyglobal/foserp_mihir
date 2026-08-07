@@ -21,6 +21,8 @@ import { ErpCardSection, ErpFieldRow, ErpFormSpan } from '@/components/erp/card-
 import { ErpButton } from '@/components/erp/ErpButton'
 import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Checkbox, DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
+import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
+import { formatPurchaseQty } from '@/utils/purchaseLineUom'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
@@ -111,6 +113,17 @@ function emptyLine(partial?: Partial<EditorLine>): EditorLine {
     purchaseOrderLineId: null,
     ...partial,
   }
+}
+
+/** Vendor-unit equivalent shown under the base-qty input for multi-UOM items. */
+function PurchaseReturnQtyHint({ itemId, baseQty }: { itemId: string; baseQty: number }) {
+  const dual = resolveDualQtyForPrint({ stockQty: Number(baseQty) || 0, itemId })
+  if (!dual.showDual) return null
+  return (
+    <div className="mt-0.5 text-right text-[11px] tabular-nums text-erp-muted">
+      = {formatPurchaseQty(dual.purchaseQty)} {dual.purchaseUom}
+    </div>
+  )
 }
 
 function lineTaxable(l: EditorLine) {
@@ -1231,6 +1244,7 @@ export function PurchaseReturnEditorPage() {
                         }
                         disabled={!editable}
                       />
+                      <PurchaseReturnQtyHint itemId={l.itemId} baseQty={l.returnQty} />
                     </td>
                     <td>{l.uom}</td>
                     <td>

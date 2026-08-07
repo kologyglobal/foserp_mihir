@@ -12,6 +12,7 @@ import {
   Truck,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { PurchaseStockDualQtyCell } from '@/components/purchase/PurchaseStockDualQtyCell'
 import {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,
@@ -477,9 +478,15 @@ export function PurchaseReturnDetailPage() {
                       {l.batchLotNo || '—'}
                       {l.serialNumber ? ` / ${l.serialNumber}` : ''}
                     </td>
-                    <td className="num tabular-nums">{l.receivedQty}</td>
-                    <td className="num tabular-nums">{l.availableReturnQty}</td>
-                    <td className="num tabular-nums">{l.returnQty}</td>
+                    <td className="num">
+                      <PurchaseStockDualQtyCell baseQty={l.receivedQty} itemId={l.itemId} bareWhenSingle />
+                    </td>
+                    <td className="num">
+                      <PurchaseStockDualQtyCell baseQty={l.availableReturnQty} itemId={l.itemId} bareWhenSingle />
+                    </td>
+                    <td className="num">
+                      <PurchaseStockDualQtyCell baseQty={l.returnQty} itemId={l.itemId} bareWhenSingle />
+                    </td>
                     <td>{l.uom || '—'}</td>
                     <td className="num tabular-nums">{formatCurrency(l.unitCost)}</td>
                     <td className="num tabular-nums">

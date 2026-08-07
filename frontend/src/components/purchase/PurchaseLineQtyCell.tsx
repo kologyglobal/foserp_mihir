@@ -1,13 +1,12 @@
 import type { PurchaseOrderLine } from '@/types/purchaseDomain'
 import {
   formatPurchaseQty,
-  getPurchaseLineBaseUomCode,
-  purchaseLineHasDualUom,
+  resolvePurchaseLineQtyPresentation,
 } from '@/utils/purchaseLineUom'
 import { cn } from '@/utils/cn'
 import { DecimalInput } from '@/components/forms/Inputs'
 
-type LineQty = Pick<PurchaseOrderLine, 'itemId' | 'uom' | 'uomQuantity' | 'quantity' | 'uomConversionFactor'>
+type LineQty = Pick<PurchaseOrderLine, 'itemId' | 'uom' | 'uomQuantity' | 'quantity' | 'uomConversionFactor' | 'uomId'>
 
 type Props = {
   line: LineQty
@@ -17,9 +16,11 @@ type Props = {
   disabled?: boolean
   className?: string
   inputId?: string
+  /** PO view: caption Purchase (vendor UOM) / Stock (base UOM) on dual rows. */
+  showDualQtyLabels?: boolean
 }
 
-/** Purchase qty + unit; when MUOM applies, also show base/stock qty (e.g. 30 MTR / 10 NOS). */
+/** Purchase qty + unit; when MUOM applies, vendor UOM on top and stock/base UOM below (e.g. 800 KG / 16 NOS). */
 export function PurchaseLineQtyCell({
   line,
   editable = false,
@@ -28,12 +29,10 @@ export function PurchaseLineQtyCell({
   disabled = false,
   className,
   inputId,
+  showDualQtyLabels = false,
 }: Props) {
-  const purchaseQty = Number(value ?? line.uomQuantity ?? line.quantity) || 0
-  const purchaseUom = (line.uom || '—').trim()
-  const dual = purchaseLineHasDualUom(line)
-  const baseUom = getPurchaseLineBaseUomCode(line.itemId)
-  const baseQty = Number(line.quantity) || 0
+  const pres = resolvePurchaseLineQtyPresentation(line)
+  const editQty = Number(value ?? pres.purchaseQty) || 0
 
   if (editable) {
     return (
@@ -42,19 +41,19 @@ export function PurchaseLineQtyCell({
           <DecimalInput
             id={inputId}
             min={0}
-            className="h-8 w-[4.5rem] shrink-0 text-right text-[11px]"
+            className="h-8 w-[4.5rem] shrink-0 text-right text-[12px]"
             disabled={disabled}
             title="Purchase quantity"
-            value={purchaseQty}
+            value={editQty}
             onChange={(v) => onChange?.(v)}
           />
-          <span className="min-w-[2.75rem] shrink-0 text-left text-[11px] font-semibold uppercase tracking-wide text-erp-text">
-            {purchaseUom}
+          <span className="min-w-[2.75rem] shrink-0 text-left text-[12px] font-semibold uppercase tracking-wide text-erp-text">
+            {pres.purchaseUom}
           </span>
         </div>
-        {dual && baseUom ? (
-          <p className="mt-1 whitespace-nowrap text-right text-[10px] font-medium tabular-nums text-erp-muted">
-            {formatPurchaseQty(baseQty)} {baseUom}
+        {pres.dual ? (
+          <p className="purchase-dual-qty__secondary mt-1 text-right">
+            {formatPurchaseQty(pres.baseQty)} {pres.baseUom}
           </p>
         ) : null}
       </div>
@@ -62,13 +61,25 @@ export function PurchaseLineQtyCell({
   }
 
   return (
-    <div className={cn('min-w-[10rem] text-right tabular-nums', className)}>
-      <div className="whitespace-nowrap text-[11px] font-medium text-erp-text">
-        {formatPurchaseQty(purchaseQty)} {purchaseUom}
+    <div
+      className={cn(
+        'purchase-dual-qty text-right',
+        !pres.dual && 'purchase-dual-qty--single',
+        className,
+      )}
+    >
+      <div className="purchase-dual-qty__primary">
+        {showDualQtyLabels && pres.dual ? (
+          <span className="purchase-dual-qty__label">Purchase</span>
+        ) : null}
+        {formatPurchaseQty(pres.purchaseQty)} {pres.purchaseUom}
       </div>
-      {dual && baseUom ? (
-        <div className="mt-0.5 whitespace-nowrap text-[10px] font-medium text-erp-muted">
-          {formatPurchaseQty(baseQty)} {baseUom}
+      {pres.dual ? (
+        <div className="purchase-dual-qty__secondary">
+          {showDualQtyLabels ? (
+            <span className="purchase-dual-qty__label">Stock</span>
+          ) : null}
+          {formatPurchaseQty(pres.baseQty)} {pres.baseUom}
         </div>
       ) : null}
     </div>

@@ -2360,6 +2360,8 @@ export interface QualityInspectionListRow {
   batchLotNo: string
   receivedQty: number
   sampleQty: number
+  acceptedQty: number
+  rejectedQty: number
   inspectorName: string
   status: QualityInspectionStatus
   statusLabel: string

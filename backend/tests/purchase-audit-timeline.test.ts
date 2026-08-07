@@ -71,4 +71,46 @@ describe('purchase audit catalog', () => {
     expect(merged[0]?.remarks).toBe('E2E approve L0')
     expect(merged[0]?.newValue).toEqual({ status: 'APPROVED', rfqRequired: false })
   })
+
+  it('merges approve pairs written a few seconds apart in the same minute', () => {
+    const merged = dedupePurchaseTimelineEvents([
+      {
+        id: 'status:1',
+        source: 'status_history',
+        tenantId: 't1',
+        module: 'purchase',
+        entityType: 'PurchaseRequisition',
+        entityId: 'pr-1',
+        action: 'APPROVED',
+        actionLabel: 'Approved',
+        previousValue: { status: 'PENDING_APPROVAL' },
+        newValue: { status: 'APPROVED' },
+        actorId: 'u1',
+        actorName: 'Rajesh Patel',
+        timestamp: '2026-08-07T09:17:02.000Z',
+        remarks: 'Approved — no RFQ',
+        requestMetadata: null,
+      },
+      {
+        id: 'audit:1',
+        source: 'audit',
+        tenantId: 't1',
+        module: 'purchase',
+        entityType: 'PurchaseRequisition',
+        entityId: 'pr-1',
+        action: 'PR_APPROVED',
+        actionLabel: 'Approved',
+        previousValue: { status: 'PENDING_APPROVAL' },
+        newValue: { status: 'APPROVED', rfqRequired: false },
+        actorId: 'u1',
+        actorName: null,
+        timestamp: '2026-08-07T09:17:00.000Z',
+        remarks: null,
+        requestMetadata: null,
+      },
+    ])
+
+    expect(merged).toHaveLength(1)
+    expect(merged[0]?.remarks).toBe('Approved — no RFQ')
+  })
 })

@@ -8,12 +8,15 @@ import {
   PURCHASE_RETURN_REASON_LABELS,
 } from '@/services/purchase'
 import type { PurchaseReturn } from '@/types/purchaseDomain'
-import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
+import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { formatStatus } from '@/components/ui/Badge'
 import { notify } from '@/store/toastStore'
 import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
 import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
+import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
+import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
+import { useMasterStore } from '@/store/masterStore'
 
 export function PurchaseReturnPrintPage() {
   const { id } = useParams()
@@ -27,6 +30,16 @@ export function PurchaseReturnPrintPage() {
     let cancelled = false
     ;(async () => {
       setLoading(true)
+      // Ensure item master is available so stock/vendor UOM codes resolve on print.
+      try {
+        const store = useMasterStore.getState()
+        if (!store.items.length || !store.uoms.length) {
+          const { syncBatchMastersFromApi } = await import('@/services/bridges/masterBatchApiBridge')
+          await syncBatchMastersFromApi()
+        }
+      } catch {
+        /* print still works with single qty fallback */
+      }
       const row = await getPurchaseReturnById(id)
       if (cancelled) return
       if (!row) {
@@ -117,6 +130,9 @@ export function PurchaseReturnPrintPage() {
           <tbody>
             {doc.lines.map((l) => {
               const balance = Math.max(0, (Number(l.receivedQty) || 0) - (Number(l.returnQty) || 0))
+              const receivedDual = resolveDualQtyForPrint({ stockQty: l.receivedQty, itemId: l.itemId })
+              const returnDual = resolveDualQtyForPrint({ stockQty: l.returnQty, itemId: l.itemId })
+              const balanceDual = resolveDualQtyForPrint({ stockQty: balance, itemId: l.itemId })
               return (
               <tr key={l.id}>
                 <td>{l.lineNo}</td>
@@ -129,9 +145,9 @@ export function PurchaseReturnPrintPage() {
                   {l.batchLotNo || '—'}
                   {l.serialNumber ? ` / ${l.serialNumber}` : ''}
                 </td>
-                <td>{formatNumber(l.receivedQty)}</td>
-                <td>{formatNumber(l.returnQty)}</td>
-                <td>{formatNumber(balance)}</td>
+                <PurchasePrintDualQtyCell {...receivedDual} />
+                <PurchasePrintDualQtyCell {...returnDual} />
+                <PurchasePrintDualQtyCell {...balanceDual} />
                 <td>{l.uom}</td>
                 <td>{formatCurrency(l.unitCost)}</td>
                 <td>{formatCurrency(l.returnAmount)}</td>

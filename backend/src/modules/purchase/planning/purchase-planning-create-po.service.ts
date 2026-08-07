@@ -327,8 +327,8 @@ export async function createPurchaseOrdersFromPlanning(
         itemCode: row.itemCodeSnapshot,
         itemName: row.itemNameSnapshot,
         description: row.itemDescriptionSnapshot,
-        uomQuantity: orderQty,
-        uomId: row.uomId,
+        /** Planning/PR qty is always base (stock) UOM — omit uomQuantity so PO pipeline derives vendor qty. */
+        quantity: orderQty,
         rate,
         requiredDate: row.requiredDate ? row.requiredDate.toISOString().slice(0, 10) : null,
         purchaseRequisitionLineId: row.purchaseRequisitionLineId,

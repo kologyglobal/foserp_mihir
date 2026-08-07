@@ -354,17 +354,35 @@
 }
 
 /* Operation hub choice cards (Receive / Issue / Transfer pickers) */
+.store-zoho-register .store-op-hub {
+  gap: 12px;
+}
+
+.store-zoho-register .store-op-hub__note {
+  color: var(--store-zoho-muted);
+}
+
+.store-zoho-register .store-op-hub__section {
+  border: 1px solid var(--store-zoho-line);
+  border-radius: var(--store-zoho-radius);
+  background: #fff;
+  box-shadow: none;
+}
+
 .store-zoho-register .store-op-choice-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 10px;
+  max-width: none;
+  width: 100%;
 }
 
 .store-zoho-register .store-op-choice {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 14px 14px;
+  min-height: 88px;
+  padding: 14px;
   text-align: left;
   border: 1px solid var(--store-zoho-line);
   border-radius: var(--store-zoho-radius);
@@ -377,6 +395,11 @@
 .store-zoho-register .store-op-choice:hover {
   border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 40%, var(--store-zoho-line));
   background: color-mix(in srgb, var(--erp-primary, #0078d4) 4%, #fff);
+}
+
+.store-zoho-register .store-op-choice--primary {
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 35%, var(--store-zoho-line));
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 5%, #fff);
 }
 
 .store-zoho-register .store-op-choice__icon {
@@ -407,7 +430,6 @@
 
 .store-zoho-register .store-op-choice__badge {
   display: inline-flex;
-  margin-top: 6px;
   padding: 2px 8px;
   border-radius: 4px;
   border: 1px solid color-mix(in srgb, var(--erp-primary, #0078d4) 22%, var(--store-zoho-line));
@@ -417,6 +439,10 @@
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--erp-primary, #0078d4);
+}
+
+.store-zoho-register .store-op-choice__chevron {
+  color: var(--store-zoho-muted);
 }
 
 /* Consolidated stock / dense grids */

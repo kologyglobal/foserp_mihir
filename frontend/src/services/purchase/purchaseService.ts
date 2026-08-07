@@ -4837,6 +4837,8 @@ function toQiListRow(q: QualityInspection): QualityInspectionListRow {
     batchLotNo: q.batchLotNo,
     receivedQty: q.receivedQty,
     sampleQty: q.sampleQty,
+    acceptedQty: q.acceptedQty,
+    rejectedQty: q.rejectedQty,
     inspectorName: q.inspector.name,
     status: q.status,
     statusLabel: QUALITY_INSPECTION_STATUS_LABELS[q.status],

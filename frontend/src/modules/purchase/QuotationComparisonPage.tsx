@@ -11,6 +11,7 @@ import {
   ThumbsUp,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { PurchaseStockDualQtyCell } from '@/components/purchase/PurchaseStockDualQtyCell'
 import {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,
@@ -1069,7 +1070,11 @@ export function QuotationComparisonPage() {
                           </div>
                         </td>
                         <td className="sticky left-[160px] z-10 border-r border-erp-border bg-white num whitespace-nowrap">
-                          {row.quantity} {row.uom}
+                          <PurchaseStockDualQtyCell
+                            baseQty={row.quantity}
+                            stockUom={row.uom}
+                            itemId={row.itemId}
+                          />
                         </td>
                         {vendorMetas.map((v) => {
                           const q = row.quotes.find((x) => x.vendorId === v.vendorId)
