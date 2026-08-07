@@ -249,11 +249,11 @@ export function PurchaseRfqLinesTable({
                       {(() => {
                         const uomOptions = getPurchaseLineUomOptions(line.itemId)
                         const multi = uomOptions.length > 1
-                        const uomCode = uomOptions[0]?.code || line.uom || '—'
+                        const uomCode = uomOptions[0]?.code || line.uom || '-'
                         if (!editable || !line.itemId) {
                           return (
                             <span className="block text-center text-[11px] font-medium uppercase text-erp-text">
-                              {line.uom || '—'}
+                              {line.uom || '-'}
                             </span>
                           )
                         }
@@ -312,7 +312,7 @@ export function PurchaseRfqLinesTable({
                       />
                     </td>
                     <td className="font-mono text-[11px] text-erp-muted">
-                      {line.purchaseRequisitionNumber || '—'}
+                      {line.purchaseRequisitionNumber || '-'}
                     </td>
                     <td onKeyDown={onCellKeyDown}>
                       <Input

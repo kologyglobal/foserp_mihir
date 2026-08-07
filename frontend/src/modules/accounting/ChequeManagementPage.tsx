@@ -168,7 +168,7 @@ export function ChequeManagementPage() {
                     <td className="px-3 py-2">{c.bankAccountName}</td>
                     <td className="px-3 py-2">{c.payeeName}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(c.amount)}</td>
-                    <td className="px-3 py-2 tabular-nums">{c.pdcDate ? formatDate(c.pdcDate) : c.depositDate ? formatDate(c.depositDate) : '—'}</td>
+                    <td className="px-3 py-2 tabular-nums">{c.pdcDate ? formatDate(c.pdcDate) : c.depositDate ? formatDate(c.depositDate) : '-'}</td>
                     <td className="px-3 py-2"><ChequeStatusBadge status={c.status} /></td>
                     <td className="px-3 py-2">
                       {perms.canManageCheques ? (

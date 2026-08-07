@@ -1011,14 +1011,14 @@ export function GrnEditorPage() {
         {!showPoPicker ? (
           <ErpFieldRow label="Purchase Order" readOnly>
             <Input
-              value={selectedPo ? `${selectedPo.documentNumber} — ${selectedPo.vendor.name}` : '—'}
+              value={selectedPo ? `${selectedPo.documentNumber} — ${selectedPo.vendor.name}` : '-'}
               readOnly
               className="bg-erp-surface-alt"
             />
           </ErpFieldRow>
         ) : null}
         <ErpFieldRow label="Vendor" readOnly>
-          <Input value={selectedPo?.vendor.name ?? '—'} readOnly className="bg-erp-surface-alt" />
+          <Input value={selectedPo?.vendor.name ?? '-'} readOnly className="bg-erp-surface-alt" />
         </ErpFieldRow>
         <ErpFieldRow label="Vendor Challan Number">
           <Input
@@ -1444,7 +1444,7 @@ export function GrnEditorPage() {
                     })()}
                   </td>
                   <td className="purchase-doc-lines-grid__uom-col text-[11px] font-semibold uppercase">
-                    {l.uom || '—'}
+                    {l.uom || '-'}
                   </td>
                   <td className="num grn-lines-grid__accepted-col">
                     <DecimalInput
@@ -1493,7 +1493,7 @@ export function GrnEditorPage() {
                   {showWeightCol ? (
                     <td className="num">
                       {l.receiptEntryMode === 'UNIT_ONLY' ? (
-                        '—'
+                        '-'
                       ) : (
                         <>
                           <DecimalInput
@@ -1517,7 +1517,7 @@ export function GrnEditorPage() {
                     <td className="num">{formatNumber(l.weightTolerancePct)}</td>
                   ) : null}
                   <td className="num">
-                    {l.variancePercentage == null ? '—' : `${formatNumber(l.variancePercentage)}%`}
+                    {l.variancePercentage == null ? '-' : `${formatNumber(l.variancePercentage)}%`}
                     {l.weightVariancePercentage != null ? (
                       <p className="text-[10px] text-erp-muted">
                         Wt {formatNumber(l.weightVariancePercentage)}%
@@ -1597,7 +1597,7 @@ export function GrnEditorPage() {
                         />
                       ) : null}
                       {!l.batchControlled && !l.serialControlled ? (
-                        <span className="text-[11px] text-erp-muted">—</span>
+                        <span className="text-[11px] text-erp-muted">-</span>
                       ) : null}
                       {fieldErrors[`line-${i}-batch`] || fieldErrors[`line-${i}-serial`] ? (
                         <p className="mt-1 text-xs text-erp-danger-fg">

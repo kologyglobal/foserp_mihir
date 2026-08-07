@@ -186,7 +186,7 @@ export function BomVersionEditorPage() {
       if (snap?.itemCode) return snap.itemCode
       const fromLookup = items.find((i) => i.id === id)?.label
       if (fromLookup) return fromLookup
-      return id ? `${id.slice(0, 8)}…` : '—'
+      return id ? `${id.slice(0, 8)}…` : '-'
     },
     [items],
   )
@@ -199,9 +199,9 @@ export function BomVersionEditorPage() {
     (id: string, code?: string | null) => {
       if (code) return code
       const label = uoms.find((u) => u.id === id)?.label
-      if (!label) return id ? id.slice(0, 8) : '—'
+      if (!label) return id ? id.slice(0, 8) : '-'
       // Lookup labels come as "CODE — Name"; the code alone reads better next to a quantity.
-      return label.split('—')[0]?.trim() ?? label
+      return label.split('-')[0]?.trim() ?? label
     },
     [uoms],
   )
@@ -767,7 +767,7 @@ export function BomVersionEditorPage() {
                   const TypeIcon = meta.icon
                   const outline = outlineIndexById.get(node.id) ?? String(node.sequence)
                   const description = bomLineDescription(node)
-                  const drawingSpec = [node.drawingReference, node.specification].filter(Boolean).join(' · ') || '—'
+                  const drawingSpec = [node.drawingReference, node.specification].filter(Boolean).join(' · ') || '-'
                   const isAssembly = node.lineType === 'SUBASSEMBLY' || node.lineType === 'MANUFACTURED_COMPONENT'
                   return (
                     <tr
@@ -812,7 +812,7 @@ export function BomVersionEditorPage() {
                                 {node.itemName ?? lineLabel(node)}
                               </span>
                               <span className="block font-mono text-[10px] leading-tight text-erp-muted">
-                                {node.itemCode ?? '—'}
+                                {node.itemCode ?? '-'}
                                 {hasChildren ? ` · ${node.children.length} sub` : ''}
                               </span>
                             </span>
@@ -848,7 +848,7 @@ export function BomVersionEditorPage() {
                         <span className="text-[11px] text-erp-muted">{uomLabel(node.uomId, node.uomCode)}</span>
                       </td>
                       <td className="px-3 py-1.5 text-right tabular-nums text-erp-muted">
-                        {Number(node.scrapPercent) > 0 ? `${formatQty(node.scrapPercent)}%` : '—'}
+                        {Number(node.scrapPercent) > 0 ? `${formatQty(node.scrapPercent)}%` : '-'}
                       </td>
                       <td className="px-3 py-1.5">
                         <div className="flex flex-wrap gap-1">
@@ -930,7 +930,7 @@ export function BomVersionEditorPage() {
             <div className="rounded-md border border-erp-border bg-erp-surface-alt/50 px-3 py-2 text-[12px]">
               <span className="block font-medium text-erp-text">{lineLabel(editingLine)}</span>
               <span className="text-erp-muted">
-                Index {outlineIndexById.get(editingLine.id) ?? '—'}
+                Index {outlineIndexById.get(editingLine.id) ?? '-'}
               </span>
             </div>
           ) : (
@@ -940,7 +940,7 @@ export function BomVersionEditorPage() {
                   <option value="">— Root (top-level) —</option>
                   {flatLines.map(({ node, depth }) => (
                     <option key={node.id} value={node.id}>
-                      {'—'.repeat(depth)} {outlineIndexById.get(node.id) ?? `#${node.sequence}`} {lineLabel(node)}
+                      {'-'.repeat(depth)} {outlineIndexById.get(node.id) ?? `#${node.sequence}`} {lineLabel(node)}
                     </option>
                   ))}
                 </Select>

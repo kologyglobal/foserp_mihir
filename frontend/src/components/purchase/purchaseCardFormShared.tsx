@@ -94,7 +94,7 @@ export function PurchaseDocTimeline({
           <li key={e.t} className="border-l-2 border-erp-border pl-3">
             <strong className="text-erp-text">{e.t}</strong>
             <div className="text-erp-muted">
-              {formatDate(e.d!)} · {e.u ?? '—'}
+              {formatDate(e.d!)} · {e.u ?? '-'}
             </div>
           </li>
         ))}

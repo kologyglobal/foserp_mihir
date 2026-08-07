@@ -14,7 +14,7 @@ export function isFilterAllLabel(label: string): boolean {
     t.startsWith('all ') ||
     t === 'any' ||
     t.startsWith('any ') ||
-    t === '—' ||
+    t === '-' ||
     t === '-' ||
     t === '–'
   )

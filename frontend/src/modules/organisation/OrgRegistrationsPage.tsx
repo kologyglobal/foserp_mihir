@@ -117,7 +117,7 @@ export function OrgRegistrationsPage() {
               <td className="px-3 py-2 font-medium">{row.registrationType}</td>
               <td className="px-3 py-2">{row.registrationNumber}</td>
               <td className="px-3 py-2">{row.country}</td>
-              <td className="px-3 py-2">{row.state ?? '—'}</td>
+              <td className="px-3 py-2">{row.state ?? '-'}</td>
               <td className="px-3 py-2">{row.status}</td>
               <td className="px-3 py-2">
                 {perms.canUpdate ? (

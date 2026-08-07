@@ -416,11 +416,11 @@ export function VendorInvoiceDetailPage() {
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-erp-muted">Vendor GSTIN</dt>
-              <dd>{invoice.vendorGstinSnapshot ?? '—'}</dd>
+              <dd>{invoice.vendorGstinSnapshot ?? '-'}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-erp-muted">Posting date</dt>
-              <dd className="tabular-nums">{invoice.postingDate ?? '—'}</dd>
+              <dd className="tabular-nums">{invoice.postingDate ?? '-'}</dd>
             </div>
           </dl>
           <VendorInvoiceTotalsPanel
@@ -498,10 +498,10 @@ export function VendorInvoiceDetailPage() {
               Code: <span className="text-erp-text">{invoice.vendorCodeSnapshot}</span>
             </div>
             <div>
-              GSTIN: <span className="text-erp-text">{invoice.vendorGstinSnapshot ?? '—'}</span>
+              GSTIN: <span className="text-erp-text">{invoice.vendorGstinSnapshot ?? '-'}</span>
             </div>
             <div>
-              State code: <span className="text-erp-text">{invoice.vendorStateCodeSnapshot ?? '—'}</span>
+              State code: <span className="text-erp-text">{invoice.vendorStateCodeSnapshot ?? '-'}</span>
             </div>
           </dl>
           <PartyMasterCard
@@ -564,7 +564,7 @@ export function VendorInvoiceDetailPage() {
               </div>
               <div className="flex justify-between">
                 <dt>Section</dt>
-                <dd>{invoice.tdsSectionCode ?? '—'}</dd>
+                <dd>{invoice.tdsSectionCode ?? '-'}</dd>
               </div>
               <div className="flex justify-between">
                 <dt>Rate</dt>
@@ -617,14 +617,14 @@ export function VendorInvoiceDetailPage() {
                 <div>
                   <dt className="text-erp-muted">Status</dt>
                   <dd className="font-medium">
-                    {(approval?.approvalRequest ?? invoice.approvalRequest)?.status ?? '—'}
+                    {(approval?.approvalRequest ?? invoice.approvalRequest)?.status ?? '-'}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-erp-muted">Level</dt>
                   <dd>
-                    {(approval?.approvalRequest ?? invoice.approvalRequest)?.currentLevel ?? '—'} /{' '}
-                    {(approval?.approvalRequest ?? invoice.approvalRequest)?.totalLevels ?? '—'}
+                    {(approval?.approvalRequest ?? invoice.approvalRequest)?.currentLevel ?? '-'} /{' '}
+                    {(approval?.approvalRequest ?? invoice.approvalRequest)?.totalLevels ?? '-'}
                   </dd>
                 </div>
               </dl>
@@ -674,17 +674,17 @@ export function VendorInvoiceDetailPage() {
                         {invoice.accountingVoucherNumber ?? invoice.accountingVoucherId}
                       </Link>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-erp-muted">Ledger entries</dt>
-                  <dd>{invoice.ledgerEntryCount ?? '—'}</dd>
+                  <dd>{invoice.ledgerEntryCount ?? '-'}</dd>
                 </div>
                 <div>
                   <dt className="text-erp-muted">Posted at</dt>
-                  <dd>{invoice.postedAt ? new Date(invoice.postedAt).toLocaleString() : '—'}</dd>
+                  <dd>{invoice.postedAt ? new Date(invoice.postedAt).toLocaleString() : '-'}</dd>
                 </div>
               </dl>
             </div>

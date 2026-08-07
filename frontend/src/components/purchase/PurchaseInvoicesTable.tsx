@@ -176,7 +176,7 @@ export function PurchaseInvoicesTable({
         meta: { columnLabel: 'Purchase Order' },
         cell: ({ row }) => (
           <span className="font-mono whitespace-nowrap">
-            {row.original.purchaseOrderNumber || '—'}
+            {row.original.purchaseOrderNumber || '-'}
           </span>
         ),
       },
@@ -186,7 +186,7 @@ export function PurchaseInvoicesTable({
         meta: { columnLabel: 'Goods Receipt' },
         cell: ({ row }) => (
           <span className="font-mono whitespace-nowrap">
-            {row.original.goodsReceiptNumber || '—'}
+            {row.original.goodsReceiptNumber || '-'}
           </span>
         ),
       },
@@ -227,7 +227,7 @@ export function PurchaseInvoicesTable({
         meta: { columnLabel: 'Due Date' },
         cell: ({ row }) => (
           <span className="whitespace-nowrap tabular-nums text-erp-text">
-            {row.original.dueDate ? formatDate(row.original.dueDate) : '—'}
+            {row.original.dueDate ? formatDate(row.original.dueDate) : '-'}
           </span>
         ),
       },

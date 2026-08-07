@@ -7,7 +7,6 @@ import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { Button } from '@/design-system/components/Button'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
-import { isApiMode } from '@/config/apiConfig'
 import {
   fetchEffectiveValuationMethod,
   fetchMethodChangePreview,
@@ -32,7 +31,6 @@ const METHODS = [
 type PreviewDto = Awaited<ReturnType<typeof fetchMethodChangePreview>>['data']
 
 export function InventoryMethodChangePage() {
-  const api = isApiMode()
   const perms = useInventoryPermissions()
   const [step, setStep] = useState(1)
   const [busy, setBusy] = useState(false)
@@ -49,14 +47,13 @@ export function InventoryMethodChangePage() {
   })
 
   useEffect(() => {
-    if (!api) return
     void fetchEffectiveValuationMethod()
       .then((res) => setCurrentMethod(String(res.data.method)))
       .catch(() => setCurrentMethod(null))
-  }, [api])
+  }, [])
 
   async function loadPreview() {
-    if (!api || !form.toMethod) return
+    if (!form.toMethod) return
     setBusy(true)
     setPreviewError(null)
     try {
@@ -76,10 +73,6 @@ export function InventoryMethodChangePage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!api) {
-      notify.info('Method change requires API mode')
-      return
-    }
     if (!perms.canManageSetup) {
       notify.error('inventory.setup.manage required to execute method change')
       return
@@ -269,7 +262,7 @@ export function InventoryMethodChangePage() {
           <form className="max-w-lg space-y-3 rounded-md border border-erp-border p-4" onSubmit={onSubmit}>
             <p className="text-[13px]">
               Changing to <strong>{METHODS.find((m) => m.value === form.toMethod)?.label}</strong> effective{' '}
-              {form.effectiveDate}. Readiness: <strong>{preview?.readiness ?? '—'}</strong>.
+              {form.effectiveDate}. Readiness: <strong>{preview?.readiness ?? '-'}</strong>.
             </p>
             <label className="block text-[12px]">
               <span className="text-erp-muted">Reason (required)</span>

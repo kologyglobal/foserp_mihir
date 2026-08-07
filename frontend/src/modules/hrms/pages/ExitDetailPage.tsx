@@ -426,11 +426,11 @@ export function ExitDetailPage() {
               </div>
               <div>
                 <div className="text-xs text-erp-muted">Legal entity</div>
-                <div>{exit.legalEntity?.displayName ?? '—'}</div>
+                <div>{exit.legalEntity?.displayName ?? '-'}</div>
               </div>
               <div>
                 <div className="text-xs text-erp-muted">Branch</div>
-                <div>{exit.branch?.name ?? '—'}</div>
+                <div>{exit.branch?.name ?? '-'}</div>
               </div>
               {exit.reason ? (
                 <div className="col-span-2">
@@ -468,7 +468,7 @@ export function ExitDetailPage() {
               </div>
               <div>
                 <div className="text-xs text-erp-muted">Approved by</div>
-                <div>{exit.approvedAt ? new Date(exit.approvedAt).toLocaleString() : '—'}</div>
+                <div>{exit.approvedAt ? new Date(exit.approvedAt).toLocaleString() : '-'}</div>
               </div>
             </div>
           </div>
@@ -484,15 +484,15 @@ export function ExitDetailPage() {
             </div>
             <div>
               <div className="text-xs text-erp-muted">Served (days)</div>
-              <div className="text-lg font-semibold">{exit.noticeServedDays ?? '—'}</div>
+              <div className="text-lg font-semibold">{exit.noticeServedDays ?? '-'}</div>
             </div>
             <div>
               <div className="text-xs text-erp-muted">Shortfall (days)</div>
-              <div className="text-lg font-semibold">{exit.noticeShortfallDays ?? '—'}</div>
+              <div className="text-lg font-semibold">{exit.noticeShortfallDays ?? '-'}</div>
             </div>
             <div>
               <div className="text-xs text-erp-muted">Excess (days)</div>
-              <div className="text-lg font-semibold">{exit.noticeExcessDays ?? '—'}</div>
+              <div className="text-lg font-semibold">{exit.noticeExcessDays ?? '-'}</div>
             </div>
           </div>
           <div className="mt-3">
@@ -586,12 +586,12 @@ export function ExitDetailPage() {
                   {assetLines.map((a) => (
                     <tr key={a.id} className="border-t border-erp-border">
                       <td className="px-3 py-2 font-medium">{a.description}</td>
-                      <td className="px-3 py-2">{a.assetCategory ?? '—'}</td>
+                      <td className="px-3 py-2">{a.assetCategory ?? '-'}</td>
                       <td className="px-3 py-2 tabular-nums">{money(a.recoveryAmount)}</td>
                       <td className="px-3 py-2">
                         <HrStatusChip status={a.status} domain="assetLine" />
                       </td>
-                      <td className="max-w-[200px] truncate px-3 py-2 text-xs text-erp-muted">{a.remarks || '—'}</td>
+                      <td className="max-w-[200px] truncate px-3 py-2 text-xs text-erp-muted">{a.remarks || '-'}</td>
                       <td className="px-3 py-2 text-right">
                         {a.status === 'PENDING' && perms.canManageExitClearance ? (
                           <div className="flex flex-wrap justify-end gap-1">

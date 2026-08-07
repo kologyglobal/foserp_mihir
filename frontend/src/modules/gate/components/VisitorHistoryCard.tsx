@@ -35,19 +35,19 @@ export function VisitorHistoryCard({
         </div>
         <div className="flex justify-between gap-2 sm:block">
           <dt className="text-erp-muted">Company</dt>
-          <dd className="font-medium text-erp-text">{visitor.company ?? '—'}</dd>
+          <dd className="font-medium text-erp-text">{visitor.company ?? '-'}</dd>
         </div>
         <div className="flex justify-between gap-2 sm:block">
           <dt className="text-erp-muted">Previous host</dt>
-          <dd className="font-medium text-erp-text">{visitor.lastHost ?? '—'}</dd>
+          <dd className="font-medium text-erp-text">{visitor.lastHost ?? '-'}</dd>
         </div>
         <div className="flex justify-between gap-2 sm:block">
           <dt className="text-erp-muted">Previous vehicle</dt>
-          <dd className="font-medium text-erp-text">{visitor.lastVehicleNumber ?? '—'}</dd>
+          <dd className="font-medium text-erp-text">{visitor.lastVehicleNumber ?? '-'}</dd>
         </div>
         <div className="flex justify-between gap-2 sm:block">
           <dt className="text-erp-muted">Last visit</dt>
-          <dd className="font-medium text-erp-text">{visitor.lastVisitAt ? formatDate(visitor.lastVisitAt) : '—'}</dd>
+          <dd className="font-medium text-erp-text">{visitor.lastVisitAt ? formatDate(visitor.lastVisitAt) : '-'}</dd>
         </div>
         <div className="flex justify-between gap-2 sm:block">
           <dt className="text-erp-muted">Total visits</dt>

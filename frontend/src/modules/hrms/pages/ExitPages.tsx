@@ -242,12 +242,12 @@ export function ExitRegisterPage() {
                       <HrEmployeeCell name={r.employee?.displayName ?? r.employeeId} code={r.employee?.employeeCode} />
                       <div className="text-xs text-erp-muted">{r.code}</div>
                     </td>
-                    <td>{deptId ? departmentNameMap.get(deptId) ?? '—' : '—'}</td>
+                    <td>{deptId ? departmentNameMap.get(deptId) ?? '-' : '-'}</td>
                     <td>{EXIT_TYPE_LABELS[r.exitType] ?? r.exitType}</td>
-                    <td>{r.resignationDate ?? '—'}</td>
+                    <td>{r.resignationDate ?? '-'}</td>
                     <td>{r.approvedLastWorkingDate ?? r.requestedLastWorkingDate}</td>
                     <td>{clearanceSummaryFromExitStatus(r.status)}</td>
-                    <td>{fnf ? <HrStatusChip status={fnf.status} domain="fnf" /> : <span className="text-erp-muted">—</span>}</td>
+                    <td>{fnf ? <HrStatusChip status={fnf.status} domain="fnf" /> : <span className="text-erp-muted">-</span>}</td>
                     <td>
                       <HrStatusChip status={r.status} domain="exit" />
                     </td>

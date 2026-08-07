@@ -316,8 +316,8 @@ export function CollectionWorklistPage() {
                     <td className="px-3 py-2 text-erp-muted">{row.priorityReason}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.totalOutstanding)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-rose-700">{formatCurrency(row.overdue)}</td>
-                    <td className="px-3 py-2">{row.lastContact ? formatDate(row.lastContact) : '—'}</td>
-                    <td className="px-3 py-2">{row.nextFollowUp ? formatDate(row.nextFollowUp) : '—'}</td>
+                    <td className="px-3 py-2">{row.lastContact ? formatDate(row.lastContact) : '-'}</td>
+                    <td className="px-3 py-2">{row.nextFollowUp ? formatDate(row.nextFollowUp) : '-'}</td>
                     <td className="px-3 py-2">
                       {row.paymentPromise ? (
                         <span className="tabular-nums">
@@ -325,7 +325,7 @@ export function CollectionWorklistPage() {
                           {row.promiseAmount ? ` · ${formatCurrency(row.promiseAmount)}` : ''}
                         </span>
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
                     <td className="px-3 py-2">

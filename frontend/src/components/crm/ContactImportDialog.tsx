@@ -257,9 +257,9 @@ export function ContactImportDialog({ open, onClose, onImported }: ContactImport
                   {rows.slice(0, 50).map((row) => (
                     <tr key={row.rowNo}>
                       <td>{row.rowNo}</td>
-                      <td>{row.input.name || '—'}</td>
-                      <td>{row.companyLabel || '—'}</td>
-                      <td>{row.input.designation || '—'}</td>
+                      <td>{row.input.name || '-'}</td>
+                      <td>{row.companyLabel || '-'}</td>
+                      <td>{row.input.designation || '-'}</td>
                       <td>{row.input.isPrimary ? 'Yes' : 'No'}</td>
                       <td className={cn(row.errors.length ? 'text-red-700' : 'text-emerald-700')}>
                         {row.errors.length ? row.errors[0] : 'Ready'}

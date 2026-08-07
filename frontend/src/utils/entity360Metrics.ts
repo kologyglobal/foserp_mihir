@@ -83,7 +83,7 @@ export function useItem360(itemId: string | undefined) {
       .filter((l) => l.itemId === itemId && l.issuedQty > 0)
       .map((l) => {
         const wo = workOrders.find((w) => w.id === l.workOrderId)
-        return { woId: l.workOrderId, woNo: wo?.woNo ?? '—', qty: l.issuedQty }
+        return { woId: l.workOrderId, woNo: wo?.woNo ?? '-', qty: l.issuedQty }
       })
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 8)
@@ -114,7 +114,7 @@ export function useItem360(itemId: string | undefined) {
       openPr,
       openPo,
       vendorMaps,
-      preferredVendor: preferredMap ? getVendor(preferredMap.vendorId)?.vendorName ?? '—' : '—',
+      preferredVendor: preferredMap ? getVendor(preferredMap.vendorId)?.vendorName ?? '-' : '-',
       lastRate,
       consumedMonth,
       consumedQuarter,

@@ -195,12 +195,12 @@ export function FundTransferEditorPage({ mode }: { mode: 'new' | 'detail' }) {
 
   const previewLines = useMemo(
     () => [
-      { account: toLabel ?? existing?.toAccountName ?? '—', debit: amount, credit: 0 },
-      { account: fromLabel ?? existing?.fromAccountName ?? '—', debit: 0, credit: amount },
+      { account: toLabel ?? existing?.toAccountName ?? '-', debit: amount, credit: 0 },
+      { account: fromLabel ?? existing?.fromAccountName ?? '-', debit: 0, credit: amount },
       ...(charges > 0
         ? [
             { account: 'Bank Charges (expense)', debit: charges, credit: 0 },
-            { account: fromLabel ?? existing?.fromAccountName ?? '—', debit: 0, credit: charges },
+            { account: fromLabel ?? existing?.fromAccountName ?? '-', debit: 0, credit: charges },
           ]
         : []),
     ],
@@ -345,11 +345,11 @@ export function FundTransferEditorPage({ mode }: { mode: 'new' | 'detail' }) {
           </div>
           <div>
             <span className="text-[11px] font-semibold uppercase text-erp-muted">Amount</span>
-            <p className="font-semibold tabular-nums">{amount > 0 ? formatCurrency(amount) : '—'}</p>
+            <p className="font-semibold tabular-nums">{amount > 0 ? formatCurrency(amount) : '-'}</p>
           </div>
           <div>
             <span className="text-[11px] font-semibold uppercase text-erp-muted">From → To</span>
-            <p className="font-medium">{(fromLabel ?? existing?.fromAccountName ?? '—')} → {(toLabel ?? existing?.toAccountName ?? '—')}</p>
+            <p className="font-medium">{(fromLabel ?? existing?.fromAccountName ?? '-')} → {(toLabel ?? existing?.toAccountName ?? '-')}</p>
           </div>
           <div>
             <span className="text-[11px] font-semibold uppercase text-erp-muted">Status</span>
@@ -509,8 +509,8 @@ export function FundTransferEditorPage({ mode }: { mode: 'new' | 'detail' }) {
                   {previewLines.map((line, i) => (
                     <tr key={i} className="border-b border-erp-border/70">
                       <td className="px-3 py-2">{line.account}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.debit > 0 ? formatCurrency(line.debit) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.credit > 0 ? formatCurrency(line.credit) : '—'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</td>
                     </tr>
                   ))}
                 </tbody>

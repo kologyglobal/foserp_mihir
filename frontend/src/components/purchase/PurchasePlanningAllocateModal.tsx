@@ -134,7 +134,7 @@ export function PurchasePlanningAllocateModal({
               PRs: <strong className="tabular-nums text-erp-text">{group.prCount}</strong>
             </span>
             <span>
-              Earliest need: <strong className="text-erp-text">{group.earliestRequiredDate || '—'}</strong>
+              Earliest need: <strong className="text-erp-text">{group.earliestRequiredDate || '-'}</strong>
             </span>
           </div>
         </div>

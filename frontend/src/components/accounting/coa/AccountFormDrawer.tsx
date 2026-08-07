@@ -320,7 +320,7 @@ export function AccountFormDrawer({
   })
 
   const title = mode === 'create' ? 'Create account' : 'Edit account'
-  const codePreview = form.code.trim() || form.name.trim() ? `${form.code.trim() || '—'} – ${form.name.trim() || '—'}` : '—'
+  const codePreview = form.code.trim() || form.name.trim() ? `${form.code.trim() || '-'} – ${form.name.trim() || '-'}` : '-'
 
   return (
     <AccountDrawerShell
@@ -737,7 +737,7 @@ export function AccountFormDrawer({
                     }
                     className="erp-input h-9 w-full text-[12px]"
                   >
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {COST_ELEMENT_TYPES.map((t) => (
                       <option key={t} value={t}>
                         {t}
@@ -828,7 +828,7 @@ export function AccountFormDrawer({
                     }
                     className="erp-input h-9 w-full text-[12px]"
                   >
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {dimensionLookups[lookupKey].map((opt) => (
                       <option key={opt.id} value={opt.id}>
                         {opt.code} — {opt.name}

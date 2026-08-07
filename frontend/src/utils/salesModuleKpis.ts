@@ -354,7 +354,7 @@ export function buildPaymentAllocationWorkspaceKpis(input: {
     {
       id: 'unallocated',
       label: 'Receipt Unallocated',
-      value: hasReceipt ? formatCompactCurrency(receiptUnallocated) : '—',
+      value: hasReceipt ? formatCompactCurrency(receiptUnallocated) : '-',
       icon: Wallet,
       accent: hasReceipt && receiptUnallocated > 0.009 ? 'amber' : 'green',
       context: hasReceipt ? 'Available to apply' : 'Select a receipt',
@@ -381,7 +381,7 @@ export function buildPaymentAllocationWorkspaceKpis(input: {
     {
       id: 'remaining',
       label: 'Remaining',
-      value: remaining == null ? '—' : formatCompactCurrency(remaining),
+      value: remaining == null ? '-' : formatCompactCurrency(remaining),
       icon: Clock,
       accent: remainingAccent,
       context:

@@ -125,12 +125,12 @@ export function GatePassListPage({ initialTab }: { initialTab?: string }) {
                         {overdue ? <div className="mt-0.5"><OverdueIndicator /></div> : null}
                       </td>
                       <td className="capitalize">{p.passKind.replace(/_/g, ' ')}</td>
-                      <td className="max-w-[200px] truncate font-medium">{p.items[0]?.itemDescription ?? '—'}{p.items.length > 1 ? ` (+${p.items.length - 1})` : ''}</td>
+                      <td className="max-w-[200px] truncate font-medium">{p.items[0]?.itemDescription ?? '-'}{p.items.length > 1 ? ` (+${p.items.length - 1})` : ''}</td>
                       <td className="tabular-nums">{p.items.reduce((s, i) => s + i.quantity, 0)}</td>
                       <td>{p.carriedBy}</td>
                       <td>{p.department}</td>
                       <td>{formatDate(p.outwardDate)}</td>
-                      <td>{p.expectedReturnDate ? formatDate(p.expectedReturnDate) : '—'}</td>
+                      <td>{p.expectedReturnDate ? formatDate(p.expectedReturnDate) : '-'}</td>
                       <td className="tabular-nums font-semibold">{gatePassPendingQty(p)}</td>
                       <td><GateStatusBadge status={overdue && p.status !== 'overdue' ? 'overdue' : p.status} /></td>
                       <td><ErpButton size="sm" variant="ghost" onClick={() => navigate(`/gate/passes/${p.id}`)}>View</ErpButton></td>

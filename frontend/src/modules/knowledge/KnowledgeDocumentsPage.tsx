@@ -270,7 +270,7 @@ export function KnowledgeDocumentsPage() {
                 <td className="px-3 py-2">{r.status}</td>
                 <td className="px-3 py-2">{r.kind}</td>
                 <td className="px-3 py-2 text-erp-muted">
-                  {r.updatedAt ? new Date(r.updatedAt).toLocaleString() : '—'}
+                  {r.updatedAt ? new Date(r.updatedAt).toLocaleString() : '-'}
                 </td>
                 <td className="px-3 py-2">
                   {canReindex && (

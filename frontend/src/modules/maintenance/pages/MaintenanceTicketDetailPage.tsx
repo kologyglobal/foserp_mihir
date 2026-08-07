@@ -231,7 +231,7 @@ export function MaintenanceTicketDetailPage() {
       layout="enterprise"
       badge="Maintenance"
       title={ticket.ticketNumber}
-      description={`${ticket.machine?.name ?? ''} · Priority ${ticket.priority} · Downtime ${ticket.downtimeLabel ?? '—'}`}
+      description={`${ticket.machine?.name ?? ''} · Priority ${ticket.priority} · Downtime ${ticket.downtimeLabel ?? '-'}`}
       breadcrumbs={[
         MAINTENANCE_BREADCRUMB,
         { label: 'Tickets', to: '/maintenance/tickets' },
@@ -261,10 +261,10 @@ export function MaintenanceTicketDetailPage() {
                 </Link>
               }
             />
-            <Field label="Work Centre" value={ticket.machine?.workCentre?.name ?? '—'} />
+            <Field label="Work Centre" value={ticket.machine?.workCentre?.name ?? '-'} />
             <Field label="Problem" value={ticket.problem} />
             <Field label="Priority" value={ticket.priority} />
-            <Field label="Operator Name" value={ticket.operatorName ?? '—'} />
+            <Field label="Operator Name" value={ticket.operatorName ?? '-'} />
             <Field label="Reported At" value={formatDateTime(ticket.reportedAt)} />
             <Field
               label="Location"
@@ -272,7 +272,7 @@ export function MaintenanceTicketDetailPage() {
                 ticket.reportedLocationLabel ||
                 (ticket.reportedLatitude != null && ticket.reportedLongitude != null
                   ? `${ticket.reportedLatitude}, ${ticket.reportedLongitude}`
-                  : ticket.machine?.workCentre?.name ?? '—')
+                  : ticket.machine?.workCentre?.name ?? '-')
               }
             />
             {ticket.reportedLatitude != null && ticket.reportedLongitude != null ? (
@@ -300,27 +300,27 @@ export function MaintenanceTicketDetailPage() {
 
         <Section title="Assignment & Repair">
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            <Field label="Technician Type" value={ticket.technicianType ?? '—'} />
-            <Field label="Operator Name" value={ticket.operatorName ?? '—'} />
+            <Field label="Technician Type" value={ticket.technicianType ?? '-'} />
+            <Field label="Operator Name" value={ticket.operatorName ?? '-'} />
             <Field
               label={ticket.technicianType === 'EXTERNAL' ? 'External Contractor / Vendor' : 'Internal User / Technician'}
               value={
                 ticket.technicianType === 'EXTERNAL'
-                  ? ticket.contractor?.name ?? ticket.technicianName ?? '—'
-                  : ticket.technicianName ?? ticket.technicianUserId ?? '—'
+                  ? ticket.contractor?.name ?? ticket.technicianName ?? '-'
+                  : ticket.technicianName ?? ticket.technicianUserId ?? '-'
               }
             />
-            <Field label="Repair Started" value={ticket.repairStartedAt ? formatDateTime(ticket.repairStartedAt) : '—'} />
-            <Field label="Failure Category" value={ticket.failureCategory ?? '—'} />
-            <Field label="Root Cause" value={ticket.rootCause ?? '—'} />
-            <Field label="Repair Action" value={ticket.repairAction ?? ticket.repairDetails ?? '—'} />
-            <Field label="Downtime" value={ticket.downtimeLabel ?? '—'} />
-            <Field label="Repair Time" value={ticket.repairLabel ?? '—'} />
-            <Field label="Service Performed" value={ticket.serviceDescription ?? '—'} />
-            <Field label="Invoice Number" value={ticket.invoiceNumber ?? '—'} />
-            <Field label="Invoice Date" value={ticket.invoiceDate ? ticket.invoiceDate.slice(0, 10) : '—'} />
-            <Field label="Test Result" value={ticket.testResult ?? '—'} />
-            <Field label="Tested At" value={ticket.testedAt ? formatDateTime(ticket.testedAt) : '—'} />
+            <Field label="Repair Started" value={ticket.repairStartedAt ? formatDateTime(ticket.repairStartedAt) : '-'} />
+            <Field label="Failure Category" value={ticket.failureCategory ?? '-'} />
+            <Field label="Root Cause" value={ticket.rootCause ?? '-'} />
+            <Field label="Repair Action" value={ticket.repairAction ?? ticket.repairDetails ?? '-'} />
+            <Field label="Downtime" value={ticket.downtimeLabel ?? '-'} />
+            <Field label="Repair Time" value={ticket.repairLabel ?? '-'} />
+            <Field label="Service Performed" value={ticket.serviceDescription ?? '-'} />
+            <Field label="Invoice Number" value={ticket.invoiceNumber ?? '-'} />
+            <Field label="Invoice Date" value={ticket.invoiceDate ? ticket.invoiceDate.slice(0, 10) : '-'} />
+            <Field label="Test Result" value={ticket.testResult ?? '-'} />
+            <Field label="Tested At" value={ticket.testedAt ? formatDateTime(ticket.testedAt) : '-'} />
             {ticket.pmPlan ? (
               <Field
                 label="PM Plan"
@@ -447,7 +447,7 @@ export function MaintenanceTicketDetailPage() {
                           Part Shortage — Create PR
                         </Link>
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
                   </tr>
@@ -752,8 +752,8 @@ export function MaintenanceTicketDetailPage() {
         <div className="space-y-3 text-sm">
           <div className="grid gap-1">
             <div>Machine · {ticket.machine?.code}</div>
-            <div>Test · {ticket.testResult ?? '—'}</div>
-            <div>Downtime · {ticket.downtimeLabel ?? '—'}</div>
+            <div>Test · {ticket.testResult ?? '-'}</div>
+            <div>Downtime · {ticket.downtimeLabel ?? '-'}</div>
             {perms.canViewCost ? (
               <>
                 <div>Parts · {formatInr(ticket.partsCost)}</div>

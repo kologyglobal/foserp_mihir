@@ -80,8 +80,8 @@ export function CreditNotePrintPage() {
           <section className="po-print-box">
             <p className="po-print-box__label">Customer</p>
             <p className="po-print-box__name">{note.customerNameSnapshot}</p>
-            <p>Code: {note.customerCodeSnapshot ?? '—'}</p>
-            <p>GSTIN: {note.customerGstinSnapshot ?? '—'}</p>
+            <p>Code: {note.customerCodeSnapshot ?? '-'}</p>
+            <p>GSTIN: {note.customerGstinSnapshot ?? '-'}</p>
           </section>
           <section className="po-print-box">
             <p className="po-print-box__label">Reason</p>
@@ -108,11 +108,11 @@ export function CreditNotePrintPage() {
               <tr key={l.id}>
                 <td>{l.lineNumber}</td>
                 <td>
-                  {l.itemCodeSnapshot ?? '—'}
+                  {l.itemCodeSnapshot ?? '-'}
                   <br />
-                  <span className="text-muted">{l.description || l.itemNameSnapshot || '—'}</span>
+                  <span className="text-muted">{l.description || l.itemNameSnapshot || '-'}</span>
                 </td>
-                <td>{l.hsnCodeSnapshot ?? '—'}</td>
+                <td>{l.hsnCodeSnapshot ?? '-'}</td>
                 <td>
                   {l.quantity} {l.uomSnapshot ?? ''}
                 </td>

@@ -1,12 +1,9 @@
 /**
- * Dual-mode purchase facade.
- * `VITE_USE_API=true` → backend is source of truth for PR, Planning, RFQ flow, PO, GRN,
+ * Purchase facade — backend is source of truth for PR, Planning, RFQ flow, PO, GRN,
  * Purchase Invoice, Quality Inspection, and Purchase Return.
- * Demo mode keeps in-memory `purchaseService` behavior.
- * Approval / conversion / PO creation never use optimistic local updates in API mode.
+ * Approval / conversion / PO creation never use optimistic local updates.
  */
 
-import { isApiMode } from '../../config/apiConfig'
 import { apiRequest, tenantPath } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
 import type { Item as MasterItem, Vendor as MasterVendor } from '../../types/master'
@@ -35,6 +32,7 @@ import type {
   PurchaseOrderInput,
   PurchaseOrderLinkedDocuments,
   PurchaseOrderListRow,
+  PurchaseOrderReviseInput,
   PurchasePlanningSheetInput,
   PurchasePlanningSheetRow,
   PurchaseRequisition,
@@ -75,8 +73,12 @@ import type {
 } from '../../types/purchaseDomain'
 import { INVOICE_MATCHING_RESULT_STATUS_LABELS } from '../../types/purchaseDomain'
 import { ApiError } from '../api/apiErrors'
-import * as demo from './purchaseService'
-import { PurchaseServiceError, type PurchaseOrderSeriesOption, type CreatePurchaseOrderFromPrOptions } from './purchaseService'
+import {
+  PurchaseServiceError,
+  canSelectPlanningRowForPo,
+  type PurchaseOrderSeriesOption,
+  type CreatePurchaseOrderFromPrOptions,
+} from './purchaseService'
 export type { CreatePurchaseOrderFromPrOptions }
 import * as prApi from './purchaseRequisitionApi'
 import * as approvalApi from './purchaseApprovalApi'
@@ -138,7 +140,7 @@ function throwIfMissing(err: unknown, feature: string): never {
   if (isBackendMissingError(err)) {
     throw new PurchaseServiceError(
       'PURCHASE_API_NOT_IMPLEMENTED',
-      `${feature} backend is not available yet. Use demo mode (VITE_USE_API=false) or wait for that API.`,
+      `${feature} backend is not available yet.`,
     )
   }
   throwApi(err)
@@ -147,7 +149,6 @@ function throwIfMissing(err: unknown, feature: string): never {
 /* ─── Purchase Requisitions ─── */
 
 export async function getPurchaseRequisitions(): Promise<PurchaseRequisitionListRow[]> {
-  if (!isApiMode()) return demo.getPurchaseRequisitions()
   try {
     const res = await prApi.listPurchaseRequisitionsApi({ page: 1, limit: 100, sortOrder: 'desc' })
     return res.data.map(mapApiRequisitionToListRow)
@@ -157,7 +158,6 @@ export async function getPurchaseRequisitions(): Promise<PurchaseRequisitionList
 }
 
 export async function getPurchaseRequisitionById(id: string): Promise<PurchaseRequisition | null> {
-  if (!isApiMode()) return demo.getPurchaseRequisitionById(id)
   try {
     const res = await prApi.getPurchaseRequisitionApi(id)
     return mapApiRequisitionToDomain(res.data)
@@ -172,7 +172,6 @@ export async function getPurchaseRequisitionById(id: string): Promise<PurchaseRe
 
 /** Peek next PR number without consuming the series. */
 export async function previewNextPurchaseRequisitionNumber(): Promise<string> {
-  if (!isApiMode()) return demo.previewNextPurchaseRequisitionNumber()
   try {
     const res = await prApi.previewNextPurchaseRequisitionNumberApi()
     return res.data.requisitionNumber
@@ -183,7 +182,6 @@ export async function previewNextPurchaseRequisitionNumber(): Promise<string> {
 
 /** Peek next RFQ number without consuming the series. */
 export async function previewNextRfqNumber(): Promise<string> {
-  if (!isApiMode()) return demo.previewNextRfqNumber()
   try {
     const res = await rfqApi.previewNextRfqNumberApi()
     return res.data.rfqNumber
@@ -194,7 +192,6 @@ export async function previewNextRfqNumber(): Promise<string> {
 
 /** Peek next vendor quotation number without consuming the series. */
 export async function previewNextVendorQuotationNumber(): Promise<string> {
-  if (!isApiMode()) return demo.previewNextVendorQuotationNumber()
   try {
     const res = await vqApi.previewNextVendorQuotationNumberApi()
     return res.data.quotationNumber
@@ -205,7 +202,6 @@ export async function previewNextVendorQuotationNumber(): Promise<string> {
 
 /** Peek next PO number without consuming the series. */
 export async function previewNextPurchaseOrderNumber(): Promise<string> {
-  if (!isApiMode()) return demo.previewNextPurchaseOrderNumber()
   try {
     const res = await poApi.previewNextPurchaseOrderNumberApi()
     return res.data.orderNumber
@@ -216,7 +212,6 @@ export async function previewNextPurchaseOrderNumber(): Promise<string> {
 
 /** Peek next GRN number without consuming the series. */
 export async function previewNextGoodsReceiptNumber(): Promise<string> {
-  if (!isApiMode()) return demo.previewNextGoodsReceiptNumber()
   try {
     const res = await grnApi.previewNextGoodsReceiptNumberApi()
     return res.data.grnNumber
@@ -227,7 +222,6 @@ export async function previewNextGoodsReceiptNumber(): Promise<string> {
 
 /** Peek next invoice number. No backend preview endpoint — number is allocated on save. */
 export async function previewNextPurchaseInvoiceNumber(): Promise<string> {
-  if (!isApiMode()) return demo.previewNextPurchaseInvoiceNumber()
   throw new PurchaseServiceError(
     'PURCHASE_API_NOT_IMPLEMENTED',
     'Invoice number is allocated on save.',
@@ -236,7 +230,6 @@ export async function previewNextPurchaseInvoiceNumber(): Promise<string> {
 
 /** Peek next return number. No backend preview endpoint — number is allocated on save. */
 export async function previewNextPurchaseReturnNumber(): Promise<string> {
-  if (!isApiMode()) return demo.previewNextPurchaseReturnNumber()
   throw new PurchaseServiceError(
     'PURCHASE_API_NOT_IMPLEMENTED',
     'Return number is allocated on save.',
@@ -250,7 +243,6 @@ export async function getPurchaseRequisitionListSummary(): Promise<{
   approved: number
   converted: number
 }> {
-  if (!isApiMode()) return demo.getPurchaseRequisitionListSummary()
   const rows = await getPurchaseRequisitions()
   return {
     total: rows.length,
@@ -266,7 +258,6 @@ export async function getPurchaseRequisitionListSummary(): Promise<{
 export async function createPurchaseRequisition(
   input: PurchaseRequisitionInput,
 ): Promise<PurchaseRequisition> {
-  if (!isApiMode()) return demo.createPurchaseRequisition(input)
   try {
     const res = await prApi.createPurchaseRequisitionApi(mapDomainInputToApiPayload(input))
     return mapApiRequisitionToDomain(res.data)
@@ -279,7 +270,6 @@ export async function updatePurchaseRequisition(
   id: string,
   input: PurchaseRequisitionInput,
 ): Promise<PurchaseRequisition> {
-  if (!isApiMode()) return demo.updatePurchaseRequisition(id, input)
   try {
     const res = await prApi.updatePurchaseRequisitionApi(id, mapDomainInputToApiPayload(input))
     return mapApiRequisitionToDomain(res.data)
@@ -289,7 +279,6 @@ export async function updatePurchaseRequisition(
 }
 
 export async function submitPurchaseRequisition(id: string): Promise<PurchaseRequisition> {
-  if (!isApiMode()) return demo.submitPurchaseRequisition(id)
   try {
     const res = await prApi.submitPurchaseRequisitionApi(id, {})
     return mapApiRequisitionToDomain(res.data)
@@ -302,7 +291,6 @@ export async function approvePurchaseRequisition(
   id: string,
   remarks = '',
 ): Promise<PurchaseRequisition> {
-  if (!isApiMode()) return demo.approvePurchaseRequisition(id, remarks)
   // No optimistic update — wait for server (planning sync happens server-side).
   try {
     const res = await prApi.approvePurchaseRequisitionApi(id, { remarks: remarks || null })
@@ -316,7 +304,6 @@ export async function rejectPurchaseRequisition(
   id: string,
   reason: string,
 ): Promise<PurchaseRequisition> {
-  if (!isApiMode()) return demo.rejectPurchaseRequisition(id, reason)
   try {
     const res = await prApi.rejectPurchaseRequisitionApi(id, { reason })
     return mapApiRequisitionToDomain(res.data)
@@ -329,7 +316,6 @@ export async function cancelPurchaseRequisition(
   id: string,
   remarks = '',
 ): Promise<PurchaseRequisition> {
-  if (!isApiMode()) return demo.cancelPurchaseRequisition(id, remarks)
   try {
     const res = await prApi.cancelPurchaseRequisitionApi(id, { remarks: remarks || null })
     return mapApiRequisitionToDomain(res.data)
@@ -339,13 +325,11 @@ export async function cancelPurchaseRequisition(
 }
 
 export async function deletePurchaseRequisition(id: string): Promise<void> {
-  if (!isApiMode()) return demo.deletePurchaseRequisition(id)
   // Soft-cancel via API until hard-delete ships.
   await cancelPurchaseRequisition(id, 'Deleted')
 }
 
 export async function duplicatePurchaseRequisition(id: string): Promise<PurchaseRequisition> {
-  if (!isApiMode()) return demo.duplicatePurchaseRequisition(id)
   const source = await getPurchaseRequisitionById(id)
   if (!source) throw new PurchaseServiceError('PR_NOT_FOUND', `Purchase requisition not found: ${id}`)
   return createPurchaseRequisition({
@@ -358,7 +342,6 @@ export async function duplicatePurchaseRequisition(id: string): Promise<Purchase
 }
 
 export async function convertPurchaseRequisitionToRfq(id: string): Promise<RequestForQuotation> {
-  if (!isApiMode()) return demo.convertPurchaseRequisitionToRfq(id)
   try {
     const res = await rfqApi.createRfqFromRequisitionApi(id, {})
     return mapApiRfqToDomain(res.data)
@@ -380,7 +363,6 @@ async function ensureMasterVendorsForMapping(): Promise<void> {
 }
 
 export async function getPurchasePlanningSheet(): Promise<PurchasePlanningSheetRow[]> {
-  if (!isApiMode()) return demo.getPurchasePlanningSheet()
   try {
     await ensureMasterVendorsForMapping()
     const pageSize = 100
@@ -407,7 +389,6 @@ export async function getPurchasePlanningSheet(): Promise<PurchasePlanningSheetR
 export async function getPurchasePlanningSheetById(
   id: string,
 ): Promise<PurchasePlanningSheetRow | null> {
-  if (!isApiMode()) return demo.getPurchasePlanningSheetById(id)
   try {
     await ensureMasterVendorsForMapping()
     const res = await planningApi.getPlanningRowApi(id)
@@ -420,25 +401,6 @@ export async function getPurchasePlanningSheetById(
 }
 
 export async function getPurchasePlanningSheetSummary(): Promise<PlanningSheetSummary> {
-  if (!isApiMode()) {
-    const rows = await demo.getPurchasePlanningSheet()
-    const today = new Date().toISOString().slice(0, 10)
-    return {
-      totalPendingPlanning: rows.filter((r) => r.status === 'draft').length,
-      criticalItems: rows.filter((r) => r.priority === 'critical').length,
-      overdueItems: rows.filter(
-        (r) => r.requiredByDate && r.requiredByDate < today && !['completed', 'cancelled', 'po_created'].includes(r.status),
-      ).length,
-      vendorSelectionPending: rows.filter(
-        (r) => !r.preferredVendorId && ['draft', 'pending_review'].includes(r.status),
-      ).length,
-      poPending: rows.filter((r) => r.status === 'po_pending').length,
-      poCreated: rows.filter((r) => r.status === 'po_created').length,
-      totalEstimatedPurchaseValue: rows
-        .filter((r) => !['cancelled', 'completed'].includes(r.status))
-        .reduce((s, r) => s + r.estimatedAmount, 0),
-    }
-  }
   try {
     const res = await planningApi.getPlanningSheetSummaryApi()
     return res.data
@@ -451,7 +413,6 @@ export async function updatePurchasePlanningSheetRow(
   id: string,
   patch: PurchasePlanningSheetInput,
 ): Promise<PurchasePlanningSheetRow> {
-  if (!isApiMode()) return demo.updatePurchasePlanningSheetRow(id, patch)
   try {
     await ensureMasterVendorsForMapping()
     const res = await planningApi.updatePlanningRowApi(
@@ -479,7 +440,6 @@ export async function splitPurchasePlanningRowByVendor(
   id: string,
   splits: Array<{ vendorId: string; allocatedQuantity: number }>,
 ): Promise<PurchasePlanningSheetRow[]> {
-  if (!isApiMode()) return demo.splitPurchasePlanningRowByVendor(id, splits)
   try {
     await ensureMasterVendorsForMapping()
     const res = await planningApi.splitPlanningRowApi(id, { splits })
@@ -492,9 +452,8 @@ export async function splitPurchasePlanningRowByVendor(
 export async function assignPurchasePlanningBuyer(
   id: string,
   buyerId: string,
-  buyerName = '',
+  _buyerName = '',
 ): Promise<PurchasePlanningSheetRow> {
-  if (!isApiMode()) return demo.assignPurchasePlanningBuyer(id, buyerId, buyerName || buyerId)
   try {
     const res = await planningApi.bulkAssignBuyerApi({ rowIds: [id], buyerId })
     const row = res.data.find((r) => r.id === id) ?? res.data[0]
@@ -510,7 +469,6 @@ export async function selectPurchasePlanningVendor(
   vendorId: string,
   expectedRate?: number,
 ): Promise<PurchasePlanningSheetRow> {
-  if (!isApiMode()) return demo.selectPurchasePlanningVendor(id, vendorId)
   try {
     const res = await planningApi.bulkSelectVendorApi({
       rowIds: [id],
@@ -526,7 +484,6 @@ export async function selectPurchasePlanningVendor(
 }
 
 export async function approvePurchasePlanningRow(id: string): Promise<PurchasePlanningSheetRow> {
-  if (!isApiMode()) return demo.approvePurchasePlanningRow(id)
   try {
     const res = await planningApi.bulkPlanningStatusApi({
       rowIds: [id],
@@ -544,7 +501,6 @@ export async function holdPurchasePlanningRow(
   id: string,
   reason = 'On hold',
 ): Promise<PurchasePlanningSheetRow> {
-  if (!isApiMode()) return demo.holdPurchasePlanningRow(id, reason)
   try {
     const res = await planningApi.bulkPlanningStatusApi({
       rowIds: [id],
@@ -563,7 +519,6 @@ export async function cancelPurchasePlanningRow(
   id: string,
   reason = 'Cancelled',
 ): Promise<PurchasePlanningSheetRow> {
-  if (!isApiMode()) return demo.cancelPurchasePlanningRow(id, reason)
   try {
     const res = await planningApi.bulkPlanningStatusApi({
       rowIds: [id],
@@ -581,16 +536,9 @@ export async function cancelPurchasePlanningRow(
 export async function bulkAssignPurchasePlanningBuyer(
   rowIds: string[],
   buyerId: string,
-  buyerName = '',
+  _buyerName = '',
 ): Promise<PurchasePlanningSheetRow[]> {
   if (!rowIds.length) return []
-  if (!isApiMode()) {
-    const out: PurchasePlanningSheetRow[] = []
-    for (const id of rowIds) {
-      out.push(await demo.assignPurchasePlanningBuyer(id, buyerId, buyerName || buyerId))
-    }
-    return out
-  }
   try {
     const res = await planningApi.bulkAssignBuyerApi({ rowIds, buyerId })
     return res.data.map(mapApiPlanningRowToDomain)
@@ -605,16 +553,6 @@ export async function bulkSelectPurchasePlanningVendor(
   expectedRate?: number | null,
 ): Promise<PurchasePlanningSheetRow[]> {
   if (!rowIds.length) return []
-  if (!isApiMode()) {
-    const out: PurchasePlanningSheetRow[] = []
-    for (const id of rowIds) {
-      out.push(await demo.selectPurchasePlanningVendor(id, vendorId))
-      if (expectedRate != null) {
-        out[out.length - 1] = await demo.updatePurchasePlanningSheetRow(id, { expectedRate })
-      }
-    }
-    return out
-  }
   try {
     const res = await planningApi.bulkSelectVendorApi({
       rowIds,
@@ -633,21 +571,6 @@ export async function bulkUpdatePurchasePlanningStatus(
   reason?: string,
 ): Promise<PurchasePlanningSheetRow[]> {
   if (!rowIds.length) return []
-  if (!isApiMode()) {
-    const out: PurchasePlanningSheetRow[] = []
-    for (const id of rowIds) {
-      if (status === 'CANCELLED' || status === 'cancelled') {
-        out.push(await demo.cancelPurchasePlanningRow(id, reason))
-      } else if (status === 'ON_HOLD' || status === 'pending_review') {
-        out.push(await demo.holdPurchasePlanningRow(id, reason))
-      } else if (status === 'APPROVED' || status === 'approved') {
-        out.push(await demo.approvePurchasePlanningRow(id))
-      } else {
-        out.push(await demo.updatePurchasePlanningSheetRow(id, { status: status as never }))
-      }
-    }
-    return out
-  }
   try {
     const res = await planningApi.bulkPlanningStatusApi({ rowIds, status, reason })
     return res.data.map(mapApiPlanningRowToDomain)
@@ -659,12 +582,6 @@ export async function bulkUpdatePurchasePlanningStatus(
 export async function recalculatePurchasePlanningRows(
   rowIds: string[] = [],
 ): Promise<PurchasePlanningSheetRow[]> {
-  if (!isApiMode()) {
-    // Demo: re-read sheet (net qty already computed on write)
-    const all = await demo.getPurchasePlanningSheet()
-    if (!rowIds.length) return all
-    return all.filter((r) => rowIds.includes(r.id))
-  }
   try {
     const res = await planningApi.recalculatePlanningApi({ rowIds })
     return res.data.map(mapApiPlanningRowToDomain)
@@ -684,7 +601,6 @@ export async function createPurchaseOrdersFromPlanningSelection(
     orderQuantities?: Record<string, number>
   },
 ): Promise<PurchaseOrder[]> {
-  if (!isApiMode()) return demo.createPurchaseOrdersFromPlanningSelection(planningRowIds, options)
   try {
     const res = await poApi.createPurchaseOrdersFromPlanningApi({
       rowIds: planningRowIds,
@@ -715,9 +631,6 @@ export async function createPurchaseOrdersFromConsolidation(payload: {
   planningRowIds: string[]
   allocations: Array<{ vendorId: string; quantity: number; rate: number }>
 }): Promise<PurchaseOrder[]> {
-  if (!isApiMode()) {
-    return demo.createPurchaseOrdersFromConsolidation(payload)
-  }
   try {
     const res = await planningApi.createPurchaseOrdersFromConsolidationApi(payload)
     const orders = await Promise.all(
@@ -737,7 +650,6 @@ export async function createPurchaseOrdersFromConsolidation(payload: {
 }
 
 export async function createPurchaseOrderFromPlanningRow(id: string): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.createPurchaseOrderFromPlanningRow(id)
   const orders = await createPurchaseOrdersFromPlanningSelection([id])
   if (!orders[0]) throw new PurchaseServiceError('PPS_PO_NOT_READY', 'PO was not created')
   return orders[0]
@@ -753,7 +665,6 @@ export async function createPurchaseOrderFromPr(
   vendorId?: string,
   options?: CreatePurchaseOrderFromPrOptions,
 ): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.createPurchaseOrderFromPr(prId, vendorId, options)
 
   const pr = await getPurchaseRequisitionById(prId)
   if (!pr) {
@@ -828,7 +739,7 @@ export async function createPurchaseOrderFromPr(
     }
   }
 
-  const eligible = rows.filter(demo.canSelectPlanningRowForPo)
+  const eligible = rows.filter(canSelectPlanningRowForPo)
   if (eligible.length === 0) {
     throw new PurchaseServiceError(
       'PPS_PO_NOT_READY',
@@ -858,14 +769,12 @@ export async function createPurchaseOrderFromPr(
 
 /** Alias used by PR list “Create PO” — same Planning path as createPurchaseOrderFromPr. */
 export async function convertPurchaseRequisitionToPo(id: string): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.convertPurchaseRequisitionToPo(id)
   return createPurchaseOrderFromPr(id)
 }
 
 /* ─── Purchase Orders (list / get) ─── */
 
 export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
-  if (!isApiMode()) return demo.getPurchaseOrders()
   try {
     const res = await poApi.listPurchaseOrdersApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
     return res.data.map(mapApiPurchaseOrderToDomain)
@@ -875,7 +784,6 @@ export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
 }
 
 export async function getPurchaseOrderById(id: string): Promise<PurchaseOrder | null> {
-  if (!isApiMode()) return demo.getPurchaseOrderById(id)
   try {
     const res = await poApi.getPurchaseOrderApi(id)
     return mapApiPurchaseOrderToDomain(res.data)
@@ -888,7 +796,6 @@ export async function getPurchaseOrderById(id: string): Promise<PurchaseOrder | 
 }
 
 export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
-  if (!isApiMode()) return demo.getPurchaseOrderList()
   try {
     const res = await poApi.listPurchaseOrdersApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
     return res.data.map(mapApiPurchaseOrderToListRow)
@@ -900,7 +807,6 @@ export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
 /* ─── Purchase Orders (create / update / lifecycle) — backend is source of truth ─── */
 
 export async function createPurchaseOrder(input: PurchaseOrderInput): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.createPurchaseOrder(input)
   try {
     const res = await poApi.createPurchaseOrderApi(
       mapDomainPoInputToApiPayload(input) as unknown as Record<string, unknown>,
@@ -915,7 +821,6 @@ export async function updatePurchaseOrder(
   id: string,
   input: PurchaseOrderInput,
 ): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.updatePurchaseOrder(id, input)
   try {
     const res = await poApi.updatePurchaseOrderApi(
       id,
@@ -928,7 +833,6 @@ export async function updatePurchaseOrder(
 }
 
 export async function submitPurchaseOrder(id: string): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.submitPurchaseOrder(id)
   try {
     const res = await poApi.submitPurchaseOrderApi(id, {})
     return mapApiPurchaseOrderToDomain(res.data)
@@ -938,7 +842,6 @@ export async function submitPurchaseOrder(id: string): Promise<PurchaseOrder> {
 }
 
 export async function approvePurchaseOrder(id: string, remarks = ''): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.approvePurchaseOrder(id, remarks)
   try {
     const res = await poApi.approvePurchaseOrderApi(id, remarks ? { remarks } : {})
     return mapApiPurchaseOrderToDomain(res.data)
@@ -948,9 +851,6 @@ export async function approvePurchaseOrder(id: string, remarks = ''): Promise<Pu
 }
 
 export async function rejectPurchaseOrder(id: string, reason: string): Promise<PurchaseOrder> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError('NOT_SUPPORTED', 'PO rejection requires API mode.')
-  }
   try {
     const res = await poApi.rejectPurchaseOrderApi(id, { reason })
     return mapApiPurchaseOrderToDomain(res.data)
@@ -960,9 +860,6 @@ export async function rejectPurchaseOrder(id: string, reason: string): Promise<P
 }
 
 export async function sendBackPurchaseOrder(id: string, reason: string): Promise<PurchaseOrder> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError('NOT_SUPPORTED', 'PO send-back requires API mode.')
-  }
   try {
     const res = await poApi.sendBackPurchaseOrderApi(id, { reason })
     return mapApiPurchaseOrderToDomain(res.data)
@@ -973,12 +870,10 @@ export async function sendBackPurchaseOrder(id: string, reason: string): Promise
 
 /** "Release" maps to send-to-vendor on the backend (approved → sent_to_vendor). */
 export async function releasePurchaseOrder(id: string): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.releasePurchaseOrder(id)
   return sendPurchaseOrderToVendor(id)
 }
 
 export async function sendPurchaseOrderToVendor(id: string): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.sendPurchaseOrderToVendor(id)
   try {
     const res = await poApi.sendPurchaseOrderToVendorApi(id, {})
     return mapApiPurchaseOrderToDomain(res.data)
@@ -988,7 +883,6 @@ export async function sendPurchaseOrderToVendor(id: string): Promise<PurchaseOrd
 }
 
 export async function cancelPurchaseOrder(id: string, reason = ''): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.cancelPurchaseOrder(id, reason)
   try {
     const res = await poApi.cancelPurchaseOrderApi(id, reason ? { remarks: reason } : {})
     return mapApiPurchaseOrderToDomain(res.data)
@@ -998,7 +892,6 @@ export async function cancelPurchaseOrder(id: string, reason = ''): Promise<Purc
 }
 
 export async function closePurchaseOrder(id: string): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.closePurchaseOrder(id)
   try {
     const res = await poApi.closePurchaseOrderApi(id, {})
     return mapApiPurchaseOrderToDomain(res.data)
@@ -1008,7 +901,6 @@ export async function closePurchaseOrder(id: string): Promise<PurchaseOrder> {
 }
 
 export async function reopenPurchaseOrder(id: string): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.reopenPurchaseOrder(id)
   try {
     const res = await poApi.reopenPurchaseOrderApi(id, {})
     return mapApiPurchaseOrderToDomain(res.data)
@@ -1020,9 +912,8 @@ export async function reopenPurchaseOrder(id: string): Promise<PurchaseOrder> {
 /** PO revision (versioned amendments) — API persists Rev N snapshots. */
 export async function revisePurchaseOrder(
   id: string,
-  input: Parameters<typeof demo.revisePurchaseOrder>[1],
+  input: PurchaseOrderReviseInput,
 ): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.revisePurchaseOrder(id, input)
   try {
     const payload: Record<string, unknown> = {
       reason: input.reason,
@@ -1049,7 +940,6 @@ export async function revisePurchaseOrder(
 export async function getPurchaseOrderLinkedDocuments(
   id: string,
 ): Promise<PurchaseOrderLinkedDocuments> {
-  if (!isApiMode()) return demo.getPurchaseOrderLinkedDocuments(id)
   const po = await getPurchaseOrderById(id)
   if (!po) {
     throw new PurchaseServiceError('PO_NOT_FOUND', `Purchase order not found: ${id}`)
@@ -1113,7 +1003,6 @@ export async function getPurchaseOrderLinkedDocuments(
 /* ─── Goods Receipt Notes (GRN) ─── */
 
 export async function getGRNs(): Promise<GoodsReceiptNote[]> {
-  if (!isApiMode()) return demo.getGRNs()
   try {
     const res = await grnApi.listGoodsReceiptsApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
     return res.data.map(mapApiGoodsReceiptToDomain)
@@ -1123,7 +1012,6 @@ export async function getGRNs(): Promise<GoodsReceiptNote[]> {
 }
 
 export async function getGrnList(): Promise<GrnListRow[]> {
-  if (!isApiMode()) return demo.getGrnList()
   try {
     const res = await grnApi.listGoodsReceiptsApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
     return res.data.map(mapApiGoodsReceiptToListRow)
@@ -1161,7 +1049,6 @@ function isDuplicateQiForGrnError(err: unknown): boolean {
 }
 
 export async function getGRNById(id: string): Promise<GoodsReceiptNote | null> {
-  if (!isApiMode()) return demo.getGRNById(id)
   try {
     const res = await grnApi.getGoodsReceiptApi(id)
     return enrichGrnWithQualityInspectionId(mapApiGoodsReceiptToDomain(res.data))
@@ -1174,7 +1061,6 @@ export async function getGRNById(id: string): Promise<GoodsReceiptNote | null> {
 }
 
 export async function createGRNFromPo(input: GrnInput): Promise<GoodsReceiptNote> {
-  if (!isApiMode()) return demo.createGRNFromPo(input)
   try {
     const res = await grnApi.createGoodsReceiptApi(mapDomainGrnInputToApiPayload(input))
     return mapApiGoodsReceiptToDomain(res.data)
@@ -1188,7 +1074,6 @@ export async function createGRN(input: GrnInput): Promise<GoodsReceiptNote> {
 }
 
 export async function updateGRN(id: string, input: Partial<GrnInput>): Promise<GoodsReceiptNote> {
-  if (!isApiMode()) return demo.updateGRN(id, input)
   try {
     const payload = mapDomainGrnInputToApiPayload({
       purchaseOrderId: input.purchaseOrderId || '',
@@ -1206,7 +1091,6 @@ export async function updateGRN(id: string, input: Partial<GrnInput>): Promise<G
 }
 
 export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
-  if (!isApiMode()) return demo.submitGRN(id)
   try {
     const res = await grnApi.submitGoodsReceiptApi(id, {})
     let grn = mapApiGoodsReceiptToDomain(res.data)
@@ -1234,9 +1118,6 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
 }
 
 export async function approveToleranceGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError('NOT_SUPPORTED', 'Tolerance approval is only available in API mode.')
-  }
   try {
     const res = await grnApi.approveToleranceGoodsReceiptApi(id, remarks ? { remarks } : {})
     return mapApiGoodsReceiptToDomain(res.data)
@@ -1246,9 +1127,6 @@ export async function approveToleranceGRN(id: string, remarks = ''): Promise<Goo
 }
 
 export async function rejectToleranceGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError('NOT_SUPPORTED', 'Tolerance rejection is only available in API mode.')
-  }
   try {
     const res = await grnApi.rejectToleranceGoodsReceiptApi(id, remarks ? { remarks } : {})
     return mapApiGoodsReceiptToDomain(res.data)
@@ -1259,7 +1137,6 @@ export async function rejectToleranceGRN(id: string, remarks = ''): Promise<Good
 
 /** Demo posts stock locally; API mode calls GRN `post-inventory` (idempotent). */
 export async function postGRN(id: string): Promise<GoodsReceiptNote> {
-  if (!isApiMode()) return demo.postGRN(id)
   try {
     const current = await getGRNById(id)
     if (!current) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${id}`)
@@ -1275,9 +1152,6 @@ export async function postGRN(id: string): Promise<GoodsReceiptNote> {
 }
 
 export async function cancelGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError('NOT_SUPPORTED', 'Cancel GRN is only available in API mode.')
-  }
   try {
     const res = await grnApi.cancelGoodsReceiptApi(id, remarks ? { remarks } : {})
     return mapApiGoodsReceiptToDomain(res.data)
@@ -1294,9 +1168,6 @@ export async function reverseGRN(
     lineQuantities?: Array<{ lineId: string; quantity: number }>
   },
 ): Promise<GoodsReceiptNote> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError('NOT_SUPPORTED', 'Reverse GRN is only available in API mode.')
-  }
   try {
     const payload: Record<string, unknown> = {}
     if (remarks.trim()) payload.remarks = remarks.trim()
@@ -1312,7 +1183,6 @@ export async function reverseGRN(
 /* ─── RFQ ─── */
 
 export async function getRFQs(): Promise<RequestForQuotation[]> {
-  if (!isApiMode()) return demo.getRFQs()
   try {
     const res = await rfqApi.listRfqsApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
     return res.data.map(mapApiRfqToDomain)
@@ -1322,7 +1192,6 @@ export async function getRFQs(): Promise<RequestForQuotation[]> {
 }
 
 export async function getRfqList(): Promise<RfqListRow[]> {
-  if (!isApiMode()) return demo.getRfqList()
   try {
     const res = await rfqApi.listRfqsApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
     return res.data.map(mapApiRfqToListRow)
@@ -1332,7 +1201,6 @@ export async function getRfqList(): Promise<RfqListRow[]> {
 }
 
 export async function getRFQById(id: string): Promise<RequestForQuotation | null> {
-  if (!isApiMode()) return demo.getRFQById(id)
   try {
     const res = await rfqApi.getRfqApi(id)
     return mapApiRfqToDomain(res.data)
@@ -1344,7 +1212,6 @@ export async function getRFQById(id: string): Promise<RequestForQuotation | null
 }
 
 export async function createRFQ(input: RfqInput): Promise<RequestForQuotation> {
-  if (!isApiMode()) return demo.createRFQ(input)
   try {
     const res = await rfqApi.createRfqApi(mapDomainRfqInputToApiPayload(input))
     return mapApiRfqToDomain(res.data)
@@ -1354,7 +1221,6 @@ export async function createRFQ(input: RfqInput): Promise<RequestForQuotation> {
 }
 
 export async function updateRFQ(id: string, input: RfqInput): Promise<RequestForQuotation> {
-  if (!isApiMode()) return demo.updateRFQ(id, input)
   try {
     const payload = mapDomainRfqInputToApiPayload(input)
     const res = await rfqApi.updateRfqApi(id, {
@@ -1371,7 +1237,6 @@ export async function updateRFQ(id: string, input: RfqInput): Promise<RequestFor
 }
 
 export async function sendRFQ(id: string): Promise<RequestForQuotation> {
-  if (!isApiMode()) return demo.sendRFQ(id)
   try {
     const res = await rfqApi.sendRfqApi(id, {})
     return mapApiRfqToDomain(res.data)
@@ -1381,7 +1246,6 @@ export async function sendRFQ(id: string): Promise<RequestForQuotation> {
 }
 
 export async function cancelRFQ(id: string, remarks = 'Cancelled'): Promise<RequestForQuotation> {
-  if (!isApiMode()) return demo.cancelRFQ(id, remarks)
   try {
     const res = await rfqApi.cancelRfqApi(id, { remarks })
     return mapApiRfqToDomain(res.data)
@@ -1393,7 +1257,6 @@ export async function cancelRFQ(id: string, remarks = 'Cancelled'): Promise<Requ
 /* ─── Vendor quotations ─── */
 
 export async function getVendorQuotationList(): Promise<VendorQuotationListRow[]> {
-  if (!isApiMode()) return demo.getVendorQuotationList()
   try {
     const res = await vqApi.listVendorQuotationsApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
     return res.data.map(mapApiVendorQuotationToListRow)
@@ -1403,7 +1266,6 @@ export async function getVendorQuotationList(): Promise<VendorQuotationListRow[]
 }
 
 export async function getVendorQuotations(rfqId?: string): Promise<VendorQuotation[]> {
-  if (!isApiMode()) return demo.getVendorQuotations(rfqId)
   try {
     const res = await vqApi.listVendorQuotationsApi({
       page: 1,
@@ -1418,7 +1280,6 @@ export async function getVendorQuotations(rfqId?: string): Promise<VendorQuotati
 }
 
 export async function getVendorQuotationById(id: string): Promise<VendorQuotation | null> {
-  if (!isApiMode()) return demo.getVendorQuotationById(id)
   try {
     const res = await vqApi.getVendorQuotationApi(id)
     return mapApiVendorQuotationToDomain(res.data)
@@ -1430,7 +1291,6 @@ export async function getVendorQuotationById(id: string): Promise<VendorQuotatio
 }
 
 export async function createVendorQuotation(input: VendorQuotationInput): Promise<VendorQuotation> {
-  if (!isApiMode()) return demo.createVendorQuotation(input)
   try {
     const res = await vqApi.createVendorQuotationApi(mapDomainVendorQuotationInputToApiPayload(input))
     return mapApiVendorQuotationToDomain(res.data)
@@ -1443,7 +1303,6 @@ export async function updateVendorQuotation(
   id: string,
   input: VendorQuotationInput,
 ): Promise<VendorQuotation> {
-  if (!isApiMode()) return demo.updateVendorQuotation(id, input)
   try {
     const payload = mapDomainVendorQuotationInputToApiPayload(input)
     const { requestForQuotationId: _rfq, vendorId: _vendor, ...patch } = payload as Record<
@@ -1458,7 +1317,6 @@ export async function updateVendorQuotation(
 }
 
 export async function submitVendorQuotation(id: string): Promise<VendorQuotation> {
-  if (!isApiMode()) return demo.submitVendorQuotation(id)
   try {
     const res = await vqApi.submitVendorQuotationApi(id, {})
     return mapApiVendorQuotationToDomain(res.data)
@@ -1470,7 +1328,6 @@ export async function submitVendorQuotation(id: string): Promise<VendorQuotation
 /* ─── Quotation comparison / award / PO ─── */
 
 export async function getQuotationComparison(rfqId: string): Promise<QuotationComparison | null> {
-  if (!isApiMode()) return demo.getQuotationComparison(rfqId)
   try {
     const res = await comparisonApi.listComparisonsApi({
       requestForQuotationId: rfqId,
@@ -1498,7 +1355,6 @@ export async function getQuotationComparison(rfqId: string): Promise<QuotationCo
 export async function buildQuotationComparison(
   input: QuotationComparisonInput,
 ): Promise<QuotationComparison> {
-  if (!isApiMode()) return demo.buildQuotationComparison(input)
   try {
     const res = await comparisonApi.buildComparisonApi({
       requestForQuotationId: input.rfqId,
@@ -1535,7 +1391,6 @@ export async function updateQuotationComparisonSelection(
     selectionReason: string
   },
 ): Promise<QuotationComparison> {
-  if (!isApiMode()) return demo.updateQuotationComparisonSelection(id, input)
   // Selection is held client-side until award; refresh base comparison then overlay.
   try {
     const res = await comparisonApi.getComparisonApi(id)
@@ -1570,7 +1425,6 @@ export async function recommendQuotationVendor(
   id: string,
   input: { vendorId?: string; selectionReason?: string } = {},
 ): Promise<QuotationComparison> {
-  if (!isApiMode()) return demo.recommendQuotationVendor(id, input)
   try {
     const res = await comparisonApi.getComparisonApi(id)
     const mapped = mapApiComparisonToDomain(res.data)
@@ -1597,7 +1451,6 @@ export async function approveQuotationRecommendation(
   id: string,
   input?: { vendorId?: string; selectionReason?: string; awardedVendorQuotationId?: string },
 ): Promise<QuotationComparison> {
-  if (!isApiMode()) return demo.approveQuotationRecommendation(id)
   try {
     const current = await comparisonApi.getComparisonApi(id)
     const mapped = mapApiComparisonToDomain(current.data)
@@ -1627,7 +1480,6 @@ export async function approveQuotationRecommendation(
 export async function createPurchaseOrderFromComparison(
   comparisonId: string,
 ): Promise<PurchaseOrder> {
-  if (!isApiMode()) return demo.createPurchaseOrderFromComparison(comparisonId)
   try {
     const res = await comparisonApi.createPoFromComparisonApi(comparisonId)
     return {
@@ -1679,7 +1531,6 @@ export async function getPurchaseApprovalQueue(
   tab: PurchaseApprovalQueueTab = 'pending_mine',
   filters: PurchaseApprovalQueueFilters = {},
 ): Promise<PurchaseApprovalQueueRow[]> {
-  if (!isApiMode()) return demo.getPurchaseApprovalQueue(tab, filters)
   try {
     const documentType =
       filters.documentType === 'purchase_requisition'
@@ -1710,7 +1561,6 @@ export async function getPurchaseApprovalQueue(
 export async function getPurchaseApprovalReview(
   approvalId: string,
 ): Promise<PurchaseApprovalReviewDetail> {
-  if (!isApiMode()) return demo.getPurchaseApprovalReview(approvalId)
   try {
     const res = await approvalApi.getPurchaseApprovalApi(approvalId)
     const detail = res.data
@@ -1731,7 +1581,6 @@ export async function approvePurchaseDocument(
   documentId: string,
   remarks = 'Approved',
 ): Promise<PurchaseRequisition | PurchaseOrder | GoodsReceiptNote> {
-  if (!isApiMode()) return demo.approvePurchaseDocument(documentType, documentId, remarks)
   if (documentType === 'purchase_requisition') {
     return approvePurchaseRequisition(documentId, remarks)
   }
@@ -1752,7 +1601,6 @@ export async function rejectPurchaseDocument(
   documentId: string,
   remarks: string,
 ): Promise<PurchaseRequisition | PurchaseOrder | GoodsReceiptNote> {
-  if (!isApiMode()) return demo.rejectPurchaseDocument(documentType, documentId, remarks)
   if (!remarks.trim()) {
     throw new PurchaseServiceError('REMARKS_REQUIRED', 'Rejection comments are mandatory')
   }
@@ -1776,7 +1624,6 @@ export async function sendBackPurchaseDocument(
   documentId: string,
   remarks: string,
 ): Promise<PurchaseRequisition | PurchaseOrder | GoodsReceiptNote> {
-  if (!isApiMode()) return demo.sendBackPurchaseDocument(documentType, documentId, remarks)
   if (!remarks.trim()) {
     throw new PurchaseServiceError('REMARKS_REQUIRED', 'Send-back comments are mandatory')
   }
@@ -1813,9 +1660,6 @@ export async function revisePurchaseRequisition(
     lines?: Array<{ id: string; requiredQuantity?: number; estimatedRate?: number }>
   },
 ): Promise<PurchaseRequisition> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError('NOT_SUPPORTED', 'PR revision is API mode only in this build.')
-  }
   try {
     const res = await prApi.revisePurchaseRequisitionApi(id, input)
     return mapApiRequisitionToDomain(res.data)
@@ -1827,7 +1671,6 @@ export async function revisePurchaseRequisition(
 export async function getPurchaseRequisitionRevisions(
   id: string,
 ): Promise<PurchaseRequisitionRevisionSnapshot[]> {
-  if (!isApiMode()) return []
   try {
     const res = await prApi.listPurchaseRequisitionRevisionsApi(id)
     return (res.data ?? []).map((r) => {
@@ -1853,13 +1696,6 @@ export async function delegatePurchaseApproval(
   toUserId: string,
   remarks = '',
 ) {
-  if (!isApiMode()) {
-    return demo.delegatePurchaseApproval(
-      approvalId,
-      toUserId as PurchaseApprovalRole,
-      remarks,
-    )
-  }
   try {
     return (await approvalApi.delegatePurchaseApprovalApi(approvalId, {
       toUserId,
@@ -1873,7 +1709,6 @@ export async function delegatePurchaseApproval(
 export async function getPurchaseOrderSeriesOptions(): Promise<PurchaseOrderSeriesOption[]> {
   // Demo and API mode both use the Purchase Setup series config for the modal label.
   // Server still issues the real PO number on create-po.
-  if (!isApiMode()) return demo.getPurchaseOrderSeriesOptions()
   try {
     const setup = await getPurchaseSetup()
     const series = setup.numberSeries.purchaseOrder
@@ -1911,7 +1746,6 @@ export {
 export async function getPurchaseDashboard(
   filters: PurchaseDashboardFilters = {},
 ): Promise<PurchaseDashboardData> {
-  if (!isApiMode()) return demo.getPurchaseDashboard(filters)
 
   // Soft-fail individual registers so one schema/API gap does not blank the whole dashboard.
   const [requisitions, rfqs, warehouses, orders, grns, invoices] = await Promise.all([
@@ -2142,7 +1976,6 @@ export async function getPurchaseDashboard(
 
 /** Prefer vendors linked on items; otherwise return active vendors (no demo seed). */
 export async function getRecommendedVendorsForItems(itemIds: string[]): Promise<Vendor[]> {
-  if (!isApiMode()) return demo.getRecommendedVendorsForItems(itemIds)
   const [items, vendors] = await Promise.all([getPurchaseItems(), getVendors()])
   const preferred = new Set(
     itemIds
@@ -2307,11 +2140,10 @@ export function mapMasterVendorToDomainVendor(v: MasterVendor): Vendor {
 
 /**
  * Ensure a quick-created / master vendor is selectable on purchase docs.
- * Demo: inject into in-memory purchase vendor list. API: already on master store.
+ * No-op in API mode — quick-created vendors are already on the master store.
  */
-export function ensurePurchaseVendorKnown(vendor: Vendor): void {
-  if (isApiMode()) return
-  demo.ensurePurchaseVendorKnown(vendor)
+export function ensurePurchaseVendorKnown(_vendor: Vendor): void {
+  // intentionally no-op
 }
 
 /** Items for PR/PO pickers — Item Master via API in API mode, demo seed otherwise. */
@@ -2324,7 +2156,6 @@ export async function getPurchaseItems(options?: {
    */
   purchasableOnly?: boolean
 }): Promise<PurchaseItem[]> {
-  if (!isApiMode()) return demo.getPurchaseItems()
   let items = useMasterStore.getState().items
   // Refresh from Item Master API when empty or when the caller asks for a live snapshot.
   if (!items.length || options?.forceRefresh) {
@@ -2357,7 +2188,6 @@ export async function getPurchaseItems(options?: {
 
 /** Vendors for purchase docs — master store in API mode, demo seed otherwise. */
 export async function getVendors(): Promise<Vendor[]> {
-  if (!isApiMode()) return demo.getVendors()
   let vendors = useMasterStore.getState().vendors
   if (!vendors.length) {
     try {
@@ -2385,37 +2215,6 @@ export type PurchaseWarehouseOption = {
 
 /** Warehouses used as PR/PO location — master store in API mode. */
 export async function getPurchaseWarehouses(): Promise<PurchaseWarehouseOption[]> {
-  if (!isApiMode()) {
-    const { PURCHASE_DEMO_LOCATION, PURCHASE_DEMO_LOCATION_FG } = await import(
-      '../../data/purchase/purchaseDomainSeed'
-    )
-    return [
-      {
-        id: PURCHASE_DEMO_LOCATION.id,
-        code: PURCHASE_DEMO_LOCATION.code,
-        name: PURCHASE_DEMO_LOCATION.name,
-        address: [PURCHASE_DEMO_LOCATION.name, PURCHASE_DEMO_LOCATION.city, PURCHASE_DEMO_LOCATION.state]
-          .filter(Boolean)
-          .join(', '),
-        state: PURCHASE_DEMO_LOCATION.state,
-        city: PURCHASE_DEMO_LOCATION.city,
-      },
-      {
-        id: PURCHASE_DEMO_LOCATION_FG.id,
-        code: PURCHASE_DEMO_LOCATION_FG.code,
-        name: PURCHASE_DEMO_LOCATION_FG.name,
-        address: [
-          PURCHASE_DEMO_LOCATION_FG.name,
-          PURCHASE_DEMO_LOCATION_FG.city,
-          PURCHASE_DEMO_LOCATION_FG.state,
-        ]
-          .filter(Boolean)
-          .join(', '),
-        state: PURCHASE_DEMO_LOCATION_FG.state,
-        city: PURCHASE_DEMO_LOCATION_FG.city,
-      },
-    ]
-  }
   let warehouses = useMasterStore.getState().warehouses
   if (!warehouses.length) {
     try {
@@ -2716,10 +2515,6 @@ export function getCachedPurchaseSetup(): PurchaseSetup | null {
 
 /** Load tenant Purchase Setup — API is source of truth in API mode (no memory fallback). */
 export async function getPurchaseSetup(): Promise<PurchaseSetup> {
-  if (!isApiMode()) {
-    cachedPurchaseSetupForMappers = await demo.getPurchaseSetup()
-    return cachedPurchaseSetupForMappers
-  }
   try {
     const res = await setupApi.getPurchaseSetupApi()
     cachedPurchaseSetupForMappers = mapApiSetupToDomain(res.data)
@@ -2733,7 +2528,6 @@ export async function getPurchaseSetup(): Promise<PurchaseSetup> {
 export async function updatePurchaseSetup(
   patch: Partial<Omit<PurchaseSetup, 'updatedAt' | 'updatedBy'>>,
 ): Promise<PurchaseSetup> {
-  if (!isApiMode()) return demo.updatePurchaseSetup(patch)
   try {
     const current = await getPurchaseSetup()
     const merged: PurchaseSetup = {
@@ -2822,7 +2616,6 @@ function mapApiPlantSetupToDomain(api: setupApi.ApiPurchasePlantSetup): Purchase
 
 /** List plant-level Purchase Setup overrides (API mode only; demo returns empty). */
 export async function getPurchasePlantSettings(): Promise<PurchasePlantSetup[]> {
-  if (!isApiMode()) return []
   try {
     const res = await setupApi.listPurchasePlantSetupsApi()
     return (res.data ?? []).map(mapApiPlantSetupToDomain)
@@ -2833,18 +2626,6 @@ export async function getPurchasePlantSettings(): Promise<PurchasePlantSetup[]> 
 
 /** Load one plant override — API is source of truth (no memory fallback). */
 export async function getPurchasePlantSetup(plantId: string): Promise<PurchasePlantSetup> {
-  if (!isApiMode()) {
-    return {
-      id: null,
-      plantId,
-      defaultWarehouseId: null,
-      defaultReceivingLocationId: null,
-      defaultQualityHoldLocationId: null,
-      defaultRejectedLocationId: null,
-      defaultVendorReturnLocationId: null,
-      isConfigured: false,
-    }
-  }
   try {
     const res = await setupApi.getPurchasePlantSetupApi(plantId)
     return mapApiPlantSetupToDomain(res.data)
@@ -2858,12 +2639,6 @@ export async function updatePurchasePlantSetup(
   plantId: string,
   body: setupApi.ApiPurchasePlantSetupInput,
 ): Promise<PurchasePlantSetup> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError(
-      'DEMO_NOT_SUPPORTED',
-      'Plant setup overrides are only available in API mode.',
-    )
-  }
   try {
     const res = await setupApi.putPurchasePlantSetupApi(plantId, body)
     return mapApiPlantSetupToDomain(res.data)
@@ -2882,7 +2657,6 @@ function notSupportedInApiMode(feature: string): never {
 /* ─── Purchase Invoices ─── */
 
 export async function getPurchaseInvoices(): Promise<PurchaseInvoice[]> {
-  if (!isApiMode()) return demo.getPurchaseInvoices()
   try {
     const res = await invoiceApi.listPurchaseInvoicesApi({ page: 1, limit: 100, sortOrder: 'desc' })
     return res.data.map(mapApiPurchaseInvoiceToDomain)
@@ -2892,7 +2666,6 @@ export async function getPurchaseInvoices(): Promise<PurchaseInvoice[]> {
 }
 
 export async function getPurchaseInvoiceList(): Promise<PurchaseInvoiceListRow[]> {
-  if (!isApiMode()) return demo.getPurchaseInvoiceList()
   try {
     const res = await invoiceApi.listPurchaseInvoicesApi({ page: 1, limit: 100, sortOrder: 'desc' })
     return res.data.map(mapApiPurchaseInvoiceToListRow)
@@ -2902,7 +2675,6 @@ export async function getPurchaseInvoiceList(): Promise<PurchaseInvoiceListRow[]
 }
 
 export async function getPurchaseInvoiceById(id: string): Promise<PurchaseInvoice | null> {
-  if (!isApiMode()) return demo.getPurchaseInvoiceById(id)
   try {
     const res = await invoiceApi.getPurchaseInvoiceApi(id)
     return mapApiPurchaseInvoiceToDomain(res.data)
@@ -2917,7 +2689,6 @@ export async function getPurchaseInvoiceById(id: string): Promise<PurchaseInvoic
 }
 
 export async function createPurchaseInvoice(input: PurchaseInvoiceInput): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.createPurchaseInvoice(input)
   try {
     const res = await invoiceApi.createPurchaseInvoiceApi(
       mapDomainPurchaseInvoiceInputToApiPayload(input),
@@ -2931,7 +2702,6 @@ export async function createPurchaseInvoice(input: PurchaseInvoiceInput): Promis
 export async function createDirectPurchaseInvoice(
   input: PurchaseInvoiceInput,
 ): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.createDirectPurchaseInvoice(input)
   return createPurchaseInvoice({ ...input, origin: 'direct' })
 }
 
@@ -2939,10 +2709,6 @@ export async function createDirectPurchaseInvoice(
 export async function listPostedGrnsForPurchaseOrder(
   purchaseOrderId: string,
 ): Promise<GoodsReceiptNote[]> {
-  if (!isApiMode()) {
-    const grns = await demo.getGRNs()
-    return grns.filter((g) => g.purchaseOrderId === purchaseOrderId && g.status === 'posted')
-  }
   const byId = new Map<string, GoodsReceiptNote>()
   try {
     const res = await grnApi.listGoodsReceiptsApi({
@@ -2970,7 +2736,6 @@ const GRN_REQUIRED_FOR_INVOICE_MSG =
   'Purchase Setup requires a posted GRN match. Switch origin to “Posted GRN” and select the GRN for this PO, or create and post a GRN first (Purchase → Goods receipts). Service-only POs use origin “Service PO”.'
 
 export async function createPurchaseInvoiceFromPo(purchaseOrderId: string): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.createPurchaseInvoiceFromPo(purchaseOrderId)
   const po = await getPurchaseOrderById(purchaseOrderId)
   if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `PO not found: ${purchaseOrderId}`)
 
@@ -3010,7 +2775,6 @@ export async function createPurchaseInvoiceFromPo(purchaseOrderId: string): Prom
 }
 
 export async function createPurchaseInvoiceFromGrn(goodsReceiptId: string): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.createPurchaseInvoiceFromGrn(goodsReceiptId)
   const grn = await getGRNById(goodsReceiptId)
   if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${goodsReceiptId}`)
   const today = new Date().toISOString().slice(0, 10)
@@ -3046,7 +2810,6 @@ export async function createPurchaseInvoiceFromGrn(goodsReceiptId: string): Prom
 export async function createPurchaseInvoiceFromServicePo(
   purchaseOrderId: string,
 ): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.createPurchaseInvoiceFromServicePo(purchaseOrderId)
   return createPurchaseInvoiceFromPo(purchaseOrderId)
 }
 
@@ -3054,7 +2817,6 @@ export async function updatePurchaseInvoice(
   id: string,
   input: PurchaseInvoiceInput,
 ): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.updatePurchaseInvoice(id, input)
   try {
     const res = await invoiceApi.updatePurchaseInvoiceApi(
       id,
@@ -3071,7 +2833,6 @@ export async function updatePurchaseInvoice(
  * Enrich with linked PO/GRN quantities when available for the detail panel.
  */
 export async function computeInvoiceMatching(id: string): Promise<InvoiceMatchingResult> {
-  if (!isApiMode()) return demo.computeInvoiceMatching(id)
   const inv = await getPurchaseInvoiceById(id)
   if (!inv) throw new PurchaseServiceError('INV_NOT_FOUND', `Invoice not found: ${id}`)
 
@@ -3240,7 +3001,6 @@ export async function computeInvoiceMatching(id: string): Promise<InvoiceMatchin
 
 /** API mode: verification is part of submit — moves the draft into approval with matching applied. */
 export async function verifyPurchaseInvoice(id: string): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.verifyPurchaseInvoice(id)
   try {
     const res = await invoiceApi.submitPurchaseInvoiceApi(id, {})
     return mapApiPurchaseInvoiceToDomain(res.data)
@@ -3250,7 +3010,6 @@ export async function verifyPurchaseInvoice(id: string): Promise<PurchaseInvoice
 }
 
 export async function submitPurchaseInvoiceForApproval(id: string): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.submitPurchaseInvoiceForApproval(id)
   try {
     const res = await invoiceApi.submitPurchaseInvoiceApi(id, {})
     return mapApiPurchaseInvoiceToDomain(res.data)
@@ -3260,7 +3019,6 @@ export async function submitPurchaseInvoiceForApproval(id: string): Promise<Purc
 }
 
 export async function approvePurchaseInvoice(id: string, remarks?: string): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.approvePurchaseInvoice(id, remarks)
   try {
     const res = await invoiceApi.approvePurchaseInvoiceApi(id, remarks ? { remarks } : {})
     return mapApiPurchaseInvoiceToDomain(res.data)
@@ -3270,7 +3028,6 @@ export async function approvePurchaseInvoice(id: string, remarks?: string): Prom
 }
 
 export async function rejectPurchaseInvoice(id: string, remarks: string): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.rejectPurchaseInvoice(id, remarks)
   try {
     const res = await invoiceApi.rejectPurchaseInvoiceApi(id, remarks ? { remarks } : {})
     return mapApiPurchaseInvoiceToDomain(res.data)
@@ -3282,9 +3039,6 @@ export async function rejectPurchaseInvoice(id: string, remarks: string): Promis
 export async function getPurchaseInvoiceApHandoffPreview(
   id: string,
 ): Promise<Record<string, unknown>> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError('NOT_SUPPORTED', 'AP handoff preview requires API mode.')
-  }
   try {
     const res = await invoiceApi.previewPurchaseInvoiceApHandoffApi(id)
     return res.data
@@ -3293,21 +3047,18 @@ export async function getPurchaseInvoiceApHandoffPreview(
   }
 }
 
-export async function holdPurchaseInvoice(id: string, reason: string): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.holdPurchaseInvoice(id, reason)
+export async function holdPurchaseInvoice(_id: string, _reason: string): Promise<PurchaseInvoice> {
   notSupportedInApiMode('Invoice hold')
 }
 
 export async function approveInvoiceMatchingException(
-  id: string,
-  remarks?: string,
+  _id: string,
+  _remarks?: string,
 ): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.approveInvoiceMatchingException(id, remarks)
   notSupportedInApiMode('Matching exception approval (use authorized override on submit)')
 }
 
 export async function postPurchaseInvoice(id: string): Promise<PurchaseInvoice> {
-  if (!isApiMode()) return demo.postPurchaseInvoice(id)
   try {
     const res = await invoiceApi.postPurchaseInvoiceApi(id, {})
     return mapApiPurchaseInvoiceToDomain(res.data)
@@ -3320,9 +3071,6 @@ export async function cancelPurchaseInvoice(
   id: string,
   remarks = 'Cancelled',
 ): Promise<PurchaseInvoice> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError('NOT_SUPPORTED', 'Cancel invoice is only available in API mode.')
-  }
   try {
     const res = await invoiceApi.cancelPurchaseInvoiceApi(id, remarks ? { remarks } : {})
     return mapApiPurchaseInvoiceToDomain(res.data)
@@ -3332,17 +3080,15 @@ export async function cancelPurchaseInvoice(
 }
 
 export async function createDebitNoteFromInvoice(
-  id: string,
-  reason?: string,
+  _id: string,
+  _reason?: string,
 ): Promise<{ invoice: PurchaseInvoice; debitNoteNumber: string; debitNoteId: string }> {
-  if (!isApiMode()) return demo.createDebitNoteFromInvoice(id, reason)
   notSupportedInApiMode('Debit note from invoice')
 }
 
 /* ─── Quality Inspections ─── */
 
 export async function getQualityInspections(goodsReceiptId?: string): Promise<QualityInspection[]> {
-  if (!isApiMode()) return demo.getQualityInspections(goodsReceiptId)
   try {
     const res = await qiApi.listQualityInspectionsApi({
       page: 1,
@@ -3359,7 +3105,6 @@ export async function getQualityInspections(goodsReceiptId?: string): Promise<Qu
 export async function getQualityInspectionList(
   goodsReceiptId?: string,
 ): Promise<QualityInspectionListRow[]> {
-  if (!isApiMode()) return demo.getQualityInspectionList(goodsReceiptId)
   try {
     const res = await qiApi.listQualityInspectionsApi({
       page: 1,
@@ -3374,7 +3119,6 @@ export async function getQualityInspectionList(
 }
 
 export async function getQualityInspectionById(id: string): Promise<QualityInspection | null> {
-  if (!isApiMode()) return demo.getQualityInspectionById(id)
   try {
     const res = await qiApi.getQualityInspectionApi(id)
     return mapApiQualityInspectionToDomain(res.data)
@@ -3391,7 +3135,6 @@ export async function getQualityInspectionById(id: string): Promise<QualityInspe
 export async function createQualityInspection(
   input: QualityInspectionInput,
 ): Promise<QualityInspection> {
-  if (!isApiMode()) return demo.createQualityInspection(input)
   try {
     const res = await qiApi.createQualityInspectionApi(
       mapDomainQualityInspectionInputToApiPayload(input),
@@ -3474,7 +3217,6 @@ export async function updateQualityInspection(
   id: string,
   input: QualityInspectionUpdatePatch,
 ): Promise<QualityInspection> {
-  if (!isApiMode()) return demo.updateQualityInspection(id, input)
   try {
     return await patchQualityInspectionApi(id, input)
   } catch (err) {
@@ -3487,7 +3229,6 @@ export async function acceptQualityInspection(
   acceptedQty?: number,
   rejectedQty = 0,
 ): Promise<QualityInspection> {
-  if (!isApiMode()) return demo.acceptQualityInspection(id, acceptedQty, rejectedQty)
   try {
     if (acceptedQty != null || rejectedQty > 0) {
       await patchQualityInspectionApi(id, { acceptedQty, rejectedQty })
@@ -3507,7 +3248,6 @@ export async function rejectQualityInspection(
   id: string,
   rejectedQty?: number,
 ): Promise<QualityInspection> {
-  if (!isApiMode()) return demo.rejectQualityInspection(id, rejectedQty)
   try {
     if (rejectedQty != null && rejectedQty >= 0) {
       // Persist split before complete — REJECT outcome would force full inspected qty.
@@ -3523,7 +3263,6 @@ export async function rejectQualityInspection(
 }
 
 export async function holdQualityInspection(id: string, remarks = ''): Promise<QualityInspection> {
-  if (!isApiMode()) return demo.holdQualityInspection(id, remarks)
   try {
     const res = await qiApi.holdQualityInspectionApi(id, { remarks: remarks || undefined })
     return mapApiQualityInspectionToDomain(res.data)
@@ -3536,9 +3275,6 @@ export async function cancelQualityInspection(
   id: string,
   remarks = '',
 ): Promise<QualityInspection> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError('NOT_SUPPORTED', 'Cancel quality inspection is only available in API mode.')
-  }
   try {
     const res = await qiApi.cancelQualityInspectionApi(id, { remarks: remarks || undefined })
     return mapApiQualityInspectionToDomain(res.data)
@@ -3551,7 +3287,6 @@ export async function requestDeviationApproval(
   id: string,
   remarks: string,
 ): Promise<QualityInspection> {
-  if (!isApiMode()) return demo.requestDeviationApproval(id, remarks)
   try {
     const res = await qiApi.completeQualityInspectionApi(id, {
       outcome: 'AUTO',
@@ -3611,97 +3346,6 @@ function mapWizardPrefillFromApi(api: returnApi.ApiReturnWizardPrefill): ReturnW
   }
 }
 
-/** Demo fallback: build wizard-style prefill without posting a return document. */
-async function buildDemoReturnWizardPrefill(params: {
-  qualityInspectionId?: string
-  goodsReceiptId?: string
-}): Promise<ReturnWizardPrefill> {
-  if (params.qualityInspectionId) {
-    const qi = await demo.getQualityInspectionById(params.qualityInspectionId)
-    if (!qi) throw new PurchaseServiceError('QI_NOT_FOUND', 'Quality inspection not found')
-    if (qi.rejectedQty <= 0) {
-      throw new PurchaseServiceError('RETURN_NO_QTY', 'Quality inspection has no rejected quantity')
-    }
-    const grn = qi.goodsReceiptId ? await demo.getGRNById(qi.goodsReceiptId) : null
-    const grnLine = grn?.lines.find((l) => l.id === qi.goodsReceiptLineId)
-    return {
-      vendorId: qi.vendor.id,
-      purchaseOrderId: qi.purchaseOrderId,
-      goodsReceiptId: qi.goodsReceiptId,
-      qualityInspectionId: qi.id,
-      qualityInspectionNumber: qi.documentNumber,
-      warehouseId: grn?.warehouseId ?? qi.location.id,
-      suggestedReturnType: 'CREDIT',
-      replacementRequired: false,
-      reason: qi.remarks || `Rejected on ${qi.documentNumber}`,
-      totalRejected: qi.rejectedQty,
-      totalReturned: 0,
-      totalRemaining: qi.rejectedQty,
-      lines: [
-        {
-          goodsReceiptLineId: qi.goodsReceiptLineId,
-          purchaseOrderLineId: null,
-          itemId: qi.itemId,
-          itemCode: qi.itemCode || '',
-          itemName: qi.itemName,
-          returnQty: qi.rejectedQty,
-          unitCost: grnLine?.rate ?? 0,
-          batchLotNo: qi.batchLotNo || '',
-          serialNumber: grnLine?.serialNumber || '',
-          availableReturnQty: qi.rejectedQty,
-        },
-      ],
-    }
-  }
-  if (params.goodsReceiptId) {
-    const grn = await demo.getGRNById(params.goodsReceiptId)
-    if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', 'GRN not found')
-    if (['draft', 'cancelled', 'reversed', 'pending_tolerance_approval'].includes(grn.status)) {
-      throw new PurchaseServiceError(
-        'RETURN_NO_QTY',
-        'Goods receipt must be submitted and posted before creating a return.',
-      )
-    }
-    const lines = grn.lines
-      .map((l) => {
-        const availableReturnQty = demo.availableReturnQtyForGrnLine(grn.id, l.id)
-        if (availableReturnQty <= 0) return null
-        return {
-          goodsReceiptLineId: l.id,
-          purchaseOrderLineId: l.purchaseOrderLineId ?? null,
-          itemId: l.itemId,
-          itemCode: l.itemCode,
-          itemName: l.itemName,
-          returnQty: availableReturnQty,
-          unitCost: l.rate,
-          batchLotNo: l.batchNumber || '',
-          serialNumber: l.serialNumber || '',
-          availableReturnQty,
-        }
-      })
-      .filter((l): l is NonNullable<typeof l> => l != null)
-    if (!lines.length) {
-      throw new PurchaseServiceError('RETURN_NO_QTY', 'No returnable quantity on this GRN')
-    }
-    return {
-      vendorId: grn.vendor.id,
-      purchaseOrderId: grn.purchaseOrderId,
-      goodsReceiptId: grn.id,
-      qualityInspectionId: null,
-      qualityInspectionNumber: null,
-      warehouseId: grn.warehouseId,
-      suggestedReturnType: 'CREDIT',
-      replacementRequired: false,
-      reason: `Rejected on ${grn.documentNumber}`,
-      totalRejected: lines.reduce((s, l) => s + l.returnQty, 0),
-      totalReturned: 0,
-      totalRemaining: lines.reduce((s, l) => s + l.returnQty, 0),
-      lines,
-    }
-  }
-  throw new PurchaseServiceError('RETURN_PREFILL_ARGS', 'Provide qualityInspectionId or goodsReceiptId')
-}
-
 /**
  * Prefill purchase return create wizard from QI and/or GRN
  * (does not create a document — forms stay on /returns/new until save).
@@ -3716,7 +3360,6 @@ export async function getReturnWizardPrefill(params: {
       'Provide qualityInspectionId or goodsReceiptId for return wizard prefill',
     )
   }
-  if (!isApiMode()) return buildDemoReturnWizardPrefill(params)
   try {
     const res = await returnApi.getReturnWizardPrefillApi({
       qualityInspectionId: params.qualityInspectionId,
@@ -3748,7 +3391,6 @@ export async function getSupplierQualityDashboardWidgets(): Promise<SupplierQual
     topRejectedVendors: [],
     mostRejectedItems: [],
   }
-  if (!isApiMode()) return empty
   try {
     const res = await supplierQualityApi.getSupplierQualityDashboardWidgetsApi()
     const d = res.data
@@ -3794,7 +3436,6 @@ export async function getSupplierQualityDashboardWidgets(): Promise<SupplierQual
 export async function getVendorQualityScorecard(
   vendorId: string,
 ): Promise<VendorQualityScorecard | null> {
-  if (!isApiMode()) return null
   try {
     const res = await supplierQualityApi.getVendorQualityScorecardApi(vendorId)
     return res.data
@@ -3809,7 +3450,6 @@ export async function getVendorQualityScorecard(
 export async function getItemSupplierQualityHistory(
   itemId: string,
 ): Promise<ItemSupplierQualityHistory> {
-  if (!isApiMode()) return { itemId, timeline: [] }
   try {
     const res = await supplierQualityApi.getItemSupplierQualityHistoryApi(itemId)
     return {
@@ -3830,7 +3470,6 @@ export async function getItemSupplierQualityHistory(
 }
 
 export async function getPurchaseReturns(): Promise<PurchaseReturn[]> {
-  if (!isApiMode()) return demo.getPurchaseReturns()
   try {
     const res = await returnApi.listPurchaseReturnsApi({ page: 1, limit: 100, sortOrder: 'desc' })
     return res.data.map(mapApiPurchaseReturnToDomain)
@@ -3840,7 +3479,6 @@ export async function getPurchaseReturns(): Promise<PurchaseReturn[]> {
 }
 
 export async function getPurchaseReturnList(): Promise<PurchaseReturnListRow[]> {
-  if (!isApiMode()) return demo.getPurchaseReturnList()
   try {
     const res = await returnApi.listPurchaseReturnsApi({ page: 1, limit: 100, sortOrder: 'desc' })
     return res.data.map(mapApiPurchaseReturnToListRow)
@@ -3850,7 +3488,6 @@ export async function getPurchaseReturnList(): Promise<PurchaseReturnListRow[]> 
 }
 
 export async function getPurchaseReturnById(id: string): Promise<PurchaseReturn | null> {
-  if (!isApiMode()) return demo.getPurchaseReturnById(id)
   try {
     const res = await returnApi.getPurchaseReturnApi(id)
     return mapApiPurchaseReturnToDomain(res.data)
@@ -3865,7 +3502,6 @@ export async function getPurchaseReturnById(id: string): Promise<PurchaseReturn 
 }
 
 export async function createPurchaseReturn(input: PurchaseReturnInput): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.createPurchaseReturn(input)
   try {
     const res = await returnApi.createPurchaseReturnApi(
       mapDomainPurchaseReturnInputToApiPayload(input),
@@ -3880,7 +3516,6 @@ export async function updatePurchaseReturn(
   id: string,
   input: PurchaseReturnInput,
 ): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.updatePurchaseReturn(id, input)
   try {
     const res = await returnApi.updatePurchaseReturnApi(
       id,
@@ -3896,7 +3531,6 @@ export async function createPurchaseReturnFromGrn(
   grnId: string,
   options?: { origin?: PurchaseReturnOrigin; returnReason?: PurchaseReturnReason },
 ): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.createPurchaseReturnFromGrn(grnId, options)
   const origin = options?.origin ?? 'grn_rejected_quantity'
   const returnReason =
     options?.returnReason
@@ -3947,7 +3581,6 @@ export async function createPurchaseReturnFromGrn(
 export async function createPurchaseReturnFromQualityInspection(
   qualityInspectionId: string,
 ): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.createPurchaseReturnFromQualityInspection(qualityInspectionId)
   const prefill = await getReturnWizardPrefill({ qualityInspectionId })
   return createPurchaseReturn({
     vendorId: prefill.vendorId,
@@ -3989,7 +3622,6 @@ export async function createPurchaseReturnFromReason(
     lines?: PurchaseReturnInput['lines']
   },
 ): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.createPurchaseReturnFromReason(origin, options)
   if (options.goodsReceiptId) {
     return createPurchaseReturnFromGrn(options.goodsReceiptId, {
       origin,
@@ -4012,7 +3644,6 @@ export async function createPurchaseReturnFromReason(
 }
 
 export async function submitPurchaseReturn(id: string): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.submitPurchaseReturn(id)
   try {
     const res = await returnApi.submitPurchaseReturnApi(id, {})
     return mapApiPurchaseReturnToDomain(res.data)
@@ -4026,7 +3657,6 @@ export async function submitPurchaseReturn(id: string): Promise<PurchaseReturn> 
  * Approve advances SUBMITTED → APPROVED.
  */
 export async function approvePurchaseReturn(id: string, remarks = ''): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.approvePurchaseReturn(id, remarks)
   try {
     const res = await returnApi.approvePurchaseReturnApi(id, remarks ? { remarks } : {})
     return mapApiPurchaseReturnToDomain(res.data)
@@ -4037,12 +3667,6 @@ export async function approvePurchaseReturn(id: string, remarks = ''): Promise<P
 
 /** API: APPROVED → SHIPPED (REJECTED → BLOCKED transit via inventory engine). */
 export async function shipPurchaseReturn(id: string, remarks = ''): Promise<PurchaseReturn> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError(
-      'RETURN_SHIP_DEMO',
-      'Ship return is available in API mode only',
-    )
-  }
   try {
     const res = await returnApi.shipPurchaseReturnApi(id, remarks ? { remarks } : {})
     return mapApiPurchaseReturnToDomain(res.data)
@@ -4052,7 +3676,6 @@ export async function shipPurchaseReturn(id: string, remarks = ''): Promise<Purc
 }
 
 export async function postPurchaseReturn(id: string): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.postPurchaseReturn(id)
   try {
     const res = await returnApi.completePurchaseReturnApi(id, {})
     return mapApiPurchaseReturnToDomain(res.data)
@@ -4065,12 +3688,6 @@ export async function linkReplacementGrnToReturn(
   id: string,
   goodsReceiptId: string,
 ): Promise<PurchaseReturn> {
-  if (!isApiMode()) {
-    throw new PurchaseServiceError(
-      'RETURN_REPLACEMENT_DEMO',
-      'Link replacement GRN is available in API mode only',
-    )
-  }
   try {
     const res = await returnApi.linkReplacementGrnApi(id, { goodsReceiptId })
     return mapApiPurchaseReturnToDomain(res.data)
@@ -4080,7 +3697,6 @@ export async function linkReplacementGrnToReturn(
 }
 
 export async function cancelPurchaseReturn(id: string, remarks = 'Cancelled'): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.cancelPurchaseReturn(id, remarks)
   try {
     const res = await returnApi.cancelPurchaseReturnApi(id, remarks ? { remarks } : {})
     return mapApiPurchaseReturnToDomain(res.data)
@@ -4089,19 +3705,16 @@ export async function cancelPurchaseReturn(id: string, remarks = 'Cancelled'): P
   }
 }
 
-export async function createDebitNoteFromReturn(id: string): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.createDebitNoteFromReturn(id)
+export async function createDebitNoteFromReturn(_id: string): Promise<PurchaseReturn> {
   notSupportedInApiMode('Debit note from return')
 }
 
-export async function createReplacementPoFromReturn(id: string): Promise<PurchaseReturn> {
-  if (!isApiMode()) return demo.createReplacementPoFromReturn(id)
+export async function createReplacementPoFromReturn(_id: string): Promise<PurchaseReturn> {
   notSupportedInApiMode('Replacement PO from return')
 }
 
-/* ─── Shared helpers (approval history remains demo-only until timeline covers returns/invoices) ─── */
+/* ─── Shared helpers (approval history is not covered by the live timeline API for returns/invoices yet) ─── */
 
-export async function getApprovalHistory(documentId?: string) {
-  if (!isApiMode()) return demo.getApprovalHistory(documentId)
+export async function getApprovalHistory(_documentId?: string) {
   return []
 }

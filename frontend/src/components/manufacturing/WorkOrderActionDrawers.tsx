@@ -27,7 +27,7 @@ function SummaryField({ label, value }: { label: string; value: React.ReactNode 
   return (
     <div>
       <div className="text-[11px] font-medium uppercase tracking-wide text-erp-muted">{label}</div>
-      <div className="mt-0.5 text-[15px] font-medium text-erp-text md:text-[13px]">{value ?? '—'}</div>
+      <div className="mt-0.5 text-[15px] font-medium text-erp-text md:text-[13px]">{value ?? '-'}</div>
     </div>
   )
 }

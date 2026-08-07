@@ -172,7 +172,7 @@ export function PayableReconciliationRunDetailPage() {
               <BalanceTable
                 rows={accounts.map((a) => ({
                   key: a.id,
-                  label: `${a.accountCode ?? '—'} — ${a.accountName ?? 'Account'}`,
+                  label: `${a.accountCode ?? '-'} — ${a.accountName ?? 'Account'}`,
                   subledger: a.subledgerBalance,
                   gl: a.glBalance,
                   variance: a.variance,
@@ -191,7 +191,7 @@ export function PayableReconciliationRunDetailPage() {
                 <BalanceTable
                   rows={vendors.map((v) => ({
                     key: v.vendorId,
-                    label: `${v.vendorCode ?? '—'} — ${v.vendorName ?? 'Vendor'}`,
+                    label: `${v.vendorCode ?? '-'} — ${v.vendorName ?? 'Vendor'}`,
                     subledger: v.subledgerBalance,
                     gl: v.glBalance,
                     variance: v.variance,

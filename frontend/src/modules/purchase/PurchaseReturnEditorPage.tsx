@@ -1196,7 +1196,7 @@ export function PurchaseReturnEditorPage() {
                             key={c.goodsReceiptLineId!}
                             value={c.goodsReceiptLineId!}
                           >
-                            {(c.itemCode || '—') + ' — ' + (c.itemName || 'Item')}
+                            {(c.itemCode || '-') + ' — ' + (c.itemName || 'Item')}
                             {` · avail ${c.availableReturnQty}`}
                           </option>
                         ))}

@@ -81,7 +81,7 @@ function inspectionStatusTone(status: QcInspection['status']): 'success' | 'dang
 
 function computeVendorQualityRating(inspections: QcInspection[]): string {
   const incoming = inspections.filter((i) => i.category === 'incoming' && i.status !== 'pending')
-  if (incoming.length === 0) return '—'
+  if (incoming.length === 0) return '-'
   const passed = incoming.filter((i) => i.status === 'pass').length
   return `${Math.round((passed / incoming.length) * 100)}%`
 }
@@ -239,13 +239,13 @@ export function QcQueuePage() {
     setSelectedRowId(inspection.id)
     openDetailPanel({
       title: inspection.inspectionNo,
-      subtitle: `${inspection.woNo ?? '—'} · ${inspection.operationName}`,
+      subtitle: `${inspection.woNo ?? '-'} · ${inspection.operationName}`,
       fields: [
-        { label: 'Work Order', value: inspection.woNo ?? '—' },
+        { label: 'Work Order', value: inspection.woNo ?? '-' },
         { label: 'Operation', value: inspection.operationName },
         { label: 'Type', value: inspection.inspectionType },
         { label: 'Status', value: inspection.isReinspection && inspection.status === 'pending' ? 'Re-inspection' : formatStatus(inspection.status) },
-        { label: 'Inspector', value: inspection.inspector ?? '—' },
+        { label: 'Inspector', value: inspection.inspector ?? '-' },
       ],
       links: [{ label: 'Open Inspection', href: `/quality/inspections/${inspection.id}` }],
       timeline: [{ id: 'current', label: formatStatus(inspection.status), time: formatDate(inspection.createdAt.slice(0, 10)), status: 'current' }],
@@ -278,7 +278,7 @@ export function QcQueuePage() {
     {
       accessorKey: 'inspector',
       header: 'Inspector',
-      cell: ({ row }) => row.original.inspector ?? '—',
+      cell: ({ row }) => row.original.inspector ?? '-',
     },
   ]
 
@@ -391,9 +391,9 @@ function IncomingQcDetail({
     <>
       <DetailSection title="Incoming Material Context">
         <DetailGrid>
-          <DetailField label="GRN" value={inspection.grnNo ?? '—'} />
-          <DetailField label="PO" value={inspection.poId ? inspection.poId : '—'} />
-          <DetailField label="Item" value={inspection.itemCode ?? '—'} />
+          <DetailField label="GRN" value={inspection.grnNo ?? '-'} />
+          <DetailField label="PO" value={inspection.poId ? inspection.poId : '-'} />
+          <DetailField label="Item" value={inspection.itemCode ?? '-'} />
           <DetailField label="Total Received" value={String(totalReceived)} />
         </DetailGrid>
       </DetailSection>
@@ -482,10 +482,10 @@ function FinalQcDetail({
     <>
       <DetailSection title="Final FG QC Context">
         <DetailGrid>
-          <DetailField label="Work Order" value={inspection.woNo ?? '—'} />
-          <DetailField label="Item" value={inspection.itemCode ?? '—'} />
+          <DetailField label="Work Order" value={inspection.woNo ?? '-'} />
+          <DetailField label="Item" value={inspection.itemCode ?? '-'} />
           <DetailField label="Inspection Type" value={inspection.inspectionType} />
-          <DetailField label="Plan" value={inspection.planId ?? '—'} />
+          <DetailField label="Plan" value={inspection.planId ?? '-'} />
         </DetailGrid>
         {planMissing && !decided && (
           <QcPlanMissingBlocker
@@ -649,10 +649,10 @@ export function QcInspectionDetailPage() {
           <>
         <DetailSection title="Work Order Context">
           <DetailGrid>
-            <DetailField label="Work Order" value={inspection.woNo ?? '—'} />
+            <DetailField label="Work Order" value={inspection.woNo ?? '-'} />
             <DetailField label="Operation" value={`Seq ${inspection.sequenceNo} — ${inspection.operationName}`} />
             <DetailField label="Inspection Type" value={inspection.inspectionType} />
-            <DetailField label="Job Card" value={inspection.jobCardId ?? '—'} />
+            <DetailField label="Job Card" value={inspection.jobCardId ?? '-'} />
             {inspection.isReinspection && <DetailField label="Type" value="Re-inspection after rework" />}
           </DetailGrid>
         </DetailSection>
@@ -692,7 +692,7 @@ export function QcInspectionDetailPage() {
             />
             {!decided && parameterResults.length > 0 && (
               <p className="mt-2 text-[12px] text-erp-muted">
-                Auto decision: {validateQcSubmission(parameterResults).autoDecision?.toUpperCase() ?? '—'}
+                Auto decision: {validateQcSubmission(parameterResults).autoDecision?.toUpperCase() ?? '-'}
               </p>
             )}
           </DetailSection>
@@ -818,9 +818,9 @@ export function QcInspectionDetailPage() {
           <DetailSection title="Decision Record">
             <DetailGrid>
               <DetailField label="Result" value={formatStatus(inspection.status)} />
-              <DetailField label="Inspector" value={inspection.inspector ?? '—'} />
-              <DetailField label="Date" value={inspection.inspectionDate ? formatDate(inspection.inspectionDate) : '—'} />
-              <DetailField label="Remarks" value={inspection.remarks || '—'} />
+              <DetailField label="Inspector" value={inspection.inspector ?? '-'} />
+              <DetailField label="Date" value={inspection.inspectionDate ? formatDate(inspection.inspectionDate) : '-'} />
+              <DetailField label="Remarks" value={inspection.remarks || '-'} />
               {inspection.acceptedQty != null && (
                 <DetailField label="Accepted Qty" value={String(inspection.acceptedQty)} />
               )}
@@ -895,7 +895,7 @@ export function ReworkWorkbenchPage() {
       accessorKey: 'estimatedHours',
       header: 'Est / Act Hrs',
       cell: ({ row }) =>
-        `${row.original.estimatedHours} / ${row.original.actualHours ?? '—'}`,
+        `${row.original.estimatedHours} / ${row.original.actualHours ?? '-'}`,
     },
   ]
 
@@ -1032,7 +1032,7 @@ export function NcrRegisterPage() {
       title: ncr.ncrNo,
       subtitle: ncr.defectDescription,
       fields: [
-        { label: 'Work Order', value: ncr.woNo ?? '—' },
+        { label: 'Work Order', value: ncr.woNo ?? '-' },
         { label: 'Item', value: ncr.itemCode },
         { label: 'Operation', value: ncr.operationName },
         { label: 'Severity', value: formatStatus(ncr.severity) },

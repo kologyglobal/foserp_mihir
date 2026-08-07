@@ -128,19 +128,19 @@ export function BomDetailPage() {
   const uomLabel = useCallback(
     (id: string, code?: string | null) => {
       if (code) return code
-      return uoms.find((u) => u.id === id)?.label?.split('—')[0]?.trim() ?? '—'
+      return uoms.find((u) => u.id === id)?.label?.split('-')[0]?.trim() ?? '-'
     },
     [uoms],
   )
 
   const productLabel = useCallback((row: Bom) => {
     if (row.productItemCode && row.productItemName) return `${row.productItemCode} — ${row.productItemName}`
-    return row.productItemCode || row.productItemName || '—'
+    return row.productItemCode || row.productItemName || '-'
   }, [])
 
   const lineLabel = useCallback((node: BomTreeNode) => {
     if (node.itemCode && node.itemName) return `${node.itemCode} — ${node.itemName}`
-    return node.itemName || node.itemCode || '—'
+    return node.itemName || node.itemCode || '-'
   }, [])
 
   const loadTree = useCallback(async (versionId: string) => {
@@ -532,7 +532,7 @@ export function BomDetailPage() {
                       const TypeIcon = meta.icon
                       const outline = outlineIndexById.get(node.id) ?? String(node.sequence)
                       const description = bomLineDescription(node)
-                      const drawingSpec = [node.drawingReference, node.specification].filter(Boolean).join(' · ') || '—'
+                      const drawingSpec = [node.drawingReference, node.specification].filter(Boolean).join(' · ') || '-'
                       const isAssembly = node.lineType === 'SUBASSEMBLY' || node.lineType === 'MANUFACTURED_COMPONENT'
                       return (
                         <tr
@@ -572,7 +572,7 @@ export function BomDetailPage() {
                                     {node.itemName ?? lineLabel(node)}
                                   </span>
                                   <span className="block font-mono text-[10px] leading-tight text-erp-muted">
-                                    {node.itemCode ?? '—'}
+                                    {node.itemCode ?? '-'}
                                     {hasChildren ? ` · ${node.children.length} sub` : ''}
                                   </span>
                                 </span>
@@ -608,7 +608,7 @@ export function BomDetailPage() {
                             <span className="text-[11px] text-erp-muted">{uomLabel(node.uomId, node.uomCode)}</span>
                           </td>
                           <td className="px-3 py-1.5 text-right tabular-nums text-erp-muted">
-                            {Number(node.scrapPercent) > 0 ? `${formatQty(node.scrapPercent)}%` : '—'}
+                            {Number(node.scrapPercent) > 0 ? `${formatQty(node.scrapPercent)}%` : '-'}
                           </td>
                           <td className="px-3 py-1.5">
                             <div className="flex flex-wrap gap-1">

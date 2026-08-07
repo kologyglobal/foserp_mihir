@@ -226,8 +226,8 @@ export function VendorPaymentAllocatePage() {
               {items.map((item) => (
                 <tr key={item.openItemId} className="border-b border-erp-border/60">
                   <td className="py-2 pr-3 font-medium">{item.documentNumber}</td>
-                  <td className="py-2 pr-3">{item.supplierInvoiceNumber ?? '—'}</td>
-                  <td className="py-2 pr-3 tabular-nums">{item.dueDate ?? '—'}</td>
+                  <td className="py-2 pr-3">{item.supplierInvoiceNumber ?? '-'}</td>
+                  <td className="py-2 pr-3 tabular-nums">{item.dueDate ?? '-'}</td>
                   <td className="py-2 pr-3 text-right tabular-nums">
                     {formatCurrency(parseDecimal(item.outstandingAmount))}
                   </td>

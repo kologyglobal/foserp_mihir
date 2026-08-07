@@ -1364,7 +1364,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                     </FormField>
                     <FormField label="Currency">
                       <div className="erp-input flex min-h-[34px] items-center bg-erp-surface-alt/70 text-erp-text">
-                        {selectedPo.currencyCode || '—'}
+                        {selectedPo.currencyCode || '-'}
                       </div>
                     </FormField>
                   </div>
@@ -1373,12 +1373,12 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   <div className="mi-create-source-row">
                     <FormField label="GRN date">
                       <div className="erp-input flex min-h-[34px] items-center bg-erp-surface-alt/70 text-erp-text">
-                        {selectedGrn.receiptDate || '—'}
+                        {selectedGrn.receiptDate || '-'}
                       </div>
                     </FormField>
                     <FormField label="PO">
                       <div className="erp-input flex min-h-[34px] items-center bg-erp-surface-alt/70 text-erp-text">
-                        {selectedGrn.purchaseOrderNumber || '—'}
+                        {selectedGrn.purchaseOrderNumber || '-'}
                       </div>
                     </FormField>
                   </div>
@@ -1444,13 +1444,13 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   <div className="mi-create-party__chips">
                     <span className="mi-create-party__chip">
                       <span className="mi-create-party__chip-label">GSTIN</span>
-                      {selectedVendor.gstin || '—'}
+                      {selectedVendor.gstin || '-'}
                     </span>
                     <span className="mi-create-party__chip">
                       <span className="mi-create-party__chip-label">Place of supply</span>
                       {watched.placeOfSupply
                         ? formatPlaceOfSupplyLabel(watched.placeOfSupply)
-                        : '—'}
+                        : '-'}
                     </span>
                     {selectedVendor.paymentTermsDays != null ? (
                       <span className="mi-create-party__chip">
@@ -1895,7 +1895,7 @@ export function VendorInvoiceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   <>
                     <p className="vi-create-source-card__title">{selectedGrn.grnNumber}</p>
                     <p className="vi-create-source-card__meta">
-                      {selectedGrn.receiptDate || '—'}
+                      {selectedGrn.receiptDate || '-'}
                       {selectedGrn.purchaseOrderNumber
                         ? ` · PO ${selectedGrn.purchaseOrderNumber}`
                         : ''}

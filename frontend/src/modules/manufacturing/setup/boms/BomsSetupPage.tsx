@@ -382,7 +382,7 @@ export function BomsSetupPage() {
                                 : 'Component lines on the active revision (or latest if none active)'
                             }
                           >
-                            {itemCount == null ? '—' : itemCount}
+                            {itemCount == null ? '-' : itemCount}
                           </td>
                           <td className="px-4 py-2.5">
                             {latest ? (

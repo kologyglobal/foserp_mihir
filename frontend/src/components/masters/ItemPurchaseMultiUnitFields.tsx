@@ -22,7 +22,7 @@ export function ItemPurchaseMultiUnitFields({
   onConversionFactorChange,
   conversionError,
 }: Props) {
-  const dualUom = Boolean(purchaseUomId && baseUomCode !== '—' && purchaseUomCode && purchaseUomCode !== baseUomCode)
+  const dualUom = Boolean(purchaseUomId && baseUomCode !== '-' && purchaseUomCode && purchaseUomCode !== baseUomCode)
   const factor = uomConversionFactor > 0 ? uomConversionFactor : 1
 
   return (

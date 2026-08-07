@@ -117,7 +117,7 @@ export function PoAmendFormPage() {
 
   const statusStrip: ErpCardFormStatusItem[] = [
     { label: 'PO No', value: po.poNo, tone: 'neutral' },
-    { label: 'Vendor', value: vendor?.vendorName ?? '—', tone: 'neutral' },
+    { label: 'Vendor', value: vendor?.vendorName ?? '-', tone: 'neutral' },
     { label: 'Current Rev', value: String(po.revisionNo), tone: 'info' },
     { label: 'New Rev', value: String(nextRev), tone: 'warning' },
     { label: 'Lines', value: String(lines.length), tone: 'neutral' },
@@ -162,7 +162,7 @@ export function PoAmendFormPage() {
       ]}
       summary={[
         { label: 'PO', value: po.poNo },
-        { label: 'Vendor', value: vendor?.vendorName ?? '—' },
+        { label: 'Vendor', value: vendor?.vendorName ?? '-' },
         { label: 'Current Rev', value: po.revisionNo },
         { label: 'New Rev', value: nextRev, highlight: true },
         { label: 'Lines', value: lines.length },

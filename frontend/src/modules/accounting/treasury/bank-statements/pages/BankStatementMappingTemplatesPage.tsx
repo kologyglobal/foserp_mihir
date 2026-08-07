@@ -89,7 +89,7 @@ export function BankStatementMappingTemplatesPage() {
                 <tr key={row.id} className="border-t border-erp-border">
                   <td className="px-2 py-1.5 font-semibold">{row.name}</td>
                   <td className="px-2 py-1.5">{row.importFormat}</td>
-                  <td className="px-2 py-1.5">{row.isDefault ? 'Yes' : '—'}</td>
+                  <td className="px-2 py-1.5">{row.isDefault ? 'Yes' : '-'}</td>
                   <td className="px-2 py-1.5">
                     <ErpStatusChip tone={row.isActive ? 'success' : 'neutral'} label={row.isActive ? 'Active' : 'Inactive'} />
                   </td>

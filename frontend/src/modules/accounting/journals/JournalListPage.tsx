@@ -239,7 +239,7 @@ export function JournalListPage() {
                   </td>
                   <td className="text-right tabular-nums">{row.totalDebit}</td>
                   <td className="text-right tabular-nums">{row.totalCredit}</td>
-                  <td className="max-w-[280px] truncate text-erp-muted">{row.narration ?? '—'}</td>
+                  <td className="max-w-[280px] truncate text-erp-muted">{row.narration ?? '-'}</td>
                   <td>
                     {row.status === 'APPROVED' && !row.voucherNumber && perms.canPostVoucher ? (
                       <button
@@ -251,7 +251,7 @@ export function JournalListPage() {
                         {postingId === row.id ? 'Posting…' : 'Post'}
                       </button>
                     ) : (
-                      <span className="text-erp-muted">—</span>
+                      <span className="text-erp-muted">-</span>
                     )}
                   </td>
                 </tr>

@@ -139,7 +139,7 @@ export function MaintenanceTicketsPage() {
                       to={`/maintenance/machines/${row.machineId}/history`}
                       className="text-erp-primary hover:underline"
                     >
-                      {row.machine?.code ?? '—'}
+                      {row.machine?.code ?? '-'}
                     </Link>
                   </td>
                   <td className="max-w-[280px] truncate px-3 py-2" title={row.problem}>
@@ -149,7 +149,7 @@ export function MaintenanceTicketsPage() {
                   <td className="px-3 py-2">
                     <StatusDot label={formatStatusLabel(row.status)} tone={maintenanceStatusTone(row.status)} />
                   </td>
-                  <td className="px-3 py-2 tabular-nums">{row.downtimeLabel ?? '—'}</td>
+                  <td className="px-3 py-2 tabular-nums">{row.downtimeLabel ?? '-'}</td>
                   {perms.canViewCost ? (
                     <td className="px-3 py-2 text-right tabular-nums">{formatInr(row.totalCost)}</td>
                   ) : null}

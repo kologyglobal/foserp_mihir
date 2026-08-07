@@ -121,7 +121,7 @@ export function derivePurchaseVendorDemoInsights(
   }
 }
 
-function dash(value: string | number | null | undefined, empty = '—') {
+function dash(value: string | number | null | undefined, empty = '-') {
   if (value == null || value === '') return empty
   return value
 }
@@ -167,7 +167,7 @@ export function PurchaseDocumentFactBox({
   const modified =
     documentStatus.modifiedBy || documentStatus.modifiedDate
       ? [documentStatus.modifiedBy, documentStatus.modifiedDate].filter(Boolean).join(' · ')
-      : '—'
+      : '-'
 
   const vendorFields = vendor?.id || vendor?.name
     ? [
@@ -175,48 +175,48 @@ export function PurchaseDocumentFactBox({
           label: 'Vendor',
           value: vendor.code ? `${vendor.code} — ${vendor.name ?? ''}` : dash(vendor.name),
         },
-        { label: 'Rating', value: rating != null ? `${rating} / 5` : '—' },
+        { label: 'Rating', value: rating != null ? `${rating} / 5` : '-' },
         {
           label: 'Outstanding',
-          value: outstanding != null ? formatCurrency(outstanding) : '—',
+          value: outstanding != null ? formatCurrency(outstanding) : '-',
         },
         {
           label: 'Credit Limit',
-          value: creditLimit != null ? formatCurrency(creditLimit) : '—',
+          value: creditLimit != null ? formatCurrency(creditLimit) : '-',
         },
         { label: 'Payment Terms', value: dash(paymentTerms) },
         {
           label: 'Last Purchase',
-          value: lastPurchaseDate ? formatDate(lastPurchaseDate) : '—',
+          value: lastPurchaseDate ? formatDate(lastPurchaseDate) : '-',
         },
         {
           label: 'Last Purchase Value',
-          value: lastPurchaseValue != null ? formatCurrency(lastPurchaseValue) : '—',
+          value: lastPurchaseValue != null ? formatCurrency(lastPurchaseValue) : '-',
         },
       ]
     : [
         { label: 'Vendor', value: 'Not selected' },
-        { label: 'Rating', value: '—' },
-        { label: 'Outstanding', value: '—' },
-        { label: 'Credit Limit', value: '—' },
-        { label: 'Payment Terms', value: '—' },
-        { label: 'Last Purchase', value: '—' },
-        { label: 'Last Purchase Value', value: '—' },
+        { label: 'Rating', value: '-' },
+        { label: 'Outstanding', value: '-' },
+        { label: 'Credit Limit', value: '-' },
+        { label: 'Payment Terms', value: '-' },
+        { label: 'Last Purchase', value: '-' },
+        { label: 'Last Purchase Value', value: '-' },
       ]
 
   const historyFields = [
     {
       label: 'Last Purchase Price',
-      value: lastPrice != null ? formatCurrency(lastPrice) : '—',
+      value: lastPrice != null ? formatCurrency(lastPrice) : '-',
     },
     { label: 'Last Vendor', value: dash(lastVendor) },
     {
       label: 'Avg Lead Time',
-      value: avgLead != null ? `${avgLead} days` : '—',
+      value: avgLead != null ? `${avgLead} days` : '-',
     },
     {
       label: 'Prev. Rejection Rate',
-      value: rejection != null ? `${rejection}%` : '—',
+      value: rejection != null ? `${rejection}%` : '-',
     },
   ]
 
@@ -351,10 +351,10 @@ export function purchaseDocumentApprovalFact(
     }
   }
   if (s.includes('draft') || s === 'new') {
-    return { currentApprover: '—', approvalLevel: 'Not submitted' }
+    return { currentApprover: '-', approvalLevel: 'Not submitted' }
   }
   if (approverName) {
     return { currentApprover: approverName, approvalLevel: 'Complete' }
   }
-  return { currentApprover: '—', approvalLevel: '—' }
+  return { currentApprover: '-', approvalLevel: '-' }
 }

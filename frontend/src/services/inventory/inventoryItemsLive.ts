@@ -78,9 +78,9 @@ function emptyItemDefaults(partial: Partial<InventoryItem> & Pick<InventoryItem,
   return {
     itemType: 'raw_material',
     categoryId: '',
-    categoryName: '—',
+    categoryName: '-',
     baseUomId: '',
-    baseUomCode: '—',
+    baseUomCode: '-',
     defaultWarehouseId: null,
     defaultWarehouseName: null,
     status: 'active',
@@ -148,15 +148,20 @@ function dtoToInventoryItem(
   const reorderLevel = num(dto.reorderLevel)
   const reorderQty = num(dto.reorderQty)
   const standardCost = num(dto.standardRate)
+  const altUomId = dto.purchaseUomId
+  const altFactor = num(dto.uomConversionFactor ?? dto.purchaseQtyPerUom)
+  const hasAltUom = Boolean(altUomId) && altUomId !== dto.baseUomId && altFactor > 0 && altFactor !== 1
   return emptyItemDefaults({
     id: dto.id,
     itemCode: dto.code,
     itemName: dto.name,
     itemType: mapMasterItemType(dto.itemType),
     categoryId: dto.categoryId,
-    categoryName: lookups.categories.get(dto.categoryId) ?? '—',
+    categoryName: lookups.categories.get(dto.categoryId) ?? '-',
     baseUomId: dto.baseUomId,
-    baseUomCode: lookups.uoms.get(dto.baseUomId) ?? '—',
+    baseUomCode: lookups.uoms.get(dto.baseUomId) ?? '-',
+    alternateUomCode: hasAltUom ? lookups.uoms.get(altUomId as string) ?? null : null,
+    alternateUomFactor: hasAltUom ? altFactor : null,
     status: mapStatus(dto),
     isInventoryItem: dto.isStockable,
     reorderLevel,
@@ -226,7 +231,7 @@ export async function getLiveStockDetails(itemId: string): Promise<StockDetailsD
   const warehouses = balances.map((b) => ({
     warehouseId: b.warehouseId,
     warehouseCode: b.warehouse?.code ?? b.warehouseId.slice(0, 8),
-    warehouseName: b.warehouse?.name ?? '—',
+    warehouseName: b.warehouse?.name ?? '-',
     onHand: num(b.onHandQty),
     qualityHold: 0,
     blocked: 0,
@@ -264,7 +269,7 @@ export async function getLiveStockDetails(itemId: string): Promise<StockDetailsD
       itemId: r.itemId,
       itemCode: r.item?.code ?? item.itemCode,
       warehouseId: r.warehouseId,
-      warehouseName: r.warehouse?.name ?? warehouses.find((w) => w.warehouseId === r.warehouseId)?.warehouseName ?? '—',
+      warehouseName: r.warehouse?.name ?? warehouses.find((w) => w.warehouseId === r.warehouseId)?.warehouseName ?? '-',
       qty: num(r.remainingQty),
       demandType: (r.demandType === 'WO' ? 'WO' : 'SO') as 'SO' | 'WO',
       referenceNo: r.referenceNo ?? r.demandId,
@@ -279,7 +284,7 @@ export async function getLiveStockDetails(itemId: string): Promise<StockDetailsD
       type: m.movementType,
       qty: num(m.quantity),
       date: m.movementDate,
-      warehouseName: m.warehouse?.name ?? '—',
+      warehouseName: m.warehouse?.name ?? '-',
     })),
     valuation: {
       standardCost: item.standardCost,

@@ -245,7 +245,7 @@ export function VendorInvoiceListPage() {
                         </Link>
                       </td>
                       <td className="py-2 pr-3 tabular-nums">{inv.supplierInvoiceDate}</td>
-                      <td className="py-2 pr-3 tabular-nums">{inv.dueDate ?? '—'}</td>
+                      <td className="py-2 pr-3 tabular-nums">{inv.dueDate ?? '-'}</td>
                       <td className="py-2 pr-3">{inv.invoiceType}</td>
                       <td className="py-2 pr-3">
                         <ErpStatusChip

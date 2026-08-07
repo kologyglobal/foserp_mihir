@@ -67,7 +67,7 @@ export function ReceivingToleranceListPage() {
     { accessorKey: 'code', header: 'Code', cell: ({ row }) => <span className="font-mono text-xs font-semibold">{row.original.code}</span> },
     { accessorKey: 'name', header: 'Name' },
     { accessorKey: 'percentage', header: 'Excess %', cell: ({ row }) => `${row.original.percentage}%` },
-    { id: 'system', header: 'System', cell: ({ row }) => (row.original.isSystem ? 'Yes' : '—') },
+    { id: 'system', header: 'System', cell: ({ row }) => (row.original.isSystem ? 'Yes' : '-') },
     { accessorKey: 'isActive', header: 'Status', cell: ({ row }) => <ActiveBadge isActive={row.original.isActive} /> },
     {
       id: 'actions',
@@ -194,8 +194,8 @@ export function ReceivingToleranceFormPage() {
       breadcrumbs={buildMasterBreadcrumbs('inventory', isEdit ? 'Edit tolerance' : 'New tolerance')}
       validationErrors={validationErrors}
       documentStrip={[
-        { label: 'Code', value: watched.code?.trim() || '—', highlight: Boolean(watched.code?.trim()) },
-        { label: 'Excess %', value: watched.percentage != null ? `${watched.percentage}%` : '—' },
+        { label: 'Code', value: watched.code?.trim() || '-', highlight: Boolean(watched.code?.trim()) },
+        { label: 'Excess %', value: watched.percentage != null ? `${watched.percentage}%` : '-' },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
       ]}
       commandBar={
@@ -264,7 +264,7 @@ export function ReceivingToleranceDetailPage() {
           <DetailField label="Excess %" value={`${row.percentage}%`} />
           <DetailField label="System" value={row.isSystem ? 'Yes' : 'No'} />
           <DetailField label="Status" value={<ActiveBadge isActive={row.isActive} />} />
-          <DetailField label="Description" value={row.description || '—'} />
+          <DetailField label="Description" value={row.description || '-'} />
           <DetailField label="Created" value={formatDate(row.createdAt)} />
           <DetailField label="Updated" value={formatDate(row.updatedAt)} />
         </DetailGrid>

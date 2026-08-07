@@ -116,7 +116,7 @@ export function GstRateOpsPage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">Ops score</h2>
             <p className="mt-1 text-xs text-erp-muted">
-              Overall: {health?.overall ?? '—'} · Score: {health?.scorePct ?? '—'}% · Full GST compliant? No
+              Overall: {health?.overall ?? '-'} · Score: {health?.scorePct ?? '-'}% · Full GST compliant? No
               (honest) · Mode: {perms.isApiMode ? 'API' : 'Demo'}
             </p>
             <p className="mt-2 text-xs text-erp-muted">{health?.disclaimer}</p>
@@ -125,7 +125,7 @@ export function GstRateOpsPage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">Coverage</h2>
             <p className="mt-1 text-xs text-erp-muted">
-              As-of {coverage?.asOfDate ?? '—'} · Active groups {coverage?.activeGroupCount ?? 0} · Active rates{' '}
+              As-of {coverage?.asOfDate ?? '-'} · Active groups {coverage?.activeGroupCount ?? 0} · Active rates{' '}
               {coverage?.activeRateCount ?? 0}
             </p>
             <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">

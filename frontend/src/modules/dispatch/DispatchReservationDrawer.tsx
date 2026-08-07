@@ -205,7 +205,7 @@ export function DispatchReservationDrawer({ open, onClose, dispatchId, onReserve
                 </label>
                 {preview ? (
                   <p className={`text-xs ${preview.ok ? 'text-green-700' : 'text-red-600'}`}>
-                    Available {preview.allowedQty ?? '—'} · {preview.message}
+                    Available {preview.allowedQty ?? '-'} · {preview.message}
                   </p>
                 ) : null}
               </div>

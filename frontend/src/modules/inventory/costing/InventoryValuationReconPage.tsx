@@ -9,7 +9,6 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/forms/Inputs'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
-import { isApiMode } from '@/config/apiConfig'
 import {
   fetchValuationReconciliation,
   runValuationReconciliation,
@@ -18,10 +17,9 @@ import {
 import { formatCurrency } from '@/utils/formatters/currency'
 import { InventoryCostingShell } from './InventoryCostingShell'
 import { inventoryCostingPaths } from './inventoryCostingPaths'
-import { DEMO_RECON, methodLabel } from './costingDemoData'
+import { methodLabel } from './costingDemoData'
 
 export function InventoryValuationReconPage() {
-  const api = isApiMode()
   const [data, setData] = useState<ValuationReconciliationDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -33,10 +31,6 @@ export function InventoryValuationReconPage() {
     setLoading(true)
     setError(null)
     try {
-      if (!api) {
-        setData(DEMO_RECON)
-        return
-      }
       const res = await fetchValuationReconciliation({ mismatchesOnly })
       setData(res.data)
     } catch (e) {
@@ -44,13 +38,9 @@ export function InventoryValuationReconPage() {
     } finally {
       setLoading(false)
     }
-  }, [api, mismatchesOnly])
+  }, [mismatchesOnly])
 
   const runRecon = useCallback(async () => {
-    if (!api) {
-      setError('Run Reconciliation requires API mode')
-      return
-    }
     setBusy(true)
     setError(null)
     try {
@@ -61,7 +51,7 @@ export function InventoryValuationReconPage() {
     } finally {
       setBusy(false)
     }
-  }, [api, mismatchesOnly])
+  }, [mismatchesOnly])
 
   useEffect(() => {
     void load()
@@ -222,7 +212,7 @@ export function InventoryValuationReconPage() {
                     {formatCurrency(Number(r.valueDifference))}
                   </td>
                   <td className="max-w-[200px] text-[11px] text-erp-muted">
-                    {(r.reasonCodes ?? []).map(reasonLabel).join('; ') || '—'}
+                    {(r.reasonCodes ?? []).map(reasonLabel).join('; ') || '-'}
                   </td>
                   <td className="text-right">
                     <Link

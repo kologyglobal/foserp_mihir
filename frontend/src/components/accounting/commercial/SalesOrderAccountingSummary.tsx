@@ -143,7 +143,7 @@ export function SalesOrderAccountingSummary({
               <dd className="font-medium">
                 {money.nextPaymentDueDate
                   ? `${formatDate(money.nextPaymentDueDate)} · ${formatCurrency(money.nextPaymentDueAmount ?? 0)}`
-                  : '—'}
+                  : '-'}
               </dd>
             </div>
           </>

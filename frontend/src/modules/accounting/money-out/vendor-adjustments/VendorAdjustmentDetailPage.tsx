@@ -458,7 +458,7 @@ export function VendorAdjustmentDetailPage() {
                   {adjustment.accountingVoucherNumber}
                 </Link>
               ) : (
-                '—'
+                '-'
               )}
             </dd>
           </div>

@@ -18,8 +18,10 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import {
   getStoreDashboard,
+  getStoreTotals,
   type StoreDashKpi,
   type StoreDashboardData,
+  type StoreTotals,
 } from '@/services/inventory/storeOperationsService'
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate, formatDateTime } from '@/utils/dates/format'
@@ -68,6 +70,8 @@ export function StoreDashboardPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<StoreDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [totals, setTotals] = useState<StoreTotals | null>(null)
+  const [totalsLoading, setTotalsLoading] = useState(true)
   const [token, setToken] = useState(0)
 
   const load = useCallback(async () => {
@@ -85,6 +89,27 @@ export function StoreDashboardPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Total Items / Total Stock Qty aggregate the full item × warehouse register —
+  // heavier than the needs-action queue, so it loads independently and never
+  // blocks the primary KPI / queue render above.
+  useEffect(() => {
+    let cancelled = false
+    setTotalsLoading(true)
+    getStoreTotals()
+      .then((t) => {
+        if (!cancelled) setTotals(t)
+      })
+      .catch(() => {
+        if (!cancelled) setTotals(null)
+      })
+      .finally(() => {
+        if (!cancelled) setTotalsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token])
 
   const kpiStrip: EnterpriseKpiItem[] | undefined = useMemo(() => {
     if (!data) return undefined
@@ -116,6 +141,29 @@ export function StoreDashboardPage() {
 
       {!loading && data ? (
         <div className="inv-hub">
+          <div className="store-kpi-grid" aria-label="Store totals">
+            <button
+              type="button"
+              className="store-kpi-card"
+              onClick={() => navigate('/inventory/stock')}
+            >
+              <span className="store-kpi-card__label">Total Items</span>
+              <span className="store-kpi-card__value">
+                {totalsLoading ? '-' : formatNumber(totals?.totalItems ?? 0)}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="store-kpi-card"
+              onClick={() => navigate('/inventory/stock')}
+            >
+              <span className="store-kpi-card__label">Total Stock Qty</span>
+              <span className="store-kpi-card__value">
+                {totalsLoading ? '-' : formatNumber(totals?.totalStockQty ?? 0)}
+              </span>
+            </button>
+          </div>
+
           <nav className="inv-hub-shortcuts" aria-label="Store modules">
             {MODULE_LINKS.map((q) => {
               const Icon = q.icon
@@ -198,7 +246,7 @@ export function StoreDashboardPage() {
                         <td className="inv-hub-table__strong">{row.title}</td>
                         <td className="inv-hub-table__muted inv-hub-table__clamp">{row.detail}</td>
                         <td className="inv-hub-table__num font-mono">
-                          {row.quantity != null && row.quantity !== '' ? row.quantity : '—'}
+                          {row.quantity != null && row.quantity !== '' ? row.quantity : '-'}
                         </td>
                         <td className="inv-hub-table__action">
                           {row.deepLink ? (
@@ -314,10 +362,10 @@ export function StoreDashboardPage() {
                         >
                           <td className="inv-hub-table__strong">{ev.title}</td>
                           <td className="inv-hub-table__muted inv-hub-table__clamp">
-                            {ev.subtitle ?? '—'}
+                            {ev.subtitle ?? '-'}
                           </td>
                           <td className="inv-hub-table__num font-mono">
-                            {ev.qty != null ? formatNumber(ev.qty) : '—'}
+                            {ev.qty != null ? formatNumber(ev.qty) : '-'}
                           </td>
                         </tr>
                       ))}

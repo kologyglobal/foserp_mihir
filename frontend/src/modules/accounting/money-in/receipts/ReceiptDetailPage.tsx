@@ -475,14 +475,14 @@ export function ReceiptDetailPage() {
                       {history.map((row) => (
                         <tr key={row.allocationId}>
                           <td className="tabular-nums">{row.allocationDate}</td>
-                          <td>{row.invoiceNumber ?? '—'}</td>
+                          <td>{row.invoiceNumber ?? '-'}</td>
                           <td className="mi-receipt-detail-history__num tabular-nums">
                             {formatCurrency(parseDecimal(row.allocatedAmount))}
                           </td>
                           <td className="mi-receipt-detail-history__num tabular-nums">
                             {row.invoiceOutstandingAfter
                               ? formatCurrency(parseDecimal(row.invoiceOutstandingAfter))
-                              : '—'}
+                              : '-'}
                           </td>
                           <td>{row.status}</td>
                           {perms.canReverseAllocation ? (
@@ -546,16 +546,16 @@ export function ReceiptDetailPage() {
               <dl className="mi-receipt-detail-meta-list">
                 <SideMeta label="Receipt date">{formatDate(receipt.receiptDate)}</SideMeta>
                 <SideMeta label="Posting date">
-                  {receipt.postingDate ? formatDate(receipt.postingDate) : '—'}
+                  {receipt.postingDate ? formatDate(receipt.postingDate) : '-'}
                 </SideMeta>
                 <SideMeta label="Payment method">
                   {CUSTOMER_RECEIPT_PAYMENT_METHOD_LABELS[receipt.paymentMethod]}
                 </SideMeta>
                 <SideMeta label="Currency">{receipt.currencyCode}</SideMeta>
-                <SideMeta label="Transaction ref">{receipt.transactionReference || '—'}</SideMeta>
+                <SideMeta label="Transaction ref">{receipt.transactionReference || '-'}</SideMeta>
                 {receipt.paymentMethod === 'CHEQUE' ? (
                   <SideMeta label="Cheque">
-                    {receipt.chequeNumber || '—'}
+                    {receipt.chequeNumber || '-'}
                     {receipt.chequeDate ? ` · ${formatDate(receipt.chequeDate)}` : ''}
                   </SideMeta>
                 ) : null}

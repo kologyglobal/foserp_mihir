@@ -24,7 +24,7 @@ describe('formatPoLineGstLabel', () => {
   })
 
   it('returns dash when rate is zero', () => {
-    expect(formatPoLineGstLabel({ gstRatePct: 0 }, false)).toBe('—')
+    expect(formatPoLineGstLabel({ gstRatePct: 0 }, false)).toBe('-')
   })
 })
 
@@ -45,7 +45,7 @@ describe('discount modes mapping', () => {
   it('formats display', () => {
     expect(formatPoDiscountDisplay({ discountPct: 5 })).toBe('5%')
     expect(formatPoDiscountDisplay({ discountAmount: 20 })).toBe('20')
-    expect(formatPoDiscountDisplay({})).toBe('—')
+    expect(formatPoDiscountDisplay({})).toBe('-')
   })
 })
 

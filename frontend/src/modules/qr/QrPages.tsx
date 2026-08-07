@@ -61,9 +61,9 @@ function MaterialLabel({ qr }: { qr: QrRecord }) {
           <p><span className="text-erp-muted">Item:</span> <strong>{m.itemCode}</strong></p>
           <p>{m.itemName}</p>
           <p><span className="text-erp-muted">Lot:</span> {m.lotNo ?? qr.displayCode}</p>
-          <p><span className="text-erp-muted">GRN:</span> {m.grnNo ?? '—'}</p>
-          <p><span className="text-erp-muted">Qty:</span> {m.qty ?? '—'}</p>
-          <p><span className="text-erp-muted">Warehouse:</span> {m.warehouseCode ?? '—'}</p>
+          <p><span className="text-erp-muted">GRN:</span> {m.grnNo ?? '-'}</p>
+          <p><span className="text-erp-muted">Qty:</span> {m.qty ?? '-'}</p>
+          <p><span className="text-erp-muted">Warehouse:</span> {m.warehouseCode ?? '-'}</p>
           <QrStatusBadge status={qr.status} />
         </div>
         <QrCodeBlock value={qr.qrCode} size={120} label={qr.displayCode} />
@@ -97,9 +97,9 @@ function TrailerLabel({ qr }: { qr: QrRecord }) {
       <div className="grid grid-cols-[1fr_auto] gap-4">
         <div className="space-y-1 text-sm">
           <p><strong>{m.trailerNo ?? qr.displayCode}</strong></p>
-          <p><span className="text-erp-muted">Chassis:</span> {m.chassisNo ?? '—'}</p>
+          <p><span className="text-erp-muted">Chassis:</span> {m.chassisNo ?? '-'}</p>
           <p><span className="text-erp-muted">WO:</span> {m.woNo}</p>
-          <p><span className="text-erp-muted">Customer:</span> {m.customerName ?? '—'}</p>
+          <p><span className="text-erp-muted">Customer:</span> {m.customerName ?? '-'}</p>
           <QrStatusBadge status={qr.status} />
         </div>
         <QrCodeBlock value={qr.qrCode} size={120} />
@@ -115,9 +115,9 @@ function JobWorkLabel({ qr }: { qr: QrRecord }) {
       <div className="grid grid-cols-[1fr_auto] gap-4">
         <div className="space-y-1 text-sm">
           <p><strong>{qr.displayCode}</strong></p>
-          <p><span className="text-erp-muted">Vendor:</span> {m.vendorName ?? '—'}</p>
+          <p><span className="text-erp-muted">Vendor:</span> {m.vendorName ?? '-'}</p>
           <p><span className="text-erp-muted">Item:</span> {m.itemCode}</p>
-          <p><span className="text-erp-muted">Qty:</span> {m.qty ?? '—'}</p>
+          <p><span className="text-erp-muted">Qty:</span> {m.qty ?? '-'}</p>
           <QrStatusBadge status={qr.status} />
         </div>
         <QrCodeBlock value={qr.qrCode} size={120} />
@@ -551,7 +551,7 @@ export function Traceability360Page() {
               { accessorKey: 'eventType', header: 'Event', cell: ({ row }) => QR_EVENT_LABELS[row.original.eventType] },
               { accessorKey: 'referenceNo', header: 'Reference' },
               { accessorKey: 'details', header: 'Details' },
-              { accessorKey: 'movementKind', header: 'Movement', cell: ({ row }) => row.original.movementKind ?? '—' },
+              { accessorKey: 'movementKind', header: 'Movement', cell: ({ row }) => row.original.movementKind ?? '-' },
             ]}
             compact
             emptyMessage="No timeline events."

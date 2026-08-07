@@ -82,7 +82,7 @@ function reconciliationTone(status: ReconciliationRow['status']): 'success' | 'w
 }
 
 function WorkOrderLink({ id, label }: { id: string | null; label?: string | null }) {
-  if (!id) return <span className="text-erp-muted">—</span>
+  if (!id) return <span className="text-erp-muted">-</span>
   return (
     <Link to={`/manufacturing/work-orders/${id}`} className="font-medium text-erp-primary hover:underline">
       {label ?? 'Open Work Order'}
@@ -138,7 +138,7 @@ function EventTable({
               </td>
               {showFailureReason ? (
                 <td className="max-w-64 truncate text-rose-800" title={event.failureReason ?? undefined}>
-                  {event.failureReason ?? '—'}
+                  {event.failureReason ?? '-'}
                 </td>
               ) : null}
               <td className="whitespace-nowrap">{formatDateTime(event.createdAt)}</td>
@@ -594,7 +594,7 @@ export function ManufacturingAccountingWorkspacePage() {
                     ok: enablePanel.readiness.enablementChecks?.openFinancialPeriodExists ?? false,
                     label: 'Open accounting period',
                     detail: enablePanel.readiness.openPeriod
-                      ? `${enablePanel.readiness.openPeriod.code} (${enablePanel.readiness.openPeriod.status}) · ${enablePanel.readiness.openPeriod.startDate} → ${enablePanel.readiness.openPeriod.endDate} · as of ${enablePanel.readiness.postingDateChecked ?? '—'}`
+                      ? `${enablePanel.readiness.openPeriod.code} (${enablePanel.readiness.openPeriod.status}) · ${enablePanel.readiness.openPeriod.startDate} → ${enablePanel.readiness.openPeriod.endDate} · as of ${enablePanel.readiness.postingDateChecked ?? '-'}`
                       : `No OPEN period covers ${enablePanel.readiness.postingDateChecked ?? 'today'}`,
                   },
                   {
@@ -660,8 +660,8 @@ export function ManufacturingAccountingWorkspacePage() {
                         <tr key={`${ex.eventId ?? ex.sourceDocument}-${idx}`} className="border-t border-rose-100">
                           <td className="px-2 py-1 whitespace-nowrap">{ex.reconciliationStatus}</td>
                           <td className="px-2 py-1 whitespace-nowrap">{ex.eventType ?? ex.sourceType}</td>
-                          <td className="px-2 py-1 whitespace-nowrap">{ex.workOrderNumber ?? '—'}</td>
-                          <td className="px-2 py-1">{ex.failureReason ?? ex.failureCode ?? '—'}</td>
+                          <td className="px-2 py-1 whitespace-nowrap">{ex.workOrderNumber ?? '-'}</td>
+                          <td className="px-2 py-1">{ex.failureReason ?? ex.failureCode ?? '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -676,8 +676,8 @@ export function ManufacturingAccountingWorkspacePage() {
                   <ul className="mt-2 space-y-1 font-mono text-[10px] text-slate-700">
                     {enablePanel.readiness.eventIntegrity.technicalDetails.slice(0, 15).map((row, idx) => (
                       <li key={`${row.eventId ?? row.inventoryMovementId}-${idx}`}>
-                        {row.exceptionKind} · event={row.eventId ?? '—'} · posting={row.postingEventId ?? '—'} ·
-                        attempts={row.attemptCount ?? '—'} · inv={row.inventoryMovementId ?? '—'}
+                        {row.exceptionKind} · event={row.eventId ?? '-'} · posting={row.postingEventId ?? '-'} ·
+                        attempts={row.attemptCount ?? '-'} · inv={row.inventoryMovementId ?? '-'}
                         {row.postingErrorCode ? ` · code=${row.postingErrorCode}` : ''}
                       </li>
                     ))}
@@ -928,10 +928,10 @@ export function ManufacturingAccountingWorkspacePage() {
                                 </td>
                                 <td>{row.status.replace(/_/g, ' ')}</td>
                                 <td className="text-right tabular-nums">{num(row.completedGoodQuantity)}</td>
-                                <td className="text-right tabular-nums">{snapshot ? formatCurrency(num(snapshot.totalActualCost)) : '—'}</td>
-                                <td className="text-right tabular-nums">{snapshot ? formatCurrency(num(snapshot.totalPostedCost)) : '—'}</td>
+                                <td className="text-right tabular-nums">{snapshot ? formatCurrency(num(snapshot.totalActualCost)) : '-'}</td>
+                                <td className="text-right tabular-nums">{snapshot ? formatCurrency(num(snapshot.totalPostedCost)) : '-'}</td>
                                 <td className="text-right tabular-nums font-semibold">
-                                  {snapshot ? formatCurrency(num(snapshot.varianceAmount)) : '—'}
+                                  {snapshot ? formatCurrency(num(snapshot.varianceAmount)) : '-'}
                                 </td>
                               </tr>
                             )
@@ -1020,7 +1020,7 @@ export function ManufacturingAccountingWorkspacePage() {
                                     Activate
                                   </Button>
                                 ) : (
-                                  <span className="text-erp-muted">—</span>
+                                  <span className="text-erp-muted">-</span>
                                 )}
                               </td>
                             </tr>

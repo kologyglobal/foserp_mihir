@@ -150,7 +150,7 @@ const EMPTY_INVOICE_DIMENSIONS = {
   collectionStatus: 'Not Contacted' as const,
   collectionOwner: '',
   gstStatus: '',
-  eInvoiceStatus: '—',
+  eInvoiceStatus: '-',
   eInvoiceIrn: null as string | null,
   eWayBillNumber: null as string | null,
   hasCreditNote: false,
@@ -166,7 +166,7 @@ export function mapOpenItemToLegacyInvoice(oi: OutstandingOpenItemDto): Receivab
   const applied = Math.max(0, original - outstanding)
   return {
     id: oi.salesInvoiceId ?? oi.openItemId,
-    invoiceNumber: oi.invoiceNumber ?? oi.voucherNumber ?? '—',
+    invoiceNumber: oi.invoiceNumber ?? oi.voucherNumber ?? '-',
     invoiceDate: oi.invoiceDate ?? '',
     postingDate: oi.postingDate ?? oi.invoiceDate ?? '',
     dueDate: oi.dueDate ?? '',
@@ -208,7 +208,7 @@ function mapSalesInvoiceToLegacyInvoice(
   const applied = num(si.amountPaid)
   return {
     id: si.id,
-    invoiceNumber: si.invoiceNumber ?? si.draftReference ?? '—',
+    invoiceNumber: si.invoiceNumber ?? si.draftReference ?? '-',
     invoiceDate: si.invoiceDate,
     postingDate: si.postingDate ?? si.invoiceDate,
     dueDate: si.dueDate ?? '',
@@ -273,7 +273,7 @@ export function mapReceiptToLegacy(r: CustomerReceiptListItemDto): CustomerRecei
   const allocated = num(r.allocatedAmount)
   return {
     id: r.id,
-    receiptNumber: r.receiptNumber ?? r.draftReference ?? '—',
+    receiptNumber: r.receiptNumber ?? r.draftReference ?? '-',
     receiptDate: r.receiptDate,
     postingDate: r.postingDate ?? r.receiptDate,
     customerId: r.customerId,
@@ -346,7 +346,7 @@ function mapCreditNoteStatus(cn: CustomerCreditNoteListItemDto): CreditNote['sta
 export function mapCreditNoteToLegacy(cn: CustomerCreditNoteListItemDto): CreditNote {
   return {
     id: cn.id,
-    creditNoteNumber: cn.creditNoteNumber ?? cn.draftReference ?? '—',
+    creditNoteNumber: cn.creditNoteNumber ?? cn.draftReference ?? '-',
     creditNoteDate: cn.creditNoteDate,
     customerId: cn.customerId,
     customerName: cn.customerNameSnapshot,
@@ -1001,7 +1001,7 @@ export async function getLiveReceiptAllocationLines(receiptId: string) {
     .map((h) => ({
       id: h.allocationId,
       invoiceId: h.invoiceId ?? '',
-      invoiceNumber: h.invoiceNumber ?? '—',
+      invoiceNumber: h.invoiceNumber ?? '-',
       invoiceDate: '',
       dueDate: '',
       originalAmount: num(h.invoiceOutstandingBefore),
@@ -1053,7 +1053,7 @@ export async function getLiveCustomerStatementPreview(opts: {
     if (opts.includeOpenEntriesOnly && num(inv.outstandingAmount) <= 0 && !opts.includeSettledEntries) continue
     txns.push({
       date: inv.invoiceDate,
-      documentNumber: inv.invoiceNumber ?? '—',
+      documentNumber: inv.invoiceNumber ?? '-',
       documentType: 'Invoice',
       reference: inv.referenceNumber ?? '',
       debit: num(inv.baseTotalAmount),
@@ -1064,7 +1064,7 @@ export async function getLiveCustomerStatementPreview(opts: {
     for (const r of postedReceipts.filter((x) => x.receiptDate >= opts.dateFrom && x.receiptDate <= opts.dateTo)) {
       txns.push({
         date: r.receiptDate,
-        documentNumber: r.receiptNumber ?? '—',
+        documentNumber: r.receiptNumber ?? '-',
         documentType: 'Receipt',
         reference: r.transactionReference ?? '',
         debit: 0,
@@ -1076,7 +1076,7 @@ export async function getLiveCustomerStatementPreview(opts: {
     for (const cn of postedCreditNotes.filter((x) => x.creditNoteDate >= opts.dateFrom && x.creditNoteDate <= opts.dateTo)) {
       txns.push({
         date: cn.creditNoteDate,
-        documentNumber: cn.creditNoteNumber ?? '—',
+        documentNumber: cn.creditNoteNumber ?? '-',
         documentType: 'Credit Note',
         reference: cn.originalInvoiceNumberSnapshot ?? '',
         debit: 0,
@@ -1165,7 +1165,7 @@ export async function getLiveReceiptPostingPreview(receiptId: string): Promise<{
     validateCustomerReceipt(receiptId).catch(() => null),
   ])
   return {
-    receiptNumber: receipt.receiptNumber ?? receipt.draftReference ?? '—',
+    receiptNumber: receipt.receiptNumber ?? receipt.draftReference ?? '-',
     customerName: receipt.customerNameSnapshot,
     receiptAmount: num(receipt.grossReceiptAmount),
     allocatedAmount: num(receipt.allocatedAmount),

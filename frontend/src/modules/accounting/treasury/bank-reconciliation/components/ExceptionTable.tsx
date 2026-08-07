@@ -41,7 +41,7 @@ export function ExceptionTable({ exceptions, canResolve, busyExceptionId, onReso
               <tr key={ex.id} className="border-t border-erp-border">
                 <td className="px-2 py-1.5 font-medium text-erp-text">{EXCEPTION_REASON_LABELS[ex.reason] ?? ex.reason}</td>
                 <td className="max-w-[16rem] truncate px-2 py-1.5 text-erp-muted" title={ex.comment ?? undefined}>
-                  {ex.comment ?? '—'}
+                  {ex.comment ?? '-'}
                 </td>
                 <td className="px-2 py-1.5">
                   <ExceptionStatusChip status={ex.status} />
@@ -69,7 +69,7 @@ export function ExceptionTable({ exceptions, canResolve, busyExceptionId, onReso
                       </div>
                     ) : (
                       <span className="flex justify-end text-erp-muted">
-                        {ex.resolutionReference ?? (ex.status === 'RESOLVED' ? 'Resolved' : '—')}
+                        {ex.resolutionReference ?? (ex.status === 'RESOLVED' ? 'Resolved' : '-')}
                       </span>
                     )}
                   </td>

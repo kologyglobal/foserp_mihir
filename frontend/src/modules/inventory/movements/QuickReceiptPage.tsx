@@ -135,7 +135,7 @@ export function QuickReceiptPage() {
   const previewDoc = existing ?? ({
     id: '', documentNumber: 'Draft', movementType: 'receipt', documentDate: today(), postingDate: today(),
     sourceType, sourceDocumentId: selectedDocId, sourceDocumentNo: sourceDocs.find((d) => d.id === selectedDocId)?.documentNo ?? null,
-    warehouseId, warehouseName: sourceDocs.find((d) => d.id === selectedDocId)?.warehouseName ?? '—', plantCode: '—',
+    warehouseId, warehouseName: sourceDocs.find((d) => d.id === selectedDocId)?.warehouseName ?? '-', plantCode: '-',
     status: 'draft', createdBy: 'Demo User', approvedBy: null, postedBy: null, createdAt: today(), updatedAt: today(),
     vendorName: null, gateEntryNo: null, vehicleNo: null, lrNo: null, lines, mode: detailedMode ? 'detailed' : 'quick',
     costPreview: null, accountingPreview: null, attachments: [], auditHistory: [],

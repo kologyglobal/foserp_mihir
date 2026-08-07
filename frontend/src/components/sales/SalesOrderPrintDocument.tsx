@@ -43,10 +43,10 @@ export function buildSalesOrderPrintLines(
         (l.hsnCode ?? '').trim() ||
         (item?.hsnCode ?? '').trim() ||
         (lineProduct?.hsnCode ?? product?.hsnCode ?? '').trim() ||
-        '—'
+        '-'
       return {
         lineNo: l.lineNo || idx + 1,
-        description: l.description || l.productOrItem || lineProduct?.productName || product?.productName || '—',
+        description: l.description || l.productOrItem || lineProduct?.productName || product?.productName || '-',
         hsn,
         qty: l.qty,
         uom: l.uom || 'Nos',
@@ -73,7 +73,7 @@ export function buildSalesOrderPrintLines(
     {
       lineNo: 1,
       description: product?.productName ?? 'Sales order line',
-      hsn: product?.hsnCode ?? '—',
+      hsn: product?.hsnCode ?? '-',
       qty,
       uom: 'Nos',
       unitPrice,
@@ -113,7 +113,7 @@ export function SalesOrderPrintDocument({
 
   const billTo =
     order.billingAddress?.trim() ||
-    (customer ? formatCustomerBillingAddress(customer) : '—')
+    (customer ? formatCustomerBillingAddress(customer) : '-')
   const shipTo =
     order.shippingAddress?.trim() ||
     (customer ? resolveCustomerShippingAddress(customer) : billTo)
@@ -169,25 +169,25 @@ export function SalesOrderPrintDocument({
       <div className="so-print-parties">
         <section className="so-print-party">
           <p className="so-print-party__label">Bill to</p>
-          <p className="so-print-party__name">{customer?.customerName ?? order.customerName ?? '—'}</p>
-          <p className="so-print-party__line">Code: {order.customerCode ?? customer?.customerCode ?? '—'}</p>
-          <p className="so-print-party__line">GSTIN: {customer?.gstin || '—'}</p>
+          <p className="so-print-party__name">{customer?.customerName ?? order.customerName ?? '-'}</p>
+          <p className="so-print-party__line">Code: {order.customerCode ?? customer?.customerCode ?? '-'}</p>
+          <p className="so-print-party__line">GSTIN: {customer?.gstin || '-'}</p>
           <p className="so-print-party__line">{billTo}</p>
-          <p className="so-print-party__line">State: {customer?.state ?? '—'}</p>
+          <p className="so-print-party__line">State: {customer?.state ?? '-'}</p>
         </section>
         {isServices && bank ? (
           <section className="so-print-party">
             <p className="so-print-party__label">Bank details</p>
-            <p className="so-print-party__name">{bank.accountName || '—'}</p>
-            <p className="so-print-party__line"><span>Bank</span> {bank.bankName || '—'}</p>
-            <p className="so-print-party__line"><span>A/C No.</span> {bank.accountNumber || '—'}</p>
-            <p className="so-print-party__line"><span>IFSC</span> {bank.ifscCode || '—'}</p>
-            <p className="so-print-party__line"><span>Branch</span> {bank.branch || '—'}</p>
+            <p className="so-print-party__name">{bank.accountName || '-'}</p>
+            <p className="so-print-party__line"><span>Bank</span> {bank.bankName || '-'}</p>
+            <p className="so-print-party__line"><span>A/C No.</span> {bank.accountNumber || '-'}</p>
+            <p className="so-print-party__line"><span>IFSC</span> {bank.ifscCode || '-'}</p>
+            <p className="so-print-party__line"><span>Branch</span> {bank.branch || '-'}</p>
           </section>
         ) : (
           <section className="so-print-party">
             <p className="so-print-party__label">Ship to</p>
-            <p className="so-print-party__name">{customer?.customerName ?? order.customerName ?? '—'}</p>
+            <p className="so-print-party__name">{customer?.customerName ?? order.customerName ?? '-'}</p>
             <p className="so-print-party__line">{shipTo}</p>
             {deliveryLocationLabel ? (
               <p className="so-print-party__line">Location: {deliveryLocationLabel}</p>
@@ -265,20 +265,20 @@ export function SalesOrderPrintDocument({
 
       <section className="so-print-party so-print-party--meta so-print-commercial">
         <p className="so-print-party__label">Commercial</p>
-        <p className="so-print-party__line"><span>Payment</span> {order.paymentTerms || '—'}</p>
-        <p className="so-print-party__line"><span>Delivery terms</span> {order.deliveryTerms || '—'}</p>
+        <p className="so-print-party__line"><span>Payment</span> {order.paymentTerms || '-'}</p>
+        <p className="so-print-party__line"><span>Delivery terms</span> {order.deliveryTerms || '-'}</p>
         <p className="so-print-party__line">
-          <span>Delivery Time / Lead Time</span> {order.deliveryTime || '—'}
+          <span>Delivery Time / Lead Time</span> {order.deliveryTime || '-'}
         </p>
-        <p className="so-print-party__line"><span>Customer PO</span> {order.customerPoNumber || '—'}</p>
+        <p className="so-print-party__line"><span>Customer PO</span> {order.customerPoNumber || '-'}</p>
         <p className="so-print-party__line">
-          <span>PO date</span> {order.customerPoDate ? formatDate(order.customerPoDate) : '—'}
+          <span>PO date</span> {order.customerPoDate ? formatDate(order.customerPoDate) : '-'}
         </p>
         <p className="so-print-party__line">
           <span>Quotation Number (Reference)</span>{' '}
-          {order.quotationNo ? `${order.quotationNo} Rev ${order.quotationRevisionNo ?? 1}` : '—'}
+          {order.quotationNo ? `${order.quotationNo} Rev ${order.quotationRevisionNo ?? 1}` : '-'}
         </p>
-        <p className="so-print-party__line"><span>Owner</span> {order.salesOwnerName || '—'}</p>
+        <p className="so-print-party__line"><span>Owner</span> {order.salesOwnerName || '-'}</p>
       </section>
 
       {!isServices && bank ? <CompanyBankDetailsBlock bank={bank} /> : null}

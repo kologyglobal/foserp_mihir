@@ -61,7 +61,7 @@ export function HsnListPage() {
 
   const columns: ColumnDef<HsnMaster, unknown>[] = [
     { accessorKey: 'code', header: 'Code', cell: ({ row }) => <span className="font-mono text-xs font-semibold">{row.original.code}</span> },
-    { id: 'gstGroup', header: 'GST Group Code', cell: ({ row }) => getGstGroup(row.original.gstGroupId)?.code ?? '—' },
+    { id: 'gstGroup', header: 'GST Group Code', cell: ({ row }) => getGstGroup(row.original.gstGroupId)?.code ?? '-' },
     { accessorKey: 'description', header: 'HSN Description' },
     { accessorKey: 'isActive', header: 'Status', cell: ({ row }) => <ActiveBadge isActive={row.original.isActive} /> },
     { id: 'actions', header: 'Actions', enableSorting: false, cell: ({ row }) => (
@@ -185,8 +185,8 @@ export function HsnFormPage() {
       breadcrumbs={buildMasterBreadcrumbs('inventory', isEdit ? 'Edit HSN' : 'New HSN')}
       validationErrors={validationErrors}
       documentStrip={[
-        { label: 'Code', value: watched.code?.trim() || '—', highlight: Boolean(watched.code?.trim()) },
-        { label: 'GST Group', value: getGstGroup(gstGroupId)?.code ?? '—' },
+        { label: 'Code', value: watched.code?.trim() || '-', highlight: Boolean(watched.code?.trim()) },
+        { label: 'GST Group', value: getGstGroup(gstGroupId)?.code ?? '-' },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
       ]}
       commandBar={(
@@ -196,7 +196,7 @@ export function HsnFormPage() {
       activeSection={activeSection}
       onSectionSelect={setActiveSection}
       formMetrics={[
-        { label: 'GST Group', value: getGstGroup(gstGroupId)?.code ?? '—', accent: 'blue' as const },
+        { label: 'GST Group', value: getGstGroup(gstGroupId)?.code ?? '-', accent: 'blue' as const },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive', accent: 'green' as const },
       ]}
       factBoxTitle="HSN insight"
@@ -262,7 +262,7 @@ export function HsnDetailPage() {
       <DetailSection title="General">
         <DetailGrid>
           <DetailField label="Code" value={record.code} />
-          <DetailField label="GST Group Code" value={getGstGroup(record.gstGroupId)?.code ?? '—'} />
+          <DetailField label="GST Group Code" value={getGstGroup(record.gstGroupId)?.code ?? '-'} />
           <DetailField label="HSN Description" value={record.description} />
           <DetailField label="Status" value={record.isActive ? 'Active' : 'Inactive'} />
         </DetailGrid>

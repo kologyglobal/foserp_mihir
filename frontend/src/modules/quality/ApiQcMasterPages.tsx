@@ -150,7 +150,7 @@ export function ApiQcParameterMasterPage() {
             },
             { accessorKey: 'parameterName', header: 'Name' },
             { accessorKey: 'parameterType', header: 'Type', cell: ({ row }) => <StatusBadge status={row.original.parameterType} /> },
-            { accessorKey: 'uomCode', header: 'UOM', cell: ({ row }) => row.original.uomCode ?? '—' },
+            { accessorKey: 'uomCode', header: 'UOM', cell: ({ row }) => row.original.uomCode ?? '-' },
             { accessorKey: 'mandatory', header: 'Mandatory', cell: ({ row }) => (row.original.mandatory ? 'Yes' : 'No') },
             { accessorKey: 'severity', header: 'Severity', cell: ({ row }) => <StatusBadge status={row.original.severity} /> },
           ]}
@@ -493,13 +493,13 @@ export function ApiInspectionPlanDetailPage() {
           index,
           code: p?.parameterCode ?? pid.slice(0, 8),
           name: p?.parameterName ?? 'Unknown parameter',
-          type: p?.parameterType ?? '—',
-          severity: p?.severity ?? '—',
-          uom: p?.uomCode ?? '—',
+          type: p?.parameterType ?? '-',
+          severity: p?.severity ?? '-',
+          uom: p?.uomCode ?? '-',
           range:
             p?.parameterType === 'NUMERIC'
-              ? `${p.minValue ?? '—'} … ${p.maxValue ?? '—'}`
-              : '—',
+              ? `${p.minValue ?? '-'} … ${p.maxValue ?? '-'}`
+              : '-',
           mandatory: p?.mandatory ?? false,
           missing: !p,
         }

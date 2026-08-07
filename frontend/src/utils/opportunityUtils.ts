@@ -102,7 +102,7 @@ export function parseLostReason(stored: string): { code: string; competitorCode?
 }
 
 export function displayLostReason(stored: string | null | undefined): string {
-  if (!stored?.trim()) return '—'
+  if (!stored?.trim()) return '-'
   const { code, competitorCode } = parseLostReason(stored)
   const reasonLabel = getCrmMasterLabel('lost-reasons', code)
   const base = reasonLabel && reasonLabel !== code ? reasonLabel : stored

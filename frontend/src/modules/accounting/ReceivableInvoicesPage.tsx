@@ -354,7 +354,7 @@ export function ReceivableInvoicesPage() {
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(inv.originalAmount)}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(inv.outstandingBalance)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{inv.overdueDays > 0 ? `${inv.overdueDays}d` : '—'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{inv.overdueDays > 0 ? `${inv.overdueDays}d` : '-'}</td>
                     <td className="px-3 py-2">
                       <InvoiceStatusBadge status={inv.invoiceStatus} />
                     </td>

@@ -114,7 +114,7 @@ export function Opportunity360RecordHeader({
 
   const stageLabel = opportunityStageLabel(opportunity.stage)
   const priorityLabel = opportunityPriorityLabel(opportunity.priority)
-  const ownerName = opportunity.ownerName?.trim() || '—'
+  const ownerName = opportunity.ownerName?.trim() || '-'
   const displayTitle = opportunity.opportunityName?.trim() || opportunity.opportunityNo
 
   const moreActions: CommandBarOverflowAction[] = [

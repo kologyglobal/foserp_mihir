@@ -160,7 +160,7 @@ export function PurchaseAiOverviewBlock({
             )}
           >
             <dt>{row.label}</dt>
-            <dd>{row.value ?? '—'}</dd>
+            <dd>{row.value ?? '-'}</dd>
           </div>
         ))}
       </dl>

@@ -155,7 +155,7 @@ export function ApprovalMatrixConfigPage() {
                     onChange={(e) => updateRule(row.original.id, { threshold: Number(e.target.value) })}
                   />
                 ) : (
-                  '—'
+                  '-'
                 ),
             },
             {

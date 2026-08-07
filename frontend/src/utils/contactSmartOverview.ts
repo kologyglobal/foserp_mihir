@@ -106,9 +106,9 @@ export function buildContactAiInsight(input: ContactSmartOverviewInput): string 
 export function buildContactKeyDetails(input: ContactSmartOverviewInput): CrmSmartKeyDetail[] {
   return [
     { label: 'Company', value: input.customerName || 'Not linked', muted: !input.customerId },
-    { label: 'Designation', value: input.designation.trim() || '—', muted: !input.designation.trim() },
-    { label: 'Phone', value: input.phone.trim() || '—', muted: !input.phone.trim() },
-    { label: 'Email', value: input.email.trim() || '—', muted: !input.email.trim() },
+    { label: 'Designation', value: input.designation.trim() || '-', muted: !input.designation.trim() },
+    { label: 'Phone', value: input.phone.trim() || '-', muted: !input.phone.trim() },
+    { label: 'Email', value: input.email.trim() || '-', muted: !input.email.trim() },
   ]
 }
 

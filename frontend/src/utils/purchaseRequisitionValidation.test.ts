@@ -16,6 +16,6 @@ describe('resolvePrDepartmentDisplay', () => {
   it('hides raw UUID when name is missing', () => {
     expect(
       resolvePrDepartmentDisplay('795be403-0588-4a81-b3ea-9f755f60c329', null),
-    ).toBe('—')
+    ).toBe('-')
   })
 })

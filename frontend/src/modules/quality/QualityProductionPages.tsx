@@ -63,7 +63,7 @@ export function QualityReportsPage() {
               {processWise.map((r) => (
                 <tr key={r.inspectionNo}>
                   <td>{r.operationName}</td>
-                  <td>{r.woNo ?? '—'}</td>
+                  <td>{r.woNo ?? '-'}</td>
                   <td className="num">{r.passCount}</td>
                   <td className="num">{r.failCount}</td>
                   <td>{r.result}</td>
@@ -126,7 +126,7 @@ export function QualityReportsPage() {
                 <tr key={p.inspectionId}>
                   <td><TableLink to={`/quality/inspections/${p.inspectionId}`}>{p.inspectionNo}</TableLink></td>
                   <td>{p.category}</td>
-                  <td>{p.woNo ?? p.grnNo ?? '—'}</td>
+                  <td>{p.woNo ?? p.grnNo ?? '-'}</td>
                   <td>{p.operationName}</td>
                 </tr>
               ))}

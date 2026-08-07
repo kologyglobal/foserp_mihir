@@ -108,7 +108,7 @@ function formatRunningBalance(
   showRunningBalance: boolean,
   canViewBalance: boolean,
 ): string {
-  if (!showRunningBalance || !canViewBalance) return '—'
+  if (!showRunningBalance || !canViewBalance) return '-'
   const abs = Math.abs(row.runningBalance)
   return `${formatCurrency(abs)} ${row.runningBalanceSide}`
 }
@@ -229,7 +229,7 @@ function LedgerMobileCard({
               {row.party.partyName} ({row.party.partyType})
             </p>
           ) : null}
-          <p className="mt-1 line-clamp-2 text-erp-muted">{row.narration || '—'}</p>
+          <p className="mt-1 line-clamp-2 text-erp-muted">{row.narration || '-'}</p>
         </div>
         <EnterpriseRowActionsMenu actions={buildRowActions(row, onAction)} />
       </div>
@@ -267,37 +267,37 @@ function OptionalCell({
     case 'referenceNumber':
       return (
         <td className="max-w-[120px] truncate px-2 py-2 text-erp-muted" title={row.referenceNumber}>
-          {row.referenceNumber || '—'}
+          {row.referenceNumber || '-'}
         </td>
       )
     case 'externalDocumentNumber':
       return (
         <td className="max-w-[120px] truncate px-2 py-2 text-erp-muted" title={row.externalDocumentNumber}>
-          {row.externalDocumentNumber || '—'}
+          {row.externalDocumentNumber || '-'}
         </td>
       )
     case 'accountCategory':
       return <td className="px-2 py-2 text-erp-muted">{row.account.category}</td>
     case 'partyType':
-      return <td className="px-2 py-2 text-erp-muted">{row.party?.partyType ?? '—'}</td>
+      return <td className="px-2 py-2 text-erp-muted">{row.party?.partyType ?? '-'}</td>
     case 'location':
-      return <td className="px-2 py-2 text-erp-muted">{row.dimensions.locationName ?? '—'}</td>
+      return <td className="px-2 py-2 text-erp-muted">{row.dimensions.locationName ?? '-'}</td>
     case 'plant':
-      return <td className="px-2 py-2 text-erp-muted">{row.dimensions.plantName ?? '—'}</td>
+      return <td className="px-2 py-2 text-erp-muted">{row.dimensions.plantName ?? '-'}</td>
     case 'productionOrder':
-      return <td className="px-2 py-2 text-erp-muted">{row.manufacturing.productionOrder ?? '—'}</td>
+      return <td className="px-2 py-2 text-erp-muted">{row.manufacturing.productionOrder ?? '-'}</td>
     case 'itemCode':
-      return <td className="px-2 py-2 font-mono text-erp-muted">{row.manufacturing.itemCode ?? '—'}</td>
+      return <td className="px-2 py-2 font-mono text-erp-muted">{row.manufacturing.itemCode ?? '-'}</td>
     case 'batchNumber':
-      return <td className="px-2 py-2 font-mono text-erp-muted">{row.manufacturing.batchNumber ?? '—'}</td>
+      return <td className="px-2 py-2 font-mono text-erp-muted">{row.manufacturing.batchNumber ?? '-'}</td>
     case 'currency':
       return <td className="px-2 py-2 text-erp-muted">{row.currency}</td>
     case 'sourceModule':
-      return <td className="px-2 py-2 text-erp-muted">{row.sourceDocument?.module ?? '—'}</td>
+      return <td className="px-2 py-2 text-erp-muted">{row.sourceDocument?.module ?? '-'}</td>
     case 'sourceDocument':
       return (
         <td className="max-w-[140px] truncate px-2 py-2 text-erp-muted" title={row.sourceDocument?.documentNumber}>
-          {row.sourceDocument?.documentNumber ?? '—'}
+          {row.sourceDocument?.documentNumber ?? '-'}
         </td>
       )
     case 'createdBy':
@@ -307,7 +307,7 @@ function OptionalCell({
     case 'postedAt':
       return (
         <td className="whitespace-nowrap px-2 py-2 text-erp-muted tabular-nums">
-          {row.postedAt ? formatDateTime(row.postedAt) : '—'}
+          {row.postedAt ? formatDateTime(row.postedAt) : '-'}
         </td>
       )
     case 'reversalVoucher':
@@ -316,7 +316,7 @@ function OptionalCell({
           className="min-w-[120px] max-w-[160px] truncate px-2 py-2 font-mono text-erp-muted"
           title={row.reversal?.reversalVoucherNumber ?? row.reversal?.originalVoucherNumber ?? undefined}
         >
-          {row.reversal?.reversalVoucherNumber ?? row.reversal?.originalVoucherNumber ?? '—'}
+          {row.reversal?.reversalVoucherNumber ?? row.reversal?.originalVoucherNumber ?? '-'}
         </td>
       )
     default:
@@ -564,10 +564,10 @@ export function LedgerEntriesTable({
                     <td className="px-2 py-2 font-mono tabular-nums">{row.account.code}</td>
                     <td className="max-w-[160px] truncate px-2 py-2">{row.account.name}</td>
                     <td className="max-w-[140px] truncate px-2 py-2 text-erp-muted">
-                      {row.party?.partyName ?? '—'}
+                      {row.party?.partyName ?? '-'}
                     </td>
                     <td className="max-w-[180px] truncate px-2 py-2 text-erp-muted" title={row.narration}>
-                      {row.narration || '—'}
+                      {row.narration || '-'}
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(row.debit)}</td>
                     <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(row.credit)}</td>
@@ -577,13 +577,13 @@ export function LedgerEntriesTable({
                       </td>
                     ) : null}
                     <td className="max-w-[120px] truncate px-2 py-2 text-erp-muted">
-                      {row.dimensions.costCentreName ?? '—'}
+                      {row.dimensions.costCentreName ?? '-'}
                     </td>
                     <td className="max-w-[120px] truncate px-2 py-2 text-erp-muted">
-                      {row.dimensions.departmentName ?? '—'}
+                      {row.dimensions.departmentName ?? '-'}
                     </td>
                     <td className="max-w-[120px] truncate px-2 py-2 text-erp-muted">
-                      {row.dimensions.projectName ?? '—'}
+                      {row.dimensions.projectName ?? '-'}
                     </td>
                     {visibleOptionalColumns.map((colId) => (
                       <OptionalCell key={colId} columnId={colId} row={row} optionalSet={optionalSet} />

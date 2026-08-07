@@ -172,7 +172,7 @@ export function TransferEditorPage() {
         itemId: item.id,
         itemCode: item.itemCode,
         itemName: item.itemName,
-        uomCode: '—',
+        uomCode: '-',
         fromWarehouseId,
         toWarehouseId,
         fromLocationId: null,
@@ -362,8 +362,8 @@ export function TransferEditorPage() {
               {lines.map((l) => (
                 <tr key={l._key}>
                   <td><span className="font-mono">{l.itemCode}</span> {l.itemName}</td>
-                  <td className="font-mono text-xs">{l.batchNo ?? '—'}</td>
-                  <td className="font-mono text-xs">{l.serialNo ?? '—'}</td>
+                  <td className="font-mono text-xs">{l.batchNo ?? '-'}</td>
+                  <td className="font-mono text-xs">{l.serialNo ?? '-'}</td>
                   <td className="num">{formatNumber(l.transferQty)}</td>
                   <td className="num">{formatNumber(l.dispatchedQty)}</td>
                   <td className="num">{formatNumber(l.receivedQty)}</td>

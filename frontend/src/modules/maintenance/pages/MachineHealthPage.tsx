@@ -167,7 +167,7 @@ export function MachineHealthPage() {
                       </div>
                     ) : null}
                   </td>
-                  <td className="px-3 py-2">{r.workCentre ? `${r.workCentre.code}` : '—'}</td>
+                  <td className="px-3 py-2">{r.workCentre ? `${r.workCentre.code}` : '-'}</td>
                   <td className="px-3 py-2">{r.status}</td>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {period === 'YTD' ? r.breakdownsYtd : period === '30d' ? r.breakdowns30d : r.breakdowns90d}
@@ -178,9 +178,9 @@ export function MachineHealthPage() {
                   <td className="px-3 py-2 text-right tabular-nums">
                     {formatInr(period === 'YTD' ? r.maintenanceCostYtd : r.maintenanceCost30d)}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.averageRepairLabel ?? '—'}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{r.averageRepairLabel ?? '-'}</td>
                   <td className="px-3 py-2">
-                    {r.lastBreakdownAt ? new Date(r.lastBreakdownAt).toLocaleDateString() : '—'}
+                    {r.lastBreakdownAt ? new Date(r.lastBreakdownAt).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-3 py-2">
                     <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${healthTone(r.healthStatus)}`}>

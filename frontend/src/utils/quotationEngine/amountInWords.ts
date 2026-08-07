@@ -17,7 +17,7 @@ function threeDigits(n: number): string {
 
 /** Indian numbering — amount in words for INR quotations */
 export function amountInWordsINR(amount: number): string {
-  if (!Number.isFinite(amount) || amount < 0) return '—'
+  if (!Number.isFinite(amount) || amount < 0) return '-'
   const rounded = Math.round(amount)
   if (rounded === 0) return 'Zero Rupees Only'
 

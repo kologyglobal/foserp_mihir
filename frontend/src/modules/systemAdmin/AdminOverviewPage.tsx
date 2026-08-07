@@ -152,21 +152,21 @@ export function AdminOverviewPage() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
             label="Users"
-            value={canUsers ? users.length : '—'}
+            value={canUsers ? users.length : '-'}
             hint={canUsers ? `${activeUsers} active` : 'Requires user.view'}
             to="/admin/users"
             icon={Users}
           />
           <KpiCard
             label="Roles"
-            value={canRoles ? roles.length : '—'}
+            value={canRoles ? roles.length : '-'}
             hint={canRoles ? `${roles.filter((r) => r.isSystem).length} system` : 'Requires role.view'}
             to="/admin/roles"
             icon={ShieldCheck}
           />
           <KpiCard
             label="Tenant status"
-            value={loadingTenant && !tenantStatus ? '…' : tenantStatus ?? '—'}
+            value={loadingTenant && !tenantStatus ? '…' : tenantStatus ?? '-'}
             hint={profileTenant?.name ?? (isApiMode() ? 'Current workspace' : 'Demo tenant')}
             to="/admin/organization/tenant"
             icon={Building2}
@@ -191,20 +191,20 @@ export function AdminOverviewPage() {
           <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <dt className="text-xs text-erp-muted">Name</dt>
-              <dd className="text-sm font-medium text-erp-text">{profileTenant?.name ?? '—'}</dd>
+              <dd className="text-sm font-medium text-erp-text">{profileTenant?.name ?? '-'}</dd>
             </div>
             <div>
               <dt className="text-xs text-erp-muted">Slug</dt>
-              <dd className="text-sm font-medium text-erp-text">{profileTenant?.slug ?? getStoredSession()?.tenantSlug ?? '—'}</dd>
+              <dd className="text-sm font-medium text-erp-text">{profileTenant?.slug ?? getStoredSession()?.tenantSlug ?? '-'}</dd>
             </div>
             <div>
               <dt className="text-xs text-erp-muted">Plan</dt>
-              <dd className="text-sm font-medium text-erp-text">{profileTenant?.subscriptionPlan ?? '—'}</dd>
+              <dd className="text-sm font-medium text-erp-text">{profileTenant?.subscriptionPlan ?? '-'}</dd>
             </div>
             <div>
               <dt className="text-xs text-erp-muted">Currency / TZ</dt>
               <dd className="text-sm font-medium text-erp-text">
-                {profileTenant ? `${profileTenant.currency} · ${profileTenant.timezone}` : '—'}
+                {profileTenant ? `${profileTenant.currency} · ${profileTenant.timezone}` : '-'}
               </dd>
             </div>
           </dl>

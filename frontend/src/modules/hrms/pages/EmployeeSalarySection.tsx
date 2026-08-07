@@ -165,18 +165,18 @@ export function EmployeeSalarySection({ employeeId, employeeLabel }: Props) {
           </div>
           <div>
             <div className="text-xs uppercase text-erp-muted">Effective from</div>
-            <div>{assignmentMeta?.effectiveFrom ?? '—'}</div>
+            <div>{assignmentMeta?.effectiveFrom ?? '-'}</div>
           </div>
           <div>
             <div className="text-xs uppercase text-erp-muted">Monthly gross</div>
             <div>
-              {assignmentMeta?.monthlyGross != null ? `₹${Number(assignmentMeta.monthlyGross).toLocaleString()}` : '—'}
+              {assignmentMeta?.monthlyGross != null ? `₹${Number(assignmentMeta.monthlyGross).toLocaleString()}` : '-'}
             </div>
           </div>
           <div>
             <div className="text-xs uppercase text-erp-muted">Annual CTC</div>
             <div>
-              {assignmentMeta?.annualCtc != null ? `₹${Number(assignmentMeta.annualCtc).toLocaleString()}` : '—'}
+              {assignmentMeta?.annualCtc != null ? `₹${Number(assignmentMeta.annualCtc).toLocaleString()}` : '-'}
             </div>
           </div>
         </div>
@@ -257,13 +257,13 @@ export function EmployeeSalarySection({ employeeId, employeeLabel }: Props) {
               {history.map((h) => (
                 <tr key={h.id} className="border-t border-erp-border">
                   <td className="py-1 pr-3">
-                    {h.version?.structure?.code ?? '—'}
+                    {h.version?.structure?.code ?? '-'}
                     {h.version ? ` v${h.version.versionNo}` : ''}
                   </td>
                   <td className="py-1 pr-3">{h.effectiveFrom}</td>
-                  <td className="py-1 pr-3">{h.effectiveTo ?? '—'}</td>
+                  <td className="py-1 pr-3">{h.effectiveTo ?? '-'}</td>
                   <td className="py-1 pr-3">
-                    {h.monthlyGross != null ? `₹${h.monthlyGross.toLocaleString()}` : '—'}
+                    {h.monthlyGross != null ? `₹${h.monthlyGross.toLocaleString()}` : '-'}
                   </td>
                   <td className="py-1">{h.status}</td>
                 </tr>

@@ -77,7 +77,7 @@ const OWNER_OPTIONS = Array.from(
   new Set(
     seedWorkOrders
       .map((w) => getWorkOrderOwnerLine(w))
-      .filter((v) => v && v !== '—'),
+      .filter((v) => v && v !== '-'),
   ),
 ).sort()
 

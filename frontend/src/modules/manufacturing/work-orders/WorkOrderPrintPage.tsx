@@ -140,7 +140,7 @@ export function WorkOrderPrintPage() {
           if (cancelled) return
           const materials = (materialsRes.data ?? []).map((m) => ({
             code: m.item?.code ?? m.itemId,
-            name: m.item?.name ?? '—',
+            name: m.item?.name ?? '-',
             required: m.requiredQty,
             issued: m.issuedQty,
             uom: m.uom?.code ?? '',

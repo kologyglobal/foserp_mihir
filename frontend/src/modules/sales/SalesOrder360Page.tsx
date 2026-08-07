@@ -444,7 +444,7 @@ export function SalesOrder360Page() {
   })
 
   const formMetrics = [
-    { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', accent: 'green' as const, hint: customerDisplayName ?? 'Customer' },
+    { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '-', accent: 'green' as const, hint: customerDisplayName ?? 'Customer' },
     { label: 'Quantity', value: formatNumber(so.qty), accent: 'blue' as const, hint: product?.productName ?? productLabel },
     { label: 'Required', value: formatDate(so.requiredDate), accent: overdue ? 'amber' as const : 'blue' as const, hint: overdue ? 'Overdue' : 'On schedule' },
     ...(showMfgPanels
@@ -455,10 +455,10 @@ export function SalesOrder360Page() {
   const documentStrip = [
     { label: 'SO No.', value: so.salesOrderNo, highlight: true },
     { label: 'Status', value: salesOrderStatusLabel(so.status) },
-    { label: 'Customer', value: customerDisplayName ?? '—', highlight: Boolean(customerDisplayName) },
-    { label: productLabel, value: product?.productName ?? '—' },
+    { label: 'Customer', value: customerDisplayName ?? '-', highlight: Boolean(customerDisplayName) },
+    { label: productLabel, value: product?.productName ?? '-' },
     { label: 'Qty', value: formatNumber(so.qty) },
-    { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: displayValue > 0 },
+    { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '-', highlight: displayValue > 0 },
     { label: 'Required', value: formatDate(so.requiredDate) },
     ...(showMfgPanels ? [{ label: 'Work Orders', value: String(orderWos.length) }] : []),
   ]
@@ -542,17 +542,17 @@ export function SalesOrder360Page() {
         actionsTitle="Quick Actions"
         summary={[
           { label: 'Status', value: salesOrderStatusLabel(so.status) },
-          { label: 'Customer', value: customerDisplayName ?? '—' },
-          { label: productLabel, value: product?.productName ?? '—' },
+          { label: 'Customer', value: customerDisplayName ?? '-' },
+          { label: productLabel, value: product?.productName ?? '-' },
           { label: 'Qty', value: formatNumber(so.qty) },
-          { label: 'Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: true },
+          { label: 'Value', value: displayValue > 0 ? formatCurrency(displayValue) : '-', highlight: true },
           ...(showMfgPanels
             ? [
                 { label: 'Work Orders', value: String(orderWos.length) },
                 { label: 'Dispatches', value: String(orderDispatches.length) },
               ]
             : []),
-          { label: 'Quotation', value: so.quotationNo ? quotationNoWithRevision(so.quotationNo, so.quotationRevisionNo ?? 1) : '—' },
+          { label: 'Quotation', value: so.quotationNo ? quotationNoWithRevision(so.quotationNo, so.quotationRevisionNo ?? 1) : '-' },
         ]}
         actions={[
           ...(so.status === 'open' && canConfirmSalesOrder

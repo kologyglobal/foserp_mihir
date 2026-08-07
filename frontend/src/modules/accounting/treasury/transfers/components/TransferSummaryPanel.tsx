@@ -31,7 +31,7 @@ export function TransferSummaryPanel({ transfer }: { transfer: TreasuryTransferD
         </div>
         <div>
           <span className="text-erp-muted">Reference</span>
-          <p className="font-medium text-erp-text">{transfer.externalReference || '—'}</p>
+          <p className="font-medium text-erp-text">{transfer.externalReference || '-'}</p>
         </div>
         <div>
           <span className="text-erp-muted">Transfer no.</span>

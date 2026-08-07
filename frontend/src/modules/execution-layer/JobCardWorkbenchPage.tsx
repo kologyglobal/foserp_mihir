@@ -162,9 +162,9 @@ export function JobCardWorkbenchPage() {
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-erp-muted">
                     <span>WC: {jc.workCenterCode}</span>
-                    <span>Team: {jc.assignedTeam ?? '—'}</span>
+                    <span>Team: {jc.assignedTeam ?? '-'}</span>
                     <span>Planned: {jc.plannedHours}h</span>
-                    <span>Actual: {jc.actualHours ?? '—'}h</span>
+                    <span>Actual: {jc.actualHours ?? '-'}h</span>
                     {jc.requiresQc && <span className="text-erp-warning">QC required</span>}
                   </div>
                 </button>

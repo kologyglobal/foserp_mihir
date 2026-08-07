@@ -168,9 +168,9 @@ export function GstGroupFormPage() {
       onSaveCloseShortcut={() => save('close')}
       onSaveAndNewShortcut={() => save('new')}
       documentStrip={[
-        { label: 'Code', value: watched.code?.trim() || '—', highlight: Boolean(watched.code?.trim()) },
+        { label: 'Code', value: watched.code?.trim() || '-', highlight: Boolean(watched.code?.trim()) },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
-        { label: 'Goods Type', value: watched.goodsType ? GST_GOODS_TYPE_LABELS[watched.goodsType] : '—' },
+        { label: 'Goods Type', value: watched.goodsType ? GST_GOODS_TYPE_LABELS[watched.goodsType] : '-' },
       ]}
       commandBar={(
         <MasterFormCommandBar
@@ -191,7 +191,7 @@ export function GstGroupFormPage() {
       onSectionSelect={setActiveSection}
       formMetrics={[
         { label: 'HSN Links', value: String(hsnCount), accent: 'blue' as const },
-        { label: 'Type', value: watched.goodsType ? GST_GOODS_TYPE_LABELS[watched.goodsType] : '—', accent: 'violet' as const },
+        { label: 'Type', value: watched.goodsType ? GST_GOODS_TYPE_LABELS[watched.goodsType] : '-', accent: 'violet' as const },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive', accent: watched.isActive ? 'green' as const : 'amber' as const },
       ]}
       factBoxTitle="GST Group insight"

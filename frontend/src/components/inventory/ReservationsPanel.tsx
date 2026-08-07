@@ -94,7 +94,7 @@ export function ReservationsPanel({
           <tr key={r.id}>
             <td>{RESERVATION_SOURCE_LABELS[r.source]}</td>
             <td className="font-mono">{r.referenceNo}</td>
-            <td className="font-mono">{r.batchNo ?? '—'}</td>
+            <td className="font-mono">{r.batchNo ?? '-'}</td>
             <td className="text-right font-mono">{formatNumber(r.reservedQty)} / {formatNumber(r.qty)}</td>
             <td>{RESERVATION_STATUS_LABELS[r.status]}</td>
             <td>{r.priority}</td>

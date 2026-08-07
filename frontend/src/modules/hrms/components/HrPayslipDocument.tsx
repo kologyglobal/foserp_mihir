@@ -56,11 +56,11 @@ export function HrPayslipDocument({ payslip }: HrPayslipDocumentProps) {
         </div>
         <div className="hr-payslip-doc__employee-row">
           <dt>Designation</dt>
-          <dd>{header.designation || '—'}</dd>
+          <dd>{header.designation || '-'}</dd>
         </div>
         <div className="hr-payslip-doc__employee-row">
           <dt>Department</dt>
-          <dd>{header.department || '—'}</dd>
+          <dd>{header.department || '-'}</dd>
         </div>
         <div className="hr-payslip-doc__employee-row">
           <dt>Paid days</dt>

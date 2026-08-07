@@ -29,7 +29,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <dt className="text-[11px] font-semibold uppercase text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px]">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px]">{value ?? '-'}</dd>
     </div>
   )
 }

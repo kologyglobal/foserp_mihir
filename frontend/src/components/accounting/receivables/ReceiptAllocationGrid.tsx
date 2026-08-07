@@ -78,7 +78,7 @@ export function ReceiptAllocationGrid({
                 </td>
                 <td className="px-3 py-2 text-right">
                   {readOnly ? (
-                    <span className="tabular-nums">{alloc > 0 ? formatCurrency(alloc) : '—'}</span>
+                    <span className="tabular-nums">{alloc > 0 ? formatCurrency(alloc) : '-'}</span>
                   ) : (
                     <Input
                       type="number"

@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import { useOptionalAuth } from '@/context/AuthProvider'
-import { isApiMode } from '@/config/apiConfig'
 import {
   PurchaseEnterpriseFactBox,
   purchaseSectionId,
@@ -349,7 +348,7 @@ export function PurchaseRequisitionEditorPage() {
   const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(editable)
 
   useEffect(() => {
-    if (!isNew || !isApiMode() || !session?.user) return
+    if (!isNew || !session?.user) return
     const name = `${session.user.firstName ?? ''} ${session.user.lastName ?? ''}`.trim()
     setHeader((prev) => ({
       ...prev,
@@ -1050,7 +1049,7 @@ export function PurchaseRequisitionEditorPage() {
             },
             {
               label: 'Department',
-              value: header.department ? prDepartmentLabel(header.department) : '—',
+              value: header.department ? prDepartmentLabel(header.department) : '-',
               highlight: Boolean(header.department),
             },
             {
@@ -1397,7 +1396,7 @@ export function PurchaseRequisitionEditorPage() {
               value={
                 [header.locationName, header.locationCity, header.locationState]
                   .filter(Boolean)
-                  .join(', ') || '—'
+                  .join(', ') || '-'
               }
               readOnly
               className="bg-erp-surface-alt"

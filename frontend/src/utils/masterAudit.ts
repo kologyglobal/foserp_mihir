@@ -25,7 +25,7 @@ export function resolveAuditActorName(
     const known = getLeadUser(value)
     if (known?.name) return known.name
   }
-  return '—'
+  return '-'
 }
 
 export function stampMasterCreated(): MasterRecordAudit & { createdAt: string } {
@@ -101,7 +101,7 @@ export type AuditableListRow = RecordAuditView & {
 
 export function resolveRecordUpdatedOn(row: AuditableListRow): string {
   const ts = row.modifiedAt ?? row.updatedAt ?? row.createdAt
-  return ts ? formatDate(ts) : '—'
+  return ts ? formatDate(ts) : '-'
 }
 
 /** User name + timestamp for Updated By list cells. */
@@ -113,14 +113,14 @@ export function resolveRecordUpdatedBy(row: AuditableListRow): string {
     row.createdBy,
   )
   const ts = row.modifiedAt ?? row.updatedAt ?? row.createdAt
-  if (name === '—' && !ts) return '—'
-  if (name === '—') return ts ? formatDateTime(ts) : '—'
+  if (name === '-' && !ts) return '-'
+  if (name === '-') return ts ? formatDateTime(ts) : '-'
   if (!ts) return name
   return `${name} · ${formatDateTime(ts)}`
 }
 
 export function resolveRecordCreatedOnForList(row: AuditableListRow): string {
-  return row.createdAt ? formatDate(row.createdAt) : '—'
+  return row.createdAt ? formatDate(row.createdAt) : '-'
 }
 
 export function resolveRecordCreatedByForList(row: AuditableListRow): string {
@@ -140,7 +140,7 @@ export function buildRecordAuditStripFields(
   if (options?.includeModified !== false && audit.modifiedAt) {
     fields.push({
       label: 'Last Modified',
-      value: resolveRecordModifiedLabel(audit) ?? '—',
+      value: resolveRecordModifiedLabel(audit) ?? '-',
       highlight: true,
     })
   }

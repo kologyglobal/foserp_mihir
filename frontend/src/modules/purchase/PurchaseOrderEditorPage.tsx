@@ -1841,7 +1841,7 @@ export function PurchaseOrderEditorPage() {
                         value={
                           header.vendorId
                             ? formatVendorStateLabel(selectedVendor)
-                            : '—'
+                            : '-'
                         }
                         readOnly
                         className="bg-erp-surface-alt"
@@ -1871,7 +1871,7 @@ export function PurchaseOrderEditorPage() {
                         className="bg-erp-surface-alt"
                         value={
                           !header.vendorId
-                            ? '—'
+                            ? '-'
                             : header.isInterstate
                               ? 'IGST (inter-state — vendor ≠ place of supply)'
                               : 'CGST + SGST (intra-state — vendor matches place of supply)'

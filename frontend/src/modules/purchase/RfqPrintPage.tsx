@@ -94,28 +94,28 @@ export function RfqPrintPage() {
         <div className="po-print-grid">
           <section className="po-print-box">
             <p className="po-print-box__label">Buyer / site</p>
-            <p className="po-print-box__name">{rfq.buyer?.name || '—'}</p>
-            <p>Department: {rfq.department || '—'}</p>
-            <p>Location: {rfq.location?.name || '—'}</p>
-            <p>Requester: {rfq.requester?.name || '—'}</p>
+            <p className="po-print-box__name">{rfq.buyer?.name || '-'}</p>
+            <p>Department: {rfq.department || '-'}</p>
+            <p>Location: {rfq.location?.name || '-'}</p>
+            <p>Requester: {rfq.requester?.name || '-'}</p>
             <p>
               PR Ref:{' '}
               {(rfq.purchaseRequisitionNumbers ?? []).join(', ') ||
                 rfq.purchaseRequisitionNumber ||
-                '—'}
+                '-'}
             </p>
           </section>
           <section className="po-print-box">
             <p className="po-print-box__label">Commercial</p>
             <p>Currency: {rfq.currency}</p>
-            <p>Payment: {rfq.paymentTerms || '—'}</p>
-            <p>Delivery: {rfq.deliveryTerms || '—'}</p>
-            <p>Freight: {rfq.freightTerms || '—'}</p>
+            <p>Payment: {rfq.paymentTerms || '-'}</p>
+            <p>Delivery: {rfq.deliveryTerms || '-'}</p>
+            <p>Freight: {rfq.freightTerms || '-'}</p>
             <p>
               Expected delivery:{' '}
-              {rfq.expectedDeliveryDate ? formatDate(rfq.expectedDeliveryDate) : '—'}
+              {rfq.expectedDeliveryDate ? formatDate(rfq.expectedDeliveryDate) : '-'}
             </p>
-            <p>Vendors invited: {vendors.length ? vendors.join(', ') : '—'}</p>
+            <p>Vendors invited: {vendors.length ? vendors.join(', ') : '-'}</p>
           </section>
         </div>
 
@@ -144,11 +144,11 @@ export function RfqPrintPage() {
                     <span className="block text-[10px] text-erp-muted">{l.specification}</span>
                   ) : null}
                 </td>
-                <td>{l.hsnCode || l.sacCode || '—'}</td>
+                <td>{l.hsnCode || l.sacCode || '-'}</td>
                 <PurchasePrintDualQtyCell
                   {...resolveDualQtyForPrint({ stockQty: l.quantity, itemId: l.itemId })}
                 />
-                <td>{l.uom || '—'}</td>
+                <td>{l.uom || '-'}</td>
                 <td className="num">{formatCurrency(l.targetPrice)}</td>
                 <td className="num">{formatCurrency(l.amount)}</td>
                 <td>{formatDate(l.requiredDate)}</td>
@@ -165,8 +165,8 @@ export function RfqPrintPage() {
         </div>
 
         <div className="po-print-signatures">
-          <div className="po-print-signatures__line">Prepared by ({rfq.buyer?.name || '—'})</div>
-          <div className="po-print-signatures__line">Technical contact ({rfq.technicalContact || '—'})</div>
+          <div className="po-print-signatures__line">Prepared by ({rfq.buyer?.name || '-'})</div>
+          <div className="po-print-signatures__line">Technical contact ({rfq.technicalContact || '-'})</div>
           <div className="po-print-signatures__line">For {QUOTATION_COMPANY.legalName}</div>
         </div>
       </article>

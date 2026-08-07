@@ -106,7 +106,7 @@ export function LeadHistoryDrawer({
         <dl className="grid gap-1.5 sm:grid-cols-2">
           <div>
             <dt className="text-erp-muted">Created</dt>
-            <dd className="font-medium text-erp-text">{formatDateTime(lead.createdAt)} · {lead.createdByName ?? '—'}</dd>
+            <dd className="font-medium text-erp-text">{formatDateTime(lead.createdAt)} · {lead.createdByName ?? '-'}</dd>
           </div>
           <div>
             <dt className="text-erp-muted">Last modified</dt>

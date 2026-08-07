@@ -28,7 +28,7 @@
     "test:store-selectors": "node scripts/scan-unstable-store-selectors.mjs",
     "test:stock-count": "tsx scripts/test-stock-count.ts",
     "test:cross-module-creation": "tsx scripts/test-cross-module-creation.ts",
-    "test:integrity": "tsx scripts/test-integrity-check.ts",
+    "test:integrity": "tsx --tsconfig tsconfig.app.json scripts/test-integrity-check.ts",
     "test:period-close": "tsx scripts/verify-period-close.ts",
     "test:modern-erp-ui": "tsx scripts/test-modern-erp-ui.ts",
     "test:ui-ux-audit": "tsx scripts/test-ui-ux-audit.ts",

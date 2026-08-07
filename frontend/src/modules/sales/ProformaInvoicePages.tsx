@@ -142,7 +142,7 @@ function proformaTotalQty(pi: ProformaInvoice): number {
 
 function truncateCell(value: string | null | undefined, max = 28): string {
   const text = (value ?? '').trim()
-  if (!text) return '—'
+  if (!text) return '-'
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
 
@@ -255,7 +255,7 @@ function ProformaInvoiceTable({
         enableSorting: false,
         cell: ({ row }) => (
           <span className="font-mono text-xs text-erp-muted">
-            {getCustomer(row.original.customerId)?.customerCode ?? '—'}
+            {getCustomer(row.original.customerId)?.customerCode ?? '-'}
           </span>
         ),
       },
@@ -288,7 +288,7 @@ function ProformaInvoiceTable({
         cell: ({ row }) =>
           row.original.salesOrderNo && row.original.salesOrderId
             ? <TableLink to={`/sales/orders/${row.original.salesOrderId}`}>{row.original.salesOrderNo}</TableLink>
-            : '—',
+            : '-',
       },
       {
         id: 'quotationNo',
@@ -298,14 +298,14 @@ function ProformaInvoiceTable({
         cell: ({ row }) =>
           row.original.quotationNo && row.original.quotationId
             ? <TableLink to={`/crm/quotations/${row.original.quotationId}`}>{row.original.quotationNo}</TableLink>
-            : '—',
+            : '-',
       },
       {
         accessorKey: 'customerPoNumber',
         header: 'Customer PO',
         meta: { columnLabel: 'Customer PO' },
         enableSorting: false,
-        cell: ({ row }) => row.original.customerPoNumber ?? '—',
+        cell: ({ row }) => row.original.customerPoNumber ?? '-',
       },
       {
         accessorKey: 'placeOfSupply',
@@ -320,7 +320,7 @@ function ProformaInvoiceTable({
         meta: { columnLabel: 'GSTIN' },
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="font-mono text-xs text-erp-muted">{row.original.customerGstin || '—'}</span>
+          <span className="font-mono text-xs text-erp-muted">{row.original.customerGstin || '-'}</span>
         ),
       },
       {
@@ -401,7 +401,7 @@ function ProformaInvoiceTable({
         header: 'Issued Date',
         meta: { columnLabel: 'Issued Date' },
         enableSorting: false,
-        cell: ({ row }) => (row.original.issuedAt ? formatDate(row.original.issuedAt.slice(0, 10)) : '—'),
+        cell: ({ row }) => (row.original.issuedAt ? formatDate(row.original.issuedAt.slice(0, 10)) : '-'),
       },
       {
         accessorKey: 'createdAt',
@@ -1003,7 +1003,7 @@ export function ProformaInvoiceDetailPage() {
           { label: 'Grand Total', value: formatCurrency(proforma.gst.grandTotal), accent: 'blue' },
           {
             label: 'Payment',
-            value: paymentSummary ? PROFORMA_PAYMENT_STATUS_LABELS[paymentSummary.paymentStatus] : '—',
+            value: paymentSummary ? PROFORMA_PAYMENT_STATUS_LABELS[paymentSummary.paymentStatus] : '-',
             accent: paymentSummary?.paymentStatus === 'fully_paid' ? 'green' : 'amber',
           },
           { label: 'Balance', value: paymentSummary ? formatCurrency(paymentSummary.balanceAmount) : formatCurrency(proforma.gst.grandTotal), accent: 'slate' },

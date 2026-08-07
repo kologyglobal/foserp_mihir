@@ -78,7 +78,7 @@ export function parseDecimal(value: string | number | null | undefined): number 
 
 /** Best-effort masking when the backend does not supply a pre-masked account number. */
 export function maskAccountNumber(raw: string | null | undefined): string {
-  if (!raw) return '—'
+  if (!raw) return '-'
   const digits = raw.replace(/\s+/g, '')
   if (digits.length <= 4) return digits
   return `••••${digits.slice(-4)}`

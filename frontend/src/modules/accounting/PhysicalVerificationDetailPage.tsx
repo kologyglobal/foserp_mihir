@@ -154,11 +154,11 @@ export function PhysicalVerificationDetailPage() {
                       <p className="text-[11px] text-erp-muted">{l.assetName}</p>
                     </td>
                     <td className="px-3 py-2">{l.expectedLocation}</td>
-                    <td className="px-3 py-2">{l.foundLocation ?? '—'}</td>
-                    <td className="px-3 py-2">{l.condition ?? '—'}</td>
-                    <td className="px-3 py-2">{l.verifiedBy ?? '—'}</td>
+                    <td className="px-3 py-2">{l.foundLocation ?? '-'}</td>
+                    <td className="px-3 py-2">{l.condition ?? '-'}</td>
+                    <td className="px-3 py-2">{l.verifiedBy ?? '-'}</td>
                     <td className={cn('px-3 py-2', LINE_TONE[l.status])}>{l.status}</td>
-                    <td className="px-3 py-2 text-erp-muted">{l.remarks ?? '—'}</td>
+                    <td className="px-3 py-2 text-erp-muted">{l.remarks ?? '-'}</td>
                   </tr>
                 ))}
               </tbody>

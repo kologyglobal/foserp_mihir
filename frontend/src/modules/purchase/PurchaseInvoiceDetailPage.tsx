@@ -40,6 +40,7 @@ import {
 import {
   approveInvoiceMatchingException,
   approvePurchaseInvoice,
+  cancelPurchaseInvoice,
   computeInvoiceMatching,
   createDebitNoteFromInvoice,
   getPurchaseInvoiceApHandoffPreview,
@@ -59,8 +60,8 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { usePurchasePermissions } from '@/utils/permissions'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
+import { appPromptNote } from '@/store/confirmDialogStore'
 import { cn } from '@/utils/cn'
-import { isApiMode } from '@/config/apiConfig'
 
 function matchColor(
   status: InvoiceMatchingResult['overallStatus'],
@@ -106,7 +107,7 @@ export function PurchaseInvoiceDetailPage() {
       }
       setInv(row)
       setMatching(await computeInvoiceMatching(row.id))
-      if (isApiMode() && ['approved', 'posted', 'matched', 'paid'].includes(row.status)) {
+      if (['approved', 'posted', 'matched', 'paid'].includes(row.status)) {
         try {
           setApPreview(await getPurchaseInvoiceApHandoffPreview(row.id))
           setApPreviewError(null)
@@ -164,29 +165,18 @@ export function PurchaseInvoiceDetailPage() {
   const matchLabel = INVOICE_MATCHING_RESULT_STATUS_LABELS[inv.matchingResultStatus]
   const originLabel = PURCHASE_INVOICE_ORIGIN_LABELS[inv.origin]
 
-  const editable = ['draft', 'pending_verification', 'matched', 'mismatch', 'on_hold'].includes(
-    inv.status,
-  )
-  const canVerify = ['draft', 'pending_verification', 'matched', 'mismatch', 'on_hold'].includes(
-    inv.status,
-  )
-  const canSubmit = ['matched', 'mismatch', 'draft', 'pending_verification'].includes(inv.status)
-  const canApprove = inv.status === 'pending_approval' || inv.status === 'mismatch'
-  const canPost = ['approved', 'matched', 'mismatch'].includes(inv.status)
-  const canHold = !['posted', 'paid', 'cancelled'].includes(inv.status)
-  const canDebit = ['posted', 'approved', 'matched', 'mismatch', 'paid'].includes(inv.status)
-  const showException =
-    !isApiMode()
-    && perms.canApproveInvoice
-    && Boolean(matching?.exceedsTolerance)
-    && !inv.matchingExceptionApproved
-  const apiMode = isApiMode()
-  const showHold = !apiMode && perms.canVerifyInvoice && canHold
-  const showDebit = !apiMode && canDebit
-  const postBlocked =
-    !apiMode
-    && Boolean(matching?.exceedsTolerance)
-    && !inv.matchingExceptionApproved
+  const editable = inv.status === 'draft'
+  const canVerify = false
+  const canSubmit = ['draft', 'rejected'].includes(inv.status)
+  const canApprove = inv.status === 'pending_approval'
+  const canPost = ['approved', 'matched'].includes(inv.status)
+  const canCancel = !['posted', 'paid', 'closed', 'cancelled'].includes(inv.status)
+  // Hold, matching-exception override, and debit-note-from-invoice are not exposed via the
+  // live API today; the backend enforces tolerance/GRN 3-way match server-side.
+  const showException = false
+  const showHold = false
+  const showDebit = false
+  const postBlocked = false
   const showVerify = perms.canVerifyInvoice && canVerify
   const showSubmit = perms.canCreateInvoice && canSubmit
   const showApprove = perms.canApproveInvoice && canApprove
@@ -209,9 +199,7 @@ export function PurchaseInvoiceDetailPage() {
             onClick: () =>
               void run(
                 () => postPurchaseInvoice(inv.id),
-                apiMode
-                  ? 'Invoice posted — Vendor Invoice draft created in Money Out (AP SoT). Post GL from Accounting.'
-                  : 'Invoice posted (demo)',
+                'Invoice posted — Vendor Invoice draft created in Money Out (AP SoT). Post GL from Accounting.',
               ),
             disabled: busy || postBlocked,
             disabledReason: postBlocked
@@ -315,11 +303,11 @@ export function PurchaseInvoiceDetailPage() {
         documentFacts={[
           { label: 'Invoice No', value: inv.documentNumber, emphasize: true },
           { label: 'Vendor', value: inv.vendor.name, emphasize: true },
-          { label: 'Vendor Inv.', value: inv.vendorInvoiceNumber || '—' },
+          { label: 'Vendor Inv.', value: inv.vendorInvoiceNumber || '-' },
           { label: 'Posting Date', value: formatDate(inv.postingDate) },
           {
             label: 'Due Date',
-            value: inv.dueDate ? formatDate(inv.dueDate) : '—',
+            value: inv.dueDate ? formatDate(inv.dueDate) : '-',
             muted: !inv.dueDate,
           },
         ]}
@@ -360,7 +348,7 @@ export function PurchaseInvoiceDetailPage() {
                       : '/accounting/money-out/vendor-invoices',
                   )
                 },
-                hidden: !apiMode || inv.status !== 'posted',
+                hidden: inv.status !== 'posted',
               },
             ]}
             moreActions={[
@@ -416,9 +404,7 @@ export function PurchaseInvoiceDetailPage() {
                 onClick: () =>
                   void run(
                     () => postPurchaseInvoice(inv.id),
-                    apiMode
-                      ? 'Invoice posted — Vendor Invoice draft created in Money Out (AP SoT). Post GL from Accounting.'
-                      : 'Invoice posted (demo)',
+                    'Invoice posted — Vendor Invoice draft created in Money Out (AP SoT). Post GL from Accounting.',
                   ),
                 hidden: !showPost || primaryAction?.id === 'post',
                 disabled: busy || postBlocked,
@@ -473,6 +459,28 @@ export function PurchaseInvoiceDetailPage() {
                 hidden: !perms.canApproveInvoice || !canApprove,
                 disabled: busy,
               },
+              {
+                id: 'cancel',
+                label: 'Cancel Invoice',
+                icon: Ban,
+                onClick: async () => {
+                  const note = await appPromptNote({
+                    title: 'Cancel invoice',
+                    description: `Cancel purchase invoice ${inv.documentNumber}? This cannot be undone.`,
+                    tone: 'danger',
+                    confirmLabel: 'Cancel Invoice',
+                    cancelLabel: 'Keep Invoice',
+                    note: { label: 'Reason', required: false },
+                  })
+                  if (note === null) return
+                  void run(
+                    () => cancelPurchaseInvoice(inv.id, note || undefined),
+                    'Invoice cancelled',
+                  )
+                },
+                hidden: !perms.canCreateInvoice || !canCancel,
+                disabled: busy,
+              },
             ]}
           />
         }
@@ -510,7 +518,7 @@ export function PurchaseInvoiceDetailPage() {
           <ErpViewField label="Posting Date" value={formatDate(inv.postingDate)} />
           <ErpViewField label="Vendor" value={`${inv.vendor.code} — ${inv.vendor.name}`} />
           <ErpViewField label="GSTIN" value={inv.vendor.gstin} />
-          <ErpViewField label="Vendor State" value={inv.vendor.state || '—'} />
+          <ErpViewField label="Vendor State" value={inv.vendor.state || '-'} />
           <ErpViewField
             label="PO Number"
             value={
@@ -522,7 +530,7 @@ export function PurchaseInvoiceDetailPage() {
                   {inv.purchaseOrderNumber}
                 </Link>
               ) : (
-                '—'
+                '-'
               )
             }
           />
@@ -537,13 +545,13 @@ export function PurchaseInvoiceDetailPage() {
                   {inv.goodsReceiptNumber}
                 </Link>
               ) : (
-                inv.goodsReceiptNumber ?? '—'
+                inv.goodsReceiptNumber ?? '-'
               )
             }
           />
           <ErpViewField label="Origin" value={originLabel} />
           <ErpViewField label="Location" value={inv.location.name} />
-          <ErpViewField label="Department" value={inv.department || '—'} />
+          <ErpViewField label="Department" value={inv.department || '-'} />
           <ErpViewField label="Requester" value={inv.requester.name} />
           <ErpViewField
             label="Matching"
@@ -555,7 +563,7 @@ export function PurchaseInvoiceDetailPage() {
             label="Exception"
             value={
               inv.matchingExceptionApproved
-                ? `Approved by ${inv.exceptionApprovedBy ?? '—'}`
+                ? `Approved by ${inv.exceptionApprovedBy ?? '-'}`
                 : 'Not approved'
             }
           />
@@ -577,30 +585,30 @@ export function PurchaseInvoiceDetailPage() {
         >
           <ErpViewField label="Currency" value={inv.currency} />
           <ErpViewField label="Payment Terms" value={inv.paymentTerms} />
-          <ErpViewField label="Delivery Terms" value={inv.deliveryTerms || '—'} />
-          <ErpViewField label="Due Date" value={inv.dueDate ? formatDate(inv.dueDate) : '—'} />
-          <ErpViewField label="Place of Supply" value={inv.placeOfSupply || '—'} />
+          <ErpViewField label="Delivery Terms" value={inv.deliveryTerms || '-'} />
+          <ErpViewField label="Due Date" value={inv.dueDate ? formatDate(inv.dueDate) : '-'} />
+          <ErpViewField label="Place of Supply" value={inv.placeOfSupply || '-'} />
           <ErpViewField label="Reverse Charge" value={inv.reverseCharge ? 'Yes' : 'No'} />
           <ErpViewField
             label="GST Scheme"
             value={inv.gstScheme === 'igst' ? 'IGST' : 'CGST + SGST'}
           />
-          <ErpViewField label="E-Invoice Ref" value={inv.eInvoiceReference ?? '—'} />
+          <ErpViewField label="E-Invoice Ref" value={inv.eInvoiceReference ?? '-'} />
           <ErpViewField
             label="Verified"
             value={
               inv.verifiedAt
                 ? `${formatDate(inv.verifiedAt.slice(0, 10))}${inv.verifiedBy ? ` · ${inv.verifiedBy}` : ''}`
-                : '—'
+                : '-'
             }
           />
           <ErpViewField
             label="Posted"
-            value={inv.postedAt ? formatDate(inv.postedAt.slice(0, 10)) : '—'}
+            value={inv.postedAt ? formatDate(inv.postedAt.slice(0, 10)) : '-'}
           />
           <ErpViewField
             label="Paid"
-            value={inv.paidAt ? formatDate(inv.paidAt.slice(0, 10)) : '—'}
+            value={inv.paidAt ? formatDate(inv.paidAt.slice(0, 10)) : '-'}
           />
         </ErpCardSection>
 
@@ -708,9 +716,9 @@ export function PurchaseInvoiceDetailPage() {
                           <div className="font-mono text-[11px] text-erp-muted">{l.itemCode}</div>
                           <div className="font-medium text-erp-text">{l.itemName}</div>
                         </td>
-                        <td className="num tabular-nums">{l.poQty ?? '—'}</td>
+                        <td className="num tabular-nums">{l.poQty ?? '-'}</td>
                         <td className="num tabular-nums">
-                          {l.grnBillableQty ?? l.grnReceivedQty ?? '—'}
+                          {l.grnBillableQty ?? l.grnReceivedQty ?? '-'}
                           {l.grnBillableQty != null
                             && l.grnReceivedQty != null
                             && l.grnBillableQty !== l.grnReceivedQty ? (
@@ -721,13 +729,13 @@ export function PurchaseInvoiceDetailPage() {
                         </td>
                         <td className="num tabular-nums">{l.invoiceQty}</td>
                         <td className="num tabular-nums">
-                          {l.poRate != null ? formatCurrency(l.poRate) : '—'}
+                          {l.poRate != null ? formatCurrency(l.poRate) : '-'}
                         </td>
                         <td className="num tabular-nums">{formatCurrency(l.invoiceRate)}</td>
                         <td>
                           <div className="flex flex-wrap gap-1">
                             {l.flags.length === 0 ? (
-                              <span className="text-erp-muted">—</span>
+                              <span className="text-erp-muted">-</span>
                             ) : (
                               l.flags.map((f) => (
                                 <Badge key={f} color={matchColor(f)}>
@@ -753,7 +761,7 @@ export function PurchaseInvoiceDetailPage() {
           )}
         </ErpCardSection>
 
-        {apiMode && (apPreview || apPreviewError) ? (
+        {(apPreview || apPreviewError) ? (
           <ErpCardSection
             title="AP handoff"
             subtitle="Accounting Vendor Invoice is the liability SoT — Purchase does not post GL"
@@ -779,7 +787,7 @@ export function PurchaseInvoiceDetailPage() {
                   />
                   <ErpViewField
                     label="Vendor invoice no."
-                    value={String(apPreview?.supplierInvoiceNumber ?? apPreview?.vendorInvoiceNumber ?? inv.vendorInvoiceNumber ?? '—')}
+                    value={String(apPreview?.supplierInvoiceNumber ?? apPreview?.vendorInvoiceNumber ?? inv.vendorInvoiceNumber ?? '-')}
                   />
                   <ErpViewField
                     label="Draft ref / ID"
@@ -787,7 +795,7 @@ export function PurchaseInvoiceDetailPage() {
                       inv.accountingVendorInvoiceId ??
                         apPreview?.existingVendorInvoiceId ??
                         apPreview?.existingVendorInvoiceDraftRef ??
-                        '—',
+                        '-',
                     )}
                   />
                 </div>
@@ -849,7 +857,7 @@ export function PurchaseInvoiceDetailPage() {
                           {l.description || l.itemName}
                         </div>
                       </td>
-                      <td className="font-mono">{l.hsnCode || l.sacCode || '—'}</td>
+                      <td className="font-mono">{l.hsnCode || l.sacCode || '-'}</td>
                       <td className="num">
                         <PurchaseStockDualQtyCell
                           baseQty={l.quantity}
@@ -911,13 +919,13 @@ export function PurchaseInvoiceDetailPage() {
           collapsible
           defaultOpen={false}
         >
-          <ErpViewField label="Remarks" value={inv.remarks || '—'} />
+          <ErpViewField label="Remarks" value={inv.remarks || '-'} />
         </ErpCardSection>
       </PurchaseCardFormShell>
 
       <Modal open={matchOpen} onClose={() => setMatchOpen(false)} title="Matching details">
         <p className="mb-2 text-[13px] text-erp-muted">
-          Overall: {matching?.overallStatusLabel ?? '—'}
+          Overall: {matching?.overallStatusLabel ?? '-'}
         </p>
         <pre className="max-h-80 overflow-auto rounded bg-erp-surface-alt p-3 text-[11px]">
           {JSON.stringify(matching, null, 2)}

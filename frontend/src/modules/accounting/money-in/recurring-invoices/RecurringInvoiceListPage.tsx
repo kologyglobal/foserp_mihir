@@ -184,9 +184,9 @@ export function RecurringInvoiceListPage() {
                   <td className="px-3 py-2">{RECURRING_FREQUENCY_LABELS[s.frequency] ?? s.frequency}</td>
                   <td className="px-3 py-2 tabular-nums">{s.startDate}</td>
                   <td className="px-3 py-2 tabular-nums font-medium">
-                    {s.status === 'ACTIVE' ? s.nextInvoiceDate : '—'}
+                    {s.status === 'ACTIVE' ? s.nextInvoiceDate : '-'}
                   </td>
-                  <td className="px-3 py-2 tabular-nums">{s.endDate ?? '—'}</td>
+                  <td className="px-3 py-2 tabular-nums">{s.endDate ?? '-'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(scheduleTotal(s))}</td>
                   <td className="px-3 py-2">
                     <ErpStatusChip label={s.status} tone={scheduleStatusTone(s.status)} />
@@ -202,7 +202,7 @@ export function RecurringInvoiceListPage() {
                         {cancellingId === s.id ? 'Cancelling…' : 'Cancel'}
                       </ErpButton>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </td>
                 </tr>

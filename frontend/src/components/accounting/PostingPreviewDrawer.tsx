@@ -71,8 +71,8 @@ export function PostingPreviewDrawer({
                       <p className="font-mono text-[11px] text-erp-muted">{accountCode(l.accountId)}</p>
                       {l.narration ? <p className="text-[11px] text-erp-muted">{l.narration}</p> : null}
                     </td>
-                    <td className="text-right tabular-nums">{l.debit > 0 ? formatCurrency(l.debit) : '—'}</td>
-                    <td className="text-right tabular-nums">{l.credit > 0 ? formatCurrency(l.credit) : '—'}</td>
+                    <td className="text-right tabular-nums">{l.debit > 0 ? formatCurrency(l.debit) : '-'}</td>
+                    <td className="text-right tabular-nums">{l.credit > 0 ? formatCurrency(l.credit) : '-'}</td>
                   </tr>
                 ))}
               </tbody>

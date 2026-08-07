@@ -138,7 +138,7 @@ function parseCoverBody(content: string): { meta: Array<{ label: string; value: 
     if (/^QUOTATION$/i.test(line)) continue
     const m = line.match(/^(Quotation No\.?|Ref\.?\s*No\.?|Date)\s*:\s*(.*)$/i)
     if (inMeta && m) {
-      meta.push({ label: m[1].replace(/\s+/g, ' ').replace(/\.$/, ''), value: m[2].trim() || '—' })
+      meta.push({ label: m[1].replace(/\s+/g, ' ').replace(/\.$/, ''), value: m[2].trim() || '-' })
       continue
     }
     inMeta = false
@@ -283,7 +283,7 @@ export function QuotationPrintDocument({
           <p>{map.customer_address}</p>
           <p>Kind Attn: {map.contact_person}</p>
           <p>Mobile: {map.contact_mobile}</p>
-          {map.contact_email !== '—' ? <p>Email: {map.contact_email}</p> : null}
+          {map.contact_email !== '-' ? <p>Email: {map.contact_email}</p> : null}
         </section>
       ) : null}
 

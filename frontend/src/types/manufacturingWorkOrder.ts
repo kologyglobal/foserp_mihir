@@ -552,7 +552,7 @@ export function getWorkOrderQcStatus(wo: WorkOrder): WorkOrderQcStatus {
 
 export function getWorkOrderOwnerLine(wo: WorkOrder): string {
   const parts = [wo.supervisor, wo.workstation].filter(Boolean)
-  return parts.length ? parts.join(' · ') : wo.createdBy || '—'
+  return parts.length ? parts.join(' · ') : wo.createdBy || '-'
 }
 
 export const WO_SOURCE_LABELS: Record<WorkOrderSource, string> = {

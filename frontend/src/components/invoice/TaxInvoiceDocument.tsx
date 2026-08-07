@@ -76,7 +76,7 @@ export function TaxInvoiceDocument({ invoice, className }: TaxInvoiceDocumentPro
               <p className="mt-1 text-xs leading-relaxed text-slate-600">{invoice.customerAddress}</p>
             )}
             <p className="mt-2 text-xs">
-              <span className="font-medium">GSTIN:</span> {invoice.customerGstin || '—'}
+              <span className="font-medium">GSTIN:</span> {invoice.customerGstin || '-'}
             </p>
             <p className="text-xs">
               <span className="font-medium">Place of Supply:</span> {invoice.placeOfSupply}
@@ -85,13 +85,13 @@ export function TaxInvoiceDocument({ invoice, className }: TaxInvoiceDocumentPro
           <div className="rounded border border-slate-200 p-3">
             <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Transport</p>
             <p className="text-xs">
-              <span className="font-medium">Transporter:</span> {invoice.transporter || '—'}
+              <span className="font-medium">Transporter:</span> {invoice.transporter || '-'}
             </p>
             <p className="text-xs">
-              <span className="font-medium">LR Number:</span> {invoice.lrNo || '—'}
+              <span className="font-medium">LR Number:</span> {invoice.lrNo || '-'}
             </p>
             <p className="text-xs">
-              <span className="font-medium">Vehicle No:</span> {invoice.vehicleNo || '—'}
+              <span className="font-medium">Vehicle No:</span> {invoice.vehicleNo || '-'}
             </p>
             <p className="mt-2 text-xs text-slate-500">{gstSchemeLabel(gst.scheme)}</p>
           </div>
@@ -121,8 +121,8 @@ export function TaxInvoiceDocument({ invoice, className }: TaxInvoiceDocumentPro
                   {line.description}
                 </td>
                 <td className="border border-slate-300 px-2 py-2 font-mono">{line.hsnCode}</td>
-                <td className="border border-slate-300 px-2 py-2 font-mono">{line.trailerNo || '—'}</td>
-                <td className="border border-slate-300 px-2 py-2 font-mono">{line.chassisNo || '—'}</td>
+                <td className="border border-slate-300 px-2 py-2 font-mono">{line.trailerNo || '-'}</td>
+                <td className="border border-slate-300 px-2 py-2 font-mono">{line.chassisNo || '-'}</td>
                 <td className="border border-slate-300 px-2 py-2 text-right">{formatNumber(line.qty)}</td>
                 <td className="border border-slate-300 px-2 py-2 text-right font-mono">{formatCurrency(line.unitPrice)}</td>
                 <td className="border border-slate-300 px-2 py-2 text-right font-mono">{formatCurrency(line.taxableAmount)}</td>

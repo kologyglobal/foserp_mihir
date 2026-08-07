@@ -101,12 +101,12 @@ export function ApiReworkWorkbenchPage() {
                         View WO
                       </Link>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </td>
                   <td className="px-4 py-2">{row.title}</td>
-                  <td className="px-4 py-2 tabular-nums">{row.reworkQty ?? '—'}</td>
-                  <td className="px-4 py-2">{row.decidedAt ? formatDateTime(row.decidedAt) : '—'}</td>
+                  <td className="px-4 py-2 tabular-nums">{row.reworkQty ?? '-'}</td>
+                  <td className="px-4 py-2">{row.decidedAt ? formatDateTime(row.decidedAt) : '-'}</td>
                   <td className="px-4 py-2">
                     <StatusDot label="rework" tone="warning" />
                   </td>

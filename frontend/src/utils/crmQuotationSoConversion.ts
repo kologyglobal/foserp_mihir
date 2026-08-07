@@ -207,10 +207,10 @@ export function buildSoConversionPreview(ctx: QuotationSoConversionContext) {
   return {
     quotationNo: salesQuotation?.quotationNo ?? document.quotationId,
     revisionNo: document.revisionNo,
-    customerName: customer?.customerName ?? '—',
-    contactName: contactName ?? customer?.contactPerson ?? '—',
-    opportunityName: opportunityName ?? '—',
-    productName: priced.lineCount > 1 ? quotationLineItemsSummary(document) : productName ?? line?.productOrItem ?? '—',
+    customerName: customer?.customerName ?? '-',
+    contactName: contactName ?? customer?.contactPerson ?? '-',
+    opportunityName: opportunityName ?? '-',
+    productName: priced.lineCount > 1 ? quotationLineItemsSummary(document) : productName ?? line?.productOrItem ?? '-',
     lineCount: priced.lineCount,
     quantity: priced.totalQty,
     basicAmount: priced.summary.taxableValue,
@@ -222,7 +222,7 @@ export function buildSoConversionPreview(ctx: QuotationSoConversionContext) {
     validTill: salesQuotation?.validityDate
       ? salesQuotation.validityDate
       : '',
-    salesOwner: document.salesOwnerName ?? '—',
+    salesOwner: document.salesOwnerName ?? '-',
     lines: priced.lines.map((l) => ({
       productOrItem: l.productOrItem,
       qty: l.qty,

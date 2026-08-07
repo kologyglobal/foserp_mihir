@@ -29,7 +29,7 @@ export function ItemStockDetailPage() {
   const reservations = useInventoryStore((s) => s.reservations)
   const stockMovements = useInventoryStore((s) => s.stockMovements)
 
-  const uomCode = (uomId: string) => uoms.find((u) => u.id === uomId)?.uomCode ?? '—'
+  const uomCode = (uomId: string) => uoms.find((u) => u.id === uomId)?.uomCode ?? '-'
 
   const positions = useMemo(() => {
     if (!item) return []

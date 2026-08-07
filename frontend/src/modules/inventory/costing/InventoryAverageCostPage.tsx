@@ -7,7 +7,6 @@ import { RefreshCw, TrendingUp } from 'lucide-react'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { isApiMode } from '@/config/apiConfig'
 import { fetchMovingAverageState, fetchMovingAverageHistory } from '@/services/api/inventoryCostingApi'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
@@ -30,7 +29,6 @@ type MaRow = {
 }
 
 export function InventoryAverageCostPage() {
-  const api = isApiMode()
   const [rows, setRows] = useState<MaRow[]>([])
   const [historyItemId, setHistoryItemId] = useState<string | null>(null)
   const [history, setHistory] = useState<
@@ -57,10 +55,6 @@ export function InventoryAverageCostPage() {
     setLoading(true)
     setError(null)
     try {
-      if (!api) {
-        setRows([])
-        return
-      }
       const res = await fetchMovingAverageState({ limit: 100 })
       setRows(res.data ?? [])
     } catch (e) {
@@ -68,7 +62,7 @@ export function InventoryAverageCostPage() {
     } finally {
       setLoading(false)
     }
-  }, [api])
+  }, [])
 
   useEffect(() => {
     void load()
@@ -76,7 +70,6 @@ export function InventoryAverageCostPage() {
 
   const openHistory = async (itemId: string, warehouseId?: string) => {
     setHistoryItemId(itemId)
-    if (!api) return
     try {
       const res = await fetchMovingAverageHistory({ itemId, warehouseId, limit: 50 })
       setHistory(res.data?.items ?? [])
@@ -113,7 +106,7 @@ export function InventoryAverageCostPage() {
         <EmptyState
           icon={TrendingUp}
           title="No moving-average balances"
-          description={api ? 'No stock balances for this tenant.' : 'Requires API mode.'}
+          description="No stock balances for this tenant."
         />
       ) : null}
       {!loading && rows.length > 0 ? (
@@ -148,12 +141,12 @@ export function InventoryAverageCostPage() {
                   <td>
                     {r.lastReceipt
                       ? `${formatDate(r.lastReceipt.postingDate)} · ${formatCurrency(Number(r.lastReceipt.unitCost))}`
-                      : '—'}
+                      : '-'}
                   </td>
                   <td>
                     {r.lastIssue
                       ? `${formatDate(r.lastIssue.postingDate)} · ${formatCurrency(Number(r.lastIssue.unitCost))}`
-                      : '—'}
+                      : '-'}
                   </td>
                   <td className="text-right">
                     <button
@@ -205,7 +198,7 @@ export function InventoryAverageCostPage() {
                 {history.map((h) => (
                   <tr key={h.costEntryId}>
                     <td>{formatDate(h.postingDate.slice(0, 10))}</td>
-                    <td className="text-erp-muted">{h.sourceDocument ?? '—'}</td>
+                    <td className="text-erp-muted">{h.sourceDocument ?? '-'}</td>
                     <td>{h.entryType}</td>
                     <td className="text-right tabular-nums">{Number(h.qtyBefore).toLocaleString()}</td>
                     <td className="text-right tabular-nums">{formatCurrency(Number(h.valueBefore))}</td>

@@ -119,7 +119,7 @@ export const CRM_MASTERS_SEED: CrmMasterEntry[] = [
   entry('lead-stages', 'requirement_collected', 'Requirement Collected', 3, { stageType: 'open', color: '#8764B8', isDefault: false, isFinal: false, nextAction: 'Qualify lead' }),
   entry('lead-stages', 'qualified', 'Qualified', 4, { stageType: 'qualified', color: '#107C10', isDefault: false, isFinal: false, nextAction: 'Create opportunity' }),
   entry('lead-stages', 'not_qualified', 'Not Qualified', 5, { stageType: 'closed', color: '#D13438', isDefault: false, isFinal: false, nextAction: 'Capture reason' }),
-  entry('lead-stages', 'converted_to_opportunity', 'Converted to Opportunity', 6, { stageType: 'converted', color: '#498205', isDefault: false, isFinal: true, nextAction: '—' }, { systemControlled: true }),
+  entry('lead-stages', 'converted_to_opportunity', 'Converted to Opportunity', 6, { stageType: 'converted', color: '#498205', isDefault: false, isFinal: true, nextAction: '-' }, { systemControlled: true }),
   entry('lead-stages', 'closed', 'Closed', 7, { stageType: 'closed', color: '#605E5C', isDefault: false, isFinal: true, nextAction: 'Capture closed reason' }),
 
   entry('lead-priorities', 'low', 'Low', 1, { priorityLevel: 1, color: '#8A94A6', slaHours: 72 }),

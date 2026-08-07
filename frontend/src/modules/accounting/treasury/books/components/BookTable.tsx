@@ -39,13 +39,13 @@ export function BookTable({ result }: { result: BookResultDto }) {
                 <td className="px-2 py-1.5 whitespace-nowrap">
                   {entry.voucherType} {entry.voucherNumber}
                 </td>
-                <td className="px-2 py-1.5 text-erp-muted">{entry.sourceModule ?? '—'}</td>
-                <td className="px-2 py-1.5">{entry.narration ?? '—'}</td>
+                <td className="px-2 py-1.5 text-erp-muted">{entry.sourceModule ?? '-'}</td>
+                <td className="px-2 py-1.5">{entry.narration ?? '-'}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">
-                  {Number(entry.debitAmount) > 0 ? formatBookAmount(entry.debitAmount) : '—'}
+                  {Number(entry.debitAmount) > 0 ? formatBookAmount(entry.debitAmount) : '-'}
                 </td>
                 <td className="px-2 py-1.5 text-right tabular-nums">
-                  {Number(entry.creditAmount) > 0 ? formatBookAmount(entry.creditAmount) : '—'}
+                  {Number(entry.creditAmount) > 0 ? formatBookAmount(entry.creditAmount) : '-'}
                 </td>
                 <td className="px-2 py-1.5 text-right font-medium tabular-nums">{formatBookAmount(entry.runningBalance)}</td>
               </tr>

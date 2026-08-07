@@ -515,7 +515,7 @@ export function RfqEditorPage() {
               ? `${selectedPrIds.length} PR${selectedPrIds.length === 1 ? '' : 's'}`
               : SOURCE_MODE_LABELS[sourceMode],
       },
-      { label: 'Buyer', value: ACTOR.name || '—' },
+      { label: 'Buyer', value: ACTOR.name || '-' },
       {
         label: 'Date',
         value: formatFastTabDate(documentDate) ?? formatDate(documentDate),
@@ -583,7 +583,7 @@ export function RfqEditorPage() {
         <PurchaseEnterpriseFactBox
           title="RFQ insight"
           summary={[
-            { label: 'RFQ No.', value: documentNumber ?? (isNew ? 'Loading…' : '—') },
+            { label: 'RFQ No.', value: documentNumber ?? (isNew ? 'Loading…' : '-') },
             { label: 'Status', value: 'Draft' },
             { label: 'Source', value: SOURCE_MODE_LABELS[sourceMode] },
             {
@@ -1010,7 +1010,7 @@ export function RfqEditorPage() {
                     <td className="num">
                       {p.lastPurchasePrice != null
                         ? formatCurrency(p.lastPurchasePrice)
-                        : '—'}
+                        : '-'}
                     </td>
                   </tr>
                 ))}

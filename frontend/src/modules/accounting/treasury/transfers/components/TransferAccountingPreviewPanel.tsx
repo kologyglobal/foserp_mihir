@@ -24,8 +24,8 @@ function LineTable({ title, lines }: { title: string; lines: TransferAccountingP
                 {line.accountCode ? `${line.accountCode} — ${line.accountName ?? ''}` : line.accountId.slice(0, 8)}
               </td>
               <td className="px-2 py-1.5 text-erp-muted">{line.accountRole.replace(/_/g, ' ')}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums">{line.side === 'DEBIT' ? formatTransferAmount(line.amount) : '—'}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums">{line.side === 'CREDIT' ? formatTransferAmount(line.amount) : '—'}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{line.side === 'DEBIT' ? formatTransferAmount(line.amount) : '-'}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{line.side === 'CREDIT' ? formatTransferAmount(line.amount) : '-'}</td>
             </tr>
           ))}
         </tbody>

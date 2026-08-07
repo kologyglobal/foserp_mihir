@@ -26,7 +26,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -164,14 +164,14 @@ export function CashAccountCardPage() {
             <Field label="Physical Balance" value={formatCurrency(account.physicalBalance)} />
             <Field label="Variance" value={formatCurrency(account.variance)} />
             <Field label="Variance Tolerance" value={formatCurrency(account.varianceTolerance)} />
-            <Field label="Cash Limit" value={account.cashLimit != null ? formatCurrency(account.cashLimit) : '—'} />
-            <Field label="Imprest Limit" value={account.imprestLimit != null ? formatCurrency(account.imprestLimit) : '—'} />
+            <Field label="Cash Limit" value={account.cashLimit != null ? formatCurrency(account.cashLimit) : '-'} />
+            <Field label="Imprest Limit" value={account.imprestLimit != null ? formatCurrency(account.imprestLimit) : '-'} />
             <Field label="Count Frequency" value={account.countFrequency} />
-            <Field label="Last Count Date" value={account.lastCountDate ? formatDate(account.lastCountDate) : '—'} />
+            <Field label="Last Count Date" value={account.lastCountDate ? formatDate(account.lastCountDate) : '-'} />
             <Field label="Custodian" value={account.custodian} />
             <Field label="Location" value={account.location} />
-            <Field label="Plant" value={account.plant ?? '—'} />
-            <Field label="Department" value={account.department ?? '—'} />
+            <Field label="Plant" value={account.plant ?? '-'} />
+            <Field label="Department" value={account.department ?? '-'} />
             <Field label="Purpose" value={account.purpose} />
           </dl>
         ) : null}
@@ -198,8 +198,8 @@ export function CashAccountCardPage() {
                       <td className="px-3 py-2">{formatDate(e.entryDate)}</td>
                       <td className="px-3 py-2">{e.transactionType}</td>
                       <td className="px-3 py-2">{e.narration}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{e.debitAmount > 0 ? formatCurrency(e.debitAmount) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{e.creditAmount > 0 ? formatCurrency(e.creditAmount) : '—'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{e.debitAmount > 0 ? formatCurrency(e.debitAmount) : '-'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{e.creditAmount > 0 ? formatCurrency(e.creditAmount) : '-'}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(e.runningBalance)}</td>
                     </tr>
                   ))}

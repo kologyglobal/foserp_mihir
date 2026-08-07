@@ -9,16 +9,13 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/forms/Inputs'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
-import { isApiMode } from '@/config/apiConfig'
 import { fetchSpecificIdentification, type InventoryCostLayerDto } from '@/services/api/inventoryCostingApi'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { InventoryCostingShell } from './InventoryCostingShell'
 import { inventoryCostingPaths } from './inventoryCostingPaths'
-import { DEMO_COST_LAYERS } from './costingDemoData'
 
 export function InventorySpecificIdPage() {
-  const api = isApiMode()
   const [params] = useSearchParams()
   const [unidentifiedOnly, setUnidentifiedOnly] = useState(params.get('unidentified') === '1')
   const [rows, setRows] = useState<InventoryCostLayerDto[]>([])
@@ -29,14 +26,6 @@ export function InventorySpecificIdPage() {
     setLoading(true)
     setError(null)
     try {
-      if (!api) {
-        setRows(
-          DEMO_COST_LAYERS.filter((r) =>
-            unidentifiedOnly ? !r.serialId && !r.lotId : Boolean(r.serialId || r.lotId),
-          ),
-        )
-        return
-      }
       const res = await fetchSpecificIdentification({
         limit: 100,
         unidentifiedOnly: unidentifiedOnly || undefined,
@@ -47,7 +36,7 @@ export function InventorySpecificIdPage() {
     } finally {
       setLoading(false)
     }
-  }, [api, unidentifiedOnly])
+  }, [unidentifiedOnly])
 
   useEffect(() => {
     void load()

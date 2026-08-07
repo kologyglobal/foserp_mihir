@@ -77,7 +77,7 @@ export function OrderAddressListPage() {
   )
 
   const columns: ColumnDef<VendorOrderAddress, unknown>[] = [
-    { id: 'vendor', header: 'Vendor Code', cell: ({ row }) => <span className="font-mono text-xs">{getVendor(row.original.vendorId)?.vendorCode ?? '—'}</span> },
+    { id: 'vendor', header: 'Vendor Code', cell: ({ row }) => <span className="font-mono text-xs">{getVendor(row.original.vendorId)?.vendorCode ?? '-'}</span> },
     { accessorKey: 'code', header: 'Code', cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.code}</span> },
     { accessorKey: 'name', header: 'Name' },
     { accessorKey: 'city', header: 'City' },
@@ -208,11 +208,11 @@ export function OrderAddressFormPage() {
       subtitle={vendor ? `${vendor.vendorCode} — ${watched.name || 'Order address'}` : 'Order address code card'}
       breadcrumbs={buildMasterBreadcrumbs('procurement', isEdit ? 'Edit Order Address' : 'New Order Address')}
       documentStrip={[
-        { label: 'Vendor Code', value: vendor?.vendorCode ?? '—', highlight: Boolean(vendor) },
-        { label: 'Code', value: watched.code?.trim() || '—' },
-        { label: 'Name', value: watched.name?.trim() || '—' },
-        { label: 'City', value: watched.city?.trim() || '—' },
-        { label: 'GSTIN', value: watched.gstin?.length === 15 ? watched.gstin : '—' },
+        { label: 'Vendor Code', value: vendor?.vendorCode ?? '-', highlight: Boolean(vendor) },
+        { label: 'Code', value: watched.code?.trim() || '-' },
+        { label: 'Name', value: watched.name?.trim() || '-' },
+        { label: 'City', value: watched.city?.trim() || '-' },
+        { label: 'GSTIN', value: watched.gstin?.length === 15 ? watched.gstin : '-' },
         { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive' },
       ]}
       commandBar={(
@@ -233,17 +233,17 @@ export function OrderAddressFormPage() {
       activeSection={activeSection}
       onSectionSelect={setActiveSection}
       formMetrics={[
-        { label: 'Vendor', value: vendor?.vendorCode ?? '—', accent: 'blue' as const },
-        { label: 'Location', value: watched.city && watched.state ? `${watched.city}, ${watched.state}` : '—', accent: 'violet' as const },
-        { label: 'Post Code', value: watched.postCode || '—', accent: 'amber' as const },
+        { label: 'Vendor', value: vendor?.vendorCode ?? '-', accent: 'blue' as const },
+        { label: 'Location', value: watched.city && watched.state ? `${watched.city}, ${watched.state}` : '-', accent: 'violet' as const },
+        { label: 'Post Code', value: watched.postCode || '-', accent: 'amber' as const },
         { label: 'Active', value: watched.isActive ? 'Yes' : 'No', accent: watched.isActive ? ('green' as const) : ('amber' as const) },
       ]}
       factBoxTitle="Order address"
       factBoxSummary={[
         { label: 'Used on', value: 'Purchase Order, Vendor' },
-        { label: 'Vendor', value: vendor?.vendorName ?? '—' },
-        { label: 'GSTIN', value: watched.gstin || '—' },
-        { label: 'Phone', value: watched.phone || '—' },
+        { label: 'Vendor', value: vendor?.vendorName ?? '-' },
+        { label: 'GSTIN', value: watched.gstin || '-' },
+        { label: 'Phone', value: watched.phone || '-' },
         { label: 'Modified', value: existing ? formatDate(existing.updatedAt.slice(0, 10)) : 'New' },
       ]}
       stickyFooter={(
@@ -352,13 +352,13 @@ export function OrderAddressDetailPage() {
       backLabel="Order Address Codes"
       masterGroupId="procurement"
       title={`${record.code} — ${record.name}`}
-      subtitle={vendor ? `${vendor.vendorCode} · ${vendor.vendorName}` : '—'}
+      subtitle={vendor ? `${vendor.vendorCode} · ${vendor.vendorName}` : '-'}
       editTo={`/masters/order-addresses/${record.id}/edit`}
       badges={<ActiveBadge isActive={record.isActive} />}
     >
       <DetailSection title="General">
         <DetailGrid>
-          <DetailField label="Vendor Code" value={vendor ? <Link to={`/masters/vendors/${vendor.id}`} className="font-mono text-erp-primary hover:underline">{vendor.vendorCode}</Link> : '—'} />
+          <DetailField label="Vendor Code" value={vendor ? <Link to={`/masters/vendors/${vendor.id}`} className="font-mono text-erp-primary hover:underline">{vendor.vendorCode}</Link> : '-'} />
           <DetailField label="Code" value={<span className="font-mono">{record.code}</span>} />
           <DetailField label="Name" value={record.name} />
         </DetailGrid>
@@ -370,9 +370,9 @@ export function OrderAddressDetailPage() {
       </DetailSection>
       <DetailSection title="Contact & Tax">
         <DetailGrid>
-          <DetailField label="GST Registration No." value={record.gstin || '—'} />
-          <DetailField label="Phone no" value={record.phone || '—'} />
-          <DetailField label="Email id" value={record.email || '—'} />
+          <DetailField label="GST Registration No." value={record.gstin || '-'} />
+          <DetailField label="Phone no" value={record.phone || '-'} />
+          <DetailField label="Email id" value={record.email || '-'} />
         </DetailGrid>
       </DetailSection>
     </DetailLayout>

@@ -203,7 +203,7 @@ export function DispatchDashboardPage() {
 
   function openQuickView(plan: DispatchPlan) {
     setSelectedRowId(plan.id)
-    const trailerNos = plan.lines.map((l) => l.trailerNo).filter(Boolean).join(', ') || '—'
+    const trailerNos = plan.lines.map((l) => l.trailerNo).filter(Boolean).join(', ') || '-'
     openDetailPanel({
       title: plan.dispatchNo,
       subtitle: `${plan.customerName} · ${plan.salesOrderNo}`,
@@ -213,10 +213,10 @@ export function DispatchDashboardPage() {
         { label: 'Product', value: plan.productCode },
         { label: 'Status', value: dispatchStatusLabel(plan.status) },
         { label: 'Planned Date', value: formatDate(plan.plannedDate) },
-        { label: 'Vehicle', value: plan.vehicleNo || '—' },
-        { label: 'LR No', value: plan.lrNo || '—' },
+        { label: 'Vehicle', value: plan.vehicleNo || '-' },
+        { label: 'LR No', value: plan.lrNo || '-' },
         { label: 'Trailer No', value: trailerNos },
-        { label: 'Transporter', value: plan.transporter || '—' },
+        { label: 'Transporter', value: plan.transporter || '-' },
       ],
       links: [{ label: 'Open Dispatch', href: `/dispatch/${plan.id}` }],
       timeline: [{ id: 'planned', label: dispatchStatusLabel(plan.status), time: formatDate(plan.plannedDate), status: 'current' }],
@@ -236,17 +236,17 @@ export function DispatchDashboardPage() {
     { accessorKey: 'salesOrderNo', header: 'SO', cell: ({ row }) => <span className="font-mono text-xs">{row.original.salesOrderNo}</span> },
     { accessorKey: 'customerName', header: 'Customer' },
     { accessorKey: 'productCode', header: 'Product', cell: ({ row }) => <span className="font-mono text-xs">{row.original.productCode}</span> },
-    { accessorKey: 'vehicleNo', header: 'Vehicle', cell: ({ row }) => row.original.vehicleNo || '—' },
+    { accessorKey: 'vehicleNo', header: 'Vehicle', cell: ({ row }) => row.original.vehicleNo || '-' },
     {
       id: 'trailers',
       header: 'Trailer No',
       cell: ({ row }) => {
         const nos = row.original.lines.map((l) => l.trailerNo).filter(Boolean)
-        return nos.length ? nos.join(', ') : '—'
+        return nos.length ? nos.join(', ') : '-'
       },
     },
-    { accessorKey: 'lrNo', header: 'LR No', cell: ({ row }) => row.original.lrNo || '—' },
-    { accessorKey: 'transporter', header: 'Transporter', cell: ({ row }) => row.original.transporter || '—' },
+    { accessorKey: 'lrNo', header: 'LR No', cell: ({ row }) => row.original.lrNo || '-' },
+    { accessorKey: 'transporter', header: 'Transporter', cell: ({ row }) => row.original.transporter || '-' },
     {
       accessorKey: 'plannedDate',
       header: 'Plan Date',
@@ -764,14 +764,14 @@ export function DispatchDetailPage() {
                 <DetailField label="Destination" value={plan.destination} />
                 <DetailField
                   label="Location Code"
-                  value={planLocation ? locationDisplayLabel(planLocation) : '—'}
+                  value={planLocation ? locationDisplayLabel(planLocation) : '-'}
                 />
                 <DetailField label="Planned Date" value={formatDate(plan.plannedDate)} />
                 <DetailField label="Units" value={String(plan.lines.length)} />
-                <DetailField label="Movement No" value={plan.movementNo ?? '—'} />
-                <DetailField label="Gate Pass" value={plan.gatePass?.gatePassNo ?? '—'} />
-                <DetailField label="Security Approved" value={plan.gatePass?.securityApprovedBy ?? '—'} />
-                <DetailField label="Dispatched At" value={plan.dispatchedAt ? formatDate(plan.dispatchedAt.slice(0, 10)) : '—'} />
+                <DetailField label="Movement No" value={plan.movementNo ?? '-'} />
+                <DetailField label="Gate Pass" value={plan.gatePass?.gatePassNo ?? '-'} />
+                <DetailField label="Security Approved" value={plan.gatePass?.securityApprovedBy ?? '-'} />
+                <DetailField label="Dispatched At" value={plan.dispatchedAt ? formatDate(plan.dispatchedAt.slice(0, 10)) : '-'} />
               </DetailGrid>
               <TrailerIdentityEditor
                 plan={plan}
@@ -798,9 +798,9 @@ export function DispatchDetailPage() {
                       <tr key={line.id} className="border-b border-erp-border">
                         <td className="py-2">{idx + 1}</td>
                         <td className="py-2 font-mono text-xs">{line.itemCode}</td>
-                        <td className="py-2 font-mono text-xs">{line.trailerNo || '—'}</td>
-                        <td className="py-2 font-mono text-xs">{line.chassisNo || '—'}</td>
-                        <td className="py-2 font-mono text-xs">{line.workOrderNo ?? '—'}</td>
+                        <td className="py-2 font-mono text-xs">{line.trailerNo || '-'}</td>
+                        <td className="py-2 font-mono text-xs">{line.chassisNo || '-'}</td>
+                        <td className="py-2 font-mono text-xs">{line.workOrderNo ?? '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -957,9 +957,9 @@ export function DispatchDetailPage() {
             {plan.customerAck ? (
               <DetailGrid>
                 <DetailField label="Received By" value={plan.customerAck.acknowledgedBy} />
-                <DetailField label="Designation" value={plan.customerAck.designation || '—'} />
+                <DetailField label="Designation" value={plan.customerAck.designation || '-'} />
                 <DetailField label="POD Date" value={formatDate(plan.customerAck.ackDate)} />
-                <DetailField label="Remarks" value={plan.customerAck.remarks || '—'} />
+                <DetailField label="Remarks" value={plan.customerAck.remarks || '-'} />
                 <DetailField label="Recorded" value={formatDate(plan.customerAck.recordedAt.slice(0, 10))} />
               </DetailGrid>
             ) : canAck ? (

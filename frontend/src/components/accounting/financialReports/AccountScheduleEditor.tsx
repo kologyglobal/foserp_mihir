@@ -228,7 +228,7 @@ export function AccountScheduleEditor({
                 </td>
                 <td className="px-1.5 py-1">
                   {readOnly ? (
-                    <span className="font-mono text-[10px]">{row.accountRange || '—'}</span>
+                    <span className="font-mono text-[10px]">{row.accountRange || '-'}</span>
                   ) : (
                     <input
                       type="text"
@@ -241,7 +241,7 @@ export function AccountScheduleEditor({
                 </td>
                 <td className="px-1.5 py-1">
                   {readOnly ? (
-                    <span className="font-mono text-[10px]">{row.formula || '—'}</span>
+                    <span className="font-mono text-[10px]">{row.formula || '-'}</span>
                   ) : (
                     <input
                       type="text"

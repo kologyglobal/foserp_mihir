@@ -13,6 +13,7 @@ import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
 import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
 import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
 import { getPurchaseLineBaseUomCode } from '@/utils/purchaseLineUom'
+import { amountInWords } from '@/utils/amountInWords'
 
 export function PurchaseOrderPrintPage() {
   const { id } = useParams()
@@ -94,19 +95,19 @@ export function PurchaseOrderPrintPage() {
             <p className="po-print-box__label">Vendor</p>
             <p className="po-print-box__name">{po.vendor.name}</p>
             <p>Code: {po.vendor.code}</p>
-            <p>GSTIN: {po.vendor.gstin || '—'}</p>
-            <p>{po.vendor.address || '—'}</p>
+            <p>GSTIN: {po.vendor.gstin || '-'}</p>
+            <p>{po.vendor.address || '-'}</p>
             <p>State: {po.vendor.state}</p>
           </section>
           <section className="po-print-box">
             <p className="po-print-box__label">Order details</p>
             <p>Payment: {po.paymentTerms || 'Net 30'}</p>
-            <p>Delivery Terms: {po.deliveryTerms || '—'}</p>
-            <p>Freight: {po.freightTerms || '—'}</p>
+            <p>Delivery Terms: {po.deliveryTerms || '-'}</p>
+            <p>Freight: {po.freightTerms || '-'}</p>
             <p>Currency: {po.currency}</p>
-            <p>Place of Supply: {po.placeOfSupply || '—'}</p>
-            <p>PR Ref: {po.purchaseRequisitionNumber ?? '—'}</p>
-            <p>RFQ Ref: {po.rfqNumber ?? '—'}</p>
+            <p>Place of Supply: {po.placeOfSupply || '-'}</p>
+            <p>PR Ref: {po.purchaseRequisitionNumber ?? '-'}</p>
+            <p>RFQ Ref: {po.rfqNumber ?? '-'}</p>
             <p>Buyer: {po.buyer.name}</p>
             {showDualQtyHint ? (
               <p className="po-print-hint">Qty: purchase unit on top · stock unit below</p>
@@ -144,7 +145,7 @@ export function PurchaseOrderPrintPage() {
                 <td className="num">{l.lineNo}</td>
                 <td className="mono">{l.itemCode}</td>
                 <td>{l.itemName}</td>
-                <td>{l.hsnCode || l.sacCode || '—'}</td>
+                <td>{l.hsnCode || l.sacCode || '-'}</td>
                 <PurchasePrintDualQtyCell {...dual} />
                 <td className="num">{formatCurrency(l.rate)}</td>
                 <td className="num">{formatCurrency(l.taxableAmount)}</td>
@@ -176,18 +177,23 @@ export function PurchaseOrderPrintPage() {
             <span>Taxable Amount</span>
             <span>{formatCurrency(po.taxableAmount)}</span>
           </div>
-          <div className="po-print-summary__row">
-            <span>CGST</span>
-            <span>{formatCurrency(po.cgst)}</span>
-          </div>
-          <div className="po-print-summary__row">
-            <span>SGST</span>
-            <span>{formatCurrency(po.sgst)}</span>
-          </div>
-          <div className="po-print-summary__row">
-            <span>IGST</span>
-            <span>{formatCurrency(po.igst)}</span>
-          </div>
+          {Number(po.igst) > 0 ? (
+            <div className="po-print-summary__row">
+              <span>IGST</span>
+              <span>{formatCurrency(po.igst)}</span>
+            </div>
+          ) : (
+            <>
+              <div className="po-print-summary__row">
+                <span>CGST</span>
+                <span>{formatCurrency(po.cgst)}</span>
+              </div>
+              <div className="po-print-summary__row">
+                <span>SGST</span>
+                <span>{formatCurrency(po.sgst)}</span>
+              </div>
+            </>
+          )}
           <div className="po-print-summary__row">
             <span>TCS</span>
             <span>{formatCurrency(po.tcsAmount)}</span>
@@ -201,6 +207,10 @@ export function PurchaseOrderPrintPage() {
             <span>{formatCurrency(po.totalAmount)}</span>
           </div>
         </div>
+
+        <p className="po-print-words">
+          Amount in words: {amountInWords(Number(po.totalAmount) || 0)}
+        </p>
 
         <div className="po-print-terms">
           {(po.paymentTerms?.trim() ||
@@ -238,7 +248,7 @@ export function PurchaseOrderPrintPage() {
 
         <div className="po-print-signatures">
           <div className="po-print-signatures__line">Prepared by ({po.buyer.name})</div>
-          <div className="po-print-signatures__line">Approved by ({po.approver?.name ?? '—'})</div>
+          <div className="po-print-signatures__line">Approved by ({po.approver?.name ?? '-'})</div>
           <div className="po-print-signatures__line">
             For {QUOTATION_COMPANY.legalName} / Vendor acknowledgement
           </div>

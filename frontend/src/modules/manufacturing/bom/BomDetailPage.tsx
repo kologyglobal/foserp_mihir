@@ -313,7 +313,7 @@ export function BomDetailPage() {
                       <td className="text-right tabular-nums">{line.scrapPercent}</td>
                       <td>{line.warehouseName}</td>
                       <td>{BOM_ISSUE_METHOD_LABELS[line.issueMethod ?? 'auto']}</td>
-                      <td className="text-erp-muted">{line.remarks || '—'}</td>
+                      <td className="text-erp-muted">{line.remarks || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -373,7 +373,7 @@ export function BomDetailPage() {
                         </TableLink>
                       </td>
                       <td className="capitalize">{row.status.replace(/_/g, ' ')}</td>
-                      <td className="text-right tabular-nums">{row.qty ?? '—'}</td>
+                      <td className="text-right tabular-nums">{row.qty ?? '-'}</td>
                     </tr>
                   ))}
                 </tbody>

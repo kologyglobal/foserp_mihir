@@ -117,7 +117,7 @@ export function Customer360Hero({
             <Building2 className="h-4 w-4" aria-hidden />
             Primary contact
           </p>
-          <p className="customer-360-hero__contact-name">{customer.contactPerson || '—'}</p>
+          <p className="customer-360-hero__contact-name">{customer.contactPerson || '-'}</p>
           <div className="customer-360-hero__contact-lines">
             {customer.contactPhone ? (
               <button

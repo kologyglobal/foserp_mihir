@@ -53,10 +53,10 @@ export function buildPoPrintContext(input: {
     const item = getItem(l.itemId)
     return {
       lineNo: i + 1,
-      itemCode: item?.itemCode ?? '—',
-      itemName: item?.itemName ?? '—',
-      hsnCode: item?.hsnCode ?? '—',
-      warehouse: getWarehouse(l.warehouseId)?.warehouseName ?? '—',
+      itemCode: item?.itemCode ?? '-',
+      itemName: item?.itemName ?? '-',
+      hsnCode: item?.hsnCode ?? '-',
+      warehouse: getWarehouse(l.warehouseId)?.warehouseName ?? '-',
       qty: l.qty,
       uom: getUomCode?.(l.itemId) ?? 'Nos',
       rate: l.rate,
@@ -94,14 +94,14 @@ export function exportPoExcelTsv(ctx: PoPrintContext): string {
     ['Order Date', po.orderDate],
     ['Expected Delivery', po.expectedDate],
     ['Status', formatDocStatus(po.status)],
-    ['Vendor', vendor?.vendorName ?? '—'],
-    ['Vendor Code', vendor?.vendorCode ?? '—'],
-    ['Vendor GSTIN', vendor?.gstin ?? '—'],
+    ['Vendor', vendor?.vendorName ?? '-'],
+    ['Vendor Code', vendor?.vendorCode ?? '-'],
+    ['Vendor GSTIN', vendor?.gstin ?? '-'],
     ['Payment Terms', po.paymentTerms || 'Net 30'],
-    ['PR Reference', ctx.sourcePrNo ?? '—'],
-    ['RFQ Reference', ctx.sourceRfqNo ?? '—'],
+    ['PR Reference', ctx.sourcePrNo ?? '-'],
+    ['RFQ Reference', ctx.sourceRfqNo ?? '-'],
     ['Created By', po.createdByName],
-    ['Approved By', po.approvedByName ?? '—'],
+    ['Approved By', po.approvedByName ?? '-'],
     [],
     ['Line', 'Item Code', 'Description', 'HSN', 'Warehouse', 'Qty', 'UOM', 'Rate', 'Amount', 'Required Date'],
   ]
@@ -209,21 +209,21 @@ function buildPoPrintBodyHtml(ctx: PoPrintContext): string {
       <div class="po-print-grid">
         <section class="po-print-box">
           <p class="po-print-box__label">Vendor</p>
-          <p><strong>${vendor?.vendorName ?? '—'}</strong></p>
-          <p>Code: ${vendor?.vendorCode ?? '—'}</p>
-          <p>GSTIN: ${vendor?.gstin || '—'}</p>
+          <p><strong>${vendor?.vendorName ?? '-'}</strong></p>
+          <p>Code: ${vendor?.vendorCode ?? '-'}</p>
+          <p>GSTIN: ${vendor?.gstin || '-'}</p>
           <p>${vendor?.city ?? ''}${vendor?.state ? `, ${vendor.state}` : ''}</p>
-          <p>Contact: ${vendor?.contactPerson ?? '—'} · ${vendor?.contactPhone ?? '—'}</p>
+          <p>Contact: ${vendor?.contactPerson ?? '-'} · ${vendor?.contactPhone ?? '-'}</p>
         </section>
         <section class="po-print-box">
           <p class="po-print-box__label">Order details</p>
           <p>Payment: ${po.paymentTerms || 'Net 30'}</p>
           <p>Currency: INR</p>
           <p>Incoterms: Ex-Works</p>
-          <p>PR Ref: ${ctx.sourcePrNo ?? '—'}</p>
-          <p>RFQ Ref: ${ctx.sourceRfqNo ?? '—'}</p>
+          <p>PR Ref: ${ctx.sourcePrNo ?? '-'}</p>
+          <p>RFQ Ref: ${ctx.sourceRfqNo ?? '-'}</p>
           <p>Created by: ${po.createdByName}</p>
-          <p>Approved by: ${po.approvedByName ?? '—'}</p>
+          <p>Approved by: ${po.approvedByName ?? '-'}</p>
         </section>
       </div>
 

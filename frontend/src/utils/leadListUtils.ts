@@ -135,7 +135,7 @@ export function resolveLeadSourceIndustry(
   const n = normalizeLead(lead)
   return {
     source: leadSourceLabel(n.source) || formatStatus(n.source),
-    industry: customer?.industry?.trim() || n.industry || '—',
+    industry: customer?.industry?.trim() || n.industry || '-',
   }
 }
 
@@ -144,7 +144,7 @@ export function enrichLeadRow(lead: Lead, customer?: Customer | null): EnrichedL
   const { source, industry } = resolveLeadSourceIndustry(n, customer)
   const prospectDisplay = customer?.customerName?.trim() || n.prospectName
   const lastModified = n.modifiedAt ?? n.createdAt
-  const locationDisplay = customer?.city?.trim() || '—'
+  const locationDisplay = customer?.city?.trim() || '-'
   const accountTypeDisplay = customer
     ? customer.isCustomer
       ? 'Customer'

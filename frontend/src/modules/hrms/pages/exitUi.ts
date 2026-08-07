@@ -1,5 +1,5 @@
 export function money(n: number | null | undefined) {
-  if (n == null) return '—'
+  if (n == null) return '-'
   return `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 }
 
@@ -33,6 +33,6 @@ export function clearanceSummaryFromExitStatus(status: string): string {
     case 'CLOSED':
       return 'Cleared'
     default:
-      return '—'
+      return '-'
   }
 }

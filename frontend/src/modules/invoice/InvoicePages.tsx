@@ -421,8 +421,8 @@ export function InvoiceDetailPage() {
                               <span className="font-mono text-xs">{line.itemCode}</span>
                               <p className="text-xs text-slate-500">{line.description}</p>
                             </td>
-                            <td className="px-4 py-2 font-mono text-xs">{line.trailerNo || '—'}</td>
-                            <td className="px-4 py-2 font-mono text-xs">{line.chassisNo || '—'}</td>
+                            <td className="px-4 py-2 font-mono text-xs">{line.trailerNo || '-'}</td>
+                            <td className="px-4 py-2 font-mono text-xs">{line.chassisNo || '-'}</td>
                             <td className="px-4 py-2 font-mono text-xs">{line.hsnCode}</td>
                             <td className="px-4 py-2 text-right">{formatNumber(line.qty)}</td>
                             <td className="px-4 py-2 text-right font-mono">{formatCurrency(line.unitPrice)}</td>

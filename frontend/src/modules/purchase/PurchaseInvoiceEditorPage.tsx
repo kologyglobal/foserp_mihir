@@ -1132,10 +1132,10 @@ export function PurchaseInvoiceEditorPage() {
           <p className="erp-field-group__label">Match origin</p>
         </ErpFormSpan>
         <ErpFieldRow label="PO Number" readOnly>
-          <Input value={poNumber || '—'} readOnly className="bg-erp-surface-alt" />
+          <Input value={poNumber || '-'} readOnly className="bg-erp-surface-alt" />
         </ErpFieldRow>
         <ErpFieldRow label="GRN Number" readOnly>
-          <Input value={grnNumber || '—'} readOnly className="bg-erp-surface-alt" />
+          <Input value={grnNumber || '-'} readOnly className="bg-erp-surface-alt" />
         </ErpFieldRow>
         <ErpFieldRow label="Payment Terms">
           <PurchaseTermSelect
@@ -1284,7 +1284,7 @@ export function PurchaseInvoiceEditorPage() {
                       </td>
                       <td className="purchase-doc-lines-grid__uom-col">
                         <span className="block text-center text-[11px] font-medium uppercase text-erp-text">
-                          {line.uom || '—'}
+                          {line.uom || '-'}
                         </span>
                       </td>
                       <td className="num">

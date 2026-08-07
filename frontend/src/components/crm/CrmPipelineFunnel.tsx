@@ -172,7 +172,7 @@ export function CrmPipelineFunnel({
                       <span>
                         {openStages[index + 1].conversionFromPrev !== null
                           ? `${openStages[index + 1].conversionFromPrev}% advance`
-                          : '—'}
+                          : '-'}
                       </span>
                     </div>
                   ) : null}

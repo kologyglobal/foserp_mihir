@@ -246,7 +246,7 @@ export function SalesOrderDispatchFulfilmentPanel({ salesOrderId }: Props) {
             {
               accessorKey: 'primaryBlockerCode',
               header: 'Blocker',
-              cell: ({ row }) => row.original.primaryBlockerCode ?? '—',
+              cell: ({ row }) => row.original.primaryBlockerCode ?? '-',
             },
           ]}
         />
@@ -309,7 +309,7 @@ export function SalesOrderDispatchFulfilmentPanel({ salesOrderId }: Props) {
             {
               accessorKey: 'planningSource',
               header: 'Source',
-              cell: ({ row }) => row.original.planningSource ?? '—',
+              cell: ({ row }) => row.original.planningSource ?? '-',
             },
             {
               accessorKey: 'totalQty',

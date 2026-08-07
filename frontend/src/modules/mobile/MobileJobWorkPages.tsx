@@ -66,8 +66,8 @@ export function MobileJobWorkListPage() {
         {apiRows.slice(0, 40).map((wo) => (
           <div key={wo.id} className="mob-card mb-2">
             <div className="font-semibold">{jwLabel(wo)}</div>
-            <div className="text-sm text-[#605e5c]">{wo.processName} · {wo.vendor?.name ?? '—'}</div>
-            <MobileStatusChip label={wo.status ?? '—'} tone="amber" />
+            <div className="text-sm text-[#605e5c]">{wo.processName} · {wo.vendor?.name ?? '-'}</div>
+            <MobileStatusChip label={wo.status ?? '-'} tone="amber" />
             <div className="grid grid-cols-2 gap-2 mt-2">
               <button type="button" className="mob-btn mob-btn-primary" onClick={() => navigate(`/m/job-work/${wo.id}/send`)}>
                 Send

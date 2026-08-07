@@ -85,9 +85,9 @@ function onCellKeyDown(e: KeyboardEvent<HTMLElement>) {
 }
 
 function displayOrDash(value: string | number | null | undefined) {
-  if (value === null || value === undefined) return '—'
+  if (value === null || value === undefined) return '-'
   const text = String(value).trim()
-  return text || '—'
+  return text || '-'
 }
 
 /**
@@ -413,11 +413,11 @@ export function PurchaseRequisitionLinesTable({
                         const uomOptions = getPurchaseLineUomOptions(line.itemId)
                         const multi = uomOptions.length > 1
                         const uomCode =
-                          uomOptions.find((o) => o.id === line.uomId)?.code || line.uom || '—'
+                          uomOptions.find((o) => o.id === line.uomId)?.code || line.uom || '-'
                         if (!rowEditable || !line.itemId) {
                           return (
                             <span className="purchase-pr-lines-grid__uom-text">
-                              {line.uom || '—'}
+                              {line.uom || '-'}
                             </span>
                           )
                         }
@@ -490,7 +490,7 @@ export function PurchaseRequisitionLinesTable({
                       )}
                     </td>
                     <td className="font-mono text-[11px] text-erp-muted">
-                      {line.hsnCode || '—'}
+                      {line.hsnCode || '-'}
                     </td>
                     <td className="num" onKeyDown={rowEditable ? onCellKeyDown : undefined}>
                       {rowEditable ? (
@@ -586,7 +586,7 @@ export function PurchaseRequisitionLinesTable({
                           <span className="font-mono text-[12px]">{line.purchaseOrderNumber}</span>
                         )
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
                     <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>

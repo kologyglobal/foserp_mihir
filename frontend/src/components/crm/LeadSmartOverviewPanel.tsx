@@ -49,7 +49,7 @@ export function LeadSmartOverviewPanel({
     if (action.sectionId) onGoToSection(action.sectionId, action.focusField)
   }
 
-  const stageOwner = `${leadStageLabel(input.leadStage)} · ${input.ownerName || '—'}`
+  const stageOwner = `${leadStageLabel(input.leadStage)} · ${input.ownerName || '-'}`
 
   const quickActions: CrmSmartQuickAction[] = []
   if (onLogActivity) {

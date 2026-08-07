@@ -177,8 +177,8 @@ export function BankDepositsPage() {
                     <td className="px-3 py-2 tabular-nums">{formatDate(d.depositDate)}</td>
                     <td className="px-3 py-2">{d.bankAccountName}</td>
                     <td className="px-3 py-2">{d.depositType}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{d.cashAmount > 0 ? formatCurrency(d.cashAmount) : '—'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{d.chequeAmount > 0 ? `${formatCurrency(d.chequeAmount)} (${d.chequeCount})` : '—'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{d.cashAmount > 0 ? formatCurrency(d.cashAmount) : '-'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{d.chequeAmount > 0 ? `${formatCurrency(d.chequeAmount)} (${d.chequeCount})` : '-'}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(d.totalAmount)}</td>
                     <td className="px-3 py-2"><BankDepositStatusBadge status={d.status} /></td>
                   </tr>

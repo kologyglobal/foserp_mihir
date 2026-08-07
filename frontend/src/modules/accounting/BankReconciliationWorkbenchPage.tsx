@@ -712,12 +712,12 @@ function MatchPane({
                   </td>
                   <td className="whitespace-nowrap px-2 py-1.5">{formatDate(l.lineDate)}</td>
                   <td className="max-w-[12rem] truncate px-2 py-1.5 font-medium" title={l.description}>{l.description}</td>
-                  <td className="max-w-[8rem] truncate px-2 py-1.5 font-mono text-[11px] text-erp-muted" title={l.reference}>{l.reference || '—'}</td>
+                  <td className="max-w-[8rem] truncate px-2 py-1.5 font-mono text-[11px] text-erp-muted" title={l.reference}>{l.reference || '-'}</td>
                   {showParty ? (
                     <td className="max-w-[10rem] truncate px-2 py-1.5 text-erp-muted" title={l.description}>{l.description}</td>
                   ) : null}
-                  <td className="px-2 py-1.5 text-right tabular-nums">{l.debitAmount ? formatCurrency(l.debitAmount) : '—'}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{l.creditAmount ? formatCurrency(l.creditAmount) : '—'}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{l.debitAmount ? formatCurrency(l.debitAmount) : '-'}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{l.creditAmount ? formatCurrency(l.creditAmount) : '-'}</td>
                   <td className="px-2 py-1.5">
                     <div className="flex flex-col gap-0.5">
                       <MatchStatusBadge status={l.matchStatus} />

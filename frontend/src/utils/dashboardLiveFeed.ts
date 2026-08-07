@@ -19,7 +19,7 @@ function oppQuickView(opp: Opportunity, customerName: string): DashboardQuickVie
       { label: 'Value', value: formatCrmCurrency(opp.value) },
       { label: 'Probability', value: `${opp.probability}%` },
       { label: 'Owner', value: opp.ownerName },
-      { label: 'Expected close', value: opp.expectedCloseDate ? formatDate(opp.expectedCloseDate) : '—' },
+      { label: 'Expected close', value: opp.expectedCloseDate ? formatDate(opp.expectedCloseDate) : '-' },
       { label: 'Stage', value: opp.stage.replace(/_/g, ' ') },
     ],
     primaryAction: { label: 'Open opportunity', href: `/crm/opportunities/${opp.id}` },
@@ -50,7 +50,7 @@ function quotationQuickView(doc: QuotationDocument, customerName: string, oppNam
     badgeTone: doc.status === 'pending_approval' ? 'warning' : doc.status === 'approved' ? 'success' : 'neutral',
     fields: [
       { label: 'Amount', value: formatCrmCurrency(doc.totalAmount) },
-      { label: 'Owner', value: doc.salesOwnerName ?? '—' },
+      { label: 'Owner', value: doc.salesOwnerName ?? '-' },
       { label: 'Created', value: formatDate(doc.createdAt.slice(0, 10)) },
       ...(oppName ? [{ label: 'Opportunity', value: oppName }] : []),
     ],
@@ -67,7 +67,7 @@ function soQuickView(so: SalesOrder, customerName: string): DashboardQuickView {
     fields: [
       { label: 'Order date', value: formatDate(so.orderDate ?? so.createdAt.slice(0, 10)) },
       { label: 'Required date', value: formatDate(so.requiredDate) },
-      { label: 'Owner', value: so.salesOwnerName ?? '—' },
+      { label: 'Owner', value: so.salesOwnerName ?? '-' },
       { label: 'Status', value: so.status.replace(/_/g, ' ') },
     ],
     primaryAction: { label: 'Open sales order', href: `/sales/orders/${so.id}` },
@@ -84,7 +84,7 @@ function activityQuickView(
     subtitle: `${act.type} · ${act.ownerName}`,
     fields: [
       { label: 'Date', value: formatDate(act.activityDate) },
-      { label: 'Description', value: act.description || '—' },
+      { label: 'Description', value: act.description || '-' },
       ...(customerName ? [{ label: 'Customer', value: customerName }] : []),
       ...(oppName ? [{ label: 'Opportunity', value: oppName, href: act.opportunityId ? `/crm/opportunities/${act.opportunityId}` : undefined }] : []),
     ],
@@ -110,7 +110,7 @@ function followUpQuickView(
       { label: 'Due', value: `${formatDate(fu.dueDate)} ${fu.dueTime}` },
       { label: 'Assigned to', value: fu.assignedToName },
       { label: 'Priority', value: fu.priority },
-      { label: 'Notes', value: fu.notes || '—' },
+      { label: 'Notes', value: fu.notes || '-' },
       ...(oppName ? [{ label: 'Opportunity', value: oppName }] : []),
     ],
     primaryAction: fu.opportunityId

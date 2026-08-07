@@ -402,7 +402,7 @@ export function NewOpportunityDrawer({
         </FormField>
         <FormField label="Contact">
           <Select value={contactId} onChange={(e) => setContactId(e.target.value)}>
-            <option value="">—</option>
+            <option value="">-</option>
             {customerContacts.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -441,7 +441,7 @@ export function NewOpportunityDrawer({
             </FormField>
             <FormField label="Item" hint="Only items allowed for sales are listed.">
               <Select value={itemId} onChange={(e) => setItemId(e.target.value)}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {items.filter((i) => i.isActive && i.salesAllowed).map((i) => (
                   <option key={i.id} value={i.id}>{i.itemCode} — {i.itemName}</option>
                 ))}

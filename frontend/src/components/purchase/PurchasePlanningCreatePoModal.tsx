@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ShoppingCart } from 'lucide-react'
-import { isApiMode } from '@/config/apiConfig'
 import { Modal } from '@/design-system/components/Modal'
 import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
@@ -164,7 +163,7 @@ export function PurchasePlanningCreatePoModal({
     if (!open) return
     let cancelled = false
     ;(async () => {
-      if (storeLocations.length > 0 || !isApiMode()) {
+      if (storeLocations.length > 0) {
         setMasterLocations(storeLocations)
         return
       }

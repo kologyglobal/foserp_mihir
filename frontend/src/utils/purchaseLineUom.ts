@@ -184,7 +184,7 @@ export function resolvePurchaseLineQtyPresentation(line: {
   uomId?: string | null
 }): PurchaseLineQtyPresentation {
   const factor = resolvePurchaseLineFactor(line)
-  const baseUom = getPurchaseLineBaseUomCode(line.itemId) || (line.uom || '—').trim()
+  const baseUom = getPurchaseLineBaseUomCode(line.itemId) || (line.uom || '-').trim()
   const lineUom =
     (line.uom || resolveUomCode(line.uomId ?? null, '')).trim() || baseUom
   const baseQty = Number(line.quantity ?? 0) || 0
@@ -192,7 +192,7 @@ export function resolvePurchaseLineQtyPresentation(line: {
 
   if (!dual) {
     const qty = baseQty || Number(line.uomQuantity ?? 0) || 0
-    const uom = lineUom || baseUom || '—'
+    const uom = lineUom || baseUom || '-'
     return { dual: false, purchaseQty: qty, purchaseUom: uom, baseQty: qty, baseUom: uom }
   }
 
@@ -227,7 +227,7 @@ export function resolvePurchaseLineTrackingPresentation(
   baseQtyInput: number,
 ): PurchaseLineQtyPresentation {
   const factor = resolvePurchaseLineFactor(line)
-  const baseUom = getPurchaseLineBaseUomCode(line.itemId) || (line.uom || '—').trim()
+  const baseUom = getPurchaseLineBaseUomCode(line.itemId) || (line.uom || '-').trim()
   const lineUom =
     (line.uom || resolveUomCode(line.uomId ?? null, '')).trim() || baseUom
   const baseQty = baseQtyInput || purchaseQtyInput
@@ -235,7 +235,7 @@ export function resolvePurchaseLineTrackingPresentation(
 
   if (!dual) {
     const qty = baseQty
-    const uom = lineUom || baseUom || '—'
+    const uom = lineUom || baseUom || '-'
     return { dual: false, purchaseQty: qty, purchaseUom: uom, baseQty: qty, baseUom: uom }
   }
 
@@ -265,7 +265,7 @@ export function formatGrnUomConversionLabel(
   purchaseUom: string,
 ): string {
   const f = Number(factor) || 1
-  if (f === 1 || !baseUom || !purchaseUom || baseUom === purchaseUom) return '—'
+  if (f === 1 || !baseUom || !purchaseUom || baseUom === purchaseUom) return '-'
   return `1 ${baseUom} = ${formatPurchaseQty(f)} ${purchaseUom}`
 }
 

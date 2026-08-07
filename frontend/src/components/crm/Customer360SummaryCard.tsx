@@ -17,7 +17,7 @@ import type { CrmCompanyStatus } from '@/utils/crmCompanyStatus'
 import type { UnifiedFeedItem, UnifiedFeedKind } from '@/utils/crmUnifiedFeed'
 import { cn } from '@/utils/cn'
 
-const EMPTY = '—'
+const EMPTY = '-'
 
 const KIND_ICON: Record<UnifiedFeedKind, LucideIcon> = {
   activity: Activity,
@@ -159,7 +159,7 @@ export function Customer360SummaryCard({
             <ErpViewField
               label="Outstanding"
               value={moneyVisible && outstanding != null ? formatCurrency(outstanding) : null}
-              emptyLabel={moneyVisible ? EMPTY : '—'}
+              emptyLabel={moneyVisible ? EMPTY : '-'}
             />
             <ErpViewField label="CRM contacts" value={String(contactCount)} emptyLabel={EMPTY} />
 

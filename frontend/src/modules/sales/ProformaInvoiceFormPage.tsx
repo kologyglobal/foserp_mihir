@@ -478,19 +478,19 @@ export function ProformaInvoiceFormPage() {
   const formMetrics = useMemo(() => [
     { label: 'Completion', value: `${completionPercent}%`, accent: 'blue' as const, hint: `${completionItems.filter((i) => i.done).length} of ${completionItems.length} sections` },
     { label: 'Line Items', value: String(lines.length), accent: 'green' as const, hint: hasValidLines ? formatCurrency(pricingSummary.grandTotal) : 'Add items' },
-    { label: 'Grand Total', value: pricingSummary.grandTotal > 0 ? formatCurrency(pricingSummary.grandTotal) : '—', accent: 'violet' as const, hint: gstPreview ? gstSchemeLabel(gstPreview.scheme) : 'Select customer' },
-    { label: 'Valid Until', value: validUntil ? formatDate(validUntil) : '—', accent: 'amber' as const, hint: customer?.customerName ?? 'Select customer' },
+    { label: 'Grand Total', value: pricingSummary.grandTotal > 0 ? formatCurrency(pricingSummary.grandTotal) : '-', accent: 'violet' as const, hint: gstPreview ? gstSchemeLabel(gstPreview.scheme) : 'Select customer' },
+    { label: 'Valid Until', value: validUntil ? formatDate(validUntil) : '-', accent: 'amber' as const, hint: customer?.customerName ?? 'Select customer' },
   ], [completionPercent, completionItems, lines.length, hasValidLines, pricingSummary.grandTotal, gstPreview, validUntil, customer?.customerName])
 
   const documentStrip = [
     { label: 'PI No.', value: 'Auto on save' },
     { label: 'Status', value: 'Draft' },
-    { label: 'Customer', value: customer?.customerName ?? '—', highlight: Boolean(customerId) },
+    { label: 'Customer', value: customer?.customerName ?? '-', highlight: Boolean(customerId) },
     { label: 'Source', value: mode === 'sales_order' ? (linkedSo?.salesOrderNo ?? 'Sales Order') : 'Direct', highlight: mode === 'sales_order' },
     { label: 'PI Date', value: formatDate(proformaDate) },
     { label: 'Valid Until', value: formatDate(validUntil), highlight: Boolean(validUntil) },
     { label: 'Lines', value: String(lines.length), highlight: lines.length > 0 },
-    { label: 'Grand Total', value: pricingSummary.grandTotal > 0 ? formatCurrency(pricingSummary.grandTotal) : '—', highlight: pricingSummary.grandTotal > 0 },
+    { label: 'Grand Total', value: pricingSummary.grandTotal > 0 ? formatCurrency(pricingSummary.grandTotal) : '-', highlight: pricingSummary.grandTotal > 0 },
   ]
 
   const validationGuideItems = useMemo(
@@ -532,7 +532,7 @@ export function ProformaInvoiceFormPage() {
         actionsTitle="Quick Actions"
         summary={[
           { label: 'Status', value: 'Draft' },
-          { label: 'Customer', value: customer?.customerName ?? '—' },
+          { label: 'Customer', value: customer?.customerName ?? '-' },
           { label: 'Mode', value: mode === 'sales_order' ? 'From SO' : 'Direct' },
           { label: 'Lines', value: String(lines.length) },
           { label: 'Taxable', value: formatCurrency(pricingSummary.taxableBeforeOverallDiscount) },
@@ -655,7 +655,7 @@ export function ProformaInvoiceFormPage() {
                   <td className="so-pricing-td tabular-nums text-[12px] text-erp-muted">
                     {(row.hsnCode ?? '').trim()
                       || items.find((i) => i.id === row.itemId)?.hsnCode
-                      || '—'}
+                      || '-'}
                   </td>
                   <td className="so-pricing-td">
                     <Input type="number" min={1} className="so-pricing-input so-pricing-input--num" value={row.qty} onChange={(e) => patchLine(row.key, { qty: e.target.value })} />
@@ -677,10 +677,10 @@ export function ProformaInvoiceFormPage() {
                       ))}
                     </select>
                   </td>
-                  <td className="so-pricing-td so-pricing-td--right so-pricing-td--calc tabular-nums">{built ? formatCurrency(built.taxableValue) : '—'}</td>
-                  <td className="so-pricing-td so-pricing-td--right so-pricing-td--calc tabular-nums">{built ? formatCurrency(built.gstAmount) : '—'}</td>
+                  <td className="so-pricing-td so-pricing-td--right so-pricing-td--calc tabular-nums">{built ? formatCurrency(built.taxableValue) : '-'}</td>
+                  <td className="so-pricing-td so-pricing-td--right so-pricing-td--calc tabular-nums">{built ? formatCurrency(built.gstAmount) : '-'}</td>
                   <td className="so-pricing-td so-pricing-td--right so-pricing-td--total tabular-nums">
-                    {built ? formatCurrency(built.lineTotal) : '—'}
+                    {built ? formatCurrency(built.lineTotal) : '-'}
                   </td>
                   <td className="so-pricing-td so-pricing-td--center">
                     <button
@@ -907,7 +907,7 @@ export function ProformaInvoiceFormPage() {
               <dl className="so-customer-card__facts">
                 <div className="so-customer-card__fact">
                   <dt>GSTIN</dt>
-                  <dd className="tabular-nums">{customer.gstin?.trim() || '—'}</dd>
+                  <dd className="tabular-nums">{customer.gstin?.trim() || '-'}</dd>
                 </div>
                 <div className="so-customer-card__fact">
                   <dt>Credit days</dt>

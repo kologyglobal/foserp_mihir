@@ -61,7 +61,7 @@ export function VendorJobWorkWorkspacePage() {
                   <td>{j.sourceWoNo}</td>
                   <td>{j.process}</td>
                   <td className="num">{formatNumber(j.balanceQty)}</td>
-                  <td>{j.expectedReturnDate ? formatDate(j.expectedReturnDate) : '—'}</td>
+                  <td>{j.expectedReturnDate ? formatDate(j.expectedReturnDate) : '-'}</td>
                   <td><Badge color={statusColor(j.status)}>{formatStatus(j.status)}</Badge></td>
                 </tr>
               ))

@@ -8,7 +8,7 @@ export function parseDecimal(value: string | number | null | undefined): number 
 }
 
 export function formatSiAmount(value: string | number | null | undefined): string {
-  if (value == null || value === '') return '—'
+  if (value == null || value === '') return '-'
   return formatCurrency(parseDecimal(value))
 }
 

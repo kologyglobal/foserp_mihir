@@ -195,15 +195,15 @@ export function RatioAnalysisPage() {
                         <td className={`${DENSE_TD_CLASS} text-right tabular-nums text-erp-muted`}>
                           {item.priorValue !== undefined
                             ? `${item.priorValue}${item.unit === '%' ? '%' : item.unit === 'x' ? '×' : ` ${item.unit}`}`
-                            : '—'}
+                            : '-'}
                         </td>
                         <td className={`${DENSE_TD_CLASS} text-right tabular-nums text-erp-muted`}>
                           {item.benchmark !== undefined
                             ? `${item.benchmark}${item.unit === '%' ? '%' : item.unit === 'x' ? '×' : ` ${item.unit}`}`
-                            : '—'}
+                            : '-'}
                         </td>
                         <td className={DENSE_TD_CLASS}>{statusBadge(item.status)}</td>
-                        <td className={`${DENSE_TD_CLASS} text-[10px] text-erp-muted`}>{item.note ?? '—'}</td>
+                        <td className={`${DENSE_TD_CLASS} text-[10px] text-erp-muted`}>{item.note ?? '-'}</td>
                       </tr>
                     ))}
                   </tbody>

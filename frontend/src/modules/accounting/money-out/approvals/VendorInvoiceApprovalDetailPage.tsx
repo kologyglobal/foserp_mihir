@@ -150,13 +150,13 @@ export function VendorInvoiceApprovalDetailPage() {
           <div className="flex justify-between">
             <dt className="text-erp-muted">Approval level</dt>
             <dd>
-              {approval?.approvalRequest?.currentLevel ?? invoice.approvalRequest?.currentLevel ?? '—'} /{' '}
-              {approval?.approvalRequest?.totalLevels ?? invoice.approvalRequest?.totalLevels ?? '—'}
+              {approval?.approvalRequest?.currentLevel ?? invoice.approvalRequest?.currentLevel ?? '-'} /{' '}
+              {approval?.approvalRequest?.totalLevels ?? invoice.approvalRequest?.totalLevels ?? '-'}
             </dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-erp-muted">Duplicate risk</dt>
-            <dd>{invoice.validation?.duplicateAssessment?.riskLevel ?? '—'}</dd>
+            <dd>{invoice.validation?.duplicateAssessment?.riskLevel ?? '-'}</dd>
           </div>
         </dl>
         <VendorInvoiceTotalsPanel

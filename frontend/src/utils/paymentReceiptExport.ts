@@ -150,15 +150,15 @@ function buildReceiptPrintBodyHtml(
           <p class="pi-print-party__label">Received from</p>
           <p class="pi-print-party__name">${escapeHtml(receipt.customerName)}</p>
           ${customer?.address ? `<p class="pi-print-party__line">${escapeHtml(customer.address)}</p>` : ''}
-          <p class="pi-print-party__line">GSTIN: ${escapeHtml(customer?.gstin || '—')}</p>
+          <p class="pi-print-party__line">GSTIN: ${escapeHtml(customer?.gstin || '-')}</p>
           ${customer?.state ? `<p class="pi-print-party__line">State: ${escapeHtml(customer.state)}</p>` : ''}
         </section>
         <section class="pi-print-party pi-print-party--meta">
           <p class="pi-print-party__label">Payment details</p>
           <p class="pi-print-party__line"><span>Mode</span> ${escapeHtml(CRM_PAYMENT_MODE_LABELS[receipt.paymentMode])}</p>
-          <p class="pi-print-party__line"><span>UTR / Ref</span> ${escapeHtml(receipt.transactionRef || '—')}</p>
-          <p class="pi-print-party__line"><span>Proforma</span> ${escapeHtml(receipt.proformaNo || '—')}</p>
-          <p class="pi-print-party__line"><span>Received by</span> ${escapeHtml(receipt.createdBy || '—')}</p>
+          <p class="pi-print-party__line"><span>UTR / Ref</span> ${escapeHtml(receipt.transactionRef || '-')}</p>
+          <p class="pi-print-party__line"><span>Proforma</span> ${escapeHtml(receipt.proformaNo || '-')}</p>
+          <p class="pi-print-party__line"><span>Received by</span> ${escapeHtml(receipt.createdBy || '-')}</p>
         </section>
       </div>
 

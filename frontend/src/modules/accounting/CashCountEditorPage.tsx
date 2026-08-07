@@ -164,10 +164,10 @@ export function CashCountEditorPage() {
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
               </div>
               <dl className="grid gap-2 text-[12px]">
-                <div className="flex justify-between"><dt className="text-erp-muted">Book balance</dt><dd className="font-semibold">{bookBalance != null ? formatCurrency(bookBalance) : '—'}</dd></div>
+                <div className="flex justify-between"><dt className="text-erp-muted">Book balance</dt><dd className="font-semibold">{bookBalance != null ? formatCurrency(bookBalance) : '-'}</dd></div>
                 <div className="flex justify-between"><dt className="text-erp-muted">Physical total</dt><dd className="font-semibold">{formatCurrency(physicalTotal)}</dd></div>
-                <div className="flex justify-between"><dt className="text-erp-muted">Variance</dt><dd className={cn('font-semibold', amountTone(variance))}>{bookBalance != null ? formatCurrency(variance) : '—'}</dd></div>
-                <div className="flex justify-between items-center"><dt className="text-erp-muted">Status</dt><dd>{bookBalance != null ? <CashVarianceStatusBadge status={varianceStatus} /> : '—'}</dd></div>
+                <div className="flex justify-between"><dt className="text-erp-muted">Variance</dt><dd className={cn('font-semibold', amountTone(variance))}>{bookBalance != null ? formatCurrency(variance) : '-'}</dd></div>
+                <div className="flex justify-between items-center"><dt className="text-erp-muted">Status</dt><dd>{bookBalance != null ? <CashVarianceStatusBadge status={varianceStatus} /> : '-'}</dd></div>
               </dl>
             </div>
           </section>

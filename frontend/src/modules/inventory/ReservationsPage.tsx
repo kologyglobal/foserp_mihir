@@ -115,9 +115,9 @@ export function ReservationsPage() {
         return (
           <div>
             <Link to={`/inventory/stock/${row.original.itemId}`} className="font-mono text-xs text-erp-accent hover:underline">
-              {item?.itemCode ?? '—'}
+              {item?.itemCode ?? '-'}
             </Link>
-            <p className="text-sm text-slate-700">{item?.itemName ?? '—'}</p>
+            <p className="text-sm text-slate-700">{item?.itemName ?? '-'}</p>
           </div>
         )
       },
@@ -127,7 +127,7 @@ export function ReservationsPage() {
       header: 'Location',
       cell: ({ row }) => {
         const wh = getWarehouse(row.original.warehouseId)
-        return wh?.warehouseCode ?? getLocationName(row.original.warehouseId) ?? '—'
+        return wh?.warehouseCode ?? getLocationName(row.original.warehouseId) ?? '-'
       },
     },
     { accessorKey: 'qty', header: 'Qty', cell: ({ row }) => formatNumber(row.original.qty) },
@@ -156,7 +156,7 @@ export function ReservationsPage() {
       header: 'Actions',
       enableSorting: false,
       cell: ({ row }) => {
-        if (row.original.status !== 'active') return '—'
+        if (row.original.status !== 'active') return '-'
         return (
           <div className="flex gap-1">
             <Button

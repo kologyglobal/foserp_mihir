@@ -132,13 +132,13 @@ export function DispatchPodPanel({ detail, onChanged }: Props) {
           <div className="grid gap-1 md:grid-cols-2">
             <div>
               <span className="text-muted-foreground">Delivery status:</span>{' '}
-              <strong>{pod?.status?.replace(/_/g, ' ') ?? detail.deliveryStatus ?? '—'}</strong>
+              <strong>{pod?.status?.replace(/_/g, ' ') ?? detail.deliveryStatus ?? '-'}</strong>
             </div>
             <div>
               <span className="text-muted-foreground">Dispatch:</span> {detail.dispatchNo}
             </div>
             <div>
-              <span className="text-muted-foreground">Sales Order:</span> {detail.salesOrderNo ?? '—'}
+              <span className="text-muted-foreground">Sales Order:</span> {detail.salesOrderNo ?? '-'}
             </div>
             <div>
               <span className="text-muted-foreground">Delivered qty:</span>{' '}

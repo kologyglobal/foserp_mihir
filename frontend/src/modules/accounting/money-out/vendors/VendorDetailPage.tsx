@@ -105,7 +105,7 @@ export function VendorDetailPage() {
             </div>
             <div className="rounded border border-erp-border bg-slate-50 p-3">
               <p className="text-[11px] uppercase text-erp-muted">Max overdue</p>
-              <p className="text-[18px] font-semibold tabular-nums">{summary.maxDaysOverdue ?? '—'} days</p>
+              <p className="text-[18px] font-semibold tabular-nums">{summary.maxDaysOverdue ?? '-'} days</p>
             </div>
           </div>
 
@@ -126,7 +126,7 @@ export function VendorDetailPage() {
                   <tbody>
                     {openItems.map((o) => {
                       const href = documentLink(o)
-                      const label = o.documentNumber ?? o.supplierInvoiceNumber ?? '—'
+                      const label = o.documentNumber ?? o.supplierInvoiceNumber ?? '-'
                       return (
                         <tr key={o.openItemId} className="border-b border-erp-border/60">
                           <td className="py-2 pr-2">
@@ -138,7 +138,7 @@ export function VendorDetailPage() {
                               label
                             )}
                           </td>
-                          <td className="py-2 pr-2 tabular-nums">{o.dueDate ?? '—'}</td>
+                          <td className="py-2 pr-2 tabular-nums">{o.dueDate ?? '-'}</td>
                           <td className="py-2 text-right tabular-nums">
                             {formatCurrency(parseDecimal(o.outstandingAmount))}
                           </td>

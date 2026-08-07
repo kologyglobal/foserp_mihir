@@ -205,11 +205,11 @@ export function AdminLoginActivityPage() {
                                 </Badge>
                               </td>
                               <td className="px-3 py-2 whitespace-nowrap font-mono text-[12px] text-erp-muted">
-                                {row.ipAddress ?? '—'}
+                                {row.ipAddress ?? '-'}
                               </td>
                               <td className="px-3 py-2">
                                 <span className="truncate max-w-[260px] text-erp-muted">
-                                  {row.userAgent ?? '—'}
+                                  {row.userAgent ?? '-'}
                                 </span>
                               </td>
                               <td className="px-3 py-2">
@@ -218,7 +218,7 @@ export function AdminLoginActivityPage() {
                                     {row.user.name}
                                   </Link>
                                 ) : (
-                                  <span className="text-erp-muted">—</span>
+                                  <span className="text-erp-muted">-</span>
                                 )}
                               </td>
                             </tr>

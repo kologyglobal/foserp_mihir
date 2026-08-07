@@ -161,22 +161,22 @@ function HistoryTable({ rows, showCost }: { rows: MaintenanceTicket[]; showCost:
               <td className="px-3 py-2 text-[11px] font-semibold">
                 {row.ticketKind === 'PREVENTIVE' || row.sourceType === 'PREVENTIVE' ? 'PREVENTIVE' : 'BREAKDOWN'}
               </td>
-              <td className="px-3 py-2">{row.failureCategory ?? '—'}</td>
+              <td className="px-3 py-2">{row.failureCategory ?? '-'}</td>
               <td className="max-w-[160px] truncate px-3 py-2" title={row.problem}>
                 {row.problem}
               </td>
               <td className="max-w-[140px] truncate px-3 py-2" title={row.rootCause ?? ''}>
-                {row.rootCause ?? '—'}
+                {row.rootCause ?? '-'}
               </td>
               <td className="max-w-[140px] truncate px-3 py-2" title={row.repairAction ?? row.repairDetails ?? ''}>
-                {row.repairAction ?? row.repairDetails ?? '—'}
+                {row.repairAction ?? row.repairDetails ?? '-'}
               </td>
-              <td className="px-3 py-2">{row.technicianName ?? row.contractor?.name ?? '—'}</td>
+              <td className="px-3 py-2">{row.technicianName ?? row.contractor?.name ?? '-'}</td>
               <td className="px-3 py-2 text-[11px] text-erp-muted">
-                {[row.jobCardCode, row.operationName].filter(Boolean).join(' · ') || '—'}
+                {[row.jobCardCode, row.operationName].filter(Boolean).join(' · ') || '-'}
               </td>
-              <td className="px-3 py-2 tabular-nums">{row.downtimeLabel ?? '—'}</td>
-              <td className="px-3 py-2 tabular-nums">{row.repairLabel ?? '—'}</td>
+              <td className="px-3 py-2 tabular-nums">{row.downtimeLabel ?? '-'}</td>
+              <td className="px-3 py-2 tabular-nums">{row.repairLabel ?? '-'}</td>
               {showCost ? <td className="px-3 py-2 text-right tabular-nums">{formatInr(row.totalCost)}</td> : null}
               <td className="px-3 py-2">
                 <StatusDot label={formatStatusLabel(row.status)} tone={maintenanceStatusTone(row.status)} />

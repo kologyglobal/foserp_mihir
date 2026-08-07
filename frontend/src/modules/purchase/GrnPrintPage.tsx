@@ -14,6 +14,7 @@ import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
 import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
 import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
 import { isIncludedGrnLine } from '@/modules/purchase/grnLineDraft'
+import { amountInWords } from '@/utils/amountInWords'
 
 function factorOf(l: GoodsReceiptNote['lines'][number]) {
   return Number(l.uomConversionFactor ?? 1) > 0 ? Number(l.uomConversionFactor ?? 1) : 1
@@ -107,7 +108,7 @@ export function GrnPrintPage() {
           meta={[
             { label: 'Date', value: formatDate(grn.documentDate) },
             { label: 'Status', value: formatStatus(grn.status) },
-            { label: 'PO', value: grn.purchaseOrderNumber || '—' },
+            { label: 'PO', value: grn.purchaseOrderNumber || '-' },
           ]}
         />
 
@@ -121,21 +122,21 @@ export function GrnPrintPage() {
           <section className="po-print-box">
             <p className="po-print-box__label">Vendor</p>
             <p className="po-print-box__name">{grn.vendor.name}</p>
-            <p>GSTIN: {grn.vendor.gstin || '—'}</p>
-            <p>Received by: {grn.receivedBy?.name || '—'}</p>
-            <p>Warehouse: {grn.warehouseName || '—'}</p>
-            <p>Location: {grn.receivingLocation || grn.location?.name || '—'}</p>
+            <p>GSTIN: {grn.vendor.gstin || '-'}</p>
+            <p>Received by: {grn.receivedBy?.name || '-'}</p>
+            <p>Warehouse: {grn.warehouseName || '-'}</p>
+            <p>Location: {grn.receivingLocation || grn.location?.name || '-'}</p>
           </section>
           <section className="po-print-box">
             <p className="po-print-box__label">Receipt details</p>
-            <p>Challan: {grn.vendorChallanNumber || '—'}</p>
+            <p>Challan: {grn.vendorChallanNumber || '-'}</p>
             <p>
               Challan date:{' '}
-              {grn.vendorChallanDate ? formatDate(grn.vendorChallanDate) : '—'}
+              {grn.vendorChallanDate ? formatDate(grn.vendorChallanDate) : '-'}
             </p>
-            <p>Vehicle: {grn.vehicleNo || '—'}</p>
-            <p>Transporter: {grn.transporterName || '—'}</p>
-            <p>LR / Gate: {grn.lrNumber || grn.gateEntryNo || '—'}</p>
+            <p>Vehicle: {grn.vehicleNo || '-'}</p>
+            <p>Transporter: {grn.transporterName || '-'}</p>
+            <p>LR / Gate: {grn.lrNumber || grn.gateEntryNo || '-'}</p>
             <p>QC required: {grn.inspectionRequired || grn.qcRequired ? 'Yes' : 'No'}</p>
             <p className="po-print-hint">
               Qty: purchase unit on top · stock inward unit below
@@ -196,7 +197,7 @@ export function GrnPrintPage() {
                   <td>{formatStatus(l.toleranceStatus ?? 'EXACT')}</td>
                   <td className="num">{formatCurrency(l.rate)}</td>
                   <td>
-                    {l.batchNumber || l.lotNumber || '—'}
+                    {l.batchNumber || l.lotNumber || '-'}
                     {l.serialNumber ? ` / ${l.serialNumber}` : ''}
                   </td>
                 </tr>
@@ -210,17 +211,37 @@ export function GrnPrintPage() {
             <span>Taxable</span>
             <span>{formatCurrency(grn.taxableAmount)}</span>
           </div>
-          <div className="po-print-summary__row">
-            <span>CGST / SGST / IGST</span>
-            <span>
-              {formatCurrency(grn.cgst)} / {formatCurrency(grn.sgst)} / {formatCurrency(grn.igst)}
-            </span>
-          </div>
+          {Number(grn.igst) > 0 ? (
+            <div className="po-print-summary__row">
+              <span>IGST</span>
+              <span>{formatCurrency(grn.igst)}</span>
+            </div>
+          ) : Number(grn.cgst) > 0 || Number(grn.sgst) > 0 ? (
+            <>
+              <div className="po-print-summary__row">
+                <span>CGST</span>
+                <span>{formatCurrency(grn.cgst)}</span>
+              </div>
+              <div className="po-print-summary__row">
+                <span>SGST</span>
+                <span>{formatCurrency(grn.sgst)}</span>
+              </div>
+            </>
+          ) : (
+            <div className="po-print-summary__row">
+              <span>GST</span>
+              <span>{formatCurrency(0)}</span>
+            </div>
+          )}
           <div className="po-print-summary__row po-print-summary__row--total">
             <span>Grand Total</span>
             <span>{formatCurrency(grn.totalAmount)}</span>
           </div>
         </div>
+
+        <p className="po-print-words">
+          Amount in words: {amountInWords(Number(grn.totalAmount) || 0)}
+        </p>
 
         {grn.remarks ? (
           <div className="po-print-terms">
@@ -230,7 +251,7 @@ export function GrnPrintPage() {
         ) : null}
 
         <div className="po-print-signatures">
-          <div className="po-print-signatures__line">Received by ({grn.receivedBy?.name || '—'})</div>
+          <div className="po-print-signatures__line">Received by ({grn.receivedBy?.name || '-'})</div>
           <div className="po-print-signatures__line">Stores / Warehouse</div>
           <div className="po-print-signatures__line">For {QUOTATION_COMPANY.legalName}</div>
         </div>

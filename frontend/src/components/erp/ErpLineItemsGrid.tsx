@@ -238,7 +238,7 @@ export function ErpLineItemsGrid({
                         <div className="erp-line-items-grid__product-stack">
                           {readOnly ? (
                             <p className="erp-line-items-grid__product-name">
-                              {opportunityRequirementDisplay(line.productOrItem) || '—'}
+                              {opportunityRequirementDisplay(line.productOrItem) || '-'}
                             </p>
                           ) : (
                             <ErpSmartSelect
@@ -274,7 +274,7 @@ export function ErpLineItemsGrid({
                         <td className="erp-line-items-grid__col-desc erp-line-items-grid__col--desktop">
                           {readOnly ? (
                             <p className="erp-line-items-grid__desc-text">
-                              {opportunityRequirementDisplay(line.description) || '—'}
+                              {opportunityRequirementDisplay(line.description) || '-'}
                             </p>
                           ) : (
                             <input
@@ -287,7 +287,7 @@ export function ErpLineItemsGrid({
                           )}
                         </td>
                       ) : null}
-                      {!isOpportunity ? <td className="text-[12px]">{line.itemCode || '—'}</td> : null}
+                      {!isOpportunity ? <td className="text-[12px]">{line.itemCode || '-'}</td> : null}
                       {!isOpportunity ? (
                         <td className="min-w-[140px]">
                           {readOnly ? line.description : (
@@ -314,7 +314,7 @@ export function ErpLineItemsGrid({
                       </td>
                       {isOpportunity ? (
                         <td className="erp-line-items-grid__col-unit erp-line-items-grid__col--desktop">
-                          <span className="erp-line-items-grid__unit-badge">{line.uom || '—'}</span>
+                          <span className="erp-line-items-grid__unit-badge">{line.uom || '-'}</span>
                         </td>
                       ) : (
                         <td className="erp-line-items-grid__col-uom">{line.uom}</td>
@@ -402,7 +402,7 @@ export function ErpLineItemsGrid({
                       <td className="text-right tabular-nums font-semibold erp-line-items-grid__col-total">{formatCrmCurrency(line.lineTotal)}</td>
                       {!isOpportunity ? (
                         <td className="erp-line-items-grid__col-delivery">
-                          {readOnly ? (line.expectedDeliveryDate ?? '—') : (
+                          {readOnly ? (line.expectedDeliveryDate ?? '-') : (
                             <input type="date" className="erp-line-items-grid__input-date" value={line.expectedDeliveryDate ?? ''} onChange={(e) => updateLine(line.id, { expectedDeliveryDate: e.target.value || null })} />
                           )}
                         </td>
@@ -435,7 +435,7 @@ export function ErpLineItemsGrid({
                               <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
                                 <span>Description</span>
                                 {readOnly ? (
-                                  <p>{line.description || '—'}</p>
+                                  <p>{line.description || '-'}</p>
                                 ) : (
                                   <input
                                     className="quo-editor-price__input"
@@ -447,7 +447,7 @@ export function ErpLineItemsGrid({
                               </label>
                               <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
                                 <span>Unit</span>
-                                <p>{line.uom || '—'}</p>
+                                <p>{line.uom || '-'}</p>
                               </label>
                               <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
                                 <span>Discount</span>
@@ -492,7 +492,7 @@ export function ErpLineItemsGrid({
                                 <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--delivery">
                                   <span>Delivery date</span>
                                   {readOnly ? (
-                                    <p>{line.expectedDeliveryDate ?? '—'}</p>
+                                    <p>{line.expectedDeliveryDate ?? '-'}</p>
                                   ) : (
                                     <input
                                       type="date"
@@ -505,7 +505,7 @@ export function ErpLineItemsGrid({
                                 <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--notes">
                                   <span>Product notes</span>
                                   {readOnly ? (
-                                    <p>{line.remarks || '—'}</p>
+                                    <p>{line.remarks || '-'}</p>
                                   ) : (
                                     <input
                                       className="quo-editor-price__input"

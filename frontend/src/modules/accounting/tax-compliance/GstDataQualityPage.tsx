@@ -166,7 +166,7 @@ export function GstDataQualityPage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">Health</h2>
             <p className="mt-1 text-xs text-erp-muted">
-              Overall: {freeze?.health?.overall ?? '—'} · Score: {freeze?.health?.scorePct ?? '—'}% · Freeze
+              Overall: {freeze?.health?.overall ?? '-'} · Score: {freeze?.health?.scorePct ?? '-'}% · Freeze
               ready (books): {checklist?.ready ? 'Yes' : 'No'} · Full GST compliant? No (honest) · Mode:{' '}
               {perms.isApiMode ? 'API' : 'Demo'}
             </p>
@@ -212,7 +212,7 @@ export function GstDataQualityPage() {
               <ul className="mt-2 max-h-40 space-y-1 overflow-auto text-sm">
                 {(plan.candidates ?? []).slice(0, 20).map((c, i) => (
                   <li key={`${c.documentNumber}-${i}`}>
-                    {c.documentNumber ?? '—'} → {c.toGstin} ({c.source})
+                    {c.documentNumber ?? '-'} → {c.toGstin} ({c.source})
                   </li>
                 ))}
               </ul>

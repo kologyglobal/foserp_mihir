@@ -103,7 +103,7 @@ function getMasterCtx() {
     getWarehouse: s.getWarehouse,
     getProductByFgItem: s.getProductByFgItem,
     getCategoryName: s.getCategoryName,
-    getUomCode: (id: string) => s.uoms.find((u) => u.id === id)?.uomCode ?? '—',
+    getUomCode: (id: string) => s.uoms.find((u) => u.id === id)?.uomCode ?? '-',
     items: s.items,
     warehouses: s.warehouses,
   }

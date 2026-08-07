@@ -151,7 +151,7 @@ export function CrmReceiptMigrationPage() {
                           Open AR receipt
                         </Link>
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
                     <td className="px-3 py-2">

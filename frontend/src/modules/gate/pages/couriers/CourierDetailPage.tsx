@@ -20,7 +20,7 @@ function Field({ label, value }: { label: string; value?: string | number | null
   return (
     <div>
       <dt className="text-[12px] text-erp-muted">{label}</dt>
-      <dd className="text-[13px] font-medium text-erp-text">{value ?? '—'}</dd>
+      <dd className="text-[13px] font-medium text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -167,7 +167,7 @@ export function CourierDetailPage() {
             </p>
             <p>
               <span className="text-erp-muted">Received:</span>{' '}
-              {record.receivedTime ? formatDateTime(record.receivedTime) : '—'} by {record.receivedBy ?? '—'}
+              {record.receivedTime ? formatDateTime(record.receivedTime) : '-'} by {record.receivedBy ?? '-'}
             </p>
             <FormField label="Handed over to" required>
               <Input

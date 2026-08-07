@@ -9,7 +9,7 @@ function isBlank(value: unknown): boolean {
   if (value == null) return true
   if (typeof value === 'string') {
     const t = value.trim()
-    return t === '' || t === '—' || t === 'Date not available' || t === 'Not provided'
+    return t === '' || t === '-' || t === 'Date not available' || t === 'Not provided'
   }
   return false
 }

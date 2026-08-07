@@ -139,7 +139,7 @@ export function ApprovalInboxPage() {
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-erp-border/70">
                   <td className="px-2 py-2 font-medium">{row.documentNumberSnapshot ?? row.documentId.slice(0, 8)}</td>
-                  <td className="px-2 py-2 font-mono text-[11px]">{row.requestedBy?.slice(0, 8) ?? '—'}</td>
+                  <td className="px-2 py-2 font-mono text-[11px]">{row.requestedBy?.slice(0, 8) ?? '-'}</td>
                   <td className="px-2 py-2 tabular-nums">
                     {row.amountBasis} {row.currencyCode}
                   </td>

@@ -346,13 +346,13 @@ export function VendorPaymentFormPage({ mode }: { mode: 'create' | 'edit' }) {
           {selectedVendor && (
             <dl className="mt-3 grid gap-1 text-[11px] text-erp-muted sm:grid-cols-3">
               <div>
-                GSTIN: <span className="text-erp-text">{selectedVendor.gstin || '—'}</span>
+                GSTIN: <span className="text-erp-text">{selectedVendor.gstin || '-'}</span>
               </div>
               <div>
-                PAN: <span className="text-erp-text">{selectedVendor.pan || '—'}</span>
+                PAN: <span className="text-erp-text">{selectedVendor.pan || '-'}</span>
               </div>
               <div>
-                State: <span className="text-erp-text">{selectedVendor.state || '—'}</span>
+                State: <span className="text-erp-text">{selectedVendor.state || '-'}</span>
               </div>
             </dl>
           )}

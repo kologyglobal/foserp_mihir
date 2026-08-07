@@ -353,7 +353,7 @@ export function ReceivablesAgeingPage() {
                               {formatCurrency(amt)}
                             </button>
                           ) : (
-                            '—'
+                            '-'
                           )}
                         </td>
                       ))}
@@ -396,7 +396,7 @@ export function ReceivablesAgeingPage() {
                         </button>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(inv.outstandingBalance)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{inv.overdueDays > 0 ? inv.overdueDays : '—'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{inv.overdueDays > 0 ? inv.overdueDays : '-'}</td>
                     </tr>
                   ))}
                 </tbody>

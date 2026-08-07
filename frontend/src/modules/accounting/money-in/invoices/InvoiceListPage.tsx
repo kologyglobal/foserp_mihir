@@ -610,7 +610,7 @@ export function InvoiceListPage() {
         cell: ({ row }) => {
           const settlement = row.original.settlement
           if (!settlement || settlement === 'NOT_APPLICABLE') {
-            return <span className="text-erp-muted">—</span>
+            return <span className="text-erp-muted">-</span>
           }
           return (
             <StatusDot
@@ -640,7 +640,7 @@ export function InvoiceListPage() {
         enableSorting: false,
         cell: ({ row }) => (
           <span className="font-mono text-xs text-erp-muted">
-            {row.original.invoice.customerCodeSnapshot ?? '—'}
+            {row.original.invoice.customerCodeSnapshot ?? '-'}
           </span>
         ),
       },
@@ -658,7 +658,7 @@ export function InvoiceListPage() {
         enableSorting: false,
         cell: ({ row }) => {
           const overdue = row.original.overdueDays > 0
-          if (!row.original.invoice.dueDate) return '—'
+          if (!row.original.invoice.dueDate) return '-'
           return (
             <span className={cn(overdue && 'font-semibold text-erp-danger')} title={overdue ? 'Overdue' : undefined}>
               {formatDate(row.original.invoice.dueDate)}
@@ -703,7 +703,7 @@ export function InvoiceListPage() {
         cell: ({ row }) => {
           const inv = row.original.invoice
           if (inv.status !== 'POSTED' && inv.status !== 'REVERSED') {
-            return <span className="text-erp-muted">—</span>
+            return <span className="text-erp-muted">-</span>
           }
           const overdue = row.original.overdueDays > 0
           return (
@@ -726,7 +726,7 @@ export function InvoiceListPage() {
               className="font-semibold text-erp-danger"
             />
           ) : (
-            <span className="text-erp-muted">—</span>
+            <span className="text-erp-muted">-</span>
           ),
       },
       {
@@ -735,7 +735,7 @@ export function InvoiceListPage() {
         meta: { columnLabel: 'Ageing' },
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="text-erp-muted">{row.original.isOpen ? row.original.ageingBucket : '—'}</span>
+          <span className="text-erp-muted">{row.original.isOpen ? row.original.ageingBucket : '-'}</span>
         ),
       },
       {

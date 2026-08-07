@@ -18,7 +18,7 @@ import { opportunityRequirementDisplay } from '@/utils/leadRequirementLines'
 import type { UnifiedFeedItem, UnifiedFeedKind } from '@/utils/crmUnifiedFeed'
 import { cn } from '@/utils/cn'
 
-const EMPTY = '—'
+const EMPTY = '-'
 
 const KIND_ICON: Record<UnifiedFeedKind, LucideIcon> = {
   activity: Activity,

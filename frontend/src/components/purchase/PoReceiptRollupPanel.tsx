@@ -53,7 +53,7 @@ function LineRow({
             {line.itemName}
           </div>
           <div className="mt-0.5 text-[11px] text-erp-muted">
-            {line.uom || '—'}
+            {line.uom || '-'}
             {line.rate > 0 ? (
               <>
                 {' · '}

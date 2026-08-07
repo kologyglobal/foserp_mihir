@@ -1,9 +1,8 @@
 /**
  * PO-centric receipt rollup — FE composition only.
  * Summarizes ordered / received / pending / rejected per PO line with unmerged GRN drill-down.
- * Dual-mode: reuses getPurchaseOrderById + GRNs (list filtered by PO in API mode).
+ * Reuses getPurchaseOrderById + GRNs (list filtered by PO).
  */
-import { isApiMode } from '../../config/apiConfig'
 import type {
   GoodsReceiptNote,
   PurchaseOrder,
@@ -52,10 +51,6 @@ function lineMatchesGrnLine(
 }
 
 async function loadGrnsForPo(purchaseOrderId: string): Promise<GoodsReceiptNote[]> {
-  if (!isApiMode()) {
-    const all = await getGRNs()
-    return all.filter((g) => g.purchaseOrderId === purchaseOrderId)
-  }
   try {
     const res = await grnApi.listGoodsReceiptsApi({
       page: 1,
@@ -98,7 +93,7 @@ function buildLineRollup(
         grnNumber: grn.documentNumber,
         receiptDate: grn.documentDate,
         vendorId: grn.vendor?.id ?? '',
-        vendorName: grn.vendor?.name ?? '—',
+        vendorName: grn.vendor?.name ?? '-',
         qty,
         acceptedQty: num(gl.acceptedQty) || qty,
         rejectedQty: rejected,

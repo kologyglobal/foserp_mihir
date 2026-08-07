@@ -147,7 +147,7 @@ export function QuickIssuePage() {
   const previewDoc = existing ?? ({
     id: '', documentNumber: 'Draft', movementType: 'issue', documentDate: today(), postingDate: today(),
     sourceType, sourceDocumentId: selectedDocId, sourceDocumentNo: sourceDocs.find((d) => d.id === selectedDocId)?.documentNo ?? null,
-    warehouseId, warehouseName: '—', plantCode: '—', status: 'draft', createdBy: 'Demo User', approvedBy: null, postedBy: null,
+    warehouseId, warehouseName: '-', plantCode: '-', status: 'draft', createdBy: 'Demo User', approvedBy: null, postedBy: null,
     createdAt: today(), updatedAt: today(), department: null, costCentre: null, batchMethod, lines,
     mode: detailedMode ? 'detailed' : 'quick', costPreview: null, accountingPreview: null, attachments: [], auditHistory: [],
   } as InventoryIssue)

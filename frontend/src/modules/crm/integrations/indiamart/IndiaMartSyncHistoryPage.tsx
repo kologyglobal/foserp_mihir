@@ -62,9 +62,9 @@ export function IndiaMartSyncHistoryPage() {
                 <td className="px-3 py-2">{row.leadsCreated}</td>
                 <td className="px-3 py-2">{row.leadsLinked}</td>
                 <td className="px-3 py-2">{row.recordsFailed}</td>
-                <td className="px-3 py-2">{row.durationMs != null ? `${row.durationMs} ms` : '—'}</td>
+                <td className="px-3 py-2">{row.durationMs != null ? `${row.durationMs} ms` : '-'}</td>
                 <td className="px-3 py-2 max-w-[240px] truncate text-red-700" title={row.errorMessage ?? ''}>
-                  {row.errorMessage ?? '—'}
+                  {row.errorMessage ?? '-'}
                 </td>
               </tr>
             ))

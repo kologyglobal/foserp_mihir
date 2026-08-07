@@ -453,7 +453,7 @@ export function SalesTaxInvoiceListPage() {
           if (status === 'pending_review') {
             return <StatusDot label="Pending Accounting" tone="warning" />
           }
-          return <span className="text-erp-muted">—</span>
+          return <span className="text-erp-muted">-</span>
         },
       },
       {
@@ -476,7 +476,7 @@ export function SalesTaxInvoiceListPage() {
         enableSorting: false,
         cell: ({ row }) => (
           <span className="font-mono text-xs text-erp-muted">
-            {getCustomer(row.original.customerId)?.customerCode ?? '—'}
+            {getCustomer(row.original.customerId)?.customerCode ?? '-'}
           </span>
         ),
       },
@@ -510,7 +510,7 @@ export function SalesTaxInvoiceListPage() {
           row.original.salesOrderNo && row.original.salesOrderId ? (
             <TableLink to={`/sales/orders/${row.original.salesOrderId}`}>{row.original.salesOrderNo}</TableLink>
           ) : (
-            '—'
+            '-'
           ),
       },
       {
@@ -524,7 +524,7 @@ export function SalesTaxInvoiceListPage() {
               {row.original.proformaNo}
             </TableLink>
           ) : (
-            '—'
+            '-'
           ),
       },
       {

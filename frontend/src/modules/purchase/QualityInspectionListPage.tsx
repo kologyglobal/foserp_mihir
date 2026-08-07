@@ -106,7 +106,7 @@ export function QualityInspectionListPage() {
             to={`/purchase/quality-inspections/${row.original.id}`}
             className="font-mono"
           >
-            {row.original.documentNumber || '—'}
+            {row.original.documentNumber || '-'}
           </TableLink>
         ),
       },
@@ -114,7 +114,7 @@ export function QualityInspectionListPage() {
         accessorKey: 'documentDate',
         header: 'Date',
         meta: { columnLabel: 'Date' },
-        cell: ({ row }) => formatDate(row.original.documentDate) || '—',
+        cell: ({ row }) => formatDate(row.original.documentDate) || '-',
       },
       {
         accessorKey: 'goodsReceiptNumber',
@@ -126,7 +126,7 @@ export function QualityInspectionListPage() {
               {row.original.goodsReceiptNumber || 'Open GRN'}
             </TableLink>
           ) : (
-            '—'
+            '-'
           ),
       },
       {
@@ -135,7 +135,7 @@ export function QualityInspectionListPage() {
         meta: { columnLabel: 'Item' },
         cell: ({ row }) => (
           <div>
-            <div className="font-mono text-xs">{row.original.itemCode || '—'}</div>
+            <div className="font-mono text-xs">{row.original.itemCode || '-'}</div>
             <div className="text-erp-muted">{row.original.itemName || ''}</div>
           </div>
         ),
@@ -144,7 +144,7 @@ export function QualityInspectionListPage() {
         accessorKey: 'batchLotNo',
         header: 'Batch / Lot',
         meta: { columnLabel: 'Batch / Lot' },
-        cell: ({ row }) => row.original.batchLotNo || '—',
+        cell: ({ row }) => row.original.batchLotNo || '-',
       },
       {
         accessorKey: 'receivedQty',
@@ -178,7 +178,7 @@ export function QualityInspectionListPage() {
         accessorKey: 'inspectorName',
         header: 'Inspector',
         meta: { columnLabel: 'Inspector' },
-        cell: ({ row }) => row.original.inspectorName || '—',
+        cell: ({ row }) => row.original.inspectorName || '-',
       },
       {
         accessorKey: 'status',
@@ -187,7 +187,7 @@ export function QualityInspectionListPage() {
         cell: ({ row }) => (
           <StatusDot
             tone={statusToneFromLabel(row.original.statusLabel)}
-            label={row.original.statusLabel || '—'}
+            label={row.original.statusLabel || '-'}
           />
         ),
       },
@@ -195,7 +195,7 @@ export function QualityInspectionListPage() {
         accessorKey: 'resultLabel',
         header: 'Result',
         meta: { columnLabel: 'Result' },
-        cell: ({ row }) => row.original.resultLabel ?? '—',
+        cell: ({ row }) => row.original.resultLabel ?? '-',
       },
       {
         id: 'actions',

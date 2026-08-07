@@ -365,7 +365,7 @@ async function runReport(
       vehicles
         .filter((v) => inDateRange(v.entryTime ?? v.createdAt, dateFrom, dateTo))
         .forEach((v) => {
-          const key = v.transporter ?? '—'
+          const key = v.transporter ?? '-'
           counts.set(key, (counts.get(key) ?? 0) + 1)
         })
       const rows = [...counts.entries()]
@@ -670,7 +670,7 @@ export function GateReportsPage() {
                         {result.rows.map((row, i) => (
                           <tr key={i}>
                             {result.headers.map((h) => (
-                              <td key={h} className="max-w-[200px] truncate">{row[h] ?? '—'}</td>
+                              <td key={h} className="max-w-[200px] truncate">{row[h] ?? '-'}</td>
                             ))}
                           </tr>
                         ))}

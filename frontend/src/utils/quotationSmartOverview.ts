@@ -342,7 +342,7 @@ export function buildQuotationKeyDetails(input: QuotationSmartOverviewInput): Cr
     { label: 'Customer', value: input.customerName || 'Not linked', muted: !input.customerId },
     {
       label: 'Grand Total',
-      value: input.grandTotal > 0 ? formatCurrency(input.grandTotal) : '—',
+      value: input.grandTotal > 0 ? formatCurrency(input.grandTotal) : '-',
       muted: input.grandTotal <= 0,
     },
     {

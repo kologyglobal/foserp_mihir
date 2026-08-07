@@ -167,7 +167,7 @@ export function ApiQcInspectionDetailPage() {
     inspection?.inspectionPlan?.planName ||
     inspection?.inspectionPlan?.planCode ||
     inspection?.planCodeSnapshot ||
-    '—'
+    '-'
   const workOrderLabel = inspection?.productionOrderNumber || null
   const itemLabel = [inspection?.itemCode, inspection?.itemName].filter(Boolean).join(' — ') || null
   const stageOpLabel =
@@ -340,7 +340,7 @@ export function ApiQcInspectionDetailPage() {
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Inspected qty</dt>
                 <dd className="mt-0.5 text-base font-semibold tabular-nums text-[#242424]">
-                  {inspection.inspectedQty ?? '—'}
+                  {inspection.inspectedQty ?? '-'}
                 </dd>
               </div>
               <div>
@@ -354,13 +354,13 @@ export function ApiQcInspectionDetailPage() {
                       {workOrderLabel}
                     </Link>
                   ) : (
-                    '—'
+                    '-'
                   )}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Product</dt>
-                <dd className="mt-0.5 text-base font-semibold text-[#242424]">{itemLabel ?? '—'}</dd>
+                <dd className="mt-0.5 text-base font-semibold text-[#242424]">{itemLabel ?? '-'}</dd>
               </div>
               {stageOpLabel ? (
                 <div>

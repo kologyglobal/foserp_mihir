@@ -70,8 +70,8 @@ export function VoucherPostingPreviewModal({
                   <td className="py-1.5">
                     <span className="font-medium tabular-nums">{l.accountCode}</span> {l.accountName}
                   </td>
-                  <td className="py-1.5 text-right tabular-nums">{l.debit ? formatCurrency(l.debit) : '—'}</td>
-                  <td className="py-1.5 text-right tabular-nums">{l.credit ? formatCurrency(l.credit) : '—'}</td>
+                  <td className="py-1.5 text-right tabular-nums">{l.debit ? formatCurrency(l.debit) : '-'}</td>
+                  <td className="py-1.5 text-right tabular-nums">{l.credit ? formatCurrency(l.credit) : '-'}</td>
                 </tr>
               ))}
             </tbody>

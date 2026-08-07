@@ -327,9 +327,9 @@ export function CrmInvoiceDetailPage() {
               <dl className="ti-zoho-meta-list">
                 <SideMeta label="Invoice date">{formatDate(invoice.invoiceDate)}</SideMeta>
                 <SideMeta label="Due date">{formatDate(invoice.dueDate)}</SideMeta>
-                <SideMeta label="Payment terms">{invoice.paymentTerms || '—'}</SideMeta>
-                <SideMeta label="Delivery">{invoice.deliveryTerms || '—'}</SideMeta>
-                <SideMeta label="Customer PO">{invoice.customerPoNumber || '—'}</SideMeta>
+                <SideMeta label="Payment terms">{invoice.paymentTerms || '-'}</SideMeta>
+                <SideMeta label="Delivery">{invoice.deliveryTerms || '-'}</SideMeta>
+                <SideMeta label="Customer PO">{invoice.customerPoNumber || '-'}</SideMeta>
               </dl>
             </SideCard>
 
@@ -374,11 +374,11 @@ export function CrmInvoiceDetailPage() {
                         {invoice.salesInvoiceNumber || 'Open'}
                       </TableLink>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </SideMeta>
                   <SideMeta label="Last payment">
-                    {invoice.lastPaymentDate ? formatDate(invoice.lastPaymentDate) : '—'}
+                    {invoice.lastPaymentDate ? formatDate(invoice.lastPaymentDate) : '-'}
                   </SideMeta>
                 </dl>
               </SideCard>

@@ -108,7 +108,7 @@ export function PayableCloseGateRunDetailPage() {
             <ErpStatusChip label={run.status} tone={payableCloseGateStatusTone(run.status)} />
             <span className="text-[12px] text-erp-muted">As of {run.asOfDate}</span>
             <span className="text-[12px] text-erp-muted">
-              Completed {run.completedAt ? new Date(run.completedAt).toLocaleString() : '—'}
+              Completed {run.completedAt ? new Date(run.completedAt).toLocaleString() : '-'}
             </span>
           </div>
 

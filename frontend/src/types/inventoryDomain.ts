@@ -59,6 +59,10 @@ export interface InventoryItem {
   categoryName: string
   baseUomId: string
   baseUomCode: string
+  /** Alternate (purchase) UOM — e.g. NOS base, MTR alternate. Null when item has no conversion set up. */
+  alternateUomCode?: string | null
+  /** Alternate units per 1 base unit (e.g. 3 MTR = 1 NOS → factor 3). */
+  alternateUomFactor?: number | null
   defaultWarehouseId: string | null
   defaultWarehouseName: string | null
   status: InventoryItemStatus

@@ -42,10 +42,10 @@ function ruleLabel(line: HrSalaryStructureLine | DraftLine, components: HrSalary
       : components.find((c) => c.id === line.percentageOfComponentId)?.code
   if (line.calculationType === 'FIXED') {
     const amt = 'fixedAmount' in line ? line.fixedAmount : null
-    return `Fixed ₹${amt ?? '—'}`
+    return `Fixed ₹${amt ?? '-'}`
   }
   if (line.calculationType === 'PERCENTAGE') {
-    return `${line.percentage ?? '—'}% of ${ofCode ?? '—'}`
+    return `${line.percentage ?? '-'}% of ${ofCode ?? '-'}`
   }
   if (line.calculationType === 'OT_LINKED') return 'OT Linked'
   if (line.calculationType === 'ATTENDANCE_LINKED') return 'Attendance Linked'
@@ -228,7 +228,7 @@ export function SalaryStructureDetailPage() {
       <div className="mb-4 grid gap-3 rounded border border-erp-border bg-white p-4 text-sm md:grid-cols-3">
         <div>
           <div className="text-xs uppercase text-erp-muted">Category</div>
-          <div>{structure.workerCategory ?? '—'}</div>
+          <div>{structure.workerCategory ?? '-'}</div>
         </div>
         <div>
           <div className="text-xs uppercase text-erp-muted">Version status</div>
@@ -236,7 +236,7 @@ export function SalaryStructureDetailPage() {
         </div>
         <div>
           <div className="text-xs uppercase text-erp-muted">Effective from</div>
-          <div>{version?.effectiveFrom ?? '—'}</div>
+          <div>{version?.effectiveFrom ?? '-'}</div>
         </div>
       </div>
 

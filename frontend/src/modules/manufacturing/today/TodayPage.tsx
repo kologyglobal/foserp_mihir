@@ -74,10 +74,10 @@ function WorkOrderCard({
             <span className="truncate text-[13px] font-medium text-erp-text">{productLabel}</span>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-erp-muted">
-            <span>Stage {wo.currentStageId ? 'in progress' : '—'}</span>
+            <span>Stage {wo.currentStageId ? 'in progress' : '-'}</span>
             <span className="tabular-nums">{pct}%</span>
-            <span>Due {wo.requiredCompletionDate ? formatDate(wo.requiredCompletionDate) : '—'}</span>
-            <span>Sup. {wo.supervisorId ? `${wo.supervisorId.slice(0, 8)}…` : '—'}</span>
+            <span>Due {wo.requiredCompletionDate ? formatDate(wo.requiredCompletionDate) : '-'}</span>
+            <span>Sup. {wo.supervisorId ? `${wo.supervisorId.slice(0, 8)}…` : '-'}</span>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <WorkOrderStatusBadge status={wo.status} />

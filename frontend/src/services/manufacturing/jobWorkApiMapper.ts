@@ -137,7 +137,7 @@ export function mapApiJobWork(row: ApiJobWork): JobWorkOrder {
     id: row.id,
     jwNumber: row.jwNumber,
     workOrderId: row.productionOrderId ?? row.productionOrder?.id ?? '',
-    workOrderNo: row.productionOrder?.orderNumber ?? '—',
+    workOrderNo: row.productionOrder?.orderNumber ?? '-',
     vendorId: row.vendorId,
     vendorName: row.vendor?.name ?? 'Vendor',
     vendorAddress: row.vendor?.address ?? undefined,

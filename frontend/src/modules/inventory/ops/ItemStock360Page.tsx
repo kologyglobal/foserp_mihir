@@ -367,7 +367,14 @@ export function ItemStock360Page() {
 
         {/* KPI strip */}
         <section className="stock-360-kpi-grid" aria-label="Stock metrics">
-          <KpiTile label="On hand" value={formatNumber(overview.onHand)} emphasize />
+          <KpiTile label="On hand" value={`${formatNumber(overview.onHand)} ${data.uom}`} emphasize />
+          {data.alternateUom ? (
+            <KpiTile
+              label={`Equivalent (${data.alternateUom.code})`}
+              value={formatNumber(overview.onHand * data.alternateUom.factor)}
+              hint={`1 ${data.uom} = ${formatNumber(data.alternateUom.factor)} ${data.alternateUom.code}`}
+            />
+          ) : null}
           <KpiTile label="Available" value={formatNumber(overview.available)} emphasize />
           <KpiTile label="Reserved" value={formatNumber(overview.reserved)} />
           <KpiTile label="Incoming" value={formatNumber(overview.incoming)} />
@@ -375,9 +382,9 @@ export function ItemStock360Page() {
           <KpiTile label="Avg cost" value={formatCurrency(overview.avgCost)} />
           <KpiTile
             label="Last purchase"
-            value={lastPurchase ? formatDate(lastPurchase) : '—'}
+            value={lastPurchase ? formatDate(lastPurchase) : '-'}
           />
-          <KpiTile label="Last issue" value={lastIssue ? formatDate(lastIssue) : '—'} />
+          <KpiTile label="Last issue" value={lastIssue ? formatDate(lastIssue) : '-'} />
         </section>
 
         {/* Tabs */}
@@ -544,10 +551,10 @@ export function ItemStock360Page() {
                             b.sourceDocumentNo
                           )
                         ) : (
-                          '—'
+                          '-'
                         )}
                       </td>
-                      <td className="stock-360-cell-meta">{b.note || '—'}</td>
+                      <td className="stock-360-cell-meta">{b.note || '-'}</td>
                     </tr>
                   ))}
                 </StockTable>
@@ -576,7 +583,7 @@ export function ItemStock360Page() {
                       <td>{b.warehouseName}</td>
                       <td className="is-right is-num">{formatNumber(b.qty)}</td>
                       <td>{b.status}</td>
-                      <td>{b.expiryDate ? formatDate(b.expiryDate) : '—'}</td>
+                      <td>{b.expiryDate ? formatDate(b.expiryDate) : '-'}</td>
                     </tr>
                   ))}
                 </StockTable>
@@ -622,7 +629,7 @@ export function ItemStock360Page() {
                             s.sourceDocumentNo
                           )
                         ) : (
-                          '—'
+                          '-'
                         )}
                       </td>
                     </tr>
@@ -686,7 +693,7 @@ export function ItemStock360Page() {
                   value={
                     data.receiptSummary.lastPurchaseDate
                       ? formatDate(data.receiptSummary.lastPurchaseDate)
-                      : '—'
+                      : '-'
                   }
                 />
               </div>
@@ -749,7 +756,7 @@ export function ItemStock360Page() {
                           Open
                         </Link>
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
                   </tr>
@@ -843,7 +850,7 @@ export function ItemStock360Page() {
                       <div className="stock-360-timeline__card">
                         <div className="stock-360-timeline__meta">
                           <span className="stock-360-tag">{ev.type.replace(/_/g, ' ')}</span>
-                          <span>{ev.at ? formatDate(ev.at.slice(0, 10)) : '—'}</span>
+                          <span>{ev.at ? formatDate(ev.at.slice(0, 10)) : '-'}</span>
                         </div>
                         <div className="stock-360-timeline__title">
                           {ev.href ? (
@@ -874,7 +881,7 @@ export function ItemStock360Page() {
                 <KpiTile label="Stock value" value={formatCurrency(overview.stockValue)} emphasize />
                 <KpiTile
                   label="Last purchase rate"
-                  value={data.receipts[0] ? formatCurrency(data.receipts[0].rate) : '—'}
+                  value={data.receipts[0] ? formatCurrency(data.receipts[0].rate) : '-'}
                 />
                 <KpiTile label="Reorder level" value={formatNumber(overview.reorderLevel)} />
               </div>

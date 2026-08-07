@@ -655,8 +655,8 @@ export function getPrimaryItemLabel(opportunity: Opportunity, product?: Product)
         getProduct: (id) => useMasterStore.getState().getProduct(id),
       },
     )
-    if (headerLabel !== '—') return headerLabel
-    return opportunityRequirementDisplay(opportunity.productRequirement) || '—'
+    if (headerLabel !== '-') return headerLabel
+    return opportunityRequirementDisplay(opportunity.productRequirement) || '-'
   }
   const line = lines[0]!
   if (line.itemCode?.trim()) {
@@ -677,10 +677,10 @@ export function getPrimaryItemLabel(opportunity: Opportunity, product?: Product)
       getProduct: (id) => useMasterStore.getState().getProduct(id),
     },
   )
-  if (fromMaster !== '—') return fromMaster
+  if (fromMaster !== '-') return fromMaster
   const free = line.productOrItem?.trim() || line.description?.trim() || ''
   if (free && !isLikelyUuid(free)) return free
-  return opportunityRequirementDisplay(opportunity.productRequirement) || '—'
+  return opportunityRequirementDisplay(opportunity.productRequirement) || '-'
 }
 
 export function getOpportunityItemSummary(opportunity: Opportunity, product?: Product): string {

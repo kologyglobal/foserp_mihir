@@ -135,7 +135,7 @@ export function QuotationSectionEditor({
                 onChange={(specRows) => updateSection(sec.id, { specRows, contentFormat: 'spec_table' })}
               />
             ) : locked ? (
-              <div className="quo-editor-section__content-read">{sec.content || '—'}</div>
+              <div className="quo-editor-section__content-read">{sec.content || '-'}</div>
             ) : (
               <>
                 <textarea

@@ -175,7 +175,7 @@ export function IndiaMartProductMappingsPage() {
                         }}
                       />
                     ) : (
-                      row.itemId ?? '—'
+                      row.itemId ?? '-'
                     )}
                   </td>
                   <td className="px-3 py-2">

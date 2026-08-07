@@ -79,7 +79,7 @@ function errMsg(e: unknown): string {
 }
 
 function shortId(id: string | null | undefined): string {
-  if (!id) return '—'
+  if (!id) return '-'
   return id.length > 12 ? `${id.slice(0, 8)}…` : id
 }
 
@@ -329,7 +329,7 @@ export function ApiOutboundDispatchRegisterPage() {
               {row.original.salesOrderNo ?? shortId(row.original.salesOrderId)}
             </Link>
           ) : (
-            '—'
+            '-'
           ),
       },
       {
@@ -341,7 +341,7 @@ export function ApiOutboundDispatchRegisterPage() {
         id: 'planned',
         header: 'Planned',
         cell: ({ row }: { row: { original: OutboundDispatch } }) =>
-          row.original.plannedDispatchDate ? formatDate(row.original.plannedDispatchDate.slice(0, 10)) : '—',
+          row.original.plannedDispatchDate ? formatDate(row.original.plannedDispatchDate.slice(0, 10)) : '-',
       },
       {
         id: 'created',
@@ -649,11 +649,11 @@ export function ApiOutboundDispatchDetailPage() {
       | undefined
     const qtyLines = qty
       ? [
-          `Requested ${qty.requestedQty ?? '—'}`,
-          `Reserved ${qty.reservedQty ?? '—'}`,
-          `Picked ${qty.pickedQty ?? '—'}`,
-          `Packed ${qty.packedQty ?? '—'}`,
-          `Challan ${qty.challanQty ?? '—'}`,
+          `Requested ${qty.requestedQty ?? '-'}`,
+          `Reserved ${qty.reservedQty ?? '-'}`,
+          `Picked ${qty.pickedQty ?? '-'}`,
+          `Packed ${qty.packedQty ?? '-'}`,
+          `Challan ${qty.challanQty ?? '-'}`,
           qty.salesOrderRemainingQty != null
             ? `SO remaining after post ≈ ${Math.max(0, Number(qty.salesOrderRemainingQty) - Number(qty.requestedQty ?? 0))}`
             : null,
@@ -924,14 +924,14 @@ export function ApiOutboundDispatchDetailPage() {
           row.original.readyQuantitySnapshot != null ? (
             <span className="tabular-nums">{row.original.readyQuantitySnapshot}</span>
           ) : (
-            '—'
+            '-'
           ),
       },
       {
         id: 'movement',
         header: 'Movement',
         cell: ({ row }: { row: { original: OutboundDispatch['lines'][number] } }) =>
-          row.original.inventoryMovementNo ?? '—',
+          row.original.inventoryMovementNo ?? '-',
       },
     ],
     [],
@@ -1319,13 +1319,13 @@ export function ApiOutboundDispatchDetailPage() {
                   {detail.salesOrderNo ?? shortId(detail.salesOrderId)}
                 </Link>
               ) : (
-                '—'
+                '-'
               )}
             </dd>
           </div>
           <div>
             <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Planned date</dt>
-            <dd className="mt-0.5">{detail.plannedDispatchDate ? formatDate(detail.plannedDispatchDate.slice(0, 10)) : '—'}</dd>
+            <dd className="mt-0.5">{detail.plannedDispatchDate ? formatDate(detail.plannedDispatchDate.slice(0, 10)) : '-'}</dd>
           </div>
           <div>
             <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Preferred warehouse</dt>
@@ -1335,12 +1335,12 @@ export function ApiOutboundDispatchDetailPage() {
           </div>
           <div>
             <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Ship-to</dt>
-            <dd className="mt-0.5">{detail.shipToAddress?.trim() || detail.shipToKey || '—'}</dd>
+            <dd className="mt-0.5">{detail.shipToAddress?.trim() || detail.shipToKey || '-'}</dd>
           </div>
           <div>
             <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Confirmed</dt>
             <dd className="mt-0.5">
-              {detail.confirmedAt ? new Date(detail.confirmedAt).toLocaleString() : '—'}
+              {detail.confirmedAt ? new Date(detail.confirmedAt).toLocaleString() : '-'}
             </dd>
           </div>
           <div>

@@ -58,7 +58,7 @@ export function queryWidgetDemo(
       return base({
         items: cos.map((c) => ({
           label: c.customerName,
-          value: '—',
+          value: '-',
           href: `/crm/companies/${c.id}`,
         })),
       }, '/crm/companies')

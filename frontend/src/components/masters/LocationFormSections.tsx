@@ -129,17 +129,17 @@ export function LocationFormPreview({
       <dl className="space-y-2 text-[12px]">
         <div className="erp-factbox-row flex justify-between gap-2 border-0 py-1">
           <dt className="text-erp-muted">Warehouse</dt>
-          <dd className="text-right font-medium text-erp-text">{values.useAsInTransit ? 'In-Transit' : warehouseLabel || '—'}</dd>
+          <dd className="text-right font-medium text-erp-text">{values.useAsInTransit ? 'In-Transit' : warehouseLabel || '-'}</dd>
         </div>
         <div className="erp-factbox-row flex flex-col gap-1 border-0 py-1">
           <dt className="text-erp-muted">Address</dt>
           <dd className="text-[11px] font-medium leading-snug text-erp-text">
-            {formatLocationAddress(values) || '—'}
+            {formatLocationAddress(values) || '-'}
           </dd>
         </div>
         <div className="erp-factbox-row flex justify-between gap-2 border-0 py-1">
           <dt className="text-erp-muted">Usage</dt>
-          <dd className="text-right font-medium text-erp-text">{usage.join(' · ') || '—'}</dd>
+          <dd className="text-right font-medium text-erp-text">{usage.join(' · ') || '-'}</dd>
         </div>
         {values.contactName ? (
           <div className="erp-factbox-row flex justify-between gap-2 border-0 py-1">

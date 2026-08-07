@@ -189,7 +189,7 @@ export function ApiNcrRegisterPage() {
                         View WO
                       </Link>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </td>
                   <td className="px-4 py-2">
@@ -201,7 +201,7 @@ export function ApiNcrRegisterPage() {
                         Open
                       </Link>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </td>
                   <td className="px-4 py-2">{formatDateTime(row.createdAt)}</td>
@@ -309,10 +309,10 @@ export function ApiNcrDetailPage() {
         <DetailGrid>
           <DetailField label="Severity" value={ncr.severity} />
           <DetailField label="Status" value={ncr.status.replace(/_/g, ' ')} />
-          <DetailField label="Description" value={ncr.description ?? '—'} />
-          <DetailField label="Disposition" value={ncr.disposition ?? '—'} />
+          <DetailField label="Description" value={ncr.description ?? '-'} />
+          <DetailField label="Disposition" value={ncr.disposition ?? '-'} />
           <DetailField label="Created" value={formatDateTime(ncr.createdAt)} />
-          <DetailField label="Closed" value={ncr.closedAt ? formatDateTime(ncr.closedAt) : '—'} />
+          <DetailField label="Closed" value={ncr.closedAt ? formatDateTime(ncr.closedAt) : '-'} />
         </DetailGrid>
       </DetailSection>
 

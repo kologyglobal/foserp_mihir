@@ -61,7 +61,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <dt className="text-[11px] font-semibold uppercase text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px]">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px]">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -259,7 +259,7 @@ export function VendorPayablesCardPage() {
                     value={
                       outstanding.lastPaymentDate
                         ? `${outstanding.lastPaymentDate} · ${formatCurrency(outstanding.lastPaymentAmount)}`
-                        : '—'
+                        : '-'
                     }
                   />
                 </dl>
@@ -436,8 +436,8 @@ export function VendorPayablesCardPage() {
           <dl className="space-y-3">
             <Field label="Contact" value={`${vendor.contactPerson} · ${vendor.mobile}`} />
             <Field label="Email" value={vendor.email} />
-            <Field label="GST" value={vendor.gstin ?? '—'} />
-            <Field label="PAN" value={vendor.pan ?? '—'} />
+            <Field label="GST" value={vendor.gstin ?? '-'} />
+            <Field label="PAN" value={vendor.pan ?? '-'} />
             <Field label="MSME" value={vendor.msmeCategory !== 'Not MSME' ? `${vendor.msmeCategory} · ${vendor.msmeStatus}` : 'Not applicable'} />
             <Field label="Bank verification" value={<BankVerificationStatusBadge status={vendor.bankVerificationStatus} />} />
             <Field label="Payment terms" value={vendor.paymentTerms} />

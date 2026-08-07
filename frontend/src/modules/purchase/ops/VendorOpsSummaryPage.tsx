@@ -88,7 +88,7 @@ export function VendorOpsSummaryPage() {
                 <div className="ops-summary-card__metric">
                   <span className="ops-summary-card__metric-label">Last supply</span>
                   <span className="ops-summary-card__metric-value">
-                    {v.lastSupplyDate ? formatDate(v.lastSupplyDate) : '—'}
+                    {v.lastSupplyDate ? formatDate(v.lastSupplyDate) : '-'}
                   </span>
                 </div>
                 <div className="ops-summary-card__metric">

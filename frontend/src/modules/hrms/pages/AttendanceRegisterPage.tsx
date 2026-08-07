@@ -40,7 +40,7 @@ import {
 } from '../components'
 import '../hrms-ui.css'
 
-const DASH = '—'
+const DASH = '-'
 const STATUS_OPTIONS: HrAttendanceStatus[] = [
   'PRESENT',
   'ABSENT',

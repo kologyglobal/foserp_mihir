@@ -292,9 +292,11 @@ export type PurchaseInvoiceStatus =
   | 'mismatch'
   | 'pending_approval'
   | 'approved'
+  | 'rejected'
   | 'on_hold'
   | 'posted'
   | 'paid'
+  | 'closed'
   | 'cancelled'
 
 export const PURCHASE_INVOICE_STATUSES: readonly PurchaseInvoiceStatus[] = [
@@ -304,9 +306,11 @@ export const PURCHASE_INVOICE_STATUSES: readonly PurchaseInvoiceStatus[] = [
   'mismatch',
   'pending_approval',
   'approved',
+  'rejected',
   'on_hold',
   'posted',
   'paid',
+  'closed',
   'cancelled',
 ] as const
 
@@ -317,9 +321,11 @@ export const PURCHASE_INVOICE_STATUS_LABELS: Record<PurchaseInvoiceStatus, strin
   mismatch: 'Mismatch',
   pending_approval: 'Pending Approval',
   approved: 'Approved',
+  rejected: 'Rejected',
   on_hold: 'On Hold',
   posted: 'Posted',
   paid: 'Paid',
+  closed: 'Closed',
   cancelled: 'Cancelled',
 }
 

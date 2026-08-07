@@ -77,7 +77,7 @@ export function PaymentReceiptDocument({
           <p className="pi-print-party__label">Received from</p>
           <p className="pi-print-party__name">{receipt.customerName}</p>
           {customer?.address ? <p className="pi-print-party__line">{customer.address}</p> : null}
-          <p className="pi-print-party__line">GSTIN: {customer?.gstin || '—'}</p>
+          <p className="pi-print-party__line">GSTIN: {customer?.gstin || '-'}</p>
           {customer?.state ? <p className="pi-print-party__line">State: {customer.state}</p> : null}
         </section>
 
@@ -87,13 +87,13 @@ export function PaymentReceiptDocument({
             <span>Mode</span> {CRM_PAYMENT_MODE_LABELS[receipt.paymentMode]}
           </p>
           <p className="pi-print-party__line">
-            <span>UTR / Ref</span> {receipt.transactionRef || '—'}
+            <span>UTR / Ref</span> {receipt.transactionRef || '-'}
           </p>
           <p className="pi-print-party__line">
-            <span>Proforma</span> {receipt.proformaNo || '—'}
+            <span>Proforma</span> {receipt.proformaNo || '-'}
           </p>
           <p className="pi-print-party__line">
-            <span>Received by</span> {receipt.createdBy || '—'}
+            <span>Received by</span> {receipt.createdBy || '-'}
           </p>
         </section>
       </div>

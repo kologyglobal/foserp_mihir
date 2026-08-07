@@ -362,15 +362,15 @@ export function RfqDetailPage() {
             />
             <ErpViewField label="Enquiry Due Date" value={formatDate(rfq.bidDueDate)} />
             <ErpViewField label="Buyer" value={buyerName} />
-            <ErpViewField label="Department" value={rfq.department || '—'} />
+            <ErpViewField label="Department" value={rfq.department || '-'} />
             <ErpViewField label="Purchase Location" value={purchaseLoc} />
-            <ErpViewField label="Delivery Location" value={rfq.deliveryLocation?.name ?? '—'} />
+            <ErpViewField label="Delivery Location" value={rfq.deliveryLocation?.name ?? '-'} />
             <ErpViewField label="Currency" value={rfq.currency} />
             <ErpViewField
               label="Expected Delivery"
-              value={rfq.expectedDeliveryDate ? formatDate(rfq.expectedDeliveryDate) : '—'}
+              value={rfq.expectedDeliveryDate ? formatDate(rfq.expectedDeliveryDate) : '-'}
             />
-            <ErpViewField label="Sent At" value={rfq.sentAt ? formatDate(rfq.sentAt.slice(0, 10)) : '—'} />
+            <ErpViewField label="Sent At" value={rfq.sentAt ? formatDate(rfq.sentAt.slice(0, 10)) : '-'} />
             <ErpViewField label="Estimated Value" value={formatCurrency(rfq.estimatedValue)} />
             <ErpViewField label="Source PR(s)" hideIfEmpty={sourcePrLabel === 'Manual'}>
               {rfq.purchaseRequisitionIds?.length ? (
@@ -408,11 +408,11 @@ export function RfqDetailPage() {
           >
             <ErpViewField label="Payment Terms" value={rfq.paymentTerms} />
             <ErpViewField label="Delivery Terms" value={rfq.deliveryTerms} />
-            <ErpViewField label="Freight Terms" value={rfq.freightTerms || '—'} />
-            <ErpViewField label="Inspection Requirement" value={rfq.inspectionRequirement || '—'} />
-            <ErpViewField label="Technical Contact" value={rfq.technicalContact || '—'} />
-            <ErpViewField label="Commercial Contact" value={rfq.commercialContact || '—'} />
-            <ErpViewField label="Remarks" value={rfq.remarks || '—'} colSpan={3} />
+            <ErpViewField label="Freight Terms" value={rfq.freightTerms || '-'} />
+            <ErpViewField label="Inspection Requirement" value={rfq.inspectionRequirement || '-'} />
+            <ErpViewField label="Technical Contact" value={rfq.technicalContact || '-'} />
+            <ErpViewField label="Commercial Contact" value={rfq.commercialContact || '-'} />
+            <ErpViewField label="Remarks" value={rfq.remarks || '-'} colSpan={3} />
           </ErpCardSection>
 
           <ErpCardSection
@@ -450,8 +450,8 @@ export function RfqDetailPage() {
                           <div className="font-mono text-[11px] text-erp-muted">{l.itemCode}</div>
                           <div className="font-medium text-erp-text">{l.itemName}</div>
                         </td>
-                        <td className="max-w-[12rem] text-erp-muted">{l.specification || '—'}</td>
-                        <td className="font-mono">{l.hsnCode || l.sacCode || '—'}</td>
+                        <td className="max-w-[12rem] text-erp-muted">{l.specification || '-'}</td>
+                        <td className="font-mono">{l.hsnCode || l.sacCode || '-'}</td>
                         <td className="num">
                           <PurchaseStockDualQtyCell baseQty={l.quantity} itemId={l.itemId} bareWhenSingle />
                         </td>
@@ -468,10 +468,10 @@ export function RfqDetailPage() {
                               {l.purchaseRequisitionNumber}
                             </Link>
                           ) : (
-                            '—'
+                            '-'
                           )}
                         </td>
-                        <td className="text-erp-muted">{l.remarks || '—'}</td>
+                        <td className="text-erp-muted">{l.remarks || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -525,17 +525,17 @@ export function RfqDetailPage() {
                             ) : null}
                           </div>
                         </td>
-                        <td className="font-mono text-[11px]">{v.gstin || '—'}</td>
+                        <td className="font-mono text-[11px]">{v.gstin || '-'}</td>
                         <td>{v.state}</td>
-                        <td>{v.contactPerson || '—'}</td>
+                        <td>{v.contactPerson || '-'}</td>
                         <td>
-                          <div>{v.contactEmail || '—'}</div>
-                          <div className="text-erp-muted">{v.contactPhone || '—'}</div>
+                          <div>{v.contactEmail || '-'}</div>
+                          <div className="text-erp-muted">{v.contactPhone || '-'}</div>
                         </td>
                         <td className="num">
                           <span className="inline-flex items-center justify-end gap-1 tabular-nums">
                             <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                            {v.vendorRating != null ? v.vendorRating.toFixed(1) : '—'}
+                            {v.vendorRating != null ? v.vendorRating.toFixed(1) : '-'}
                           </span>
                         </td>
                         <td>
@@ -543,12 +543,12 @@ export function RfqDetailPage() {
                             {RFQ_VENDOR_INVITE_STATUS_LABELS[v.status]}
                           </Badge>
                         </td>
-                        <td>{v.sentAt ? formatDate(v.sentAt.slice(0, 10)) : '—'}</td>
-                        <td>{v.respondedAt ? formatDate(v.respondedAt.slice(0, 10)) : '—'}</td>
+                        <td>{v.sentAt ? formatDate(v.sentAt.slice(0, 10)) : '-'}</td>
+                        <td>{v.respondedAt ? formatDate(v.respondedAt.slice(0, 10)) : '-'}</td>
                         <td className="num tabular-nums">
                           {v.lastPurchasePrice != null
                             ? formatCurrency(v.lastPurchasePrice)
-                            : '—'}
+                            : '-'}
                         </td>
                       </tr>
                     ))}

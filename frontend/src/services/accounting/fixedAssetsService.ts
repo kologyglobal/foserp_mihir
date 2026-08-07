@@ -173,7 +173,7 @@ function mapAssetDto(dto: FixedAssetDto, companyName = COMPANY_NAME): FixedAsset
     parentAssetId: null,
     currency: dto.currencyCode,
     company: companyName,
-    createdBy: '—',
+    createdBy: '-',
     createdAt: dto.createdAt,
     modifiedAt: dto.updatedAt,
     notes: dto.notes,
@@ -221,7 +221,7 @@ function mapDepreciationRunDto(dto: FixedAssetDepreciationRunDto): DepreciationR
     postedBy: dto.postedAt ? 'System' : null,
     postedAt: dto.postedAt,
     lines,
-    createdBy: '—',
+    createdBy: '-',
     createdAt: dto.createdAt,
   }
 }
@@ -587,11 +587,11 @@ function mapAssetDtoToAcquisition(dto: FixedAssetDto): AssetAcquisition {
     currency: dto.currencyCode,
     status: dto.status === 'Draft' ? 'Draft' : 'Pending Capitalization',
     assetId: dto.id,
-    location: dto.location ?? '—',
-    plant: dto.plant ?? '—',
-    department: dto.department ?? '—',
+    location: dto.location ?? '-',
+    plant: dto.plant ?? '-',
+    department: dto.department ?? '-',
     notes: dto.notes,
-    createdBy: '—',
+    createdBy: '-',
     createdAt: dto.createdAt,
   }
 }
@@ -694,9 +694,9 @@ export async function getCapitalizations(): Promise<AssetCapitalization[]> {
       status,
       approvedBy: null,
       approvedAt: dto.capitalizedAt,
-      glAssetAccount: '—',
+      glAssetAccount: '-',
       notes: dto.notes,
-      createdBy: '—',
+      createdBy: '-',
       createdAt: dto.createdAt,
     })
     return [
@@ -729,9 +729,9 @@ export async function capitalizeAssetDemo(id: string): Promise<AssetCapitalizati
       status: 'Capitalized',
       approvedBy: 'System',
       approvedAt: asset.capitalizedAt,
-      glAssetAccount: '—',
+      glAssetAccount: '-',
       notes: result.idempotentReplay ? 'Capitalization replayed (idempotent).' : null,
-      createdBy: '—',
+      createdBy: '-',
       createdAt: asset.updatedAt,
     }
   }
@@ -922,7 +922,7 @@ function mapTransferDto(row: FixedAssetTransferDto): AssetTransfer {
     reason: row.reason,
     approvedBy: null,
     approvedAt: row.completedAt,
-    createdBy: '—',
+    createdBy: '-',
     createdAt: row.createdAt,
   }
 }
@@ -1136,7 +1136,7 @@ export async function getDisposals(): Promise<AssetDisposal[]> {
       reason: a.disposalReason ?? 'Disposed',
       approvedBy: null,
       approvedAt: a.disposedAt ?? null,
-      createdBy: '—',
+      createdBy: '-',
       createdAt: a.disposedAt ?? a.updatedAt,
     }))
   }

@@ -289,7 +289,7 @@ export function ApiConnectorListPage() {
                   <td className="px-3 py-2 font-medium text-erp-text">{row.code}</td>
                   <td className="px-3 py-2">{row.name}</td>
                   <td className="px-3 py-2">{PROVIDER_LABELS[row.provider]}</td>
-                  <td className="px-3 py-2">{row.configJson?.expectedFormat ?? '—'}</td>
+                  <td className="px-3 py-2">{row.configJson?.expectedFormat ?? '-'}</td>
                   <td className="px-3 py-2">{row.status}</td>
                   <td className="px-3 py-2 text-erp-muted">
                     {row.syncInProgress

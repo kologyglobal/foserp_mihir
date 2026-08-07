@@ -102,7 +102,7 @@ export function GstGlReconPage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">Health</h2>
             <p className="mt-1 text-xs text-erp-muted">
-              Overall: {report?.health?.overall ?? '—'} · Score: {report?.health?.scorePct ?? '—'}% · Variances:{' '}
+              Overall: {report?.health?.overall ?? '-'} · Score: {report?.health?.scorePct ?? '-'}% · Variances:{' '}
               {report?.health?.varianceCount ?? 0} · Unmapped: {report?.health?.unmappedCount ?? 0} · Abs var:{' '}
               {report?.health?.totalAbsVariance ?? 0} · Close claim:{' '}
               {report?.readyForCloseClaim ? 'Yes (books)' : 'No'} · Full GST compliant? No · Mode:{' '}
@@ -130,7 +130,7 @@ export function GstGlReconPage() {
                   <tr key={l.taxType} className="border-t border-erp-border/60">
                     <td className="py-1 pr-2">{l.label ?? l.taxType}</td>
                     <td className="py-1 pr-2 font-medium">{l.status}</td>
-                    <td className="py-1 pr-2">{l.accountCode ?? '—'}</td>
+                    <td className="py-1 pr-2">{l.accountCode ?? '-'}</td>
                     <td className="py-1 pr-2">{l.gstLedgerAmount ?? 0}</td>
                     <td className="py-1 pr-2">{l.glNetAmount ?? 0}</td>
                     <td className="py-1 pr-2">{l.variance ?? 0}</td>

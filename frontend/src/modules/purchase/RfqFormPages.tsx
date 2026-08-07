@@ -201,9 +201,9 @@ export function RfqCreateDocumentPage() {
 
   const statusStrip = [
     { label: 'Document', value: 'New RFQ', tone: 'info' as const },
-    { label: 'PR Ref', value: pr?.prNo ?? '—', tone: 'neutral' as const },
-    { label: 'Lines', value: pr ? String(pr.lines.length) : '—', tone: 'neutral' as const },
-    { label: 'Total Qty', value: pr ? formatNumber(totalQty) : '—', tone: 'neutral' as const },
+    { label: 'PR Ref', value: pr?.prNo ?? '-', tone: 'neutral' as const },
+    { label: 'Lines', value: pr ? String(pr.lines.length) : '-', tone: 'neutral' as const },
+    { label: 'Total Qty', value: pr ? formatNumber(totalQty) : '-', tone: 'neutral' as const },
     {
       label: 'Vendors',
       value: String(selectedVendors.length),
@@ -222,7 +222,7 @@ export function RfqCreateDocumentPage() {
       },
       {
         label: 'PR Lines',
-        value: pr ? String(pr.lines.length) : '—',
+        value: pr ? String(pr.lines.length) : '-',
         accent: 'green' as const,
         hint: pr ? `${formatNumber(totalQty)} total qty` : 'Select approved PR',
       },
@@ -234,7 +234,7 @@ export function RfqCreateDocumentPage() {
       },
       {
         label: 'Total Qty',
-        value: pr ? formatNumber(totalQty) : '—',
+        value: pr ? formatNumber(totalQty) : '-',
         accent: 'slate' as const,
         hint: pr?.prNo ?? 'No PR',
       },
@@ -324,11 +324,11 @@ export function RfqCreateDocumentPage() {
         { label: 'Status', value: 'Draft' },
         {
           label: 'PR',
-          value: pr?.prNo ?? '—',
+          value: pr?.prNo ?? '-',
           muted: !pr,
         },
-        { label: 'Lines', value: pr ? String(pr.lines.length) : '—' },
-        { label: 'Total Qty', value: pr ? formatNumber(totalQty) : '—' },
+        { label: 'Lines', value: pr ? String(pr.lines.length) : '-' },
+        { label: 'Total Qty', value: pr ? formatNumber(totalQty) : '-' },
         {
           label: 'Vendors',
           value: String(selectedVendors.length),
@@ -520,7 +520,7 @@ export function RfqCreateDocumentPage() {
                       <td>{v.city}</td>
                       <td>{'★'.repeat(Math.round(v.rating))}</td>
                       <td>{v.paymentTermsDays} days</td>
-                      <td>{preferredCount > 0 ? `${preferredCount} ★` : '—'}</td>
+                      <td>{preferredCount > 0 ? `${preferredCount} ★` : '-'}</td>
                     </tr>
                   )
                 })}

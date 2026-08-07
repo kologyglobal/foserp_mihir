@@ -437,7 +437,7 @@ export const usePurchaseStore = create<PurchaseState>()(
             vendorId: q.vendorId,
             vendorName: vendor?.vendorName ?? q.vendorId,
             itemId: q.itemId,
-            itemCode: item?.itemCode ?? '—',
+            itemCode: item?.itemCode ?? '-',
             quotedRate: q.quotedRate,
             landedCostPerUnit: computeLandedCostPerUnit(q.quotedRate, line?.qty ?? 1, q.freightAmount, q.gstPct),
             deliveryDate: q.deliveryDate,
@@ -1050,7 +1050,7 @@ export const usePurchaseStore = create<PurchaseState>()(
             salesOrderNo: p.salesOrderNo,
             lineCount: p.lines.length,
             status: p.status,
-            requiredDate: p.lines[0]?.requiredDate ?? '—',
+            requiredDate: p.lines[0]?.requiredDate ?? '-',
             createdAt: p.createdAt,
           })),
 
@@ -1064,7 +1064,7 @@ export const usePurchaseStore = create<PurchaseState>()(
             return {
               poId: p.id,
               poNo: p.poNo,
-              vendorName: master.vendors.find((v) => v.id === p.vendorId)?.vendorName ?? '—',
+              vendorName: master.vendors.find((v) => v.id === p.vendorId)?.vendorName ?? '-',
               status: p.status,
               expectedDate: p.expectedDate,
               openQty,

@@ -130,8 +130,8 @@ export function CrmLeadsTable({
         cell: ({ row }) => (
           <EnterpriseRecordCell
             primary={row.original.prospectDisplay}
-            location={row.original.locationDisplay !== '—' ? row.original.locationDisplay : undefined}
-            industry={row.original.industryDisplay !== '—' ? row.original.industryDisplay : undefined}
+            location={row.original.locationDisplay !== '-' ? row.original.locationDisplay : undefined}
+            industry={row.original.industryDisplay !== '-' ? row.original.industryDisplay : undefined}
             subtitle={row.original.accountTypeDisplay}
           />
         ),

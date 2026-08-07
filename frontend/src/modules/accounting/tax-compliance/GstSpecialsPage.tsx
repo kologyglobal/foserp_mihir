@@ -90,7 +90,7 @@ export function GstSpecialsPage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">Capability matrix</h2>
             <p className="mt-1 text-xs text-erp-muted">
-              Verdict: {matrix?.verdict ?? '—'} · Full GST compliant?{' '}
+              Verdict: {matrix?.verdict ?? '-'} · Full GST compliant?{' '}
               {matrix?.notFullGstCompliant === false ? 'Yes' : 'No (honest label)'} · Mode:{' '}
               {perms.isApiMode ? 'API' : 'Demo'}
             </p>
@@ -132,10 +132,10 @@ export function GstSpecialsPage() {
                   <tbody>
                     {nilRows.slice(0, 20).map((r) => (
                       <tr key={String(r.id)} className="border-t border-erp-border">
-                        <td className="py-1 pr-3">{String(r.documentNumber ?? '—')}</td>
-                        <td className="py-1 pr-3">{String(r.supplyClass ?? '—')}</td>
-                        <td className="py-1 pr-3">{String(r.taxableValue ?? '—')}</td>
-                        <td className="py-1">{String(r.taxAmount ?? '—')}</td>
+                        <td className="py-1 pr-3">{String(r.documentNumber ?? '-')}</td>
+                        <td className="py-1 pr-3">{String(r.supplyClass ?? '-')}</td>
+                        <td className="py-1 pr-3">{String(r.taxableValue ?? '-')}</td>
+                        <td className="py-1">{String(r.taxAmount ?? '-')}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -7,7 +7,6 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { listPutAwayQueue, type PutAwayCard } from '@/services/inventory/putAwayService'
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
-import { isApiMode } from '@/config/apiConfig'
 
 function PutAwayCardView({
   card,
@@ -125,7 +124,6 @@ export function PutAwayWorkbenchPage() {
       badge="Store"
       title="Put Away"
       description="Complete GRN stock post first, then move to storage with the transfer/scan engine. No second put-away ledger."
-      backLink={{ to: '/inventory', label: 'Store Dashboard' }}
       breadcrumbs={[
         { label: 'Store', to: '/inventory' },
         { label: 'Put Away' },
@@ -137,7 +135,6 @@ export function PutAwayWorkbenchPage() {
         <p className="m-0 text-[12px] text-erp-muted">
           Flow: <strong>GRN post</strong> (inventory ledger) → <strong>Transfer / scan</strong> into storage bin.
           Serials and bins stay on the GRN/transfer documents.
-          {!isApiMode() ? ' Demo GRNs appear when purchase demo data is loaded.' : ''}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <button

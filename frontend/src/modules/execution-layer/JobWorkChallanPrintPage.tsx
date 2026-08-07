@@ -35,7 +35,7 @@ export function JobWorkChallanPrintPage() {
           <p><strong>Process:</strong> {jwo.process}</p>
         </div>
         <div>
-          <p><strong>Expected Return:</strong> {jwo.expectedReturnDate ? formatDate(jwo.expectedReturnDate) : '—'}</p>
+          <p><strong>Expected Return:</strong> {jwo.expectedReturnDate ? formatDate(jwo.expectedReturnDate) : '-'}</p>
           <p><strong>Status:</strong> {jwo.status}</p>
         </div>
       </div>
@@ -54,11 +54,11 @@ export function JobWorkChallanPrintPage() {
           {shipments.map((s) => (
             <tr key={s.id}>
               <td>{s.challanNo}</td>
-              <td>{getItem(s.itemId)?.itemCode ?? '—'}</td>
+              <td>{getItem(s.itemId)?.itemCode ?? '-'}</td>
               <td>{s.sentQty}</td>
-              <td>{s.vehicleNo ?? '—'}</td>
-              <td>{s.driver ?? '—'}</td>
-              <td>{s.sentAt ? formatDate(s.sentAt.slice(0, 10)) : '—'}</td>
+              <td>{s.vehicleNo ?? '-'}</td>
+              <td>{s.driver ?? '-'}</td>
+              <td>{s.sentAt ? formatDate(s.sentAt.slice(0, 10)) : '-'}</td>
             </tr>
           ))}
         </tbody>

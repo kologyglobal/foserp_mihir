@@ -25,7 +25,7 @@ function Field({ label, value }: { label: string; value?: string | number | null
   return (
     <div>
       <dt className="text-[12px] text-erp-muted">{label}</dt>
-      <dd className="text-[13px] font-medium text-erp-text">{value ?? '—'}</dd>
+      <dd className="text-[13px] font-medium text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -178,7 +178,7 @@ export function GatePassDetailPage() {
                     <Field label="Party" value={pass.partyName} />
                     <Field label="Purpose" value={pass.purpose} />
                     <Field label="Outward date" value={formatDate(pass.outwardDate)} />
-                    <Field label="Expected return" value={pass.expectedReturnDate ? formatDate(pass.expectedReturnDate) : '—'} />
+                    <Field label="Expected return" value={pass.expectedReturnDate ? formatDate(pass.expectedReturnDate) : '-'} />
                     <Field label="Pending quantity" value={gatePassPendingQty(pass)} />
                     <Field label="Approver" value={pass.approverName} />
                     <Field label="Gate" value={pass.gate} />
@@ -200,12 +200,12 @@ export function GatePassDetailPage() {
                           return (
                             <tr key={item.id}>
                               <td className="font-medium">{item.itemDescription}</td>
-                              <td>{item.serialNumber ?? '—'}</td>
+                              <td>{item.serialNumber ?? '-'}</td>
                               <td className="tabular-nums">{item.quantity}</td>
                               <td className="tabular-nums">{item.returnedQuantity}</td>
                               <td className="tabular-nums font-semibold">{itemPending}</td>
                               <td>{item.uom}</td>
-                              <td>{item.conditionOut ?? '—'}</td>
+                              <td>{item.conditionOut ?? '-'}</td>
                               <td>
                                 {canReturn && itemPending > 0 ? (
                                   <ErpButton size="sm" variant="outline" onClick={() => setReturnItemId(item.id)}>Return</ErpButton>

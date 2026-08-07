@@ -147,7 +147,7 @@ function BomReferenceTree({ nodes, depth }: { nodes: BomRefNode[]; depth: number
           node.makeOrBuy === 'MAKE' &&
           !node.phantomAssembly
         const label = node.descriptionOverride?.trim() || node.item?.name || node.itemId.slice(0, 8)
-        const code = node.item?.code ?? '—'
+        const code = node.item?.code ?? '-'
         return (
           <li key={node.id}>
             <div
@@ -219,11 +219,11 @@ export function RoutingVersionEditorPage() {
   const [loadingWhereUsed, setLoadingWhereUsed] = useState(false)
 
   const workCentreLabel = useCallback(
-    (id: string | null) => (id ? workCentres.find((w) => w.id === id)?.name ?? id.slice(0, 8) : '—'),
+    (id: string | null) => (id ? workCentres.find((w) => w.id === id)?.name ?? id.slice(0, 8) : '-'),
     [workCentres],
   )
   const machineLabel = useCallback(
-    (id: string | null) => (id ? machines.find((m) => m.id === id)?.name ?? id.slice(0, 8) : '—'),
+    (id: string | null) => (id ? machines.find((m) => m.id === id)?.name ?? id.slice(0, 8) : '-'),
     [machines],
   )
   const qcPlanLabel = useCallback(
@@ -910,9 +910,9 @@ export function RoutingVersionEditorPage() {
                 <td>{MANUFACTURING_TIME_UNIT_LABELS[op.setupTimeUnit ?? 'MINUTE']}</td>
                 <td className="tabular-nums">{op.runTimeValue || '0'}</td>
                 <td>{MANUFACTURING_TIME_UNIT_LABELS[op.runTimeUnit ?? 'MINUTE']}</td>
-                <td className="text-center">{op.qualityRequired ? 'Yes' : '—'}</td>
+                <td className="text-center">{op.qualityRequired ? 'Yes' : '-'}</td>
                 <td className="text-[11px]">
-                  {op.qualityRequired ? qcPlanLabel(op.qcTestGroupId) ?? '—' : '—'}
+                  {op.qualityRequired ? qcPlanLabel(op.qcTestGroupId) ?? '-' : '-'}
                 </td>
                 {canManage ? (
                   <td className="text-right">

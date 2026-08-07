@@ -147,7 +147,7 @@ export function GstHardeningCockpitPage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">Capability matrix</h2>
             <p className="mt-1 text-xs text-erp-muted">
-              Verdict: {matrix?.verdict ?? '—'} · Mode: {perms.isApiMode ? 'API' : 'Demo'} · Full GST
+              Verdict: {matrix?.verdict ?? '-'} · Mode: {perms.isApiMode ? 'API' : 'Demo'} · Full GST
               compliant? No
             </p>
             <ul className="mt-3 divide-y divide-erp-border text-sm">
@@ -163,8 +163,8 @@ export function GstHardeningCockpitPage() {
           <section className="rounded border border-erp-border bg-white p-4">
             <h2 className="text-sm font-semibold">Period books health</h2>
             <p className="mt-1 text-xs text-erp-muted">
-              {health?.returnPeriod ?? '—'} · GSTIN {health?.companyGstin ?? '—'} · Overall{' '}
-              {health?.health.overall ?? '—'} · blockers {health?.health.blockerCount ?? 0} · warnings{' '}
+              {health?.returnPeriod ?? '-'} · GSTIN {health?.companyGstin ?? '-'} · Overall{' '}
+              {health?.health.overall ?? '-'} · blockers {health?.health.blockerCount ?? 0} · warnings{' '}
               {health?.health.warningCount ?? 0}
             </p>
             <p className="mt-1 text-xs text-erp-muted">
@@ -190,7 +190,7 @@ export function GstHardeningCockpitPage() {
             <h2 className="text-sm font-semibold">Go-live / UAT gate</h2>
             <p className="mt-1 text-xs text-erp-muted">
               {gate?.gate.passedCount ?? 0}/{gate?.gate.totalCount ?? 7} axes · provider{' '}
-              {gate?.gate.filingProviderMode ?? '—'} · canClaimFullGstCompliant:{' '}
+              {gate?.gate.filingProviderMode ?? '-'} · canClaimFullGstCompliant:{' '}
               {String(gate?.gate.canClaimFullGstCompliant ?? false)}
             </p>
             <ul className="mt-3 divide-y divide-erp-border text-sm">

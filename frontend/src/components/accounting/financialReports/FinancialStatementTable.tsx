@@ -41,7 +41,7 @@ function AmountCell({
   )
 
   const renderAmount = (value: number | undefined, key: string) => {
-    if (value === undefined) return <td key={key} className="px-3 py-1.5 text-right text-[12px] text-erp-muted">—</td>
+    if (value === undefined) return <td key={key} className="px-3 py-1.5 text-right text-[12px] text-erp-muted">-</td>
     const fmt = formatStatementAmount(value)
     return (
       <td key={key} className={cn('px-3 py-1.5', fmt.negative && 'text-rose-600', 'tabular-nums text-right text-[12px]')}>
@@ -77,7 +77,7 @@ function AmountCell({
               {line.variancePct.toFixed(1)}%
             </>
           ) : (
-            '—'
+            '-'
           )}
         </td>
       ) : null}

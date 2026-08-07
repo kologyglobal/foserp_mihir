@@ -165,7 +165,7 @@ export function CreditNoteAllocatePage() {
             <tbody>
               {openItems.map((item) => (
                 <tr key={item.openItemId} className="border-b border-erp-border/60">
-                  <td className="py-2 pr-3 font-medium">{item.invoiceNumber ?? '—'}</td>
+                  <td className="py-2 pr-3 font-medium">{item.invoiceNumber ?? '-'}</td>
                   <td className="py-2 pr-3 tabular-nums">{item.invoiceDate}</td>
                   <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(parseDecimal(item.outstandingAmount))}</td>
                   <td className="py-2">

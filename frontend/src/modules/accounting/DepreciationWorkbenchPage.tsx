@@ -195,12 +195,12 @@ export function DepreciationWorkbenchPage() {
           </label>
           <div>
             <p className="text-[11px] text-erp-muted">Run status</p>
-            <div className="mt-1">{selectedRun ? <DepreciationRunStatusBadge status={selectedRun.status} /> : '—'}</div>
+            <div className="mt-1">{selectedRun ? <DepreciationRunStatusBadge status={selectedRun.status} /> : '-'}</div>
           </div>
           <div>
             <p className="text-[11px] text-erp-muted">Period range</p>
             <p className="mt-1 text-[12px] font-semibold">
-              {selectedRun ? `${formatDate(selectedRun.periodFrom)} – ${formatDate(selectedRun.periodTo)}` : '—'}
+              {selectedRun ? `${formatDate(selectedRun.periodFrom)} – ${formatDate(selectedRun.periodTo)}` : '-'}
             </p>
           </div>
         </div>

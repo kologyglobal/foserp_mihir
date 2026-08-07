@@ -753,8 +753,8 @@ export function CrmActivitiesPanel({ scope }: { scope: CrmEngagementScope }) {
                       <span className="crm-engage-type-pill">{formatTypeLabel(a.type)}</span>
                     </td>
                     <td className="crm-engage-table__subject">{a.subject}</td>
-                    <td>{customers.find((c) => c.id === a.customerId)?.customerName ?? '—'}</td>
-                    <td className="crm-engage-table__muted">{deal?.opportunityName ?? '—'}</td>
+                    <td>{customers.find((c) => c.id === a.customerId)?.customerName ?? '-'}</td>
+                    <td className="crm-engage-table__muted">{deal?.opportunityName ?? '-'}</td>
                     <td>{a.ownerName}</td>
                     <td>
                       {completed ? (

@@ -23,7 +23,7 @@ export function VendorPaymentOpenItemSummary({ payment }: { payment: VendorPayme
       <dl className="grid gap-1.5 sm:grid-cols-2">
         <div>
           <dt className="text-erp-muted">Document</dt>
-          <dd className="font-medium">{payment.vendorPaymentNumber ?? '—'}</dd>
+          <dd className="font-medium">{payment.vendorPaymentNumber ?? '-'}</dd>
         </div>
         <div>
           <dt className="text-erp-muted">Type</dt>
@@ -48,7 +48,7 @@ export function VendorPaymentOpenItemSummary({ payment }: { payment: VendorPayme
         <div>
           <dt className="text-erp-muted">Allocation state</dt>
           <dd className="font-medium">
-            {payment.allocationState ? PAYMENT_ALLOCATION_STATE_LABELS[payment.allocationState] : '—'}
+            {payment.allocationState ? PAYMENT_ALLOCATION_STATE_LABELS[payment.allocationState] : '-'}
           </dd>
         </div>
       </dl>

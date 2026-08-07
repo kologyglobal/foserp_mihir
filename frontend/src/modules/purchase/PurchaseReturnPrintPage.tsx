@@ -17,6 +17,7 @@ import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
 import { PurchasePrintDualQtyCell } from '@/components/purchase/print/PurchasePrintDualQtyCell'
 import { resolveDualQtyForPrint } from '@/utils/purchasePrintDualQty'
 import { useMasterStore } from '@/store/masterStore'
+import { amountInWords } from '@/utils/amountInWords'
 
 export function PurchaseReturnPrintPage() {
   const { id } = useParams()
@@ -101,10 +102,10 @@ export function PurchaseReturnPrintPage() {
             <p className="po-print-box__label">Return details</p>
             <p>Reason: {PURCHASE_RETURN_REASON_LABELS[doc.returnReason]}</p>
             <p>Warehouse: {doc.warehouseName}</p>
-            <p>Transport: {doc.transportDetails || '—'}</p>
-            <p>PO: {doc.purchaseOrderNumber || '—'}</p>
-            <p>GRN: {doc.goodsReceiptNumber || '—'}</p>
-            <p>Invoice: {doc.purchaseInvoiceNumber || '—'}</p>
+            <p>Transport: {doc.transportDetails || '-'}</p>
+            <p>PO: {doc.purchaseOrderNumber || '-'}</p>
+            <p>GRN: {doc.goodsReceiptNumber || '-'}</p>
+            <p>Invoice: {doc.purchaseInvoiceNumber || '-'}</p>
             {doc.linkedDebitNoteNumber ? <p>Debit Note: {doc.linkedDebitNoteNumber}</p> : null}
             {doc.linkedReplacementPoNumber ? (
               <p>Replacement PO: {doc.linkedReplacementPoNumber}</p>
@@ -118,12 +119,12 @@ export function PurchaseReturnPrintPage() {
               <th>#</th>
               <th>Item</th>
               <th>Batch / Serial</th>
-              <th>Original Received</th>
-              <th>Returned (this doc)</th>
-              <th>Balance after</th>
+              <th className="num">Original Received</th>
+              <th className="num">Returned (this doc)</th>
+              <th className="num">Balance after</th>
               <th>UOM</th>
-              <th>Unit Cost</th>
-              <th>Amount</th>
+              <th className="num">Unit Cost</th>
+              <th className="num">Amount</th>
               <th>Reason</th>
             </tr>
           </thead>
@@ -142,15 +143,15 @@ export function PurchaseReturnPrintPage() {
                   {l.description || l.itemName}
                 </td>
                 <td>
-                  {l.batchLotNo || '—'}
+                  {l.batchLotNo || '-'}
                   {l.serialNumber ? ` / ${l.serialNumber}` : ''}
                 </td>
                 <PurchasePrintDualQtyCell {...receivedDual} />
                 <PurchasePrintDualQtyCell {...returnDual} />
                 <PurchasePrintDualQtyCell {...balanceDual} />
-                <td>{l.uom}</td>
-                <td>{formatCurrency(l.unitCost)}</td>
-                <td>{formatCurrency(l.returnAmount)}</td>
+                <td>{l.uom || '-'}</td>
+                <td className="num">{formatCurrency(l.unitCost)}</td>
+                <td className="num">{formatCurrency(l.returnAmount)}</td>
                 <td>{PURCHASE_RETURN_REASON_LABELS[l.reason]}</td>
               </tr>
             )})}
@@ -159,14 +160,20 @@ export function PurchaseReturnPrintPage() {
 
         <div className="po-print-totals">
           <p>
-            Taxable: {formatCurrency(doc.taxableAmount)} · CGST: {formatCurrency(doc.cgst)} · SGST:{' '}
-            {formatCurrency(doc.sgst)} · IGST: {formatCurrency(doc.igst)}
+            Taxable: {formatCurrency(doc.taxableAmount)}
+            {Number(doc.igst) > 0
+              ? ` · IGST: ${formatCurrency(doc.igst)}`
+              : ` · CGST: ${formatCurrency(doc.cgst)} · SGST: ${formatCurrency(doc.sgst)}`}
           </p>
           <p className="po-print-totals__grand">
             <strong>Grand Total: {formatCurrency(doc.totalAmount)}</strong>
           </p>
           {doc.remarks ? <p>Remarks: {doc.remarks}</p> : null}
         </div>
+
+        <p className="po-print-words">
+          Amount in words: {amountInWords(Number(doc.totalAmount) || 0)}
+        </p>
 
         <div className="po-print-signatures">
           <div className="po-print-signatures__line">Prepared by</div>

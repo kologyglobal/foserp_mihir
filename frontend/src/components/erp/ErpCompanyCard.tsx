@@ -51,7 +51,7 @@ function customerInitials(name: string) {
 }
 
 function formatShortDate(iso: string | null | undefined) {
-  if (!iso) return '—'
+  if (!iso) return '-'
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 

@@ -141,16 +141,16 @@ export function WorkOrder360Page() {
               fields={[
                 { label: 'WO No', value: wo.woNo },
                 { label: 'Linked SO', value: <TableLink to={`/sales/orders/${wo.salesOrderId}`}>{wo.salesOrderNo}</TableLink> },
-                { label: 'Company', value: data.customer?.customerName ?? '—' },
+                { label: 'Company', value: data.customer?.customerName ?? '-' },
                 { label: 'Product / FG', value: data.product?.productName ?? wo.outputItemCode },
                 { label: 'WO Type', value: formatStatus(wo.woType) },
                 { label: 'Status', value: <Badge color={statusColor(wo.status)}>{formatStatus(wo.status)}</Badge> },
                 { label: 'Progress', value: `${kpis.progressPct}%` },
                 { label: 'Planned Start', value: formatDate(wo.plannedStartDate) },
                 { label: 'Planned Finish', value: formatDate(wo.plannedFinishDate) },
-                { label: 'Actual Start', value: wo.releasedAt ? formatDate(wo.releasedAt.slice(0, 10)) : '—' },
-                { label: 'Actual Finish', value: wo.completedAt ? formatDate(wo.completedAt.slice(0, 10)) : '—' },
-                { label: 'Current Operation', value: data.currentOp?.operationName ?? '—' },
+                { label: 'Actual Start', value: wo.releasedAt ? formatDate(wo.releasedAt.slice(0, 10)) : '-' },
+                { label: 'Actual Finish', value: wo.completedAt ? formatDate(wo.completedAt.slice(0, 10)) : '-' },
+                { label: 'Current Operation', value: data.currentOp?.operationName ?? '-' },
                 { label: 'Next Action', value: data.nextAction },
                 { label: 'Blockers', value: data.blockers.length ? data.blockers.join('; ') : 'None' },
               ]}
@@ -196,8 +196,8 @@ export function WorkOrder360Page() {
             </Entity360Panel>
             <Entity360Panel title="Next Steps">
               <div className="space-y-2 p-4 text-sm">
-                <p><strong>Current:</strong> {data.currentOp?.operationName ?? '—'}</p>
-                <p><strong>Next operation:</strong> {data.nextOp?.operationName ?? '—'}</p>
+                <p><strong>Current:</strong> {data.currentOp?.operationName ?? '-'}</p>
+                <p><strong>Next operation:</strong> {data.nextOp?.operationName ?? '-'}</p>
                 <p><strong>Recommended action:</strong> {data.nextAction}</p>
                 {data.blockers.length > 0 && (
                   <ul className="mt-2 list-disc pl-5 text-erp-danger">

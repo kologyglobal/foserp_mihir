@@ -205,7 +205,7 @@ export function StockDetailsDrawer({ itemId, warehouseId, onClose, onOpenFull }:
                         <tr key={b.id}>
                           <td className="font-mono">{b.batchNo}</td>
                           <td className="text-right font-mono">{formatNumber(b.qty)}</td>
-                          <td>{b.expiryDate ? formatDate(b.expiryDate) : '—'}</td>
+                          <td>{b.expiryDate ? formatDate(b.expiryDate) : '-'}</td>
                           <td>{BATCH_STATUS_LABELS[b.status as keyof typeof BATCH_STATUS_LABELS] ?? b.status}</td>
                           <td>
                             <button type="button" className="text-erp-primary underline" onClick={() => setBatchDrawerId(b.id)}>Details</button>

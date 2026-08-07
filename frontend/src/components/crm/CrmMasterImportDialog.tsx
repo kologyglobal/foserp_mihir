@@ -231,7 +231,7 @@ export function CrmMasterImportDialog({
                     {rows.filter((r) => r.errors.length > 0).slice(0, 25).map((row) => (
                       <tr key={`err-${row.rowNo}`}>
                         <td>{row.rowNo}</td>
-                        <td className="font-mono text-[11px]">{row.input.code || '—'}</td>
+                        <td className="font-mono text-[11px]">{row.input.code || '-'}</td>
                         <td className="text-red-800">{row.errors.join('; ')}</td>
                       </tr>
                     ))}
@@ -254,8 +254,8 @@ export function CrmMasterImportDialog({
                   {rows.slice(0, 50).map((row) => (
                     <tr key={row.rowNo}>
                       <td>{row.rowNo}</td>
-                      <td className="font-mono text-[11px]">{row.input.code || '—'}</td>
-                      <td>{row.input.name || '—'}</td>
+                      <td className="font-mono text-[11px]">{row.input.code || '-'}</td>
+                      <td>{row.input.name || '-'}</td>
                       <td>{row.input.status}</td>
                       <td className={cn(row.errors.length ? 'text-red-700' : 'text-emerald-700')}>
                         {row.errors.length ? row.errors[0] : 'Ready'}

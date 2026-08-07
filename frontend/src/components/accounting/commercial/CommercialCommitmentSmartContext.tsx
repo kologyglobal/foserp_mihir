@@ -87,7 +87,7 @@ export function CommercialCommitmentSmartContext({
                   permission="crm.opportunity.view"
                 />
               ) : (
-                '—'
+                '-'
               )}
             </dd>
           </div>
@@ -97,11 +97,11 @@ export function CommercialCommitmentSmartContext({
               {row.quotationId ? (
                 <CrmDocumentLink
                   to={`/crm/quotations/${row.quotationId}`}
-                  label={`${row.quotationNo ?? ''} Rev ${row.quotationRevision ?? '—'}`}
+                  label={`${row.quotationNo ?? ''} Rev ${row.quotationRevision ?? '-'}`}
                   permission="crm.quotation.view"
                 />
               ) : (
-                '—'
+                '-'
               )}
             </dd>
           </div>
@@ -115,7 +115,7 @@ export function CommercialCommitmentSmartContext({
                   permission="crm.sales_order.view"
                 />
               ) : (
-                '—'
+                '-'
               )}
             </dd>
           </div>

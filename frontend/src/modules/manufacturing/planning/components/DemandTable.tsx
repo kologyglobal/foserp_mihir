@@ -47,9 +47,9 @@ export function DemandTable({ lines }: { lines: ProductionPlanDemandLine[] }) {
               <td className="text-right tabular-nums font-semibold">
                 {line.netRequirement} {line.uomCode}
               </td>
-              <td className="whitespace-nowrap">{line.requiredDate ? formatDate(line.requiredDate) : '—'}</td>
+              <td className="whitespace-nowrap">{line.requiredDate ? formatDate(line.requiredDate) : '-'}</td>
               <td className="max-w-[200px] truncate text-erp-muted" title={line.notes ?? undefined}>
-                {line.notes || '—'}
+                {line.notes || '-'}
               </td>
             </tr>
           ))}

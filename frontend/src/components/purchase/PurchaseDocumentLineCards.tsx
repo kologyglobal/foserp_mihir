@@ -313,7 +313,7 @@ export function PurchaseDocumentLineCards({
                                 className="erp-input h-9 w-full text-[13px]"
                                 disabled
                                 readOnly
-                                value={uomOptions[0]?.code || line.uom || '—'}
+                                value={uomOptions[0]?.code || line.uom || '-'}
                               />
                             )}
                           </label>

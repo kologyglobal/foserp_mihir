@@ -47,7 +47,7 @@ export function VoucherRegisterTable({
               </td>
               <td className="px-3 py-2">{VOUCHER_DOCUMENT_TYPE_LABELS[v.voucherType]}</td>
               <td className="px-3 py-2 tabular-nums">{v.voucherDate}</td>
-              <td className="px-3 py-2">{v.partyName ?? '—'}</td>
+              <td className="px-3 py-2">{v.partyName ?? '-'}</td>
               <td className="max-w-[220px] truncate px-3 py-2 text-erp-muted" title={v.narration}>
                 {v.narration}
               </td>

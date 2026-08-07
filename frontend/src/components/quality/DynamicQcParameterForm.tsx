@@ -77,7 +77,7 @@ export function DynamicQcParameterForm({ results, onChange, disabled, inspector 
                 {r.uomCode && <span className="text-[12px] text-erp-muted">{r.uomCode}</span>}
                 {(r.minValue != null || r.maxValue != null) && (
                   <span className="text-[11px] text-erp-muted">
-                    Tol: {r.minValue ?? '—'} – {r.maxValue ?? '—'}
+                    Tol: {r.minValue ?? '-'} – {r.maxValue ?? '-'}
                     {r.targetValue != null && ` · Target ${r.targetValue}`}
                   </span>
                 )}

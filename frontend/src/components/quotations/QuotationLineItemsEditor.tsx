@@ -535,7 +535,7 @@ export function QuotationLineItemsEditor({
         <label className="block">
           <span className="mb-1.5 block text-[13px] font-semibold text-erp-text">Scope Notes</span>
           {readOnly ? (
-            <p className="text-[14px] text-erp-muted">{scopeNotes?.trim() || '—'}</p>
+            <p className="text-[14px] text-erp-muted">{scopeNotes?.trim() || '-'}</p>
           ) : (
             <textarea
               rows={3}

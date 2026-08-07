@@ -135,15 +135,15 @@ export function PreventiveMaintenanceListPage() {
                     </Link>
                     <div className="text-[12px] text-erp-fg">{r.name}</div>
                   </td>
-                  <td className="px-3 py-2">{r.machine?.code ?? '—'}</td>
+                  <td className="px-3 py-2">{r.machine?.code ?? '-'}</td>
                   <td className="px-3 py-2">{r.frequencyLabel}</td>
-                  <td className="px-3 py-2 tabular-nums">{r.lastCompletedDate ?? '—'}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.lastCompletedDate ?? '-'}</td>
                   <td className="px-3 py-2 tabular-nums">{r.nextDueDate}</td>
                   <td className="px-3 py-2">
                     <StatusDot label={r.dueStatus} tone={dueTone(r.dueStatus)} />
                   </td>
                   <td className="px-3 py-2">
-                    {r.contractor?.name ?? (r.assignedTechnicianId ? 'Internal' : '—')}
+                    {r.contractor?.name ?? (r.assignedTechnicianId ? 'Internal' : '-')}
                   </td>
                 </tr>
               ))}

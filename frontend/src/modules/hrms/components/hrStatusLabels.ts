@@ -344,7 +344,7 @@ const TONE_MAPS: Record<HrStatusDomain, Record<string, DynamicsStatusChipTone>> 
 
 /** Human label for an attendance exception type code. */
 export function hrExceptionTypeLabel(type: string | null | undefined): string {
-  if (!type) return '—'
+  if (!type) return '-'
   if (ATTENDANCE_EXCEPTION_TYPE_LABELS[type]) return ATTENDANCE_EXCEPTION_TYPE_LABELS[type]
   return type
     .toLowerCase()
@@ -355,7 +355,7 @@ export function hrExceptionTypeLabel(type: string | null | undefined): string {
 
 /** Human-readable label for a status code — falls back to a title-cased version of the code. */
 export function hrStatusLabel(status: string | null | undefined, domain: HrStatusDomain = 'employee'): string {
-  if (!status) return '—'
+  if (!status) return '-'
   const map = LABEL_MAPS[domain]
   if (map[status]) return map[status]
   return status

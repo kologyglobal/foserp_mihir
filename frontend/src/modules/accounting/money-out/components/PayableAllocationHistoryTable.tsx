@@ -51,8 +51,8 @@ export function PayableAllocationHistoryTable({
                   </Link>
                 </td>
                 <td className="py-2 pr-3 tabular-nums">{row.allocationDate}</td>
-                <td className="py-2 pr-3">{row.vendorPaymentNumber ?? '—'}</td>
-                <td className="py-2 pr-3">{row.vendorInvoiceNumber ?? row.supplierInvoiceNumber ?? '—'}</td>
+                <td className="py-2 pr-3">{row.vendorPaymentNumber ?? '-'}</td>
+                <td className="py-2 pr-3">{row.vendorInvoiceNumber ?? row.supplierInvoiceNumber ?? '-'}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(parseDecimal(row.amount))}</td>
                 <td className="py-2">{row.status}</td>
                 {showActions ? (
@@ -64,7 +64,7 @@ export function PayableAllocationHistoryTable({
                         </ErpButton>
                       </Link>
                     ) : (
-                      <span className="text-erp-muted">—</span>
+                      <span className="text-erp-muted">-</span>
                     )}
                   </td>
                 ) : null}

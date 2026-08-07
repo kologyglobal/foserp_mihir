@@ -15,7 +15,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <dt className="text-[11px] font-semibold uppercase text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px]">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px]">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -156,8 +156,8 @@ export function BankStatementDetailPage() {
           <Field label="Closing Balance" value={formatCurrency(statement.closingBalance)} />
           <Field label="Total Debits" value={formatCurrency(statement.totalDebits)} />
           <Field label="Total Credits" value={formatCurrency(statement.totalCredits)} />
-          <Field label="File Name" value={statement.fileName ?? '—'} />
-          <Field label="Imported By" value={statement.importedBy ?? '—'} />
+          <Field label="File Name" value={statement.fileName ?? '-'} />
+          <Field label="Imported By" value={statement.importedBy ?? '-'} />
           <Field label="Imported At" value={formatDateTime(statement.importedAt)} />
           <Field label="Status" value={<BankStatementStatusBadge status={statement.status} />} />
         </dl>
@@ -181,9 +181,9 @@ export function BankStatementDetailPage() {
               <tr key={l.id} className="border-b border-erp-border/70">
                 <td className="px-3 py-2">{formatDate(l.lineDate)}</td>
                 <td className="px-3 py-2">{l.description}</td>
-                <td className="px-3 py-2 text-erp-muted">{l.reference || '—'}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{l.debitAmount > 0 ? formatCurrency(l.debitAmount) : '—'}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{l.creditAmount > 0 ? formatCurrency(l.creditAmount) : '—'}</td>
+                <td className="px-3 py-2 text-erp-muted">{l.reference || '-'}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{l.debitAmount > 0 ? formatCurrency(l.debitAmount) : '-'}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{l.creditAmount > 0 ? formatCurrency(l.creditAmount) : '-'}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(l.balance)}</td>
                 <td className="px-3 py-2"><MatchStatusBadge status={l.matchStatus} /></td>
               </tr>

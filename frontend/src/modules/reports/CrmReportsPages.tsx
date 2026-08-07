@@ -226,7 +226,7 @@ function statusChipTone(key: string, value: unknown): ChipTone | null {
 }
 
 function formatCellValue(key: string, value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—'
+  if (value === null || value === undefined || value === '') return '-'
   if (typeof value === 'number') {
     if (/value|amount|pipeline|revenue|total/i.test(key)) return formatCrmCurrency(value)
     return String(value)
@@ -236,7 +236,7 @@ function formatCellValue(key: string, value: unknown): string {
 
 function buildReportColumns(rows: Record<string, unknown>[]): ColumnDef<Record<string, unknown>>[] {
   if (!rows.length) {
-    return [{ accessorKey: 'empty', header: 'Data', cell: () => '—' }]
+    return [{ accessorKey: 'empty', header: 'Data', cell: () => '-' }]
   }
   return Object.keys(rows[0]).map((key) => ({
     accessorKey: key,
@@ -631,7 +631,7 @@ export function CrmReportPage() {
     () =>
       buildCrmReportDetailKpiStrip({
         rowCount: rows.length,
-        categoryLabel: catalogItem ? CATEGORY_SHORT[catalogItem.category] : '—',
+        categoryLabel: catalogItem ? CATEGORY_SHORT[catalogItem.category] : '-',
         columnCount: columns.length,
       }),
     [rows.length, catalogItem, columns.length],

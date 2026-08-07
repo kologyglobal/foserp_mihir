@@ -320,7 +320,7 @@ export function InventoryGlReconciliationPage() {
                       <ErpStatusChip tone={statusTone(row.status)} label={row.status} />
                     </td>
                     <td className="max-w-[240px] px-3 py-2 text-[12px] text-erp-muted">
-                      {row.failureReason ?? '—'}
+                      {row.failureReason ?? '-'}
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-2">

@@ -220,7 +220,7 @@ export function CollectionActivityDrawer({
               <div>
                 <dt className="text-erp-muted">Oldest due</dt>
                 <dd className="text-erp-text">
-                  {customerSummary.oldestDueDate ? formatDate(customerSummary.oldestDueDate) : '—'}
+                  {customerSummary.oldestDueDate ? formatDate(customerSummary.oldestDueDate) : '-'}
                 </dd>
               </div>
             </dl>

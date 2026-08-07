@@ -33,7 +33,7 @@ export function SourceDocumentCard({ sources, emptyText }: { sources: SourceDocu
               <span>
                 <span className="font-medium">{sourceTypeLabel(s.sourceType)}</span>
                 {' — '}
-                {s.documentNumber ?? s.sourceDocumentId ?? '—'}
+                {s.documentNumber ?? s.sourceDocumentId ?? '-'}
                 {s.documentDate ? <span className="ml-2 tabular-nums text-erp-muted">{s.documentDate}</span> : null}
               </span>
               {route && (

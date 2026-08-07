@@ -265,9 +265,9 @@ export function IndiaMartSettingsPage() {
           </label>
           <div className="text-sm">
             <div className="text-erp-muted">Last successful sync</div>
-            <div>{settings.lastSuccessfulSyncAt ? new Date(settings.lastSuccessfulSyncAt).toLocaleString() : '—'}</div>
+            <div>{settings.lastSuccessfulSyncAt ? new Date(settings.lastSuccessfulSyncAt).toLocaleString() : '-'}</div>
             <div className="mt-1 text-erp-muted">Next scheduled</div>
-            <div>{settings.nextScheduledSyncAt ? new Date(settings.nextScheduledSyncAt).toLocaleString() : '—'}</div>
+            <div>{settings.nextScheduledSyncAt ? new Date(settings.nextScheduledSyncAt).toLocaleString() : '-'}</div>
           </div>
         </div>
         {canSync && (

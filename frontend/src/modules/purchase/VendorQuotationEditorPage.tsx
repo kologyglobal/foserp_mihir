@@ -207,7 +207,7 @@ function LineEditRow({ line, rfqLineLabel, canRemove, onPatch, onRemove }: LineE
     <>
       <tr className={cn(open && 'bg-erp-primary-soft/20')}>
         <td className="sticky left-0 z-[1] bg-inherit font-mono text-erp-muted">{line.lineNo}</td>
-        <td className="text-erp-muted">{line.rfqLineId ? `#${rfqLineLabel}` : '—'}</td>
+        <td className="text-erp-muted">{line.rfqLineId ? `#${rfqLineLabel}` : '-'}</td>
         <td>
           <input
             className="erp-input h-8 min-w-[5.5rem] font-mono text-[11px]"
@@ -1024,7 +1024,7 @@ export function VendorQuotationEditorPage() {
           <Input
             value={
               !selectedVendor
-                ? '—'
+                ? '-'
                 : isInterstate
                   ? 'IGST (interstate)'
                   : 'CGST + SGST'

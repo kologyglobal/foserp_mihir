@@ -682,7 +682,7 @@ export function PurchaseModuleDashboard() {
                           {row.purchaseOrderNumber}
                         </TableLink>
                       ) : (
-                        row.purchaseOrderNumber || '—'
+                        row.purchaseOrderNumber || '-'
                       )}
                     </td>
                     <td>{formatDate(row.receiptDate)}</td>

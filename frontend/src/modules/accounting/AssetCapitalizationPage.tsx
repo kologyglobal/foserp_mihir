@@ -162,7 +162,7 @@ export function AssetCapitalizationPage() {
                               {isApiMode() ? 'Capitalize' : 'Capitalize (demo)'}
                             </button>
                           ) : (
-                            <span className="text-erp-muted">—</span>
+                            <span className="text-erp-muted">-</span>
                           )}
                         </td>
                       </tr>

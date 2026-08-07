@@ -584,7 +584,7 @@ export function RoleAdminDetailPage() {
         { label: 'Access', value: `${detail.permissions.length} permissions` },
         {
           label: 'Updated',
-          value: detail.updatedAt ? new Date(detail.updatedAt).toLocaleDateString() : '—',
+          value: detail.updatedAt ? new Date(detail.updatedAt).toLocaleDateString() : '-',
         },
       ]}
       sectionNavItems={[
@@ -657,7 +657,7 @@ export function RoleAdminDetailPage() {
             <DetailField label="Modules with access" value={modulesWithAccess} />
             <DetailField
               label="Last updated"
-              value={detail.updatedAt ? new Date(detail.updatedAt).toLocaleString() : '—'}
+              value={detail.updatedAt ? new Date(detail.updatedAt).toLocaleString() : '-'}
             />
           </DetailGrid>
 

@@ -73,7 +73,7 @@ export function resolvePrDepartmentDisplay(
   if (!raw) return ''
   const legacy = prDepartmentLabel(raw)
   if (legacy !== raw) return legacy
-  if (UUID_RE.test(raw)) return '—'
+  if (UUID_RE.test(raw)) return '-'
   return legacy
 }
 

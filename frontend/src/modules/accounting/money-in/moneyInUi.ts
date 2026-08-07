@@ -39,7 +39,7 @@ export const SETTLEMENT_STATUS_LABELS: Record<SalesInvoiceSettlementStatus, stri
   PARTIALLY_PAID: 'Partially Paid',
   PAID: 'Paid',
   OVERDUE: 'Overdue',
-  NOT_APPLICABLE: '—',
+  NOT_APPLICABLE: '-',
 }
 
 export function settlementStatusTone(status: SalesInvoiceSettlementStatus): ErpStatusChipTone {
@@ -291,15 +291,15 @@ export function summarizeReceiptValidationToast(
 }
 
 export function invoiceDisplayNumber(inv: { invoiceNumber: string | null; draftReference: string | null }) {
-  return inv.invoiceNumber ?? inv.draftReference ?? '—'
+  return inv.invoiceNumber ?? inv.draftReference ?? '-'
 }
 
 export function creditNoteDisplayNumber(note: { creditNoteNumber: string | null; draftReference: string | null }) {
-  return note.creditNoteNumber ?? note.draftReference ?? '—'
+  return note.creditNoteNumber ?? note.draftReference ?? '-'
 }
 
 export function receiptDisplayNumber(receipt: { receiptNumber: string | null; draftReference: string | null }) {
-  return receipt.receiptNumber ?? receipt.draftReference ?? '—'
+  return receipt.receiptNumber ?? receipt.draftReference ?? '-'
 }
 
 export const MONEY_IN_WORKSPACE_TABS = [

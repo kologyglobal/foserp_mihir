@@ -8,12 +8,12 @@ import { getInspection, type QualityInspection } from '@/services/api/qualityApi
 import { notify } from '@/store/toastStore'
 
 function fmt(value: string | null | undefined) {
-  if (value == null || value === '') return '—'
+  if (value == null || value === '') return '-'
   return value
 }
 
 function fmtDate(iso: string | null | undefined) {
-  if (!iso) return '—'
+  if (!iso) return '-'
   try {
     return new Date(iso).toLocaleString()
   } catch {
@@ -54,7 +54,7 @@ function formatStatus(status: string): string {
 }
 
 function formatDecision(decision: string | null | undefined): string {
-  if (!decision) return '—'
+  if (!decision) return '-'
   switch (decision) {
     case 'PASS':
       return 'Pass'
@@ -83,7 +83,7 @@ function measuredDisplay(row: {
     return `${row.measuredNumeric}${row.uomCode ? ` ${row.uomCode}` : ''}`
   }
   if (row.measuredValue != null && row.measuredValue !== '') return row.measuredValue
-  return '—'
+  return '-'
 }
 
 export function ApiQcInspectionReportPage() {
@@ -234,7 +234,7 @@ export function ApiQcInspectionReportPage() {
               {inspection.inspectionPlan?.planName ??
                 inspection.inspectionPlan?.planCode ??
                 inspection.planCodeSnapshot ??
-                '—'}
+                '-'}
             </p>
           </div>
           <div>
@@ -248,13 +248,13 @@ export function ApiQcInspectionReportPage() {
                   {workOrderLabel}
                 </Link>
               ) : (
-                '—'
+                '-'
               )}
             </p>
           </div>
           <div>
             <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Product</p>
-            <p className="m-0 font-semibold">{productLabel || '—'}</p>
+            <p className="m-0 font-semibold">{productLabel || '-'}</p>
           </div>
           <div>
             <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
@@ -305,12 +305,12 @@ export function ApiQcInspectionReportPage() {
                     <td className="px-2 py-1.5">{row.parameterName}</td>
                     <td className="px-2 py-1.5 tabular-nums text-slate-600">
                       {row.minValue != null || row.maxValue != null
-                        ? `${row.minValue ?? '—'} – ${row.maxValue ?? '—'}${row.uomCode ? ` ${row.uomCode}` : ''}`
-                        : '—'}
+                        ? `${row.minValue ?? '-'} – ${row.maxValue ?? '-'}${row.uomCode ? ` ${row.uomCode}` : ''}`
+                        : '-'}
                     </td>
                     <td className="px-2 py-1.5 tabular-nums font-medium">{measuredDisplay(row)}</td>
                     <td className="px-2 py-1.5 font-semibold">
-                      {row.passed == null ? '—' : row.passed ? 'PASS' : 'FAIL'}
+                      {row.passed == null ? '-' : row.passed ? 'PASS' : 'FAIL'}
                     </td>
                     <td className="px-2 py-1.5 text-slate-600">{fmt(row.remarks)}</td>
                   </tr>

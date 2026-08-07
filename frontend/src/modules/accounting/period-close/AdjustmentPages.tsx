@@ -152,7 +152,7 @@ export function AccrualsPage() {
                     <td className="py-1.5 pr-2 text-erp-muted">
                       {r.accountCode} {r.accountName}
                     </td>
-                    <td className="py-1.5 pr-2 text-erp-muted">{r.department ?? '—'}</td>
+                    <td className="py-1.5 pr-2 text-erp-muted">{r.department ?? '-'}</td>
                     <td className="py-1.5 pr-2 text-right tabular-nums">{formatCurrency(r.amount)}</td>
                     <td className="py-1.5 pr-2 text-erp-muted">{formatDate(r.reversalDate)}</td>
                     <td className="py-1.5 pr-2">
@@ -219,7 +219,7 @@ export function AccrualsPage() {
                     </div>
                     <div>
                       <dt className="text-erp-muted">Cost Centre</dt>
-                      <dd className="font-medium text-erp-text">{selected.costCentre ?? '—'}</dd>
+                      <dd className="font-medium text-erp-text">{selected.costCentre ?? '-'}</dd>
                     </div>
                     <div>
                       <dt className="text-erp-muted">Start Period</dt>
@@ -275,11 +275,11 @@ export function AccrualsPage() {
                         <tr className="border-b border-erp-border/60">
                           <td className="py-1.5 pr-2">{selected.debitAccount}</td>
                           <td className="py-1.5 pr-2 text-right tabular-nums">{formatCurrency(selected.amount)}</td>
-                          <td className="py-1.5 text-right">—</td>
+                          <td className="py-1.5 text-right">-</td>
                         </tr>
                         <tr>
                           <td className="py-1.5 pr-2">{selected.creditAccount}</td>
-                          <td className="py-1.5 pr-2 text-right">—</td>
+                          <td className="py-1.5 pr-2 text-right">-</td>
                           <td className="py-1.5 text-right tabular-nums">{formatCurrency(selected.amount)}</td>
                         </tr>
                       </tbody>
@@ -622,7 +622,7 @@ export function FxRevaluationPage() {
           </div>
           {data.status || data.voucherNumber ? (
             <p className="text-[12px] text-erp-muted">
-              Status: <span className="font-medium text-erp-text">{data.status ?? '—'}</span>
+              Status: <span className="font-medium text-erp-text">{data.status ?? '-'}</span>
               {data.voucherNumber ? (
                 <>
                   {' '}
@@ -768,10 +768,10 @@ export function TrialBalanceReviewPage() {
                       ) : null}
                     </td>
                     <td className="py-1.5 pr-2 text-right tabular-nums">
-                      {r.debit ? formatCurrency(r.debit) : '—'}
+                      {r.debit ? formatCurrency(r.debit) : '-'}
                     </td>
                     <td className="py-1.5 text-right tabular-nums">
-                      {r.credit ? formatCurrency(r.credit) : '—'}
+                      {r.credit ? formatCurrency(r.credit) : '-'}
                     </td>
                   </tr>
                 ))}

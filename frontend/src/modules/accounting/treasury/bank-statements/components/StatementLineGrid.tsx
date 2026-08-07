@@ -67,9 +67,9 @@ export function StatementLineGrid({
                   {formatCurrency(amount)}
                 </td>
                 <td className="max-w-[16rem] truncate px-2 py-1.5" title={row.description ?? undefined}>
-                  {row.description ?? '—'}
+                  {row.description ?? '-'}
                 </td>
-                <td className="px-2 py-1.5">{row.referenceNumber ?? '—'}</td>
+                <td className="px-2 py-1.5">{row.referenceNumber ?? '-'}</td>
                 {showFlags ? (
                   <td className="px-2 py-1.5">
                     {isPersistedLine(row) ? (

@@ -154,7 +154,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <div className="text-[11px] font-medium uppercase tracking-wide text-erp-muted">{label}</div>
-      <div className="mt-0.5 text-[13px] font-medium text-erp-text">{value ?? '—'}</div>
+      <div className="mt-0.5 text-[13px] font-medium text-erp-text">{value ?? '-'}</div>
     </div>
   )
 }
@@ -474,7 +474,7 @@ export function WorkOrderDetailPage() {
               <p className="font-mono text-lg font-semibold text-erp-primary">{wo.woNumber}</p>
               <p className="text-[14px] font-medium text-erp-text">{wo.finishedItemCode} — {wo.finishedItemName}</p>
               <p className="mt-1 text-[12px] text-erp-muted">
-                Source: {WO_SOURCE_LABELS[wo.source]} · {wo.sourceDocumentNo || '—'}
+                Source: {WO_SOURCE_LABELS[wo.source]} · {wo.sourceDocumentNo || '-'}
               </p>
             </div>
             <ShopfloorStatusChip status={listStatus} />
@@ -505,7 +505,7 @@ export function WorkOrderDetailPage() {
                 </span>
               )}
             />
-            <Field label="Source Reference" value={wo.sourceDocumentNo || '—'} />
+            <Field label="Source Reference" value={wo.sourceDocumentNo || '-'} />
             <Field label="Owner / Line" value={getWorkOrderOwnerLine(wo)} />
           </div>
           <div className="mt-3">
@@ -615,7 +615,7 @@ export function WorkOrderDetailPage() {
               <h3 className="mb-3 text-sm font-semibold">Basic info</h3>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Finished Item" value={`${wo.finishedItemCode} — ${wo.finishedItemName}`} />
-                <Field label="Source" value={`${WO_SOURCE_LABELS[wo.source]} · ${wo.sourceDocumentNo || '—'}`} />
+                <Field label="Source" value={`${WO_SOURCE_LABELS[wo.source]} · ${wo.sourceDocumentNo || '-'}`} />
                 <Field label="Method" value={PRODUCTION_METHOD_LABELS[wo.productionMethod]} />
                 <Field label="BOM" value={`${wo.bomNumber} ${wo.bomVersion}`} />
                 <Field
@@ -628,14 +628,14 @@ export function WorkOrderDetailPage() {
                 />
                 <Field
                   label="Snapshot at"
-                  value={wo.routeSnapshotAt ? formatDateTime(wo.routeSnapshotAt) : '—'}
+                  value={wo.routeSnapshotAt ? formatDateTime(wo.routeSnapshotAt) : '-'}
                 />
-                <Field label="Current Operation" value={wo.currentOperationName || '—'} />
-                <Field label="Next Operation" value={wo.nextOperationName || '—'} />
+                <Field label="Current Operation" value={wo.currentOperationName || '-'} />
+                <Field label="Next Operation" value={wo.nextOperationName || '-'} />
                 <Field label="Due Date" value={formatDate(wo.dueDate)} />
                 <Field label="Owner / Line" value={getWorkOrderOwnerLine(wo)} />
                 <Field label="Plant" value={wo.plantName} />
-                <Field label="Customer" value={wo.customerName || '—'} />
+                <Field label="Customer" value={wo.customerName || '-'} />
               </div>
             </section>
             <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
@@ -745,7 +745,7 @@ export function WorkOrderDetailPage() {
                       </div>
                       <div>
                         <dt className="text-erp-muted">Warehouse</dt>
-                        <dd className="font-medium">{m.warehouseName || '—'}</dd>
+                        <dd className="font-medium">{m.warehouseName || '-'}</dd>
                       </div>
                     </dl>
                   </li>
@@ -769,10 +769,10 @@ export function WorkOrderDetailPage() {
                 <Field label="Rework Qty" value={wo.reworkQty} />
                 <Field label="Rejected Qty" value={wo.rejectedQty} />
                 <Field label="Remaining" value={wo.remainingQty} />
-                <Field label="Start" value={wo.startedAt ? formatDateTime(wo.startedAt) : '—'} />
-                <Field label="End" value={wo.completedAt ? formatDateTime(wo.completedAt) : '—'} />
+                <Field label="Start" value={wo.startedAt ? formatDateTime(wo.startedAt) : '-'} />
+                <Field label="End" value={wo.completedAt ? formatDateTime(wo.completedAt) : '-'} />
                 <Field label="Operator / Line" value={getWorkOrderOwnerLine(wo)} />
-                <Field label="Completion notes" value={wo.notes || '—'} />
+                <Field label="Completion notes" value={wo.notes || '-'} />
               </div>
               {!readOnly && wo.status === 'in_progress' ? (
                 <Button className="mt-4" onClick={() => setDialog('complete')}>Complete Production</Button>
@@ -926,7 +926,7 @@ export function WorkOrderDetailPage() {
           <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
             <Field label="Notes" value={wo.notes || 'No notes'} />
             <p className="mt-4 text-[13px] text-erp-muted">
-              Attachments are demo-only until the manufacturing API ships. Source document: {wo.sourceDocumentNo || '—'}.
+              Attachments are demo-only until the manufacturing API ships. Source document: {wo.sourceDocumentNo || '-'}.
             </p>
             {wo.salesOrderId ? (
               <p className="mt-2 text-[13px]">

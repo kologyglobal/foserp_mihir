@@ -217,7 +217,7 @@ export function InventoryStockDetailPage() {
             { label: 'Planned Issue', value: stock.summary.plannedIssue },
             {
               label: 'Inventory Value',
-              value: perms.canViewCost ? formatCurrency(stock.summary.stockValue) : '—',
+              value: perms.canViewCost ? formatCurrency(stock.summary.stockValue) : '-',
               raw: true,
             },
           ].map((k) => (

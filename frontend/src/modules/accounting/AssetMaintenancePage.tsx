@@ -146,10 +146,10 @@ export function AssetMaintenancePage() {
                         </td>
                         <td className="px-3 py-2">{r.maintenanceType}</td>
                         <td className="px-3 py-2">{formatDate(r.scheduledDate)}</td>
-                        <td className="px-3 py-2">{r.completedDate ? formatDate(r.completedDate) : '—'}</td>
-                        <td className="px-3 py-2">{r.vendorName ?? '—'}</td>
+                        <td className="px-3 py-2">{r.completedDate ? formatDate(r.completedDate) : '-'}</td>
+                        <td className="px-3 py-2">{r.vendorName ?? '-'}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(r.cost)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.downtimeHours ?? '—'}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.downtimeHours ?? '-'}</td>
                         <td className="px-3 py-2"><FixedAssetsGenericStatusBadge status={r.status} /></td>
                       </tr>
                     ))}

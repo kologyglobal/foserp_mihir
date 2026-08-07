@@ -89,9 +89,9 @@ export function PurchaseRequisitionPrintPage() {
         <div className="po-print-grid">
           <section className="po-print-box">
             <p className="po-print-box__label">Requesting</p>
-            <p className="po-print-box__name">{pr.requester?.name || '—'}</p>
-            <p>Department: {pr.department || '—'}</p>
-            <p>Location: {pr.location?.name || '—'}</p>
+            <p className="po-print-box__name">{pr.requester?.name || '-'}</p>
+            <p>Department: {pr.department || '-'}</p>
+            <p>Location: {pr.location?.name || '-'}</p>
             <p>Type: {formatStatus(pr.requisitionType)}</p>
             <p>Source: {formatStatus(pr.source)}</p>
           </section>
@@ -99,13 +99,13 @@ export function PurchaseRequisitionPrintPage() {
             <p className="po-print-box__label">Planning</p>
             <p>
               Required by:{' '}
-              {pr.expectedDeliveryDate ? formatDate(pr.expectedDeliveryDate) : '—'}
+              {pr.expectedDeliveryDate ? formatDate(pr.expectedDeliveryDate) : '-'}
             </p>
-            <p>Cost centre: {pr.costCentre || '—'}</p>
-            <p>Project: {pr.project || '—'}</p>
-            <p>Production order: {pr.productionOrderNo || '—'}</p>
-            <p>Preferred vendor: {pr.vendor?.name || '—'}</p>
-            <p>Purpose: {pr.purpose || '—'}</p>
+            <p>Cost centre: {pr.costCentre || '-'}</p>
+            <p>Project: {pr.project || '-'}</p>
+            <p>Production order: {pr.productionOrderNo || '-'}</p>
+            <p>Preferred vendor: {pr.vendor?.name || '-'}</p>
+            <p>Purpose: {pr.purpose || '-'}</p>
           </section>
         </div>
 
@@ -143,7 +143,7 @@ export function PurchaseRequisitionPrintPage() {
                 <td className="num">{formatCurrency(l.estimatedRate)}</td>
                 <td className="num">{formatCurrency(l.amount)}</td>
                 <td>{formatDate(l.requiredDate)}</td>
-                <td>{l.preferredVendorName || '—'}</td>
+                <td>{l.preferredVendorName || '-'}</td>
               </tr>
               )
             })}
@@ -165,8 +165,8 @@ export function PurchaseRequisitionPrintPage() {
         ) : null}
 
         <div className="po-print-signatures">
-          <div className="po-print-signatures__line">Requested by ({pr.requester?.name || '—'})</div>
-          <div className="po-print-signatures__line">Approved by ({pr.approver?.name || '—'})</div>
+          <div className="po-print-signatures__line">Requested by ({pr.requester?.name || '-'})</div>
+          <div className="po-print-signatures__line">Approved by ({pr.approver?.name || '-'})</div>
           <div className="po-print-signatures__line">For {QUOTATION_COMPANY.legalName}</div>
         </div>
       </article>

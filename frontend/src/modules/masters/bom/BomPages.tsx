@@ -97,7 +97,7 @@ export function BomListPage() {
         const p = productMap.get(row.original.productId)
         return (
           <div>
-            <p className="text-sm font-medium">{p?.productName ?? '—'}</p>
+            <p className="text-sm font-medium">{p?.productName ?? '-'}</p>
             <p className="font-mono text-xs text-slate-500">{p?.productCode}</p>
           </div>
         )
@@ -307,7 +307,7 @@ export function BomDetailPage() {
   }
 
   function handleExport() {
-    const csv = exportBomCsv(bom!, product?.productName ?? '—', flatLines)
+    const csv = exportBomCsv(bom!, product?.productName ?? '-', flatLines)
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -361,7 +361,7 @@ export function BomDetailPage() {
     { accessorKey: 'qtyPerProduct', header: 'Qty / Product', cell: ({ row }) => row.original.qtyPerProduct },
     { accessorKey: 'uomCode', header: 'UOM' },
     { accessorKey: 'issueWarehouseCode', header: 'Issue WH' },
-    { accessorKey: 'subAssemblyRule', header: 'SA Rule', cell: ({ row }) => row.original.subAssemblyRule ?? '—' },
+    { accessorKey: 'subAssemblyRule', header: 'SA Rule', cell: ({ row }) => row.original.subAssemblyRule ?? '-' },
     { accessorKey: 'scrapPct', header: 'Scrap %', cell: ({ row }) => `${row.original.scrapPct}%` },
     { accessorKey: 'sourceType', header: 'Source', cell: ({ row }) => <TypeBadge value={row.original.sourceType} color="green" /> },
     { accessorKey: 'leadTimeDays', header: 'Lead Time', cell: ({ row }) => `${row.original.leadTimeDays}d` },
@@ -415,12 +415,12 @@ export function BomDetailPage() {
         ]}
         factBoxTitle="BOM summary"
         factBoxSummary={[
-          { label: 'Product', value: product ? `${product.productCode}` : '—', highlight: true },
-          { label: 'Product name', value: product?.productName ?? '—' },
+          { label: 'Product', value: product ? `${product.productCode}` : '-', highlight: true },
+          { label: 'Product name', value: product?.productName ?? '-' },
           { label: 'Revision', value: bom.revision },
           { label: 'Effective from', value: new Date(bom.effectiveFrom).toLocaleDateString('en-IN') },
           { label: 'Total cost', value: formatCurrency(bom.totalCost), highlight: true },
-          { label: 'Std price', value: product?.standardPrice != null ? formatCurrency(product.standardPrice) : '—' },
+          { label: 'Std price', value: product?.standardPrice != null ? formatCurrency(product.standardPrice) : '-' },
           { label: 'MRP status', value: mrpEligible ? 'Eligible' : 'Release required' },
           { label: 'Components', value: String(componentCount) },
         ]}

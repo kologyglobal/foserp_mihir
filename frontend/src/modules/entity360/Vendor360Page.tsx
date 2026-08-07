@@ -95,7 +95,7 @@ export function Vendor360Page() {
     ).length
   const openAdjustments = scorecard?.openAdjustmentCount ?? 0
   const onTimePct = scorecard ? scorecard.onTimeDeliveryPct : data.onTimePct
-  const onTimeLabel = onTimePct != null ? `${onTimePct}%` : '—'
+  const onTimeLabel = onTimePct != null ? `${onTimePct}%` : '-'
 
   return (
     <Entity360Shell
@@ -326,7 +326,7 @@ export function Vendor360Page() {
               </div>
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-erp-muted">Return qty</p>
-                <p className="text-xl font-bold">{scorecard?.returnQty ?? '—'}</p>
+                <p className="text-xl font-bold">{scorecard?.returnQty ?? '-'}</p>
               </div>
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-erp-muted">Open returns</p>
@@ -339,18 +339,18 @@ export function Vendor360Page() {
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-erp-muted">Replacements</p>
                 <p className="text-xl font-bold">
-                  {scorecard?.replacementReturnCount ?? '—'}
+                  {scorecard?.replacementReturnCount ?? '-'}
                 </p>
               </div>
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-erp-muted">Inspection pass %</p>
                 <p className="text-xl font-bold">
-                  {scorecard ? `${scorecard.inspectionPassPct}%` : '—'}
+                  {scorecard ? `${scorecard.inspectionPassPct}%` : '-'}
                 </p>
               </div>
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-erp-muted">Open QI</p>
-                <p className="text-xl font-bold">{scorecard?.openQiCount ?? '—'}</p>
+                <p className="text-xl font-bold">{scorecard?.openQiCount ?? '-'}</p>
               </div>
             </div>
             {!scorecard && !isApiMode() ? (
@@ -388,7 +388,7 @@ export function Vendor360Page() {
                       <td>{formatDate(r.documentDate)}</td>
                       <td>{r.statusLabel}</td>
                       <td className="num">{r.totalReturnQty}</td>
-                      <td>{r.replacementRequired ? 'Yes' : '—'}</td>
+                      <td>{r.replacementRequired ? 'Yes' : '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -538,7 +538,7 @@ export function Vendor360Page() {
               <div className="rounded-lg border p-3 text-center">
                 <p className="text-xs text-erp-muted">Avg QI hours</p>
                 <p className="text-lg font-bold">
-                  {scorecard.avgInspectionTurnaroundHours ?? '—'}
+                  {scorecard.avgInspectionTurnaroundHours ?? '-'}
                 </p>
               </div>
             </div>

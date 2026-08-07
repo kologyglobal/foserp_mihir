@@ -89,7 +89,7 @@ export function MaintenanceMachinesPage() {
                   </td>
                   <td className="px-3 py-2">
                     <StatusDot
-                      label={(m.status ?? '—').replace(/_/g, ' ')}
+                      label={(m.status ?? '-').replace(/_/g, ' ')}
                       tone={
                         m.status === 'AVAILABLE'
                           ? 'success'

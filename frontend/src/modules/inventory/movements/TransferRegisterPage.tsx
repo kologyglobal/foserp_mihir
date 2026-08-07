@@ -83,7 +83,7 @@ export function TransferRegisterPage() {
       {
         accessorKey: 'expectedReceiptDate',
         header: 'Expected Receipt',
-        cell: ({ row }) => (row.original.expectedReceiptDate ? formatDate(row.original.expectedReceiptDate) : '—'),
+        cell: ({ row }) => (row.original.expectedReceiptDate ? formatDate(row.original.expectedReceiptDate) : '-'),
       },
       {
         accessorKey: 'status',

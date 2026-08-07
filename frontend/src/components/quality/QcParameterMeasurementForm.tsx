@@ -146,7 +146,7 @@ export function QcParameterMeasurementForm({
                   </p>
                   {snap.minValue != null || snap.maxValue != null ? (
                     <p className="mt-1 text-sm text-[#605e5c]">
-                      Spec {snap.minValue ?? '—'}–{snap.maxValue ?? '—'}
+                      Spec {snap.minValue ?? '-'}–{snap.maxValue ?? '-'}
                       {snap.uomCode ? ` ${snap.uomCode}` : ''}
                     </p>
                   ) : null}
@@ -296,7 +296,7 @@ export function QcParameterMeasurementForm({
               ) : null}
               {snap.minValue != null || snap.maxValue != null ? (
                 <span className="text-[11px] text-erp-muted">
-                  Spec {snap.minValue ?? '—'}–{snap.maxValue ?? '—'} {snap.uomCode ?? ''}
+                  Spec {snap.minValue ?? '-'}–{snap.maxValue ?? '-'} {snap.uomCode ?? ''}
                 </span>
               ) : null}
             </div>

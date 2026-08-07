@@ -240,7 +240,7 @@ export function CrmCustomersPage({
         {
           id: 'activity',
           label: summary.lastActivityAt ? 'Last activity' : 'No recent activity',
-          time: summary.lastActivityAt ?? '—',
+          time: summary.lastActivityAt ?? '-',
           status: 'current',
         },
         ...(summary.nextFollowUpDate
@@ -663,13 +663,13 @@ export function CrmContactsPage() {
         return {
           contact: c,
           customerId: c.customerId,
-          customerName: cust?.customerName ?? '—',
-          customerCode: cust?.customerCode ?? '—',
-          city: cust?.city ?? '—',
-          state: cust?.state ?? '—',
-          territory: cust?.salesTerritory ?? '—',
+          customerName: cust?.customerName ?? '-',
+          customerCode: cust?.customerCode ?? '-',
+          city: cust?.city ?? '-',
+          state: cust?.state ?? '-',
+          territory: cust?.salesTerritory ?? '-',
           industry: cust?.industry ?? 'Transport & Logistics',
-          customerType: cust?.customerType ?? '—',
+          customerType: cust?.customerType ?? '-',
           lastAct,
           nextFu,
           openOpportunities,
@@ -756,12 +756,12 @@ export function CrmContactsPage() {
       subtitle: `${contact.designation} · ${customerName}`,
       fields: [
         { label: 'Company', value: customerName },
-        { label: 'Email', value: contact.email || '—' },
-        { label: 'Phone', value: contact.phone || '—' },
+        { label: 'Email', value: contact.email || '-' },
+        { label: 'Phone', value: contact.phone || '-' },
         { label: 'City', value: city },
         { label: 'Primary', value: contact.isPrimary ? 'Yes' : 'No' },
-        { label: 'Last Activity', value: lastAct ? new Date(lastAct.activityDate).toLocaleDateString('en-IN') : '—' },
-        { label: 'Next Follow-up', value: nextFu?.dueDate ?? '—' },
+        { label: 'Last Activity', value: lastAct ? new Date(lastAct.activityDate).toLocaleDateString('en-IN') : '-' },
+        { label: 'Next Follow-up', value: nextFu?.dueDate ?? '-' },
       ],
       timeline: nextFu
         ? [{

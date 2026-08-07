@@ -9,7 +9,6 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Input, Select } from '@/components/forms/Inputs'
 import { ItemLookupSelect } from '@/components/lookups/ItemLookupSelect'
 import { Button } from '@/design-system/components/Button'
-import { isApiMode } from '@/config/apiConfig'
 import {
   fetchInventoryCostVariances,
   fetchStandardCostVersions,
@@ -23,27 +22,7 @@ import { useInventoryPermissions } from '@/utils/permissions/inventory'
 import { InventoryCostingShell } from './InventoryCostingShell'
 import { inventoryCostingPaths } from './inventoryCostingPaths'
 
-const DEMO_VARIANCES: InventoryCostVarianceDto[] = [
-  {
-    id: 'demo-var-1',
-    itemId: 'demo-item-steel',
-    warehouseId: 'demo-wh-rm',
-    inventoryMovementId: 'demo-mv-1',
-    varianceType: 'PURCHASE_PRICE',
-    quantity: '100.0000',
-    standardUnitCost: '80.0000',
-    actualUnitCost: '85.0000',
-    varianceAmount: '500.0000',
-    postingDate: '2026-07-20T00:00:00.000Z',
-    sourceType: 'GOODS_RECEIPT',
-    sourceId: 'demo-grn-1',
-    remarks: 'Demo purchase price vs standard',
-    createdAt: '2026-07-20T10:00:00.000Z',
-  },
-]
-
 export function InventoryStandardCostPage() {
-  const api = isApiMode()
   const perms = useInventoryPermissions()
   const [rows, setRows] = useState<InventoryCostVarianceDto[]>([])
   const [versions, setVersions] = useState<
@@ -73,11 +52,6 @@ export function InventoryStandardCostPage() {
     setLoading(true)
     setError(null)
     try {
-      if (!api) {
-        setRows(DEMO_VARIANCES)
-        setVersions([])
-        return
-      }
       const [varRes, verRes] = await Promise.all([
         fetchInventoryCostVariances({ limit: 100 }),
         fetchStandardCostVersions({ limit: 100 }),
@@ -89,7 +63,7 @@ export function InventoryStandardCostPage() {
     } finally {
       setLoading(false)
     }
-  }, [api])
+  }, [])
 
   useEffect(() => {
     void load()
@@ -97,10 +71,6 @@ export function InventoryStandardCostPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!api) {
-      notify.info('Standard cost versions require API mode')
-      return
-    }
     if (!perms.canManageSetup) {
       notify.error('inventory.setup.manage required')
       return

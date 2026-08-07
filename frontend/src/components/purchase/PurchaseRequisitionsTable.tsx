@@ -288,7 +288,7 @@ export function PurchaseRequisitionsTable({
         header: 'Department',
         meta: { columnLabel: 'Department' },
         cell: ({ row }) => (
-          <span className="whitespace-nowrap">{row.original.department || '—'}</span>
+          <span className="whitespace-nowrap">{row.original.department || '-'}</span>
         ),
       },
       {
@@ -315,7 +315,7 @@ export function PurchaseRequisitionsTable({
         meta: { columnLabel: 'Required By' },
         cell: ({ row }) => (
           <span className="whitespace-nowrap tabular-nums text-erp-text">
-            {row.original.requiredBy ? formatDate(row.original.requiredBy) : '—'}
+            {row.original.requiredBy ? formatDate(row.original.requiredBy) : '-'}
           </span>
         ),
       },

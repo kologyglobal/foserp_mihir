@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { isApiMode } from '../config/apiConfig'
 import { searchVendorLookups, type VendorLookupRow } from '../services/api/masterBatchApi'
 import { formatApiError } from '../services/api/apiErrors'
 import { useMasterStore } from '../store/masterStore'
@@ -47,7 +46,6 @@ function mapApiRow(row: VendorLookupRow): VendorLookupOption {
 }
 
 export function useVendorLookup(options?: { activeOnly?: boolean; selectedId?: string; initialQuery?: string }) {
-  const vendors = useMasterStore((s) => s.vendors)
   const getVendor = useMasterStore((s) => s.getVendor)
   const activeOnly = options?.activeOnly ?? true
 
@@ -58,17 +56,6 @@ export function useVendorLookup(options?: { activeOnly?: boolean; selectedId?: s
   const [error, setError] = useState<string | null>(null)
 
   const search = useCallback(async (q: string) => {
-    if (!isApiMode()) {
-      const needle = q.trim().toLowerCase()
-      const filtered = vendors
-        .filter((v) => (activeOnly ? v.isActive : true))
-        .filter((v) => !needle || mapStoreVendor(v).searchText.includes(needle))
-        .slice(0, 25)
-        .map(mapStoreVendor)
-      setOptionsList(filtered)
-      return filtered
-    }
-
     setLoading(true)
     setError(null)
     try {
@@ -87,7 +74,7 @@ export function useVendorLookup(options?: { activeOnly?: boolean; selectedId?: s
     } finally {
       setLoading(false)
     }
-  }, [vendors, activeOnly])
+  }, [activeOnly])
 
   useEffect(() => {
     void search(debouncedQuery)

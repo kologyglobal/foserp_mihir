@@ -57,11 +57,11 @@ export function BatchDetailDrawer({ open, batchId, onClose, onTrace }: BatchDeta
       {!loading && batch ? (
         <dl className="grid grid-cols-2 gap-3 text-[12px]">
           <Field label="Batch Number" value={batch.batchNo} mono />
-          <Field label="Supplier Batch" value={batch.supplierBatchNo ?? '—'} mono />
+          <Field label="Supplier Batch" value={batch.supplierBatchNo ?? '-'} mono />
           <Field label="Item" value={`${batch.itemCode} — ${batch.itemName}`} />
           <Field label="Warehouse" value={batch.warehouseName} />
-          <Field label="Manufacturing Date" value={batch.manufacturingDate ? formatDate(batch.manufacturingDate) : '—'} />
-          <Field label="Expiry Date" value={batch.expiryDate ? formatDate(batch.expiryDate) : '—'} />
+          <Field label="Manufacturing Date" value={batch.manufacturingDate ? formatDate(batch.manufacturingDate) : '-'} />
+          <Field label="Expiry Date" value={batch.expiryDate ? formatDate(batch.expiryDate) : '-'} />
           <Field label="Receipt Date" value={formatDate(batch.receiptDate)} />
           <Field label="Available Qty" value={formatNumber(batch.availableQty)} />
           <Field label="Reserved Qty" value={formatNumber(batch.reservedQty)} />

@@ -181,12 +181,12 @@ export function isBackendMissingError(err: unknown): boolean {
 function mapPrStatus(status: string): PurchaseRequisitionStatus {
   const s = status.toLowerCase()
   if (s === 'submitted') return 'pending_approval'
-  if (s === 'partially_converted') return 'converted_to_po'
   if (
     s === 'draft' ||
     s === 'pending_approval' ||
     s === 'approved' ||
     s === 'rejected' ||
+    s === 'partially_converted' ||
     s === 'converted_to_rfq' ||
     s === 'converted_to_po' ||
     s === 'closed' ||
@@ -303,7 +303,7 @@ function resolveRequesterDisplayName(
   }
   // Never prefer UUID as a "name" in registers — blank is clearer than a technical id.
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
-    return '—'
+    return '-'
   }
   return id
 }
@@ -338,7 +338,7 @@ function resolveWarehouseFromMaster(warehouseId: string | null | undefined): {
   return {
     id,
     code: warehouse?.warehouseCode?.trim() || '',
-    name: warehouse?.warehouseName?.trim() || warehouse?.warehouseCode?.trim() || '—',
+    name: warehouse?.warehouseName?.trim() || warehouse?.warehouseCode?.trim() || '-',
     state: pos.state,
     city: pos.city,
   }
@@ -879,8 +879,8 @@ export function mapApiRfqToListRow(api: ApiRequestForQuotation): RfqListRow {
     documentNumber: domain.documentNumber,
     documentDate: domain.documentDate,
     bidDueDate: domain.bidDueDate,
-    buyerName: domain.buyer.name || '—',
-    locationName: domain.location.name || '—',
+    buyerName: domain.buyer.name || '-',
+    locationName: domain.location.name || '-',
     vendorCount: domain.vendors.length,
     itemCount: domain.lines.length,
     estimatedValue: domain.estimatedValue,
@@ -1145,7 +1145,7 @@ export function mapApiComparisonToDomain(
   if (byItem.size === 0 && vendors.length) {
     byItem.set('_summary', {
       itemId: '_summary',
-      itemCode: '—',
+      itemCode: '-',
       itemName: 'Vendor totals',
       quantity: 1,
       uom: '',
@@ -1457,7 +1457,7 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
       ? {
           id: api.createdById ?? '',
           code: '',
-          name: (api.createdByName ?? '').trim() || '—',
+          name: (api.createdByName ?? '').trim() || '-',
         }
       : { ...EMPTY_PARTY }
 
@@ -1597,8 +1597,8 @@ export function mapApiPurchaseOrderToListRow(api: ApiPurchaseOrder): PurchaseOrd
     documentDate: domain.documentDate,
     vendorName: domain.vendor.name,
     vendorGstin: domain.vendor.gstin,
-    locationName: domain.purchaseLocation.name || domain.deliveryLocation.name || '—',
-    createdByName: domain.createdBy || '—',
+    locationName: domain.purchaseLocation.name || domain.deliveryLocation.name || '-',
+    createdByName: domain.createdBy || '-',
     currency: domain.currency,
     expectedDeliveryDate: domain.expectedDeliveryDate,
     basicAmount: domain.subtotal,
@@ -1980,11 +1980,12 @@ function mapApiInvoiceStatus(status: string): PurchaseInvoiceStatus {
     case 'POSTED':
       return 'posted'
     case 'CLOSED':
-      return 'paid'
+      return 'closed'
+    case 'REJECTED':
+      return 'rejected'
     case 'CANCELLED':
       return 'cancelled'
     case 'DRAFT':
-    case 'REJECTED':
     default:
       return 'draft'
   }
@@ -2295,7 +2296,7 @@ export function mapApiQualityInspectionToListRow(
     status,
     statusLabel: QUALITY_INSPECTION_STATUS_LABELS[status],
     result,
-    resultLabel: result ? QUALITY_INSPECTION_RESULT_LABELS[result] : '—',
+    resultLabel: result ? QUALITY_INSPECTION_RESULT_LABELS[result] : '-',
   }
 }
 

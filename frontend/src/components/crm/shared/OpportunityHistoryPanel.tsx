@@ -37,7 +37,7 @@ function parseStageSubject(subject: string): { from: string; to: string } {
   const match = subject.match(/Stage:\s*(.+?)\s*→\s*(.+)$/i)
     ?? subject.match(/:\s*(.+?)\s*→\s*(.+)$/)
   if (match) return { from: match[1]!.trim(), to: match[2]!.trim() }
-  return { from: '—', to: subject }
+  return { from: '-', to: subject }
 }
 
 export function OpportunityHistoryPanel({ opportunityId }: OpportunityHistoryPanelProps) {
@@ -146,7 +146,7 @@ export function OpportunityHistoryPanel({ opportunityId }: OpportunityHistoryPan
             return (
               <>
                 <p className="font-medium text-erp-text">
-                  {String(row.fromStageName ?? row.fromStageId ?? '—')} → {String(row.toStageName ?? row.toStageId ?? '—')}
+                  {String(row.fromStageName ?? row.fromStageId ?? '-')} → {String(row.toStageName ?? row.toStageId ?? '-')}
                 </p>
                 <p className="text-erp-muted">{String(row.changedByName ?? row.changedBy ?? 'System')} · {formatDateTime(String(row.createdAt))}</p>
                 {row.reason ? <p className="mt-1">{String(row.reason)}</p> : null}
@@ -178,7 +178,7 @@ export function OpportunityHistoryPanel({ opportunityId }: OpportunityHistoryPan
           return (
             <>
               <p className="font-medium text-erp-text">
-                {String(row.fromStatus ?? '—')} → {String(row.toStatus)}
+                {String(row.fromStatus ?? '-')} → {String(row.toStatus)}
               </p>
               <p className="text-erp-muted">{String(row.changedByName ?? row.changedBy ?? 'System')} · {formatDateTime(String(row.createdAt))}</p>
               {row.reason ? <p className="mt-1">{String(row.reason)}</p> : null}

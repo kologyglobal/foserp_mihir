@@ -90,7 +90,7 @@ export function OpportunityCommercialBreakdownPanel({
               >
                 Other Charges
               </dt>
-              <dd>{otherCharges > 0 ? formatCrmCurrency(otherCharges) : '—'}</dd>
+              <dd>{otherCharges > 0 ? formatCrmCurrency(otherCharges) : '-'}</dd>
             </div>
             <div className="opp-commercial-breakdown__row opp-commercial-breakdown__row--total">
               <dt title="Product subtotal − discount + tax + other charges">Final Quoted Value</dt>

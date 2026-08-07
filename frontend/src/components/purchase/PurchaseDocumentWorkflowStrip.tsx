@@ -76,7 +76,7 @@ export function purchaseOrderWorkflowNextAction(
     case 'cancelled':
       return 'Order cancelled — workflow stopped'
     default:
-      return '—'
+      return '-'
   }
 }
 
@@ -279,7 +279,7 @@ export function purchaseRequisitionWorkflowNextAction(
     case 'cancelled':
       return 'Requisition cancelled — workflow stopped'
     default:
-      return '—'
+      return '-'
   }
 }
 
@@ -451,7 +451,7 @@ export function rfqWorkflowNextAction(
     case 'cancelled':
       return 'RFQ cancelled — workflow stopped'
     default:
-      return '—'
+      return '-'
   }
 }
 

@@ -203,7 +203,7 @@ export function MaterialOutwardVerifyPage() {
                           {r.documentType} {r.documentNumber}
                           {r.approved ? <GateStatusBadge status="approved" /> : <GateStatusBadge status="pending" />}
                         </span>
-                        <span className="text-[12px] text-erp-muted">{r.partyName ?? '—'} · {r.materialSummary} · {r.packagesExpected} pkgs</span>
+                        <span className="text-[12px] text-erp-muted">{r.partyName ?? '-'} · {r.materialSummary} · {r.packagesExpected} pkgs</span>
                       </button>
                     </li>
                   ))}
@@ -227,7 +227,7 @@ export function MaterialOutwardVerifyPage() {
                   <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-erp-muted">Expected</p>
                   <dl className="space-y-1.5 text-[13px]">
                     <div className="flex justify-between gap-2"><dt className="text-erp-muted">Document</dt><dd className="font-medium">{entry.documentType} {entry.documentNumber}</dd></div>
-                    <div className="flex justify-between gap-2"><dt className="text-erp-muted">Party</dt><dd className="font-medium">{entry.partyName ?? '—'}</dd></div>
+                    <div className="flex justify-between gap-2"><dt className="text-erp-muted">Party</dt><dd className="font-medium">{entry.partyName ?? '-'}</dd></div>
                     <div className="flex justify-between gap-2"><dt className="text-erp-muted">Material</dt><dd className="max-w-[220px] truncate font-medium">{entry.materialSummary}</dd></div>
                     <div className="flex justify-between gap-2"><dt className="text-erp-muted">Packages</dt><dd className="font-medium tabular-nums">{entry.packagesExpected}</dd></div>
                     <div className="flex justify-between gap-2"><dt className="text-erp-muted">Approved</dt><dd className="font-medium">{entry.documentApproved && entry.approvalStatus === 'approved' ? 'Yes' : 'No'}</dd></div>

@@ -131,7 +131,7 @@ export function CreditNotesPage() {
                     <td className="px-3 py-2">
                       <TableLink to={`/accounting/receivables/customer/${r.customerId}`}>{r.customerName}</TableLink>
                     </td>
-                    <td className="px-3 py-2">{r.referenceInvoiceNumber ?? '—'}</td>
+                    <td className="px-3 py-2">{r.referenceInvoiceNumber ?? '-'}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(r.originalAmount)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(r.remainingAmount)}</td>
                     <td className="px-3 py-2">{r.status}</td>

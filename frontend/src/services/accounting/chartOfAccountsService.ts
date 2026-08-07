@@ -293,9 +293,9 @@ function mapFinanceAccountToChart(a: FinanceAccount): ChartOfAccount {
     dimensions: defaultDimensionConfiguration(),
     currentBalance: 0,
     hasLedgerActivity: false,
-    createdBy: '—',
+    createdBy: '-',
     createdAt: a.createdAt ?? nowIso(),
-    modifiedBy: '—',
+    modifiedBy: '-',
     modifiedAt: a.updatedAt ?? a.createdAt ?? nowIso(),
   }
 }

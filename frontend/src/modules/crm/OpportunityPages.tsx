@@ -232,12 +232,12 @@ export function OpportunityPipelinePage() {
       title: opp.opportunityNo,
       subtitle: `${opp.opportunityName} · ${opp.ownerName}`,
       fields: [
-        { label: 'Company', value: customer?.customerName ?? '—' },
+        { label: 'Company', value: customer?.customerName ?? '-' },
         { label: 'Stage', value: opportunityStageLabel(opp.stage) },
         { label: 'Value', value: formatCrmCurrency(opp.value) },
         { label: 'Probability', value: `${opp.probability}%` },
         { label: 'Weighted', value: formatCrmCurrency(opp.value * (opp.probability / 100)) },
-        { label: 'Close Date', value: opp.expectedCloseDate?.slice(0, 10) ?? '—' },
+        { label: 'Close Date', value: opp.expectedCloseDate?.slice(0, 10) ?? '-' },
         { label: 'Owner', value: opp.ownerName },
       ],
       timeline: opp.nextFollowUpDate

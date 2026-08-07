@@ -163,8 +163,8 @@ export function OrgLegalEntityPage() {
               <td className="px-3 py-2 font-medium">{row.code}</td>
               <td className="px-3 py-2">{row.legalName}</td>
               <td className="px-3 py-2">{row.tradeName}</td>
-              <td className="px-3 py-2">{row.gstNumber ?? '—'}</td>
-              <td className="px-3 py-2">{row.city || '—'}</td>
+              <td className="px-3 py-2">{row.gstNumber ?? '-'}</td>
+              <td className="px-3 py-2">{row.city || '-'}</td>
               <td className="px-3 py-2">{row.status}</td>
               <td className="px-3 py-2">
                 {perms.canUpdate ? (

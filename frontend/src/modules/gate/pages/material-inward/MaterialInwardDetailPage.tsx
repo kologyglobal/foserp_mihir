@@ -18,7 +18,7 @@ function Field({ label, value }: { label: string; value?: string | number | null
   return (
     <div>
       <dt className="text-[12px] text-erp-muted">{label}</dt>
-      <dd className="text-[13px] font-medium text-erp-text">{value ?? '—'}</dd>
+      <dd className="text-[13px] font-medium text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -138,7 +138,7 @@ export function MaterialInwardDetailPage() {
                     <Field label="Material" value={entry.materialSummary} />
                     <Field label="Packages" value={entry.packages} />
                     <Field label="Warehouse" value={entry.warehouse} />
-                    <Field label="Arrival" value={entry.arrivalTime ? formatDateTime(entry.arrivalTime) : '—'} />
+                    <Field label="Arrival" value={entry.arrivalTime ? formatDateTime(entry.arrivalTime) : '-'} />
                     <div>
                       <dt className="text-[12px] text-erp-muted">Waiting</dt>
                       <dd className="text-[13px] font-medium"><InsideDuration from={entry.arrivalTime} warnAfterMinutes={60} /></dd>
@@ -151,7 +151,7 @@ export function MaterialInwardDetailPage() {
                   <section className="rounded-md border border-erp-border bg-white p-4">
                     <h3 className="mb-2 text-[13px] font-semibold text-erp-text">Linked documents</h3>
                     <dl className="space-y-2 text-[13px]">
-                      <div className="flex justify-between gap-2"><dt className="text-erp-muted">PO</dt><dd className="font-medium">{entry.poNumber ?? '—'}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-erp-muted">PO</dt><dd className="font-medium">{entry.poNumber ?? '-'}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-erp-muted">GRN</dt><dd className="font-medium text-erp-muted">{entry.linkedGrnNumber ?? 'Pending Store'}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-erp-muted">Quality Inspection</dt><dd className="font-medium text-erp-muted">{entry.linkedQcNumber ?? 'Pending QC'}</dd></div>
                     </dl>

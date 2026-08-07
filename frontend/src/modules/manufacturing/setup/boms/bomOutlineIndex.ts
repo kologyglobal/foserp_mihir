@@ -28,7 +28,7 @@ export function buildBomOutlineIndexMap(tree: BomTreeNode[]): Map<string, string
 export function bomLineDescription(
   node: Pick<BomTreeNode, 'descriptionOverride' | 'notes' | 'specification'>,
 ): string {
-  return node.descriptionOverride?.trim() || node.notes?.trim() || node.specification?.trim() || '—'
+  return node.descriptionOverride?.trim() || node.notes?.trim() || node.specification?.trim() || '-'
 }
 
 export type WoBomTreeNode = ProductionOrderBomSnapshotLine & {

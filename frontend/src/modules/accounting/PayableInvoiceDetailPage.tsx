@@ -29,7 +29,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <dt className="text-[11px] font-semibold uppercase text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px]">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px]">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -223,7 +223,7 @@ export function PayableInvoiceDetailPage() {
             <Field label="Paid" value={formatCurrency(invoice.paidAmount)} />
             <Field label="Debit notes" value={formatCurrency(invoice.debitNoteAmount)} />
             <Field label="Outstanding" value={formatCurrency(invoice.outstandingBalance)} />
-            <Field label="TDS" value={invoice.tdsAmount > 0 ? `${formatCurrency(invoice.tdsAmount)} (${invoice.tdsSection ?? '—'})` : '—'} />
+            <Field label="TDS" value={invoice.tdsAmount > 0 ? `${formatCurrency(invoice.tdsAmount)} (${invoice.tdsSection ?? '-'})` : '-'} />
             <Field label="GST registration" value={invoice.gstRegistrationType} />
           </dl>
         </section>

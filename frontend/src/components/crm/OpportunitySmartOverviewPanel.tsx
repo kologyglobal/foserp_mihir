@@ -51,7 +51,7 @@ export function OpportunitySmartOverviewPanel({
     if (sectionId) onGoToSection(sectionId)
   }
 
-  const stageOwner = `${opportunityStageLabel(input.stage)} · ${input.ownerName || '—'}`
+  const stageOwner = `${opportunityStageLabel(input.stage)} · ${input.ownerName || '-'}`
 
   return (
     <CrmSmartOverviewPanel

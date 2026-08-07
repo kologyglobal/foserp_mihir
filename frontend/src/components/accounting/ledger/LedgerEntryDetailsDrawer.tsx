@@ -12,7 +12,7 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -149,9 +149,9 @@ export function LedgerEntryDetailsDrawer({
               </span>
             }
           />
-          <Field label="Narration" value={entry.narration || '—'} />
-          <Field label="Reference" value={entry.referenceNumber || '—'} />
-          <Field label="External document" value={entry.externalDocumentNumber || '—'} />
+          <Field label="Narration" value={entry.narration || '-'} />
+          <Field label="Reference" value={entry.referenceNumber || '-'} />
+          <Field label="External document" value={entry.externalDocumentNumber || '-'} />
         </DetailSection>
 
         <DetailSection title="Account">
@@ -160,7 +160,7 @@ export function LedgerEntryDetailsDrawer({
           <Field label="Category" value={entry.account.category} />
           <Field label="Account type" value={entry.account.accountType} />
           <Field label="Normal balance" value={entry.account.normalBalance} />
-          <Field label="Control account type" value={entry.account.controlAccountType ?? '—'} />
+          <Field label="Control account type" value={entry.account.controlAccountType ?? '-'} />
         </DetailSection>
 
         <DetailSection title="Voucher">
@@ -180,61 +180,61 @@ export function LedgerEntryDetailsDrawer({
               <Field label="Party name" value={entry.party.partyName} />
               <Field label="Party code" value={entry.party.partyCode} />
               <Field label="Party type" value={entry.party.partyType} />
-              <Field label="GST number" value={entry.party.gstNumber ?? '—'} />
+              <Field label="GST number" value={entry.party.gstNumber ?? '-'} />
             </>
           ) : (
-            <Field label="Party" value="—" />
+            <Field label="Party" value="-" />
           )}
         </DetailSection>
 
         <DetailSection title="Dimensions">
-          <Field label="Company" value={entry.dimensions.company ?? '—'} />
-          <Field label="Location" value={entry.dimensions.locationName ?? '—'} />
-          <Field label="Plant" value={entry.dimensions.plantName ?? '—'} />
-          <Field label="Department" value={entry.dimensions.departmentName ?? '—'} />
+          <Field label="Company" value={entry.dimensions.company ?? '-'} />
+          <Field label="Location" value={entry.dimensions.locationName ?? '-'} />
+          <Field label="Plant" value={entry.dimensions.plantName ?? '-'} />
+          <Field label="Department" value={entry.dimensions.departmentName ?? '-'} />
           <Field
             label="Cost centre"
             value={
               entry.dimensions.costCentreCode
                 ? `${entry.dimensions.costCentreCode} — ${entry.dimensions.costCentreName}`
-                : '—'
+                : '-'
             }
           />
           <Field
             label="Project"
             value={
-              entry.dimensions.projectCode ? `${entry.dimensions.projectCode} — ${entry.dimensions.projectName}` : '—'
+              entry.dimensions.projectCode ? `${entry.dimensions.projectCode} — ${entry.dimensions.projectName}` : '-'
             }
           />
-          <Field label="Business unit" value={entry.dimensions.businessUnit ?? '—'} />
+          <Field label="Business unit" value={entry.dimensions.businessUnit ?? '-'} />
         </DetailSection>
 
         <DetailSection title="Manufacturing">
-          <Field label="Production order" value={entry.manufacturing.productionOrder ?? '—'} />
-          <Field label="Work centre" value={entry.manufacturing.workCentre ?? '—'} />
-          <Field label="Machine centre" value={entry.manufacturing.machineCentre ?? '—'} />
-          <Field label="Item code" value={entry.manufacturing.itemCode ?? '—'} />
-          <Field label="Item name" value={entry.manufacturing.itemName ?? '—'} />
-          <Field label="Item category" value={entry.manufacturing.itemCategory ?? '—'} />
-          <Field label="Batch number" value={entry.manufacturing.batchNumber ?? '—'} />
-          <Field label="Job work order" value={entry.manufacturing.jobWorkOrder ?? '—'} />
-          <Field label="Mfg. account type" value={entry.manufacturing.manufacturingAccountType ?? '—'} />
-          <Field label="Cost type" value={entry.manufacturing.costType ?? '—'} />
+          <Field label="Production order" value={entry.manufacturing.productionOrder ?? '-'} />
+          <Field label="Work centre" value={entry.manufacturing.workCentre ?? '-'} />
+          <Field label="Machine centre" value={entry.manufacturing.machineCentre ?? '-'} />
+          <Field label="Item code" value={entry.manufacturing.itemCode ?? '-'} />
+          <Field label="Item name" value={entry.manufacturing.itemName ?? '-'} />
+          <Field label="Item category" value={entry.manufacturing.itemCategory ?? '-'} />
+          <Field label="Batch number" value={entry.manufacturing.batchNumber ?? '-'} />
+          <Field label="Job work order" value={entry.manufacturing.jobWorkOrder ?? '-'} />
+          <Field label="Mfg. account type" value={entry.manufacturing.manufacturingAccountType ?? '-'} />
+          <Field label="Cost type" value={entry.manufacturing.costType ?? '-'} />
         </DetailSection>
 
         <DetailSection title="Tax">
           <Field label="GST applicable" value={<YesNo value={entry.tax.gstApplicable} />} />
-          <Field label="GST type" value={entry.tax.gstType ?? '—'} />
-          <Field label="GST rate" value={entry.tax.gstRate != null ? `${entry.tax.gstRate}%` : '—'} />
+          <Field label="GST type" value={entry.tax.gstType ?? '-'} />
+          <Field label="GST rate" value={entry.tax.gstRate != null ? `${entry.tax.gstRate}%` : '-'} />
           <Field label="TDS applicable" value={<YesNo value={entry.tax.tdsApplicable} />} />
-          <Field label="TDS section" value={entry.tax.tdsSection ?? '—'} />
+          <Field label="TDS section" value={entry.tax.tdsSection ?? '-'} />
           <Field
             label="Taxable amount"
             value={
               entry.tax.taxableAmount != null ? (
                 <span className="tabular-nums">{formatCurrency(entry.tax.taxableAmount)}</span>
               ) : (
-                '—'
+                '-'
               )
             }
           />
@@ -247,14 +247,14 @@ export function LedgerEntryDetailsDrawer({
               <Field label="Document type" value={entry.sourceDocument.documentType} />
               <Field label="Document number" value={entry.sourceDocument.documentNumber} />
               <Field label="Document date" value={entry.sourceDocument.documentDate} />
-              <Field label="Party" value={entry.sourceDocument.partyName ?? '—'} />
+              <Field label="Party" value={entry.sourceDocument.partyName ?? '-'} />
               <Field
                 label="Amount"
                 value={
                   entry.sourceDocument.amount != null ? (
                     <span className="tabular-nums">{formatCurrency(entry.sourceDocument.amount)}</span>
                   ) : (
-                    '—'
+                    '-'
                   )
                 }
               />
@@ -304,20 +304,20 @@ export function LedgerEntryDetailsDrawer({
               ) : null}
             </>
           ) : (
-            <Field label="Source document" value="—" />
+            <Field label="Source document" value="-" />
           )}
         </DetailSection>
 
         <DetailSection title="Reversal">
           {entry.reversal ? (
             <>
-              <Field label="Original voucher" value={entry.reversal.originalVoucherNumber ?? '—'} />
-              <Field label="Reversal voucher" value={entry.reversal.reversalVoucherNumber ?? '—'} />
-              <Field label="Reversal date" value={entry.reversal.reversalDate ?? '—'} />
-              <Field label="Reason" value={entry.reversal.reversalReason ?? '—'} />
+              <Field label="Original voucher" value={entry.reversal.originalVoucherNumber ?? '-'} />
+              <Field label="Reversal voucher" value={entry.reversal.reversalVoucherNumber ?? '-'} />
+              <Field label="Reversal date" value={entry.reversal.reversalDate ?? '-'} />
+              <Field label="Reason" value={entry.reversal.reversalReason ?? '-'} />
             </>
           ) : (
-            <Field label="Reversal" value="—" />
+            <Field label="Reversal" value="-" />
           )}
         </DetailSection>
 

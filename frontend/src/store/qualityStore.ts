@@ -456,7 +456,7 @@ export const useQualityStore = create<QualityState>()(
             .getProductionOperations(workOrderId)
             .find((o) => o.id === productionOperationId)
           const workCenterId = input.reworkWorkCenterId ?? op?.workCenterId ?? ''
-          const workCenterCode = op?.workCenterCode ?? '—'
+          const workCenterCode = op?.workCenterCode ?? '-'
 
           const reworkId = genId('rwk')
           const reworkNo = nextReworkNo(get().reworks.map((r) => r.reworkNo))
@@ -965,7 +965,7 @@ export const useQualityStore = create<QualityState>()(
             vendorId: null,
             subcontractShipmentId: null,
             itemId: inspection.itemId!,
-            itemCode: inspection.itemCode ?? '—',
+            itemCode: inspection.itemCode ?? '-',
             productionOperationId: null,
             operationName: 'Incoming QC',
             inspectionId,
@@ -1226,7 +1226,7 @@ export const useQualityStore = create<QualityState>()(
           .inspections.filter((i) => i.status === 'reject')
           .map((i) => ({
             inspectionNo: i.inspectionNo,
-            itemCode: i.itemCode ?? '—',
+            itemCode: i.itemCode ?? '-',
             rejectedQty: i.rejectedQty ?? 0,
             date: i.inspectionDate ?? i.createdAt,
           })),

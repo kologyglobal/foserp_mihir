@@ -411,10 +411,10 @@ export function CreditNoteDetailPage() {
                   {history.map((row) => (
                     <tr key={row.allocationId} className="border-b border-erp-border/60">
                       <td className="py-1.5 pr-2 tabular-nums">{row.allocationDate}</td>
-                      <td className="py-1.5 pr-2">{row.invoiceNumber ?? '—'}</td>
+                      <td className="py-1.5 pr-2">{row.invoiceNumber ?? '-'}</td>
                       <td className="py-1.5 pr-2 text-right tabular-nums">{formatCurrency(parseDecimal(row.allocatedAmount))}</td>
                       <td className="py-1.5 pr-2 text-right tabular-nums">
-                        {row.invoiceOutstandingAfter ? formatCurrency(parseDecimal(row.invoiceOutstandingAfter)) : '—'}
+                        {row.invoiceOutstandingAfter ? formatCurrency(parseDecimal(row.invoiceOutstandingAfter)) : '-'}
                       </td>
                       <td className="py-1.5 pr-2">{row.status}</td>
                       {perms.canReverseAllocation && (

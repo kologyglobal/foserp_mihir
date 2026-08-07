@@ -27,7 +27,7 @@ import { useHrmsPermissions } from '@/utils/permissions/hrms'
 import { HrExceptionPanel, type HrExceptionItem, HrKpiStrip, hrStatusLabel } from '../components'
 import '../hrms-ui.css'
 
-const DASH = '—'
+const DASH = '-'
 
 interface QuickAction {
   id: string

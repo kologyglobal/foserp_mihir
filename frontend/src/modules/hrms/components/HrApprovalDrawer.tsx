@@ -70,7 +70,7 @@ export function HrApprovalDrawer({
               {fields.map((f, idx) => (
                 <div key={`${f.label}-${idx}`} className="hr-approval-drawer__field">
                   <div className="hr-approval-drawer__field-label">{f.label}</div>
-                  <div className="hr-approval-drawer__field-value">{f.value ?? '—'}</div>
+                  <div className="hr-approval-drawer__field-value">{f.value ?? '-'}</div>
                 </div>
               ))}
             </div>

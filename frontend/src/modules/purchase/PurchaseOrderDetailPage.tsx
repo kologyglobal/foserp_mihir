@@ -661,26 +661,26 @@ export function PurchaseOrderDetailPage() {
           <ErpViewField label="Currency" value={po.currency} />
           <ErpViewField label="Vendor" value={`${po.vendor.code} — ${po.vendor.name}`} />
           <ErpViewField label="Vendor GST Number" value={po.vendor.gstin} />
-          <ErpViewField label="Place of Supply" value={po.placeOfSupply || '—'} />
+          <ErpViewField label="Place of Supply" value={po.placeOfSupply || '-'} />
           <ErpViewField label="Buyer" value={po.buyer.name} />
           <ErpViewField label="Purchase Location" value={po.purchaseLocation.name} />
           <ErpViewField label="Delivery Location" value={po.deliveryLocation.name} />
           <ErpViewField label="Expected Delivery Date" value={formatDate(po.expectedDeliveryDate)} />
-          <ErpViewField label="Validity Date" value={po.validityDate ? formatDate(po.validityDate) : '—'} />
-          <ErpViewField label="Price Basis" value={po.priceBasis || '—'} />
+          <ErpViewField label="Validity Date" value={po.validityDate ? formatDate(po.validityDate) : '-'} />
+          <ErpViewField label="Price Basis" value={po.priceBasis || '-'} />
           <ErpViewField label="Payment Terms" value={po.paymentTerms} />
           <ErpViewField label="Delivery Terms" value={po.deliveryTerms} />
-          <ErpViewField label="Freight Terms" value={po.freightTerms || '—'} />
-          <ErpViewField label="Packing Terms" value={po.packingTerms || '—'} />
-          <ErpViewField label="Insurance Terms" value={po.insuranceTerms || '—'} />
-          <ErpViewField label="Warranty" value={po.warranty || '—'} />
-          <ErpViewField label="Inspection Requirement" value={po.inspectionRequirement || '—'} />
+          <ErpViewField label="Freight Terms" value={po.freightTerms || '-'} />
+          <ErpViewField label="Packing Terms" value={po.packingTerms || '-'} />
+          <ErpViewField label="Insurance Terms" value={po.insuranceTerms || '-'} />
+          <ErpViewField label="Warranty" value={po.warranty || '-'} />
+          <ErpViewField label="Inspection Requirement" value={po.inspectionRequirement || '-'} />
           <ErpViewField
             label="Sent to Vendor"
-            value={po.sentToVendorAt ? formatDate(po.sentToVendorAt.slice(0, 10)) : '—'}
+            value={po.sentToVendorAt ? formatDate(po.sentToVendorAt.slice(0, 10)) : '-'}
           />
-          <ErpViewField label="Released At" value={po.releasedAt ? formatDate(po.releasedAt.slice(0, 10)) : '—'} />
-          <ErpViewField label="Vendor Address" value={po.vendor.address || '—'} colSpan={3} />
+          <ErpViewField label="Released At" value={po.releasedAt ? formatDate(po.releasedAt.slice(0, 10)) : '-'} />
+          <ErpViewField label="Vendor Address" value={po.vendor.address || '-'} colSpan={3} />
           <ErpViewField label="Source PR" hideIfEmpty>
             {po.purchaseRequisitionId ? (
               <Link className="text-erp-primary font-mono" to={`/purchase/requisitions/${po.purchaseRequisitionId}`}>
@@ -863,10 +863,10 @@ export function PurchaseOrderDetailPage() {
                       </td>
                       <td className="purchase-order-detail-lines__col-flag">{l.qcRequired ? 'Yes' : 'No'}</td>
                       <td className="font-mono text-[12px] purchase-order-detail-lines__col-code-wide">
-                        {l.qualityTestGroupCode || '—'}
+                        {l.qualityTestGroupCode || '-'}
                       </td>
                       <td className="font-mono text-[12px] purchase-order-detail-lines__col-code">
-                        {l.binCode || '—'}
+                        {l.binCode || '-'}
                       </td>
                       <td className="purchase-order-detail-lines__col-status">
                         <Badge color={lineStatusBadgeColor(l.lineStatus)}>
@@ -877,7 +877,7 @@ export function PurchaseOrderDetailPage() {
                         {formatDate(l.expectedDeliveryDate || l.requiredDate)}
                       </td>
                       <td className="font-mono text-[12px] purchase-order-detail-lines__col-code">
-                        {l.requisitionNo || '—'}
+                        {l.requisitionNo || '-'}
                       </td>
                     </tr>
                   ))}
@@ -1037,15 +1037,15 @@ export function PurchaseOrderDetailPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <ErpViewField label="Terms and Conditions">
               <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-erp-text">
-                {po.termsAndConditions || '—'}
+                {po.termsAndConditions || '-'}
               </p>
             </ErpViewField>
             <ErpViewField label="Internal Notes">
               <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-erp-text">
-                {po.internalNotes || '—'}
+                {po.internalNotes || '-'}
               </p>
             </ErpViewField>
-            <ErpViewField label="Remarks" value={po.remarks || '—'} className="sm:col-span-2" />
+            <ErpViewField label="Remarks" value={po.remarks || '-'} className="sm:col-span-2" />
           </div>
         </ErpCardSection>
 
@@ -1089,7 +1089,7 @@ export function PurchaseOrderDetailPage() {
                   action: `CHANGE_${c.id}`,
                   actionLabel: `Changed ${c.fieldLabel}${
                     c.previousValue || c.newValue
-                      ? `: ${c.previousValue || '—'} → ${c.newValue || '—'}`
+                      ? `: ${c.previousValue || '-'} → ${c.newValue || '-'}`
                       : ''
                   }`,
                   timestamp: c.changedAt,
@@ -1117,7 +1117,7 @@ export function PurchaseOrderDetailPage() {
                   {linked.purchaseRequisition.documentNumber}
                 </Link>
               ) : (
-                '—'
+                '-'
               )}
             </ErpViewField>
             <ErpViewField label="RFQ">
@@ -1126,7 +1126,7 @@ export function PurchaseOrderDetailPage() {
                   {linked.rfq.documentNumber}
                 </Link>
               ) : (
-                '—'
+                '-'
               )}
             </ErpViewField>
             <ErpViewField label="Vendor Quotation">
@@ -1138,11 +1138,11 @@ export function PurchaseOrderDetailPage() {
                   {linked.vendorQuotation.documentNumber}
                 </Link>
               ) : (
-                '—'
+                '-'
               )}
             </ErpViewField>
-            <ErpViewField label="Comparison" value={linked?.comparison?.documentNumber ?? '—'} />
-            <ErpViewField label="Blanket Order" value={linked?.blanketOrder?.documentNumber ?? '—'} />
+            <ErpViewField label="Comparison" value={linked?.comparison?.documentNumber ?? '-'} />
+            <ErpViewField label="Blanket Order" value={linked?.blanketOrder?.documentNumber ?? '-'} />
           </div>
 
           <div className="mt-1 space-y-4">

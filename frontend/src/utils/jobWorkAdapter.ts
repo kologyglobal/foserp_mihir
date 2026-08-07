@@ -116,7 +116,7 @@ export function listJobWorkOrdersFromState(): JobWorkOrderView[] {
     .map((wo) => {
       const shipments = woState.subcontractShipments.filter((s) => s.workOrderId === wo.id)
       const meta = metaMap[wo.id]
-      const vendorName = wo.vendorId ? useMasterStore.getState().getVendor(wo.vendorId)?.vendorName ?? '—' : '—'
+      const vendorName = wo.vendorId ? useMasterStore.getState().getVendor(wo.vendorId)?.vendorName ?? '-' : '-'
       const matLine = woState.materialLines.find((l) => l.workOrderId === wo.id)
       const item = matLine ? useMasterStore.getState().getItem(matLine.itemId) : null
       const rate = item?.standardRate ?? 0

@@ -141,21 +141,21 @@ export function QuotationConversionDialog({
               <div>
                 <dt className="text-[var(--dyn-text-muted)]">Valid till</dt>
                 <dd className="font-medium text-[var(--dyn-text)]">
-                  {preview.validTill && preview.validTill !== '—'
+                  {preview.validTill && preview.validTill !== '-'
                     ? formatDate(preview.validTill)
-                    : '—'}
+                    : '-'}
                 </dd>
               </div>
               <div className="col-span-2">
                 <dt className="text-[var(--dyn-text-muted)]">Payment Terms</dt>
                 <dd className="font-medium text-[var(--dyn-text)] whitespace-pre-wrap">
-                  {preview.paymentTerms || '—'}
+                  {preview.paymentTerms || '-'}
                 </dd>
               </div>
               <div className="col-span-2">
                 <dt className="text-[var(--dyn-text-muted)]">Delivery Terms</dt>
                 <dd className="font-medium text-[var(--dyn-text)] whitespace-pre-wrap">
-                  {preview.deliveryTerms || '—'}
+                  {preview.deliveryTerms || '-'}
                 </dd>
               </div>
               {preview.deliveryTime ? (

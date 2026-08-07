@@ -183,8 +183,8 @@ export function MaintenanceReportsPage() {
                         </Link>
                       </td>
                       <td className="px-3 py-2">{t.machineCode}</td>
-                      <td className="px-3 py-2">{t.failureCategory ?? '—'}</td>
-                      <td className="px-3 py-2 tabular-nums">{t.downtimeMinutes ?? '—'}m</td>
+                      <td className="px-3 py-2">{t.failureCategory ?? '-'}</td>
+                      <td className="px-3 py-2 tabular-nums">{t.downtimeMinutes ?? '-'}m</td>
                       {perms.canViewCost ? (
                         <td className="px-3 py-2 text-right tabular-nums">{formatInr(t.totalCost)}</td>
                       ) : null}
@@ -218,7 +218,7 @@ export function MaintenanceReportsPage() {
                           {c.code} — {c.name}
                         </td>
                         <td className="px-3 py-2">{c.jobs}</td>
-                        <td className="px-3 py-2">{c.closedJobs ?? '—'}</td>
+                        <td className="px-3 py-2">{c.closedJobs ?? '-'}</td>
                         <td className="px-3 py-2">{c.avgRepairMinutes}m</td>
                         <td className="px-3 py-2 text-right">{formatInr(c.totalCost)}</td>
                         <td className="px-3 py-2 text-right">
@@ -301,10 +301,10 @@ export function MaintenanceReportsPage() {
                           <div className="text-[11px] text-erp-muted">{r.planName}</div>
                         </td>
                         <td className="px-3 py-2">{r.machineCode}</td>
-                        <td className="px-3 py-2">{r.dueDate ?? '—'}</td>
-                        <td className="px-3 py-2">{r.completedDate ?? '—'}</td>
+                        <td className="px-3 py-2">{r.dueDate ?? '-'}</td>
+                        <td className="px-3 py-2">{r.completedDate ?? '-'}</td>
                         <td className="px-3 py-2">{r.status.replace(/_/g, ' ')}</td>
-                        <td className="px-3 py-2 text-right">{r.delayDays ? `${r.delayDays}d` : '—'}</td>
+                        <td className="px-3 py-2 text-right">{r.delayDays ? `${r.delayDays}d` : '-'}</td>
                       </tr>
                     ))}
                   </tbody>

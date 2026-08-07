@@ -202,13 +202,13 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <div className="text-[10px] font-semibold uppercase tracking-[0.05em] text-erp-muted">{label}</div>
-      <div className="mt-1 text-[13px] font-medium leading-snug text-erp-text">{value ?? '—'}</div>
+      <div className="mt-1 text-[13px] font-medium leading-snug text-erp-text">{value ?? '-'}</div>
     </div>
   )
 }
 
 function personLabel(id: string | null | undefined, names: Record<string, string>): string {
-  if (!id) return '—'
+  if (!id) return '-'
   return names[id] ?? 'Assigned'
 }
 
@@ -227,9 +227,9 @@ function currentStageLabel(wo: WorkOrderDetail): string {
   if (wo.currentStageCode || wo.currentStageName) {
     return [wo.currentStageCode, wo.currentStageName].filter(Boolean).join(' · ')
   }
-  if (!wo.currentStageId) return '—'
+  if (!wo.currentStageId) return '-'
   const stage = wo.stages.find((s) => s.id === wo.currentStageId)
-  return stage ? `${stage.code} · ${stage.name}` : '—'
+  return stage ? `${stage.code} · ${stage.name}` : '-'
 }
 
 /** Live progress for Overview — pipeline + current-stage qty (WO FG qty only rolls up on final stage). */
@@ -534,8 +534,8 @@ function StagesProcessPanel({
   const completedCount = sorted.filter((s) => s.status === 'COMPLETED' || s.status === 'SKIPPED').length
   const current = sorted.find((s) => s.id === wo.currentStageId) ?? null
   const overallPct = sorted.length === 0 ? 0 : Math.round((completedCount / sorted.length) * 100)
-  const labelWc = (id: string | null) => (id ? wcLabels[id] ?? id.slice(0, 8) : '—')
-  const labelMachine = (id: string | null) => (id ? machineLabels[id] ?? id.slice(0, 8) : '—')
+  const labelWc = (id: string | null) => (id ? wcLabels[id] ?? id.slice(0, 8) : '-')
+  const labelMachine = (id: string | null) => (id ? machineLabels[id] ?? id.slice(0, 8) : '-')
 
   const beginOpEdit = (op: WorkOrderDetail['operations'][number]) => {
     setEditingOpId(op.id)
@@ -920,7 +920,7 @@ function StagesProcessPanel({
                                       Yes
                                     </span>
                                   ) : (
-                                    '—'
+                                    '-'
                                   )}
                                 </td>
                                 {canEditRoute ? (
@@ -1700,11 +1700,11 @@ export function ApiWorkOrderDetailPage() {
 
           <div className="grid gap-4 px-4 py-3.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
             <Field label="Planned Qty" value={<span className="tabular-nums">{wo.plannedQuantity}</span>} />
-            <Field label="Planned Start" value={wo.plannedStartDate ? formatDate(wo.plannedStartDate) : '—'} />
-            <Field label="Due" value={wo.requiredCompletionDate ? formatDate(wo.requiredCompletionDate) : '—'} />
+            <Field label="Planned Start" value={wo.plannedStartDate ? formatDate(wo.plannedStartDate) : '-'} />
+            <Field label="Due" value={wo.requiredCompletionDate ? formatDate(wo.requiredCompletionDate) : '-'} />
             <Field label="Current Stage" value={currentStageLabel(wo)} />
             <Field label="Priority" value={wo.priority} />
-            <Field label="Plant" value={wo.plantCode || '—'} />
+            <Field label="Plant" value={wo.plantCode || '-'} />
             <Field label="Supervisor" value={personLabel(wo.supervisorId, userNames)} />
             <Field label="Manager" value={personLabel(wo.managerId, userNames)} />
           </div>
@@ -1923,24 +1923,24 @@ export function ApiWorkOrderDetailPage() {
                           {relatedSo.salesOrderNo}
                         </Link>
                       ) : (
-                        '—'
+                        '-'
                       )
                     }
                   />
-                  <Field label="Customer" value={relatedSo?.customerName || relatedSo?.customerCode || '—'} />
-                  <Field label="Job Number" value={wo.jobNumber || '—'} />
-                  <Field label="Project Ref" value={wo.projectRef || '—'} />
+                  <Field label="Customer" value={relatedSo?.customerName || relatedSo?.customerCode || '-'} />
+                  <Field label="Job Number" value={wo.jobNumber || '-'} />
+                  <Field label="Project Ref" value={wo.projectRef || '-'} />
                   <Field
                     label="Demand"
-                    value={wo.demandId ? <span className="font-mono text-[12px]">{wo.demandId.slice(0, 8)}…</span> : '—'}
+                    value={wo.demandId ? <span className="font-mono text-[12px]">{wo.demandId.slice(0, 8)}…</span> : '-'}
                   />
-                  <Field label="Plant" value={wo.plantCode || '—'} />
+                  <Field label="Plant" value={wo.plantCode || '-'} />
                   <Field label="Manager" value={personLabel(wo.managerId, userNames)} />
                   <Field label="Supervisor" value={personLabel(wo.supervisorId, userNames)} />
-                  <Field label="Tracking" value={wo.outputTrackingType?.replace(/_/g, ' ') || '—'} />
-                  <Field label="Released" value={wo.releasedAt ? formatDateTime(wo.releasedAt) : '—'} />
-                  <Field label="Started" value={wo.actualStartAt ? formatDateTime(wo.actualStartAt) : '—'} />
-                  <Field label="Completed" value={wo.actualCompletedAt ? formatDateTime(wo.actualCompletedAt) : '—'} />
+                  <Field label="Tracking" value={wo.outputTrackingType?.replace(/_/g, ' ') || '-'} />
+                  <Field label="Released" value={wo.releasedAt ? formatDateTime(wo.releasedAt) : '-'} />
+                  <Field label="Started" value={wo.actualStartAt ? formatDateTime(wo.actualStartAt) : '-'} />
+                  <Field label="Completed" value={wo.actualCompletedAt ? formatDateTime(wo.actualCompletedAt) : '-'} />
                   {wo.notes ? (
                     <div className="sm:col-span-2">
                       <Field label="Notes" value={wo.notes} />
@@ -1979,14 +1979,14 @@ export function ApiWorkOrderDetailPage() {
                               {receipt.acceptedQuantity || receipt.receiptQuantity}
                               {receipt.uom?.code ? ` ${receipt.uom.code}` : ''}
                             </td>
-                            <td>{receipt.warehouse?.name ?? receipt.warehouse?.code ?? '—'}</td>
-                            <td>{receipt.batchOrLotNumber || '—'}</td>
+                            <td>{receipt.warehouse?.name ?? receipt.warehouse?.code ?? '-'}</td>
+                            <td>{receipt.batchOrLotNumber || '-'}</td>
                             <td>
                               {receipt.postedAt
                                 ? formatDateTime(receipt.postedAt)
                                 : receipt.receiptDate
                                   ? formatDate(receipt.receiptDate)
-                                  : '—'}
+                                  : '-'}
                             </td>
                           </tr>
                         ))}
@@ -2052,21 +2052,21 @@ export function ApiWorkOrderDetailPage() {
                     fields: [
                       { label: 'Document', value: wo.workOrderNo },
                       { label: 'Priority', value: wo.priority },
-                      { label: 'Plant', value: wo.plantCode || '—' },
+                      { label: 'Plant', value: wo.plantCode || '-' },
                       { label: 'Supervisor', value: personLabel(wo.supervisorId, userNames) },
                       { label: 'Manager', value: personLabel(wo.managerId, userNames) },
-                      { label: 'Tracking', value: wo.outputTrackingType?.replace(/_/g, ' ') || '—' },
+                      { label: 'Tracking', value: wo.outputTrackingType?.replace(/_/g, ' ') || '-' },
                     ],
                   },
                   {
                     title: 'Dates',
                     fields: [
-                      { label: 'Created', value: wo.createdAt ? formatDate(wo.createdAt) : '—' },
-                      { label: 'Planned start', value: wo.plannedStartDate ? formatDate(wo.plannedStartDate) : '—' },
-                      { label: 'Required', value: wo.requiredCompletionDate ? formatDate(wo.requiredCompletionDate) : '—' },
-                      { label: 'Released', value: wo.releasedAt ? formatDate(wo.releasedAt) : '—' },
-                      { label: 'Started', value: wo.actualStartAt ? formatDate(wo.actualStartAt) : '—' },
-                      { label: 'Completed', value: wo.actualCompletedAt ? formatDate(wo.actualCompletedAt) : '—' },
+                      { label: 'Created', value: wo.createdAt ? formatDate(wo.createdAt) : '-' },
+                      { label: 'Planned start', value: wo.plannedStartDate ? formatDate(wo.plannedStartDate) : '-' },
+                      { label: 'Required', value: wo.requiredCompletionDate ? formatDate(wo.requiredCompletionDate) : '-' },
+                      { label: 'Released', value: wo.releasedAt ? formatDate(wo.releasedAt) : '-' },
+                      { label: 'Started', value: wo.actualStartAt ? formatDate(wo.actualStartAt) : '-' },
+                      { label: 'Completed', value: wo.actualCompletedAt ? formatDate(wo.actualCompletedAt) : '-' },
                     ],
                   },
                   {
@@ -2202,7 +2202,7 @@ export function ApiWorkOrderDetailPage() {
                         <td><DynamicsStatusChip label={aMeta.label} tone={aMeta.tone} /></td>
                         <td className="text-right tabular-nums">{a.assignedQuantity}</td>
                         <td className="text-right tabular-nums">{a.completedQuantity}</td>
-                        <td>{a.machine?.name ?? '—'}</td>
+                        <td>{a.machine?.name ?? '-'}</td>
                         <td className="text-right">
                           <div className="flex flex-wrap justify-end gap-1">
                             {a.status === 'ACCEPTED' || a.status === 'ASSIGNED' ? (
@@ -2354,9 +2354,9 @@ export function ApiWorkOrderDetailPage() {
                               {inspection.inspectionNumber ?? inspection.id.slice(0, 8)}
                             </Link>
                           </td>
-                          <td>{inspection.category?.replace(/_/g, ' ') ?? '—'}</td>
+                          <td>{inspection.category?.replace(/_/g, ' ') ?? '-'}</td>
                           <td>{inspection.status}</td>
-                          <td>{inspection.stageId ? wo.stages.find((s) => s.id === inspection.stageId)?.name ?? '—' : '—'}</td>
+                          <td>{inspection.stageId ? wo.stages.find((s) => s.id === inspection.stageId)?.name ?? '-' : '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2412,7 +2412,7 @@ export function ApiWorkOrderDetailPage() {
                       <td><p className="font-medium">{RUNTIME_CHANGE_TYPE_LABELS[change.changeType]}</p><p className="font-mono text-[10px] text-erp-muted">{change.changeNumber}</p></td>
                       <td><StatusDot tone={change.status === 'APPLIED' ? 'success' : change.status === 'FAILED' || change.status === 'REJECTED' ? 'danger' : 'neutral'} label={RUNTIME_CHANGE_STATUS_LABELS[change.status]} /></td>
                       <td>{change.riskLevel.toLowerCase()}</td>
-                      <td><p>{change.requestedBy ? userNames[change.requestedBy] ?? 'User' : 'System'}</p><p className="text-[10px] text-erp-muted">{change.requestedAt ? formatDateTime(change.requestedAt) : '—'}</p></td>
+                      <td><p>{change.requestedBy ? userNames[change.requestedBy] ?? 'User' : 'System'}</p><p className="text-[10px] text-erp-muted">{change.requestedAt ? formatDateTime(change.requestedAt) : '-'}</p></td>
                       <td className="max-w-52 truncate" title={change.reason}>{change.reason}</td>
                       <td className="text-right"><div className="flex justify-end gap-1">
                         {change.status === 'DRAFT' && canRequestRuntimeChange() ? <Button size="sm" variant="secondary" disabled={busy} onClick={() => void runRuntimeChange(() => submitRuntimeChange(wo.id, change.id), 'Change submitted')}>Submit</Button> : null}
@@ -2482,7 +2482,7 @@ export function ApiWorkOrderDetailPage() {
                         </td>
                         <td>
                           <p>{movement.physicalPosted ? 'Physical' : 'Logical'}</p>
-                          <p className="text-[10px] text-erp-muted">{movement.postedAt ? formatDateTime(movement.postedAt) : '—'}</p>
+                          <p className="text-[10px] text-erp-muted">{movement.postedAt ? formatDateTime(movement.postedAt) : '-'}</p>
                         </td>
                         <td className="max-w-52 truncate" title={movement.reason}>{movement.reason}</td>
                       </tr>
@@ -2753,7 +2753,7 @@ export function ApiWorkOrderDetailPage() {
                             <td className="text-right tabular-nums">{line.reservedQty}</td>
                             <td className="text-right tabular-nums">{line.issuedQty}</td>
                             <td className="text-right tabular-nums">{line.shortageQty}</td>
-                            <td className="text-right tabular-nums">{line.freeQty ?? '—'}</td>
+                            <td className="text-right tabular-nums">{line.freeQty ?? '-'}</td>
                             <td>
                               {(() => {
                                 const meta = materialLineMeta(line.status)
@@ -2900,14 +2900,14 @@ export function ApiWorkOrderDetailPage() {
                             {receipt.acceptedQuantity || receipt.receiptQuantity}
                             {receipt.uom?.code ? ` ${receipt.uom.code}` : ''}
                           </td>
-                          <td>{receipt.warehouse?.name ?? receipt.warehouse?.code ?? '—'}</td>
-                          <td>{receipt.batchOrLotNumber || '—'}</td>
+                          <td>{receipt.warehouse?.name ?? receipt.warehouse?.code ?? '-'}</td>
+                          <td>{receipt.batchOrLotNumber || '-'}</td>
                           <td>
                             {receipt.postedAt
                               ? formatDateTime(receipt.postedAt)
                               : receipt.receiptDate
                                 ? formatDate(receipt.receiptDate)
-                                : '—'}
+                                : '-'}
                           </td>
                         </tr>
                       ))}
@@ -2945,7 +2945,7 @@ export function ApiWorkOrderDetailPage() {
                           <td className="text-right tabular-nums">{entry.rejectedQuantity}</td>
                           <td className="text-right tabular-nums">{entry.scrapQuantity}</td>
                           <td className="max-w-xs truncate" title={entry.remarks ?? undefined}>
-                            {entry.remarks || '—'}
+                            {entry.remarks || '-'}
                           </td>
                         </tr>
                       ))}

@@ -64,8 +64,8 @@ export function ReversalHistoryPage() {
                   <td className="py-2 pr-3">{AP_REVERSAL_TYPE_LABELS[row.documentType] ?? row.documentType}</td>
                   <td className="py-2 pr-3">{row.documentNumber ?? row.documentId}</td>
                   <td className="py-2 pr-3 tabular-nums">{row.reversalDate}</td>
-                  <td className="py-2 pr-3">{row.reason || '—'}</td>
-                  <td className="py-2">{row.reversalVoucherNumber ?? (row.documentType === 'allocation' ? '— (subledger)' : '—')}</td>
+                  <td className="py-2 pr-3">{row.reason || '-'}</td>
+                  <td className="py-2">{row.reversalVoucherNumber ?? (row.documentType === 'allocation' ? '— (subledger)' : '-')}</td>
                 </tr>
               ))}
             </tbody>

@@ -184,10 +184,10 @@ export function ItemLedgerPage() {
                   )}
                 </td>
                 <td>{r.warehouseName}</td>
-                <td className="font-mono">{r.batchNo ?? '—'}</td>
-                <td className="font-mono">{r.serialNo ?? '—'}</td>
-                <td className="text-right font-mono">{r.qtyIn > 0 ? formatNumber(r.qtyIn) : '—'}</td>
-                <td className="text-right font-mono">{r.qtyOut > 0 ? formatNumber(r.qtyOut) : '—'}</td>
+                <td className="font-mono">{r.batchNo ?? '-'}</td>
+                <td className="font-mono">{r.serialNo ?? '-'}</td>
+                <td className="text-right font-mono">{r.qtyIn > 0 ? formatNumber(r.qtyIn) : '-'}</td>
+                <td className="text-right font-mono">{r.qtyOut > 0 ? formatNumber(r.qtyOut) : '-'}</td>
                 <td className="text-right font-mono font-semibold">{formatNumber(r.balance)}</td>
                 {perms.canViewCost ? (
                   <td className="text-right font-mono">{formatCurrency(r.unitCost)}</td>

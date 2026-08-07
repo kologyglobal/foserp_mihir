@@ -26,7 +26,7 @@ function InfoSection({ section }: { section: Enterprise360InfoSection }) {
               className={cn('ent-360-info-field', field.colSpan === 2 && 'ent-360-info-field--wide')}
             >
               <dt className="ent-360-info-field__label">{field.label}</dt>
-              <dd className="ent-360-info-field__value">{field.value ?? '—'}</dd>
+              <dd className="ent-360-info-field__value">{field.value ?? '-'}</dd>
             </div>
           ))}
         </dl>

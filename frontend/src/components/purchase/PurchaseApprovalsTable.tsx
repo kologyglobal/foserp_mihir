@@ -170,7 +170,7 @@ export function PurchaseApprovalsTable({
           <div className="min-w-[8.5rem]">
             <span className="whitespace-nowrap">{row.original.requestedBy}</span>
             <div className="ent-record-cell__meta mt-0.5 whitespace-nowrap">
-              {row.original.department || '—'}
+              {row.original.department || '-'}
             </div>
           </div>
         ),
@@ -180,7 +180,7 @@ export function PurchaseApprovalsTable({
         header: 'Location',
         meta: { columnLabel: 'Location' },
         cell: ({ row }) => (
-          <span className="whitespace-nowrap">{row.original.locationName || '—'}</span>
+          <span className="whitespace-nowrap">{row.original.locationName || '-'}</span>
         ),
       },
       {
@@ -221,7 +221,7 @@ export function PurchaseApprovalsTable({
         cell: ({ row }) => {
           const r = row.original
           if (r.status !== 'pending') {
-            return <span className="text-erp-text-muted">—</span>
+            return <span className="text-erp-text-muted">-</span>
           }
           const overdue = r.pendingSinceDays >= 8
           return (

@@ -8,7 +8,7 @@ import { ErpViewField, ErpViewPhone, ErpViewEmail } from '@/components/erp/card-
 import { entity360CustomerPath } from '@/config/entity360Routes'
 import { formatDate, formatDateTime } from '@/utils/dates/format'
 
-const EMPTY = '—'
+const EMPTY = '-'
 
 export interface ContactSummaryCardProps {
   contact: CrmContact

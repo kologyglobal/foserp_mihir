@@ -695,7 +695,7 @@ export function ApiReservationsPage() {
                             Cancel
                           </button>
                         ) : (
-                          <span className="text-erp-muted">—</span>
+                          <span className="text-erp-muted">-</span>
                         )}
                       </td>
                     </tr>
@@ -1250,7 +1250,7 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
                 {rows.map((row) => (
                   <tr key={row.id}>
                     <td className="font-mono">{cfg.number(row)}</td>
-                    <td>{cfg.date(row) ? formatDate(cfg.date(row)!) : '—'}</td>
+                    <td>{cfg.date(row) ? formatDate(cfg.date(row)!) : '-'}</td>
                     <td>{row.status}</td>
                     <td className="text-right tabular-nums">{row.lines?.length ?? 0}</td>
                     <td className="text-right space-x-2">
@@ -1270,7 +1270,7 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
                       ) : null}
                       {!cfg.postable.includes(row.status)
                         && !(kind === 'transfers' && ['DRAFT', 'SUBMITTED', 'IN_TRANSIT', 'PARTIALLY_RECEIVED'].includes(row.status))
-                        ? <span className="text-erp-muted">—</span>
+                        ? <span className="text-erp-muted">-</span>
                         : null}
                     </td>
                   </tr>

@@ -183,8 +183,8 @@ export function CrmCompaniesTable({
         meta: { columnLabel: 'Primary Contact' },
         cell: ({ row }) => {
           const { customer, primaryContact } = row.original
-          if (primaryContact === '—' && !customer.contactPhone && !customer.contactEmail) {
-            return <span className="crm-companies-table__muted">—</span>
+          if (primaryContact === '-' && !customer.contactPhone && !customer.contactEmail) {
+            return <span className="crm-companies-table__muted">-</span>
           }
           return (
             <div className="min-w-0">
@@ -265,7 +265,7 @@ export function CrmCompaniesTable({
         meta: entCenterMeta('Active Quotations'),
         cell: ({ row }) => {
           const { openQuotations, quotationValue } = row.original
-          if (openQuotations <= 0) return <span className="crm-companies-table__muted">—</span>
+          if (openQuotations <= 0) return <span className="crm-companies-table__muted">-</span>
           return (
             <span className="crm-companies-table__text whitespace-nowrap" title={formatCrmCurrency(quotationValue)}>
               {openQuotations}
@@ -317,7 +317,7 @@ export function CrmCompaniesTable({
         meta: { columnLabel: 'Next Follow-up' },
         cell: ({ row }) => {
           const { nextFollowUpDate, hasOverdueFollowUp } = row.original.summary
-          if (!nextFollowUpDate) return <span className="crm-companies-table__muted">—</span>
+          if (!nextFollowUpDate) return <span className="crm-companies-table__muted">-</span>
           return (
             <span
               className={cn(

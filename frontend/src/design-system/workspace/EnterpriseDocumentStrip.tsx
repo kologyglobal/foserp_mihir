@@ -22,7 +22,7 @@ export function EnterpriseDocumentStrip({
         <div key={field.label} className="ent-ws-doc-strip__field">
           <span className="ent-ws-doc-strip__label">{field.label}</span>
           <span className={cn('ent-ws-doc-strip__value', field.highlight && 'ent-ws-doc-strip__value--highlight')}>
-            {field.value || '—'}
+            {field.value || '-'}
           </span>
         </div>
       ))}

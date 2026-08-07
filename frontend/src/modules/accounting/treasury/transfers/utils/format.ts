@@ -18,9 +18,9 @@ export function formatTransferDateTime(value: string | null | undefined): string
 
 /** "CODE — Name (••••1234)" account label used across selector / summary / timeline. */
 export function formatAccountLabel(account: TransferAccountSnapshot | undefined | null): string {
-  if (!account) return '—'
+  if (!account) return '-'
   const masked = account.accountType === 'BANK' ? maskAccountNumber(account.maskedNumber) : null
-  return [`${account.code} — ${account.name}`, masked && masked !== '—' ? `(${masked})` : null]
+  return [`${account.code} — ${account.name}`, masked && masked !== '-' ? `(${masked})` : null]
     .filter(Boolean)
     .join(' ')
 }

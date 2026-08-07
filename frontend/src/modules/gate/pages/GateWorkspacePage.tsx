@@ -63,10 +63,10 @@ export function GateWorkspacePage() {
       favoritePath="/gate"
       healthScore={88}
       heroMetrics={[
-        { id: 'visitors', label: 'Visitors', value: '—', accent: 'blue', href: '/gate/visitors' },
-        { id: 'vehicles', label: 'Vehicles', value: '—', accent: 'cyan', href: '/gate/vehicles' },
-        { id: 'inward', label: 'Material In', value: '—', accent: 'green', href: '/gate/material-inward' },
-        { id: 'approvals', label: 'Approvals', value: '—', accent: 'amber', href: '/gate/approvals' },
+        { id: 'visitors', label: 'Visitors', value: '-', accent: 'blue', href: '/gate/visitors' },
+        { id: 'vehicles', label: 'Vehicles', value: '-', accent: 'cyan', href: '/gate/vehicles' },
+        { id: 'inward', label: 'Material In', value: '-', accent: 'green', href: '/gate/material-inward' },
+        { id: 'approvals', label: 'Approvals', value: '-', accent: 'amber', href: '/gate/approvals' },
       ]}
       emptyState={
         <SmartEmptyState

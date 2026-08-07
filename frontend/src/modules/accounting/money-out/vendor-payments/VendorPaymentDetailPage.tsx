@@ -409,16 +409,16 @@ export function VendorPaymentDetailPage() {
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-erp-muted">Reference</dt>
-              <dd>{payment.paymentReference ?? payment.chequeNumber ?? payment.bankReference ?? '—'}</dd>
+              <dd>{payment.paymentReference ?? payment.chequeNumber ?? payment.bankReference ?? '-'}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-erp-muted">Proposed posting date</dt>
-              <dd className="tabular-nums">{payment.proposedPostingDate ?? '—'}</dd>
+              <dd className="tabular-nums">{payment.proposedPostingDate ?? '-'}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-erp-muted">Narration</dt>
               <dd className="max-w-[220px] truncate" title={payment.narration ?? ''}>
-                {payment.narration ?? '—'}
+                {payment.narration ?? '-'}
               </dd>
             </div>
           </dl>
@@ -450,7 +450,7 @@ export function VendorPaymentDetailPage() {
                       <td className="py-2 pr-2">{a.adjustmentType}</td>
                       <td className="py-2 pr-2">{a.description}</td>
                       <td className="py-2 pr-2">{a.accountingRole.replace(/_/g, ' ')}</td>
-                      <td className="py-2 pr-2 text-right tabular-nums">{a.rate ? `${a.rate}%` : '—'}</td>
+                      <td className="py-2 pr-2 text-right tabular-nums">{a.rate ? `${a.rate}%` : '-'}</td>
                       <td className="py-2 text-right tabular-nums">{formatCurrency(parseDecimal(a.amount))}</td>
                     </tr>
                   ))}
@@ -494,13 +494,13 @@ export function VendorPaymentDetailPage() {
               <dl className="grid gap-2 sm:grid-cols-2">
                 <div>
                   <dt className="text-erp-muted">Status</dt>
-                  <dd className="font-medium">{(approval?.approvalRequest ?? payment.approvalRequest)?.status ?? '—'}</dd>
+                  <dd className="font-medium">{(approval?.approvalRequest ?? payment.approvalRequest)?.status ?? '-'}</dd>
                 </div>
                 <div>
                   <dt className="text-erp-muted">Level</dt>
                   <dd>
-                    {(approval?.approvalRequest ?? payment.approvalRequest)?.currentLevel ?? '—'} /{' '}
-                    {(approval?.approvalRequest ?? payment.approvalRequest)?.totalLevels ?? '—'}
+                    {(approval?.approvalRequest ?? payment.approvalRequest)?.currentLevel ?? '-'} /{' '}
+                    {(approval?.approvalRequest ?? payment.approvalRequest)?.totalLevels ?? '-'}
                   </dd>
                 </div>
               </dl>
@@ -550,17 +550,17 @@ export function VendorPaymentDetailPage() {
                         {payment.accountingVoucherNumber ?? payment.accountingVoucherId}
                       </Link>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-erp-muted">Ledger entries</dt>
-                  <dd>{payment.ledgerEntryCount ?? '—'}</dd>
+                  <dd>{payment.ledgerEntryCount ?? '-'}</dd>
                 </div>
                 <div>
                   <dt className="text-erp-muted">Posted at</dt>
-                  <dd>{payment.postedAt ? new Date(payment.postedAt).toLocaleString() : '—'}</dd>
+                  <dd>{payment.postedAt ? new Date(payment.postedAt).toLocaleString() : '-'}</dd>
                 </div>
               </dl>
             </div>

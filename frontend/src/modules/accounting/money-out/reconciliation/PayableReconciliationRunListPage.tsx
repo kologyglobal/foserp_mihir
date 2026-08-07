@@ -106,12 +106,12 @@ export function PayableReconciliationRunListPage() {
                     {r.status ? (
                       <ErpStatusChip label={r.status} tone={payableReconciliationStatusTone(r.status)} />
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </td>
                   <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(parseDecimal(r.variance))}</td>
                   <td className="py-2 pr-2">{r.exceptionCount}</td>
-                  <td className="py-2 pr-2">{r.completedAt ? new Date(r.completedAt).toLocaleString() : '—'}</td>
+                  <td className="py-2 pr-2">{r.completedAt ? new Date(r.completedAt).toLocaleString() : '-'}</td>
                 </tr>
               ))}
             </tbody>

@@ -113,7 +113,7 @@ export function enrichManufacturingRow(
     ...row,
     product,
     category,
-    productionOrder: row.unitsProduced > 0 ? `PO-26${String(1400 + index).padStart(4, '0')}` : '—',
+    productionOrder: row.unitsProduced > 0 ? `PO-26${String(1400 + index).padStart(4, '0')}` : '-',
     plant: row.unitsProduced > 0 ? plants[index % plants.length] : 'Central / Spares',
     qty: row.unitsProduced,
     machineCost: Math.round(row.overhead * 0.55),

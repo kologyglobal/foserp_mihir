@@ -59,7 +59,7 @@ export function GrnQrPanel({ grnId, grnNo, className }: GrnQrPanelProps) {
           <p className="mb-2 text-xs font-semibold uppercase text-erp-muted">Material Lot Labels ({lotQrs.length})</p>
           <ul className="space-y-2">
             {lotQrs.map((lot) => {
-              const itemCode = lot.metadata.itemCode ?? '—'
+              const itemCode = lot.metadata.itemCode ?? '-'
               return (
                 <li
                   key={lot.qrId}

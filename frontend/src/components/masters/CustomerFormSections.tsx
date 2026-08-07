@@ -268,7 +268,7 @@ export function CustomerFormPreview({
       <dl className="space-y-1.5 text-[12px]">
         <div className="flex justify-between gap-2 py-1">
           <dt className="text-erp-muted">GSTIN</dt>
-          <dd className="font-mono font-medium text-erp-text">{values.gstin || '—'}</dd>
+          <dd className="font-mono font-medium text-erp-text">{values.gstin || '-'}</dd>
         </div>
         {values.pan ? (
           <div className="flex justify-between gap-2 py-1">
@@ -281,13 +281,13 @@ export function CustomerFormPreview({
           <dd className="text-right font-medium text-erp-text">
             {values.city
               ? `${values.city}${values.state ? `, ${values.state}` : ''}${values.country && values.country !== 'India' ? ` · ${values.country}` : ''}`
-              : '—'}
+              : '-'}
           </dd>
         </div>
         <div className="flex justify-between gap-2 py-1">
           <dt className="text-erp-muted">Credit limit</dt>
           <dd className="font-medium tabular-nums text-erp-text">
-            {values.creditLimit > 0 ? `₹${values.creditLimit.toLocaleString('en-IN')}` : '—'}
+            {values.creditLimit > 0 ? `₹${values.creditLimit.toLocaleString('en-IN')}` : '-'}
           </dd>
         </div>
         <div className="flex justify-between gap-2 py-1">

@@ -268,7 +268,7 @@ export function AdminSecuritySessionsPage() {
                                   )}
                                 </td>
                                 <td className="px-3 py-2.5 whitespace-nowrap font-mono text-[12px] text-erp-muted">
-                                  {row.ipAddress ?? '—'}
+                                  {row.ipAddress ?? '-'}
                                 </td>
                                 <td className="px-3 py-2.5">
                                   <span

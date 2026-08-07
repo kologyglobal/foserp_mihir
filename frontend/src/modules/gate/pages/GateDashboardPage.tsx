@@ -171,9 +171,9 @@ export function GateDashboardPage() {
                             <TableLink to={`/gate/visitors/${v.id}`}>{v.entryNumber}</TableLink>
                           </td>
                           <td className="font-medium">{v.visitorName}</td>
-                          <td>{v.company ?? '—'}</td>
+                          <td>{v.company ?? '-'}</td>
                           <td>{v.hostName}</td>
-                          <td>{v.entryTime ? formatDateTime(v.entryTime) : '—'}</td>
+                          <td>{v.entryTime ? formatDateTime(v.entryTime) : '-'}</td>
                           <td>
                             <InsideDuration from={v.entryTime} warnAfterMinutes={240} />
                           </td>
@@ -225,9 +225,9 @@ export function GateDashboardPage() {
                             <TableLink to={`/gate/vehicles/${v.id}`}>{v.vehicleNumber}</TableLink>
                           </td>
                           <td>{v.purpose}</td>
-                          <td>{v.companyName ?? '—'}</td>
+                          <td>{v.companyName ?? '-'}</td>
                           <td>{v.driverName}</td>
-                          <td>{v.entryTime ? formatDateTime(v.entryTime) : '—'}</td>
+                          <td>{v.entryTime ? formatDateTime(v.entryTime) : '-'}</td>
                           <td>
                             <InsideDuration from={v.entryTime ?? v.createdAt} warnAfterMinutes={30} />
                           </td>

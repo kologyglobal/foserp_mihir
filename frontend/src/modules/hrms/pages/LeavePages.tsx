@@ -47,7 +47,7 @@ function BalanceChips({ rows }: { rows: HrLeaveBalance[] }) {
     <div className="hr-balance-chips">
       {rows.map((b) => (
         <div key={b.id} className="hr-balance-chip">
-          <span className="hr-balance-chip__code">{b.leaveType?.code ?? '—'}</span>
+          <span className="hr-balance-chip__code">{b.leaveType?.code ?? '-'}</span>
           <span className={`hr-balance-chip__value ${b.available <= 0 ? 'hr-balance-chip__value--low' : ''}`}>
             {b.available}
           </span>
@@ -88,7 +88,7 @@ function BalancesTable({
         {rows.map((b) => (
           <tr key={b.id}>
             <td>
-              <HrEmployeeCell name={b.employee?.displayName ?? '—'} code={b.employee?.employeeCode} size="sm" />
+              <HrEmployeeCell name={b.employee?.displayName ?? '-'} code={b.employee?.employeeCode} size="sm" />
             </td>
             <td>{b.leaveType?.code}</td>
             <td className="tabular-nums">{b.opening}</td>
@@ -373,7 +373,7 @@ export function LeaveHubPage() {
                   return (
                     <tr key={r.id} onClick={() => setDrawerRequest(r)}>
                       <td>
-                        <HrEmployeeCell name={r.employee?.displayName ?? '—'} code={r.employee?.employeeCode} size="sm" />
+                        <HrEmployeeCell name={r.employee?.displayName ?? '-'} code={r.employee?.employeeCode} size="sm" />
                       </td>
                       <td>{r.leaveType?.code}</td>
                       <td className="tabular-nums">
@@ -381,7 +381,7 @@ export function LeaveHubPage() {
                       </td>
                       <td className="tabular-nums">{r.requestedDays}</td>
                       <td className="max-w-[200px] truncate">{r.reason}</td>
-                      <td className="tabular-nums">{bal ? bal.available : '—'}</td>
+                      <td className="tabular-nums">{bal ? bal.available : '-'}</td>
                     </tr>
                   )
                 })}
@@ -408,10 +408,10 @@ export function LeaveHubPage() {
                 { label: 'Dates', value: `${drawerRequest.fromDate} → ${drawerRequest.toDate}` },
                 { label: 'Days requested', value: drawerRequest.requestedDays },
                 { label: 'Duration', value: drawerRequest.durationType.replace('_', ' ') },
-                { label: 'Available balance', value: balanceForDrawer ? balanceForDrawer.available : '—' },
+                { label: 'Available balance', value: balanceForDrawer ? balanceForDrawer.available : '-' },
                 {
                   label: 'Balance after approval',
-                  value: balanceForDrawer ? balanceForDrawer.available - drawerRequest.requestedDays : '—',
+                  value: balanceForDrawer ? balanceForDrawer.available - drawerRequest.requestedDays : '-',
                 },
               ]
             : []
@@ -743,7 +743,7 @@ export function LeaveRequestsPage() {
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td>
-                    <HrEmployeeCell name={r.employee?.displayName ?? '—'} code={r.employee?.employeeCode} size="sm" />
+                    <HrEmployeeCell name={r.employee?.displayName ?? '-'} code={r.employee?.employeeCode} size="sm" />
                   </td>
                   <td>{r.leaveType?.code}</td>
                   <td className="tabular-nums">{r.fromDate}</td>
@@ -752,7 +752,7 @@ export function LeaveRequestsPage() {
                   <td>
                     <HrStatusChip status={r.status} domain="leave" />
                   </td>
-                  <td>{r.employee?.reportingManager?.displayName ?? '—'}</td>
+                  <td>{r.employee?.reportingManager?.displayName ?? '-'}</td>
                   <td className="max-w-[200px] truncate">{r.reason}</td>
                   <td className="text-right">
                     <div className="flex justify-end gap-1">

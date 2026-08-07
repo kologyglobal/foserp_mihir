@@ -133,9 +133,9 @@ export function SalaryStructuresPage() {
                     </Link>
                   </td>
                   <td>{r.name}</td>
-                  <td>{r.workerCategory ?? '—'}</td>
-                  <td>{r.activeVersion ? `v${r.activeVersion.versionNo}` : '—'}</td>
-                  <td>{r.activeVersion?.effectiveFrom ?? '—'}</td>
+                  <td>{r.workerCategory ?? '-'}</td>
+                  <td>{r.activeVersion ? `v${r.activeVersion.versionNo}` : '-'}</td>
+                  <td>{r.activeVersion?.effectiveFrom ?? '-'}</td>
                   <td>
                     <DynamicsStatusChip label={r.isActive ? 'Active' : 'Inactive'} tone={r.isActive ? 'success' : 'neutral'} />
                   </td>

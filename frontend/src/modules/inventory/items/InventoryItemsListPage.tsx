@@ -10,14 +10,13 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { DataTable } from '@/components/tables/DataTable'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
-import { deactivateItem, duplicateItem, getItems } from '@/services/inventory'
+import { deactivateItem, getItems } from '@/services/inventory'
 import type { InventoryItem } from '@/types/inventoryDomain'
 import { INVENTORY_ITEM_REGISTER_TABS, INVENTORY_ITEM_TYPE_LABELS, trackingLabel } from '@/utils/inventoryItemLabels'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
-import { isApiMode } from '@/config/apiConfig'
 
 export function InventoryItemsListPage() {
   const navigate = useNavigate()
@@ -54,19 +53,9 @@ export function InventoryItemsListPage() {
     void load()
   }, [load])
 
-  const onDuplicate = useCallback(async (id: string) => {
-    if (isApiMode()) {
-      navigate(`/masters/items/${id}/edit`)
-      notify.info('Open Masters → Items to create a copy in live mode')
-      return
-    }
-    try {
-      const d = await duplicateItem(id)
-      notify.success('Item duplicated')
-      navigate(`/inventory/items/${d.id}`)
-    } catch {
-      notify.error('Duplicate failed')
-    }
+  const onDuplicate = useCallback((id: string) => {
+    navigate(`/masters/items/${id}/edit`)
+    notify.info('Open Masters → Items to create a copy')
   }, [navigate])
 
   const onDeactivate = useCallback(async (id: string) => {
@@ -100,7 +89,7 @@ export function InventoryItemsListPage() {
       {
         accessorKey: 'defaultWarehouseName',
         header: 'Default Warehouse',
-        cell: ({ row }) => row.original.defaultWarehouseName ?? '—',
+        cell: ({ row }) => row.original.defaultWarehouseName ?? '-',
       },
       {
         accessorKey: 'availableQuantity',
@@ -157,12 +146,7 @@ export function InventoryItemsListPage() {
                     ...(perms.canEditItem
                       ? [{
                           label: 'Edit Item',
-                          onClick: () =>
-                            navigate(
-                              isApiMode()
-                                ? `/masters/items/${item.id}/edit`
-                                : `/inventory/items/${item.id}/edit`,
-                            ),
+                          onClick: () => navigate(`/masters/items/${item.id}/edit`),
                         }]
                       : []),
                     {
@@ -244,7 +228,7 @@ export function InventoryItemsListPage() {
                   id: 'new',
                   label: 'New Item',
                   icon: Plus,
-                  onClick: () => navigate(isApiMode() ? '/masters/items/new' : '/inventory/items/new'),
+                  onClick: () => navigate('/masters/items/new'),
                 }
               : undefined
           }

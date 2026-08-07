@@ -16,7 +16,7 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
     <div>
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">{label}</dt>
-      <dd className="mt-1 text-[13px] text-erp-text">{value || '—'}</dd>
+      <dd className="mt-1 text-[13px] text-erp-text">{value || '-'}</dd>
     </div>
   )
 }
@@ -165,7 +165,7 @@ export function ApiCashAccountDetailPage() {
           <Field label="Location" value={account.cashProfile?.locationDescription} />
           <Field label="Imprest limit" value={account.cashProfile?.imprestLimit} />
           <Field label="GL account ID" value={<span className="font-mono text-[12px]">{account.glAccountId}</span>} />
-          <Field label="Organization branch ID" value={account.branchId ? <span className="font-mono text-[12px]">{account.branchId}</span> : '—'} />
+          <Field label="Organization branch ID" value={account.branchId ? <span className="font-mono text-[12px]">{account.branchId}</span> : '-'} />
           <Field label="Last updated" value={formatDateTime(account.updatedAt)} />
           <Field label="Description" value={account.description} />
           <Field label="Deactivation reason" value={account.deactivationReason} />

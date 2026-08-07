@@ -1,5 +1,5 @@
 /**
- * Inventory Costing — Overview hub (API-backed; demo seed when offline).
+ * Inventory Costing — Overview hub (API-backed).
  */
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -8,7 +8,6 @@ import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import { Button } from '@/design-system/components/Button'
-import { isApiMode } from '@/config/apiConfig'
 import {
   fetchCostingOverview,
   fetchValuationItems,
@@ -17,7 +16,7 @@ import {
 import { formatCurrency } from '@/utils/formatters/currency'
 import { InventoryCostingShell } from './InventoryCostingShell'
 import { COSTING_SUBNAV, inventoryCostingPaths } from './inventoryCostingPaths'
-import { DEMO_RECON, methodLabel } from './costingDemoData'
+import { methodLabel } from './costingDemoData'
 import { cn } from '@/utils/cn'
 
 type ValuationItemRow = {
@@ -39,7 +38,6 @@ type ValuationItemRow = {
 }
 
 export function InventoryCostingSummaryPage() {
-  const api = isApiMode()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [overview, setOverview] = useState<CostingOverviewDto | null>(null)
@@ -49,38 +47,6 @@ export function InventoryCostingSummaryPage() {
     setLoading(true)
     setError(null)
     try {
-      if (!api) {
-        setOverview({
-          valuationMethod: DEMO_RECON.valuationMethod,
-          methodSource: 'DEMO',
-          methodDescription: 'Demo seed — switch to API mode for live valuation.',
-          effectiveDate: new Date().toISOString().slice(0, 10),
-          summary: {
-            inventoryValue: 284500,
-            stockQuantity: 14825,
-            uncostedMovements: 0,
-            unreconciledValue: 0,
-            glDifference: null,
-            openLayers: 2,
-            openLayerValue: 120000,
-            costEntryCount: 4,
-            reconMismatches: DEMO_RECON.mismatched,
-          },
-          policy: {
-            scope: 'DEMO',
-            effectiveFrom: new Date().toISOString().slice(0, 10),
-            lastChangedBy: null,
-            lastChangedAt: null,
-            lastFrom: null,
-            lastTo: null,
-          },
-          attention: [],
-          accounting: { enabled: false, note: 'Demo mode' },
-          manufacturing: { note: 'Open Manufacturing for WO costing', openPath: '/manufacturing' },
-        })
-        setItems([])
-        return
-      }
       const [ov, val] = await Promise.all([
         fetchCostingOverview(),
         fetchValuationItems({ limit: 50 }),
@@ -92,7 +58,7 @@ export function InventoryCostingSummaryPage() {
     } finally {
       setLoading(false)
     }
-  }, [api])
+  }, [])
 
   useEffect(() => {
     void load()
@@ -179,8 +145,8 @@ export function InventoryCostingSummaryPage() {
                   <dt className="text-erp-muted">Last change</dt>
                   <dd className="font-medium">
                     {overview.policy.lastChangedAt
-                      ? `${overview.policy.lastFrom ?? '—'} → ${overview.policy.lastTo ?? '—'}`
-                      : '—'}
+                      ? `${overview.policy.lastFrom ?? '-'} → ${overview.policy.lastTo ?? '-'}`
+                      : '-'}
                   </dd>
                 </div>
                 <div>
@@ -246,7 +212,7 @@ export function InventoryCostingSummaryPage() {
             </div>
             {items.length === 0 ? (
               <p className="px-4 py-6 text-[13px] text-erp-muted">
-                {api ? 'No stock balances with value in this tenant yet.' : 'Demo mode — valuation table available in API mode.'}
+                No stock balances with value in this tenant yet.
               </p>
             ) : (
               <div className="erp-table-wrap overflow-x-auto">
@@ -271,10 +237,10 @@ export function InventoryCostingSummaryPage() {
                         <td className="font-medium">
                           {r.itemCode} — {r.itemName}
                         </td>
-                        <td>{r.category ?? '—'}</td>
+                        <td>{r.category ?? '-'}</td>
                         <td>{methodLabel(r.valuationMethod)}</td>
                         <td className="text-right tabular-nums">{r.onHandQty.toLocaleString()}</td>
-                        <td>{r.uom ?? '—'}</td>
+                        <td>{r.uom ?? '-'}</td>
                         <td className="text-right tabular-nums">
                           {r.unitCostLabel === 'Layered' || r.unitCostLabel.startsWith('Specific')
                             ? r.unitCostLabel

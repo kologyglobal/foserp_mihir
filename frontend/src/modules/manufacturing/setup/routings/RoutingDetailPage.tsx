@@ -85,18 +85,18 @@ export function RoutingDetailPage() {
 
   const workCentreLabel = useCallback(
     (id: string | null | undefined) => {
-      if (!id) return '—'
+      if (!id) return '-'
       const wc = workCentres.find((w) => w.id === id)
-      return wc ? `${wc.code} — ${wc.name}` : '—'
+      return wc ? `${wc.code} — ${wc.name}` : '-'
     },
     [workCentres],
   )
 
   const machineLabel = useCallback(
     (id: string | null | undefined) => {
-      if (!id) return '—'
+      if (!id) return '-'
       const m = machines.find((x) => x.id === id)
-      return m ? `${m.code} — ${m.name}` : '—'
+      return m ? `${m.code} — ${m.name}` : '-'
     },
     [machines],
   )
@@ -390,7 +390,7 @@ export function RoutingDetailPage() {
               </div>
               <div className="sm:col-span-2">
                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Description</dt>
-                <dd className="mt-0.5 text-erp-text">{routing.description?.trim() || '—'}</dd>
+                <dd className="mt-0.5 text-erp-text">{routing.description?.trim() || '-'}</dd>
               </div>
               {version?.revisionNotes?.trim() ? (
                 <div className="sm:col-span-2 lg:col-span-4">
@@ -536,7 +536,7 @@ export function RoutingDetailPage() {
                                     Yes
                                   </span>
                                 ) : (
-                                  '—'
+                                  '-'
                                 )}
                               </td>
                               <td>

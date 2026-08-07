@@ -52,7 +52,7 @@ import '../hrms-ui.css'
 type TabId = 'overview' | 'employment' | 'attendance' | 'leave' | 'overtime' | 'payroll' | 'loans' | 'documents' | 'history'
 
 function fmtDate(value: string | null | undefined) {
-  if (!value) return '—'
+  if (!value) return '-'
   return value.slice(0, 10)
 }
 
@@ -175,11 +175,11 @@ export function Employee360Page() {
         factBoxes={
           <HrSmartContext
             fields={[
-              { label: 'Manager', value: employee.reportingManager?.displayName ?? '—' },
-              { label: 'Work Centre', value: employee.primaryWorkCentre?.name ?? '—' },
+              { label: 'Manager', value: employee.reportingManager?.displayName ?? '-' },
+              { label: 'Work Centre', value: employee.primaryWorkCentre?.name ?? '-' },
               { label: 'Join Date', value: fmtDate(employee.joinDate) },
               { label: 'Employment Type', value: EMPLOYMENT_TYPE_LABELS[employee.employmentType] ?? employee.employmentType },
-              { label: 'Shift', value: employee.defaultShift?.name ?? '—' },
+              { label: 'Shift', value: employee.defaultShift?.name ?? '-' },
             ]}
           />
         }
@@ -201,14 +201,14 @@ function OverviewTab({
       <HrInfoSection
         title="Personal & Contact"
         fields={[
-          { label: 'Gender', value: employee.gender ? GENDER_LABELS[employee.gender] : '—' },
+          { label: 'Gender', value: employee.gender ? GENDER_LABELS[employee.gender] : '-' },
           { label: 'Date of birth', value: fmtDate(employee.dateOfBirth) },
-          { label: 'Mobile', value: employee.mobile ?? '—' },
-          { label: 'Email', value: employee.email ?? '—' },
-          { label: 'Address', value: employee.addressLine ?? '—' },
-          { label: 'City / State', value: [employee.city, employee.state].filter(Boolean).join(', ') || '—' },
-          { label: 'PIN', value: employee.pin ?? '—' },
-          { label: 'Country', value: employee.country ?? '—' },
+          { label: 'Mobile', value: employee.mobile ?? '-' },
+          { label: 'Email', value: employee.email ?? '-' },
+          { label: 'Address', value: employee.addressLine ?? '-' },
+          { label: 'City / State', value: [employee.city, employee.state].filter(Boolean).join(', ') || '-' },
+          { label: 'PIN', value: employee.pin ?? '-' },
+          { label: 'Country', value: employee.country ?? '-' },
         ]}
       />
       <HrInfoSection
@@ -240,14 +240,14 @@ function EmploymentTab({ employee }: { employee: HrEmployee }) {
     <HrInfoSection
       title="Assignment"
       fields={[
-        { label: 'Legal entity', value: employee.legalEntity?.displayName ?? '—' },
-        { label: 'Branch', value: employee.branch?.name ?? '—' },
-        { label: 'Department', value: employee.department?.name ?? '—' },
-        { label: 'Designation', value: employee.designation?.name ?? '—' },
-        { label: 'Reporting manager', value: employee.reportingManager?.displayName ?? '—' },
-        { label: 'Primary work centre', value: employee.primaryWorkCentre?.name ?? '—' },
-        { label: 'Default shift', value: employee.defaultShift?.name ?? '—' },
-        { label: 'Weekly off', value: employee.weeklyOffDay != null ? WEEKDAYS[employee.weeklyOffDay] : '—' },
+        { label: 'Legal entity', value: employee.legalEntity?.displayName ?? '-' },
+        { label: 'Branch', value: employee.branch?.name ?? '-' },
+        { label: 'Department', value: employee.department?.name ?? '-' },
+        { label: 'Designation', value: employee.designation?.name ?? '-' },
+        { label: 'Reporting manager', value: employee.reportingManager?.displayName ?? '-' },
+        { label: 'Primary work centre', value: employee.primaryWorkCentre?.name ?? '-' },
+        { label: 'Default shift', value: employee.defaultShift?.name ?? '-' },
+        { label: 'Weekly off', value: employee.weeklyOffDay != null ? WEEKDAYS[employee.weeklyOffDay] : '-' },
       ]}
     />
   )
@@ -291,8 +291,8 @@ function AttendanceTab({ employeeId }: { employeeId: string }) {
             <tr key={r.id}>
               <td>{r.attendanceDate}</td>
               <td>{r.status}</td>
-              <td>{r.firstInAt ? new Date(r.firstInAt).toLocaleTimeString() : '—'}</td>
-              <td>{r.lastOutAt ? new Date(r.lastOutAt).toLocaleTimeString() : '—'}</td>
+              <td>{r.firstInAt ? new Date(r.firstInAt).toLocaleTimeString() : '-'}</td>
+              <td>{r.lastOutAt ? new Date(r.lastOutAt).toLocaleTimeString() : '-'}</td>
             </tr>
           ))}
         </tbody>
@@ -336,7 +336,7 @@ function LeaveTab({ employeeId }: { employeeId: string }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td>{r.leaveType?.name ?? '—'}</td>
+                <td>{r.leaveType?.name ?? '-'}</td>
                 <td>{r.opening}</td>
                 <td>{r.accrued}</td>
                 <td>{r.used}</td>
@@ -385,7 +385,7 @@ function OvertimeTab({ employeeId }: { employeeId: string }) {
             <tr key={r.id}>
               <td>{r.attendanceDate}</td>
               <td>{r.eligibleMinutes}m</td>
-              <td>{r.approvedMinutes != null ? `${r.approvedMinutes}m` : '—'}</td>
+              <td>{r.approvedMinutes != null ? `${r.approvedMinutes}m` : '-'}</td>
               <td>{r.status}</td>
             </tr>
           ))}
@@ -511,8 +511,8 @@ function HistoryTab({ employeeId }: { employeeId: string }) {
           {rows.map((h) => (
             <tr key={h.id}>
               <td>{h.field}</td>
-              <td>{h.oldValue ?? '—'}</td>
-              <td>{h.newValue ?? '—'}</td>
+              <td>{h.oldValue ?? '-'}</td>
+              <td>{h.newValue ?? '-'}</td>
               <td>{fmtDate(h.effectiveFrom)}</td>
             </tr>
           ))}

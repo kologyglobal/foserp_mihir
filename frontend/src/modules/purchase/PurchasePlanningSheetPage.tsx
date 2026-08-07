@@ -295,7 +295,7 @@ function sortRows(rows: PurchasePlanningSheetRow[], sortBy: SortKey) {
 }
 
 function Truncate({ text, className }: { text: string; className?: string }) {
-  const value = text.trim() || '—'
+  const value = text.trim() || '-'
   return (
     <span className={cn('block max-w-[14rem] truncate', className)} title={value}>
       {value}
@@ -992,7 +992,7 @@ export function PurchasePlanningSheetPage() {
         header: 'Item Code',
         meta: { columnLabel: 'Item Code' },
         cell: ({ row }) => (
-          <span className="font-mono text-[12px]">{row.original.itemCode || '—'}</span>
+          <span className="font-mono text-[12px]">{row.original.itemCode || '-'}</span>
         ),
       },
       {
@@ -1080,7 +1080,7 @@ export function PurchasePlanningSheetPage() {
         accessorKey: 'uom',
         header: 'UOM',
         meta: { columnLabel: 'UOM' },
-        cell: ({ row }) => row.original.uom || '—',
+        cell: ({ row }) => row.original.uom || '-',
       },
       {
         id: 'requiredByDate',
@@ -1091,7 +1091,7 @@ export function PurchasePlanningSheetPage() {
           const overdue = isOverdue(row.original)
           return (
             <span className={cn('tabular-nums', overdue && 'font-semibold text-red-700')}>
-              {row.original.requiredByDate ? formatDate(row.original.requiredByDate) : '—'}
+              {row.original.requiredByDate ? formatDate(row.original.requiredByDate) : '-'}
             </span>
           )
         },
@@ -1495,7 +1495,7 @@ export function PurchasePlanningSheetPage() {
                                 <td>
                                   <div className="purchase-planning-demand-table__item">
                                     <span className="purchase-planning-demand-table__code">
-                                      {g.itemCode || '—'}
+                                      {g.itemCode || '-'}
                                     </span>
                                     <span className="purchase-planning-demand-table__name">
                                       {g.itemName}
@@ -1517,7 +1517,7 @@ export function PurchasePlanningSheetPage() {
                                         : 'Any location'}
                                     </span>
                                     <span className="font-medium text-erp-text">
-                                      {g.uomId || '—'}
+                                      {g.uomId || '-'}
                                     </span>
                                   </div>
                                 </td>
@@ -1560,7 +1560,7 @@ export function PurchasePlanningSheetPage() {
                                   >
                                     {g.earliestRequiredDate
                                       ? formatDate(g.earliestRequiredDate)
-                                      : '—'}
+                                      : '-'}
                                   </span>
                                 </td>
                                 <td>
@@ -1581,7 +1581,7 @@ export function PurchasePlanningSheetPage() {
                                       ) : null}
                                     </div>
                                   ) : (
-                                    <span className="text-erp-muted">—</span>
+                                    <span className="text-erp-muted">-</span>
                                   )}
                                 </td>
                                 <td className="text-right">
@@ -1639,7 +1639,7 @@ export function PurchasePlanningSheetPage() {
                                                 </TableLink>
                                               </td>
                                               <td className="font-mono text-[12px]">
-                                                {m.planningNumber || '—'}
+                                                {m.planningNumber || '-'}
                                               </td>
                                               <td className="text-right tabular-nums">
                                                 {m.requiredQuantity}
@@ -1658,7 +1658,7 @@ export function PurchasePlanningSheetPage() {
                                               <td className="text-right tabular-nums">
                                                 {m.expectedRate != null && m.expectedRate > 0
                                                   ? formatCurrency(m.expectedRate)
-                                                  : '—'}
+                                                  : '-'}
                                               </td>
                                             </tr>
                                             )

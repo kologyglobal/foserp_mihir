@@ -472,7 +472,7 @@ export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) 
                 const planned =
                   row.planned && snapshot
                     ? moneyValue(snapshot[row.planned as keyof typeof snapshot] as string)
-                    : '—'
+                    : '-'
                 const actualRaw = snapshot
                   ? row.key === 'SCRAP_REWORK'
                     ? String(Number(snapshot.scrapCost) + Number(snapshot.reworkCost))
@@ -482,7 +482,7 @@ export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) 
                 return (
                   <tr key={row.key}>
                     <td className="font-medium">{row.label}</td>
-                    <td className="text-right tabular-nums">{notCalculated ? '—' : planned}</td>
+                    <td className="text-right tabular-nums">{notCalculated ? '-' : planned}</td>
                     <td className={actual.warn ? 'text-right font-medium text-amber-700' : 'text-right tabular-nums'}>
                       {actual.text}
                     </td>
@@ -533,14 +533,14 @@ export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) 
                   <tr key={line.id}>
                     <td className="font-medium">
                       {line.itemCode ? `${line.itemCode} — ` : ''}
-                      {line.itemName ?? line.itemId ?? '—'}
+                      {line.itemName ?? line.itemId ?? '-'}
                     </td>
-                    <td className="text-right tabular-nums">{line.quantity ?? '—'}</td>
-                    <td>{line.uom ?? '—'}</td>
+                    <td className="text-right tabular-nums">{line.quantity ?? '-'}</td>
+                    <td>{line.uom ?? '-'}</td>
                     <td>
                       {line.valuationMethod
                         ? String(line.valuationMethod).replace(/_/g, ' ')
-                        : '—'}
+                        : '-'}
                     </td>
                     <td className="text-right tabular-nums">{moneyValue(line.rate)}</td>
                     <td className="text-right tabular-nums">{moneyValue(line.amount)}</td>
@@ -693,7 +693,7 @@ export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) 
               <div>
                 <p className="text-[11px] uppercase text-erp-muted">Material</p>
                 <p className="font-medium">
-                  {trace.item ? `${trace.item.itemCode} — ${trace.item.itemName}` : '—'}
+                  {trace.item ? `${trace.item.itemCode} — ${trace.item.itemName}` : '-'}
                 </p>
               </div>
               <div>
@@ -702,7 +702,7 @@ export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) 
               </div>
               <div>
                 <p className="text-[11px] uppercase text-erp-muted">Valuation</p>
-                <p className="font-medium">{(trace.valuationMethod ?? '—').replace(/_/g, ' ')}</p>
+                <p className="font-medium">{(trace.valuationMethod ?? '-').replace(/_/g, ' ')}</p>
               </div>
               <div>
                 <p className="text-[11px] uppercase text-erp-muted">Amount</p>

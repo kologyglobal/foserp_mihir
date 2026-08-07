@@ -1,9 +1,7 @@
 /**
- * Inventory Setup — demo memory store + live API/master dual-mode.
+ * Inventory Setup — live API/master data. Saved views are in-memory only (no persistence API yet).
  */
 
-import { isApiMode } from '../../config/apiConfig'
-import { useMasterStore } from '../../store/masterStore'
 import type {
   InventorySavedView,
   InventorySetup,
@@ -24,14 +22,12 @@ import {
 } from '../api/masterApi'
 import { getInventorySetupApi, putInventorySetupApi } from '../api/inventorySetupApi'
 
-const delay = (ms = 60) => new Promise<void>((r) => setTimeout(r, ms))
+const delay = (ms = 30) => new Promise<void>((r) => setTimeout(r, ms))
 
 function genId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }
 
-let setupStore: InventorySetup = structuredClone(DEFAULT_INVENTORY_SETUP)
-const warehouseExtensions = new Map<string, Partial<InventoryWarehouseRecord>>()
 let savedViewsStore: InventorySavedView[] = INVENTORY_SAVED_VIEW_PRESETS.map((p, idx) => ({
   id: `sys-view-${idx}`,
   name: p.name,
@@ -60,32 +56,13 @@ function stripMeta(setup: InventorySetup & { version?: number; updatedAt?: strin
 }
 
 export async function getInventorySetup(): Promise<InventorySetup> {
-  if (isApiMode()) {
-    const res = await getInventorySetupApi()
-    return stripMeta(res.data)
-  }
-  await delay()
-  return structuredClone(setupStore)
+  const res = await getInventorySetupApi()
+  return stripMeta(res.data)
 }
 
 export async function updateInventorySetup(patch: Partial<InventorySetup>): Promise<InventorySetup> {
-  if (isApiMode()) {
-    const res = await putInventorySetupApi(patch)
-    return stripMeta(res.data)
-  }
-  await delay()
-  setupStore = {
-    ...setupStore,
-    ...patch,
-    general: { ...setupStore.general, ...patch.general },
-    tracking: { ...setupStore.tracking, ...patch.tracking },
-    quality: { ...setupStore.quality, ...patch.quality },
-    planning: { ...setupStore.planning, ...patch.planning },
-    approvals: { ...setupStore.approvals, ...patch.approvals },
-    advancedWarehouse: { ...setupStore.advancedWarehouse, ...patch.advancedWarehouse },
-    numberSeries: { ...setupStore.numberSeries, ...patch.numberSeries },
-  }
-  return structuredClone(setupStore)
+  const res = await putInventorySetupApi(patch)
+  return stripMeta(res.data)
 }
 
 /** @deprecated Prefer updateInventorySetup */
@@ -94,52 +71,17 @@ export async function updateInventorySetupDemo(patch: Partial<InventorySetup>): 
 }
 
 export async function getWarehouses(): Promise<InventoryWarehouseRecord[]> {
-  if (isApiMode()) {
-    const rows = await fetchMasterWarehouses()
-    return rows.map((row, idx) => {
-      const wh = mapWarehouseDto(row)
-      return mapMasterWarehouseToSetup(wh, idx)
-    })
-  }
-  await delay()
-  const master = useMasterStore.getState()
-  return master.warehouses.map((wh, idx) => {
-    const base = mapMasterWarehouseToSetup(wh, idx)
-    const ext = warehouseExtensions.get(wh.id)
-    return ext ? { ...base, ...ext } : base
+  const rows = await fetchMasterWarehouses()
+  return rows.map((row, idx) => {
+    const wh = mapWarehouseDto(row)
+    return mapMasterWarehouseToSetup(wh, idx)
   })
 }
 
 export async function createWarehouse(input: InventoryWarehouseInput): Promise<InventoryWarehouseRecord> {
-  if (isApiMode()) {
-    const created = await createMasterApi(
-      'warehouses',
-      warehouseToApiPayload({
-        warehouseCode: input.warehouseCode,
-        warehouseName: input.warehouseName,
-        warehouseType:
-          input.warehouseType === 'wip'
-            ? 'wip'
-            : input.warehouseType === 'finished'
-              ? 'fg'
-              : input.warehouseType === 'transit'
-                ? 'sub'
-                : 'main',
-        plantCode: input.plantCode,
-        address: input.location || '',
-        isActive: input.isActive,
-      }),
-    )
-    const wh = mapWarehouseDto(created.data)
-    return { ...mapMasterWarehouseToSetup(wh, 0), ...input, id: wh.id }
-  }
-  await delay()
-  const master = useMasterStore.getState()
-  if (master.warehouses.some((w) => w.warehouseCode.toLowerCase() === input.warehouseCode.toLowerCase())) {
-    throw new Error('Warehouse code already exists')
-  }
-  const id = await Promise.resolve(
-    master.addWarehouse({
+  const created = await createMasterApi(
+    'warehouses',
+    warehouseToApiPayload({
       warehouseCode: input.warehouseCode,
       warehouseName: input.warehouseName,
       warehouseType:
@@ -155,56 +97,37 @@ export async function createWarehouse(input: InventoryWarehouseInput): Promise<I
       isActive: input.isActive,
     }),
   )
-  const record: InventoryWarehouseRecord = { id, ...input }
-  warehouseExtensions.set(id, record)
-  return record
+  const wh = mapWarehouseDto(created.data)
+  return { ...mapMasterWarehouseToSetup(wh, 0), ...input, id: wh.id }
 }
 
 export async function updateWarehouse(
   id: string,
   input: Partial<InventoryWarehouseInput>,
 ): Promise<InventoryWarehouseRecord> {
-  if (isApiMode()) {
-    const current = (await getWarehouses()).find((w) => w.id === id)
-    if (!current) throw new Error('Warehouse not found')
-    const merged = { ...current, ...input }
-    await updateMasterApi(
-      'warehouses',
-      id,
-      warehouseToApiPayload({
-        warehouseCode: merged.warehouseCode,
-        warehouseName: merged.warehouseName,
-        warehouseType:
-          merged.warehouseType === 'wip'
-            ? 'wip'
-            : merged.warehouseType === 'finished'
-              ? 'fg'
-              : merged.warehouseType === 'transit'
-                ? 'sub'
-                : 'main',
-        plantCode: merged.plantCode,
-        address: merged.location || '',
-        isActive: merged.isActive,
-      }),
-    )
-    return merged
-  }
-  await delay()
-  const master = useMasterStore.getState()
-  const existing = master.getWarehouse(id)
-  if (!existing) throw new Error('Warehouse not found')
-  await Promise.resolve(
-    master.updateWarehouse(id, {
-      warehouseCode: input.warehouseCode,
-      warehouseName: input.warehouseName,
-      plantCode: input.plantCode,
-      isActive: input.isActive,
+  const current = (await getWarehouses()).find((w) => w.id === id)
+  if (!current) throw new Error('Warehouse not found')
+  const merged = { ...current, ...input }
+  await updateMasterApi(
+    'warehouses',
+    id,
+    warehouseToApiPayload({
+      warehouseCode: merged.warehouseCode,
+      warehouseName: merged.warehouseName,
+      warehouseType:
+        merged.warehouseType === 'wip'
+          ? 'wip'
+          : merged.warehouseType === 'finished'
+            ? 'fg'
+            : merged.warehouseType === 'transit'
+              ? 'sub'
+              : 'main',
+      plantCode: merged.plantCode,
+      address: merged.location || '',
+      isActive: merged.isActive,
     }),
   )
-  const current = (await getWarehouses()).find((w) => w.id === id)!
-  const updated = { ...current, ...input }
-  warehouseExtensions.set(id, updated)
-  return updated
+  return merged
 }
 
 export async function getSavedInventoryViews(workspace?: string): Promise<InventorySavedView[]> {
@@ -254,8 +177,6 @@ export async function deleteInventoryView(id: string): Promise<void> {
 
 /** Test helper */
 export function resetInventorySetupForTests() {
-  setupStore = structuredClone(DEFAULT_INVENTORY_SETUP)
-  warehouseExtensions.clear()
   savedViewsStore = INVENTORY_SAVED_VIEW_PRESETS.map((p, idx) => ({
     id: `sys-view-${idx}`,
     name: p.name,

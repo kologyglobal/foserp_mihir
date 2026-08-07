@@ -36,7 +36,7 @@ function listStatusLabel(item: QuotationListItem): string {
 }
 
 function customerApprovalLabel(value?: string | null): string {
-  if (!value) return '—'
+  if (!value) return '-'
   return value.replace(/_/g, ' ')
 }
 
@@ -179,13 +179,13 @@ export function CrmQuotationsTable({
         meta: { columnLabel: 'Opportunity' },
         cell: ({ row }) => {
           const { opportunityName, opportunityNo, opportunityId } = row.original
-          const label = opportunityName || opportunityNo || '—'
-          if (label === '—') return <span className="text-[13px] text-erp-muted">—</span>
+          const label = opportunityName || opportunityNo || '-'
+          if (label === '-') return <span className="text-[13px] text-erp-muted">-</span>
           if (opportunityId) {
             return (
               <TableLink to={`/crm/opportunities/${opportunityId}`}>
                 <EnterpriseRecordCell
-                  primary={opportunityName || opportunityNo || '—'}
+                  primary={opportunityName || opportunityNo || '-'}
                   subtitle={opportunityNo && opportunityName ? opportunityNo : undefined}
                 />
               </TableLink>
@@ -193,7 +193,7 @@ export function CrmQuotationsTable({
           }
           return (
             <EnterpriseRecordCell
-              primary={opportunityName || opportunityNo || '—'}
+              primary={opportunityName || opportunityNo || '-'}
               subtitle={opportunityNo && opportunityName ? opportunityNo : undefined}
             />
           )
@@ -207,7 +207,7 @@ export function CrmQuotationsTable({
         meta: { columnLabel: 'Opportunity Stage' },
         cell: ({ row }) => {
           const stage = row.original.opportunityStage
-          if (!stage) return <span className="text-[13px] text-erp-muted">—</span>
+          if (!stage) return <span className="text-[13px] text-erp-muted">-</span>
           return <StageBadge label={opportunityStageLabel(stage)} stage={stage} />
         },
       },
@@ -229,7 +229,7 @@ export function CrmQuotationsTable({
         meta: { columnLabel: 'Valid Until' },
         cell: ({ row }) => {
           const { expiryDate } = row.original
-          if (!expiryDate) return <span className="text-[13px] text-erp-muted">—</span>
+          if (!expiryDate) return <span className="text-[13px] text-erp-muted">-</span>
           const overdue = expiryDate < new Date().toISOString().slice(0, 10)
             && row.original.document.status !== 'converted'
             && row.original.document.status !== 'superseded'
@@ -258,7 +258,7 @@ export function CrmQuotationsTable({
         meta: entNumericMeta('Qty'),
         cell: ({ row }) => {
           const qty = row.original.qty
-          if (qty == null) return <span className="text-[13px] text-erp-muted">—</span>
+          if (qty == null) return <span className="text-[13px] text-erp-muted">-</span>
           return <EnterpriseNumericCell value={String(qty)} />
         },
       },
@@ -270,7 +270,7 @@ export function CrmQuotationsTable({
         meta: entNumericMeta('Subtotal'),
         cell: ({ row }) => {
           const v = row.original.subtotalAmount
-          if (v == null) return <span className="text-[13px] text-erp-muted">—</span>
+          if (v == null) return <span className="text-[13px] text-erp-muted">-</span>
           return <EnterpriseNumericCell value={formatCrmCurrency(v)} />
         },
       },
@@ -282,7 +282,7 @@ export function CrmQuotationsTable({
         meta: entNumericMeta('Tax'),
         cell: ({ row }) => {
           const v = row.original.taxAmount
-          if (v == null) return <span className="text-[13px] text-erp-muted">—</span>
+          if (v == null) return <span className="text-[13px] text-erp-muted">-</span>
           return <EnterpriseNumericCell value={formatCrmCurrency(v)} />
         },
       },
@@ -333,7 +333,7 @@ export function CrmQuotationsTable({
         meta: { columnLabel: 'Customer Approval' },
         cell: ({ row }) => {
           const approval = row.original.customerApproval
-          if (!approval) return <span className="text-[13px] text-erp-muted">—</span>
+          if (!approval) return <span className="text-[13px] text-erp-muted">-</span>
           return <StatusBadge label={customerApprovalLabel(approval)} status={approval} />
         },
       },
@@ -355,7 +355,7 @@ export function CrmQuotationsTable({
         meta: { columnLabel: 'Payment Terms' },
         cell: ({ row }) => (
           <span className="max-w-[140px] truncate text-[12px] text-erp-text" title={row.original.paymentTerms ?? undefined}>
-            {row.original.paymentTerms?.trim() || '—'}
+            {row.original.paymentTerms?.trim() || '-'}
           </span>
         ),
       },
@@ -367,7 +367,7 @@ export function CrmQuotationsTable({
         meta: { columnLabel: 'Delivery Time' },
         cell: ({ row }) => (
           <span className="max-w-[120px] truncate text-[12px] text-erp-text" title={row.original.deliveryTime ?? undefined}>
-            {row.original.deliveryTime?.trim() || '—'}
+            {row.original.deliveryTime?.trim() || '-'}
           </span>
         ),
       },
@@ -380,7 +380,7 @@ export function CrmQuotationsTable({
         cell: ({ row }) => {
           const soNo = row.original.salesOrderNo ?? row.original.document.salesOrderNo
           const soId = row.original.document.salesOrderId
-          if (!soNo && !soId) return <span className="text-[13px] text-erp-muted">—</span>
+          if (!soNo && !soId) return <span className="text-[13px] text-erp-muted">-</span>
           if (soId) {
             return (
               <TableLink to={resolveSalesOrderDetailPath(soId, true)}>
@@ -388,7 +388,7 @@ export function CrmQuotationsTable({
               </TableLink>
             )
           }
-          return <EnterpriseIdCell id={soNo || '—'} />
+          return <EnterpriseIdCell id={soNo || '-'} />
         },
       },
       {

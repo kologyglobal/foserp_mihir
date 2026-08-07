@@ -212,7 +212,7 @@ export function VendorLookupSelect({
                     >
                       <span className="erp-smart-select__option-label">{opt.label}</span>
                       <span className="erp-smart-select__option-meta text-xs text-erp-muted">
-                        {opt.city} · GST {opt.gstin || '—'}{!opt.isActive ? ' · Inactive' : ''}
+                        {opt.city} · GST {opt.gstin || '-'}{!opt.isActive ? ' · Inactive' : ''}
                       </span>
                     </button>
                   </li>

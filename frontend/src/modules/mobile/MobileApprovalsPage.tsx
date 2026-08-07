@@ -59,7 +59,7 @@ export function MobileApprovalsPage() {
               key={req.id}
               title={APPROVAL_DOCUMENT_LABELS[req.documentType as ApprovalDocumentType]}
               docNo={req.entityLabel}
-              requestedBy={req.submittedByName ?? '—'}
+              requestedBy={req.submittedByName ?? '-'}
               reason={step?.ruleLabel}
               canAct={canAct}
               onApprove={() => {

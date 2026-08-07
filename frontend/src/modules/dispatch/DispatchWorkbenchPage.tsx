@@ -488,7 +488,7 @@ export function DispatchWorkbenchPage() {
             {
               accessorKey: 'customerName',
               header: 'Customer',
-              cell: ({ row }) => row.original.customerName ?? '—',
+              cell: ({ row }) => row.original.customerName ?? '-',
             },
             { accessorKey: 'productOrItem', header: 'Item' },
             {
@@ -509,12 +509,12 @@ export function DispatchWorkbenchPage() {
             {
               accessorKey: 'primaryBlockerCode',
               header: 'Blocker',
-              cell: ({ row }) => row.original.primaryBlockerCode ?? '—',
+              cell: ({ row }) => row.original.primaryBlockerCode ?? '-',
             },
             {
               accessorKey: 'requestedDeliveryDate',
               header: 'Due',
-              cell: ({ row }) => row.original.requestedDeliveryDate ?? '—',
+              cell: ({ row }) => row.original.requestedDeliveryDate ?? '-',
             },
           ]}
         />
@@ -598,7 +598,7 @@ export function DispatchWorkbenchPage() {
             {
               accessorKey: 'reason',
               header: 'Reason',
-              cell: ({ row }) => row.original.reason ?? '—',
+              cell: ({ row }) => row.original.reason ?? '-',
             },
           ]}
         />
@@ -773,7 +773,7 @@ function PackingSessionWorkbenchGrid({
         {
           id: 'picked',
           header: 'Picked',
-          cell: ({ row }) => String(row.original.totalPickedQuantity ?? '—'),
+          cell: ({ row }) => String(row.original.totalPickedQuantity ?? '-'),
         },
         ...(showCreateChallan
           ? [

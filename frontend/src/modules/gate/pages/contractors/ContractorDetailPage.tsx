@@ -22,7 +22,7 @@ import { GATE_BREADCRUMB } from '../../gateUi'
 
 function Field({ label, value }: { label: string; value?: string | number | boolean | null }) {
   const display =
-    typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value ?? '—'
+    typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value ?? '-'
   return (
     <div>
       <dt className="text-[12px] text-erp-muted">{label}</dt>
@@ -189,7 +189,7 @@ export function ContractorDetailPage() {
         {record ? (
           <div className="space-y-3">
             <p className="text-[13px] text-erp-muted">
-              Inside since {record.entryTime ? formatDateTime(record.entryTime) : '—'} (
+              Inside since {record.entryTime ? formatDateTime(record.entryTime) : '-'} (
               <InsideDuration from={record.entryTime} />)
             </p>
             <FormField label="Exit remarks">

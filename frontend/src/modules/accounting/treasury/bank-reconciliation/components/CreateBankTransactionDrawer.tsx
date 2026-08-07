@@ -146,9 +146,9 @@ export function CreateBankTransactionDrawer({
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 text-[13px]">
           <section className="rounded-lg border border-erp-border bg-erp-surface/40 p-3 space-y-1.5">
-            <Row label="Statement date" value={line.transactionDate?.slice(0, 10) ?? '—'} />
-            <Row label="Description" value={line.description || '—'} />
-            <Row label="Reference" value={line.referenceNumber || '—'} />
+            <Row label="Statement date" value={line.transactionDate?.slice(0, 10) ?? '-'} />
+            <Row label="Description" value={line.description || '-'} />
+            <Row label="Reference" value={line.referenceNumber || '-'} />
             <Row label="Direction" value={directionLabel} />
             <Row label="Unmatched amount" value={formatCurrency(bankAmount)} emphasize />
           </section>
@@ -160,7 +160,7 @@ export function CreateBankTransactionDrawer({
               <p className="text-[12px] font-semibold text-emerald-900">Suggested classification</p>
               <Row label="Rule" value={classification.ruleName} />
               <Row label="Type" value={ADJUSTMENT_TYPE_LABELS[classification.adjustmentType]} />
-              <Row label="Keywords" value={classification.matchedKeywords.join(', ') || '—'} />
+              <Row label="Keywords" value={classification.matchedKeywords.join(', ') || '-'} />
               <Row label="Candidates" value={String(classification.candidateCount)} />
             </section>
           ) : null}

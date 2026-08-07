@@ -81,15 +81,15 @@ export function PurchaseOrderPrintDocument({
       <div className="po-print-grid">
         <section className="po-print-box">
           <p className="po-print-box__label">Vendor</p>
-          <p className="po-print-box__name">{vendor?.vendorName ?? '—'}</p>
-          <p>Code: {vendor?.vendorCode ?? '—'}</p>
-          <p>GSTIN: {vendor?.gstin || '—'}</p>
+          <p className="po-print-box__name">{vendor?.vendorName ?? '-'}</p>
+          <p>Code: {vendor?.vendorCode ?? '-'}</p>
+          <p>GSTIN: {vendor?.gstin || '-'}</p>
           <p>
             {vendor?.city ?? ''}
             {vendor?.state ? `, ${vendor.state}` : ''}
           </p>
           <p>
-            Contact: {vendor?.contactPerson ?? '—'} · {vendor?.contactPhone ?? '—'}
+            Contact: {vendor?.contactPerson ?? '-'} · {vendor?.contactPhone ?? '-'}
           </p>
         </section>
         <section className="po-print-box">
@@ -97,10 +97,10 @@ export function PurchaseOrderPrintDocument({
           <p>Payment: {po.paymentTerms || 'Net 30'}</p>
           <p>Currency: INR</p>
           <p>Incoterms: Ex-Works</p>
-          <p>PR Ref: {sourcePrNo ?? '—'}</p>
-          <p>RFQ Ref: {sourceRfqNo ?? '—'}</p>
+          <p>PR Ref: {sourcePrNo ?? '-'}</p>
+          <p>RFQ Ref: {sourceRfqNo ?? '-'}</p>
           <p>Created by: {po.createdByName}</p>
-          <p>Approved by: {po.approvedByName ?? '—'}</p>
+          <p>Approved by: {po.approvedByName ?? '-'}</p>
         </section>
       </div>
 

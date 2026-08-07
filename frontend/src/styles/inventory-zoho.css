@@ -79,8 +79,7 @@
 
 .store-zoho-register .crm-list-filter-bar,
 .store-zoho-register [class*='CrmListFilterBar'],
-.store-zoho-register .erp-register-filter-bar,
-.store-zoho-register .erp-page-hero-filter > * {
+.store-zoho-register .erp-register-filter-bar {
   border: 1px solid var(--store-zoho-line);
   border-radius: var(--store-zoho-radius);
   background: #fff;
@@ -371,7 +370,7 @@
 
 .store-zoho-register .store-op-choice-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 10px;
   max-width: none;
   width: 100%;

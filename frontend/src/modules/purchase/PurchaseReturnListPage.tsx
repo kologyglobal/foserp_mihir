@@ -115,13 +115,13 @@ export function PurchaseReturnListPage() {
         accessorKey: 'purchaseOrderNumber',
         header: 'PO',
         meta: { columnLabel: 'PO' },
-        cell: ({ row }) => row.original.purchaseOrderNumber || '—',
+        cell: ({ row }) => row.original.purchaseOrderNumber || '-',
       },
       {
         accessorKey: 'goodsReceiptNumber',
         header: 'GRN',
         meta: { columnLabel: 'GRN' },
-        cell: ({ row }) => row.original.goodsReceiptNumber || '—',
+        cell: ({ row }) => row.original.goodsReceiptNumber || '-',
       },
       {
         accessorKey: 'returnReasonLabel',

@@ -111,7 +111,7 @@ export function GstPortalFilingPage() {
           <section className="rounded border border-erp-border bg-white p-4 text-[13px]">
             <h2 className="text-sm font-semibold">Capability</h2>
             <p className="mt-1 text-erp-muted">
-              Mode: {capability?.providerMode ?? '—'} · Verdict: {capability?.verdict ?? '—'} · Full GST
+              Mode: {capability?.providerMode ?? '-'} · Verdict: {capability?.verdict ?? '-'} · Full GST
               compliant? {capability?.notFullGstCompliant === false ? 'Yes' : 'No (honest label)'}
             </p>
             <p className="mt-2 text-[12px] text-erp-muted">{capability?.note}</p>
@@ -181,7 +181,7 @@ export function GstPortalFilingPage() {
                         <TaxStatusBadge status={r.status} />
                       </td>
                       <td className="px-3 py-2">{r.providerMode}</td>
-                      <td className="px-3 py-2 font-mono text-[11px]">{r.acknowledgmentRef ?? '—'}</td>
+                      <td className="px-3 py-2 font-mono text-[11px]">{r.acknowledgmentRef ?? '-'}</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1">
                           {r.status === 'PENDING_CHECKER' && perms.isApiMode && canFile && (

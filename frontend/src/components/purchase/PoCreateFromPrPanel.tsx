@@ -428,8 +428,8 @@ export function PoCreateFromPrPanel({ initialPrId = '', initialVendorId = '', on
                         />
                       </td>
                       <td className="tabular-nums">{line.lineNo}</td>
-                      <td className="font-mono text-[12px]">{line.itemCode || '—'}</td>
-                      <td>{line.itemName || '—'}</td>
+                      <td className="font-mono text-[12px]">{line.itemCode || '-'}</td>
+                      <td>{line.itemName || '-'}</td>
                       <td className="text-right tabular-nums">{formatNumber(line.quantity)}</td>
                       <td className="text-right tabular-nums">{formatNumber(rem)}</td>
                       <td className="text-right">
@@ -447,12 +447,12 @@ export function PoCreateFromPrPanel({ initialPrId = '', initialVendorId = '', on
                           aria-label={`Order quantity line ${line.lineNo}`}
                         />
                       </td>
-                      <td>{line.uom || '—'}</td>
-                      <td>{line.requiredDate ? formatDate(line.requiredDate) : '—'}</td>
+                      <td>{line.uom || '-'}</td>
+                      <td>{line.requiredDate ? formatDate(line.requiredDate) : '-'}</td>
                       <td className="text-[12px]">
                         {line.preferredVendorName ||
                           vendors.find((v) => v.id === line.preferredVendorId)?.vendorName ||
-                          '—'}
+                          '-'}
                       </td>
                     </tr>
                   )

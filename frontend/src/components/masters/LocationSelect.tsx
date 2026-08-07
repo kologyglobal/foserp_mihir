@@ -79,7 +79,7 @@ export function LocationSelect({
       placeholder={placeholder}
       resolveOrphanLabel={(id) => {
         const name = getLocationName(id)
-        return name !== '—' ? name : undefined
+        return name !== '-' ? name : undefined
       }}
     />
   )

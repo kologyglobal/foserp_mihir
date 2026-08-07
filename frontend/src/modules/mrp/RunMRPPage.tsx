@@ -74,8 +74,8 @@ export function RunMRPPage() {
       favoritePath="/mrp/run"
       heroMetrics={[
         { id: 'so', label: 'Open Orders', value: salesOrders.length, helper: 'Available to plan' },
-        { id: 'items', label: 'Materials', value: previewLines.length || '—', helper: selectedSo ? 'In BOM preview' : 'Select an order' },
-        { id: 'short', label: 'Shortages', value: selectedSo ? shortageCount : '—', accent: shortageCount ? 'red' : 'green', helper: 'Before planning' },
+        { id: 'items', label: 'Materials', value: previewLines.length || '-', helper: selectedSo ? 'In BOM preview' : 'Select an order' },
+        { id: 'short', label: 'Shortages', value: selectedSo ? shortageCount : '-', accent: shortageCount ? 'red' : 'green', helper: 'Before planning' },
       ]}
       quickActions={
         <Link to="/mrp">
@@ -104,7 +104,7 @@ export function RunMRPPage() {
 
           {selectedSo && (
             <div className="space-y-1 rounded-md border border-erp-border bg-erp-surface-alt p-3 text-sm">
-              <p><span className="text-erp-muted">Product:</span> {selectedProduct?.productName ?? '—'}</p>
+              <p><span className="text-erp-muted">Product:</span> {selectedProduct?.productName ?? '-'}</p>
               <p>
                 <span className="text-erp-muted">Quantity:</span> {selectedSo.qty}
                 {' · '}

@@ -129,12 +129,12 @@ export function CashBookPage() {
               {entries.map((e) => (
                 <tr key={e.id} className="border-b border-erp-border/80">
                   <td className="px-3 py-2 tabular-nums">{formatDate(e.entryDate)}</td>
-                  <td className="px-3 py-2 font-mono">{e.voucherNumber ?? '—'}</td>
+                  <td className="px-3 py-2 font-mono">{e.voucherNumber ?? '-'}</td>
                   <td className="px-3 py-2">{e.transactionType}</td>
                   <td className="px-3 py-2">{e.narration}</td>
-                  <td className="px-3 py-2">{e.receivedFrom ?? e.paidTo ?? '—'}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{e.debitAmount > 0 ? formatCurrency(e.debitAmount) : '—'}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{e.creditAmount > 0 ? formatCurrency(e.creditAmount) : '—'}</td>
+                  <td className="px-3 py-2">{e.receivedFrom ?? e.paidTo ?? '-'}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{e.debitAmount > 0 ? formatCurrency(e.debitAmount) : '-'}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{e.creditAmount > 0 ? formatCurrency(e.creditAmount) : '-'}</td>
                   <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(e.runningBalance)}</td>
                 </tr>
               ))}

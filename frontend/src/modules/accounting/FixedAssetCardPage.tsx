@@ -63,7 +63,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px] text-erp-text">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -262,14 +262,14 @@ export function FixedAssetCardPage() {
           {tab === 'purchase' ? (
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="Acquisition Date" value={formatDate(asset.acquisitionDate)} />
-              <Field label="Capitalization Date" value={asset.capitalizationDate ? formatDate(asset.capitalizationDate) : '—'} />
+              <Field label="Capitalization Date" value={asset.capitalizationDate ? formatDate(asset.capitalizationDate) : '-'} />
               <Field label="Acquisition Cost" value={formatCurrency(asset.acquisitionCost)} />
               <Field label="Vendor" value={asset.vendorName} />
               <Field label="PO Number" value={asset.poNumber} />
               <Field label="Invoice Number" value={asset.invoiceNumber} />
               <Field label="Salvage Value" value={formatCurrency(asset.salvageValue)} />
               <Field label="Residual Value" value={formatCurrency(asset.residualValue)} />
-              <Field label="Warranty Expiry" value={asset.warrantyExpiry ? formatDate(asset.warrantyExpiry) : '—'} />
+              <Field label="Warranty Expiry" value={asset.warrantyExpiry ? formatDate(asset.warrantyExpiry) : '-'} />
             </dl>
           ) : null}
 
@@ -300,15 +300,15 @@ export function FixedAssetCardPage() {
               <Field label="Location" value={asset.location} />
               <Field label="Department" value={asset.department} />
               <Field label="Custodian" value={asset.custodian} />
-              <Field label="Last Verification" value={asset.lastVerificationDate ? formatDate(asset.lastVerificationDate) : '—'} />
-              <Field label="Next Verification" value={asset.nextVerificationDate ? formatDate(asset.nextVerificationDate) : '—'} />
+              <Field label="Last Verification" value={asset.lastVerificationDate ? formatDate(asset.lastVerificationDate) : '-'} />
+              <Field label="Next Verification" value={asset.nextVerificationDate ? formatDate(asset.nextVerificationDate) : '-'} />
             </dl>
           ) : null}
 
           {tab === 'insurance' ? (
             <dl className="grid gap-4 sm:grid-cols-2">
               <Field label="Insurance Policy" value={asset.insurancePolicy} />
-              <Field label="Insurance Expiry" value={asset.insuranceExpiry ? formatDate(asset.insuranceExpiry) : '—'} />
+              <Field label="Insurance Expiry" value={asset.insuranceExpiry ? formatDate(asset.insuranceExpiry) : '-'} />
             </dl>
           ) : null}
 
@@ -401,8 +401,8 @@ export function FixedAssetCardPage() {
                       <td className="px-3 py-2">{e.entryType}</td>
                       <td className="px-3 py-2">{e.reference}</td>
                       <td className="px-3 py-2 text-erp-muted">{e.narration}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{e.debitAmount ? formatCurrency(e.debitAmount) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{e.creditAmount ? formatCurrency(e.creditAmount) : '—'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{e.debitAmount ? formatCurrency(e.debitAmount) : '-'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{e.creditAmount ? formatCurrency(e.creditAmount) : '-'}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(e.runningNBV)}</td>
                     </tr>
                   ))}

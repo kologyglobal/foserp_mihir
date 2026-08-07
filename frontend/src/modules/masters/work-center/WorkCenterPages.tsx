@@ -47,7 +47,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 function warehouseLabel(code: string | null) {
-  if (!code) return '—'
+  if (!code) return '-'
   return <span className="font-mono text-xs">{code}</span>
 }
 
@@ -324,7 +324,7 @@ export function WorkCenterDetailPage() {
           <DetailField label="Plant" value={wc.plantCode} />
           <DetailField label="Capacity" value={`${wc.capacityHoursPerDay} hrs/day`} />
           <DetailField label="Cost Rate" value={formatCurrency(wc.costRatePerHour)} />
-          <DetailField label="Description" value={wc.description || '—'} />
+          <DetailField label="Description" value={wc.description || '-'} />
         </DetailGrid>
       </DetailSection>
 

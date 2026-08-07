@@ -219,18 +219,18 @@ export function PreventiveMaintenanceDetailPage() {
 
       {!editing ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Info label="Machine" value={`${plan.machine?.code ?? '—'} — ${plan.machine?.name ?? ''}`} />
-          <Info label="Work Centre" value={plan.machine?.workCentre?.code ?? '—'} />
-          <Info label="Last Service" value={plan.lastCompletedDate ?? '—'} />
+          <Info label="Machine" value={`${plan.machine?.code ?? '-'} — ${plan.machine?.name ?? ''}`} />
+          <Info label="Work Centre" value={plan.machine?.workCentre?.code ?? '-'} />
+          <Info label="Last Service" value={plan.lastCompletedDate ?? '-'} />
           <Info label="Next Due" value={plan.nextDueDate} />
           <Info label="Frequency" value={plan.frequencyLabel} />
           <Info
             label="Assigned"
-            value={plan.contractor?.name ?? (plan.assignedTechnicianId ? 'Internal tech' : '—')}
+            value={plan.contractor?.name ?? (plan.assignedTechnicianId ? 'Internal tech' : '-')}
           />
           <Info
             label="Est. duration"
-            value={plan.estimatedDurationMin != null ? `${plan.estimatedDurationMin} min` : '—'}
+            value={plan.estimatedDurationMin != null ? `${plan.estimatedDurationMin} min` : '-'}
           />
         </div>
       ) : (

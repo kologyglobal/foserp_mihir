@@ -4,13 +4,11 @@ import { Package, RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { isApiMode } from '@/config/apiConfig'
 import {
   cancelInventoryReservation,
   listInventoryReservations,
   type InventoryStockReservation,
 } from '@/services/api/inventoryApi'
-import { inventoryApiFacade } from '@/services/inventory/inventoryApiFacade'
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
@@ -32,13 +30,8 @@ export function StoreReservationsPage() {
     void token
     setLoading(true)
     try {
-      if (isApiMode()) {
-        const res = await listInventoryReservations({ status: 'ACTIVE', limit: 100 })
-        setRows((res.data ?? []) as ResRow[])
-      } else {
-        const demo = (await inventoryApiFacade.listReservations({})) as unknown as ResRow[]
-        setRows(Array.isArray(demo) ? demo : [])
-      }
+      const res = await listInventoryReservations({ status: 'ACTIVE', limit: 100 })
+      setRows((res.data ?? []) as ResRow[])
     } catch {
       setRows([])
     } finally {
@@ -59,12 +52,8 @@ export function StoreReservationsPage() {
     if (!ok) return
     setBusyId(id)
     try {
-      if (isApiMode()) {
-        await cancelInventoryReservation(id)
-        notify.success('Reservation released')
-      } else {
-        notify.info('Release runs against live API reservation engine in API mode.')
-      }
+      await cancelInventoryReservation(id)
+      notify.success('Reservation released')
       setToken((n) => n + 1)
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Could not release reservation')
@@ -80,7 +69,6 @@ export function StoreReservationsPage() {
       badge="Store"
       title="Reservations"
       description="Reserved vs available. Release frees stock for other demands — balance stays ledger-backed."
-      backLink={{ to: '/inventory', label: 'Store Dashboard' }}
       breadcrumbs={[
         { label: 'Store', to: '/inventory' },
         { label: 'Reservations' },
@@ -98,7 +86,7 @@ export function StoreReservationsPage() {
           Refresh
         </button>
         <Link to="/inventory/store/picking" className="erp-btn erp-btn--secondary erp-btn--sm">
-          Picking
+          Material Picking
         </Link>
         <Link to="/inventory/reservations" className="erp-btn erp-btn--secondary erp-btn--sm">
           Full register

@@ -155,6 +155,8 @@ export interface ItemStock360 {
   itemCode: string
   itemName: string
   uom: string
+  /** Alternate (purchase) UOM + conversion — null when the item has no alternate UOM configured. */
+  alternateUom: { code: string; factor: number } | null
   overview: {
     onHand: number
     reserved: number

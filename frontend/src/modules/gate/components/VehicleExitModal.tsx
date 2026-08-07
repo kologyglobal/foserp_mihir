@@ -75,15 +75,15 @@ export function VehicleExitModal({
         </div>
         <div>
           <dt className="text-erp-muted">Related document</dt>
-          <dd className="font-medium text-erp-text">{vehicle.relatedDocument ?? '—'}</dd>
+          <dd className="font-medium text-erp-text">{vehicle.relatedDocument ?? '-'}</dd>
         </div>
         <div>
           <dt className="text-erp-muted">Seal</dt>
-          <dd className="font-medium text-erp-text">{vehicle.sealNumber ?? '—'}</dd>
+          <dd className="font-medium text-erp-text">{vehicle.sealNumber ?? '-'}</dd>
         </div>
         <div>
           <dt className="text-erp-muted">Entry time</dt>
-          <dd className="font-medium text-erp-text">{vehicle.entryTime ? formatDateTime(vehicle.entryTime) : '—'}</dd>
+          <dd className="font-medium text-erp-text">{vehicle.entryTime ? formatDateTime(vehicle.entryTime) : '-'}</dd>
         </div>
         <div>
           <dt className="text-erp-muted">Duration inside</dt>

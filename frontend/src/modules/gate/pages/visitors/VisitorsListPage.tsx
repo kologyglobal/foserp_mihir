@@ -180,7 +180,7 @@ export function VisitorsListPage({ initialTab }: { initialTab?: VisitorTab }) {
                       <td className="tabular-nums">{row.reference}</td>
                       <td className="font-medium">{row.visitorName}</td>
                       <td className="tabular-nums">{row.mobile}</td>
-                      <td>{row.company ?? '—'}</td>
+                      <td>{row.company ?? '-'}</td>
                       <td>{row.expectedArrival}</td>
                       <td>{row.hostName}</td>
                       <td className="max-w-[200px] truncate">{row.purpose}</td>
@@ -221,12 +221,12 @@ export function VisitorsListPage({ initialTab }: { initialTab?: VisitorTab }) {
                       </td>
                       <td className="font-medium">{v.visitorName}</td>
                       <td className="tabular-nums">{v.mobile}</td>
-                      <td className="max-w-[150px] truncate">{v.company ?? '—'}</td>
+                      <td className="max-w-[150px] truncate">{v.company ?? '-'}</td>
                       <td>{VISITOR_TYPE_LABELS[v.visitorType]}</td>
                       <td>{v.hostName}</td>
                       <td className="max-w-[180px] truncate">{v.purpose}</td>
-                      <td className="whitespace-nowrap">{v.entryTime ? formatDateTime(v.entryTime) : '—'}</td>
-                      <td className="whitespace-nowrap">{v.exitTime ? formatDateTime(v.exitTime) : '—'}</td>
+                      <td className="whitespace-nowrap">{v.entryTime ? formatDateTime(v.entryTime) : '-'}</td>
+                      <td className="whitespace-nowrap">{v.exitTime ? formatDateTime(v.exitTime) : '-'}</td>
                       <td>
                         <GateStatusBadge status={v.status} />
                       </td>

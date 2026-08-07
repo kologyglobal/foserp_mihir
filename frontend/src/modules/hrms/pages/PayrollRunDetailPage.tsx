@@ -575,7 +575,7 @@ export function PayrollRunDetailPage() {
                     </td>
                     <td>{row.payableDays}</td>
                     <td>{row.lopDays}</td>
-                    <td>{row.approvedOtMinutes ? `${(row.approvedOtMinutes / 60).toFixed(1)}h` : '—'}</td>
+                    <td>{row.approvedOtMinutes ? `${(row.approvedOtMinutes / 60).toFixed(1)}h` : '-'}</td>
                     <td>{money(row.grossAmount)}</td>
                     <td>{money(row.deductionAmount)}</td>
                     <td className="font-medium">{money(row.netAmount)}</td>
@@ -648,12 +648,12 @@ export function PayrollRunDetailPage() {
               <div className="grid grid-cols-2 gap-1 text-xs">
                 <div>Paid days: {selected.payableDays}</div>
                 <div>LOP: {selected.lopDays}</div>
-                <div>Present: {selected.presentDays ?? '—'}</div>
-                <div>Paid leave: {selected.paidLeaveDays ?? '—'}</div>
-                <div>Weekly offs: {selected.weeklyOffDays ?? '—'}</div>
-                <div>Holidays: {selected.holidayDays ?? '—'}</div>
+                <div>Present: {selected.presentDays ?? '-'}</div>
+                <div>Paid leave: {selected.paidLeaveDays ?? '-'}</div>
+                <div>Weekly offs: {selected.weeklyOffDays ?? '-'}</div>
+                <div>Holidays: {selected.holidayDays ?? '-'}</div>
                 <div>Approved OT: {(selected.approvedOtMinutes / 60).toFixed(1)}h</div>
-                <div>Basis days: {selected.basisDays ?? '—'}</div>
+                <div>Basis days: {selected.basisDays ?? '-'}</div>
               </div>
             </div>
 
@@ -704,7 +704,7 @@ export function PayrollRunDetailPage() {
                     {loanComps.map((c) => {
                       const basisMatch = c.calculationBasis ? /loan:([^|]+)/.exec(c.calculationBasis) : null
                       const notesMatch = c.notes ? /Source\s+(\S+)/.exec(c.notes) : null
-                      const source = basisMatch?.[1] ?? notesMatch?.[1] ?? '—'
+                      const source = basisMatch?.[1] ?? notesMatch?.[1] ?? '-'
                       return (
                         <li key={c.id} className="flex justify-between gap-2">
                           <span>
@@ -880,12 +880,12 @@ export function PayrollRunDetailPage() {
                         {accounting.voucherNumber ?? accounting.accountingVoucherId}
                       </Link>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </div>
                   <div>
                     <span className="text-erp-muted">Posted at: </span>
-                    {accounting.accountingPostedAt ? new Date(accounting.accountingPostedAt).toLocaleString() : '—'}
+                    {accounting.accountingPostedAt ? new Date(accounting.accountingPostedAt).toLocaleString() : '-'}
                   </div>
                 </div>
               ) : (
@@ -1106,7 +1106,7 @@ export function PayrollRunDetailPage() {
                         <div className="text-xs text-erp-muted">{l.employee?.employeeCode}</div>
                       </td>
                       <td className="px-2 py-2 text-xs">
-                        {l.bankName ?? '—'}
+                        {l.bankName ?? '-'}
                         <div className="text-erp-muted">
                           {l.accountNumberMasked} · {l.ifsc}
                         </div>

@@ -406,7 +406,7 @@ export async function getInventoryTraceability(
       eventDate: serial.receiptDate ?? new Date().toISOString().slice(0, 10),
       eventType: 'receipt',
       eventLabel: 'Serial registered',
-      documentNo: serial.sourceDocumentNo ?? '—',
+      documentNo: serial.sourceDocumentNo ?? '-',
       documentHref: serial.sourceDocumentType === 'GRN' ? '/purchase/grn' : '/work-orders',
       warehouseName: serial.warehouseName,
       qty: 1,

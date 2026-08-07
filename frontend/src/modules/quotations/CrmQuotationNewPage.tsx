@@ -729,7 +729,7 @@ export function CrmQuotationNewPage() {
       recordTitle={recordTitle}
       status="Draft"
       statusTone="info"
-      stage={selectedOpp ? opportunityStageLabel(selectedOpp.stage) : createMode === 'direct' ? 'Direct' : '—'}
+      stage={selectedOpp ? opportunityStageLabel(selectedOpp.stage) : createMode === 'direct' ? 'Direct' : '-'}
       createdDate={formatDate(new Date().toISOString().slice(0, 10))}
       owner={selectedOpp?.ownerName}
       company={selectedCustomer?.customerName}

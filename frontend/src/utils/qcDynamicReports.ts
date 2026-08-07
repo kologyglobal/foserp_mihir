@@ -48,7 +48,7 @@ export interface FinalQcChecklistRow {
 }
 
 function fmtValue(v: QcParameterResult['actualValue']): string {
-  if (v === null || v === undefined) return '—'
+  if (v === null || v === undefined) return '-'
   return String(v)
 }
 
@@ -57,7 +57,7 @@ export function getProcessWiseQcReport(inspections: QcInspection[]): ProcessWise
     .filter((i) => i.category === 'in_process' && i.parameterResults.length > 0)
     .map((i) => ({
       operationName: i.operationName,
-      planCode: i.planId ?? '—',
+      planCode: i.planId ?? '-',
       inspectionNo: i.inspectionNo,
       woNo: i.woNo,
       result: i.result ?? i.status,
@@ -125,7 +125,7 @@ export function getSubcontractReturnQcReport(inspections: QcInspection[]) {
       i.parameterResults.map((p) => ({
         inspectionNo: i.inspectionNo,
         woNo: i.woNo,
-        itemCode: i.itemCode ?? '—',
+        itemCode: i.itemCode ?? '-',
         parameterName: p.parameterName,
         actualValue: fmtValue(p.actualValue),
         passed: p.passed === true,
@@ -145,9 +145,9 @@ export function getVendorIncomingRejectionReport(
       i.parameterResults
         .filter((p) => p.passed === false)
         .map((p) => ({
-          vendorId: i.vendorId ?? '—',
-          vendorName: i.vendorId ? vendorNameLookup(i.vendorId) : '—',
-          itemCode: i.itemCode ?? '—',
+          vendorId: i.vendorId ?? '-',
+          vendorName: i.vendorId ? vendorNameLookup(i.vendorId) : '-',
+          itemCode: i.itemCode ?? '-',
           inspectionNo: i.inspectionNo,
           rejectedParameter: p.parameterName,
           inspectionDate: i.inspectionDate,

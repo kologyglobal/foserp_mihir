@@ -6,11 +6,9 @@ export {
   updateItem,
   deactivateItem,
   duplicateItem,
-  getStockAvailability,
   getStockDetails,
   getInventoryAuditTrail,
   InventoryServiceError,
-  resetInventoryServiceForTests,
 } from './inventoryService'
 
 export type { InventoryItemExtension } from './inventorySeed'
@@ -23,7 +21,6 @@ export {
   createPurchaseRequisitionDraftDemo,
   createProductionRequestDraftDemo,
   createTransferDraftFromPlanningDemo,
-  resetInventoryPlanningForTests,
 } from './inventoryPlanningService'
 
 export {

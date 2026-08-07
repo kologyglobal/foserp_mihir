@@ -45,7 +45,7 @@ function buildOptions(
       : opportunityRequirementDisplay(opportunity.productRequirement) || 'No product linked'
 
     const customerName = customer?.customerName ?? 'Unknown customer'
-    const customerCity = customer?.city ?? '—'
+    const customerCity = customer?.city ?? '-'
 
     const searchText = [
       opportunity.opportunityNo,
@@ -233,7 +233,7 @@ export function OpportunitySelectPicker({
                               {opportunity.opportunityNo}
                               {' · '}
                               {option.customerName}
-                              {option.customerCity !== '—' ? ` · ${option.customerCity}` : ''}
+                              {option.customerCity !== '-' ? ` · ${option.customerCity}` : ''}
                             </p>
                           </div>
                           <div className="crm-opp-picker__value">
@@ -254,7 +254,7 @@ export function OpportunitySelectPicker({
                             {' · '}
                             {opportunity.ownerName}
                             {' · Close '}
-                            {opportunity.expectedCloseDate?.slice(0, 10) ?? '—'}
+                            {opportunity.expectedCloseDate?.slice(0, 10) ?? '-'}
                           </span>
                           {opportunity.quotationId ? (
                             <span className="crm-opp-picker__badge">Has quotation</span>

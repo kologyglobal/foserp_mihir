@@ -88,8 +88,8 @@ function getMasterContext() {
     return {
       items: [] as Item[],
       categories: [] as { id: string; defaultWarehouseId?: string | null }[],
-      getUomCode: (_id: string) => '—',
-      getWarehouseCode: (_id: string) => '—',
+      getUomCode: (_id: string) => '-',
+      getWarehouseCode: (_id: string) => '-',
       getCategoryDefaultWh: (_catId: string) => null as string | null,
       getItem: (_id: string) => undefined as Item | undefined,
       getVendorMapsForItem: (_itemId: string) => [] as ItemVendorMap[],
@@ -98,8 +98,8 @@ function getMasterContext() {
   return {
     items: s.items,
     categories: s.categories,
-    getUomCode: (id: string) => s.uoms.find((u) => u.id === id)?.uomCode ?? '—',
-    getWarehouseCode: (id: string) => s.warehouses.find((w) => w.id === id)?.warehouseCode ?? '—',
+    getUomCode: (id: string) => s.uoms.find((u) => u.id === id)?.uomCode ?? '-',
+    getWarehouseCode: (id: string) => s.warehouses.find((w) => w.id === id)?.warehouseCode ?? '-',
     getCategoryDefaultWh: (catId: string) =>
       s.categories.find((c) => c.id === catId)?.defaultWarehouseId ?? null,
     getItem: s.getItem,

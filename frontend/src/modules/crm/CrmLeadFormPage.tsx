@@ -420,7 +420,7 @@ export function CrmLeadFormPage() {
   }
 
   const customer = company.customerId ? useMasterStore.getState().getCustomer(company.customerId) : undefined
-  const territory = customer?.salesTerritory ?? companyInfo?.salesTerritory ?? '—'
+  const territory = customer?.salesTerritory ?? companyInfo?.salesTerritory ?? '-'
   const customerState = customer?.state?.trim() || null
   const customerGstin = customer?.gstin?.trim() || null
   const customerShipState =
@@ -1806,7 +1806,7 @@ export function CrmLeadFormPage() {
               />
             </ErpFieldRow>
             <ErpFieldRow label="Assigned To" readOnly horizontal={false}>
-              <Input value={selectedOwner?.name ?? '—'} readOnly className="erp-input" />
+              <Input value={selectedOwner?.name ?? '-'} readOnly className="erp-input" />
             </ErpFieldRow>
             <ErpFieldRow label="Remarks" colSpan={3} horizontal={false}>
               <Textarea rows={2} value={followUpNotes} onChange={(e) => setFollowUpNotes(e.target.value)} placeholder="Follow-up notes" className="erp-input" />

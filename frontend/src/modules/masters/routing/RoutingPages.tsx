@@ -86,7 +86,7 @@ export function RoutingListPage() {
         const p = productMap.get(row.original.productId)
         return (
           <div>
-            <p className="text-[13px] font-medium">{p?.productName ?? '—'}</p>
+            <p className="text-[13px] font-medium">{p?.productName ?? '-'}</p>
             <p className="font-mono text-[11px] text-erp-muted">{p?.productCode}</p>
           </div>
         )
@@ -279,12 +279,12 @@ export function RoutingDetailPage() {
     {
       accessorKey: 'qcRequired',
       header: 'QC',
-      cell: ({ row }) => row.original.qcRequired ? <Badge color="yellow">Yes</Badge> : '—',
+      cell: ({ row }) => row.original.qcRequired ? <Badge color="yellow">Yes</Badge> : '-',
     },
     {
       accessorKey: 'outsourced',
       header: 'Outsourced',
-      cell: ({ row }) => row.original.outsourced ? <Badge color="purple">Yes</Badge> : '—',
+      cell: ({ row }) => row.original.outsourced ? <Badge color="purple">Yes</Badge> : '-',
     },
     ...(routing.status === 'draft'
       ? [{
@@ -303,7 +303,7 @@ export function RoutingDetailPage() {
   return (
     <DetailLayout
       title={routing.routingNo}
-      subtitle={`${product?.productName ?? '—'} · ${routing.revision} · ${routing.totalStdHours.toFixed(1)} std hrs`}
+      subtitle={`${product?.productName ?? '-'} · ${routing.revision} · ${routing.totalStdHours.toFixed(1)} std hrs`}
       backTo="/masters/routing"
       backLabel="Routing"
       editTo={routing.status === 'draft' ? `/masters/routing/${routing.id}#operations` : undefined}

@@ -858,7 +858,7 @@ export function SalesPaymentAllocationPage() {
                           Reverse
                         </ErpButton>
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
                   </tr>

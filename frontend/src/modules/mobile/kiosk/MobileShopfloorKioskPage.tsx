@@ -197,7 +197,7 @@ export function MobileShopfloorKioskPage() {
             productLabel={
               assignment.productionOrder?.productItem
                 ? `${assignment.productionOrder.productItem.code} · ${assignment.productionOrder.productItem.name}`
-                : cards.find((c) => c.id === assignment.id)?.productLabel ?? '—'
+                : cards.find((c) => c.id === assignment.id)?.productLabel ?? '-'
             }
             busy={busy}
             onAccept={() => void runAction(() => acceptAssignment(assignment.id), 'Accepted')}

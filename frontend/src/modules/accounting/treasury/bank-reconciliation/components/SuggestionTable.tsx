@@ -75,7 +75,7 @@ export function SuggestionTable({ suggestions, canAccept, canReject, busySuggest
                       ) : null}
                     </div>
                   ) : (
-                    <span className="text-erp-muted">—</span>
+                    <span className="text-erp-muted">-</span>
                   )}
                 </td>
               </tr>

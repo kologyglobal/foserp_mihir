@@ -42,7 +42,7 @@ export function KnowledgeHomePage() {
       try {
         const st = await fetchKnowledgeStatus()
         const wave = st.data?.wave ?? '?'
-        setStatus(`Wave ${wave} · chat ${st.data?.chatMode ?? '—'} · copilot ${st.data?.copilotMode ?? '—'}`)
+        setStatus(`Wave ${wave} · chat ${st.data?.chatMode ?? '-'} · copilot ${st.data?.copilotMode ?? '-'}`)
         if (canChat) {
           const session = await createKnowledgeChatSession({ title: 'Knowledge workspace' })
           setSessionId(session.data.id)

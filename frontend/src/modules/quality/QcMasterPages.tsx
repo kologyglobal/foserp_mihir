@@ -49,10 +49,10 @@ export function QcParameterMasterPage() {
           },
           { accessorKey: 'parameterName', header: 'Name' },
           { accessorKey: 'parameterType', header: 'Type', cell: ({ row }) => <StatusBadge status={row.original.parameterType} /> },
-          { accessorKey: 'uomCode', header: 'UOM', cell: ({ row }) => row.original.uomCode ?? '—' },
-          { accessorKey: 'minValue', header: 'Min', cell: ({ row }) => row.original.minValue ?? '—' },
-          { accessorKey: 'maxValue', header: 'Max', cell: ({ row }) => row.original.maxValue ?? '—' },
-          { accessorKey: 'targetValue', header: 'Target', cell: ({ row }) => row.original.targetValue ?? '—' },
+          { accessorKey: 'uomCode', header: 'UOM', cell: ({ row }) => row.original.uomCode ?? '-' },
+          { accessorKey: 'minValue', header: 'Min', cell: ({ row }) => row.original.minValue ?? '-' },
+          { accessorKey: 'maxValue', header: 'Max', cell: ({ row }) => row.original.maxValue ?? '-' },
+          { accessorKey: 'targetValue', header: 'Target', cell: ({ row }) => row.original.targetValue ?? '-' },
           { accessorKey: 'mandatory', header: 'Mandatory', cell: ({ row }) => (row.original.mandatory ? 'Yes' : 'No') },
           { accessorKey: 'severity', header: 'Severity', cell: ({ row }) => <StatusBadge status={row.original.severity} /> },
           { accessorKey: 'passFailRule', header: 'Auto Fail Rule' },
@@ -211,10 +211,10 @@ export function InspectionPlanMasterPage() {
           },
           { accessorKey: 'planName', header: 'Plan Name' },
           { accessorKey: 'category', header: 'QC Stage', cell: ({ row }) => <StatusBadge status={row.original.category} /> },
-          { accessorKey: 'productId', header: 'Product', cell: ({ row }) => row.original.productId ?? '—' },
-          { accessorKey: 'operationName', header: 'Operation', cell: ({ row }) => row.original.operationName ?? '—' },
-          { accessorKey: 'workCenterId', header: 'Work Center', cell: ({ row }) => row.original.workCenterId ?? '—' },
-          { accessorKey: 'itemId', header: 'Item', cell: ({ row }) => row.original.itemId ?? '—' },
+          { accessorKey: 'productId', header: 'Product', cell: ({ row }) => row.original.productId ?? '-' },
+          { accessorKey: 'operationName', header: 'Operation', cell: ({ row }) => row.original.operationName ?? '-' },
+          { accessorKey: 'workCenterId', header: 'Work Center', cell: ({ row }) => row.original.workCenterId ?? '-' },
+          { accessorKey: 'itemId', header: 'Item', cell: ({ row }) => row.original.itemId ?? '-' },
           { accessorKey: 'revision', header: 'Rev', cell: ({ row }) => row.original.revision ?? 'A' },
           { accessorKey: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.status} /> },
           { id: 'lines', header: 'Lines', cell: ({ row }) => row.original.lines.length },
@@ -314,7 +314,7 @@ export function InspectionPlanDetailPage() {
             <label className="block text-sm">
               <span className="font-medium">Product</span>
               <Select wrapClassName="mt-1 w-full" value={header.productId ?? ''} onChange={(e) => setHeader({ ...header, productId: e.target.value || null })}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {products.map((p) => <option key={p.id} value={p.id}>{p.productCode}</option>)}
               </Select>
             </label>
@@ -354,9 +354,9 @@ export function InspectionPlanDetailPage() {
             columns={[
               { id: 'seq', header: 'Seq', cell: ({ row }) => row.original.sortOrder },
               { id: 'param', header: 'Parameter', cell: ({ row }) => paramLookup.get(row.original.parameterId)?.parameterName ?? row.original.parameterId },
-              { id: 'code', header: 'Code', cell: ({ row }) => paramLookup.get(row.original.parameterId)?.parameterCode ?? '—' },
-              { id: 'type', header: 'Type', cell: ({ row }) => paramLookup.get(row.original.parameterId)?.parameterType ?? '—' },
-              { id: 'sev', header: 'Severity', cell: ({ row }) => row.original.severityOverride ?? paramLookup.get(row.original.parameterId)?.severity ?? '—' },
+              { id: 'code', header: 'Code', cell: ({ row }) => paramLookup.get(row.original.parameterId)?.parameterCode ?? '-' },
+              { id: 'type', header: 'Type', cell: ({ row }) => paramLookup.get(row.original.parameterId)?.parameterType ?? '-' },
+              { id: 'sev', header: 'Severity', cell: ({ row }) => row.original.severityOverride ?? paramLookup.get(row.original.parameterId)?.severity ?? '-' },
               {
                 id: 'actions',
                 header: '',

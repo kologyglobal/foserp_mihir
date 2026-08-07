@@ -261,7 +261,7 @@ export function LeadImportDialog({ open, onClose, onImported }: LeadImportDialog
                   {rows.slice(0, 50).map((row) => (
                     <tr key={row.rowNo}>
                       <td>{row.rowNo}</td>
-                      <td>{row.input.prospectName || '—'}</td>
+                      <td>{row.input.prospectName || '-'}</td>
                       <td>{row.input.leadOwnerName}</td>
                       <td className="num">{formatCurrency(row.input.expectedValue)}</td>
                       <td>{row.input.stage}</td>

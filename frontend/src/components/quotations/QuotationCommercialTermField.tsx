@@ -54,7 +54,7 @@ export function QuotationCommercialTermField({ section, locked, onChange }: Quot
   if (locked) {
     return (
       <div className="quo-commercial-term">
-        <div className="quo-commercial-term__content-read">{section.content || '—'}</div>
+        <div className="quo-commercial-term__content-read">{section.content || '-'}</div>
         {selectedCode ? (
           <p className="quo-commercial-term__meta">Master: {selectedCode}</p>
         ) : null}

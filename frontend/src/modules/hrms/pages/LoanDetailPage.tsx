@@ -530,7 +530,7 @@ export function LoanDetailPage() {
                   <div>
                     {loan.recoveryStartYear && loan.recoveryStartMonth
                       ? `${MONTHS[loan.recoveryStartMonth - 1]} ${loan.recoveryStartYear}`
-                      : '—'}
+                      : '-'}
                   </div>
                 </div>
                 <div>
@@ -539,7 +539,7 @@ export function LoanDetailPage() {
                 </div>
                 <div>
                   <div className="text-xs text-erp-muted">Installment count</div>
-                  <div>{loan.installmentCount ?? '—'}</div>
+                  <div>{loan.installmentCount ?? '-'}</div>
                 </div>
                 {loan.rejectionReason ? (
                   <div className="col-span-2">
@@ -588,7 +588,7 @@ export function LoanDetailPage() {
                       <HrStatusChip status={s.status} domain="loanSchedule" />
                     </td>
                     <td className="max-w-[200px] truncate text-xs text-erp-muted">
-                      {s.skipReason || s.notes || '—'}
+                      {s.skipReason || s.notes || '-'}
                     </td>
                     <td className="text-right">
                       {s.status === 'PENDING' && perms.canManageLoan ? (
@@ -642,15 +642,15 @@ export function LoanDetailPage() {
                       <td className="px-3 py-2 tabular-nums">{r.repaymentDate}</td>
                       <td className="px-3 py-2 font-medium tabular-nums">{money(r.amount)}</td>
                       <td className="px-3 py-2">{r.method}</td>
-                      <td className="px-3 py-2">{r.reference ?? '—'}</td>
-                      <td className="max-w-[200px] truncate px-3 py-2 text-xs text-erp-muted">{r.reason ?? '—'}</td>
+                      <td className="px-3 py-2">{r.reference ?? '-'}</td>
+                      <td className="max-w-[200px] truncate px-3 py-2 text-xs text-erp-muted">{r.reason ?? '-'}</td>
                       <td className="px-3 py-2">
                         {r.accountingVoucherId ? (
                           <Link className="text-erp-primary" to={`/accounting/ledger-entries/voucher/${r.accountingVoucherId}`}>
                             View
                           </Link>
                         ) : (
-                          '—'
+                          '-'
                         )}
                       </td>
                     </tr>

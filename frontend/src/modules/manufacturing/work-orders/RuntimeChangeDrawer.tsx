@@ -41,7 +41,7 @@ function permitted(type: RuntimeChangeType) {
   return canRequestHoldChange()
 }
 function display(value: unknown): string {
-  if (value == null) return '—'
+  if (value == null) return '-'
   if (typeof value !== 'object') return String(value)
   return Object.entries(value as Record<string, unknown>).map(([key, entry]) => `${key.replace(/([A-Z])/g, ' $1')}: ${Array.isArray(entry) ? entry.length : display(entry)}`).join(' · ')
 }

@@ -15,7 +15,6 @@ import {
   updateInventorySetup,
   updateWarehouse,
 } from '@/services/inventory'
-import { isApiMode } from '@/config/apiConfig'
 import type {
   InventorySetup,
   InventorySetupTabId,
@@ -105,7 +104,7 @@ export function InventorySetupPage() {
     setSaving(true)
     try {
       await updateInventorySetup(setup)
-      notify.success(isApiMode() ? 'Inventory setup saved' : 'Inventory setup saved (demo)')
+      notify.success('Inventory setup saved')
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Save failed')
     } finally {
@@ -157,15 +156,9 @@ export function InventorySetupPage() {
         />
       )}
     >
-      {isApiMode() ? (
-        <p className="mb-4 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
-          Live mode — settings persist to the tenant inventory setup API. Warehouses use Master Data.
-        </p>
-      ) : (
-        <p className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-          Demo mode — settings saved in browser memory only. No backend API.
-        </p>
-      )}
+      <p className="mb-4 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
+        Settings persist to the tenant inventory setup API. Warehouses use Master Data.
+      </p>
 
       <TabStrip
         tabs={SETUP_TABS.map((id) => ({ id, label: INVENTORY_SETUP_TAB_LABELS[id] ?? id }))}
@@ -376,7 +369,7 @@ export function InventorySetupPage() {
                 <Checkbox checked={setup.approvals.negativeStockOverrideApproval} onChange={(e: ChangeEvent<HTMLInputElement>) => setSetup({ ...setup, approvals: { ...setup.approvals, negativeStockOverrideApproval: e.target.checked } })} label="Negative Stock Override Approval" />
                 <Checkbox checked={setup.approvals.qualityDeviationApproval} onChange={(e: ChangeEvent<HTMLInputElement>) => setSetup({ ...setup, approvals: { ...setup.approvals, qualityDeviationApproval: e.target.checked } })} label="Quality Deviation Approval" />
               </div>
-              <p className="mt-2 text-[12px] text-erp-muted">Limits shown as {formatCurrency(setup.approvals.adjustmentApprovalLimit)} (demo).</p>
+              <p className="mt-2 text-[12px] text-erp-muted">Limits shown as {formatCurrency(setup.approvals.adjustmentApprovalLimit)}.</p>
             </section>
           ) : null}
 
@@ -395,7 +388,7 @@ export function InventorySetupPage() {
           {tab === 'advanced_warehouse' ? (
             <section className="crm-masters-card rounded-lg border border-erp-border bg-white p-4">
               <h2 className="mb-3 text-sm font-semibold">Advanced Warehouse</h2>
-              <p className="mb-3 text-[12px] text-amber-800">All advanced features are disabled by default in demo mode.</p>
+              <p className="mb-3 text-[12px] text-amber-800">All advanced features are disabled by default.</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 {(['binManagement', 'barcodeScanning', 'putAway', 'pickList', 'packing', 'wavePicking', 'mobileWarehouse', 'consignmentInventory'] as const).map((key) => (
                   <Checkbox

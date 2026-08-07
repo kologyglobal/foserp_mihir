@@ -133,8 +133,8 @@ export function VoucherImportDialog({
                     <td className="px-2 py-1 tabular-nums">{r.rowNo}</td>
                     <td className="px-2 py-1">{r.voucherType}</td>
                     <td className="px-2 py-1">{r.accountCode}</td>
-                    <td className="px-2 py-1">{r.debit || '—'}</td>
-                    <td className="px-2 py-1">{r.credit || '—'}</td>
+                    <td className="px-2 py-1">{r.debit || '-'}</td>
+                    <td className="px-2 py-1">{r.credit || '-'}</td>
                     <td className="px-2 py-1">
                       <span
                         className={

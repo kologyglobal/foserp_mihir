@@ -305,7 +305,7 @@ export function CloseChecklistPage() {
                       <TaskStatusBadge status={t.status} />
                     </td>
                     <td className="py-1.5 pr-2 tabular-nums text-erp-muted">{t.completionPct}%</td>
-                    <td className="py-1.5 pr-2 text-erp-muted">{t.evidence ?? '—'}</td>
+                    <td className="py-1.5 pr-2 text-erp-muted">{t.evidence ?? '-'}</td>
                     <td className="py-1.5">
                       {api ? (
                         <div className="flex min-w-[200px] flex-col gap-1">
@@ -498,7 +498,7 @@ export function SubledgerReconciliationPage() {
                     <td className="py-1.5 pr-2 text-right tabular-nums">{formatCurrency(r.glBalance)}</td>
                     <td className="py-1.5 pr-2 text-right tabular-nums font-semibold">{formatCurrency(r.difference)}</td>
                     <td className="py-1.5 pr-2 text-erp-muted">
-                      {r.lastReconciled ? formatDate(r.lastReconciled) : '—'}
+                      {r.lastReconciled ? formatDate(r.lastReconciled) : '-'}
                     </td>
                     <td className="py-1.5 pr-2 text-erp-muted">{r.owner}</td>
                     <td className="py-1.5 pr-2">

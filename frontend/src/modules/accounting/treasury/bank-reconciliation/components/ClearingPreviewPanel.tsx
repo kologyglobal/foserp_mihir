@@ -43,10 +43,10 @@ export function ClearingPreviewPanel({ preview }: { preview: MatchPreviewResultD
                 <tr key={`${line.accountId}-${idx}`} className="border-t border-amber-200/60">
                   <td className="py-1">{line.accountRole === 'BANK' ? 'Bank GL account' : 'Clearing GL account'}</td>
                   <td className="py-1 text-right tabular-nums">
-                    {line.side === 'DEBIT' ? formatCurrency(parseDecimal(line.amount)) : '—'}
+                    {line.side === 'DEBIT' ? formatCurrency(parseDecimal(line.amount)) : '-'}
                   </td>
                   <td className="py-1 text-right tabular-nums">
-                    {line.side === 'CREDIT' ? formatCurrency(parseDecimal(line.amount)) : '—'}
+                    {line.side === 'CREDIT' ? formatCurrency(parseDecimal(line.amount)) : '-'}
                   </td>
                 </tr>
               ))}

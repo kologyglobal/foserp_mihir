@@ -233,10 +233,10 @@ export function OpportunityEditPage() {
     { label: 'Status', value: 'Open' },
     { label: 'Stage', value: opportunityStageLabel(opp.stage) },
     { label: 'Owner', value: owner.label },
-    { label: 'Customer', value: customer?.customerName ?? '—', highlight: Boolean(customer) },
+    { label: 'Customer', value: customer?.customerName ?? '-', highlight: Boolean(customer) },
     { label: 'Priority', value: opportunityPriorityLabel(priority) },
     { label: 'Deal Value', value: formatCrmCurrency(dealValue), highlight: dealValue > 0 },
-    { label: 'Last Modified', value: opp.modifiedAt ? formatDate(opp.modifiedAt) : '—' },
+    { label: 'Last Modified', value: opp.modifiedAt ? formatDate(opp.modifiedAt) : '-' },
   ]
 
   const commandBar = (
@@ -560,7 +560,7 @@ export function OpportunityEditPage() {
             hint={`${probability}% × Final Quoted Value`}
           />
           <ErpViewField label="Product Subtotal" value={formatCrmCurrency(summary.basicAmount)} hint="Sum of qty × unit price before discount" />
-          <ErpViewField label="Discount" value={summary.totalDiscount > 0 ? formatCrmCurrency(summary.totalDiscount) : '—'} />
+          <ErpViewField label="Discount" value={summary.totalDiscount > 0 ? formatCrmCurrency(summary.totalDiscount) : '-'} />
           <ErpViewField label="Tax" value={formatCrmCurrency(summary.gstAmount)} hint="GST from product lines" />
           <ErpFieldRow
             label="Expected Close Date"

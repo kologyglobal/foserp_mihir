@@ -149,7 +149,7 @@ export function MobileQcKioskListPage() {
               <p className="font-mono text-lg font-bold text-[#0078d4]">{insp.inspectionNumber}</p>
               <p className="mt-1 text-sm font-medium">{insp.title}</p>
               <p className="mt-1 text-xs text-[#605e5c]">
-                {insp.category.replace(/_/g, ' ')} · Qty {insp.inspectedQty ?? '—'}
+                {insp.category.replace(/_/g, ' ')} · Qty {insp.inspectedQty ?? '-'}
               </p>
             </div>
             <MobileStatusChip label={insp.status} tone={toneForStatus(insp.status)} />
@@ -312,7 +312,7 @@ export function MobileQcKioskDetailPage() {
       <div className={kioskCardClass}>
         <MobileStatusChip label={inspection.status} tone={toneForStatus(inspection.status)} />
         <p className="mt-2 font-semibold">{inspection.title}</p>
-        <p className="mt-1 text-sm text-[#605e5c]">Inspected qty: {inspection.inspectedQty ?? '—'}</p>
+        <p className="mt-1 text-sm text-[#605e5c]">Inspected qty: {inspection.inspectedQty ?? '-'}</p>
         <p className="mt-1 text-xs text-[#605e5c]">{formatDateTime(inspection.requestedAt)}</p>
       </div>
 
@@ -326,7 +326,7 @@ export function MobileQcKioskDetailPage() {
               {snap.parameterType}
               {snap.mandatory ? ' · mandatory' : ''}
               {snap.minValue != null || snap.maxValue != null
-                ? ` · ${snap.minValue ?? '—'} – ${snap.maxValue ?? '—'}`
+                ? ` · ${snap.minValue ?? '-'} – ${snap.maxValue ?? '-'}`
                 : ''}
             </p>
             {snap.parameterType === 'BOOLEAN' || snap.parameterType === 'boolean' ? (

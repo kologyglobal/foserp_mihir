@@ -65,7 +65,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <dt className="text-[11px] font-semibold uppercase text-erp-muted">{label}</dt>
-      <dd className="mt-0.5 text-[13px]">{value ?? '—'}</dd>
+      <dd className="mt-0.5 text-[13px]">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -231,7 +231,7 @@ export function CustomerReceivableCardPage() {
                   <Field label="Total outstanding" value={formatCurrency(card.totalOutstanding)} />
                   <Field label="Overdue" value={formatCurrency(card.overdue)} />
                   <Field label="Dispute amount" value={formatCurrency(card.disputeAmount)} />
-                  <Field label="Last receipt" value={card.lastReceipt ? `${card.lastReceipt.receiptNumber} · ${formatCurrency(card.lastReceipt.receiptAmount)}` : '—'} />
+                  <Field label="Last receipt" value={card.lastReceipt ? `${card.lastReceipt.receiptNumber} · ${formatCurrency(card.lastReceipt.receiptAmount)}` : '-'} />
                 </dl>
               </section>
               <section className="rounded-lg border border-erp-border p-4">
@@ -450,7 +450,7 @@ export function CustomerReceivableCardPage() {
             <Field label="Email" value={customer.email} />
             <Field label="Billing address" value={customer.billingAddress} />
             <Field label="Shipping address" value={customer.shippingAddress} />
-            <Field label="GST" value={customer.gstNumber ? `${customer.gstNumber} (${customer.gstRegistrationType})` : '—'} />
+            <Field label="GST" value={customer.gstNumber ? `${customer.gstNumber} (${customer.gstRegistrationType})` : '-'} />
             <Field label="Payment terms" value={customer.paymentTerms} />
             <Field label="Credit limit" value={formatCurrency(customer.creditLimit)} />
             <div>

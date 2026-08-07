@@ -289,8 +289,8 @@ export function SalesQuotationApprovalsPanel({
                   <td>
                     <TableLink to={`/crm/quotations/${doc.quotationId}`}>{quotationRevisionLabel(doc.revisionNo)}</TableLink>
                   </td>
-                  <td>{cust?.customerName ?? '—'}</td>
-                  <td>{opp?.opportunityName ?? '—'}</td>
+                  <td>{cust?.customerName ?? '-'}</td>
+                  <td>{opp?.opportunityName ?? '-'}</td>
                   <td className="num">{formatSalesCurrency(doc.totalAmount)}</td>
                 </tr>
               )

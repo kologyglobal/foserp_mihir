@@ -226,7 +226,7 @@ export function formatBalanceDisplay(
   hasBalance: boolean | null | undefined,
 ): string {
   if (hasBalance === false) return 'N/A'
-  if (amount == null || amount === '') return '—'
+  if (amount == null || amount === '') return '-'
   return String(amount)
 }
 

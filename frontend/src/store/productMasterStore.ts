@@ -262,7 +262,7 @@ const productMasterActions: ProductMasterActions = {
     patchProduct(productId, (p) => ({
       ...p,
       attachments: [...p.attachments, att],
-      changeLog: appendChangeLog(p, [{ field: 'attachment', oldValue: '—', newValue: name, reason: `Added ${category}` }]),
+      changeLog: appendChangeLog(p, [{ field: 'attachment', oldValue: '-', newValue: name, reason: `Added ${category}` }]),
     }))
     return { ok: true }
   },

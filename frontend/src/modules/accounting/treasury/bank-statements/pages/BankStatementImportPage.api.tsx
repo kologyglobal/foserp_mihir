@@ -397,7 +397,7 @@ export function ApiBankStatementImportPage() {
                     value={columnMap[field.key] ?? ''}
                     onChange={(e) => setColumnMap((m) => ({ ...m, [field.key]: e.target.value }))}
                   >
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {headers.map((h) => (
                       <option key={h} value={h}>
                         {h}

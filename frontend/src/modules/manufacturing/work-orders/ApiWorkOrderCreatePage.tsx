@@ -1082,7 +1082,7 @@ export function ApiWorkOrderCreatePage() {
                                 />
                               </td>
                               <td>
-                                <div className="font-medium">{line.productOrItem || line.resolvedItemCode || '—'}</div>
+                                <div className="font-medium">{line.productOrItem || line.resolvedItemCode || '-'}</div>
                                 {line.description ? <div className="text-erp-muted">{line.description}</div> : null}
                               </td>
                               <td className="text-right tabular-nums">

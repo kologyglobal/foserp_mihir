@@ -85,7 +85,7 @@ export function listPendingQuotationSoHandovers(input: {
       id: `${PENDING_SO_ID_PREFIX}${doc.id}`,
       salesOrderNo: `Pending · ${quotationNo}`,
       customerId,
-      productId: productId || '—',
+      productId: productId || '-',
       qty,
       requiredDate:
         salesQuo?.validityDate

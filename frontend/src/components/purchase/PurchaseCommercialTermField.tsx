@@ -28,7 +28,7 @@ export function PurchaseCommercialTermField({
   const selected = options.find((o) => o.text === value || o.label === value || o.value === value)
 
   if (readOnly) {
-    return <span className="text-[13px] text-erp-text">{value || '—'}</span>
+    return <span className="text-[13px] text-erp-text">{value || '-'}</span>
   }
 
   return (

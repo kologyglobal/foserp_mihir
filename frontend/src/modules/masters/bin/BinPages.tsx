@@ -103,8 +103,8 @@ export function BinListPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
 
-  const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.warehouseName ?? '—'
-  const locationName = (id: string) => locations.find((l) => l.id === id)?.locationName ?? '—'
+  const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.warehouseName ?? '-'
+  const locationName = (id: string) => locations.find((l) => l.id === id)?.locationName ?? '-'
 
   const filtered = useMemo(
     () =>
@@ -131,7 +131,7 @@ export function BinListPage() {
       header: 'Storage Location',
       cell: ({ row }) => locationName(row.original.storageLocationId),
     },
-    { accessorKey: 'binType', header: 'Type', cell: ({ row }) => row.original.binType || '—' },
+    { accessorKey: 'binType', header: 'Type', cell: ({ row }) => row.original.binType || '-' },
     { accessorKey: 'isActive', header: 'Status', cell: ({ row }) => <ActiveBadge isActive={row.original.isActive} /> },
     {
       id: 'actions',
@@ -376,9 +376,9 @@ export function BinDetailPage() {
       <DetailSection title="BIN Details">
         <DetailGrid>
           <DetailField label="Code" value={<span className="font-mono">{record.code}</span>} />
-          <DetailField label="Warehouse" value={warehouse ? `${warehouse.warehouseCode} — ${warehouse.warehouseName}` : '—'} />
-          <DetailField label="Storage Location" value={location ? `${location.locationCode} — ${location.locationName}` : '—'} />
-          <DetailField label="BIN Type" value={record.binType || '—'} />
+          <DetailField label="Warehouse" value={warehouse ? `${warehouse.warehouseCode} — ${warehouse.warehouseName}` : '-'} />
+          <DetailField label="Storage Location" value={location ? `${location.locationCode} — ${location.locationName}` : '-'} />
+          <DetailField label="BIN Type" value={record.binType || '-'} />
           <DetailField label="Status" value={<ActiveBadge isActive={record.isActive} />} />
         </DetailGrid>
       </DetailSection>

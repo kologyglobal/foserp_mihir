@@ -169,7 +169,7 @@ export function ManufacturingReportRunnerPage() {
     return entries.map(([key, value]) => ({
       id: key,
       label: humanize(key),
-      value: typeof value === 'number' ? value : String(value ?? '—'),
+      value: typeof value === 'number' ? value : String(value ?? '-'),
     }))
   }, [result])
 
@@ -280,7 +280,7 @@ export function ManufacturingReportRunnerPage() {
               <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-erp-muted">
                 <span>
                   {result.rows.length} row{result.rows.length === 1 ? '' : 's'}
-                  {result.pagination ? ` · Page ${result.pagination.page} of ${result.pagination.totalPages ?? '—'}` : ''}
+                  {result.pagination ? ` · Page ${result.pagination.page} of ${result.pagination.totalPages ?? '-'}` : ''}
                 </span>
                 {result.generatedAt ? <span>Generated {formatDateTime(result.generatedAt)}</span> : null}
               </div>

@@ -139,7 +139,7 @@ export function DocumentRegisterPage() {
                   {row.original.documentNo ?? row.original.registryId}
                 </Link>
               ) : (
-                row.original.documentNo ?? '—'
+                row.original.documentNo ?? '-'
               ),
           },
           { accessorKey: 'title', header: 'Name' },
@@ -210,8 +210,8 @@ export function DocumentDetailPage() {
           ['Status', DMS_WORKFLOW_STATUS_LABELS[doc.workflowStatus ?? doc.status ?? 'uploaded']],
           ['Uploaded by', doc.uploadedByName],
           ['Uploaded', formatDate(doc.uploadedAt.slice(0, 10))],
-          ['Approved by', doc.approvedBy ?? '—'],
-          ['Approved', doc.approvedAt ? formatDate(doc.approvedAt.slice(0, 10)) : '—'],
+          ['Approved by', doc.approvedBy ?? '-'],
+          ['Approved', doc.approvedAt ? formatDate(doc.approvedAt.slice(0, 10)) : '-'],
           ['File', doc.fileName],
           ['Latest', doc.isLatest === false ? 'No' : 'Yes'],
         ].map(([label, val]) => (

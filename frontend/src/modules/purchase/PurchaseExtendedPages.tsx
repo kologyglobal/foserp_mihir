@@ -95,7 +95,7 @@ export function VendorQuotationListPage() {
         headers={['Vendor Quote No', 'RFQ No', 'Vendor', 'Quote Date', 'Valid Till', 'Total Value', 'Status']}
         rows={rows.map((q) => [
           <TableLink key={q.id} to={`/purchase/vendor-quotations/${q.id}`}>{q.vendorQuoteNo}</TableLink>,
-          rfqs.find((r) => r.id === q.rfqId)?.rfqNo ?? '—',
+          rfqs.find((r) => r.id === q.rfqId)?.rfqNo ?? '-',
           vendors.find((v) => v.id === q.vendorId)?.vendorName ?? q.vendorId,
           formatDate(q.quoteDate),
           formatDate(q.validTill),
@@ -139,8 +139,8 @@ export function VendorQuotationDetailPage() {
       detailMode
       documentStrip={[
         { label: 'Quote', value: quote.vendorQuoteNo, highlight: true },
-        { label: 'RFQ', value: rfq?.rfqNo ?? '—' },
-        { label: 'Vendor', value: vendor?.vendorName ?? '—' },
+        { label: 'RFQ', value: rfq?.rfqNo ?? '-' },
+        { label: 'Vendor', value: vendor?.vendorName ?? '-' },
         { label: 'Total', value: formatCurrency(quote.totalValue), highlight: true },
       ]}
       factBox={
@@ -148,8 +148,8 @@ export function VendorQuotationDetailPage() {
           title="Quote insight"
           summary={[
             { label: 'Quote', value: quote.vendorQuoteNo },
-            { label: 'Vendor', value: vendor?.vendorName ?? '—' },
-            { label: 'RFQ', value: rfq?.rfqNo ?? '—' },
+            { label: 'Vendor', value: vendor?.vendorName ?? '-' },
+            { label: 'RFQ', value: rfq?.rfqNo ?? '-' },
             { label: 'Total', value: formatCurrency(quote.totalValue), highlight: true },
           ]}
           actions={[
@@ -277,8 +277,8 @@ export function QuotationComparisonPage() {
       favoritePath={`/purchase/comparison/${rfq.id}`}
       insights={[
         { label: 'Quotes', value: comparison.length, accent: 'blue' },
-        { label: 'Lowest', value: lowest?.vendorName ?? '—', accent: 'green' },
-        { label: 'Fastest', value: fastest?.vendorName ?? '—', accent: 'amber' },
+        { label: 'Lowest', value: lowest?.vendorName ?? '-', accent: 'green' },
+        { label: 'Fastest', value: fastest?.vendorName ?? '-', accent: 'amber' },
       ]}
       commandBar={
         lowest ? (
@@ -298,16 +298,16 @@ export function QuotationComparisonPage() {
       <div className="mb-4 grid gap-4 md:grid-cols-3">
         <div className="rounded border border-erp-border bg-white px-4 py-3">
           <p className="text-xs font-semibold uppercase text-erp-muted">Lowest Landed Cost</p>
-          <p className="font-bold text-erp-text">{lowest?.vendorName ?? '—'}</p>
+          <p className="font-bold text-erp-text">{lowest?.vendorName ?? '-'}</p>
         </div>
         <div className="rounded border border-erp-border bg-white px-4 py-3">
           <p className="text-xs font-semibold uppercase text-erp-muted">Fastest Delivery</p>
-          <p className="font-bold text-erp-text">{fastest?.vendorName ?? '—'}</p>
+          <p className="font-bold text-erp-text">{fastest?.vendorName ?? '-'}</p>
         </div>
         <div className="rounded border border-erp-border bg-white px-4 py-3">
           <p className="text-xs font-semibold uppercase text-erp-muted">Best Vendor Rating</p>
           <p className="flex items-center gap-1 font-bold text-erp-text">
-            {bestRated?.vendorName ?? '—'} <Star className="h-3.5 w-3.5 text-amber-500" />
+            {bestRated?.vendorName ?? '-'} <Star className="h-3.5 w-3.5 text-amber-500" />
           </p>
         </div>
       </div>
@@ -453,7 +453,7 @@ export function VendorPerformancePage() {
           formatCurrency(r.totalPoValue ?? 0),
           formatCurrency(r.openPoValue ?? 0),
           `${r.rating ?? 4}/5`,
-          r.lastPurchaseDate ? formatDate(r.lastPurchaseDate) : '—',
+          r.lastPurchaseDate ? formatDate(r.lastPurchaseDate) : '-',
         ])}
       />
     </OperationalPageShell>

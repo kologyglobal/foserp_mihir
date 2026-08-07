@@ -193,11 +193,11 @@ export function Contact360Page() {
 
   const documentStrip = [
     { label: 'Contact', value: contact.name, highlight: true },
-    { label: 'Company', value: customer?.customerName ?? '—', highlight: Boolean(customer) },
-    { label: 'Designation', value: contact.designation || '—' },
-    { label: 'Department', value: contact.department || '—' },
-    { label: 'Phone', value: contact.phone || '—' },
-    { label: 'Email', value: contact.email || '—' },
+    { label: 'Company', value: customer?.customerName ?? '-', highlight: Boolean(customer) },
+    { label: 'Designation', value: contact.designation || '-' },
+    { label: 'Department', value: contact.department || '-' },
+    { label: 'Phone', value: contact.phone || '-' },
+    { label: 'Email', value: contact.email || '-' },
     { label: 'Primary', value: contact.isPrimary ? 'Yes' : 'No' },
     { label: 'Status', value: contact.isActive === false ? 'Inactive' : 'Active' },
     { label: 'Attachments', value: String(contactAttachments.length) },

@@ -183,7 +183,7 @@ export function SalesOrderConfirmDialog({
   const valueLabel =
     order.grandTotal != null && Number(order.grandTotal) > 0
       ? formatCurrency(Number(order.grandTotal))
-      : '—'
+      : '-'
 
   return (
     <Modal

@@ -218,7 +218,7 @@ export function summarizeQuotationLinesForSo(document: QuotationDocument) {
 
 export function quotationLineItemsSummary(document: QuotationDocument): string {
   const lines = quotationPriceLinesForSo(document)
-  if (lines.length === 0) return '—'
+  if (lines.length === 0) return '-'
   if (lines.length === 1) return lines[0]!.productOrItem
   return `${lines[0]!.productOrItem} + ${lines.length - 1} more`
 }

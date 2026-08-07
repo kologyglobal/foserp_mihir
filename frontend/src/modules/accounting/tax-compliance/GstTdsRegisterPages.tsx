@@ -41,7 +41,7 @@ export function OutwardSuppliesPage() {
         { key: 'doc', header: 'Document', render: (r) => `${r.docType} ${r.docNo}` },
         { key: 'date', header: 'Date', render: (r) => formatDate(r.docDate) },
         { key: 'party', header: 'Party', render: (r) => r.partyName },
-        { key: 'gstin', header: 'GSTIN', render: (r) => r.partyGstin || '—' },
+        { key: 'gstin', header: 'GSTIN', render: (r) => r.partyGstin || '-' },
         { key: 'pos', header: 'PoS', render: (r) => r.placeOfSupply },
         { key: 'taxable', header: 'Taxable', className: 'text-right', render: (r) => inr(r.taxableValue) },
         { key: 'cgst', header: 'CGST', className: 'text-right', render: (r) => inr(r.cgst) },
@@ -69,7 +69,7 @@ export function InwardSuppliesPage() {
         { key: 'doc', header: 'Document', render: (r) => `${r.docType} ${r.docNo}` },
         { key: 'date', header: 'Date', render: (r) => formatDate(r.docDate) },
         { key: 'party', header: 'Vendor', render: (r) => r.partyName },
-        { key: 'gstin', header: 'GSTIN', render: (r) => r.partyGstin || '—' },
+        { key: 'gstin', header: 'GSTIN', render: (r) => r.partyGstin || '-' },
         { key: 'taxable', header: 'Taxable', className: 'text-right', render: (r) => inr(r.taxableValue) },
         { key: 'cgst', header: 'CGST', className: 'text-right', render: (r) => inr(r.cgst) },
         { key: 'sgst', header: 'SGST', className: 'text-right', render: (r) => inr(r.sgst) },
@@ -254,8 +254,8 @@ export function EInvoicesPage() {
         { key: 'party', header: 'Customer', render: (r) => r.customerName },
         { key: 'taxable', header: 'Taxable', className: 'text-right', render: (r) => inr(r.taxableValue) },
         { key: 'status', header: 'IRN Status', render: (r) => statusCell(r.irnStatus) },
-        { key: 'mode', header: 'Mode', render: (r) => r.providerMode ?? '—' },
-        { key: 'irn', header: 'IRN / Ack', render: (r) => r.irn?.slice(0, 18) ?? r.ackNo ?? '—' },
+        { key: 'mode', header: 'Mode', render: (r) => r.providerMode ?? '-' },
+        { key: 'irn', header: 'IRN / Ack', render: (r) => r.irn?.slice(0, 18) ?? r.ackNo ?? '-' },
         {
           key: 'act',
           header: 'Actions',
@@ -269,7 +269,7 @@ export function EInvoicesPage() {
                 Cancel
               </button>
             ) : (
-              '—'
+              '-'
             ),
         },
       ]}
@@ -359,10 +359,10 @@ export function EWayBillsPage() {
         { key: 'party', header: 'Party', render: (r) => r.partyName },
         { key: 'route', header: 'Route', render: (r) => `${r.fromPlace} → ${r.toPlace}` },
         { key: 'km', header: 'Km', render: (r) => String(r.distanceKm) },
-        { key: 'veh', header: 'Vehicle', render: (r) => r.vehicleNo ?? '—' },
+        { key: 'veh', header: 'Vehicle', render: (r) => r.vehicleNo ?? '-' },
         { key: 'status', header: 'Status', render: (r) => statusCell(r.ewbStatus) },
-        { key: 'mode', header: 'Mode', render: (r) => r.providerMode ?? '—' },
-        { key: 'ewb', header: 'EWB No', render: (r) => r.ewbNo ?? '—' },
+        { key: 'mode', header: 'Mode', render: (r) => r.providerMode ?? '-' },
+        { key: 'ewb', header: 'EWB No', render: (r) => r.ewbNo ?? '-' },
         {
           key: 'act',
           header: 'Actions',
@@ -376,7 +376,7 @@ export function EWayBillsPage() {
                 Cancel
               </button>
             ) : (
-              '—'
+              '-'
             ),
         },
       ]}
@@ -486,7 +486,7 @@ export function TdsReturnsPage() {
         { key: 'q', header: 'Quarter', render: (r) => `${r.quarter} ${r.fyLabel}` },
         { key: 'cnt', header: 'Deductees', render: (r) => String(r.deducteeCount) },
         { key: 'tds', header: 'Total TDS', className: 'text-right', render: (r) => inr(r.totalTds) },
-        { key: 'ack', header: 'Ack / Ref', render: (r) => r.acknowledgmentNo ?? '—' },
+        { key: 'ack', header: 'Ack / Ref', render: (r) => r.acknowledgmentNo ?? '-' },
         { key: 'status', header: 'Status', render: (r) => statusCell(r.status) },
       ]}
     />
@@ -507,7 +507,7 @@ export function TdsCertificatesPage() {
         { key: 'pan', header: 'PAN', render: (r) => r.deducteePan },
         { key: 'q', header: 'Quarter', render: (r) => r.quarter },
         { key: 'amt', header: 'TDS', className: 'text-right', render: (r) => inr(r.tdsAmount) },
-        { key: 'no', header: 'Certificate No', render: (r) => r.certificateNo ?? '—' },
+        { key: 'no', header: 'Certificate No', render: (r) => r.certificateNo ?? '-' },
         { key: 'status', header: 'Status', render: (r) => statusCell(r.status) },
       ]}
     />

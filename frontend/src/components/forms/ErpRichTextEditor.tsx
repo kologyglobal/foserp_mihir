@@ -116,7 +116,7 @@ export function ErpRichTextEditor({
 }
 
 export function ErpRichTextRead({ html, className }: { html: string; className?: string }) {
-  if (!html?.trim()) return <span>—</span>
+  if (!html?.trim()) return <span>-</span>
   return (
     <div
       className={cn('erp-richtext-read', className)}

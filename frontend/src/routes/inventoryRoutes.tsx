@@ -93,17 +93,16 @@ import {
   ApiScanToTransferPage,
 } from '@/modules/inventory/api/ApiInventoryScanPages'
 import { StoreWorkbenchPage } from '@/modules/manufacturing/store-workbench/StoreWorkbenchPage'
-import { isApiMode } from '@/config/apiConfig'
-import { ApiModeDemoGatePage } from '@/components/system/DemoOnlyRouteGate'
 
-/** Live mode: item master CRUD lives under /masters/items. */
+/** Item master CRUD lives under /masters/items. */
 function MastersItemEditRedirect() {
   const { id, itemId } = useParams()
   const recordId = id ?? itemId
   return <Navigate to={recordId ? `/masters/items/${recordId}/edit` : '/masters/items'} replace />
 }
 
-const demoInventoryRouteChildren: RouteObject[] = [
+/** Route shape (paths) — element for each is resolved from apiInventoryRoutes below. */
+const inventoryRoutePaths: RouteObject[] = [
   { path: 'inventory', element: <StoreDashboardPage /> },
   { path: 'inventory/overview', element: <InventoryOverviewPage /> },
   { path: 'inventory/store', element: <StoreDashboardPage /> },
@@ -191,28 +190,13 @@ const demoInventoryRouteChildren: RouteObject[] = [
 ]
 
 /**
- * Phase 8C Wave 1 + Inventory 3A/documents FE wiring: stock truth lives in the
- * Inventory API. In API mode (`VITE_USE_API=true`) live pages cover items
- * register, receipts/issues/returns, planning (reorder from balances), balances,
- * ledger, reservations, immediate movement posts, document registers
- * (transfers / adjustments / stock counts), reports, setup, and barcode scan.
- * Demo mode is unchanged.
+ * Inventory 3A/documents FE wiring: stock truth lives in the Inventory API.
+ * Live pages cover items register, receipts/issues/returns, planning (reorder
+ * from balances), balances, ledger, reservations, immediate movement posts,
+ * document registers (transfers / adjustments / stock counts), reports,
+ * setup, and barcode scan.
  */
-const inventoryApiModeGate = (
-  <ApiModeDemoGatePage
-    title="Inventory workspace"
-    description="This inventory screen is demo-only and does not read live stock. Live stock is available under Stock, Stock Ledger, Issues and Reservations; work-order material moves also run from the Work Order Materials tab."
-    links={[
-      { label: 'Open Stock', to: '/inventory/stock' },
-      { label: 'Open Stock Ledger', to: '/inventory/ledger' },
-      { label: 'Open Issues', to: '/inventory/movements/issues' },
-      { label: 'Open Work Orders', to: '/manufacturing/work-orders' },
-    ]}
-  />
-)
-
-/** Routes with a live Inventory 3A backend — rendered instead of the gate in API mode. */
-const apiInventoryRouteOverrides: Record<string, ReactElement> = {
+const apiInventoryRoutes: Record<string, ReactElement> = {
   inventory: <StoreDashboardPage />,
   'inventory/overview': <InventoryOverviewPage />,
   'inventory/store': <StoreDashboardPage />,
@@ -288,11 +272,14 @@ const apiInventoryRouteOverrides: Record<string, ReactElement> = {
   'inventory/counts': <Navigate to="/inventory/stock-count" replace />,
   'inventory/traceability': <Navigate to="/manufacturing/traceability" replace />,
   'inventory/settings': <Navigate to="/inventory/setup" replace />,
+  /** Alias redirects — mode-agnostic, no live/demo split. */
+  'inventory/costing/fifo-layers': <Navigate to="/inventory/costing/layers" replace />,
+  'inventory/costing/moving-average': <Navigate to="/inventory/costing/average" replace />,
+  'inventory/costing/standard-costs': <Navigate to="/inventory/costing/standard" replace />,
+  'inventory/costing/specific-identification': <Navigate to="/inventory/costing/specific" replace />,
 }
 
-export const inventoryRouteChildren: RouteObject[] = isApiMode()
-  ? demoInventoryRouteChildren.map((route) => ({
-      ...route,
-      element: apiInventoryRouteOverrides[route.path ?? ''] ?? inventoryApiModeGate,
-    }))
-  : demoInventoryRouteChildren
+export const inventoryRouteChildren: RouteObject[] = inventoryRoutePaths.map((route) => ({
+  ...route,
+  element: apiInventoryRoutes[route.path ?? ''] ?? route.element,
+}))

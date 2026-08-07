@@ -314,10 +314,10 @@ export function VendorStatementPreview({
                         <td className="px-2 py-1.5 font-mono">{line.documentNumber}</td>
                         <td className="px-2 py-1.5">{line.documentType}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums">
-                          {line.debit > 0 ? formatCurrency(line.debit) : '—'}
+                          {line.debit > 0 ? formatCurrency(line.debit) : '-'}
                         </td>
                         <td className="px-2 py-1.5 text-right tabular-nums">
-                          {line.credit > 0 ? formatCurrency(line.credit) : '—'}
+                          {line.credit > 0 ? formatCurrency(line.credit) : '-'}
                         </td>
                         <td className="px-2 py-1.5 text-right tabular-nums font-semibold">
                           {formatCurrency(line.runningBalance)}
