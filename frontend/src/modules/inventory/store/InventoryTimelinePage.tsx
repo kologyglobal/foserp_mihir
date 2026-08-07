@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Package } from 'lucide-react'
@@ -33,6 +34,7 @@ function mapMovement(m: InventoryStockMovement): ItemTimelineEvent {
 
 /** Chronological inventory activity — ledger rows as audit truth. */
 export function InventoryTimelinePage() {
+  const navigate = useNavigate()
   const [events, setEvents] = useState<ItemTimelineEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [token, setToken] = useState(0)
@@ -75,33 +77,33 @@ export function InventoryTimelinePage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/store/timeline"
+      commandBar={(
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={{
+            id: 'refresh',
+            label: 'Refresh',
+            icon: RefreshCw,
+            onClick: () => setToken((n) => n + 1),
+          }}
+          secondaryActions={[
+            { id: 'ledger', label: 'Open ledger', onClick: () => navigate('/inventory/ledger') },
+          ]}
+        />
+      )}
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="store-chip-row">
-          {(['all', 'receipt', 'grn', 'issue', 'other'] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              className={filter === f ? 'store-chip store-chip--active' : 'store-chip'}
-              onClick={() => setFilter(f)}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="mb-3 store-chip-row">
+        {(['all', 'receipt', 'grn', 'issue', 'other'] as const).map((f) => (
           <button
+            key={f}
             type="button"
-            className="erp-btn erp-btn--ghost erp-btn--sm inline-flex items-center gap-1.5"
-            onClick={() => setToken((n) => n + 1)}
+            className={filter === f ? 'store-chip store-chip--active' : 'store-chip'}
+            onClick={() => setFilter(f)}
           >
-            <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-            Refresh
+            {f}
           </button>
-          <Link to="/inventory/ledger" className="erp-btn erp-btn--secondary erp-btn--sm">
-            Open ledger
-          </Link>
-        </div>
+        ))}
       </div>
 
       {loading ? <LoadingState variant="card" /> : null}

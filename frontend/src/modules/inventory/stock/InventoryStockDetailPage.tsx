@@ -3,7 +3,7 @@
  * Replaces legacy Zustand ItemStockDetailPage for this route.
  */
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowDownToLine,
   ArrowLeftRight,
@@ -77,6 +77,7 @@ export function InventoryStockDetailPage() {
           { label: 'Details' },
         ]}
         autoBreadcrumbs={false}
+        backLink={{ to: '/inventory/stock', label: 'Back to Stock Availability' }}
       >
         <EmptyState
           icon={ShieldOff}
@@ -102,28 +103,20 @@ export function InventoryStockDetailPage() {
           { label: 'Details' },
         ]}
         autoBreadcrumbs={false}
+        backLink={{ to: '/inventory/stock', label: 'Back to Stock Availability' }}
       >
         <EmptyState
           icon={Package}
           title="Could not load stock details"
           description="Something went wrong while loading stock for this item. Try again."
           action={(
-            <div className="flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
-                onClick={() => setReloadToken((n) => n + 1)}
-              >
-                Retry
-              </button>
-              <button
-                type="button"
-                className="erp-btn erp-btn-secondary h-9 px-3 text-[13px]"
-                onClick={() => navigate('/inventory/stock')}
-              >
-                Back to Stock
-              </button>
-            </div>
+            <button
+              type="button"
+              className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
+              onClick={() => setReloadToken((n) => n + 1)}
+            >
+              Retry
+            </button>
           )}
         />
       </OperationalPageShell>
@@ -146,6 +139,7 @@ export function InventoryStockDetailPage() {
           { label: item.itemCode },
         ]}
         autoBreadcrumbs={false}
+        backLink={{ to: '/inventory/stock', label: 'Back to Stock Availability' }}
         favoritePath={`/inventory/stock/${itemId}`}
         commandBar={(
           <ErpCommandBar
@@ -233,9 +227,6 @@ export function InventoryStockDetailPage() {
         <section className="rounded border border-erp-border bg-erp-surface p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-erp-text">Warehouse balances</h2>
-            <Link to="/inventory/stock" className="text-[12px] font-semibold text-erp-primary hover:underline">
-              Back to Stock Availability
-            </Link>
           </div>
           <div className="overflow-x-auto">
             <table className="erp-table w-full text-[12px]">

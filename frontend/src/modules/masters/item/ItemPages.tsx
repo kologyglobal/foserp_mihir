@@ -1011,6 +1011,11 @@ export function ItemFormPage() {
               <option value="WEIGHT_ONLY">Weight only</option>
               <option value="UNIT_AND_WEIGHT">Unit and weight</option>
             </Select>
+            <p className="mt-1 text-xs text-erp-muted">
+              This is the GRN tolerance type. Unit only checks piece/qty tolerance; Weight only
+              checks weight tolerance and ignores qty variance (e.g. casting, where piece weight
+              naturally varies); Unit and weight checks both.
+            </p>
           </FormField>
           <FormField label="Standard weight per base unit">
             <Input type="number" step="0.0001" min={0} {...register('standardWeightPerBaseUnit')} />

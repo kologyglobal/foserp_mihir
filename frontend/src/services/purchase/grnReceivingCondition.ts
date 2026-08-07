@@ -57,8 +57,9 @@ export const GRN_LINES_RECEIVING_GUIDE = {
       meaning: 'Full qty received but quality is bad — pair with Rejected qty so accepted + rejected = received.',
     },
     {
-      term: 'Qty Tol % / Status',
-      meaning: 'System tolerance check on quantity variance — not the business reason (use Condition for that).',
+      term: 'Tolerance',
+      meaning:
+        'Allowed qty = pending + item tolerance %. Beyond that, received is Exceeds tolerance and needs an Override reason (or reduce qty) — separate from Condition, which is the business reason.',
     },
     {
       term: 'Close open',

@@ -721,6 +721,7 @@ export interface ApiGoodsReceiptLine {
   tolerancePercentage?: number
   variancePercentage?: number | null
   toleranceStatus?: string
+  maximumAllowedUnitQuantity?: number | null
   returnedQuantity?: number
   returnableQuantity?: number
   reversedQuantity?: number

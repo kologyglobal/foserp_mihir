@@ -3758,7 +3758,7 @@
 .ops-summary-card {
   border: 1px solid var(--erp-border, #edebe9);
   background: #fff;
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 12px 14px;
   box-shadow: none;
 }
@@ -4085,7 +4085,7 @@
   align-items: center;
   height: 20px;
   padding: 0 8px;
-  border-radius: 3px;
+  border-radius: 6px;
   border: 1px solid #e4e7ec;
   background: #f8fafc;
   font-size: 10px;
@@ -4119,7 +4119,7 @@
 .store-ops-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   width: 100%;
   max-width: none;
 }
@@ -4177,7 +4177,7 @@
   gap: 4px;
   min-height: 80px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--erp-border, #edebe9);
   background: #fff;
   text-align: left;
@@ -4193,7 +4193,7 @@
 }
 
 .store-kpi-card__value {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
@@ -4215,7 +4215,7 @@
 
 .store-section {
   border: 1px solid var(--erp-border, #edebe9);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fff;
   padding: 12px 14px;
 }
@@ -4247,7 +4247,7 @@
   width: 100%;
   text-align: left;
   border: 1px solid var(--erp-border, #edebe9);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #faf9f8;
   padding: 12px 14px;
   cursor: pointer;
@@ -4337,7 +4337,7 @@ button.store-action-card:hover,
   width: 100%;
   min-height: 88px;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--erp-border, #edebe9);
   background: #fff;
   text-align: left;
@@ -4558,7 +4558,7 @@ button.store-action-card:hover,
   --stock-360-radius: 8px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   width: 100%;
   max-width: none;
   margin: 0;
@@ -4600,7 +4600,7 @@ button.store-action-card:hover,
   letter-spacing: 0.04em;
   color: var(--stock-360-muted);
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 6px;
   background: var(--stock-360-soft);
   border: 1px solid var(--stock-360-line);
 }

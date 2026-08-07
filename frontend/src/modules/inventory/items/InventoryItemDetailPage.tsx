@@ -12,6 +12,7 @@ import { INVENTORY_ITEM_TYPE_LABELS, trackingLabel } from '@/utils/inventoryItem
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
+import { appConfirm } from '@/store/confirmDialogStore'
 import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
 import { BATCH_STATUS_LABELS } from '@/utils/inventoryTraceabilityLabels'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
@@ -69,6 +70,7 @@ export function InventoryItemDetailPage() {
           { label: 'Details' },
         ]}
         autoBreadcrumbs={false}
+        backLink={{ to: '/inventory/items', label: 'Back to Items' }}
       >
         <EmptyState
           icon={ShieldOff}
@@ -94,28 +96,20 @@ export function InventoryItemDetailPage() {
           { label: 'Details' },
         ]}
         autoBreadcrumbs={false}
+        backLink={{ to: '/inventory/items', label: 'Back to Items' }}
       >
         <EmptyState
           icon={Package}
           title="Could not load item"
           description="Something went wrong while loading this item. Try again or return to the items register."
           action={(
-            <div className="flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
-                onClick={() => setReloadToken((n) => n + 1)}
-              >
-                Retry
-              </button>
-              <button
-                type="button"
-                className="erp-btn erp-btn-secondary h-9 px-3 text-[13px]"
-                onClick={() => navigate('/inventory/items')}
-              >
-                Back to Items
-              </button>
-            </div>
+            <button
+              type="button"
+              className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
+              onClick={() => setReloadToken((n) => n + 1)}
+            >
+              Retry
+            </button>
           )}
         />
       </OperationalPageShell>
@@ -131,6 +125,7 @@ export function InventoryItemDetailPage() {
       description={`${item.itemCode} · ${INVENTORY_ITEM_TYPE_LABELS[item.itemType]}`}
       breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Items', to: '/inventory/items' }, { label: item.itemCode }]}
       autoBreadcrumbs={false}
+      backLink={{ to: '/inventory/items', label: 'Back to Items' }}
       favoritePath={`/inventory/items/${recordId}`}
       commandBar={(
         <ErpCommandBar
@@ -162,6 +157,12 @@ export function InventoryItemDetailPage() {
                   id: 'deact',
                   label: 'Deactivate',
                   onClick: async () => {
+                    const ok = await appConfirm({
+                      title: 'Deactivate item',
+                      description: `Deactivate ${item.itemCode} — ${item.itemName}? It will no longer be selectable on new documents.`,
+                      confirmLabel: 'Deactivate',
+                    })
+                    if (!ok) return
                     await deactivateItem(recordId!)
                     notify.success('Deactivated')
                     navigate('/inventory/items')

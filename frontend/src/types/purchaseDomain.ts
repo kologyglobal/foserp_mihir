@@ -2207,6 +2207,8 @@ export interface GoodsReceiptLine {
     | 'REJECTED'
     | 'QUALITY_HOLD'
   receivingConditionReason?: string | null
+  /** Snapshot max receivable qty (stock/base UOM) = open qty + tolerance band at receive time. */
+  maximumAllowedUnitQuantity?: number | null
   receivedWeight?: number | null
   expectedWeight?: number | null
   maximumAllowedWeight?: number | null

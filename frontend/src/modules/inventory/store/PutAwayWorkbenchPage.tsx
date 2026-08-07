@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeftRight, Package, RefreshCw, ScanLine, Truck } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { listPutAwayQueue, type PutAwayCard } from '@/services/inventory/putAwayService'
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
+import { cn } from '@/utils/cn'
 
 function PutAwayCardView({
   card,
@@ -21,7 +23,9 @@ function PutAwayCardView({
   return (
     <div className={isReady ? 'store-action-card' : 'store-action-card store-action-card--warning'}>
       <div className="store-action-card__top">
-        <span className="store-action-card__severity">{isReady ? 'PUT AWAY' : 'POST STOCK'}</span>
+        <span className={cn('inv-hub-badge', isReady ? 'inv-hub-badge--info' : 'inv-hub-badge--warning')}>
+          {isReady ? 'PUT AWAY' : 'POST STOCK'}
+        </span>
         <span className="store-action-card__domain">{card.status}</span>
       </div>
       <div className="store-action-card__title font-mono">{card.grnNumber}</div>
@@ -130,30 +134,27 @@ export function PutAwayWorkbenchPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/store/put-away"
+      commandBar={(
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={{
+            id: 'refresh',
+            label: 'Refresh',
+            icon: RefreshCw,
+            onClick: () => setToken((n) => n + 1),
+          }}
+          secondaryActions={[
+            { id: 'transfer', label: 'New transfer', onClick: () => navigate('/inventory/movements/transfers?create=1') },
+            { id: 'scan', label: 'Scan transfer', icon: ScanLine, onClick: () => navigate('/inventory/scan/transfer') },
+          ]}
+        />
+      )}
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="m-0 text-[12px] text-erp-muted">
-          Flow: <strong>GRN post</strong> (inventory ledger) → <strong>Transfer / scan</strong> into storage bin.
-          Serials and bins stay on the GRN/transfer documents.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="erp-btn erp-btn--ghost erp-btn--sm inline-flex items-center gap-1.5"
-            onClick={() => setToken((n) => n + 1)}
-          >
-            <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-            Refresh
-          </button>
-          <Link to="/inventory/movements/transfers?create=1" className="erp-btn erp-btn--secondary erp-btn--sm">
-            New transfer
-          </Link>
-          <Link to="/inventory/scan/transfer" className="erp-btn erp-btn--secondary erp-btn--sm inline-flex items-center gap-1.5">
-            <ScanLine className="h-3.5 w-3.5" aria-hidden />
-            Scan transfer
-          </Link>
-        </div>
-      </div>
+      <p className="mb-3 text-[12px] text-erp-muted">
+        Flow: <strong>GRN post</strong> (inventory ledger) → <strong>Transfer / scan</strong> into storage bin.
+        Serials and bins stay on the GRN/transfer documents.
+      </p>
 
       {loading ? <LoadingState variant="dashboard" /> : null}
 

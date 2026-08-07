@@ -890,6 +890,121 @@ a.purchase-process-map__step:hover {
   min-width: 5.5rem;
 }
 
+/* Receive UOM — vertically center against the received-qty input's height (fixes
+   misaligned unit text vs the taller input cell that broke visually on wide grids). */
+.grn-lines-grid .purchase-doc-lines-grid__uom-col {
+  min-height: 2.5rem;
+  vertical-align: middle;
+  padding-top: 8px !important;
+}
+
+/* Bin column — explicit width so codes like "AHMD-PLT-B04" don't get clipped. */
+.grn-lines-grid__bin-col {
+  width: 10rem !important;
+  min-width: 10rem !important;
+  max-width: 11rem !important;
+  padding: 6px 8px !important;
+  vertical-align: top;
+}
+
+.grn-lines-grid__bin-col .erp-input,
+.grn-lines-grid__bin-col select {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Tolerance column — merged allowed-qty / variance / status (replaces 3 cramped columns). */
+.grn-lines-grid__tolerance-col {
+  width: 15rem !important;
+  min-width: 15rem !important;
+  max-width: 17rem !important;
+  padding: 8px !important;
+  vertical-align: top;
+  white-space: normal;
+}
+
+.grn-tolerance-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.grn-tolerance-cell__band {
+  margin: 0;
+  font-size: 11px;
+  color: var(--erp-muted, #64748b);
+}
+
+.grn-tolerance-cell__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.grn-tolerance-cell__variance {
+  font-size: 11px;
+  color: var(--erp-muted, #64748b);
+}
+
+.grn-tolerance-cell__alert {
+  margin-top: 2px;
+  border-radius: 6px;
+  border: 1px solid var(--erp-danger-border, #fecaca);
+  background: var(--erp-danger-bg, #fef2f2);
+  padding: 6px 8px;
+}
+
+.grn-tolerance-cell__alert p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--erp-danger-fg, #b91c1c);
+}
+
+.grn-tolerance-cell__reason {
+  margin-top: 4px !important;
+  font-style: italic;
+  color: var(--erp-text, #0f172a) !important;
+}
+
+.grn-tolerance-cell__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.grn-tolerance-cell__action {
+  border-radius: 4px;
+  border: 1px solid var(--erp-border-strong, #cbd5e1);
+  background: #fff;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--erp-text, #0f172a);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.grn-tolerance-cell__action:hover {
+  background: var(--erp-surface-alt, #f8fafc);
+}
+
+.grn-tolerance-cell__action--muted {
+  color: var(--erp-muted, #64748b);
+}
+
+.grn-tolerance-cell__weight {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--erp-muted, #64748b);
+}
+
 /* PI lines: sticky # then Item (no Product Type column like PO) */
 .purchase-invoice-lines-grid .purchase-doc-lines-grid__sticky-item {
   left: 2.5rem;

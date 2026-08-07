@@ -35,15 +35,11 @@ export function StoreOpHub({
   title,
   description,
   favoritePath,
-  backTo = '/inventory',
-  backLabel = 'Back to Store',
   choices,
 }: {
   title: string
   description: string
   favoritePath: string
-  backTo?: string
-  backLabel?: string
   choices: StoreOpChoice[]
 }) {
   const navigate = useNavigate()
@@ -70,7 +66,6 @@ export function StoreOpHub({
       title={title}
       description={description}
       showDescription
-      backLink={{ to: backTo, label: backLabel }}
       breadcrumbs={[
         { label: 'Store', to: '/inventory' },
         { label: title },

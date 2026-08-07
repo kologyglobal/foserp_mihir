@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Package, RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import {
@@ -13,6 +14,7 @@ import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { appConfirm } from '@/store/confirmDialogStore'
+import { cn } from '@/utils/cn'
 
 type ResRow = InventoryStockReservation & {
   item?: { code?: string; name?: string }
@@ -75,23 +77,23 @@ export function StoreReservationsPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/store/reservations"
+      commandBar={(
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={{
+            id: 'refresh',
+            label: 'Refresh',
+            icon: RefreshCw,
+            onClick: () => setToken((n) => n + 1),
+          }}
+          secondaryActions={[
+            { id: 'picking', label: 'Material Picking', onClick: () => navigate('/inventory/store/picking') },
+            { id: 'register', label: 'Full register', onClick: () => navigate('/inventory/reservations') },
+          ]}
+        />
+      )}
     >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="erp-btn erp-btn--ghost erp-btn--sm inline-flex items-center gap-1.5"
-          onClick={() => setToken((n) => n + 1)}
-        >
-          <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-          Refresh
-        </button>
-        <Link to="/inventory/store/picking" className="erp-btn erp-btn--secondary erp-btn--sm">
-          Material Picking
-        </Link>
-        <Link to="/inventory/reservations" className="erp-btn erp-btn--secondary erp-btn--sm">
-          Full register
-        </Link>
-      </div>
       {loading ? <LoadingState variant="card" /> : null}
       {!loading && rows.length === 0 ? (
         <EmptyState icon={Package} title="No active reservations" description="Production, sales, or manual reservations will appear here." />
@@ -102,11 +104,14 @@ export function StoreReservationsPage() {
             const remaining = Number(r.remainingQty ?? r.quantity ?? 0)
             const itemLabel = r.item ? `${r.item.code} · ${r.item.name}` : r.itemId
             const whLabel = r.warehouse?.name ?? r.warehouseId
+            const isActive = String(r.status).toUpperCase() === 'ACTIVE'
             return (
               <li key={r.id}>
                 <div className="store-action-card">
                   <div className="store-action-card__top">
-                    <span className="store-action-card__severity">{r.status}</span>
+                    <span className={cn('inv-hub-badge', isActive ? 'inv-hub-badge--info' : 'inv-hub-badge--warning')}>
+                      {r.status}
+                    </span>
                     <span className="store-action-card__domain">{r.demandType}</span>
                   </div>
                   <div className="store-action-card__title">{itemLabel}</div>
@@ -125,7 +130,7 @@ export function StoreReservationsPage() {
                     >
                       Item 360
                     </button>
-                    {String(r.status).toUpperCase() === 'ACTIVE' || String(r.status).toLowerCase() === 'active' ? (
+                    {isActive ? (
                       <button
                         type="button"
                         className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"

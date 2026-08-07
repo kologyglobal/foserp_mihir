@@ -181,7 +181,7 @@
 }
 
 .store-zoho-register .inv-hub-badge {
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 10px;
   letter-spacing: 0.03em;
 }
@@ -430,7 +430,7 @@
 .store-zoho-register .store-op-choice__badge {
   display: inline-flex;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--erp-primary, #0078d4) 22%, var(--store-zoho-line));
   background: color-mix(in srgb, var(--erp-primary, #0078d4) 8%, #fff);
   font-size: 10px;

@@ -231,11 +231,6 @@ export function ItemStock360Page() {
           icon={Package}
           title="Item stock not found"
           description="The item may not exist or balances are unavailable."
-          action={(
-            <button type="button" className="erp-btn erp-btn-primary h-10 px-4" onClick={() => navigate('/inventory/stock')}>
-              Back to stock
-            </button>
-          )}
         />
       </OperationalPageShell>
     )

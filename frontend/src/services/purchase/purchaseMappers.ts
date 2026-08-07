@@ -1862,6 +1862,8 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       shortCloseReason: l.shortCloseReason ?? null,
       receivingCondition: (l.receivingCondition as GoodsReceiptLine['receivingCondition']) ?? 'NORMAL',
       receivingConditionReason: l.receivingConditionReason ?? null,
+      maximumAllowedUnitQuantity:
+        l.maximumAllowedUnitQuantity == null ? null : Number(l.maximumAllowedUnitQuantity),
       receivedWeight: l.receivedWeight == null ? null : Number(l.receivedWeight),
       expectedWeight: l.expectedWeight == null ? null : Number(l.expectedWeight),
       maximumAllowedWeight:

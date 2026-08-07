@@ -92,7 +92,7 @@ export function InventoryCostingSummaryPage() {
       {!loading && !error && overview ? (
         <div className="flex flex-col gap-3">
           {/* Compact summary strip */}
-          <div className="grid gap-0 overflow-hidden rounded-md border border-erp-border bg-white shadow-sm sm:grid-cols-2 lg:grid-cols-5">
+          <div className="store-kpi-grid" aria-label="Costing summary">
             {[
               { label: 'Inventory Value', value: formatCurrency(s?.inventoryValue ?? 0) },
               { label: 'Stock Quantity', value: Number(s?.stockQuantity ?? 0).toLocaleString() },
@@ -110,15 +110,13 @@ export function InventoryCostingSummaryPage() {
                 label: 'GL Difference',
                 value: s?.glDifference == null ? 'N/A' : formatCurrency(s.glDifference),
               },
-            ].map((card, i) => (
+            ].map((card) => (
               <div
                 key={card.label}
-                className={cn('px-4 py-3', i > 0 && 'border-t border-erp-border sm:border-t-0 sm:border-l')}
+                className={cn('store-kpi-card cursor-default', card.warn && 'store-kpi-card--warning')}
               >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">{card.label}</p>
-                <p className={cn('mt-1 text-lg font-semibold tabular-nums', card.warn && 'text-rose-700')}>
-                  {card.value}
-                </p>
+                <span className="store-kpi-card__label">{card.label}</span>
+                <span className="store-kpi-card__value">{card.value}</span>
               </div>
             ))}
           </div>
