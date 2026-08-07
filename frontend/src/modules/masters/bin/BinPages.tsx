@@ -26,6 +26,7 @@ import {
 import { formatApiError } from '../../../services/api/apiErrors'
 import { notifyMasterSaved } from '../../../store/toastStore'
 import { DEMO_BIN_OPTIONS } from '../../../data/masters/demoBinSeed'
+import { binCodeFromName } from '../../../utils/binCodeFromName'
 
 export interface BinRecord {
   id: string
@@ -218,6 +219,13 @@ export function BinFormPage() {
   })
   const watched = useWatch({ control })
   const warehouseId = watch('warehouseId')
+  const watchedName = watch('name')
+
+  useEffect(() => {
+    if (isEdit) return
+    setValue('code', binCodeFromName(watchedName ?? ''), { shouldValidate: true })
+  }, [isEdit, setValue, watchedName])
+
   const warehouseLocations = useMemo(
     () => locations.filter((l) => !warehouseId || l.warehouseId === warehouseId),
     [locations, warehouseId],
@@ -240,13 +248,18 @@ export function BinFormPage() {
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     void handleSubmit(async (data) => {
-      if (records.some((b) => b.code === data.code && b.id !== id)) {
+      const code = isEdit ? data.code.trim() : binCodeFromName(data.name)
+      if (!code) {
+        setSaveError('BIN name must yield a valid code')
+        return
+      }
+      if (records.some((b) => b.code === code && b.id !== id)) {
         setSaveError('BIN code already exists')
         return
       }
       setSaveError(null)
       const payload = {
-        code: data.code.trim(),
+        code,
         name: data.name.trim(),
         warehouseId: data.warehouseId,
         storageLocationId: data.storageLocationId,
@@ -284,16 +297,22 @@ export function BinFormPage() {
       onCancel={() => navigate('/masters/bins')}
     >
       <FormSection title="BIN Details">
-        <FormField label="BIN Code" required error={errors.code?.message}>
-          <Input
-            {...register('code')}
-            disabled={isEdit}
-            readOnly={isEdit}
-            error={!!errors.code}
-          />
-        </FormField>
         <FormField label="BIN Name" required error={errors.name?.message}>
           <Input {...register('name')} error={!!errors.name} />
+        </FormField>
+        <FormField
+          label="BIN Code"
+          required
+          error={errors.code?.message}
+          hint={isEdit ? 'Code is fixed after create.' : 'Auto-generated from BIN name.'}
+        >
+          <Input
+            {...register('code')}
+            readOnly
+            disabled={isEdit}
+            className="font-mono uppercase"
+            error={!!errors.code}
+          />
         </FormField>
         <FormField label="Warehouse" required error={errors.warehouseId?.message}>
           <Select

@@ -80,8 +80,9 @@ function line(partial: Partial<PurchaseRequisitionLine> = {}): PurchaseRequisiti
 }
 
 describe('purchase requisition workflow', () => {
-  it('allows draft edit and blocks submitted / approved edit with stable codes', () => {
+  it('allows draft and rejected edit and blocks submitted / approved edit with stable codes', () => {
     expect(() => assertDraftEditable(pr({ status: 'DRAFT' }))).not.toThrow()
+    expect(() => assertDraftEditable(pr({ status: 'REJECTED' }))).not.toThrow()
     try {
       assertDraftEditable(pr({ status: 'PENDING_APPROVAL' }))
       expect.fail('expected throw')
@@ -109,6 +110,8 @@ describe('purchase requisition workflow', () => {
       PurchaseRequisitionValidationError,
     )
     expect(() => assertSubmittable(pr({ lines: [line()] }))).not.toThrow()
+    expect(() => assertSubmittable(pr({ status: 'REJECTED', lines: [line()] }))).not.toThrow()
+    expect(() => assertSubmittable(pr({ status: 'PENDING_APPROVAL', lines: [line()] }))).toThrow()
   })
 
   it('rejects required date before requisition date', () => {

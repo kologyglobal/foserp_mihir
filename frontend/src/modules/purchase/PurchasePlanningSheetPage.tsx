@@ -94,7 +94,14 @@ import { systemConfirm, systemPrompt } from '@/utils/systemConfirm'
 import { cn } from '@/utils/cn'
 import type { CrmFilterField, CrmFilterValues } from '@/types/crmListFilters'
 
-type SortKey = 'planningDate' | 'requiredByDate' | 'priority' | 'status' | 'planningNumber'
+type SortKey =
+  | 'planningDate'
+  | 'requiredByDate'
+  | 'priority'
+  | 'status'
+  | 'planningNumber'
+  | 'prNumberAsc'
+  | 'prNumberDesc'
 
 const DEFAULT_FILTERS: CrmFilterValues = {
   search: '',
@@ -257,6 +264,14 @@ function sortRows(rows: PurchasePlanningSheetRow[], sortBy: SortKey) {
   switch (sortBy) {
     case 'planningNumber':
       return list.sort((a, b) => cmp(a.planningNumber, b.planningNumber))
+    case 'prNumberAsc':
+      return list.sort((a, b) =>
+        cmp(a.purchaseRequisitionNumber, b.purchaseRequisitionNumber),
+      )
+    case 'prNumberDesc':
+      return list.sort((a, b) =>
+        cmp(b.purchaseRequisitionNumber, a.purchaseRequisitionNumber),
+      )
     case 'requiredByDate':
       return list.sort((a, b) => cmp(a.requiredByDate, b.requiredByDate))
     case 'priority':
@@ -994,8 +1009,8 @@ export function PurchasePlanningSheetPage() {
       {
         id: 'remainingQuantity',
         accessorKey: 'remainingQuantity',
-        header: 'Remaining',
-        meta: { columnLabel: 'Remaining', align: 'right' },
+        header: 'Qty to order in PO',
+        meta: { columnLabel: 'Qty to order in PO', align: 'right' },
         cell: ({ row }) => (
           <span className="tabular-nums font-medium">{row.original.remainingQuantity}</span>
         ),
@@ -1662,6 +1677,8 @@ export function PurchasePlanningSheetPage() {
                             { value: 'priority', label: 'Priority' },
                             { value: 'status', label: 'Status' },
                             { value: 'planningNumber', label: 'Planning no.' },
+                            { value: 'prNumberAsc', label: 'PR number (A→Z)' },
+                            { value: 'prNumberDesc', label: 'PR number (Z→A)' },
                           ]}
                         />
                       }

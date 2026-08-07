@@ -699,14 +699,12 @@ a.purchase-process-map__step:hover {
 
 /* Shared purchase document line grid — compact UOM + QC test group columns */
 .purchase-doc-lines-grid__uom-col {
-  width: 3.25rem !important;
-  min-width: 3.25rem !important;
-  max-width: 3.25rem !important;
+  width: 4.75rem !important;
+  min-width: 4.75rem !important;
+  max-width: 4.75rem !important;
   padding: 6px 4px !important;
   text-align: center;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   vertical-align: middle;
 }
 
@@ -717,7 +715,7 @@ a.purchase-process-map__step:hover {
 .purchase-doc-lines-grid__uom-col .erp-input,
 .purchase-doc-lines-grid__uom-col select {
   width: 100% !important;
-  max-width: 3.25rem !important;
+  max-width: 4.75rem !important;
   min-width: 0 !important;
   padding-left: 2px !important;
   padding-right: 2px !important;

@@ -1,11 +1,29 @@
 import type { Request } from 'express'
 import { auditFromRequest, createAuditLog } from '../../services/audit.service.js'
 import { NotFoundError, ValidationError } from '../../utils/errors.js'
+import { assertActiveIncomingPlanCode } from '../quality/inspection-plans/inspection-plan.service.js'
 import type { ItemLookupQuery, ListItemsQuery } from './item.validation.js'
 import * as repo from './item.repository.js'
 
 function auditMeta(req: Request) {
   return auditFromRequest(req)
+}
+
+/**
+ * Only validate qualityTestGroupCode against the Inspection Plan master when the
+ * value is newly set or actually changed. Untouched legacy values (from the
+ * retired hardcoded enum) are grandfathered in so existing items keep saving.
+ */
+async function assertQualityTestGroupCodeIfChanged(
+  tenantId: string,
+  input: Record<string, unknown>,
+  previousCode?: string | null,
+) {
+  if (!('qualityTestGroupCode' in input)) return
+  const code = typeof input.qualityTestGroupCode === 'string' ? input.qualityTestGroupCode.trim() : null
+  if (!code) return
+  if (code === (previousCode ?? null)) return
+  await assertActiveIncomingPlanCode(tenantId, code)
 }
 
 export async function listRecords(_req: Request, tenantId: string, query: ListItemsQuery) {
@@ -23,6 +41,7 @@ export async function getRecord(tenantId: string, id: string) {
 export async function createRecord(req: Request, tenantId: string, input: Record<string, unknown>) {
   const audit = auditMeta(req)
   const userId = req.context?.userId ?? ''
+  await assertQualityTestGroupCodeIfChanged(tenantId, input, null)
   const record = await repo.createItem(tenantId, userId, input)
   await createAuditLog({
     tenantId,
@@ -47,6 +66,11 @@ export async function updateRecord(
   const audit = auditMeta(req)
   const userId = req.context?.userId ?? ''
   const before = await repo.getItem(tenantId, id)
+  await assertQualityTestGroupCodeIfChanged(
+    tenantId,
+    input,
+    (before as { qualityTestGroupCode?: string | null }).qualityTestGroupCode,
+  )
   const record = await repo.updateItem(tenantId, id, userId, input)
   await createAuditLog({
     tenantId,

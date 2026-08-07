@@ -231,6 +231,13 @@ export function IncomingQcQueuePage() {
             <Button size="sm" variant="secondary" onClick={() => { window.location.href = '/purchase/quality-inspections' }}>
               QI register
             </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => { window.location.href = '/purchase/quality-inspections?status=completed' }}
+            >
+              Completed QC
+            </Button>
             <Button size="sm" onClick={() => { window.location.href = '/purchase/grn' }}>
               GRN
             </Button>

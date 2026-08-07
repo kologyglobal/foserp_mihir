@@ -498,6 +498,7 @@ export function mapApiRequisitionToDomain(dto: ApiPurchaseRequisition): Purchase
     updatedBy: dto.updatedById,
     updatedAt: dto.updatedAt,
     remarks: dto.remarks ?? '',
+    rejectionReason: dto.rejectionReason ?? null,
     attachmentIds: [],
   }
 }
@@ -1768,6 +1769,7 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       : undefined,
     reversedAt: api.reversedAt ?? null,
     partiallyReversed: Boolean(api.partiallyReversed),
+    reverseBlockedReason: api.reverseBlockedReason ?? null,
     lines: (api.lines ?? []).map((l) => ({
       id: l.id,
       lineNo: l.lineNumber,
@@ -2207,6 +2209,11 @@ export function mapApiQualityInspectionToDomain(api: ApiQualityInspection): Qual
     sampleQty: Number(api.totals?.inspected) || 0,
     acceptedQty: Number(api.totals?.accepted) || 0,
     rejectedQty: Number(api.totals?.rejected) || 0,
+    uom: api.uomCode || first?.uomCode || '',
+    uomConversionFactor: Number(api.uomConversionFactor ?? first?.uomConversionFactor) || 1,
+    receivedUomQty: Number(api.totals?.inspectedUom) || 0,
+    acceptedUomQty: Number(api.totals?.acceptedUom) || 0,
+    rejectedUomQty: Number(api.totals?.rejectedUom) || 0,
     inspectionPlan: api.inspectionPlan || '',
     inspectionPlanId: uuidOrNull(api.inspectionPlanId ?? null),
     inspector: { id: api.inspectedById || '', code: '', name: api.inspectedByName || '' },

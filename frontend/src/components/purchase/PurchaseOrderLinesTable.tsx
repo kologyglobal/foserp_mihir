@@ -350,7 +350,7 @@ export function PurchaseOrderLinesTable({
             icon={Plus}
             disabled={!editable}
             onClick={openQuickCreate}
-            title="Free-text goods or service without Item Master"
+            title="Manual line without Item Master"
           >
             Quick New Item
           </ErpButton>
@@ -922,7 +922,7 @@ export function PurchaseOrderLinesTable({
                         <option value="">{SELECT_PLACEHOLDER}</option>
                         {qualityTestGroupOptions.map((o) => (
                           <option key={o.code} value={o.code}>
-                            {o.label}
+                            {o.code}
                           </option>
                         ))}
                         {line.qualityTestGroupCode &&
@@ -975,7 +975,6 @@ export function PurchaseOrderLinesTable({
                               {binOptions.map((b) => (
                                 <option key={b.id} value={b.id}>
                                   {b.code}
-                                  {b.name && b.name !== b.code ? ` — ${b.name}` : ''}
                                 </option>
                               ))}
                               {resolvedBinId && !hasOption ? (

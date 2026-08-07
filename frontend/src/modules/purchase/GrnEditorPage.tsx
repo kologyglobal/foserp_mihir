@@ -1288,7 +1288,7 @@ export function GrnEditorPage() {
                   title={GRN_LINES_RECEIVING_GUIDE.columns[2].meaning}
                 >
                   Rejected
-                  <span className="block text-[10px] font-normal text-erp-muted">(incl. damage · stock UOM)</span>
+                  <span className="block text-[10px] font-normal text-erp-muted">(stock UOM · set by QC if required)</span>
                 </th>
                 {showWeightCol ? <th className="num">Weight</th> : null}
                 <th className="num">Qty Tol %</th>
@@ -1411,9 +1411,16 @@ export function GrnEditorPage() {
                       min={0}
                       value={Number(l.acceptedQty) || 0}
                       disabled={l.qcRequired || inspectionRequired}
+                      title={
+                        l.qcRequired || inspectionRequired
+                          ? 'Determined by Quality Inspection after receiving — not editable here'
+                          : undefined
+                      }
                       onChange={(v) => updateLine(i, { acceptedQty: v })}
                     />
-                    {l.baseUom ? (
+                    {l.qcRequired || inspectionRequired ? (
+                      <p className="mt-1 text-[10px] text-erp-muted">Set by QC</p>
+                    ) : l.baseUom ? (
                       <p className="mt-1 text-[10px] uppercase text-erp-muted">{l.baseUom}</p>
                     ) : null}
                   </td>
@@ -1422,6 +1429,12 @@ export function GrnEditorPage() {
                       className="w-20"
                       min={0}
                       value={Number(l.rejectedQty) || 0}
+                      disabled={l.qcRequired || inspectionRequired}
+                      title={
+                        l.qcRequired || inspectionRequired
+                          ? 'Determined by Quality Inspection after receiving — not editable here'
+                          : undefined
+                      }
                       onChange={(v) =>
                         updateLine(i, {
                           rejectedQty: v,
@@ -1430,7 +1443,9 @@ export function GrnEditorPage() {
                         })
                       }
                     />
-                    {l.baseUom ? (
+                    {l.qcRequired || inspectionRequired ? (
+                      <p className="mt-1 text-[10px] text-erp-muted">Set by QC</p>
+                    ) : l.baseUom ? (
                       <p className="mt-1 text-[10px] uppercase text-erp-muted">{l.baseUom}</p>
                     ) : null}
                   </td>

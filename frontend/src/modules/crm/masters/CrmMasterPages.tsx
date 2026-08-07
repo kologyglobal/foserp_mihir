@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Plus, Trash2, Copy, ChevronLeft, ChevronRight,
@@ -695,12 +695,19 @@ export function CrmMasterFormPage({ fixedSlug }: { fixedSlug?: string } = {}) {
   })
   const [errors, setErrors] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const codeSyncedRef = useRef(false)
 
   useEffect(() => {
-    if (!isEdit && !existing?.systemControlled && series.code && series.code !== code) {
+    codeSyncedRef.current = false
+  }, [slug, id])
+
+  useEffect(() => {
+    if (isEdit || existing?.systemControlled || codeSyncedRef.current) return
+    if (series.code) {
       setCode(series.code)
+      codeSyncedRef.current = true
     }
-  }, [series.code, isEdit, existing?.systemControlled, code])
+  }, [series.code, isEdit, existing?.systemControlled])
 
   const configFields = useMemo(
     () => (catalog ? crmMasterConfigurationFields(catalog) : []),
@@ -860,8 +867,12 @@ export function CrmMasterFormPage({ fixedSlug }: { fixedSlug?: string } = {}) {
               }}
             />
             {!isEdit && !series.canManual && !series.error ? (
-              <p className="mt-1 text-[12px] text-erp-muted">{MASTER_CODE_HELPER_TEXT}</p>
-            ) : null}
+              <p className="mt-1 min-h-[1.125rem] text-[12px] text-erp-muted">{MASTER_CODE_HELPER_TEXT}</p>
+            ) : (
+              <p className="mt-1 min-h-[1.125rem] text-[12px] text-erp-muted" aria-hidden="true">
+                {'\u00a0'}
+              </p>
+            )}
             {series.error ? (
               <p className="mt-1 text-[12px] text-erp-danger">{series.error}</p>
             ) : null}

@@ -27,7 +27,6 @@ import {
   getPurchaseRequisitionById,
   getRFQById,
   getPurchaseOrderById,
-  getPurchaseRequisitionRevisions,
   getVendors,
   submitPurchaseRequisition,
   updatePurchaseRequisition,
@@ -36,7 +35,7 @@ import {
   PURCHASE_REQUISITION_STATUS_LABELS,
   PurchaseServiceError,
 } from '@/services/purchase'
-import type { PurchaseRequisition, PurchaseRequisitionRevisionSnapshot, Vendor } from '@/types/purchaseDomain'
+import type { PurchaseRequisition, Vendor } from '@/types/purchaseDomain'
 import { purchaseRequisitionApprovalStatusLabel } from '@/types/purchaseDomain'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
@@ -77,7 +76,6 @@ export function PurchaseRequisitionDomainDetailPage({
   const [submitting, setSubmitting] = useState(false)
   const [converting, setConverting] = useState(false)
   const [vendors, setVendors] = useState<Vendor[]>([])
-  const [revisions, setRevisions] = useState<PurchaseRequisitionRevisionSnapshot[]>([])
 
   const canEdit = pr && (pr.status === 'draft' || pr.status === 'rejected')
   const showCreatePo = pr ? canConvertPrToPo(pr) && !pr.rfqRequired && perms.canCreateOrder : false
@@ -141,12 +139,6 @@ export function PurchaseRequisitionDomainDetailPage({
       if (row.convertedPoId) {
         const po = await getPurchaseOrderById(row.convertedPoId)
         if (!cancelled) setLinkedPoNo(po?.documentNumber ?? null)
-      }
-      if (isApiMode()) {
-        const revs = await getPurchaseRequisitionRevisions(id)
-        if (!cancelled) setRevisions(revs)
-      } else {
-        setRevisions([])
       }
       setLoading(false)
       if (searchParams.get('print') === '1') {
@@ -301,8 +293,10 @@ export function PurchaseRequisitionDomainDetailPage({
     />
   )
 
-  const canSubmitDraft =
-    mode === 'view' && pr.status === 'draft' && perms.canSubmitRequisition
+  const canSubmitForApproval =
+    mode === 'view' &&
+    (pr.status === 'draft' || pr.status === 'rejected') &&
+    perms.canSubmitRequisition
   const canRevisePr =
     isApiMode() &&
     mode === 'view' &&
@@ -339,10 +333,15 @@ export function PurchaseRequisitionDomainDetailPage({
               icon: ClipboardList,
               onClick: () => navigate(purchasePlanningSheetHrefForPr(pr.documentNumber)),
             }
-          : canSubmitDraft
+          : canSubmitForApproval
             ? {
                 id: 'submit',
-                label: submitting ? 'Submitting…' : 'Submit',
+                label:
+                  submitting
+                    ? 'Submitting…'
+                    : pr.status === 'rejected'
+                      ? 'Resubmit for Approval'
+                      : 'Submit for Approval',
                 icon: Send,
                 onClick: () => void submit(),
                 disabled: submitting,
@@ -451,7 +450,7 @@ export function PurchaseRequisitionDomainDetailPage({
           rfqRequired={pr.rfqRequired}
           purpose="Purchase requisitions — request, approve, then source via RFQ or direct planning."
           nextActionContext={{
-            canSubmit: canSubmitDraft,
+            canSubmit: canSubmitForApproval,
             canCreateRfq: showCreateRfq,
             canOpenPlanning: showViewPlanning,
           }}
@@ -567,44 +566,19 @@ export function PurchaseRequisitionDomainDetailPage({
               <Badge color="orange">Pending approval — requester cannot edit</Badge>
             </div>
           ) : null}
-        </ErpCardSection>
-
-        <ErpCardSection
-          title="Change History"
-          subtitle="Revision audit trail"
-          columns={1}
-          collapsible
-          defaultOpen={false}
-        >
-          {revisions.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No revisions recorded yet.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border border-erp-border">
-              <table className="erp-table min-w-[640px] text-[12px]">
-                <thead>
-                  <tr>
-                    <th>Revision</th>
-                    <th>Reason</th>
-                    <th>Revised At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {revisions.map((rev) => (
-                    <tr key={rev.id}>
-                      <td className="num tabular-nums">{rev.revisionNo}</td>
-                      <td>{rev.reason || '—'}</td>
-                      <td className="whitespace-nowrap">
-                        {rev.revisedAt ? formatDate(rev.revisedAt.slice(0, 10)) : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {pr.status === 'rejected' ? (
+            <div className="col-span-full space-y-1">
+              <Badge color="red">Rejected — edit and resubmit for approval</Badge>
+              {pr.rejectionReason ? (
+                <p className="text-[12px] text-erp-muted">
+                  Reason: {pr.rejectionReason}
+                </p>
+              ) : null}
             </div>
-          )}
+          ) : null}
         </ErpCardSection>
 
-        <ErpCardSection title="Audit" subtitle="Lifecycle history" columns={1} collapsible defaultOpen={false}>
+        <ErpCardSection title="History" subtitle="Lifecycle history" columns={1} collapsible defaultOpen={false}>
           <PurchaseAuditTimeline
             entityType="purchase-requisition"
             entityId={pr.id}

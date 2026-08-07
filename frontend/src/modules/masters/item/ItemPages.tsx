@@ -25,6 +25,7 @@ import { ErpSmartSelect } from '../../../components/erp/ErpSmartSelect'
 import { ActiveBadge } from '../../../components/ui/StatusBadge'
 import { FormField } from '../../../components/forms/FormField'
 import { Input, Select, Checkbox, Textarea } from '../../../components/forms/Inputs'
+import { SELECT_PLACEHOLDER } from '../../../components/forms/selectStandards'
 import { ErpCardSection } from '../../../components/erp/card-form'
 import { useMasterStore } from '../../../store/masterStore'
 import { resolveMaybeId, resolveMaybeVoid } from '../../../store/storeAction'
@@ -36,6 +37,7 @@ import { useLeafCategories, useActiveUoms, useEnrichedItems } from '../../../hoo
 import { useBinOptions } from '../../../hooks/useBinOptions'
 import { enrichItemWithDefaults } from '../../../utils/itemMasterDefaults'
 import { buildMasterBreadcrumbs } from '../../../utils/masterNavigation'
+import { loadQualityTestGroupOptions, type QualityTestGroupOption } from '../../../utils/qualityTestGroupOptions'
 import { formatCurrency, formatNumber } from '../../../utils/formatters/currency'
 import {
   ENGINEERING_PRODUCT_TYPE_LABELS,
@@ -487,6 +489,19 @@ export function ItemFormPage() {
   const [uomConversionRows, setUomConversionRows] = useState<ItemUomConversionRow[]>([])
   const purchaseQtySyncRef = useRef(false)
   const prevBaseUomIdRef = useRef<string | undefined>(undefined)
+  const [qualityTestGroupOptions, setQualityTestGroupOptions] = useState<QualityTestGroupOption[]>(() =>
+    QUALITY_TEST_GROUP_OPTIONS.map((o) => ({ code: o.code, label: o.label })),
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    void loadQualityTestGroupOptions().then((opts) => {
+      if (!cancelled) setQualityTestGroupOptions(opts)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!existing) {
@@ -1178,16 +1193,23 @@ export function ItemFormPage() {
           <FormField label="Serial tracking">
             <Checkbox {...register('serialTracked')} label="Track serial numbers at receipt" />
           </FormField>
-          <FormField label="Quality Test Group Code">
-            <Select
-              value={watch('qualityTestGroupCode') ?? ''}
-              onChange={(e) => setValue('qualityTestGroupCode', e.target.value || null, { shouldDirty: true })}
-            >
-              <option value="">None</option>
-              {QUALITY_TEST_GROUP_OPTIONS.map((o) => (
-                <option key={o.code} value={o.code}>{o.label}</option>
-              ))}
-            </Select>
+          <FormField label="Quality Test Group Code" hint="Active incoming inspection plans (Quality → Inspection Plans).">
+            {(() => {
+              const currentCode = watch('qualityTestGroupCode') ?? ''
+              const isOrphan = Boolean(currentCode) && !qualityTestGroupOptions.some((o) => o.code === currentCode)
+              return (
+                <Select
+                  value={currentCode}
+                  onChange={(e) => setValue('qualityTestGroupCode', e.target.value || null, { shouldDirty: true })}
+                >
+                  <option value="">{SELECT_PLACEHOLDER}</option>
+                  {qualityTestGroupOptions.map((o) => (
+                    <option key={o.code} value={o.code}>{o.label}</option>
+                  ))}
+                  {isOrphan ? <option value={currentCode}>{currentCode} (legacy — not an active plan)</option> : null}
+                </Select>
+              )
+            })()}
           </FormField>
         </ErpCardSection>
 

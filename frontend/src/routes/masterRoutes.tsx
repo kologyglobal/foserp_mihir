@@ -178,7 +178,7 @@ export const masterRouteChildren: RouteObject[] = [
   { path: 'masters/cities/:id', element: <CityDetailPage /> },
   { path: 'masters/cities/:id/edit', element: <CityFormPage /> },
   { path: 'masters/price-lists', element: <MasterPlaceholderPage masterId="price-lists" /> },
-  { path: 'masters/quality-test-groups', element: <MasterPlaceholderPage masterId="quality-test-groups" /> },
+  { path: 'masters/quality-test-groups', element: <Navigate to="/quality/inspection-plans" replace /> },
 
   { path: 'settings/roles', element: <Navigate to="/masters/roles" replace /> },
   { path: 'settings/permissions', element: <Navigate to="/masters/role-permissions" replace /> },

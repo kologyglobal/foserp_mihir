@@ -74,6 +74,25 @@ export function mapPlan(row: PlanWithLines) {
   }
 }
 
+/**
+ * QC master unification (Phase 1): Item Master and Purchase Order "Quality Test
+ * Group" fields must reference an active INCOMING inspection plan. Callers should
+ * only invoke this for a newly set/changed value — pre-existing legacy values
+ * (e.g. from the retired hardcoded enum) are intentionally left untouched so old
+ * records keep saving.
+ */
+export async function assertActiveIncomingPlanCode(tenantId: string, planCode: string): Promise<void> {
+  const plan = await prisma.qualityInspectionPlan.findFirst({
+    where: { tenantId, planCode, category: 'INCOMING', status: 'ACTIVE', deletedAt: null },
+    select: { id: true },
+  })
+  if (!plan) {
+    throw new ValidationError(
+      `Quality test group "${planCode}" is not an active incoming inspection plan. Create or activate it under Quality \u2192 Inspection Plans, or choose an existing one.`,
+    )
+  }
+}
+
 async function assertParametersExist(tenantId: string, parameterIds: string[]) {
   const unique = [...new Set(parameterIds)]
   for (const parameterId of unique) {

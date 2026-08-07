@@ -196,7 +196,10 @@ export function recalcGrnLineDraft(
   let accepted = received
   let nextRejected = rejected
   if (qcRequired) {
+    // Fully deferred to QC: GRN only captures Received. Accepted/Rejected are
+    // determined when the Quality Inspection completes, not at receiving.
     accepted = 0
+    nextRejected = 0
   } else if (row.receivingCondition === 'DAMAGE' || damaged > 0) {
     nextRejected = Math.max(rejected, damaged)
     accepted = Math.max(0, received - nextRejected)
@@ -211,7 +214,7 @@ export function recalcGrnLineDraft(
     pendingQty: pending,
     receivedQty: received,
     rejectedQty: nextRejected,
-    damagedQty: damaged,
+    damagedQty: qcRequired ? 0 : damaged,
     qcRequired,
     shortCloseRequested: row.closeOpenQuantity,
     userCondition:

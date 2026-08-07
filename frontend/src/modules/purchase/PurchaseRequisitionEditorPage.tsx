@@ -21,6 +21,10 @@ import {
 } from '@/components/purchase/purchaseCardFormShared'
 import { PurchaseRequisitionLinesTable } from '@/components/purchase/PurchaseRequisitionLinesTable'
 import {
+  PurchaseAuditTimeline,
+  buildDemoPurchaseTimeline,
+} from '@/components/purchase/PurchaseAuditTimeline'
+import {
   emptyPurchaseOrderAdjustments,
   computePrOrderDocumentTotals,
   PurchaseOrderAdjustmentsBlock,
@@ -50,7 +54,6 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   createPurchaseRequisition,
-  getApprovalHistory,
   getPurchaseItems,
   getPurchaseRequisitionById,
   getPurchaseSetup,
@@ -67,7 +70,6 @@ import {
   PURCHASE_REQUISITION_TYPE_LABELS,
 } from '@/services/purchase'
 import {
-  type ApprovalHistory,
   type PurchaseItem,
   type PurchaseItemCategory,
   type PurchaseRequisition,
@@ -332,13 +334,13 @@ export function PurchaseRequisitionEditorPage() {
     emptyPurchaseOrderAdjustments,
   )
   const [attachments, setAttachments] = useState<PurchaseRequisitionAttachmentPlaceholder[]>([])
-  const [history, setHistory] = useState<ApprovalHistory[]>([])
   const [createdMeta, setCreatedMeta] = useState({ by: ACTOR.name, at: '' })
   const [updatedMeta, setUpdatedMeta] = useState({ by: '', at: '' })
   const [catalogItems, setCatalogItems] = useState<PurchaseItem[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>([])
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null)
   const [, setLastSavedAt] = useState<Date | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const binOptions = useBinOptions()
@@ -416,9 +418,8 @@ export function PurchaseRequisitionEditorPage() {
     () =>
       approvalActivitySummary({
         statusLabel: PURCHASE_REQUISITION_STATUS_LABELS[status],
-        historyCount: history.length,
       }),
-    [status, history.length],
+    [status],
   )
   const quickEntrySummaryText = useMemo(
     () =>
@@ -672,10 +673,9 @@ export function PurchaseRequisitionEditorPage() {
       setHeader(headerFromPr(pr))
       setLines(linesFromPr(pr))
       setAttachments(pr.attachmentPlaceholders ?? [])
+      setRejectionReason(pr.rejectionReason ?? null)
       setCreatedMeta({ by: pr.createdBy, at: pr.createdAt })
       setUpdatedMeta({ by: pr.updatedBy ?? '', at: pr.updatedAt ?? '' })
-      const hist = await getApprovalHistory(pr.id)
-      if (!cancelled) setHistory(hist)
       resetDirty()
       setLoading(false)
     })()
@@ -819,6 +819,7 @@ export function PurchaseRequisitionEditorPage() {
     try {
       const submitted = await submitPurchaseRequisition(saved.id)
       setStatus(submitted.status)
+      setRejectionReason(submitted.rejectionReason ?? null)
       setDocumentNumber(submitted.documentNumber)
       setUpdatedMeta({ by: submitted.updatedBy ?? '', at: submitted.updatedAt ?? '' })
       notify.success(`${submitted.documentNumber} submitted for approval`)
@@ -1140,7 +1141,7 @@ export function PurchaseRequisitionEditorPage() {
                   disabled={saving}
                   onClick={() => void submitForApproval()}
                 >
-                  Submit for Approval
+                  {status === 'rejected' ? 'Resubmit for Approval' : 'Submit for Approval'}
                 </ErpButton>
               ) : null}
             </ErpButtonGroup>
@@ -1155,6 +1156,15 @@ export function PurchaseRequisitionEditorPage() {
           rfqRequired={header.rfqRequired}
           className="purchase-pr-path-banner"
         />
+
+        {status === 'rejected' ? (
+          <div className="rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-[13px] text-red-900">
+            <p className="font-semibold">Rejected — update this requisition and resubmit for approval.</p>
+            {rejectionReason ? (
+              <p className="mt-1 text-[12px] text-red-800">Reason: {rejectionReason}</p>
+            ) : null}
+          </div>
+        ) : null}
 
         <input
           ref={fileInputRef}
@@ -1603,38 +1613,35 @@ export function PurchaseRequisitionEditorPage() {
         </ErpCardSection>
 
         <ErpCardSection
-          id={purchaseSectionId('timeline')}
-          title="Timeline"
+          id={purchaseSectionId('history')}
+          title="History"
           subtitle="Approval and activity history"
           collapsedSummary={approvalSummaryText || undefined}
           icon={ClipboardList}
           accent="blue"
           collapsible
-          defaultOpen={history.length > 0}
+          defaultOpen={!isNew && Boolean(recordId)}
           columns={1}
           className="crm-lead-zoho-section"
         >
-          {history.length === 0 ? (
-            <p className="text-[12px] text-erp-muted">No approval activity yet.</p>
+          {isNew || !recordId ? (
+            <p className="text-[12px] text-erp-muted">Save the requisition to record history.</p>
           ) : (
-            <ul className="divide-y divide-erp-border rounded-lg border border-erp-border bg-white">
-              {history.map((h) => (
-                <li key={h.id} className="flex justify-between gap-3 px-3 py-2.5 text-[12px]">
-                  <span>
-                    <span className="font-medium capitalize text-erp-text">
-                      {h.action.replace(/_/g, ' ')}
-                    </span>
-                    <span className="text-erp-muted"> · {h.actorName}</span>
-                    {h.remarks ? (
-                      <span className="block text-erp-muted">{h.remarks}</span>
-                    ) : null}
-                  </span>
-                  <span className="shrink-0 tabular-nums text-erp-muted">
-                    {formatDate(h.actedAt.slice(0, 10))}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <PurchaseAuditTimeline
+              entityType="purchase-requisition"
+              entityId={recordId}
+              showTitle={false}
+              className="border-0 p-0 shadow-none"
+              demoEvents={buildDemoPurchaseTimeline({
+                entityId: recordId,
+                entityType: 'PurchaseRequisition',
+                createdAt: createdMeta.at,
+                createdBy: createdMeta.by,
+                updatedAt: updatedMeta.at,
+                updatedBy: updatedMeta.by,
+                statusLabel: PURCHASE_REQUISITION_STATUS_LABELS[status],
+              })}
+            />
           )}
         </ErpCardSection>
       </div>

@@ -33,6 +33,7 @@ import {
   PurchaseOrderWorkflowError,
 } from './purchase-order.errors.js'
 import { ValidationError } from '../../../utils/errors.js'
+import { assertActiveIncomingPlanCode } from '../../quality/inspection-plans/inspection-plan.service.js'
 import {
   assertBackdatedPoReleasedThroughApproval,
   assertPoOrderDateAllowed,
@@ -378,6 +379,27 @@ export function taxAmountFromLineSnapshots(
   )
 }
 
+/**
+ * QC master unification (Phase 1): validate only quality test group codes the user
+ * explicitly set on the line (captured before item-default backfill mutates the
+ * line objects in fillLineMasterSnapshots). Codes auto-filled from the item's own
+ * (possibly legacy) qualityTestGroupCode are not re-validated here — the item
+ * already grandfathers/validates its own value on save.
+ */
+async function assertLineQualityTestGroupCodesIfExplicit(tenantId: string, explicitCodes: Array<string | null>) {
+  const codes = new Set(explicitCodes.filter((c): c is string => Boolean(c)))
+  for (const code of codes) {
+    try {
+      await assertActiveIncomingPlanCode(tenantId, code)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : purchaseMessage(PURCHASE_ERROR_CODE.PO_QUALITY_TEST_GROUP_INVALID)
+      throw new PurchaseOrderValidationError(message, PURCHASE_ERROR_CODE.PO_QUALITY_TEST_GROUP_INVALID, [
+        { field: 'lines.qualityTestGroupCode', message },
+      ])
+    }
+  }
+}
+
 /** Shared PO line pipeline: item UOM enrichment → dual qty normalize → master snapshots. */
 export async function preparePurchaseOrderLinesForCreate(
   tenantId: string,
@@ -390,8 +412,10 @@ export async function preparePurchaseOrderLinesForCreate(
 ) {
   const enrichedLines = await enrichLinesWithItemUom(tenantId, lines)
   const normalized = normalizeLineInputs(enrichedLines)
+  const explicitQualityTestGroupCodes = normalized.map((l) => l.qualityTestGroupCodeSnapshot ?? null)
   const withSnapshots = await fillLineMasterSnapshots(tenantId, normalized, taxContext)
   await assertLineMastersActive(tenantId, withSnapshots)
+  await assertLineQualityTestGroupCodesIfExplicit(tenantId, explicitQualityTestGroupCodes)
   return withSnapshots
 }
 
@@ -596,8 +620,11 @@ export async function updatePurchaseOrder(
       vendorId: input.vendorId ?? existing.vendorId,
       deliveryWarehouseId: input.deliveryWarehouseId ?? existing.deliveryWarehouseId,
     }
-    lines = await fillLineMasterSnapshots(tenantId, normalizeLineInputs(enrichedLines), taxContext)
+    const normalizedForUpdate = normalizeLineInputs(enrichedLines)
+    const explicitQualityTestGroupCodes = normalizedForUpdate.map((l) => l.qualityTestGroupCodeSnapshot ?? null)
+    lines = await fillLineMasterSnapshots(tenantId, normalizedForUpdate, taxContext)
     await assertLineMastersActive(tenantId, lines)
+    await assertLineQualityTestGroupCodesIfExplicit(tenantId, explicitQualityTestGroupCodes)
     // Preserve PR/Planning references when the client resends existing lines by id.
     const existingById = new Map(existing.lines.map((l) => [l.id, l]))
     input.lines.forEach((inputLine, index) => {
