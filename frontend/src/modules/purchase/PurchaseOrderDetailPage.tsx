@@ -340,9 +340,16 @@ export function PurchaseOrderDetailPage() {
     ]
   }, [po])
 
+  // Fall back to header-level GST totals — some lines may not carry a per-line
+  // tax split even though the document clearly has CGST/SGST/IGST on it.
   const lineTaxCols = useMemo(
-    () => resolvePurchaseGstColumnVisibility(po?.lines ?? []),
-    [po?.lines],
+    () =>
+      resolvePurchaseGstColumnVisibility(po?.lines ?? [], {
+        cgst: po?.cgst,
+        sgst: po?.sgst,
+        igst: po?.igst,
+      }),
+    [po?.lines, po?.cgst, po?.sgst, po?.igst],
   )
 
   if (loading || !po) {
