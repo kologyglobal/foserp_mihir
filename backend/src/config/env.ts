@@ -55,6 +55,10 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_BASE_URL: z.string().url().optional(),
+  /** OpenRouter (openai-compatible aggregator) for Copilot / KB chat. Takes priority when set. */
+  OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_MODEL: z.string().optional(),
+  OPENROUTER_BASE_URL: z.string().url().optional(),
   OPENKB_BASE_URL: z.string().url().optional(),
   OPENKB_API_KEY: z.string().optional(),
   KB_EMBEDDING_MODEL: z.string().optional(),

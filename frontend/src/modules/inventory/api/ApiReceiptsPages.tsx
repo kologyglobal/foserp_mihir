@@ -5,10 +5,11 @@
  * stock ledger (`movementType=INWARD`). PO goods receipts live under Purchase GRN.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowDownToLine, PackagePlus, RefreshCw, Lock } from 'lucide-react'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { ArrowDownToLine, PackagePlus, Lock } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { ErpCardFormPage, ErpCardSection, ErpStickySaveBar } from '@/components/erp/card-form'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -21,14 +22,13 @@ import { fetchLookup } from '@/services/api/masterApi'
 import {
   getInventoryLedgerMovement,
   getInventoryPosition,
-  listInventoryLedger,
   postInwardStock,
   type InventoryStockBalance,
   type InventoryStockMovement,
 } from '@/services/api/inventoryApi'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
 import { formatDate } from '@/utils/dates/format'
-import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
+import { StoreMovementRegisterPage } from '../shared/StoreMovementRegisterPage'
 
 interface LookupOption {
   id: string
@@ -85,207 +85,58 @@ function AccessDenied({ title }: { title: string }) {
   )
 }
 
-interface PageMeta {
-  page: number
-  totalPages: number
-  total: number
-}
-
-function Pager({ meta, onPage }: { meta: PageMeta | null; onPage: (page: number) => void }) {
-  if (!meta || meta.totalPages <= 1) return null
-  return (
-    <div className="flex items-center justify-end gap-2 px-3 py-2 text-[12px] text-erp-muted">
-      <span>
-        Page {meta.page} of {meta.totalPages} · {meta.total} rows
-      </span>
-      <Button size="sm" variant="ghost" disabled={meta.page <= 1} onClick={() => onPage(meta.page - 1)}>
-        Prev
-      </Button>
-      <Button size="sm" variant="ghost" disabled={meta.page >= meta.totalPages} onClick={() => onPage(meta.page + 1)}>
-        Next
-      </Button>
-    </div>
-  )
-}
-
 /** Posted inward movements register (live stock receipts). */
 export function ApiReceiptsRegisterPage() {
   const navigate = useNavigate()
   const perms = useInventoryPermissions()
-  const [searchParams] = useSearchParams()
-  const items = useLookupOptions('items')
-  const warehouses = useLookupOptions('warehouses')
-  const [itemId, setItemId] = useState(searchParams.get('itemId') ?? '')
-  const [warehouseId, setWarehouseId] = useState(searchParams.get('warehouseId') ?? '')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [page, setPage] = useState(1)
-  const [rows, setRows] = useState<InventoryStockMovement[]>([])
-  const [meta, setMeta] = useState<PageMeta | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await listInventoryLedger({
-        page,
-        limit: 50,
-        movementType: 'INWARD',
-        itemId: itemId || undefined,
-        warehouseId: warehouseId || undefined,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-      })
-      setRows(res.data ?? [])
-      const m = res.meta as PageMeta | undefined
-      setMeta(m ? { page: m.page, totalPages: m.totalPages, total: m.total } : null)
-    } catch {
-      notify.error('Could not load receipts')
-      setRows([])
-    } finally {
-      setLoading(false)
-    }
-  }, [page, itemId, warehouseId, fromDate, toDate])
-
-  useEffect(() => {
-    void load()
-  }, [load])
 
   if (!perms.canViewReceipts && !perms.canViewStock && !perms.canViewItemLedger) {
     return <AccessDenied title="Receipts" />
   }
 
-  const resetPageAnd = <T,>(setter: (v: T) => void) => (v: T) => {
-    setPage(1)
-    setter(v)
-  }
-
   return (
-    <OperationalPageShell
-      variant="dynamics"
-      layout="enterprise"
-      badge="Store"
+    <StoreMovementRegisterPage
+      pageId="/inventory/movements/receipts"
       title="Receipts"
       description="Live inward stock movements. Purchase-order receipts post via Purchase GRN."
-      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Receipts' }]}
-      autoBreadcrumbs={false}
-      favoritePath="/inventory/movements/receipts"
-      commandBar={(
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={
-            perms.canPostReceipt
-              ? {
-                  id: 'new',
-                  label: 'Direct Receive',
-                  icon: PackagePlus,
-                  onClick: () => navigate('/inventory/movements/receipts/new'),
-                }
-              : undefined
-          }
-          secondaryActions={[
-            { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
-            { id: 'grn', label: 'Open GRN', onClick: () => navigate('/purchase/grn') },
-          ]}
-        />
+      query={{ movementType: 'INWARD' }}
+      detailPathBase="/inventory/movements/receipts"
+      referenceHeader="Reference"
+      referenceCell={(m) => (
+        <span>
+          {m.referenceType}
+          {m.referenceNo ? <span className="text-erp-muted"> · {m.referenceNo}</span> : null}
+        </span>
       )}
-    >
-      <div className="mb-3 flex flex-wrap items-end gap-2">
-        <label className="text-[11px] text-erp-muted">
-          Item
-          <Select wrapClassName="w-64" value={itemId} onChange={(e) => resetPageAnd(setItemId)(e.target.value)}>
-            <option value="">All items</option>
-            {items.map((i) => (
-              <option key={i.id} value={i.id}>{i.label}</option>
-            ))}
-          </Select>
-        </label>
-        <label className="text-[11px] text-erp-muted">
-          Warehouse
-          <Select wrapClassName="w-56" value={warehouseId} onChange={(e) => resetPageAnd(setWarehouseId)(e.target.value)}>
-            <option value="">All warehouses</option>
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>{w.label}</option>
-            ))}
-          </Select>
-        </label>
-        <label className="text-[11px] text-erp-muted">
-          From
-          <Input type="date" className="w-36" value={fromDate} onChange={(e) => resetPageAnd(setFromDate)(e.target.value)} />
-        </label>
-        <label className="text-[11px] text-erp-muted">
-          To
-          <Input type="date" className="w-36" value={toDate} onChange={(e) => resetPageAnd(setToDate)(e.target.value)} />
-        </label>
-      </div>
-
-      {loading ? <LoadingState variant="table" rows={8} /> : null}
-      {!loading && rows.length === 0 ? (
-        <EmptyState
-          icon={ArrowDownToLine}
-          title="No stock received yet"
-          description="For purchase orders use Purchase → GRN (stock updates automatically). Use Direct Receive only for non-PO inward."
-          action={(
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={() => navigate('/purchase/grn')}>
-                Open Purchase GRN
-              </Button>
-              {perms.canPostReceipt ? (
-                <Button size="sm" onClick={() => navigate('/inventory/movements/receipts/new')}>
-                  <PackagePlus className="h-4 w-4" /> Direct Receive
-                </Button>
-              ) : null}
-            </div>
-          )}
-        />
-      ) : null}
-      {!loading && rows.length > 0 ? (
-        <EnterpriseRegisterTableShell>
-          <div className="overflow-x-auto">
-            <table className="erp-table w-full min-w-[980px] text-[13px]">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Movement #</th>
-                  <th>Reference</th>
-                  <th>Item</th>
-                  <th>Warehouse</th>
-                  <th className="text-right">Qty</th>
-                  <th className="text-right">Value</th>
-                  <th className="text-right">Balance After</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((m) => (
-                  <tr key={m.id}>
-                    <td>{formatDate(m.movementDate)}</td>
-                    <td>
-                      <Link
-                        to={`/inventory/movements/receipts/${m.id}`}
-                        className="font-mono font-semibold text-erp-primary hover:underline"
-                      >
-                        {m.movementNumber}
-                      </Link>
-                    </td>
-                    <td>
-                      {m.referenceType}
-                      {m.referenceNo ? <span className="text-erp-muted"> · {m.referenceNo}</span> : null}
-                    </td>
-                    <td>{refLabel(m.item, m.itemId)}</td>
-                    <td>{refLabel(m.warehouse, m.warehouseId)}</td>
-                    <td className="text-right tabular-nums font-semibold text-emerald-700">{fmtQty(m.quantity)}</td>
-                    <td className="text-right tabular-nums">{fmtQty(m.value)}</td>
-                    <td className="text-right tabular-nums">{fmtQty(m.balanceAfter)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pager meta={meta} onPage={setPage} />
-        </EnterpriseRegisterTableShell>
-      ) : null}
-    </OperationalPageShell>
+      primaryAction={
+        perms.canPostReceipt
+          ? {
+              id: 'new',
+              label: 'Direct Receive',
+              icon: PackagePlus,
+              onClick: () => navigate('/inventory/movements/receipts/new'),
+            }
+          : undefined
+      }
+      secondaryActions={[
+        { id: 'grn', label: 'Open GRN', onClick: () => navigate('/purchase/grn') },
+      ]}
+      emptyIcon={ArrowDownToLine}
+      emptyTitle="No stock received yet"
+      emptyDescription="For purchase orders use Purchase → GRN (stock updates automatically). Use Direct Receive only for non-PO inward."
+      emptyAction={(
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => navigate('/purchase/grn')}>
+            Open Purchase GRN
+          </Button>
+          {perms.canPostReceipt ? (
+            <Button size="sm" onClick={() => navigate('/inventory/movements/receipts/new')}>
+              <PackagePlus className="h-4 w-4" /> Direct Receive
+            </Button>
+          ) : null}
+        </div>
+      )}
+    />
   )
 }
 
@@ -358,39 +209,30 @@ export function ApiReceiptPostPage() {
   if (!perms.canPostReceipt) return <AccessDenied title="Direct Receive" />
 
   return (
-    <OperationalPageShell
+    <ErpCardFormPage
       variant="dynamics"
-      layout="enterprise"
       badge="Store"
       title="Direct Receive"
       description="Posts an inward movement to live stock. For purchase-order receipts use Purchase GRN."
-      breadcrumbs={[
-        { label: 'Store', to: '/inventory' },
-        { label: 'Receipts', to: '/inventory/movements/receipts' },
-        { label: 'Direct Receive' },
-      ]}
-      autoBreadcrumbs={false}
       favoritePath="/inventory/movements/receipts/new"
-      commandBar={(
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={{
-            id: 'post',
-            label: busy ? 'Posting…' : 'Post Receipt',
-            onClick: () => void submit(),
-            disabled: busy,
-          }}
-          secondaryActions={[
-            { id: 'cancel', label: 'Cancel', onClick: () => navigate('/inventory/movements/receipts') },
-            { id: 'grn', label: 'Open GRN', onClick: () => navigate('/purchase/grn') },
-          ]}
+      backLink={{ to: '/inventory/movements/receipts', label: 'Back to Receipts' }}
+      stickyFooter
+      footer={(
+        <ErpStickySaveBar
+          sticky
+          submitLabel="Post Receipt"
+          isSubmitting={busy}
+          onSave={() => void submit()}
+          cancelTo="/inventory/movements/receipts"
+          cancelLabel="Cancel"
+          hint="Posts the inward movement to live stock immediately."
         />
       )}
+      onSaveShortcut={() => void submit()}
     >
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SectionCard title="Receipt">
+          <ErpCardSection title="Receipt">
             <div className="grid gap-3 sm:grid-cols-2">
               <FormField label="Item" required>
                 <Select value={form.itemId} onChange={(e) => setForm((f) => ({ ...f, itemId: e.target.value }))}>
@@ -440,11 +282,11 @@ export function ApiReceiptPostPage() {
                 <Textarea rows={2} value={form.remarks} onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))} />
               </FormField>
             </div>
-          </SectionCard>
+          </ErpCardSection>
         </div>
 
-        <div className="space-y-3">
-          <SectionCard title="Current Position">
+        <div className="space-y-4">
+          <ErpCardSection title="Current Position">
             {position ? (
               <dl className="space-y-1 text-[13px]">
                 <div className="flex justify-between"><dt className="text-erp-muted">On hand</dt><dd className="tabular-nums font-semibold">{fmtQty(position.onHandQty)}</dd></div>
@@ -454,8 +296,8 @@ export function ApiReceiptPostPage() {
             ) : (
               <p className="text-[12px] text-erp-muted">Select an item and warehouse to see the live position.</p>
             )}
-          </SectionCard>
-          <SectionCard title="Also available">
+          </ErpCardSection>
+          <ErpCardSection title="Also available">
             <ul className="space-y-1 text-[12px]">
               <li>
                 <Link to="/purchase/grn" className="font-semibold text-erp-primary hover:underline">Purchase GRN</Link>
@@ -466,10 +308,10 @@ export function ApiReceiptPostPage() {
                 {' '}— all movement types
               </li>
             </ul>
-          </SectionCard>
+          </ErpCardSection>
         </div>
       </div>
-    </OperationalPageShell>
+    </ErpCardFormPage>
   )
 }
 

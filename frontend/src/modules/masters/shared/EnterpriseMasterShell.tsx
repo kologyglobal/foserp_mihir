@@ -84,6 +84,7 @@ export function MasterStickyFooter({
   isSubmitting,
   hint,
   isEdit,
+  hideSaveClose,
 }: {
   onSave: () => void
   onSaveClose?: () => void
@@ -92,12 +93,14 @@ export function MasterStickyFooter({
   isSubmitting?: boolean
   hint?: ReactNode
   isEdit?: boolean
+  /** Footer shows Save + Cancel only — omit the Save & Close shortcut. */
+  hideSaveClose?: boolean
 }) {
   return (
     <ErpStickySaveBar
       onCancel={onCancel}
       onSave={onSave}
-      onSaveAndClose={onSaveClose}
+      onSaveAndClose={hideSaveClose ? undefined : onSaveClose}
       onSaveAndNew={isEdit ? undefined : onSaveNew}
       isSubmitting={isSubmitting}
       hint={hint}
@@ -420,6 +423,12 @@ export interface StandardMasterFormShellProps {
   onCancel: () => void
   onSubmit: (e: FormEvent) => void
   children: ReactNode
+  /** Setup-style form — no document strip / created-by stat card, minimal header. */
+  minimalChrome?: boolean
+  /** Omit the header command bar (Save / Save & Close / Save & New) — sticky footer only. */
+  hideCommandBar?: boolean
+  /** Sticky footer shows Save + Cancel only — omit Save & Close. */
+  hideFooterSaveClose?: boolean
 }
 
 /** Full SAP / BC card form shell — used by FormLayout and complex master forms */
@@ -452,6 +461,9 @@ export function StandardMasterFormShell({
   onCancel,
   onSubmit,
   children,
+  minimalChrome,
+  hideCommandBar,
+  hideFooterSaveClose,
 }: StandardMasterFormShellProps) {
   const sections = sectionNavItems ?? [{ id: 'general', label: 'General', icon: FileText, done: true }]
 
@@ -464,6 +476,7 @@ export function StandardMasterFormShell({
       favoritePath={favoritePath ?? listPath}
       recordNo={recordNo}
       isActive={isActive}
+      minimalChrome={minimalChrome}
       documentStrip={documentStrip}
       recordAudit={recordAudit}
       pendingAuditUserName={pendingAuditUserName}
@@ -479,17 +492,19 @@ export function StandardMasterFormShell({
       formMetrics={formMetrics}
       factBoxTitle={factBoxTitle}
       factBoxSummary={factBoxSummary}
-      commandBar={(
-        <MasterFormCommandBar
-          listPath={listPath}
-          isEdit={isEdit}
-          isSubmitting={isSubmitting}
-          onSave={onSave}
-          onSaveClose={onSaveClose}
-          onSaveNew={onSaveNew}
-          onCancel={onCancel}
-        />
-      )}
+      commandBar={
+        hideCommandBar ? undefined : (
+          <MasterFormCommandBar
+            listPath={listPath}
+            isEdit={isEdit}
+            isSubmitting={isSubmitting}
+            onSave={onSave}
+            onSaveClose={onSaveClose}
+            onSaveNew={onSaveNew}
+            onCancel={onCancel}
+          />
+        )
+      }
       stickyFooter={(
         <MasterStickyFooter
           isEdit={isEdit}
@@ -499,6 +514,7 @@ export function StandardMasterFormShell({
           onSaveClose={onSaveClose}
           onSaveNew={onSaveNew}
           onCancel={onCancel}
+          hideSaveClose={hideFooterSaveClose}
         />
       )}
     >

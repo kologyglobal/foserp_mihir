@@ -113,4 +113,44 @@ describe('dedupePurchaseTimelineEvents', () => {
     expect(merged).toHaveLength(2)
     expect(merged.map((row) => row.actionLabel).sort()).toEqual(['Created', 'Submitted'])
   })
+
+  it('merges PO_ prefixed audit actions with unprefixed status_history rows', () => {
+    const merged = dedupePurchaseTimelineEvents([
+      event({
+        id: 'audit:1',
+        source: 'audit',
+        action: 'PO_SUBMITTED',
+        actionLabel: 'Submitted',
+        newValue: { status: 'PENDING_APPROVAL' },
+      }),
+      event({
+        id: 'status:1',
+        source: 'status_history',
+        action: 'SUBMITTED',
+        actionLabel: 'Submitted',
+        previousValue: { status: 'DRAFT' },
+        newValue: { status: 'PENDING_APPROVAL' },
+      }),
+      event({
+        id: 'audit:2',
+        source: 'audit',
+        action: 'PO_APPROVED',
+        actionLabel: 'Approved',
+        timestamp: '2026-08-07T09:17:00.000Z',
+        newValue: { status: 'SENT_TO_VENDOR' },
+      }),
+      event({
+        id: 'status:2',
+        source: 'status_history',
+        action: 'APPROVED',
+        actionLabel: 'Approved',
+        timestamp: '2026-08-07T09:17:02.000Z',
+        previousValue: { status: 'PENDING_APPROVAL' },
+        newValue: { status: 'SENT_TO_VENDOR' },
+      }),
+    ])
+
+    expect(merged).toHaveLength(2)
+    expect(merged.map((row) => row.actionLabel).sort()).toEqual(['Approved', 'Submitted'])
+  })
 })

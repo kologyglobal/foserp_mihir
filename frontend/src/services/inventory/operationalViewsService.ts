@@ -656,11 +656,88 @@ export async function listVendorOpsSummaries(): Promise<VendorOpsSummary[]> {
     .sort((a, b) => b.totalQtySupplied - a.totalQtySupplied)
 }
 
-export async function getItemStock360(itemId: string, warehouseId?: string): Promise<ItemStock360 | null> {
-  const item = await getItemById(itemId)
+/**
+ * Raw (warehouse-agnostic) data bundle for Item Stock 360.
+ * All network calls live here; the warehouse filter is applied in memory during
+ * assembly, so switching the warehouse on the page never refetches.
+ */
+type ItemStock360Raw = {
+  item: Awaited<ReturnType<typeof getItemById>>
+  grns: GoodsReceiptNote[]
+  pos: PurchaseOrder[]
+  returns: PurchaseReturn[]
+  balances: Awaited<ReturnType<typeof loadBalancesRaw>>
+  lineage: Awaited<ReturnType<typeof inventoryApi.getInventoryItemLineage>>['data'] | null
+  lots: Awaited<ReturnType<typeof inventoryApi.listInventoryLots>>['data'] | null
+  serialsFallback: Awaited<ReturnType<typeof inventoryApi.listInventorySerials>>['data'] | null
+  movements: inventoryApi.InventoryStockMovement[]
+  transfersRaw: Array<Record<string, unknown>>
+  reservationsRaw: Array<Record<string, unknown>>
+}
 
-  const { grns, pos, returns } = await loadDocs()
-  const balances = await loadBalancesRaw({ itemId })
+const STOCK360_CACHE_TTL_MS = 60_000
+const stock360RawCache = new Map<string, { at: number; promise: Promise<ItemStock360Raw> }>()
+
+async function fetchItemStock360Raw(itemId: string): Promise<ItemStock360Raw> {
+  const [item, docs, balances, lineage, movements, transfersRaw, reservationsRaw] = await Promise.all([
+    getItemById(itemId),
+    loadDocs(),
+    loadBalancesRaw({ itemId }),
+    inventoryApi
+      .getInventoryItemLineage(itemId)
+      .then((r) => r.data ?? null)
+      .catch(() => null),
+    inventoryApi
+      .listInventoryLedger({ itemId, limit: 200 })
+      .then((r) =>
+        Array.isArray(r) ? r : ((r as { data?: inventoryApi.InventoryStockMovement[] }).data ?? []),
+      )
+      .catch(() => [] as inventoryApi.InventoryStockMovement[]),
+    inventoryApiFacade
+      .listTransfers({ itemId, limit: 100 } as never)
+      .then((r) => (Array.isArray(r) ? r : ((r as { data?: unknown[] }).data ?? [])) as Array<Record<string, unknown>>)
+      .catch(() => [] as Array<Record<string, unknown>>),
+    inventoryApiFacade
+      .listReservations({ itemId, limit: 100 })
+      .then((r) => (Array.isArray(r) ? r : ((r as { data?: unknown[] }).data ?? [])) as Array<Record<string, unknown>>)
+      .catch(() => [] as Array<Record<string, unknown>>),
+  ])
+  // Tracking fallbacks only matter when the lineage endpoint is unavailable.
+  const [lots, serialsFallback] = lineage
+    ? [null, null]
+    : await Promise.all([
+        inventoryApi
+          .listInventoryLots({ itemId, limit: 200 })
+          .then((r) => r.data ?? [])
+          .catch(() => null),
+        inventoryApi
+          .listInventorySerials({ itemId, limit: 200 })
+          .then((r) => r.data ?? [])
+          .catch(() => null),
+      ])
+  return { item, ...docs, balances, lineage, lots, serialsFallback, movements, transfersRaw, reservationsRaw }
+}
+
+function loadItemStock360Raw(itemId: string, refresh?: boolean): Promise<ItemStock360Raw> {
+  const now = Date.now()
+  const hit = stock360RawCache.get(itemId)
+  if (!refresh && hit && now - hit.at < STOCK360_CACHE_TTL_MS) return hit.promise
+  const promise = fetchItemStock360Raw(itemId)
+  stock360RawCache.set(itemId, { at: now, promise })
+  // Never cache a failed bundle.
+  promise.catch(() => {
+    if (stock360RawCache.get(itemId)?.promise === promise) stock360RawCache.delete(itemId)
+  })
+  return promise
+}
+
+export async function getItemStock360(
+  itemId: string,
+  warehouseId?: string,
+  opts?: { refresh?: boolean },
+): Promise<ItemStock360 | null> {
+  const raw = await loadItemStock360Raw(itemId, opts?.refresh)
+  const { item, grns, pos, returns, balances } = raw
   const filtered = warehouseId
     ? balances.filter((b) => b.warehouseId === warehouseId)
     : balances
@@ -703,12 +780,10 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
   const receiptSummary = buildReceiptSummary(itemId, receipts)
   const purchaseSummary = buildPurchaseSummary(itemId, pos, grns, returns)
 
-  // Batches
+  // Batches — from the cached raw bundle; warehouse filter is in-memory only.
   let batches: BatchStockSlice[] = []
-  try {
-    const lineageRes = await inventoryApi.getInventoryItemLineage(itemId)
-    const lineage = lineageRes.data
-    for (const batch of lineage.batches ?? []) {
+  if (raw.lineage) {
+    for (const batch of raw.lineage.batches ?? []) {
       for (const bal of batch.balances ?? []) {
         if (warehouseId && bal.warehouseId !== warehouseId) continue
         batches.push({
@@ -720,22 +795,16 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
         })
       }
     }
-  } catch {
-    try {
-      const lotsRes = await inventoryApi.listInventoryLots({ itemId, limit: 200 })
-      const list = lotsRes.data ?? []
-      batches = list
-        .filter((l) => !warehouseId || l.warehouseId === warehouseId)
-        .map((l) => ({
-          batchNo: l.lotNumber,
-          warehouseName: warehouses.find((w) => w.warehouseId === l.warehouseId)?.warehouseName ?? '-',
-          qty: num(l.quantityOnHand),
-          status: l.status,
-          expiryDate: l.expiryDate,
-        }))
-    } catch {
-      batches = []
-    }
+  } else if (raw.lots) {
+    batches = raw.lots
+      .filter((l) => !warehouseId || l.warehouseId === warehouseId)
+      .map((l) => ({
+        batchNo: l.lotNumber,
+        warehouseName: warehouses.find((w) => w.warehouseId === l.warehouseId)?.warehouseName ?? '-',
+        qty: num(l.quantityOnHand),
+        status: l.status,
+        expiryDate: l.expiryDate,
+      }))
   }
 
   // Bins — document destinations only (no bin balance SoT)
@@ -763,10 +832,8 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
 
   // Serials — tracking masters + document references (never a fake consolidated balance)
   let serials: SerialStockSlice[] = []
-  try {
-    const lineageRes = await inventoryApi.getInventoryItemLineage(itemId)
-    const linSerials = lineageRes.data?.serials ?? []
-    serials = linSerials
+  if (raw.lineage) {
+    serials = (raw.lineage.serials ?? [])
       .filter((s) => !warehouseId || !s.warehouseId || s.warehouseId === warehouseId)
       .map((s) => ({
         serialNo: s.serialNumber,
@@ -775,19 +842,16 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
         source: 'master' as const,
         sourceDocumentNo: null,
       }))
-  } catch {
-    try {
-      const listRes = await inventoryApi.listInventorySerials({ itemId, limit: 200, warehouseId })
-      serials = (listRes.data ?? []).map((s) => ({
+  } else if (raw.serialsFallback) {
+    serials = raw.serialsFallback
+      .filter((s) => !warehouseId || !s.warehouseId || s.warehouseId === warehouseId)
+      .map((s) => ({
         serialNo: s.serialNumber,
         warehouseName: warehouses.find((w) => w.warehouseId === s.warehouseId)?.warehouseName ?? '-',
         status: s.status,
         source: 'master' as const,
         sourceDocumentNo: s.sourceReferenceNo ?? null,
       }))
-    } catch {
-      serials = []
-    }
   }
   // Document serial snapshots from GRNs (unmerged, audit only)
   const serialSeen = new Set(serials.map((s) => s.serialNo.toLowerCase()))
@@ -811,80 +875,54 @@ export async function getItemStock360(itemId: string, warehouseId?: string): Pro
     }
   }
 
-  // Issues
-  let issues: ItemStock360['issues'] = []
-  try {
-    const ledgerRes = await inventoryApi.listInventoryLedger({
-      itemId,
-      limit: 100,
-      warehouseId: warehouseId || undefined,
-    })
-    const movements = Array.isArray(ledgerRes)
-      ? ledgerRes
-      : (ledgerRes as { data?: inventoryApi.InventoryStockMovement[] }).data ?? []
-    issues = movements
-      .filter((m) => m.movementType === 'ISSUE' || String(m.referenceType).includes('ISSUE'))
-      .map((m) => ({
-        id: m.id,
-        date: m.movementDate?.slice(0, 10) ?? m.createdAt?.slice(0, 10) ?? '',
-        number: m.movementNumber,
-        qty: num(m.quantity),
-        reference: m.referenceNo ?? m.referenceType,
-        href: `/inventory/ledger?itemId=${itemId}`,
-      }))
-  } catch {
-    issues = []
-  }
+  // Issues — ledger movements from the raw bundle, warehouse-filtered in memory.
+  const issues: ItemStock360['issues'] = raw.movements
+    .filter((m) => !warehouseId || m.warehouseId === warehouseId)
+    .filter((m) => m.movementType === 'ISSUE' || String(m.referenceType).includes('ISSUE'))
+    .map((m) => ({
+      id: m.id,
+      date: m.movementDate?.slice(0, 10) ?? m.createdAt?.slice(0, 10) ?? '',
+      number: m.movementNumber,
+      qty: num(m.quantity),
+      reference: m.referenceNo ?? m.referenceType,
+      href: `/inventory/ledger?itemId=${itemId}`,
+    }))
 
   // Transfers
-  let transfers: ItemStock360['transfers'] = []
-  try {
-    const tRes = await inventoryApiFacade.listTransfers({ itemId, limit: 100 } as never)
-    const tList = Array.isArray(tRes) ? tRes : (tRes as { data?: unknown[] }).data ?? []
-    transfers = (tList as Array<Record<string, unknown>>).flatMap((t) => {
-      const lines = (t.lines as Array<Record<string, unknown>> | undefined) ?? []
-      const matchLines = lines.filter((l) => l.itemId === itemId)
-      if (matchLines.length === 0 && t.itemId !== itemId) return []
-      const qtyLines = matchLines.length > 0 ? matchLines : [{ qty: t.qty, quantity: t.quantity }]
-      return qtyLines.map((line, idx) => ({
-        id: `${String(t.id)}-${idx}`,
-        date: String(t.documentDate ?? t.transferDate ?? t.createdAt ?? '').slice(0, 10),
-        number: String(t.documentNumber ?? t.transferNumber ?? t.id),
-        fromWh: String(t.fromWarehouseName ?? t.sourceWarehouseName ?? t.fromWarehouseId ?? '-'),
-        toWh: String(t.toWarehouseName ?? t.destinationWarehouseName ?? t.toWarehouseId ?? '-'),
-        qty: num((line as { qty?: number; quantity?: number; transferQty?: number }).transferQty
-          ?? (line as { qty?: number }).qty
-          ?? (line as { quantity?: number }).quantity),
-        href: `/inventory/movements/transfers/${String(t.id)}`,
-      }))
-    })
-  } catch {
-    transfers = []
-  }
+  const transfers: ItemStock360['transfers'] = raw.transfersRaw.flatMap((t) => {
+    const lines = (t.lines as Array<Record<string, unknown>> | undefined) ?? []
+    const matchLines = lines.filter((l) => l.itemId === itemId)
+    if (matchLines.length === 0 && t.itemId !== itemId) return []
+    const qtyLines = matchLines.length > 0 ? matchLines : [{ qty: t.qty, quantity: t.quantity }]
+    return qtyLines.map((line, idx) => ({
+      id: `${String(t.id)}-${idx}`,
+      date: String(t.documentDate ?? t.transferDate ?? t.createdAt ?? '').slice(0, 10),
+      number: String(t.documentNumber ?? t.transferNumber ?? t.id),
+      fromWh: String(t.fromWarehouseName ?? t.sourceWarehouseName ?? t.fromWarehouseId ?? '-'),
+      toWh: String(t.toWarehouseName ?? t.destinationWarehouseName ?? t.toWarehouseId ?? '-'),
+      qty: num((line as { qty?: number; quantity?: number; transferQty?: number }).transferQty
+        ?? (line as { qty?: number }).qty
+        ?? (line as { quantity?: number }).quantity),
+      href: `/inventory/movements/transfers/${String(t.id)}`,
+    }))
+  })
 
   // Reservations
-  let reservations: ItemStock360['reservations'] = []
-  try {
-    const rRes = await inventoryApiFacade.listReservations({ itemId, limit: 100 })
-    const rList = Array.isArray(rRes) ? rRes : (rRes as { data?: unknown[] }).data ?? []
-    reservations = (rList as Array<Record<string, unknown>>)
-      .filter((r) => !warehouseId || r.warehouseId === warehouseId)
-      .map((r) => {
-        const qtyRaw = r.remainingQty ?? r.qty ?? r.quantity
-        return {
-          id: String(r.id),
-          qty: num(typeof qtyRaw === 'number' || typeof qtyRaw === 'string' ? qtyRaw : null),
-          demandType: String(r.demandType ?? r.source ?? '-'),
-          referenceNo: String(r.referenceNo ?? r.demandId ?? '-'),
-          warehouseName:
-            warehouses.find((w) => w.warehouseId === r.warehouseId)?.warehouseName ??
-            String(r.warehouseName ?? r.warehouseId ?? '-'),
-          status: String(r.status ?? '-'),
-        }
-      })
-  } catch {
-    reservations = []
-  }
+  const reservations: ItemStock360['reservations'] = raw.reservationsRaw
+    .filter((r) => !warehouseId || r.warehouseId === warehouseId)
+    .map((r) => {
+      const qtyRaw = r.remainingQty ?? r.qty ?? r.quantity
+      return {
+        id: String(r.id),
+        qty: num(typeof qtyRaw === 'number' || typeof qtyRaw === 'string' ? qtyRaw : null),
+        demandType: String(r.demandType ?? r.source ?? '-'),
+        referenceNo: String(r.referenceNo ?? r.demandId ?? '-'),
+        warehouseName:
+          warehouses.find((w) => w.warehouseId === r.warehouseId)?.warehouseName ??
+          String(r.warehouseName ?? r.warehouseId ?? '-'),
+        status: String(r.status ?? '-'),
+      }
+    })
 
   // Timeline
   const timeline: ItemTimelineEvent[] = []

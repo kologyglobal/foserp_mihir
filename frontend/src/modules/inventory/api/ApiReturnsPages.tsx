@@ -6,10 +6,10 @@
  * run from the Work Order Materials tab.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Lock, PackagePlus, RefreshCw, RotateCcw } from 'lucide-react'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Lock, PackagePlus, RotateCcw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { ErpCardFormPage, ErpCardSection, ErpStickySaveBar } from '@/components/erp/card-form'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { Button } from '@/components/ui/Button'
@@ -24,14 +24,13 @@ import { listWorkOrders } from '@/services/api/manufacturingApi'
 import {
   getInventoryLedgerMovement,
   getInventoryPosition,
-  listInventoryLedger,
   postReturnFromWorkOrder,
   type InventoryStockBalance,
   type InventoryStockMovement,
 } from '@/services/api/inventoryApi'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
 import { formatDate } from '@/utils/dates/format'
-import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
+import { StoreMovementRegisterPage } from '../shared/StoreMovementRegisterPage'
 
 interface LookupOption {
   id: string
@@ -112,29 +111,6 @@ function AccessDenied({ title }: { title: string }) {
   )
 }
 
-interface PageMeta {
-  page: number
-  totalPages: number
-  total: number
-}
-
-function Pager({ meta, onPage }: { meta: PageMeta | null; onPage: (page: number) => void }) {
-  if (!meta || meta.totalPages <= 1) return null
-  return (
-    <div className="flex items-center justify-end gap-2 px-3 py-2 text-[12px] text-erp-muted">
-      <span>
-        Page {meta.page} of {meta.totalPages} · {meta.total} rows
-      </span>
-      <Button size="sm" variant="ghost" disabled={meta.page <= 1} onClick={() => onPage(meta.page - 1)}>
-        Prev
-      </Button>
-      <Button size="sm" variant="ghost" disabled={meta.page >= meta.totalPages} onClick={() => onPage(meta.page + 1)}>
-        Next
-      </Button>
-    </div>
-  )
-}
-
 function isReturnMovement(m: InventoryStockMovement): boolean {
   return m.referenceType === 'RETURN_FROM_WO'
 }
@@ -143,183 +119,55 @@ function isReturnMovement(m: InventoryStockMovement): boolean {
 export function ApiReturnsRegisterPage() {
   const navigate = useNavigate()
   const perms = useInventoryPermissions()
-  const [searchParams] = useSearchParams()
-  const items = useLookupOptions('items')
-  const warehouses = useLookupOptions('warehouses')
-  const [itemId, setItemId] = useState(searchParams.get('itemId') ?? '')
-  const [warehouseId, setWarehouseId] = useState(searchParams.get('warehouseId') ?? '')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [page, setPage] = useState(1)
-  const [rows, setRows] = useState<InventoryStockMovement[]>([])
-  const [meta, setMeta] = useState<PageMeta | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await listInventoryLedger({
-        page,
-        limit: 50,
-        referenceType: 'RETURN_FROM_WO',
-        itemId: itemId || undefined,
-        warehouseId: warehouseId || undefined,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-      })
-      setRows(res.data ?? [])
-      const m = res.meta as PageMeta | undefined
-      setMeta(m ? { page: m.page, totalPages: m.totalPages, total: m.total } : null)
-    } catch {
-      notify.error('Could not load returns')
-      setRows([])
-    } finally {
-      setLoading(false)
-    }
-  }, [page, itemId, warehouseId, fromDate, toDate])
-
-  useEffect(() => {
-    void load()
-  }, [load])
 
   if (!perms.canViewReturns && !perms.canViewStock && !perms.canViewItemLedger) {
     return <AccessDenied title="Returns" />
   }
 
-  const resetPageAnd = <T,>(setter: (v: T) => void) => (v: T) => {
-    setPage(1)
-    setter(v)
-  }
-
   return (
-    <OperationalPageShell
-      variant="dynamics"
-      layout="enterprise"
-      badge="Store"
+    <StoreMovementRegisterPage
+      pageId="/inventory/movements/returns"
       title="Returns"
       description="Live material returns from work orders. You can also return from the Work Order Materials tab."
-      breadcrumbs={[{ label: 'Store', to: '/inventory' }, { label: 'Returns' }]}
-      autoBreadcrumbs={false}
-      favoritePath="/inventory/movements/returns"
-      commandBar={(
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={
-            perms.canPostReturn || perms.canCreateReturn
-              ? {
-                  id: 'new',
-                  label: 'New Return',
-                  icon: PackagePlus,
-                  onClick: () => navigate('/inventory/movements/returns/new'),
-                }
-              : undefined
-          }
-          secondaryActions={[
-            { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
-            { id: 'wo', label: 'Open Work Orders', onClick: () => navigate('/manufacturing/work-orders') },
-          ]}
-        />
-      )}
-    >
-      <div className="mb-3 flex flex-wrap items-end gap-2">
-        <label className="text-[11px] text-erp-muted">
-          Item
-          <Select wrapClassName="w-64" value={itemId} onChange={(e) => resetPageAnd(setItemId)(e.target.value)}>
-            <option value="">All items</option>
-            {items.map((i) => (
-              <option key={i.id} value={i.id}>{i.label}</option>
-            ))}
-          </Select>
-        </label>
-        <label className="text-[11px] text-erp-muted">
-          Warehouse
-          <Select wrapClassName="w-56" value={warehouseId} onChange={(e) => resetPageAnd(setWarehouseId)(e.target.value)}>
-            <option value="">All warehouses</option>
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>{w.label}</option>
-            ))}
-          </Select>
-        </label>
-        <label className="text-[11px] text-erp-muted">
-          From
-          <Input type="date" className="w-36" value={fromDate} onChange={(e) => resetPageAnd(setFromDate)(e.target.value)} />
-        </label>
-        <label className="text-[11px] text-erp-muted">
-          To
-          <Input type="date" className="w-36" value={toDate} onChange={(e) => resetPageAnd(setToDate)(e.target.value)} />
-        </label>
-      </div>
-
-      {loading ? <LoadingState variant="table" rows={8} /> : null}
-      {!loading && rows.length === 0 ? (
-        <EmptyState
-          icon={RotateCcw}
-          title="No returns posted yet"
-          description="Post a return from work order here, or use the Work Order Materials tab."
-          action={
-            perms.canPostReturn || perms.canCreateReturn ? (
-              <Button size="sm" onClick={() => navigate('/inventory/movements/returns/new')}>
-                <PackagePlus className="h-4 w-4" /> New Return
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : null}
-      {!loading && rows.length > 0 ? (
-        <EnterpriseRegisterTableShell>
-          <div className="overflow-x-auto">
-            <table className="erp-table w-full min-w-[980px] text-[13px]">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Movement #</th>
-                  <th>Work Order</th>
-                  <th>Item</th>
-                  <th>Warehouse</th>
-                  <th className="text-right">Qty</th>
-                  <th className="text-right">Value</th>
-                  <th className="text-right">Balance After</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((m) => (
-                  <tr key={m.id}>
-                    <td>{formatDate(m.movementDate)}</td>
-                    <td>
-                      <Link
-                        to={`/inventory/movements/returns/${m.id}`}
-                        className="font-mono font-semibold text-erp-primary hover:underline"
-                      >
-                        {m.movementNumber}
-                      </Link>
-                    </td>
-                    <td className="font-mono text-[12px]">
-                      {m.workOrderId ? (
-                        <Link
-                          to={`/manufacturing/work-orders/${m.workOrderId}`}
-                          className="text-erp-primary hover:underline"
-                        >
-                          {m.referenceNo ?? m.workOrderId.slice(0, 8)}
-                        </Link>
-                      ) : (
-                        m.referenceNo ?? '-'
-                      )}
-                    </td>
-                    <td>{refLabel(m.item, m.itemId)}</td>
-                    <td>{refLabel(m.warehouse, m.warehouseId)}</td>
-                    <td className="text-right tabular-nums font-semibold text-emerald-700">{fmtQty(m.quantity)}</td>
-                    <td className="text-right tabular-nums">{fmtQty(m.value)}</td>
-                    <td className="text-right tabular-nums">{fmtQty(m.balanceAfter)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pager meta={meta} onPage={setPage} />
-        </EnterpriseRegisterTableShell>
-      ) : null}
-    </OperationalPageShell>
+      query={{ referenceType: 'RETURN_FROM_WO' }}
+      detailPathBase="/inventory/movements/returns"
+      referenceHeader="Work Order"
+      referenceCell={(m) =>
+        m.workOrderId ? (
+          <Link
+            to={`/manufacturing/work-orders/${m.workOrderId}`}
+            className="font-mono text-[12px] text-erp-primary hover:underline"
+          >
+            {m.referenceNo ?? m.workOrderId.slice(0, 8)}
+          </Link>
+        ) : (
+          <span className="font-mono text-[12px]">{m.referenceNo ?? '-'}</span>
+        )
+      }
+      primaryAction={
+        perms.canPostReturn || perms.canCreateReturn
+          ? {
+              id: 'new',
+              label: 'New Return',
+              icon: PackagePlus,
+              onClick: () => navigate('/inventory/movements/returns/new'),
+            }
+          : undefined
+      }
+      secondaryActions={[
+        { id: 'wo', label: 'Open Work Orders', onClick: () => navigate('/manufacturing/work-orders') },
+      ]}
+      emptyIcon={RotateCcw}
+      emptyTitle="No returns posted yet"
+      emptyDescription="Post a return from work order here, or use the Work Order Materials tab."
+      emptyAction={
+        perms.canPostReturn || perms.canCreateReturn ? (
+          <Button size="sm" onClick={() => navigate('/inventory/movements/returns/new')}>
+            <PackagePlus className="h-4 w-4" /> New Return
+          </Button>
+        ) : undefined
+      }
+    />
   )
 }
 
@@ -396,20 +244,30 @@ export function ApiReturnPostPage() {
   if (!perms.canPostReturn && !perms.canCreateReturn) return <AccessDenied title="New Return" />
 
   return (
-    <div className="erp-page">
-      <PageHeader
-        title="New Return"
-        description="Posts a return-from-work-order movement to live stock."
-        breadcrumbs={[
-          { label: 'Store', to: '/inventory/stock' },
-          { label: 'Returns', to: '/inventory/movements/returns' },
-          { label: 'New' },
-        ]}
-      />
-
+    <ErpCardFormPage
+      variant="dynamics"
+      badge="Store"
+      title="New Return"
+      description="Posts a return-from-work-order movement to live stock."
+      favoritePath="/inventory/movements/returns/new"
+      backLink={{ to: '/inventory/movements/returns', label: 'Back to Returns' }}
+      stickyFooter
+      footer={(
+        <ErpStickySaveBar
+          sticky
+          submitLabel="Post Return"
+          isSubmitting={busy}
+          onSave={() => void submit()}
+          cancelTo="/inventory/movements/returns"
+          cancelLabel="Cancel"
+          hint="Posts the return-from-work-order movement to live stock immediately."
+        />
+      )}
+      onSaveShortcut={() => void submit()}
+    >
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SectionCard title="Return">
+          <ErpCardSection title="Return">
             <div className="grid gap-3 sm:grid-cols-2">
               <FormField label="Work Order" required className="sm:col-span-2">
                 <Select value={form.workOrderId} onChange={(e) => setForm((f) => ({ ...f, workOrderId: e.target.value }))}>
@@ -467,19 +325,11 @@ export function ApiReturnPostPage() {
                 <Textarea rows={2} value={form.remarks} onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))} />
               </FormField>
             </div>
-            <div className="mt-3 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => navigate('/inventory/movements/returns')}>
-                Cancel
-              </Button>
-              <Button disabled={busy} onClick={() => void submit()}>
-                {busy ? 'Posting…' : 'Post Return'}
-              </Button>
-            </div>
-          </SectionCard>
+          </ErpCardSection>
         </div>
 
-        <div className="space-y-3">
-          <SectionCard title="Current Position">
+        <div className="space-y-4">
+          <ErpCardSection title="Current Position">
             {position ? (
               <dl className="space-y-1 text-[13px]">
                 <div className="flex justify-between"><dt className="text-erp-muted">On hand</dt><dd className="tabular-nums font-semibold">{fmtQty(position.onHandQty)}</dd></div>
@@ -489,8 +339,8 @@ export function ApiReturnPostPage() {
             ) : (
               <p className="text-[12px] text-erp-muted">Select an item and warehouse to see the live position.</p>
             )}
-          </SectionCard>
-          <SectionCard title="Also available">
+          </ErpCardSection>
+          <ErpCardSection title="Also available">
             <ul className="space-y-1 text-[12px]">
               <li>
                 <Link to="/manufacturing/work-orders" className="font-semibold text-erp-primary hover:underline">Work Orders</Link>
@@ -501,10 +351,10 @@ export function ApiReturnPostPage() {
                 {' '}— all movement types
               </li>
             </ul>
-          </SectionCard>
+          </ErpCardSection>
         </div>
       </div>
-    </div>
+    </ErpCardFormPage>
   )
 }
 

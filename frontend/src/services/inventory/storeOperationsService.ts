@@ -129,8 +129,10 @@ export async function getStoreDashboard(): Promise<StoreDashboardData> {
       href: '/quality/incoming',
     },
     {
+      // Counts GRNs awaiting inventory post — true "pending put-away" needs
+      // bin-level stock, which is not a ledger dimension yet.
       id: 'pendingPutAway',
-      label: 'Pending Put Away',
+      label: 'Awaiting Inventory Post',
       value: pendingPutAway,
       tone: pendingPutAway > 0 ? 'warning' : 'ok',
       href: '/inventory/store/put-away',
@@ -140,14 +142,14 @@ export async function getStoreDashboard(): Promise<StoreDashboardData> {
       label: "Today's Receipt",
       value: todayReceipt,
       tone: 'default',
-      href: '/inventory/store/timeline',
+      href: '/inventory/ledger',
     },
     {
       id: 'todayIssue',
       label: "Today's Issue",
       value: todayIssue,
       tone: 'default',
-      href: '/inventory/store/timeline',
+      href: '/inventory/ledger',
     },
     {
       id: 'lowStock',
@@ -175,14 +177,15 @@ export async function getStoreDashboard(): Promise<StoreDashboardData> {
       label: 'Pending Transfer',
       value: pendingTransfer,
       tone: pendingTransfer > 0 ? 'warning' : 'ok',
-      href: '/inventory/store/transfer',
+      // ?status=_open pre-applies the register's "Open (any active)" filter.
+      href: '/inventory/store/transfer?status=_open',
     },
     {
       id: 'pendingCount',
       label: 'Pending Count',
       value: pendingCount,
       tone: pendingCount > 0 ? 'warning' : 'ok',
-      href: '/inventory/store/count',
+      href: '/inventory/store/count?status=_open',
     },
     {
       id: 'reservations',

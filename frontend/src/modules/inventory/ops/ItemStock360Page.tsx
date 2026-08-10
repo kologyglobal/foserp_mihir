@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowDownToLine,
@@ -6,7 +6,6 @@ import {
   ArrowUpFromLine,
   Package,
   RefreshCw,
-  ScanLine,
   Search,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -160,17 +159,28 @@ export function ItemStock360Page() {
       .catch(() => setSearchHits([]))
   }, [searchQ])
 
+  // Track what's on screen so warehouse/tab switches re-filter without a full-page shimmer.
+  const loadedItemRef = useRef<string | null>(null)
+  const lastTokenRef = useRef(0)
+
   const load = useCallback(async () => {
     if (!itemId) return
-    void token
-    setLoading(true)
+    const isItemChange = loadedItemRef.current !== itemId
+    const isManualRefresh = token !== lastTokenRef.current
+    lastTokenRef.current = token
+    // Shimmer only when there is nothing to show yet; warehouse changes are an
+    // in-memory re-filter (service caches the raw bundle), so keep content up.
+    if (isItemChange) setLoading(true)
     setError(false)
     try {
-      const d = await getItemStock360(itemId, warehouseId)
+      const d = await getItemStock360(itemId, warehouseId, { refresh: isManualRefresh })
       if (!d) {
         setData(null)
         setError(true)
-      } else setData(d)
+      } else {
+        setData(d)
+        loadedItemRef.current = itemId
+      }
     } catch {
       setData(null)
       setError(true)
@@ -278,12 +288,6 @@ export function ItemStock360Page() {
               label: 'Transfer',
               icon: ArrowLeftRight,
               onClick: () => navigate('/inventory/store/transfer'),
-            },
-            {
-              id: 'scan',
-              label: 'Scan',
-              icon: ScanLine,
-              onClick: () => navigate('/inventory/store/scan'),
             },
             {
               id: 'refresh',

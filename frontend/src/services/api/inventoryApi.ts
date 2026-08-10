@@ -62,6 +62,11 @@ export interface InventoryStockBalance {
   inTransitQty?: string | number
   avgRate?: string | number
   stockValue?: string | number
+  /** Stock (base) UOM code, e.g. KG — present on list responses. */
+  primaryUomCode?: string | null
+  purchaseUomCode?: string | null
+  uomQuantity?: string | number
+  uomConversionFactor?: string | number
   item?: InventoryRefSummary
   warehouse?: InventoryRefSummary
   updatedAt?: string

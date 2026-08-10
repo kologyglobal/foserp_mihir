@@ -63,6 +63,8 @@ export const INVENTORY_PERMISSIONS = [
   'inventory.stock_count.request_recount',
   'inventory.stock_count.approve',
   'inventory.stock_count.post',
+  /** Supervisor override — posted document reversals (counts/adjustments). */
+  'inventory.override',
 ] as const
 
 export type InventoryPermission = (typeof INVENTORY_PERMISSIONS)[number]

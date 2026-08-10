@@ -136,14 +136,15 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Store Home', path: '/inventory', icon: LayoutDashboard, end: true, workspace: true },
       { label: 'Item Stock 360', path: '/inventory/stock', icon: Package },
       { label: 'Receive', path: '/inventory/store/receive', icon: ArrowDownToLine },
-      { label: 'Put Away', path: '/inventory/store/put-away', icon: Warehouse },
+      { label: 'Put Away (Preview)', path: '/inventory/store/put-away', icon: Warehouse },
       { label: 'Reservations', path: '/inventory/store/reservations', icon: ClipboardList },
-      { label: 'Material Picking', path: '/inventory/store/picking', icon: ClipboardList },
+      { label: 'Material Picking (Preview)', path: '/inventory/store/picking', icon: ClipboardList },
       { label: 'Issue', path: '/inventory/store/issue', icon: ArrowUpFromLine },
       { label: 'Transfer', path: '/inventory/store/transfer', icon: GitBranch },
       { label: 'Stock Count', path: '/inventory/store/count', icon: ClipboardList },
-      { label: 'Scan', path: '/inventory/store/scan', icon: ScanLine },
-      { label: 'Timeline', path: '/inventory/store/timeline', icon: ClipboardList },
+      /** Scan hub hidden from the rail for now — deep link /inventory/store/scan still works */
+      { label: 'Scan', path: '/inventory/store/scan', icon: ScanLine, subNav: false },
+      { label: 'Stock Ledger', path: '/inventory/ledger', icon: BookOpen },
       { label: 'Reports', path: '/inventory/reports', icon: BarChart3 },
       { label: 'Setup', path: '/inventory/setup', icon: Settings2 },
       /** Hidden from workspace rail — power-user registers, still deep-linkable */
@@ -156,7 +157,6 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Returns', path: '/inventory/movements/returns', icon: RotateCcw, subNav: false },
       { label: 'Stock Count (register)', path: '/inventory/stock-count', icon: ClipboardList, subNav: false },
       /** Legacy routes — kept for bookmarks / deep links; hidden from workspace tabs */
-      { label: 'Stock Ledger', path: '/inventory/ledger', icon: BookOpen, subNav: false },
       { label: 'Reservations (register)', path: '/inventory/reservations', icon: ClipboardList, subNav: false },
       { label: 'Opening Stock', path: '/inventory/opening-stock', icon: ClipboardList, subNav: false },
       { label: 'Material Inward', path: '/inventory/inward', icon: ArrowDownToLine, subNav: false },

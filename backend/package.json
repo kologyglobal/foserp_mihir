@@ -7,7 +7,7 @@
     "node": ">=20 <=22"
   },
   "scripts": {
-    "predev": "npm run db:generate",
+    "predev": "node scripts/ensure-prisma-client.mjs",
     "dev": "tsx watch src/server.ts",
     "build": "node scripts/build-hostinger-deploy.mjs",
     "build:app": "node scripts/ensure-prisma-client.mjs && node scripts/clean-dist.mjs && node scripts/compile-dist.mjs && node scripts/verify-dist-critical.mjs",

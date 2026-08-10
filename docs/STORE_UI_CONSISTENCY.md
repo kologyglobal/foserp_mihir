@@ -27,7 +27,7 @@ Store surfaces (hub choice cards, ops summary cards) must stretch to fill the ma
 
 The **workspace header tab bar** (`WorkspaceUnifiedHeader` / `DynamicsTabs`) already provides navigation across all Store nav-rail destinations, so an in-page “Back to Store” link on those pages is redundant chrome.
 
-- **Tab-bar-level pages** — dashboard (`StoreDashboardPage`), hubs/choosers (`StoreOpHub`: Receive/Issue/Transfer/Put Away/Picking/Count/Scan), workbenches (`PutAwayWorkbenchPage`), and registers reachable directly from the Store nav rail (`StoreReservationsPage`, `InventoryTimelinePage`, `ConsolidatedStockPage`, `InventoryItemsListPage`, …) — **never** pass `backLink` to `OperationalPageShell`. The tab bar is the only Back affordance here.
+- **Tab-bar-level pages** — dashboard (`StoreDashboardPage`), hubs/choosers (`StoreOpHub`: Receive/Issue/Transfer/Put Away/Picking/Count/Scan), workbenches (`PutAwayWorkbenchPage`), and registers reachable directly from the Store nav rail (`StoreReservationsPage`, `ApiStockLedgerPage`, `ConsolidatedStockPage`, `InventoryItemsListPage`, …) — **never** pass `backLink` to `OperationalPageShell`. The tab bar is the only Back affordance here.
 - **True drill-in views** — pages reached by clicking a row/record from a register, not from the nav rail (`ItemStock360Page`, `InventoryItemDetailPage`, `InventoryStockDetailPage`, and equivalents) — **do** get `backLink={{ to: <parent register>, label: '…' }}` pointing at the register they drilled in from.
 - Don’t duplicate the shell’s `backLink` with a second “Back to …” button/link inside the page body (empty-state action buttons, section headers) — one Back affordance per page.
 
@@ -52,12 +52,24 @@ Status/severity chips (`SeverityBadge`, Put Away card top-line, Reservations sta
 
 ## Command bars
 
-Registers/hubs/workbenches render actions via `ErpCommandBar` (`commandBar` prop on `OperationalPageShell`/`InventoryCostingShell`) — Refresh as `primaryAction`, navigation links as `secondaryActions`. Don't render a raw `flex` row of `<button>`/`<Link>` for page-level actions (`StoreDashboardPage`, `PutAwayWorkbenchPage`, `StoreReservationsPage`, `InventoryTimelinePage` all follow this now, matching `ConsolidatedStockPage` / `WarehouseOpsDashboardPage`). Filter chips/selects (e.g. the timeline kind filter) are page content, not command-bar actions — leave those in the body.
+Registers/hubs/workbenches render actions via `ErpCommandBar` (`commandBar` prop on `OperationalPageShell`/`InventoryCostingShell`) — Refresh as `primaryAction`, navigation links as `secondaryActions`. Don't render a raw `flex` row of `<button>`/`<Link>` for page-level actions (`StoreDashboardPage`, `PutAwayWorkbenchPage`, `StoreReservationsPage`, `ApiStockLedgerPage` all follow this now, matching `ConsolidatedStockPage` / `WarehouseOpsDashboardPage`). Filter chips/selects are page content, not command-bar actions — leave those in the body.
+
+## Register list pages (standard chrome)
+
+Store registers follow `docs/PURCHASE_LIST_PAGE_STANDARD.md` via two shared scaffolds:
+
+| Piece | Path |
+|-------|------|
+| Register scaffold | `frontend/src/modules/inventory/shared/StoreRegisterListPage.tsx` |
+| Movement-register wrapper | `frontend/src/modules/inventory/shared/StoreMovementRegisterPage.tsx` |
+
+`StoreRegisterListPage` provides: `OperationalPageShell` (dynamics/enterprise) + `ErpCommandBar`, `EnterpriseRegisterTableShell` + `DataGrid` with embedded `CrmListFilterBar` (search / Sort / View / Save view / Columns / Filters), `CrmFilterDrawer` with sectioned fields, `useSavedViews` + `SaveViewDialog`, and DataGrid's themed pagination + column show/reorder persistence (keyed by route). Callers own data loading (one large page, client-side filter/sort) and pass final rows + `ColumnDef`s.
+
+Converted registers: Transfers / Adjustments / Stock Counts (`ApiInventoryDocumentsPage`), Receipts + Returns (`StoreMovementRegisterPage`), Reservations (`ApiReservationsPage`, inline create panel via `beforeTable`). New Store list pages must use the scaffold — do not hand-roll `<table>` registers.
 
 ## Known debt (intentionally out of scope for the visual pass)
 
-- Most live registers (`api/ApiStockLedgerPage.tsx`, receipts/returns/documents/reservations, costing tables) still render plain `<table>`s rather than `CrmListFilterBar` / `CrmFilterDrawer` / `useSavedViews` / `ErpDataGrid`. They already inherit the dense Zoho table look via the blanket `.store-zoho-register table thead th / tbody td` rules, so this is a structural/architecture gap, not a visual one — full parity with Purchase's register shell is a separate, larger effort.
-- No saved views / column show-reorder on Store registers (Purchase gold-path pattern) — same reason as above.
+- Report-style pages (`ApiStockBalancesPage`, `ApiStockLedgerPage`, costing tables) keep server-side pagination with the lightweight `Pager` — the ledger can exceed the client-side register model. Bring them onto the scaffold only with server-side DataGrid pagination support.
 
 ## Shells
 

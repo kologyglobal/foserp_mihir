@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -10,12 +10,22 @@ import {
   Factory,
   Package,
   PackageOpen,
-  ScanLine,
+  Plus,
   Settings2,
   Truck,
   Wrench,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
+import { LoadingState } from '@/design-system/components/LoadingState'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Button } from '@/components/ui/Button'
+import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
+import { formatDate } from '@/utils/dates/format'
+import { formatNumber } from '@/utils/formatters/currency'
+import { notify } from '@/store/toastStore'
+import { listInventoryStockCounts, type ApiInventoryDocument } from '@/services/api/inventoryDocumentsApi'
 import { cn } from '@/utils/cn'
 
 export type StoreOpChoice = {
@@ -177,18 +187,10 @@ export function MaterialReceiptHubPage() {
         },
         {
           id: 'return-rev',
-          title: 'Return / reverse path',
-          description: 'Purchase return documents and inventory returns register.',
+          title: 'Production material return',
+          description: 'Material returned from work orders back to store (inward).',
           href: '/inventory/movements/returns',
           icon: Package,
-          group: 'Other Receipts',
-        },
-        {
-          id: 'scan',
-          title: 'Scan to receive',
-          description: 'Barcode-assisted goods receipt movement.',
-          href: '/inventory/scan/receive',
-          icon: ScanLine,
           group: 'Other Receipts',
         },
       ]}
@@ -243,6 +245,14 @@ export function MaterialIssueHubPage() {
           description: 'Stock adjustment decrease when a count is not required.',
           href: '/inventory/movements/adjustments/new',
           icon: Settings2,
+          group: 'Issue types',
+        },
+        {
+          id: 'vendor-return',
+          title: 'Vendor Return',
+          description: 'Return rejected or excess stock to the supplier — purchase return document (outward).',
+          href: '/purchase/returns',
+          icon: Truck,
           group: 'Issue types',
         },
         {
@@ -337,14 +347,6 @@ export function PutAwayHubPage() {
           badge: 'Suggested path',
           group: 'Put-away',
         },
-        {
-          id: 'scan',
-          title: 'Scan to transfer',
-          description: 'Barcode-assisted put-away move.',
-          href: '/inventory/scan/transfer',
-          icon: ScanLine,
-          group: 'Put-away',
-        },
       ]}
     />
   )
@@ -353,8 +355,8 @@ export function PutAwayHubPage() {
 export function PickingHubPage() {
   return (
     <StoreOpHub
-      title="Material Picking"
-      description="Reservation-based picking for sales, production, transfer, and maintenance."
+      title="Material Picking (Preview)"
+      description="Reservation-based picking helper for sales, production, transfer, and maintenance. Bin-directed picking arrives with bin-level stock."
       favoritePath="/inventory/store/picking"
       choices={[
         {
@@ -404,49 +406,147 @@ export function PickingHubPage() {
   )
 }
 
+const STOCK_COUNT_STATUS_TONE: Record<string, 'neutral' | 'pending' | 'info' | 'warning' | 'success' | 'critical'> = {
+  DRAFT: 'neutral',
+  SNAPSHOTTED: 'pending',
+  COUNTING: 'pending',
+  SUBMITTED: 'info',
+  APPROVED: 'warning',
+  POSTED: 'success',
+  REVERSED: 'critical',
+}
+
+function countNumber(row: ApiInventoryDocument): string {
+  return row.countNumber ?? row.id.slice(0, 8)
+}
+
+function countVarianceSummary(row: ApiInventoryDocument): string {
+  const lines = row.lines ?? []
+  if (lines.length === 0) return '-'
+  const withVariance = lines.filter((l) => l.countedQty != null && Number(l.varianceQty ?? 0) !== 0)
+  if (withVariance.length === 0) return lines.some((l) => l.countedQty != null) ? 'No variance' : '-'
+  return `${withVariance.length} of ${lines.length} lines`
+}
+
 export function StockCountHubPage() {
+  const navigate = useNavigate()
+  const [rows, setRows] = useState<ApiInventoryDocument[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await listInventoryStockCounts({ page: 1, limit: 20 })
+      setRows(res.data ?? [])
+      setTotal(res.meta?.total ?? (res.data ?? []).length)
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : 'Could not load stock counts')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
   return (
-    <StoreOpHub
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Store"
       title="Stock Count"
-      description="Cycle / physical counts → variance → approval → adjustment through existing count engine."
-      favoritePath="/inventory/store/count"
-      choices={[
-        {
-          id: 'new',
-          title: 'Start count',
-          description: 'Snapshot system qty then enter physical count (manual / barcode).',
-          href: '/inventory/stock-count/new',
-          icon: ClipboardList,
-          badge: 'Cycle / physical',
-          primary: true,
-          group: 'Count',
-        },
-        {
-          id: 'open',
-          title: 'Open counts',
-          description: 'Resume counting, approve, post variance.',
-          href: '/inventory/stock-count',
-          icon: Package,
-          group: 'Count',
-        },
-        {
-          id: 'adjust',
-          title: 'Adjustments',
-          description: 'Manual stock adjustment when count is not required.',
-          href: '/inventory/movements/adjustments/new',
-          icon: Settings2,
-          group: 'Count',
-        },
-        {
-          id: 'scan',
-          title: 'Scan assist',
-          description: 'Barcode scan to identify item then count.',
-          href: '/inventory/store/scan',
-          icon: ScanLine,
-          group: 'Count',
-        },
+      description="Cycle / physical counts → variance → approval → adjustment through the live count engine."
+      showDescription
+      breadcrumbs={[
+        { label: 'Store', to: '/inventory' },
+        { label: 'Stock Count' },
       ]}
-    />
+      autoBreadcrumbs={false}
+      favoritePath="/inventory/store/count"
+      commandBar={(
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={{
+            id: 'new',
+            label: 'Start Count',
+            icon: Plus,
+            onClick: () => navigate('/inventory/stock-count/new'),
+          }}
+          secondaryActions={[
+            {
+              id: 'adjust',
+              label: 'Adjustments',
+              icon: Settings2,
+              onClick: () => navigate('/inventory/movements/adjustments/new'),
+            },
+          ]}
+        />
+      )}
+    >
+      <div className="store-ops-page">
+        <p className="store-op-hub__note">
+          Snapshot system qty, enter the physical count (manual / barcode), then approve and post the variance.
+          Prefer an adjustment instead when a full count is not required.
+        </p>
+
+        {loading ? <LoadingState variant="table" rows={6} /> : null}
+
+        {!loading && rows.length === 0 ? (
+          <EmptyState
+            icon={ClipboardList}
+            title="No stock counts yet"
+            description="Start a cycle or physical count to snapshot system quantities and enter a physical count."
+            action={<Button size="sm" onClick={() => navigate('/inventory/stock-count/new')}>Start Count</Button>}
+          />
+        ) : null}
+
+        {!loading && rows.length > 0 ? (
+          <EnterpriseRegisterTableShell>
+            <div className="overflow-x-auto">
+              <table className="erp-table w-full min-w-[900px] text-[13px]">
+                <thead>
+                  <tr>
+                    <th>Count #</th>
+                    <th>Warehouse</th>
+                    <th>Status</th>
+                    <th>Count Date</th>
+                    <th className="text-right">Lines</th>
+                    <th>Variance</th>
+                    <th aria-hidden />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => navigate(`/inventory/stock-count/${row.id}`)}
+                    >
+                      <td className="font-mono">{countNumber(row)}</td>
+                      <td>{row.warehouse ? `${row.warehouse.code} — ${row.warehouse.name}` : row.warehouseId ?? '-'}</td>
+                      <td><DynamicsStatusChip label={row.status} tone={STOCK_COUNT_STATUS_TONE[row.status] ?? 'neutral'} /></td>
+                      <td>{row.countDate ? formatDate(row.countDate) : '-'}</td>
+                      <td className="text-right tabular-nums">{formatNumber(row.lines?.length ?? 0)}</td>
+                      <td className="text-erp-muted">{countVarianceSummary(row)}</td>
+                      <td><ChevronRight className="h-4 w-4 text-erp-muted" aria-hidden /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {total > rows.length ? (
+              <div className="flex items-center justify-end px-3 py-2 text-[12px] text-erp-muted">
+                Showing {rows.length} of {total} ·{' '}
+                <button type="button" className="ml-1 text-erp-primary hover:underline" onClick={() => navigate('/inventory/stock-count')}>
+                  View all counts
+                </button>
+              </div>
+            ) : null}
+          </EnterpriseRegisterTableShell>
+        ) : null}
+      </div>
+    </OperationalPageShell>
   )
 }
 

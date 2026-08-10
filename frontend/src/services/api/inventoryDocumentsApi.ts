@@ -12,12 +12,17 @@ const query = (params?: Query) => {
 export interface ApiInventoryDocumentLine {
   id: string
   itemId: string
+  item?: { id: string; code: string; name: string }
   quantity?: string | number
   requestedQty?: string | number
   dispatchedQty?: string | number
   receivedQty?: string | number
+  /** Absent on blind counts (redacted server-side without reveal permission). */
+  systemQty?: string | number
   countedQty?: string | number | null
   varianceQty?: string | number
+  rate?: string | number | null
+  remarks?: string | null
 }
 
 export interface ApiInventoryDocument {
@@ -31,8 +36,12 @@ export interface ApiInventoryDocument {
   adjustmentDate?: string
   fromWarehouseId?: string
   toWarehouseId?: string
+  fromWarehouse?: { id: string; code: string; name: string }
+  toWarehouse?: { id: string; code: string; name: string }
   warehouseId?: string
+  warehouse?: { id: string; code: string; name: string }
   reason?: string
+  remarks?: string | null
   lines?: ApiInventoryDocumentLine[]
   createdAt: string
 }
@@ -133,6 +142,12 @@ export function postInventoryStockCount(id: string) {
     method: 'POST', body: JSON.stringify({ idempotencyKey: `spa-count-${id}` }),
   })
 }
+export function reverseInventoryStockCount(id: string, remarks?: string) {
+  return apiRequest<ApiInventoryDocument>(tenantPath(`/inventory/stock-counts/${id}/reverse`), {
+    method: 'POST',
+    body: JSON.stringify({ idempotencyKey: `spa-count-rev-${id}`, remarks: remarks || undefined }),
+  })
+}
 
 export function listInventoryAdjustments(params?: Query) {
   return apiRequest<ApiInventoryDocument[]>(`${tenantPath('/inventory/adjustments')}${query(params)}`)
@@ -164,5 +179,11 @@ export function approveInventoryAdjustment(id: string) {
 export function postInventoryAdjustment(id: string) {
   return apiRequest<ApiInventoryDocument>(tenantPath(`/inventory/adjustments/${id}/post`), {
     method: 'POST', body: JSON.stringify({ idempotencyKey: `spa-adjustment-${id}` }),
+  })
+}
+export function reverseInventoryAdjustment(id: string, remarks?: string) {
+  return apiRequest<ApiInventoryDocument>(tenantPath(`/inventory/adjustments/${id}/reverse`), {
+    method: 'POST',
+    body: JSON.stringify({ idempotencyKey: `spa-adjustment-rev-${id}`, remarks: remarks || undefined }),
   })
 }
