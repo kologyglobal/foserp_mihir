@@ -50,4 +50,11 @@ router.post(
   controller.deactivateParameter,
 )
 
+router.delete(
+  '/:id',
+  validateParams(uuidParamSchema),
+  requirePermission('quality.edit'),
+  controller.deleteParameter,
+)
+
 export default router
