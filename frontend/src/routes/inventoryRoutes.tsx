@@ -12,7 +12,6 @@ import {
   BarcodeHubPage,
 } from '@/modules/inventory/store/StoreOperationHubs'
 import { PutAwayWorkbenchPage } from '@/modules/inventory/store/PutAwayWorkbenchPage'
-import { InventoryTimelinePage } from '@/modules/inventory/store/InventoryTimelinePage'
 import { StoreReservationsPage } from '@/modules/inventory/store/StoreReservationsPage'
 import { InventoryItemsListPage } from '@/modules/inventory/items/InventoryItemsListPage'
 import { InventoryItemFormPage } from '@/modules/inventory/items/InventoryItemFormPage'
@@ -70,6 +69,7 @@ import {
   ApiMovementPostPage,
   ApiInventoryDocumentsPage,
 } from '@/modules/inventory/api/ApiInventoryPages'
+import { ApiStockCountWorkbenchPage } from '@/modules/inventory/api/ApiStockCountWorkbenchPage'
 import {
   ApiReceiptsRegisterPage,
   ApiReceiptPostPage,
@@ -113,7 +113,7 @@ const inventoryRoutePaths: RouteObject[] = [
   { path: 'inventory/store/picking', element: <PickingHubPage /> },
   { path: 'inventory/store/count', element: <StockCountHubPage /> },
   { path: 'inventory/store/scan', element: <BarcodeHubPage /> },
-  { path: 'inventory/store/timeline', element: <InventoryTimelinePage /> },
+  { path: 'inventory/store/timeline', element: <Navigate to="/inventory/ledger" replace /> },
   { path: 'inventory/store/reservations', element: <StoreReservationsPage /> },
   { path: 'inventory/items', element: <InventoryItemsListPage /> },
   { path: 'inventory/items/new', element: <InventoryItemFormPage /> },
@@ -202,12 +202,14 @@ const apiInventoryRoutes: Record<string, ReactElement> = {
   'inventory/store': <StoreDashboardPage />,
   'inventory/store/receive': <MaterialReceiptHubPage />,
   'inventory/store/issue': <MaterialIssueHubPage />,
-  'inventory/store/transfer': <StockTransferHubPage />,
+  // Transfer hub shows the live transfers register directly (hub options live on its command bar).
+  'inventory/store/transfer': <ApiInventoryDocumentsPage kind="transfers" />,
   'inventory/store/put-away': <PutAwayWorkbenchPage />,
   'inventory/store/picking': <PickingHubPage />,
-  'inventory/store/count': <StockCountHubPage />,
+  // Count hub shows the live stock-count register directly (standard list page with pagination).
+  'inventory/store/count': <ApiInventoryDocumentsPage kind="stock-counts" />,
   'inventory/store/scan': <BarcodeHubPage />,
-  'inventory/store/timeline': <InventoryTimelinePage />,
+  'inventory/store/timeline': <Navigate to="/inventory/ledger" replace />,
   'inventory/store/reservations': <StoreReservationsPage />,
   'inventory/store-workbench': <StoreWorkbenchPage />,
   'inventory/items': <InventoryItemsListPage />,
@@ -267,7 +269,7 @@ const apiInventoryRoutes: Record<string, ReactElement> = {
   'inventory/movements/adjustments/:id': <ApiInventoryDocumentsPage kind="adjustments" />,
   'inventory/stock-count': <ApiInventoryDocumentsPage kind="stock-counts" />,
   'inventory/stock-count/new': <ApiInventoryDocumentsPage kind="stock-counts" />,
-  'inventory/stock-count/:id': <ApiInventoryDocumentsPage kind="stock-counts" />,
+  'inventory/stock-count/:id': <ApiStockCountWorkbenchPage />,
   'inventory/transfers': <Navigate to="/inventory/movements/transfers" replace />,
   'inventory/counts': <Navigate to="/inventory/stock-count" replace />,
   'inventory/traceability': <Navigate to="/manufacturing/traceability" replace />,

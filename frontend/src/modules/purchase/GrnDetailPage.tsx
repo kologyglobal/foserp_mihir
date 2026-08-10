@@ -705,8 +705,14 @@ export function GrnDetailPage() {
                   const returnedTotal = l.returnedQty ?? returnRows.reduce((s, r) => s + r.returnQuantity, 0)
                   const hasReturns = returnedTotal > 0
                   const reversedQty = Number(l.reversedQty) || 0
-                  const netReceived = l.receivedQty - returnedTotal - reversedQty
-                  const netAccepted = l.acceptedQty - returnedTotal - (Number(l.reversedAcceptedQty) || 0)
+                  const netReceived = Math.max(0, l.receivedQty - returnedTotal - reversedQty)
+                  // Returns can be fulfilled from received-but-not-yet-accepted stock (e.g. no
+                  // QC line where acceptedQty was never synced to receivedQty) — never show a
+                  // negative "net accepted" just because the return exceeded the accepted bucket.
+                  const netAccepted = Math.max(
+                    0,
+                    l.acceptedQty - returnedTotal - (Number(l.reversedAcceptedQty) || 0),
+                  )
                   const lineUom = l.uom?.trim() || '-'
                   const baseUom = getPurchaseLineBaseUomCode(l.itemId) || lineUom
                   const dualReceived = purchaseLineHasDualUom({

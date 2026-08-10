@@ -77,14 +77,6 @@ export function ConsolidatedStockPage() {
   const [allWh, setAllWh] = useState<Array<[string, string]>>([])
   const whOptions = allWh.length > 0 ? allWh : warehouses
 
-  const kpis = useMemo(() => {
-    const items = new Set(rows.map((r) => r.itemId)).size
-    const low = rows.filter((r) => r.status === 'low').length
-    const out = rows.filter((r) => r.status === 'out').length
-    const value = rows.reduce((s, r) => s + r.stockValue, 0)
-    return { items, low, out, value }
-  }, [rows])
-
   const applySearch = () => {
     const next = new URLSearchParams(params)
     if (search) next.set('q', search)
@@ -213,13 +205,6 @@ export function ConsolidatedStockPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath="/inventory/stock"
-      kpiStrip={[
-        { id: 'sku', label: 'Balance rows', value: rows.length, accent: 'blue' },
-        { id: 'items', label: 'Items', value: kpis.items, accent: 'slate' },
-        { id: 'low', label: 'Low stock', value: kpis.low, accent: kpis.low ? 'amber' : 'green' },
-        { id: 'out', label: 'Out of stock', value: kpis.out, accent: kpis.out ? 'red' : 'green' },
-        { id: 'val', label: 'Stock value', value: formatCurrency(kpis.value), accent: 'slate' },
-      ]}
       commandBar={(
         <ErpCommandBar
           inline

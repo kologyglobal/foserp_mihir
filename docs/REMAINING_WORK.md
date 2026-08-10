@@ -4,6 +4,18 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Open — Store Phase 2: Dual-Variable UOM architecture (decision gate)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory / Store |
+| Description | Phase 1 Store stabilisation shipped 2026-08-10 (stock count workbench, adjustment lifecycle, honest nav). Phase 2A design doc + schema proposal for catch-weight (`DUAL_VARIABLE`) inventory written — **awaiting product answers** (item classification, tolerance %, cutover, valuation confirmation) before migration. Shared movement-line editor (2B) and ad-hoc movement reversal (2C) are sequenced after 2A. |
+| Doc | [`docs/inventory/DUAL_VARIABLE_UOM_DESIGN.md`](inventory/DUAL_VARIABLE_UOM_DESIGN.md) |
+| Status | **open — blocked on product decision** (§11 of the doc) |
+| Next step | Answer §11 questions → migration `inventory_dual_variable_uom` → posting-engine dual support → acceptance scenarios §10 |
+
+---
+
 ## Open — Indian GST Compliance Platform (post Phase 18)
 
 | Field | Value |

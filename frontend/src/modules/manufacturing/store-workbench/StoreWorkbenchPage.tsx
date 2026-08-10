@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Package, RotateCcw, Route, ShieldAlert, Warehouse } from 'lucide-react'
 import { isApiMode } from '@/config/apiConfig'
@@ -20,7 +20,6 @@ import { canViewStoreWorkbench } from '@/utils/permissions/manufacturing'
 import { canInventoryPermission } from '@/utils/permissions/inventory'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
-import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import { ProductionEmptyState, ProductionPageHeader } from '../ui'
 
 type WorkbenchTab =
@@ -125,52 +124,6 @@ export function StoreWorkbenchPage() {
     if (hasAccess && isApiMode() && !loading) void loadRows(tab)
   }, [hasAccess, tab, loading, loadRows])
 
-  const kpiStrip = useMemo<EnterpriseKpiItem[]>(
-    () => [
-      {
-        id: 'waitingReservation',
-        label: 'Production requests',
-        value: summary.kpis.waitingReservation,
-        accent: 'amber',
-        active: tab === 'to_reserve',
-        onClick: () => setTab('to_reserve'),
-      },
-      {
-        id: 'waitingIssue',
-        label: 'Material to issue',
-        value: summary.kpis.waitingIssue,
-        accent: 'blue',
-        active: tab === 'to_issue',
-        onClick: () => setTab('to_issue'),
-      },
-      {
-        id: 'waitingReturns',
-        label: 'Shop returns',
-        value: summary.kpis.waitingReturns,
-        accent: 'slate',
-        active: tab === 'returns',
-        onClick: () => setTab('returns'),
-      },
-      {
-        id: 'waitingWip',
-        label: 'WIP moves',
-        value: summary.kpis.waitingWip,
-        accent: 'blue',
-        active: tab === 'wip',
-        onClick: () => setTab('wip'),
-      },
-      {
-        id: 'waitingFg',
-        label: 'Finished goods',
-        value: summary.kpis.waitingFg,
-        accent: 'green',
-        active: tab === 'finished_goods',
-        onClick: () => setTab('finished_goods'),
-      },
-    ],
-    [summary.kpis, tab],
-  )
-
   if (!hasAccess) {
     return (
       <ProductionPageHeader title="Store Workbench" favoritePath="/manufacturing/store-workbench">
@@ -221,7 +174,6 @@ export function StoreWorkbenchPage() {
             ]
           : undefined
       }
-      kpiStrip={isApiMode() && !loading ? kpiStrip : undefined}
       filterBar={
         isApiMode() ? (
           <div className="flex flex-wrap items-center gap-1">

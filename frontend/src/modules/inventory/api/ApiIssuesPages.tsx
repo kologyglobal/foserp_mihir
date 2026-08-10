@@ -32,6 +32,8 @@ import {
 } from '@/design-system/enterprise/EnterpriseTablePrimitives'
 import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { ErpSegmentedControl } from '@/components/erp/ErpSegmentedControl'
+import { ErpCardFormPage, ErpStickySaveBar } from '@/components/erp/card-form'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
@@ -874,24 +876,18 @@ export function ApiIssuesRegisterPage() {
       commandBar={commandBar}
       className="inventory-issues-register"
     >
-      <div className="mb-2 flex flex-wrap gap-1.5">
-        {(
-          [
-            { id: 'assign' as const, label: 'Assign to production' },
-            { id: 'prs' as const, label: 'Production requisitions' },
-            { id: 'posted' as const, label: 'Posted issues' },
-          ] as const
-        ).map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`erp-btn h-8 px-3 text-[12px] ${tab === t.id ? 'erp-btn-primary' : 'erp-btn-ghost'}`}
-            onClick={() => switchTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <ErpSegmentedControl
+        className="mb-2"
+        variant="pills"
+        name="Issue views"
+        value={tab}
+        onChange={switchTab}
+        options={[
+          { value: 'assign', label: 'Assign to production' },
+          { value: 'prs', label: 'Production requisitions' },
+          { value: 'posted', label: 'Posted issues' },
+        ]}
+      />
 
       {tab === 'assign' ? (
         assignLoading && assignRows.length === 0 ? (
@@ -1512,36 +1508,58 @@ export function ApiIssuePostPage() {
   if (!perms.canPostIssue) return <AccessDenied title="New Issue" />
 
   return (
-    <div className="erp-page">
-      <PageHeader
-        title="New Issue"
-        description="General stock issue, or issue multiple materials against a work order (partial or full)."
-        breadcrumbs={[
-          { label: 'Store', to: '/inventory/stock' },
-          { label: 'Issues', to: '/inventory/movements/issues' },
-          { label: 'New' },
-        ]}
-      />
-
+    <ErpCardFormPage
+      variant="dynamics"
+      badge="Store"
+      title="New Issue"
+      description="General stock issue, or issue multiple materials against a work order (partial or full)."
+      favoritePath="/inventory/movements/issues/new"
+      backLink={{ to: '/inventory/movements/issues', label: 'Back to Issues' }}
+      stickyFooter
+      footer={(
+        <ErpStickySaveBar
+          sticky
+          submitLabel={
+            mode === 'general'
+              ? 'Post Issue'
+              : selectedDrafts.length === 0
+                ? 'Post Issues'
+                : `Issue ${selectedDrafts.length} Line(s)`
+          }
+          isSubmitting={busy}
+          submitDisabled={mode === 'work_order' && selectedDrafts.length === 0}
+          submitDisabledReason="Select at least one material line with an issue quantity"
+          onSave={() => void (mode === 'general' ? submitGeneral() : submitWorkOrder())}
+          cancelTo="/inventory/movements/issues"
+          cancelLabel="Cancel"
+          hint={mode === 'general' ? 'Posts the issue movement to live stock immediately.' : undefined}
+        />
+      )}
+      onSaveShortcut={() => void (mode === 'general' ? submitGeneral() : submitWorkOrder())}
+    >
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
           <SectionCard title="Issue">
-            <div className="mb-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={`erp-btn h-8 px-3 text-[12px] ${mode === 'general' ? 'erp-btn-primary' : 'erp-btn-ghost'}`}
-                onClick={() => setMode('general')}
-              >
-                General issue
-              </button>
-              <button
-                type="button"
-                className={`erp-btn h-8 px-3 text-[12px] ${mode === 'work_order' ? 'erp-btn-primary' : 'erp-btn-ghost'}`}
-                onClick={() => setMode('work_order')}
-              >
-                Issue to work order
-              </button>
-            </div>
+            <ErpSegmentedControl
+              className="mb-4"
+              name="Issue type"
+              value={mode}
+              onChange={setMode}
+              options={[
+                {
+                  value: 'general',
+                  label: 'General issue',
+                  description: 'Direct stock issue - posts to the ledger immediately.',
+                  icon: PackageMinus,
+                },
+                {
+                  value: 'work_order',
+                  label: 'Issue to work order',
+                  description: 'Issue material lines against WO requirements (partial or full).',
+                  icon: Wrench,
+                },
+              ]}
+            />
 
             {mode === 'general' ? (
               <>
@@ -1584,14 +1602,6 @@ export function ApiIssuePostPage() {
                   <FormField label="Remarks" className="sm:col-span-2">
                     <Textarea rows={2} value={form.remarks} onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))} />
                   </FormField>
-                </div>
-                <div className="mt-3 flex justify-end gap-2">
-                  <Button variant="secondary" onClick={() => navigate('/inventory/movements/issues')}>
-                    Cancel
-                  </Button>
-                  <Button disabled={busy} onClick={() => void submitGeneral()}>
-                    {busy ? 'Posting…' : 'Post Issue'}
-                  </Button>
                 </div>
               </>
             ) : (
@@ -1842,24 +1852,13 @@ export function ApiIssuePostPage() {
                       {shortageLines.length > 0
                         ? ` · ${shortageLines.length} short — use Create Shortage PR`
                         : ''}
+                      {' · use the Save bar below to post'}
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                      {canCreateShortagePr && shortageLines.length > 0 ? (
-                        <Button variant="secondary" disabled={busy} onClick={() => void createShortagePr()}>
-                          Create Shortage PR
-                        </Button>
-                      ) : null}
-                      <Button variant="secondary" onClick={() => navigate('/inventory/movements/issues')}>
-                        Cancel
+                    {canCreateShortagePr && shortageLines.length > 0 ? (
+                      <Button variant="secondary" disabled={busy} onClick={() => void createShortagePr()}>
+                        Create Shortage PR
                       </Button>
-                      <Button disabled={busy || selectedDrafts.length === 0} onClick={() => void submitWorkOrder()}>
-                        {busy
-                          ? 'Issuing…'
-                          : selectedDrafts.length === 0
-                            ? 'Post issues'
-                            : `Issue ${selectedDrafts.length} line(s)`}
-                      </Button>
-                    </div>
+                    ) : null}
                   </div>
                 </>
               )}
@@ -1916,7 +1915,7 @@ export function ApiIssuePostPage() {
           </SectionCard>
         </div>
       </div>
-    </div>
+    </ErpCardFormPage>
   )
 }
 

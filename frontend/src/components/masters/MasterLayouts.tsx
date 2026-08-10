@@ -198,6 +198,9 @@ export function FormLayout({
   onSaveClose,
   onSaveNew,
   onCancel,
+  minimalChrome,
+  hideCommandBar,
+  hideFooterSaveClose,
 }: {
   title: string
   subtitle?: string
@@ -225,6 +228,12 @@ export function FormLayout({
   onSaveClose?: () => void
   onSaveNew?: () => void
   onCancel?: () => void
+  /** Setup-style form — no document strip / created-by stat card, minimal header. */
+  minimalChrome?: boolean
+  /** Omit the header command bar (Save / Save & Close / Save & New) — sticky footer only. */
+  hideCommandBar?: boolean
+  /** Sticky footer shows Save + Cancel only — omit Save & Close. */
+  hideFooterSaveClose?: boolean
 }) {
   const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState(sectionNavItems?.[0]?.id ?? 'general')
@@ -265,8 +274,11 @@ export function FormLayout({
       onSaveNew={handleSaveNew}
       onCancel={handleCancel}
       onSubmit={onSubmit}
+      minimalChrome={minimalChrome}
+      hideCommandBar={hideCommandBar}
+      hideFooterSaveClose={hideFooterSaveClose}
     >
-      {activeSection === 'general' || !sectionNavItems ? children : null}
+      {!sectionNavItems || sectionNavItems.length === 0 || activeSection === 'general' ? children : null}
     </StandardMasterFormShell>
   )
 }

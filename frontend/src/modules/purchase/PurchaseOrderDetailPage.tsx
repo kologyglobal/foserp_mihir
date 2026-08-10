@@ -78,8 +78,8 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { appPromptNote } from '@/store/confirmDialogStore'
 import { resolvePurchaseGstColumnVisibility } from '@/utils/purchasePoGst'
-import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
 import { PoReceiptRollupPanel } from '@/components/purchase/PoReceiptRollupPanel'
+import { PurchaseTaxTotalsView } from '@/components/purchase/PurchaseTaxTotalsView'
 
 const REVISABLE_STATUSES: PurchaseOrder['status'][] = [
   'released',
@@ -983,28 +983,26 @@ export function PurchaseOrderDetailPage() {
           collapsible
           defaultOpen={taxTotalsDefaultOpen}
         >
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <ErpViewField label="Basic Amount" value={formatCurrency(po.subtotal)} />
-            <ErpViewField label="Line Discount" value={formatCurrency(po.lineDiscount)} />
-            <ErpViewField label="Trade Discount" value={formatCurrency(po.tradeDiscount)} />
-            <ErpViewField label="Freight" value={formatCurrency(po.freight)} />
-            <ErpViewField label="Packing Charges" value={formatCurrency(po.packingCharges)} />
-            <ErpViewField label="Insurance Charges" value={formatCurrency(po.insuranceCharges)} />
-            <ErpViewField label="Other Charges" value={formatCurrency(po.otherCharges)} />
-            <ErpViewField label="Taxable Amount" value={formatCurrency(po.taxableAmount)} />
-            {lineTaxCols.showCgst ? (
-              <ErpViewField label="CGST" value={formatCurrency(po.cgst)} />
-            ) : null}
-            {lineTaxCols.showSgst ? (
-              <ErpViewField label="SGST" value={formatCurrency(po.sgst)} />
-            ) : null}
-            {lineTaxCols.showIgst ? (
-              <ErpViewField label="IGST" value={formatCurrency(po.igst)} />
-            ) : null}
-            <ErpViewField label="TCS" value={formatCurrency(po.tcsAmount)} />
-            <ErpViewField label="Round Off" value={formatCurrency(po.roundOff)} />
-            <ErpViewField label="Grand Total" value={formatCurrency(po.totalAmount)} />
-          </div>
+          <PurchaseTaxTotalsView
+            charges={[
+              { id: 'basic', label: 'Basic Amount', value: formatCurrency(po.subtotal) },
+              { id: 'lineDiscount', label: 'Line Discount', value: formatCurrency(po.lineDiscount) },
+              { id: 'tradeDiscount', label: 'Trade Discount', value: formatCurrency(po.tradeDiscount) },
+              { id: 'freight', label: 'Freight', value: formatCurrency(po.freight) },
+              { id: 'packing', label: 'Packing Charges', value: formatCurrency(po.packingCharges) },
+              { id: 'insurance', label: 'Insurance Charges', value: formatCurrency(po.insuranceCharges) },
+              { id: 'other', label: 'Other Charges', value: formatCurrency(po.otherCharges) },
+            ]}
+            calcRows={[
+              { id: 'taxable', label: 'Taxable Amount', value: formatCurrency(po.taxableAmount) },
+              { id: 'cgst', label: 'CGST', value: formatCurrency(po.cgst), hidden: !lineTaxCols.showCgst },
+              { id: 'sgst', label: 'SGST', value: formatCurrency(po.sgst), hidden: !lineTaxCols.showSgst },
+              { id: 'igst', label: 'IGST', value: formatCurrency(po.igst), hidden: !lineTaxCols.showIgst },
+              { id: 'tcs', label: 'TCS', value: formatCurrency(po.tcsAmount) },
+              { id: 'roundOff', label: 'Round Off', value: formatCurrency(po.roundOff) },
+            ]}
+            grandTotalValue={formatCurrency(po.totalAmount)}
+          />
         </ErpCardSection>
 
         <ErpCardSection
@@ -1015,16 +1013,6 @@ export function PurchaseOrderDetailPage() {
           defaultOpen
         >
           <PoReceiptRollupPanel purchaseOrderId={po.id} refreshToken={receiptRefreshToken} />
-        </ErpCardSection>
-
-        <ErpCardSection
-          title="Inventory Reservations"
-          subtitle="Stock reserved for this purchase order"
-          columns={1}
-          collapsible
-          defaultOpen={false}
-        >
-          <ReservationsPanel referenceNo={po.documentNumber} />
         </ErpCardSection>
 
         <ErpCardSection

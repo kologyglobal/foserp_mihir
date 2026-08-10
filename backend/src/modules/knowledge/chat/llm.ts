@@ -31,17 +31,20 @@ function chatConfig() {
   }
 }
 
-function friendlyChatApiError(status: number, body: string, provider: 'gemini' | 'openai'): string {
+function friendlyChatApiError(status: number, body: string, provider: 'gemini' | 'openai' | 'openrouter'): string {
   const lower = body.toLowerCase()
   if (status === 429 || lower.includes('insufficient_quota') || lower.includes('exceeded your current quota')) {
-    return provider === 'gemini'
-      ? 'Gemini quota/rate limit hit. Check Google AI Studio billing or remove GEMINI_API_KEY for local answers.'
-      : 'OpenAI quota exceeded (billing/plan). Top up at platform.openai.com or remove OPENAI_API_KEY for local answers.'
+    if (provider === 'gemini') return 'Gemini quota/rate limit hit. Check Google AI Studio billing or remove GEMINI_API_KEY for local answers.'
+    if (provider === 'openrouter') return 'OpenRouter quota/rate limit hit. Check credits at openrouter.ai or remove OPENROUTER_API_KEY for local answers.'
+    return 'OpenAI quota exceeded (billing/plan). Top up at platform.openai.com or remove OPENAI_API_KEY for local answers.'
   }
   if (status === 401 || status === 403 || lower.includes('invalid_api_key')) {
-    return provider === 'gemini'
-      ? 'Gemini API key rejected. Check GEMINI_API_KEY in backend/.env and restart the backend.'
-      : 'OpenAI API key rejected. Check OPENAI_API_KEY in backend/.env and restart.'
+    if (provider === 'gemini') return 'Gemini API key rejected. Check GEMINI_API_KEY in backend/.env and restart the backend.'
+    if (provider === 'openrouter') return 'OpenRouter API key rejected. Check OPENROUTER_API_KEY in backend/.env and restart.'
+    return 'OpenAI API key rejected. Check OPENAI_API_KEY in backend/.env and restart.'
+  }
+  if (status === 404 && provider === 'openrouter') {
+    return `OpenRouter model not found — use a vendor-prefixed slug (e.g. openai/gpt-4o-mini) in OPENROUTER_MODEL. ${body.slice(0, 200)}`
   }
   return `Chat API ${status}: ${body.slice(0, 280)}`
 }

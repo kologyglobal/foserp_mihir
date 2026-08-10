@@ -1,3 +1,34 @@
+## 2026-08-10 — Store registers on the standard list-page chrome (purchase gold path)
+
+### Delivered
+- **New shared scaffolds** (Store implementation of `docs/PURCHASE_LIST_PAGE_STANDARD.md`, reference `/purchase/requisitions`):
+  - `frontend/src/modules/inventory/shared/StoreRegisterListPage.tsx` — `OperationalPageShell` + `ErpCommandBar`, `EnterpriseRegisterTableShell` + `DataGrid` with embedded `CrmListFilterBar` (search / Sort / View / Save view / Columns / Filters), `CrmFilterDrawer` (sectioned fields), `useSavedViews` + `SaveViewDialog`, themed DataGrid pagination + per-route column layout persistence.
+  - `frontend/src/modules/inventory/shared/StoreMovementRegisterPage.tsx` — movement-ledger register (Date / Movement / Reference / Item / Warehouse / Qty / Value / Balance After) on top of the scaffold.
+- **Converted registers**: Transfers, Adjustments, Stock Counts (`ApiInventoryDocumentsPage` — plus new Route/Warehouse and "Items · Qty" chip columns and lifecycle action buttons preserved), Receipts (`movementType=INWARD`), Returns (`referenceType=RETURN_FROM_WO`, WO link kept), Reservations (item/warehouse codes instead of raw UUID prefixes; inline create panel via `beforeTable`).
+- Registers now load one large page (limit 200) and filter/sort/paginate client-side — same model as purchase registers. Balances/Ledger/costing stay on server-side pagination by design (documented in `docs/STORE_UI_CONSISTENCY.md`).
+- Cleanup: removed obsolete local `Pager` from receipts/returns registers; dropped stale `PurchaseTaxTotalsView` import in `GrnDetailPage` that broke typecheck.
+
+### Tests
+FE `npx tsc -b --noEmit` — PASS.
+
+---
+
+## 2026-08-10 — Store stabilisation Phase 1 (stock count workbench, adjustment lifecycle, honest nav)
+
+### Delivered
+- **Desktop stock count workbench** (`ApiStockCountWorkbenchPage`, route `/inventory/stock-count/:id`): full lifecycle DRAFT → Take Snapshot → COUNTING (editable count sheet with system/counted/variance/line remarks) → Submit → Approve → Post Variance → Reverse (reason required). Blind-count aware (system/variance hidden without `inventory.stock_count.reveal_system_quantity`). Register rows link into the workbench; previously desktop could only create + post an already-approved count (dead-end).
+- **Adjustment lifecycle on the documents register**: Submit (DRAFT) / Approve (SUBMITTED) / Reverse (POSTED, reason prompt) buttons with permission gates — previously a draft adjustment could never reach POSTED from desktop.
+- New API client fns `reverseInventoryStockCount` / `reverseInventoryAdjustment`; richer `ApiInventoryDocument(Line)` types (item, warehouse, systemQty, remarks). Added `inventory.override` to the FE permission catalog (reverse gating).
+- **Store nav honesty** (per WMS architecture review): Put Away and Material Picking labelled **(Preview)** in nav + page headers (BIN is not a ledger stock dimension yet); dashboard KPI renamed "Pending Put Away" → **"Awaiting Inventory Post"** (it counts `GRN_POSTING_PENDING`).
+- **Receive hub Return tile fixed**: now "Production material return" (WO returns, inward); new **Vendor Return** tile added to the Issue hub → `/purchase/returns` (outward — was previously mislabelled as purchase returns under Receive).
+- Document registers auto-open the create form on `/new` paths.
+- Deferred by design (flagged for product decision): dual-variable/catch-weight UOM mode, shared movement-line editor (batch/serial/UOM/multi-line), ad-hoc movement reversal API, BIN-dimensional stock.
+
+### Tests
+FE `npm run typecheck` — PASS. `npm run test:integrity` — 6/6 PASS. Live lifecycle smokes: `backend/scripts/test-stock-count-desktop-flow.ts` (STC-000001: snapshot→count→submit→approve→post→reverse, ledger STOCK_COUNT −2 / STOCK_COUNT_REVERSAL +2, stock net-zero) — **PASS**; `backend/scripts/test-adjustment-desktop-flow.ts` (IADJ-000001: submit→approve→post→reverse, net-zero) — **PASS**.
+
+---
+
 ## 2026-08-07 — Dual UOM (vendor + stock qty) across entire purchase flow
 
 ### Delivered

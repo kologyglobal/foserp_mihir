@@ -182,7 +182,20 @@ export function WarehouseFormPage() {
   const validationErrors = [...Object.values(errors).map((e) => e?.message).filter(Boolean) as string[], ...(saveError ? [saveError] : [])]
 
   return (
-    <FormLayout masterGroupId="inventory" backTo="/masters/warehouses" backLabel="Back to Warehouses" title={isEdit ? 'Edit Warehouse' : 'Create Warehouse'} onSubmit={onSubmit} isSubmitting={isSubmitting} validationErrors={validationErrors} onCancel={cancelForm}>
+    <FormLayout
+      masterGroupId="inventory"
+      backTo="/masters/warehouses"
+      backLabel="Back to Warehouses"
+      title={isEdit ? 'Edit Warehouse' : 'Create Warehouse'}
+      onSubmit={onSubmit}
+      isSubmitting={isSubmitting}
+      validationErrors={validationErrors}
+      onCancel={cancelForm}
+      sectionNavItems={[]}
+      minimalChrome
+      hideCommandBar
+      hideFooterSaveClose
+    >
       <FormSection title="Warehouse Details">
       <MasterCodeField
         entityType="warehouse"

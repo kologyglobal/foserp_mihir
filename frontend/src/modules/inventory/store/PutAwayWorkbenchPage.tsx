@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeftRight, Package, RefreshCw, ScanLine, Truck } from 'lucide-react'
+import { ArrowLeftRight, Package, RefreshCw, Truck } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -13,11 +13,9 @@ import { cn } from '@/utils/cn'
 function PutAwayCardView({
   card,
   onTransfer,
-  onScan,
 }: {
   card: PutAwayCard
   onTransfer: (href: string) => void
-  onScan: (href: string) => void
 }) {
   const isReady = card.kind === 'ready_for_putaway'
   return (
@@ -61,24 +59,14 @@ function PutAwayCardView({
           Open GRN
         </Link>
         {isReady ? (
-          <>
-            <button
-              type="button"
-              className="erp-btn erp-btn-primary h-10 px-3 text-[13px] inline-flex items-center gap-1"
-              onClick={() => onTransfer(card.putAwayTransferHref)}
-            >
-              <ArrowLeftRight className="h-4 w-4" aria-hidden />
-              Transfer to storage
-            </button>
-            <button
-              type="button"
-              className="erp-btn erp-btn-secondary h-10 px-3 text-[13px] inline-flex items-center gap-1"
-              onClick={() => onScan(card.scanHref)}
-            >
-              <ScanLine className="h-4 w-4" aria-hidden />
-              Scan put-away
-            </button>
-          </>
+          <button
+            type="button"
+            className="erp-btn erp-btn-primary h-10 px-3 text-[13px] inline-flex items-center gap-1"
+            onClick={() => onTransfer(card.putAwayTransferHref)}
+          >
+            <ArrowLeftRight className="h-4 w-4" aria-hidden />
+            Transfer to storage
+          </button>
         ) : (
           <Link to={card.openGrnHref} className="erp-btn erp-btn-primary h-10 px-3 text-[13px] inline-flex items-center gap-1">
             <Truck className="h-4 w-4" aria-hidden />
@@ -93,7 +81,7 @@ function PutAwayCardView({
 /**
  * Store put-away workbench.
  * Step 1: GRN inventory post (ledger truth).
- * Step 2: Transfer / scan into storage bin via inventory transfer engine.
+ * Step 2: Transfer into storage bin via inventory transfer engine.
  */
 export function PutAwayWorkbenchPage() {
   const navigate = useNavigate()
@@ -126,8 +114,8 @@ export function PutAwayWorkbenchPage() {
       variant="dynamics"
       layout="enterprise"
       badge="Store"
-      title="Put Away"
-      description="Complete GRN stock post first, then move to storage with the transfer/scan engine. No second put-away ledger."
+      title="Put Away (Preview)"
+      description="Preview workflow — bin-level stock is not a ledger dimension yet. Complete GRN stock post first, then move to storage with the transfer/scan engine. No second put-away ledger."
       breadcrumbs={[
         { label: 'Store', to: '/inventory' },
         { label: 'Put Away' },
@@ -145,14 +133,13 @@ export function PutAwayWorkbenchPage() {
             onClick: () => setToken((n) => n + 1),
           }}
           secondaryActions={[
-            { id: 'transfer', label: 'New transfer', onClick: () => navigate('/inventory/movements/transfers?create=1') },
-            { id: 'scan', label: 'Scan transfer', icon: ScanLine, onClick: () => navigate('/inventory/scan/transfer') },
+            { id: 'transfer', label: 'New transfer', onClick: () => navigate('/inventory/movements/transfers/new') },
           ]}
         />
       )}
     >
       <p className="mb-3 text-[12px] text-erp-muted">
-        Flow: <strong>GRN post</strong> (inventory ledger) → <strong>Transfer / scan</strong> into storage bin.
+        Flow: <strong>GRN post</strong> (inventory ledger) → <strong>Transfer</strong> into storage bin.
         Serials and bins stay on the GRN/transfer documents.
       </p>
 
@@ -171,11 +158,7 @@ export function PutAwayWorkbenchPage() {
               <ul className="store-card-list">
                 {awaiting.map((c) => (
                   <li key={c.grnId}>
-                    <PutAwayCardView
-                      card={c}
-                      onTransfer={(h) => navigate(h)}
-                      onScan={(h) => navigate(h)}
-                    />
+                    <PutAwayCardView card={c} onTransfer={(h) => navigate(h)} />
                   </li>
                 ))}
               </ul>
@@ -191,17 +174,13 @@ export function PutAwayWorkbenchPage() {
               <EmptyState
                 icon={ArrowLeftRight}
                 title="No posted GRNs in queue"
-                description="After a GRN is inventory-posted, use Transfer to storage or Scan put-away here."
+                description="After a GRN is inventory-posted, use Transfer to storage here."
               />
             ) : (
               <ul className="store-card-list">
                 {ready.map((c) => (
                   <li key={c.grnId}>
-                    <PutAwayCardView
-                      card={c}
-                      onTransfer={(h) => navigate(h)}
-                      onScan={(h) => navigate(h)}
-                    />
+                    <PutAwayCardView card={c} onTransfer={(h) => navigate(h)} />
                   </li>
                 ))}
               </ul>

@@ -1,6 +1,6 @@
 import { env } from '../../config/env.js'
 
-export type KnowledgeLlmProvider = 'gemini' | 'openai'
+export type KnowledgeLlmProvider = 'gemini' | 'openai' | 'openrouter'
 /**
  * 'gemini-native' calls Google's own generateContent API with an `x-goog-api-key` header.
  * 'openai-compatible' calls an OpenAI-shaped `/chat/completions` endpoint with `Authorization: Bearer`.
@@ -22,14 +22,30 @@ export type KnowledgeChatLlmConfig = {
 
 const GEMINI_NATIVE_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 const OPENAI_DEFAULT_BASE = 'https://api.openai.com/v1'
+const OPENROUTER_DEFAULT_BASE = 'https://openrouter.ai/api/v1'
 
 /** True when Copilot / KB chat can use a generative model (not local-extractive). */
 export function hasKnowledgeGenerativeLlm(): boolean {
-  return Boolean(env.GEMINI_API_KEY?.trim() || env.OPENAI_API_KEY?.trim())
+  return Boolean(env.OPENROUTER_API_KEY?.trim() || env.GEMINI_API_KEY?.trim() || env.OPENAI_API_KEY?.trim())
 }
 
-/** Chat + Copilot LLM config. Prefers Gemini when GEMINI_API_KEY is set. */
+/**
+ * Chat + Copilot LLM config. Provider priority: OpenRouter → Gemini → OpenAI
+ * (setting OPENROUTER_API_KEY is an explicit operator choice, so it wins).
+ */
 export function resolveKnowledgeChatLlmConfig(): KnowledgeChatLlmConfig | null {
+  const openrouterKey = env.OPENROUTER_API_KEY?.trim()
+  if (openrouterKey) {
+    return {
+      apiKey: openrouterKey,
+      baseUrl: (env.OPENROUTER_BASE_URL?.trim() || OPENROUTER_DEFAULT_BASE).replace(/\/$/, ''),
+      // OpenRouter model slugs are vendor-prefixed, e.g. openai/gpt-4o-mini, google/gemini-2.0-flash-001.
+      model: env.OPENROUTER_MODEL?.trim() || env.KB_CHAT_MODEL?.trim() || 'openai/gpt-4o-mini',
+      provider: 'openrouter',
+      transport: 'openai-compatible',
+    }
+  }
+
   const geminiKey = env.GEMINI_API_KEY?.trim()
   if (geminiKey) {
     // An explicit OPENAI_BASE_URL means the operator is pointing Gemini at a self-hosted
@@ -67,7 +83,11 @@ export function resolveKnowledgeChatLlmConfig(): KnowledgeChatLlmConfig | null {
   return null
 }
 
-/** Embeddings API config (OpenAI or explicit OPENAI_BASE_URL + OPENAI_API_KEY only). */
+/**
+ * Embeddings API config (OpenAI or explicit OPENAI_BASE_URL + OPENAI_API_KEY only).
+ * OpenRouter is chat-only — it exposes no /embeddings endpoint, so it is deliberately
+ * excluded here; retrieval falls back to local scoring when no OpenAI key is present.
+ */
 export function resolveKnowledgeEmbeddingLlmConfig(): Omit<KnowledgeChatLlmConfig, 'provider' | 'transport'> & {
   provider: 'openai-compatible'
 } | null {

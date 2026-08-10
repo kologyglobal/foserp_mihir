@@ -49,12 +49,39 @@ function initSse(res: Response): void {
   if (typeof flushable.flushHeaders === 'function') flushable.flushHeaders()
 }
 
+/**
+ * Turn generic "about this screen" questions into search terms when the raw
+ * question alone (e.g. "tell me about this page") has no keyword overlap with
+ * any indexed document. Route segments, module, and page title are the only
+ * page signal we have — UUID-like segments are dropped as noise.
+ */
+export function buildContextFallbackQuery(question: string, resolved: ResolvedErpContext): string {
+  const routeWords = resolved.routePath
+    .split('/')
+    .filter(Boolean)
+    .filter((segment) => !/^[0-9a-f-]{6,}$/i.test(segment))
+    .join(' ')
+  const parts = [question, resolved.moduleKey, resolved.pageTitle, routeWords, ...resolved.screenHints]
+    .map((p) => p?.trim())
+    .filter((p): p is string => Boolean(p))
+  return parts.join(' ').trim()
+}
+
 async function retrieveCitations(
   tenantId: string,
   question: string,
+  resolved: ResolvedErpContext,
   topK = 6,
 ): Promise<Array<CopilotCitation & { content: string }>> {
-  const search = await hybridSearch({ tenantId, query: question, topK })
+  let search = await hybridSearch({ tenantId, query: question, topK })
+
+  if (search.hits.length === 0) {
+    const contextQuery = buildContextFallbackQuery(question, resolved)
+    if (contextQuery && contextQuery.toLowerCase() !== question.trim().toLowerCase()) {
+      search = await hybridSearch({ tenantId, query: contextQuery, topK })
+    }
+  }
+
   if (search.hits.length === 0) return []
 
   const chunkIds = search.hits.map((h) => h.chunkId)
@@ -132,7 +159,7 @@ export async function streamCopilotComplete(opts: {
     context: opts.context,
   })
 
-  const citations = await retrieveCitations(opts.tenantId, content)
+  const citations = await retrieveCitations(opts.tenantId, content, resolved)
   const systemPrompt = buildCopilotSystemPrompt(
     resolved,
     citations.map((c) => ({

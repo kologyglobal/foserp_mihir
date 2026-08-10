@@ -1,7 +1,7 @@
 # Store Operations
 
 **Status:** FE operational hub over existing Inventory / Purchase / Manufacturing engines
-**Last updated:** 2026-08-07 — Store module redesign (nav IA + full-width + hub regroup)
+**Last updated:** 2026-08-10 — Store stabilisation (desktop stock count workbench, adjustment lifecycle, honest nav)
 
 ## Principle
 
@@ -26,16 +26,39 @@ Purchase → GRN → QC Hold/Accepted → Store Receipt → Warehouse Stock → 
 | 1 | Store Dashboard | `/inventory` (= `/inventory/store`) |
 | 2 | Item Stock 360 | `/inventory/stock` → `/inventory/stock/:itemId` |
 | 3 | Receive hub | `/inventory/store/receive` |
-| 4 | Put Away | `/inventory/store/put-away` |
+| 4 | Put Away **(Preview)** | `/inventory/store/put-away` |
 | 5 | Reservations (cards) | `/inventory/store/reservations` |
-| 6 | Material Picking hub | `/inventory/store/picking` |
+| 6 | Material Picking **(Preview)** | `/inventory/store/picking` |
 | 7 | Issue hub | `/inventory/store/issue` |
 | 8 | Transfer hub | `/inventory/store/transfer` |
 | 9 | Stock Count hub | `/inventory/store/count` |
 | 10 | Scan hub | `/inventory/store/scan` |
-| 11 | Timeline | `/inventory/store/timeline` |
+| 11 | Stock Ledger | `/inventory/ledger` |
 | 12 | Reports | `/inventory/reports` |
 | 13 | Setup | `/inventory/setup` |
+
+**Timeline removed (2026-08-10):** the standalone `/inventory/store/timeline` activity-feed page was retired —
+Stock Ledger (`/inventory/ledger`) is now the single register for IN/OUT stock movements (with running balance,
+filters, and pagination). Old links/bookmarks to `/inventory/store/timeline` redirect to `/inventory/ledger`.
+
+**Preview labels (2026-08-10):** Put Away and Material Picking are marked *(Preview)* — BIN is not yet a
+ledger/balance stock dimension, so both remain queue + deep-link helpers over the transfer/scan engines.
+They graduate to full workflows only when bin-dimensional balances ship (see
+`docs/inventory/INVENTORY_BIN_WISE_STOCK_GAP_REPORT.md`).
+
+### Stock count desktop workbench (2026-08-10)
+
+`/inventory/stock-count/:id` mounts `ApiStockCountWorkbenchPage` — the full document lifecycle on desktop:
+`DRAFT → Take Snapshot → COUNTING (editable count sheet) → Submit → Approve → Post Variance → Reverse`.
+Blind counts (no `inventory.stock_count.reveal_system_quantity`) hide system/variance columns. The register
+(`/inventory/stock-count`) links each row into the workbench. Live smoke:
+`backend/scripts/test-stock-count-desktop-flow.ts` (PASS — net-zero).
+
+### Adjustment lifecycle on desktop (2026-08-10)
+
+`/inventory/movements/adjustments` register now exposes Submit (DRAFT) → Approve (SUBMITTED) → Post
+(APPROVED) → Reverse (POSTED, reason required) with permission gates. Live smoke:
+`backend/scripts/test-adjustment-desktop-flow.ts` (PASS — net-zero).
 
 Operator flow encoded in this order: `Demand → Reservation → Material Picking → Issue`.
 
@@ -58,7 +81,7 @@ Accounting/Costing/Planning are inventory-valuation and MRP concerns, not "where
 Operator daily-view order (see `frontend/src/services/inventory/storeOperationsService.ts`):
 
 1. **QC Pending** — `GRN_QC_PENDING` + `PURCHASE_QI_OPEN` → `/quality/incoming`
-2. **Pending Put Away** — posted-but-not-put-away GRNs → `/inventory/store/put-away`
+2. **Awaiting Inventory Post** — GRNs pending inventory post (`GRN_POSTING_PENDING`) → `/inventory/store/put-away`. Renamed from "Pending Put Away" 2026-08-10: true pending-put-away needs bin-level stock.
 3. **Today's Receipt** / **Today's Issue** — from today's ledger movements, split by kind
 4. **Low Stock** → `/inventory/stock?lowStock=1`
 5. Secondary: Pending GRN, Pending Issue, Pending Transfer, Pending Count, Reservations, Negative Stock
@@ -89,11 +112,11 @@ Quick actions: Receive · Issue · Transfer · Stock Count · Scan · Search · 
 
 1. **Purchase Receipt** — New GRN, Open GRN register
 2. **Opening Stock** — opening balance via inventory movement engine
-3. **Other Receipts** — production FG receipt, transfer-in, general inward/adjustment+, returns, scan-to-receive
+3. **Other Receipts** — production FG receipt, transfer-in, general inward/adjustment+, production material return (WO returns — vendor returns live under the Issue hub as outward), scan-to-receive
 
 ## Issue hub types
 
-`MaterialIssueHubPage` (`/inventory/store/issue`) leads with named issue types (Production, Sales, Department, Scrap, Adjustment) mapped onto existing engines, then a secondary "Other" group (general/sample/internal, job work, quick API issue).
+`MaterialIssueHubPage` (`/inventory/store/issue`) leads with named issue types (Production, Sales, Department, Scrap, Adjustment, Vendor Return → `/purchase/returns`) mapped onto existing engines, then a secondary "Other" group (general/sample/internal, job work, quick API issue).
 
 ## Put away & picking
 

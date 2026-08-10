@@ -89,7 +89,9 @@
   .erp-btn--icon { height: 2.25rem; width: 2.25rem; min-height: 2.25rem; padding: 0; border-radius: 9px; }
 
   /* Primary — save / main CTA */
-  .erp-btn--primary {
+  /* .erp-btn-primary (single hyphen) is a legacy alias still used across pages */
+  .erp-btn--primary,
+  .erp-btn-primary {
     color: #fff;
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--dyn-primary, #2563eb) 18%, var(--dyn-navy, #001b3a)) 0%, var(--dyn-navy, #001b3a) 100%);
@@ -97,14 +99,16 @@
       0 1px 0 rgba(255, 255, 255, 0.12) inset,
       0 4px 12px rgba(0, 27, 58, 0.22);
   }
-  .erp-btn--primary:hover:not(:disabled) {
+  .erp-btn--primary:hover:not(:disabled),
+  .erp-btn-primary:hover:not(:disabled) {
     transform: translateY(-1px);
     filter: brightness(1.06);
     box-shadow:
       0 1px 0 rgba(255, 255, 255, 0.16) inset,
       0 8px 18px rgba(0, 27, 58, 0.28);
   }
-  .erp-btn--primary:focus-visible {
+  .erp-btn--primary:focus-visible,
+  .erp-btn-primary:focus-visible {
     box-shadow:
       0 0 0 2px #fff,
       0 0 0 4px color-mix(in srgb, var(--dyn-navy, #001b3a) 40%, transparent),
@@ -191,13 +195,16 @@
   }
 
   /* Secondary — neutral supporting action */
-  .erp-btn--secondary {
+  /* .erp-btn-secondary (single hyphen) is a legacy alias still used across pages */
+  .erp-btn--secondary,
+  .erp-btn-secondary {
     color: var(--erp-text, #1f2933);
     background: linear-gradient(180deg, #fff 0%, var(--erp-surface, #fff) 100%);
     border-color: var(--erp-border, #d0d5dd);
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   }
-  .erp-btn--secondary:hover:not(:disabled) {
+  .erp-btn--secondary:hover:not(:disabled),
+  .erp-btn-secondary:hover:not(:disabled) {
     transform: translateY(-1px);
     border-color: color-mix(in srgb, var(--erp-primary, #2563eb) 35%, var(--erp-border, #d0d5dd));
     background: color-mix(in srgb, var(--erp-primary, #2563eb) 5%, #fff);
@@ -219,13 +226,16 @@
   }
 
   /* Ghost — cancel / tertiary */
-  .erp-btn--ghost {
+  /* .erp-btn-ghost (single hyphen) is a legacy alias still used across pages */
+  .erp-btn--ghost,
+  .erp-btn-ghost {
     color: var(--erp-text, #1f2933);
     background: transparent;
     border-color: transparent;
     box-shadow: none;
   }
-  .erp-btn--ghost:hover:not(:disabled) {
+  .erp-btn--ghost:hover:not(:disabled),
+  .erp-btn-ghost:hover:not(:disabled) {
     background: var(--erp-surface-alt, #f3f4f6);
     color: var(--erp-text, #1f2933);
   }
@@ -584,6 +594,18 @@
     background: var(--erp-surface-alt);
     @apply border-b border-[var(--erp-border-strong)] px-3 py-1.5 text-left text-[11px] font-bold uppercase tracking-wider text-[var(--erp-muted)];
     white-space: nowrap;
+  }
+
+  /* Numeric column headers — the base `.erp-table th` rule outweighs Tailwind's
+     `text-right`/`text-center` utilities, so restore them at higher specificity.
+     Attribute selectors keep Tailwind from treating these as custom utility
+     definitions (which would make `@apply text-right` circular). */
+  .erp-table th[class~='text-right'] {
+    text-align: right;
+  }
+
+  .erp-table th[class~='text-center'] {
+    text-align: center;
   }
 
   .erp-table td {

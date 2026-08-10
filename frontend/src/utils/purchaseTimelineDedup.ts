@@ -3,13 +3,15 @@ import type { PurchaseTimelineEvent } from '@/services/purchase/purchaseTimeline
 /** Map PR/PO lifecycle audit + status_history verbs to one bucket. */
 function lifecycleBucket(action: string): string | null {
   const u = action.toUpperCase()
-  if (u === 'PR_CREATED' || u === 'CREATED' || u === 'CREATE') return 'created'
-  if (u === 'PR_SUBMITTED' || u === 'SUBMITTED' || u === 'SUBMIT') return 'submitted'
-  if (u === 'PR_APPROVED' || u === 'APPROVED' || u === 'APPROVE') return 'approved'
-  if (u === 'PR_REJECTED' || u === 'REJECTED' || u === 'REJECT') return 'rejected'
-  if (u === 'PR_SENT_BACK' || u === 'SENT_BACK') return 'sent_back'
-  if (u === 'PR_CANCELLED' || u === 'CANCELLED' || u === 'CANCEL') return 'cancelled'
-  if (u === 'PR_REOPENED' || u === 'REOPENED' || u === 'REOPEN') return 'reopened'
+  if (u === 'PR_CREATED' || u === 'PO_CREATED' || u === 'CREATED' || u === 'CREATE') return 'created'
+  if (u === 'PR_SUBMITTED' || u === 'PO_SUBMITTED' || u === 'SUBMITTED' || u === 'SUBMIT') return 'submitted'
+  if (u === 'PR_APPROVED' || u === 'PO_APPROVED' || u === 'APPROVED' || u === 'APPROVE') return 'approved'
+  if (u === 'PR_REJECTED' || u === 'PO_REJECTED' || u === 'REJECTED' || u === 'REJECT') return 'rejected'
+  if (u === 'PR_SENT_BACK' || u === 'PO_SENT_BACK' || u === 'SENT_BACK') return 'sent_back'
+  if (u === 'PO_SENT_TO_VENDOR' || u === 'SENT_TO_VENDOR') return 'sent_to_vendor'
+  if (u === 'PO_CLOSED' || u === 'CLOSED') return 'closed'
+  if (u === 'PR_CANCELLED' || u === 'PO_CANCELLED' || u === 'CANCELLED' || u === 'CANCEL') return 'cancelled'
+  if (u === 'PR_REOPENED' || u === 'PO_REOPENED' || u === 'REOPENED' || u === 'REOPEN') return 'reopened'
   return null
 }
 

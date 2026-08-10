@@ -37,6 +37,7 @@ import {
   notesSummary,
   taxTotalsSummary,
 } from '@/modules/purchase/purchaseFastTabSummaries'
+import { PurchaseTaxTotalsView } from '@/components/purchase/PurchaseTaxTotalsView'
 import {
   approveInvoiceMatchingException,
   approvePurchaseInvoice,
@@ -893,23 +894,22 @@ export function PurchaseInvoiceDetailPage() {
           collapsible
           defaultOpen={taxTotalsDefaultOpen}
         >
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <ErpViewField label="Basic Amount" value={formatCurrency(inv.subtotal)} />
-            <ErpViewField label="Discount" value={formatCurrency(inv.discount)} />
-            <ErpViewField label="Freight" value={formatCurrency(inv.freight)} />
-            <ErpViewField label="Other Charges" value={formatCurrency(inv.otherCharges)} />
-            <ErpViewField label="Taxable Amount" value={formatCurrency(inv.taxableAmount)} />
-            {inv.gstScheme === 'igst' ? (
-              <ErpViewField label="IGST" value={formatCurrency(inv.igst)} />
-            ) : (
-              <>
-                <ErpViewField label="CGST" value={formatCurrency(inv.cgst)} />
-                <ErpViewField label="SGST" value={formatCurrency(inv.sgst)} />
-              </>
-            )}
-            <ErpViewField label="Round Off" value={formatCurrency(inv.roundOff)} />
-            <ErpViewField label="Grand Total" value={formatCurrency(inv.totalAmount)} />
-          </div>
+          <PurchaseTaxTotalsView
+            charges={[
+              { id: 'basic', label: 'Basic Amount', value: formatCurrency(inv.subtotal) },
+              { id: 'discount', label: 'Discount', value: formatCurrency(inv.discount) },
+              { id: 'freight', label: 'Freight', value: formatCurrency(inv.freight) },
+              { id: 'other', label: 'Other Charges', value: formatCurrency(inv.otherCharges) },
+            ]}
+            calcRows={[
+              { id: 'taxable', label: 'Taxable Amount', value: formatCurrency(inv.taxableAmount) },
+              { id: 'cgst', label: 'CGST', value: formatCurrency(inv.cgst), hidden: inv.gstScheme === 'igst' },
+              { id: 'sgst', label: 'SGST', value: formatCurrency(inv.sgst), hidden: inv.gstScheme === 'igst' },
+              { id: 'igst', label: 'IGST', value: formatCurrency(inv.igst), hidden: inv.gstScheme !== 'igst' },
+              { id: 'roundOff', label: 'Round Off', value: formatCurrency(inv.roundOff) },
+            ]}
+            grandTotalValue={formatCurrency(inv.totalAmount)}
+          />
         </ErpCardSection>
 
         <ErpCardSection

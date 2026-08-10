@@ -4,10 +4,10 @@ import {
   ArrowDownToLine,
   ArrowLeftRight,
   ArrowUpFromLine,
+  BookOpen,
   ClipboardList,
   Package,
   RefreshCw,
-  ScanLine,
   Search,
   Warehouse,
 } from 'lucide-react'
@@ -38,10 +38,10 @@ const MODULE_LINKS: Array<{
   { label: 'Issue', href: '/inventory/store/issue', icon: ArrowUpFromLine, primary: true },
   { label: 'Transfer', href: '/inventory/store/transfer', icon: ArrowLeftRight, primary: true },
   { label: 'Stock Count', href: '/inventory/store/count', icon: ClipboardList },
-  { label: 'Scan', href: '/inventory/store/scan', icon: ScanLine },
   { label: 'Item Search', href: '/inventory/ops/search', icon: Search },
   { label: 'Consolidated Stock', href: '/inventory/stock', icon: Package },
   { label: 'Warehouses', href: '/inventory/ops/warehouses', icon: Warehouse },
+  { label: 'Stock Ledger', href: '/inventory/ledger', icon: BookOpen },
 ]
 
 function kpiAccent(tone: StoreDashKpi['tone']): EnterpriseKpiItem['accent'] {
@@ -201,8 +201,8 @@ export function StoreDashboardPage() {
             title="Needs action"
             noPadding
             actions={(
-              <Link to="/inventory/store/timeline" className="inv-hub-panel-link">
-                View timeline →
+              <Link to="/inventory/ledger" className="inv-hub-panel-link">
+                View ledger →
               </Link>
             )}
           >
@@ -331,8 +331,8 @@ export function StoreDashboardPage() {
               title="Today's movements"
               noPadding
               actions={(
-                <Link to="/inventory/store/timeline" className="inv-hub-panel-link">
-                  Full timeline →
+                <Link to="/inventory/ledger" className="inv-hub-panel-link">
+                  Full ledger →
                 </Link>
               )}
             >
