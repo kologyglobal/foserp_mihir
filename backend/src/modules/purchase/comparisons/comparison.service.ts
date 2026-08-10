@@ -17,6 +17,7 @@ import {
 import {
   computePurchaseOrderTotals,
   preparePurchaseOrderLinesForCreate,
+  taxAmountFromLineSnapshots,
 } from '../orders/purchase-order.service.js'
 import type { CreatePurchaseOrderInput } from '../orders/purchase-order.validation.js'
 import { mapComparisonToDto, mapPurchaseOrderToDto } from './comparison.mapper.js'
@@ -208,9 +209,17 @@ export async function createPurchaseOrderFromComparison(tenantId: string, id: st
     orderDate: new Date(),
     vendorId: quotation.vendorId,
   })
+  /**
+   * Header tax must come from the PO lines' own GST snapshot (HSN/GST rate resolved per item),
+   * not the VQ header field — VQ.taxAmount is often 0 (vendor quoted a flat amount without a tax
+   * breakup), which previously left the PO header tax/grand total at 0 while the per-line GST
+   * snapshot was correct, causing a false "Invoice tax tolerance exceeded" on every downstream
+   * invoice. Mirrors the same pattern already used in purchase-planning-create-po.service.ts.
+   */
+  const lineDerivedTax = taxAmountFromLineSnapshots(normalizedLines)
   const totals = computePurchaseOrderTotals(
     normalizedLines,
-    Number(quotation.taxAmount),
+    lineDerivedTax > 0 ? lineDerivedTax : Number(quotation.taxAmount),
     Number(quotation.freightAmount),
   )
   const orderNumber = await nextPurchaseDocumentNumber(tenantId, 'PURCHASE_ORDER', 'PO')

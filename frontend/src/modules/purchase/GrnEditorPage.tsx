@@ -480,6 +480,12 @@ export function GrnEditorPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      // Refresh the item master cache first — stock/base UOM display for Accepted &
+      // Rejected quantities is resolved from this cache, so a stale cache (e.g. items
+      // created after the last sync) would silently drop the unit label.
+      await import('@/services/bridges/masterBatchApiBridge')
+        .then((m) => m.syncBatchMastersFromApi())
+        .catch(() => undefined)
       const [pos, items, setup] = await Promise.all([
         getPurchaseOrders(),
         getPurchaseItems(),

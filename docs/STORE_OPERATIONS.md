@@ -127,6 +127,17 @@ Quick actions: Receive · Issue · Transfer · Stock Count · Scan · Search · 
 
 There is **no second put-away table**. Storage movement is always transfer/scan → inventory ledger. Put Away is a **Phase 2 workflow feature** — required for larger multi-bin plants, optional for small single-location stores.
 
+**Material Picking workbench** at `/inventory/store/picking` (updated 2026-08-10 — live queue, not a static card menu):
+
+Fetches active `InventoryStockReservation` rows (`GET /inventory/reservations?status=ACTIVE`) and groups them by `demandType` into **Production picks (WO)**, **Sales picks (SO)**, and **Dispatch picks (DISPATCH)**. Each card shows item, warehouse, reserved vs remaining qty, and source reference, with actions:
+
+- **Item 360** — jump to the item's live stock view.
+- **Production / Dispatch workbench** — deep link to the demand's execution surface.
+- **Issue** — opens `ApiIssuePostPage` (`/inventory/movements/issues/new`) pre-filled with item, warehouse, remaining qty and reference (general-mode prefill via query params).
+- **Release** — cancels the reservation (same engine as the Reservations page), freeing stock for other demands.
+
+**Transfer pick** (command bar) deep-links to the transfer register — transfer-based picks are not reservation-backed yet, so they stay a register link rather than a fake queue row.
+
 **Serials / bins on Item 360** come from tracking masters + GRN line snapshots (document audit). They are **not** a fake consolidated balance — BIN is not yet a posted stock dimension (see gap report).
 
 ## Multi-UOM display contract

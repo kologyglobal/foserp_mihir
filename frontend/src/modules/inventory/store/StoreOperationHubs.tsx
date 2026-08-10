@@ -11,6 +11,7 @@ import {
   Package,
   PackageOpen,
   Plus,
+  RefreshCw,
   Settings2,
   Truck,
   Wrench,
@@ -25,7 +26,14 @@ import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import { formatDate } from '@/utils/dates/format'
 import { formatNumber } from '@/utils/formatters/currency'
 import { notify } from '@/store/toastStore'
+import { appConfirm } from '@/store/confirmDialogStore'
 import { listInventoryStockCounts, type ApiInventoryDocument } from '@/services/api/inventoryDocumentsApi'
+import {
+  cancelInventoryReservation,
+  listInventoryReservations,
+  type InventoryReservationDemandType,
+  type InventoryStockReservation,
+} from '@/services/api/inventoryApi'
 import { cn } from '@/utils/cn'
 
 export type StoreOpChoice = {
@@ -352,57 +360,178 @@ export function PutAwayHubPage() {
   )
 }
 
+type PickRow = InventoryStockReservation & {
+  item?: { code?: string; name?: string }
+  warehouse?: { code?: string; name?: string }
+}
+
+const PICK_GROUPS: Array<{
+  demandType: InventoryReservationDemandType
+  label: string
+  icon: LucideIcon
+  workbenchHref: string
+  workbenchLabel: string
+}> = [
+  { demandType: 'WO', label: 'Production picks', icon: Factory, workbenchHref: '/manufacturing/store-workbench', workbenchLabel: 'Production workbench' },
+  { demandType: 'SO', label: 'Sales picks', icon: Truck, workbenchHref: '/dispatch/workbench', workbenchLabel: 'Dispatch workbench' },
+  { demandType: 'DISPATCH', label: 'Dispatch picks', icon: Truck, workbenchHref: '/dispatch/workbench', workbenchLabel: 'Dispatch workbench' },
+]
+
+/** Live pick queue over active reservations — production, sales, dispatch. */
 export function PickingHubPage() {
+  const navigate = useNavigate()
+  const [rows, setRows] = useState<PickRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [token, setToken] = useState(0)
+
+  const load = useCallback(async () => {
+    void token
+    setLoading(true)
+    try {
+      const res = await listInventoryReservations({ status: 'ACTIVE', limit: 200 })
+      setRows((res.data ?? []) as PickRow[])
+    } catch {
+      notify.error('Could not load pick queue')
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
+  useEffect(() => { void load() }, [load])
+
+  const release = async (id: string) => {
+    const ok = await appConfirm({
+      title: 'Release reservation',
+      description: 'Release remaining reserved quantity for this demand?',
+      confirmLabel: 'Release',
+    })
+    if (!ok) return
+    setBusyId(id)
+    try {
+      await cancelInventoryReservation(id)
+      notify.success('Reservation released')
+      setToken((n) => n + 1)
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Could not release reservation')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const issueHref = (row: PickRow) => {
+    const params = new URLSearchParams({
+      itemId: row.itemId,
+      warehouseId: row.warehouseId,
+      quantity: String(Number(row.remainingQty ?? row.quantity ?? 0)),
+    })
+    if (row.referenceNo) params.set('referenceNo', row.referenceNo)
+    return `/inventory/movements/issues/new?${params.toString()}`
+  }
+
   return (
-    <StoreOpHub
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Store"
       title="Material Picking (Preview)"
-      description="Reservation-based picking helper for sales, production, transfer, and maintenance. Bin-directed picking arrives with bin-level stock."
-      favoritePath="/inventory/store/picking"
-      choices={[
-        {
-          id: 'reservations',
-          title: 'Active reservations',
-          description: 'See reserved qty, source document, release if needed.',
-          href: '/inventory/store/reservations',
-          icon: ClipboardList,
-          badge: 'Source',
-          primary: true,
-          group: 'Pick queues',
-        },
-        {
-          id: 'production',
-          title: 'Production pick / issue',
-          description: 'Production material queues.',
-          href: '/manufacturing/store-workbench',
-          icon: Factory,
-          group: 'Pick queues',
-        },
-        {
-          id: 'sales',
-          title: 'Sales / dispatch pick',
-          description: 'Dispatch workbench readiness.',
-          href: '/dispatch/workbench',
-          icon: Truck,
-          group: 'Pick queues',
-        },
-        {
-          id: 'transfer',
-          title: 'Transfer pick',
-          description: 'Dispatch outbound transfer lines.',
-          href: '/inventory/movements/transfers',
-          icon: ArrowLeftRight,
-          group: 'Pick queues',
-        },
-        {
-          id: 'issue',
-          title: 'Issue after pick',
-          description: 'Post material issue document.',
-          href: '/inventory/movements/issues/new',
-          icon: ArrowUpFromLine,
-          group: 'Pick queues',
-        },
+      description="Live pick queue from active reservations — production, sales, and dispatch. Bin-directed picking arrives with bin-level stock."
+      showDescription
+      breadcrumbs={[
+        { label: 'Store', to: '/inventory' },
+        { label: 'Material Picking' },
       ]}
-    />
+      autoBreadcrumbs={false}
+      favoritePath="/inventory/store/picking"
+      commandBar={(
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={{
+            id: 'refresh',
+            label: 'Refresh',
+            icon: RefreshCw,
+            onClick: () => setToken((n) => n + 1),
+          }}
+          secondaryActions={[
+            { id: 'transfer', label: 'Transfer pick', icon: ArrowLeftRight, onClick: () => navigate('/inventory/movements/transfers') },
+            { id: 'register', label: 'Full reservations register', icon: ClipboardList, onClick: () => navigate('/inventory/reservations') },
+          ]}
+        />
+      )}
+    >
+      <p className="mb-3 text-[12px] text-erp-muted">
+        Flow: <strong>Reservation</strong> (source demand) → <strong>Pick</strong> here → <strong>Issue</strong> to consume,
+        or <strong>Release</strong> to free stock for other demands.
+      </p>
+
+      {loading ? <LoadingState variant="dashboard" /> : null}
+
+      {!loading && rows.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title="Nothing to pick"
+          description="No active reservations right now. Production, sales, or dispatch demand will queue up here."
+        />
+      ) : null}
+
+      {!loading && rows.length > 0 ? (
+        <div className="store-ops-page max-w-none">
+          {PICK_GROUPS.map((group) => {
+            const groupRows = rows.filter((r) => r.demandType === group.demandType)
+            if (groupRows.length === 0) return null
+            const Icon = group.icon
+            return (
+              <section key={group.demandType} className="store-section">
+                <div className="store-section__head">
+                  <h2 className="store-section__title">{group.label}</h2>
+                  <span className="text-[12px] text-erp-muted">{groupRows.length}</span>
+                </div>
+                <ul className="store-card-list">
+                  {groupRows.map((r) => {
+                    const remaining = Number(r.remainingQty ?? r.quantity ?? 0)
+                    const itemLabel = r.item ? `${r.item.code} · ${r.item.name}` : r.itemId
+                    const whLabel = r.warehouse?.name ?? r.warehouseId
+                    return (
+                      <li key={r.id}>
+                        <div className="store-action-card">
+                          <div className="store-action-card__top">
+                            <span className="inv-hub-badge inv-hub-badge--info">{r.demandType}</span>
+                            <span className="store-action-card__domain">ref {r.referenceNo ?? r.demandId}</span>
+                          </div>
+                          <div className="store-action-card__title">{itemLabel}</div>
+                          <div className="store-action-card__detail">
+                            {whLabel} · reserved {formatNumber(Number(r.quantity))} · to pick {formatNumber(remaining)}
+                          </div>
+                          <div className="store-action-card__detail text-[11px]">
+                            Since {formatDate(r.createdAt)} · #{r.reservationNumber ?? r.id.slice(0, 8)}
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Button size="sm" variant="secondary" onClick={() => navigate(`/inventory/stock/${r.itemId}`)}>
+                              Item 360
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => navigate(group.workbenchHref)}>
+                              <Icon className="h-4 w-4" aria-hidden /> {group.workbenchLabel}
+                            </Button>
+                            <Button size="sm" onClick={() => navigate(issueHref(r))}>
+                              <ArrowUpFromLine className="h-4 w-4" aria-hidden /> Issue
+                            </Button>
+                            <Button size="sm" variant="ghost" disabled={busyId === r.id} onClick={() => void release(r.id)}>
+                              Release
+                            </Button>
+                          </div>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            )
+          })}
+        </div>
+      ) : null}
+    </OperationalPageShell>
   )
 }
 

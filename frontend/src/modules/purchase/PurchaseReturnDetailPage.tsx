@@ -19,6 +19,7 @@ import {
   purchaseDocumentApprovalFact,
 } from '@/components/purchase/PurchaseDocumentFactBox'
 import { ErpCardSection, ErpViewField } from '@/components/erp/card-form'
+import { PurchaseTaxTotalsView } from '@/components/purchase/PurchaseTaxTotalsView'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { Modal } from '@/design-system/components/Modal'
@@ -491,6 +492,32 @@ export function PurchaseReturnDetailPage() {
               </tbody>
             </table>
           </div>
+        </ErpCardSection>
+
+        <ErpCardSection
+          title="Tax & Totals"
+          subtitle="Return value, tax, and document total"
+          columns={1}
+          collapsible
+          defaultOpen
+        >
+          <PurchaseTaxTotalsView
+            charges={[
+              { id: 'basic', label: 'Return Value', value: formatCurrency(doc.subtotal) },
+              { id: 'discount', label: 'Discount', value: formatCurrency(doc.discount), hidden: !(Number(doc.discount) > 0) },
+              { id: 'freight', label: 'Freight', value: formatCurrency(doc.freight), hidden: !(Number(doc.freight) > 0) },
+              { id: 'other', label: 'Other Charges', value: formatCurrency(doc.otherCharges), hidden: !(Number(doc.otherCharges) > 0) },
+            ]}
+            calcRows={[
+              { id: 'taxable', label: 'Taxable Amount', value: formatCurrency(doc.taxableAmount) },
+              { id: 'cgst', label: 'CGST', value: formatCurrency(doc.cgst), hidden: Number(doc.igst) > 0 },
+              { id: 'sgst', label: 'SGST', value: formatCurrency(doc.sgst), hidden: Number(doc.igst) > 0 },
+              { id: 'igst', label: 'IGST', value: formatCurrency(doc.igst), hidden: !(Number(doc.igst) > 0) },
+              { id: 'roundOff', label: 'Round Off', value: formatCurrency(doc.roundOff), hidden: !(Number(doc.roundOff) !== 0) },
+            ]}
+            grandTotalLabel="Return Total"
+            grandTotalValue={formatCurrency(doc.totalAmount)}
+          />
         </ErpCardSection>
 
         {history.length > 0 ? (

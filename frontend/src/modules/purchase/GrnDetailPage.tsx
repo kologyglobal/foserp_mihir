@@ -20,6 +20,7 @@ import {
   purchaseDocumentApprovalFact,
 } from '@/components/purchase/PurchaseDocumentFactBox'
 import { ErpCardSection, ErpViewField } from '@/components/erp/card-form'
+import { PurchaseTaxTotalsView } from '@/components/purchase/PurchaseTaxTotalsView'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -30,7 +31,6 @@ import { DecimalInput } from '@/components/forms/Inputs'
 import {
   approveToleranceGRN,
   cancelGRN,
-  createPurchaseReturnFromGrn,
   getGRNById,
   GRN_LINE_INSPECTION_STATUS_LABELS,
   postGRN,
@@ -414,18 +414,7 @@ export function GrnDetailPage() {
               id: 'return',
               label: 'Create Material Return',
               icon: RotateCcw,
-              onClick: async () => {
-                setBusy(true)
-                try {
-                  const ret = await createPurchaseReturnFromGrn(grn.id)
-                  notify.success(`Material return ${ret.documentNumber} created`)
-                  navigate(`/purchase/returns/${ret.id}`)
-                } catch (err) {
-                  notify.error(err instanceof PurchaseServiceError ? err.message : 'Return failed')
-                } finally {
-                  setBusy(false)
-                }
-              },
+              onClick: () => navigate(`/purchase/returns/new?grnId=${grn.id}`),
               hidden: returnGate.hidden,
               disabled: busy || returnGate.disabled,
               disabledReason: returnGate.disabledReason ?? 'No returnable quantity on this GRN (complete QC / posting first)',
@@ -630,18 +619,7 @@ export function GrnDetailPage() {
                 type="button"
                 className="mt-2 font-semibold text-erp-primary hover:underline disabled:opacity-50"
                 disabled={returnGate.hidden || returnGate.disabled || busy}
-                onClick={async () => {
-                  setBusy(true)
-                  try {
-                    const ret = await createPurchaseReturnFromGrn(grn.id)
-                    notify.success(`Return ${ret.documentNumber} created`)
-                    navigate(`/purchase/returns/${ret.id}`)
-                  } catch (err) {
-                    notify.error(err instanceof PurchaseServiceError ? err.message : 'Return failed')
-                  } finally {
-                    setBusy(false)
-                  }
-                }}
+                onClick={() => navigate(`/purchase/returns/new?grnId=${grn.id}`)}
               >
                 Create return →
               </button>
@@ -937,6 +915,37 @@ export function GrnDetailPage() {
               </tbody>
             </table>
           </div>
+        </ErpCardSection>
+
+        <ErpCardSection
+          title="Receipt Value"
+          subtitle="Material value received on this GRN"
+          columns={1}
+          collapsible
+          defaultOpen={false}
+        >
+          <PurchaseTaxTotalsView
+            charges={[
+              { id: 'material', label: 'Material Value', value: formatCurrency(grn.subtotal) },
+              { id: 'freight', label: 'Freight', value: formatCurrency(grn.freight), hidden: !(Number(grn.freight) > 0) },
+              { id: 'other', label: 'Other Charges', value: formatCurrency(grn.otherCharges), hidden: !(Number(grn.otherCharges) > 0) },
+            ]}
+            calcRows={[
+              { id: 'taxable', label: 'Taxable Amount', value: formatCurrency(grn.taxableAmount) },
+              { id: 'cgst', label: 'CGST', value: formatCurrency(grn.cgst), hidden: !(Number(grn.cgst) > 0) },
+              { id: 'sgst', label: 'SGST', value: formatCurrency(grn.sgst), hidden: !(Number(grn.sgst) > 0) },
+              { id: 'igst', label: 'IGST', value: formatCurrency(grn.igst), hidden: !(Number(grn.igst) > 0) },
+              { id: 'roundOff', label: 'Round Off', value: formatCurrency(grn.roundOff), hidden: !(Number(grn.roundOff) !== 0) },
+            ]}
+            grandTotalLabel="Receipt Total"
+            grandTotalValue={formatCurrency(grn.totalAmount)}
+            footer={(
+              <p className="text-[12px] text-erp-muted">
+                GST is charged on the vendor invoice, not the GRN — tax rates are snapshotted from the
+                purchase order and applied when the Purchase Invoice is booked.
+              </p>
+            )}
+          />
         </ErpCardSection>
       </div>
 

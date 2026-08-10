@@ -15,6 +15,8 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table'
 import {
+  DATAGRID_LAYOUTS_HYDRATED_EVENT,
+  ensureDataGridColumnLayoutsHydrated,
   isDocumentNumberColumnId,
   loadDataGridColumnLayout,
   saveDataGridColumnLayout,
@@ -251,13 +253,19 @@ export function DataGrid<T>({
           ('accessorKey' in col && col.accessorKey != null ? String(col.accessorKey) : '') ??
           '',
       )
+      let next = col
+      // Document-number columns are the row identity — required on every register
+      // unless a page explicitly opts out with enableHiding: true.
+      if (next.enableHiding === undefined && isDocumentNumberColumnId(id)) {
+        next = { ...next, enableHiding: false }
+      }
       if (enableColumnSorting) {
-        return col
+        return next
       }
       if (isDocumentNumberColumnId(id)) {
-        return { ...col, enableSorting: col.enableSorting !== false }
+        return { ...next, enableSorting: next.enableSorting !== false }
       }
-      return { ...col, enableSorting: false }
+      return { ...next, enableSorting: false }
     })
   }, [columns, enableColumnSorting])
 
@@ -274,14 +282,54 @@ export function DataGrid<T>({
     layoutHydratedKey.current = resolvedLayoutKey
   }, [resolvedLayoutKey])
 
+  // Pull server-saved layouts once per session; re-apply this grid's layout when they land.
+  useEffect(() => {
+    ensureDataGridColumnLayoutsHydrated()
+    if (!resolvedLayoutKey) return
+    const onHydrated = () => {
+      const saved = loadDataGridColumnLayout(resolvedLayoutKey)
+      if (!saved) return
+      setColumnVisibility(saved.visibility)
+      setColumnOrder(saved.order)
+    }
+    window.addEventListener(DATAGRID_LAYOUTS_HYDRATED_EVENT, onHydrated)
+    return () => window.removeEventListener(DATAGRID_LAYOUTS_HYDRATED_EVENT, onHydrated)
+  }, [resolvedLayoutKey])
+
+  // Columns with enableHiding: false are required — a stale saved layout must not hide them.
+  const requiredColumnIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const col of resolvedColumns) {
+      if (col.enableHiding !== false) continue
+      const id = String(
+        col.id ??
+          ('accessorKey' in col && col.accessorKey != null ? String(col.accessorKey) : ''),
+      )
+      if (id) ids.add(id)
+    }
+    return ids
+  }, [resolvedColumns])
+
+  const effectiveColumnVisibility = useMemo(() => {
+    let changed = false
+    const next: VisibilityState = { ...columnVisibility }
+    for (const id of requiredColumnIds) {
+      if (next[id] === false) {
+        delete next[id]
+        changed = true
+      }
+    }
+    return changed ? next : columnVisibility
+  }, [columnVisibility, requiredColumnIds])
+
   // Persist column show/hide + order after user changes.
   useEffect(() => {
     if (!resolvedLayoutKey || layoutHydratedKey.current !== resolvedLayoutKey) return
     saveDataGridColumnLayout(resolvedLayoutKey, {
-      visibility: columnVisibility,
+      visibility: effectiveColumnVisibility,
       order: columnOrder,
     })
-  }, [resolvedLayoutKey, columnVisibility, columnOrder])
+  }, [resolvedLayoutKey, effectiveColumnVisibility, columnOrder])
 
   const handleSortingChange: OnChangeFn<SortingState> = (updater) => {
     setSorting((prev) => {
@@ -320,7 +368,7 @@ export function DataGrid<T>({
     columns: resolvedColumns,
     state: {
       sorting,
-      columnVisibility,
+      columnVisibility: effectiveColumnVisibility,
       columnOrder,
       ...(selectable ? { rowSelection: rowSelection ?? {} } : {}),
     },
@@ -363,16 +411,17 @@ export function DataGrid<T>({
 
   function reorderColumn(dragId: string, dropId: string) {
     if (dragId === dropId) return
+    // Locked (required) columns cannot be dragged or dropped onto, so a plain
+    // splice keeps them anchored in place instead of pushing them to the tail.
+    if (!table.getColumn(dragId)?.getCanHide() || !table.getColumn(dropId)?.getCanHide()) return
     const order = currentColumnOrderIds()
-    const movable = order.filter((id) => table.getColumn(id)?.getCanHide())
-    const fixedTail = order.filter((id) => !table.getColumn(id)?.getCanHide())
-    const from = movable.indexOf(dragId)
-    const to = movable.indexOf(dropId)
+    const from = order.indexOf(dragId)
+    const to = order.indexOf(dropId)
     if (from < 0 || to < 0) return
-    const next = [...movable]
-    const [item] = next.splice(from, 1)
-    next.splice(to, 0, item)
-    setColumnOrder([...next, ...fixedTail])
+    const next = [...order]
+    next.splice(from, 1)
+    next.splice(to, 0, dragId)
+    setColumnOrder(next)
   }
 
   useEffect(() => {

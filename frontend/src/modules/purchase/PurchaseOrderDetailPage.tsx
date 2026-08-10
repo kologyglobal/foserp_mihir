@@ -662,7 +662,6 @@ export function PurchaseOrderDetailPage() {
           <ErpViewField label="Vendor" value={`${po.vendor.code} — ${po.vendor.name}`} />
           <ErpViewField label="Vendor GST Number" value={po.vendor.gstin} />
           <ErpViewField label="Place of Supply" value={po.placeOfSupply || '-'} />
-          <ErpViewField label="Buyer" value={po.buyer.name} />
           <ErpViewField label="Purchase Location" value={po.purchaseLocation.name} />
           <ErpViewField label="Delivery Location" value={po.deliveryLocation.name} />
           <ErpViewField label="Expected Delivery Date" value={formatDate(po.expectedDeliveryDate)} />

@@ -85,25 +85,56 @@ const PR_DEPARTMENT_LEGACY_LABELS: Record<string, string> = {
   QUALITY: 'Quality',
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Batched — resolves every distinct departmentId/code in one query (avoids N+1 on list pages). */
+async function resolveDepartmentDisplayNames(
+  tenantId: string,
+  departmentIds: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const resolved = new Map<string, string>()
+  const lookupIds = new Set<string>()
+  for (const raw0 of departmentIds) {
+    const raw = (raw0 ?? '').trim()
+    if (!raw || resolved.has(raw)) continue
+    const legacy = PR_DEPARTMENT_LEGACY_LABELS[raw.toUpperCase()]
+    if (legacy) {
+      resolved.set(raw, legacy)
+      continue
+    }
+    lookupIds.add(raw)
+  }
+  if (lookupIds.size > 0) {
+    const depts = await prisma.crmMaster.findMany({
+      where: {
+        tenantId,
+        kind: 'departments',
+        deletedAt: null,
+        OR: [{ id: { in: [...lookupIds] } }, { code: { in: [...lookupIds] } }],
+      },
+      select: { id: true, code: true, name: true },
+    })
+    for (const d of depts) {
+      const name = d.name?.trim()
+      if (!name) continue
+      if (lookupIds.has(d.id)) resolved.set(d.id, name)
+      if (d.code && lookupIds.has(d.code)) resolved.set(d.code, name)
+    }
+    for (const raw of lookupIds) {
+      if (!resolved.has(raw) && !UUID_RE.test(raw)) resolved.set(raw, raw)
+    }
+  }
+  return resolved
+}
+
 async function resolveDepartmentDisplayName(
   tenantId: string,
   departmentId: string | null | undefined,
 ): Promise<string | null> {
   const raw = (departmentId ?? '').trim()
   if (!raw) return null
-  const legacy = PR_DEPARTMENT_LEGACY_LABELS[raw.toUpperCase()]
-  if (legacy) return legacy
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw)
-  const dept = await prisma.crmMaster.findFirst({
-    where: {
-      tenantId,
-      kind: 'departments',
-      deletedAt: null,
-      ...(isUuid ? { id: raw } : { OR: [{ id: raw }, { code: raw }] }),
-    },
-    select: { name: true },
-  })
-  return dept?.name?.trim() || (isUuid ? null : raw)
+  const map = await resolveDepartmentDisplayNames(tenantId, [raw])
+  return map.get(raw) ?? null
 }
 
 async function mapPrToDto(tenantId: string, pr: PrWithLines) {
@@ -117,12 +148,17 @@ async function mapPrToDto(tenantId: string, pr: PrWithLines) {
 }
 
 async function mapPrListToDto(tenantId: string, items: PrWithLines[]) {
-  const userNames = await resolveUserNames(
-    items.flatMap((pr) => [pr.requestedById, pr.createdById, pr.updatedById]),
-    tenantId,
-    prisma,
+  const [userNames, departmentNames] = await Promise.all([
+    resolveUserNames(
+      items.flatMap((pr) => [pr.requestedById, pr.createdById, pr.updatedById]),
+      tenantId,
+      prisma,
+    ),
+    resolveDepartmentDisplayNames(tenantId, items.map((pr) => pr.departmentId)),
+  ])
+  return items.map((pr) =>
+    mapPurchaseRequisitionToDto(pr, userNames, departmentNames.get((pr.departmentId ?? '').trim())),
   )
-  return items.map((pr) => mapPurchaseRequisitionToDto(pr, userNames))
 }
 
 async function assertApprovalAssignedToActor(

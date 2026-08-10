@@ -222,6 +222,7 @@ export function StoreMovementRegisterPage({
     {
       id: 'number',
       header: 'Movement',
+      enableHiding: false,
       accessorFn: (m) => m.movementNumber,
       cell: ({ row }) =>
         detailPathBase ? (

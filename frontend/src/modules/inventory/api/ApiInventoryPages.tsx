@@ -488,6 +488,7 @@ export function ApiReservationsPage() {
     {
       id: 'number',
       header: 'Reservation',
+      enableHiding: false,
       accessorFn: (r) => r.reservationNumber,
       cell: ({ row }) => <span className="font-mono font-semibold">{row.original.reservationNumber}</span>,
     },
@@ -1111,6 +1112,49 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
     }
   }
 
+  const cancelTransfer = async (row: ApiInventoryDocument) => {
+    const remarks = await appPromptNote({
+      title: `Cancel transfer ${cfg.number(row)}?`,
+      description: 'No stock has moved yet on this transfer — cancelling just closes the document.',
+      confirmLabel: 'Cancel Transfer',
+      tone: 'danger',
+      note: { required: false, label: 'Reason (optional)' },
+    })
+    if (remarks == null) return
+    setBusyId(row.id)
+    try {
+      await documentsApi.cancelInventoryTransfer(row.id, remarks || undefined)
+      notify.success(`${cfg.number(row)} cancelled`)
+      await load()
+    } catch (error) {
+      notify.error(errText(error, 'Cancel failed'))
+    } finally {
+      setBusyId('')
+    }
+  }
+
+  const reverseTransfer = async (row: ApiInventoryDocument) => {
+    const remarks = await appPromptNote({
+      title: `Reverse transfer ${cfg.number(row)}?`,
+      description: 'Posts negating movements for dispatched/received quantities. The document becomes REVERSED.',
+      detail: cfg.number(row),
+      tone: 'danger',
+      confirmLabel: 'Reverse',
+      note: { label: 'Reversal reason', required: true },
+    })
+    if (remarks == null) return
+    setBusyId(row.id)
+    try {
+      await documentsApi.reverseInventoryTransfer(row.id, remarks)
+      notify.success(`${cfg.number(row)} reversed`)
+      await load()
+    } catch (error) {
+      notify.error(errText(error, 'Reverse failed'))
+    } finally {
+      setBusyId('')
+    }
+  }
+
   const advanceAdjustment = async (row: ApiInventoryDocument, action: 'submit' | 'approve' | 'reverse') => {
     if (action === 'reverse') {
       const reason = await appPromptNote({
@@ -1295,6 +1339,7 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
     {
       id: 'number',
       header: 'Document',
+      enableHiding: false,
       accessorFn: (r) => cfg.number(r),
       cell: ({ row }) =>
         kind === 'stock-counts' ? (
@@ -1357,6 +1402,7 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
     {
       id: 'status',
       header: 'Status',
+      enableHiding: false,
       accessorFn: (r) => r.status,
       cell: ({ row }) => <span className="whitespace-nowrap">{row.original.status}</span>,
     },
@@ -1369,15 +1415,15 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
         const doc = row.original
         const hasAction =
           cfg.postable.includes(doc.status)
-          || (kind === 'transfers' && ['DRAFT', 'SUBMITTED', 'IN_TRANSIT', 'PARTIALLY_RECEIVED'].includes(doc.status))
+          || (kind === 'transfers' && ['DRAFT', 'SUBMITTED', 'APPROVED', 'IN_TRANSIT', 'PARTIALLY_RECEIVED', 'RECEIVED'].includes(doc.status))
           || (kind === 'adjustments' && ['DRAFT', 'SUBMITTED', 'POSTED'].includes(doc.status))
           || kind === 'stock-counts'
         return (
           <div className="flex justify-end gap-2">
-            {kind === 'transfers' && doc.status === 'DRAFT' ? (
+            {kind === 'transfers' && doc.status === 'DRAFT' && perms.canSubmitTransfer ? (
               <Button size="sm" disabled={busyId === doc.id} onClick={() => void advanceTransfer(doc, 'submit')}>Submit</Button>
             ) : null}
-            {kind === 'transfers' && doc.status === 'SUBMITTED' ? (
+            {kind === 'transfers' && doc.status === 'SUBMITTED' && perms.canApproveTransfer ? (
               <Button size="sm" disabled={busyId === doc.id} onClick={() => void advanceTransfer(doc, 'approve')}>Approve</Button>
             ) : null}
             {kind === 'adjustments' && doc.status === 'DRAFT' && perms.canSubmitAdjustment ? (
@@ -1391,7 +1437,8 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
                 <Button size="sm" variant="secondary">Open</Button>
               </Link>
             ) : null}
-            {cfg.postable.includes(doc.status) && kind !== 'stock-counts' ? (
+            {cfg.postable.includes(doc.status) && kind !== 'stock-counts'
+            && (kind === 'transfers' ? perms.canDispatchTransfer : perms.canPostAdjustment) ? (
               <Button size="sm" disabled={busyId === doc.id} onClick={() => void post(doc)}>
                 {busyId === doc.id ? '…' : kind === 'transfers' ? 'Dispatch' : 'Post'}
               </Button>
@@ -1399,8 +1446,14 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
             {kind === 'adjustments' && doc.status === 'POSTED' && perms.canApproveAdjustment ? (
               <Button size="sm" variant="secondary" disabled={busyId === doc.id} onClick={() => void advanceAdjustment(doc, 'reverse')}>Reverse</Button>
             ) : null}
-            {kind === 'transfers' && (doc.status === 'IN_TRANSIT' || doc.status === 'PARTIALLY_RECEIVED') ? (
+            {kind === 'transfers' && (doc.status === 'IN_TRANSIT' || doc.status === 'PARTIALLY_RECEIVED') && perms.canReceiveTransfer ? (
               <Button size="sm" disabled={busyId === doc.id} onClick={() => void advanceTransfer(doc, 'receive')}>Receive</Button>
+            ) : null}
+            {kind === 'transfers' && ['DRAFT', 'SUBMITTED', 'APPROVED'].includes(doc.status) && perms.canCancelTransfer ? (
+              <Button size="sm" variant="secondary" disabled={busyId === doc.id} onClick={() => void cancelTransfer(doc)}>Cancel</Button>
+            ) : null}
+            {kind === 'transfers' && ['IN_TRANSIT', 'PARTIALLY_RECEIVED', 'RECEIVED'].includes(doc.status) && perms.canReverseTransfer ? (
+              <Button size="sm" variant="secondary" disabled={busyId === doc.id} onClick={() => void reverseTransfer(doc)}>Reverse</Button>
             ) : null}
             {!hasAction ? <span className="text-erp-muted">-</span> : null}
           </div>

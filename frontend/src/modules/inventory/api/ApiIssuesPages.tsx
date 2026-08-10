@@ -1265,14 +1265,15 @@ export function ApiIssuePostPage() {
   const workOrders = useWorkOrderOptions()
   const today = new Date().toISOString().slice(0, 10)
   const initialWo = searchParams.get('workOrderId') ?? ''
-  const [mode, setMode] = useState<'general' | 'work_order'>('work_order')
+  const initialItemId = searchParams.get('itemId') ?? ''
+  const [mode, setMode] = useState<'general' | 'work_order'>(initialItemId ? 'general' : 'work_order')
   const [form, setForm] = useState({
     workOrderId: initialWo,
-    itemId: '',
-    warehouseId: '',
-    quantity: '',
+    itemId: initialItemId,
+    warehouseId: searchParams.get('warehouseId') ?? '',
+    quantity: searchParams.get('quantity') ?? '',
     movementDate: today,
-    referenceNo: '',
+    referenceNo: searchParams.get('referenceNo') ?? '',
     remarks: '',
   })
   const [position, setPosition] = useState<InventoryStockBalance | null>(null)
