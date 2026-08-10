@@ -11,6 +11,7 @@ import { errorMiddleware } from './middleware/error.middleware.js'
 import authRoutes from './modules/auth/auth.routes.js'
 import crmRoutes from './modules/crm/crm.routes.js'
 import notificationRoutes from './modules/notifications/notification.routes.js'
+import uiPreferenceRoutes from './modules/ui-preferences/ui-preference.routes.js'
 import departmentRoutes from './modules/departments/department.routes.js'
 import {
   responsibilityRoutes,
@@ -170,6 +171,7 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/crm', crmRoutes)
   app.use('/api/v1/tenants/:tenantId/mobile/device-tokens', mobileDeviceTokenRoutes)
   app.use('/api/v1/tenants/:tenantId/notifications', notificationRoutes)
+  app.use('/api/v1/tenants/:tenantId/me/ui-preferences', uiPreferenceRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/items', itemRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/vendors', vendorRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/imports', masterImportRoutes)
@@ -215,6 +217,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/crm', crmRoutes)
   app.use('/api/v1/t/:tenantSlug/mobile/device-tokens', mobileDeviceTokenRoutes)
   app.use('/api/v1/t/:tenantSlug/notifications', notificationRoutes)
+  app.use('/api/v1/t/:tenantSlug/me/ui-preferences', uiPreferenceRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/items', itemRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/vendors', vendorRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/imports', masterImportRoutes)

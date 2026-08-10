@@ -131,6 +131,20 @@ export async function deactivateParameter(req: Request, tenantId: string, id: st
   const userId = req.context?.userId ?? ''
   const current = await repo.getParameter(tenantId, id)
   if (!current) throw new NotFoundError('QC parameter not found')
-  const row = await prisma.$transaction((tx) => repo.softDeleteParameter(tx, tenantId, id, userId))
+  if (!current.active) return mapParameter(current)
+  const row = await prisma.$transaction((tx) =>
+    repo.updateParameter(tx, tenantId, id, { active: false, updatedBy: userId }),
+  )
+  return mapParameter(row)
+}
+
+export async function activateParameter(req: Request, tenantId: string, id: string) {
+  const userId = req.context?.userId ?? ''
+  const current = await repo.getParameter(tenantId, id)
+  if (!current) throw new NotFoundError('QC parameter not found')
+  if (current.active) return mapParameter(current)
+  const row = await prisma.$transaction((tx) =>
+    repo.updateParameter(tx, tenantId, id, { active: true, updatedBy: userId }),
+  )
   return mapParameter(row)
 }

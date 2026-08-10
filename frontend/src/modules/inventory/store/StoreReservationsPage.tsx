@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, RefreshCw } from 'lucide-react'
+import type { ColumnDef } from '@tanstack/react-table'
+import { Eye, Package, RefreshCw, XCircle } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
+import { EnterpriseRowActionsMenu, type RowActionItem } from '@/design-system/enterprise'
+import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import {
@@ -14,7 +19,13 @@ import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { appConfirm } from '@/store/confirmDialogStore'
-import { cn } from '@/utils/cn'
+
+const RESERVATION_STATUS_TONE: Record<string, 'success' | 'warning' | 'critical' | 'info' | 'neutral'> = {
+  ACTIVE: 'info',
+  FULFILLED: 'success',
+  CANCELLED: 'neutral',
+  EXPIRED: 'warning',
+}
 
 type ResRow = InventoryStockReservation & {
   item?: { code?: string; name?: string }
@@ -32,7 +43,7 @@ export function StoreReservationsPage() {
     void token
     setLoading(true)
     try {
-      const res = await listInventoryReservations({ status: 'ACTIVE', limit: 100 })
+      const res = await listInventoryReservations({ status: 'ACTIVE', limit: 300 })
       setRows((res.data ?? []) as ResRow[])
     } catch {
       setRows([])
@@ -64,6 +75,126 @@ export function StoreReservationsPage() {
     }
   }
 
+  const columns: ColumnDef<ResRow, unknown>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'reservationNumber',
+        header: 'Reservation',
+        meta: { columnLabel: 'Reservation' },
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap font-mono">
+            {row.original.reservationNumber ?? row.original.id.slice(0, 8)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        meta: { columnLabel: 'Status' },
+        cell: ({ row }) => (
+          <DynamicsStatusChip
+            label={row.original.status}
+            tone={RESERVATION_STATUS_TONE[String(row.original.status).toUpperCase()] ?? 'neutral'}
+          />
+        ),
+      },
+      {
+        id: 'item',
+        accessorFn: (r) => (r.item ? `${r.item.code} · ${r.item.name}` : r.itemId),
+        header: 'Item',
+        meta: { columnLabel: 'Item' },
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap font-mono">
+            {row.original.item ? `${row.original.item.code} · ${row.original.item.name}` : row.original.itemId}
+          </span>
+        ),
+      },
+      {
+        id: 'warehouse',
+        accessorFn: (r) => r.warehouse?.name ?? r.warehouseId,
+        header: 'Warehouse',
+        meta: { columnLabel: 'Warehouse' },
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap">{row.original.warehouse?.name ?? row.original.warehouseId}</span>
+        ),
+      },
+      {
+        id: 'demand',
+        accessorFn: (r) => r.demandType,
+        header: 'Demand',
+        meta: { columnLabel: 'Demand' },
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap text-erp-muted">
+            {row.original.demandType}
+            {row.original.referenceNo ?? row.original.demandId ? (
+              <span> · {row.original.referenceNo ?? row.original.demandId}</span>
+            ) : null}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'quantity',
+        header: 'Reserved',
+        meta: { align: 'right', columnLabel: 'Reserved' },
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(Number(row.original.quantity))}</span>
+        ),
+      },
+      {
+        id: 'remaining',
+        accessorFn: (r) => Number(r.remainingQty ?? r.quantity ?? 0),
+        header: 'Remaining',
+        meta: { align: 'right', columnLabel: 'Remaining' },
+        cell: ({ row }) => (
+          <span className="tabular-nums">
+            {formatNumber(Number(row.original.remainingQty ?? row.original.quantity ?? 0))}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'createdAt',
+        header: 'Since',
+        meta: { columnLabel: 'Since' },
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap text-erp-muted">{formatDate(row.original.createdAt)}</span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => {
+          const r = row.original
+          const isActive = String(r.status).toUpperCase() === 'ACTIVE'
+          const actions: RowActionItem[] = [
+            { id: 'item-360', label: 'Item 360', icon: Eye, onClick: () => navigate(`/inventory/stock/${r.itemId}`) },
+            ...(isActive
+              ? [
+                  {
+                    id: 'release',
+                    label: 'Release',
+                    icon: XCircle,
+                    onClick: () => void release(r.id),
+                    disabled: busyId === r.id,
+                  },
+                ]
+              : []),
+          ]
+          return (
+            <div
+              className={busyId === r.id ? 'pointer-events-none opacity-50' : undefined}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <EnterpriseRowActionsMenu actions={actions} />
+            </div>
+          )
+        },
+      },
+    ],
+    [busyId, navigate],
+  )
+
   return (
     <OperationalPageShell
       variant="dynamics"
@@ -94,58 +225,22 @@ export function StoreReservationsPage() {
         />
       )}
     >
-      {loading ? <LoadingState variant="card" /> : null}
+      {loading ? <LoadingState variant="table" rows={6} /> : null}
       {!loading && rows.length === 0 ? (
         <EmptyState icon={Package} title="No active reservations" description="Production, sales, or manual reservations will appear here." />
       ) : null}
       {!loading && rows.length > 0 ? (
-        <ul className="store-card-list">
-          {rows.map((r) => {
-            const remaining = Number(r.remainingQty ?? r.quantity ?? 0)
-            const itemLabel = r.item ? `${r.item.code} · ${r.item.name}` : r.itemId
-            const whLabel = r.warehouse?.name ?? r.warehouseId
-            const isActive = String(r.status).toUpperCase() === 'ACTIVE'
-            return (
-              <li key={r.id}>
-                <div className="store-action-card">
-                  <div className="store-action-card__top">
-                    <span className={cn('inv-hub-badge', isActive ? 'inv-hub-badge--info' : 'inv-hub-badge--warning')}>
-                      {r.status}
-                    </span>
-                    <span className="store-action-card__domain">{r.demandType}</span>
-                  </div>
-                  <div className="store-action-card__title">{itemLabel}</div>
-                  <div className="store-action-card__detail">
-                    {whLabel} · ref {r.referenceNo ?? r.demandId} · reserved {formatNumber(Number(r.quantity))} · remaining{' '}
-                    {formatNumber(remaining)}
-                  </div>
-                  <div className="store-action-card__detail text-[11px]">
-                    Since {formatDate(r.createdAt)} · #{r.reservationNumber ?? r.id.slice(0, 8)}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="erp-btn erp-btn-secondary h-9 px-3 text-[13px]"
-                      onClick={() => navigate(`/inventory/stock/${r.itemId}`)}
-                    >
-                      Item 360
-                    </button>
-                    {isActive ? (
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
-                        disabled={busyId === r.id}
-                        onClick={() => void release(r.id)}
-                      >
-                        Release
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        <EnterpriseRegisterTableShell>
+          <ErpDataGrid
+            data={rows}
+            columns={columns}
+            getRowId={(r) => r.id}
+            stickyFirstColumn
+            showCompactSearch={false}
+            enableColumnSorting={false}
+            onRowQuickView={(r) => navigate(`/inventory/stock/${r.itemId}`)}
+          />
+        </EnterpriseRegisterTableShell>
       ) : null}
     </OperationalPageShell>
   )

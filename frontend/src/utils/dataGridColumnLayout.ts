@@ -1,4 +1,9 @@
 import type { ColumnOrderState, VisibilityState } from '@tanstack/react-table'
+import {
+  canSyncUiPreferences,
+  listUiPreferences,
+  putUiPreference,
+} from '../services/api/uiPreferencesApi'
 
 export type DataGridColumnLayout = {
   visibility: VisibilityState
@@ -6,6 +11,13 @@ export type DataGridColumnLayout = {
 }
 
 const STORAGE_KEY = 'vasant-erp-grid-column-layouts'
+
+/** Server pref key namespace: `grid-columns:<layoutKey>`. */
+const SERVER_PREF_PREFIX = 'grid-columns:'
+const SERVER_SAVE_DEBOUNCE_MS = 1500
+
+/** Fired on `window` after server layouts have been merged into localStorage. */
+export const DATAGRID_LAYOUTS_HYDRATED_EVENT = 'fos-erp-datagrid-layouts-hydrated'
 
 function readAll(): Record<string, DataGridColumnLayout> {
   if (typeof window === 'undefined') return {}
@@ -48,6 +60,87 @@ export function saveDataGridColumnLayout(layoutKey: string, layout: DataGridColu
     order: [...layout.order],
   }
   writeAll(all)
+  scheduleServerSave(layoutKey, all[layoutKey])
+}
+
+// ─── Server sync (API mode only) ─────────────────────────────────────────────
+// localStorage stays the synchronous source grids read from; the server copy
+// makes layouts survive browser resets and follow the user across devices.
+
+function sanitizeLayout(value: unknown): DataGridColumnLayout | null {
+  if (!value || typeof value !== 'object') return null
+  const raw = value as Partial<DataGridColumnLayout>
+  const visibility =
+    raw.visibility && typeof raw.visibility === 'object' && !Array.isArray(raw.visibility)
+      ? Object.fromEntries(
+          Object.entries(raw.visibility).filter(([, v]) => typeof v === 'boolean'),
+        )
+      : {}
+  const order = Array.isArray(raw.order)
+    ? raw.order.filter((id): id is string => typeof id === 'string' && id.length > 0)
+    : []
+  if (Object.keys(visibility).length === 0 && order.length === 0) return null
+  return { visibility, order }
+}
+
+let hydrationStarted = false
+const lastSyncedJson = new Map<string, string>()
+const pendingServerSaves = new Map<string, ReturnType<typeof setTimeout>>()
+
+/**
+ * One-shot: pull the user's saved layouts from the server and merge them into
+ * localStorage (server wins — it is the durable cross-device copy). Grids that
+ * are already mounted re-read their layout on DATAGRID_LAYOUTS_HYDRATED_EVENT.
+ */
+export function ensureDataGridColumnLayoutsHydrated(): void {
+  if (hydrationStarted) return
+  hydrationStarted = true
+  if (!canSyncUiPreferences()) return
+  void listUiPreferences()
+    .then((rows) => {
+      const all = readAll()
+      let changed = false
+      for (const row of rows) {
+        if (!row.prefKey.startsWith(SERVER_PREF_PREFIX)) continue
+        const layoutKey = row.prefKey.slice(SERVER_PREF_PREFIX.length)
+        const layout = sanitizeLayout(row.value)
+        if (!layoutKey || !layout) continue
+        const json = JSON.stringify(layout)
+        lastSyncedJson.set(layoutKey, json)
+        if (JSON.stringify(all[layoutKey] ?? null) !== json) {
+          all[layoutKey] = layout
+          changed = true
+        }
+      }
+      if (changed) {
+        writeAll(all)
+        window.dispatchEvent(new CustomEvent(DATAGRID_LAYOUTS_HYDRATED_EVENT))
+      }
+    })
+    .catch(() => {
+      /* offline / expired session — local layouts still work */
+    })
+}
+
+function scheduleServerSave(layoutKey: string, layout: DataGridColumnLayout) {
+  if (!canSyncUiPreferences()) return
+  const json = JSON.stringify(layout)
+  if (lastSyncedJson.get(layoutKey) === json) return
+  const pending = pendingServerSaves.get(layoutKey)
+  if (pending) clearTimeout(pending)
+  pendingServerSaves.set(
+    layoutKey,
+    setTimeout(() => {
+      pendingServerSaves.delete(layoutKey)
+      void putUiPreference(`${SERVER_PREF_PREFIX}${layoutKey}`, layout)
+        .then(() => {
+          lastSyncedJson.set(layoutKey, json)
+        })
+        .catch(() => {
+          /* transient failure — next change retries */
+        })
+    }, SERVER_SAVE_DEBOUNCE_MS),
+  )
 }
 
 /** Document / register number column ids that remain header-sortable when page-level sort is used. */

@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest'
-import { filterIncludedGrnLines, isIncludedGrnLine, recalcGrnLineDraft, type GrnLineDraft } from './grnLineDraft'
+import { afterEach, describe, expect, it } from 'vitest'
+import {
+  filterIncludedGrnLines,
+  isIncludedGrnLine,
+  linesFromPo,
+  recalcGrnLineDraft,
+  type GrnLineDraft,
+} from './grnLineDraft'
+import { useMasterStore } from '@/store/masterStore'
+import type { PurchaseOrder } from '@/types/purchaseDomain'
+import type { Item, Uom } from '@/types/master'
 
 function baseDraft(overrides: Partial<GrnLineDraft> = {}): GrnLineDraft {
   return {
@@ -82,6 +91,66 @@ describe('recalcGrnLineDraft — QC deferral (Phase 2)', () => {
     const recalced = recalcGrnLineDraft(row, setup, true)
     expect(recalced.acceptedQty).toBe(0)
     expect(recalced.rejectedQty).toBe(0)
+  })
+})
+
+describe('linesFromPo — stock UOM label (regression: GRN Accepted/Rejected missing unit)', () => {
+  const originalItems = useMasterStore.getState().items
+  const originalUoms = useMasterStore.getState().uoms
+
+  afterEach(() => {
+    useMasterStore.setState({ items: originalItems, uoms: originalUoms })
+  })
+
+  function poWithLine(itemId: string): PurchaseOrder {
+    return {
+      deliveryLocation: { id: 'wh-1', name: 'Main Warehouse' },
+      lines: [
+        {
+          id: 'line-1',
+          itemId,
+          itemCode: 'ITM-MUOM-1',
+          itemName: 'Test MUOM Item',
+          specification: '',
+          uom: 'MTR',
+          uomConversionFactor: 3,
+          quantity: 30,
+          uomQuantity: 90,
+          pendingQty: 30,
+          outstandingQty: 90,
+          receivedQtyBase: 0,
+          receivedQty: 0,
+          binId: null,
+          binCode: '',
+          locationId: null,
+          locationName: '',
+        },
+      ],
+    } as unknown as PurchaseOrder
+  }
+
+  const setup = { allowOverReceipt: false, overReceiptTolerancePct: 0 }
+
+  it('resolves the base/stock UOM from the item master when the cache is warm', () => {
+    useMasterStore.setState({
+      items: [
+        ...originalItems,
+        { id: 'item-muom-1', baseUomId: 'uom-nos' } as unknown as Item,
+      ],
+      uoms: [...originalUoms, { id: 'uom-nos', uomCode: 'NOS' } as unknown as Uom],
+    })
+    const [line] = linesFromPo(poWithLine('item-muom-1'), {}, setup, false)
+    expect(line.baseUom).toBe('NOS')
+  })
+
+  it('falls back to the purchase UOM (not blank) when the item cache is stale/missing the item', () => {
+    // Simulates a freshly created/updated item whose master data hasn't synced to the
+    // client cache yet — the Accepted/Rejected column must still show *some* unit,
+    // never render blank.
+    useMasterStore.setState({ items: originalItems.filter((i) => i.id !== 'item-muom-1') })
+    const [line] = linesFromPo(poWithLine('item-muom-1'), {}, setup, false)
+    expect(line.baseUom).toBe('MTR')
+    expect(line.baseUom).not.toBe('')
   })
 })
 

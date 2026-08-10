@@ -285,9 +285,14 @@ export function PurchaseCardFormShell({
 
 }: PurchaseCardFormShellProps) {
 
-  const useStickyRecordHeader =
-
-    workspaceRecordHeader ?? Boolean(recordHeaderFacts && recordHeaderFacts.length > 0)
+  /**
+   * The CRM Quotation-style sticky record header (Rev chip + Vendor/Buyer/Date facts row) was
+   * found to duplicate fields already shown in each document's own "General" section (Rev,
+   * Vendor, PO Date, Expected Delivery, Status) — removed everywhere it was implicitly enabled
+   * via `recordHeaderFacts`. Callers may still pass `recordHeaderFacts`/`recordHeaderId` (now
+   * inert) or explicitly opt back in via `workspaceRecordHeader`.
+   */
+  const useStickyRecordHeader = workspaceRecordHeader ?? false
 
 
 

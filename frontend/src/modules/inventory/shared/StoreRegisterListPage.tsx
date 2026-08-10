@@ -34,6 +34,8 @@ export interface StoreRegisterListPageProps<T> {
   pageId: string
   title: string
   description: string
+  /** Shell badge — defaults to Store; Quality / other modules can override. */
+  badge?: string
   breadcrumbs?: { label: string; to?: string }[]
   /** Filtered + sorted rows to render. */
   rows: T[]
@@ -67,6 +69,7 @@ export function StoreRegisterListPage<T>({
   pageId,
   title,
   description,
+  badge = 'Store',
   breadcrumbs,
   rows,
   totalRowCount,
@@ -121,10 +124,10 @@ export function StoreRegisterListPage<T>({
   const shellProps = {
     variant: 'dynamics' as const,
     layout: 'enterprise' as const,
-    badge: 'Store',
+    badge,
     title,
     description,
-    breadcrumbs: breadcrumbs ?? [{ label: 'Store', to: '/inventory' }, { label: title }],
+    breadcrumbs: breadcrumbs ?? [{ label: badge, to: '/inventory' }, { label: title }],
     autoBreadcrumbs: false,
     favoritePath: pageId,
     pageGuide: null,

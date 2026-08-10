@@ -1,3 +1,18 @@
+## 2026-08-10 — Server-side DataGrid column layouts + required (non-hideable) columns
+
+### Delivered
+- **Durable per-user column layouts** (fix for stage: column show/hide + order not surviving browser resets):
+  - New Prisma model `UserUiPreference` (`user_ui_preferences`, unique `(tenantId, userId, prefKey)`, JSON value) + migration `20260810140000_user_ui_preferences`.
+  - New backend module `backend/src/modules/ui-preferences/` mounted at `/api/v1/t/:tenantSlug/me/ui-preferences` (and `/tenants/:tenantId/...`): `GET /` (all prefs for the authenticated user), `PUT /:prefKey` (Zod-validated upsert, 16KB value cap, 300 rows/user cap), `DELETE /:prefKey`. Tenant + user scoping from auth context only; no extra module permission (users own their prefs).
+  - FE `services/api/uiPreferencesApi.ts` + sync layer in `utils/dataGridColumnLayout.ts`: localStorage stays the synchronous read path; server layouts hydrate once per session (server wins, `DATAGRID_LAYOUTS_HYDRATED_EVENT` re-applies to mounted grids); saves debounce 1.5s per grid and skip no-op writes. Demo mode / logged-out stays localStorage-only.
+- **Required columns cannot be hidden**: document-number columns (`isDocumentNumberColumnId`) are auto-locked in every `DataGrid` (opt out with explicit `enableHiding: true`); Store documents register locks Document + Status, reservations lock Reservation number. Chooser already rendered locked rows (disabled checkbox + "Required" badge); added hydration guard so a stale saved layout cannot hide a required column, and fixed `reorderColumn` so locked leading columns stay anchored instead of being pushed to the order tail on drag.
+- Tenant-admin "default layout for everyone" is **deferred** — needs a tenant-scope pref row + admin permission + merge precedence (tenant default < user override); trivial to add on this schema later.
+
+### Tests
+FE `npm run typecheck` — PASS. BE typecheck — no errors in new module (pre-existing accounting/GST/knowledge errors unchanged). Migration deployed to local MySQL. Live API smoke — login → `PUT grid-columns:/inventory/ledger` → `GET` round-trip returns saved layout — **PASS**.
+
+---
+
 ## 2026-08-10 — Store registers on the standard list-page chrome (purchase gold path)
 
 ### Delivered

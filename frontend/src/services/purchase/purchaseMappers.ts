@@ -1399,7 +1399,13 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
   const gstFromLines = aggregatePurchasePoGstTotals(mappedLines)
   const tax =
     Number(api.taxAmount) > 0 ? Number(api.taxAmount) : gstFromLines.taxAmount
-  const total = Number(api.totalAmount) || subtotal + tax + freight
+  // If the header tax had to fall back to the line-derived figure (stored taxAmount was 0/missing —
+  // e.g. an older Comparison→PO order created before that rollup was fixed), api.totalAmount is
+  // stale too (it excludes tax). Recompute the grand total from parts so it isn't silently short.
+  const total =
+    Number(api.taxAmount) > 0
+      ? Number(api.totalAmount) || subtotal + tax + freight
+      : subtotal + tax + freight
   // Server line scheme is authoritative (after tax snapshot apply). Fallback: any IGST-only total.
   const isInterstate =
     gstFromLines.gstScheme === 'igst' ||

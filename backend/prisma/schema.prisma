@@ -22353,6 +22353,24 @@ model NotificationPreference {
   @@map("notification_preferences")
 }
 
+/// Per-user UI preferences (DataGrid column layouts, workspace settings).
+/// prefKey is namespaced, e.g. "grid-columns:/inventory/ledger"; value is a small
+/// JSON payload owned by the frontend. Soft tenant/user references — rows are
+/// scoped by the auth context on every query.
+model UserUiPreference {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  prefKey   String   @db.VarChar(191)
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, userId, prefKey])
+  @@index([tenantId, userId])
+  @@map("user_ui_preferences")
+}
+
 /// Tenant-level SLA / threshold knobs for CRM notification jobs.
 model NotificationTenantSettings {
   id                             String   @id @default(uuid())

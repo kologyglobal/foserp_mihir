@@ -96,6 +96,17 @@ export function approveInventoryTransfer(id: string) {
     method: 'POST', body: JSON.stringify({}),
   })
 }
+export function cancelInventoryTransfer(id: string, remarks?: string) {
+  return apiRequest<ApiInventoryDocument>(tenantPath(`/inventory/transfers/${id}/cancel`), {
+    method: 'POST', body: JSON.stringify({ remarks: remarks || undefined }),
+  })
+}
+export function reverseInventoryTransfer(id: string, remarks: string) {
+  return apiRequest<ApiInventoryDocument>(tenantPath(`/inventory/transfers/${id}/reverse`), {
+    method: 'POST',
+    body: JSON.stringify({ idempotencyKey: `spa-transfer-rev-${id}`, remarks }),
+  })
+}
 
 export function listInventoryStockCounts(params?: Query) {
   return apiRequest<ApiInventoryDocument[]>(`${tenantPath('/inventory/stock-counts')}${query(params)}`)

@@ -290,7 +290,9 @@ export function linesFromPo(
           : factor === 1
             ? Number(l.receivedQty) || 0
             : purchaseQtyToBaseQty(Number(l.receivedQty) || 0, factor)
-      const baseUom = getPurchaseLineBaseUomCode(l.itemId)
+      // Fall back to the purchase UOM if the item master cache hasn't hydrated yet —
+      // better to show a unit than none, and it self-corrects once masters sync.
+      const baseUom = getPurchaseLineBaseUomCode(l.itemId) || l.uom
       const resolvedTol = resolveReceivingTolerancePct({
         itemTolerancePct: qtyTol,
         setupTolerancePct: setup.overReceiptTolerancePct,
