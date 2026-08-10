@@ -2,31 +2,38 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import {
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  CircleOff,
+  Pencil,
   Plus,
   RefreshCw,
   Trash2,
 } from 'lucide-react'
-import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { DataGrid } from '@/components/design-system/DataGrid'
-import { CommandBar, CommandBarButton, CommandBarGroup } from '@/components/ui/CommandBar'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Button } from '@/components/ui/Button'
 import { ErpButton } from '@/components/erp/ErpButton'
+import {
+  EnterpriseRowActionsMenu,
+  type RowActionItem,
+} from '@/design-system/enterprise/EnterpriseTablePrimitives'
 import { ErpCardFormPage, ErpCardSection, ErpStickySaveBar } from '@/components/erp/card-form'
 import { FormField } from '@/components/forms/FormField'
 import { Select } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { TableLink } from '@/components/ui/AppLink'
-import { DetailLayout, DetailSection } from '@/components/masters/MasterLayouts'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { StoreRegisterListPage } from '@/modules/inventory/shared/StoreRegisterListPage'
+import {
+  StoreRegisterListPage,
+  type StoreRegisterFilters,
+} from '@/modules/inventory/shared/StoreRegisterListPage'
 import { appConfirm } from '@/store/confirmDialogStore'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
 import {
+  activateQcParameter,
   createInspectionPlan,
   createQcParameter,
   deactivateInspectionPlan,
@@ -58,15 +65,42 @@ const QC_STAGE_LABELS: Record<QualityInspectionCategory, string> = {
   SUBCONTRACT_RETURN: 'Subcontract return',
 }
 
+const PARAM_TYPE_LABELS: Record<QualityParameterType, string> = {
+  BOOLEAN: 'Boolean (pass / fail)',
+  NUMERIC: 'Numeric',
+  TEXT: 'Text',
+  DROPDOWN: 'Dropdown',
+  PHOTO_REQUIRED: 'Photo required',
+}
+
+const PARAM_DEFAULT_FILTERS: StoreRegisterFilters = {
+  search: '',
+  status: 'ACTIVE',
+  parameterType: '',
+  severity: '',
+}
+
+const PARAM_SORT_OPTIONS = [
+  { value: 'code_asc', label: 'Code A→Z' },
+  { value: 'code_desc', label: 'Code Z→A' },
+  { value: 'name_asc', label: 'Name A→Z' },
+  { value: 'type_asc', label: 'Type' },
+  { value: 'severity_asc', label: 'Severity' },
+]
+
 export function ApiQcParameterMasterPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<QualityParameter[]>([])
   const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [filters, setFilters] = useState<StoreRegisterFilters>(PARAM_DEFAULT_FILTERS)
+  const [sortBy, setSortBy] = useState('code_asc')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await listQcParameters({ active: true, limit: 200 })
+      // Load all (active + inactive) so Status filter can show both.
+      const res = await listQcParameters({ limit: 200 })
       setRows(res.data)
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load parameters')
@@ -80,45 +114,288 @@ export function ApiQcParameterMasterPage() {
     void load()
   }, [load])
 
-  return (
-    <OperationalPageShell
-      title="QC Parameter Master"
-      description="Reusable inspection parameters (API)."
-      badge={`${rows.length} parameters`}
-      commandBar={
-        <CommandBar>
-          <CommandBarGroup label="Actions">
-            <CommandBarButton icon={RefreshCw} label="Refresh" onClick={() => void load()} />
-            <CommandBarButton icon={Plus} label="New Parameter" primary onClick={() => navigate('/quality/parameters/new')} />
-          </CommandBarGroup>
-        </CommandBar>
+  const setActive = useCallback(
+    async (row: QualityParameter, active: boolean) => {
+      if (active) {
+        setBusyId(row.id)
+        try {
+          await activateQcParameter(row.id)
+          notify.success(`${row.parameterCode} activated`)
+          await load()
+        } catch (e) {
+          notify.error(e instanceof Error ? e.message : 'Activate failed')
+        } finally {
+          setBusyId(null)
+        }
+        return
       }
-    >
-      {loading ? (
-        <LoadingState variant="card" />
-      ) : (
-        <DataGrid
-          data={rows}
-          columns={[
-            {
-              accessorKey: 'parameterCode',
-              header: 'Code',
-              cell: ({ row }) => (
-                <TableLink to={`/quality/parameters/${row.original.id}`}>{row.original.parameterCode}</TableLink>
-              ),
-            },
-            { accessorKey: 'parameterName', header: 'Name' },
-            { accessorKey: 'parameterType', header: 'Type', cell: ({ row }) => <StatusBadge status={row.original.parameterType} /> },
-            { accessorKey: 'uomCode', header: 'UOM', cell: ({ row }) => row.original.uomCode ?? '-' },
-            { accessorKey: 'mandatory', header: 'Mandatory', cell: ({ row }) => (row.original.mandatory ? 'Yes' : 'No') },
-            { accessorKey: 'severity', header: 'Severity', cell: ({ row }) => <StatusBadge status={row.original.severity} /> },
-          ]}
-          compact
-          emptyMessage="No QC parameters defined."
-        />
-      )}
-    </OperationalPageShell>
+      const ok = await appConfirm({
+        title: 'Deactivate QC parameter?',
+        description: `${row.parameterCode} will no longer appear when adding lines to inspection plans.`,
+        confirmLabel: 'Deactivate',
+        tone: 'danger',
+      })
+      if (!ok) return
+      setBusyId(row.id)
+      try {
+        await deactivateQcParameter(row.id)
+        notify.success(`${row.parameterCode} deactivated`)
+        await load()
+      } catch (e) {
+        notify.error(e instanceof Error ? e.message : 'Deactivate failed')
+      } finally {
+        setBusyId(null)
+      }
+    },
+    [load],
   )
+
+  const filterFields = useMemo(
+    () => [
+      { type: 'section' as const, label: 'Status & type' },
+      {
+        type: 'select' as const,
+        key: 'status',
+        label: 'Status',
+        options: [
+          { value: '', label: 'All statuses' },
+          { value: 'ACTIVE', label: 'Active' },
+          { value: 'INACTIVE', label: 'Inactive' },
+        ],
+      },
+      {
+        type: 'select' as const,
+        key: 'parameterType',
+        label: 'Type',
+        options: [
+          { value: '', label: 'All types' },
+          ...PARAM_TYPES.map((t) => ({ value: t, label: PARAM_TYPE_LABELS[t] })),
+        ],
+      },
+      {
+        type: 'select' as const,
+        key: 'severity',
+        label: 'Severity',
+        options: [
+          { value: '', label: 'All severities' },
+          ...SEVERITIES.map((s) => ({ value: s, label: s.charAt(0) + s.slice(1).toLowerCase() })),
+        ],
+      },
+    ],
+    [],
+  )
+
+  const chipLabelResolver = useCallback((key: string, value: string) => {
+    if (!value) return undefined
+    if (key === 'status') return `Status: ${value === 'ACTIVE' ? 'Active' : 'Inactive'}`
+    if (key === 'parameterType') {
+      return `Type: ${PARAM_TYPE_LABELS[value as QualityParameterType] ?? value}`
+    }
+    if (key === 'severity') return `Severity: ${value}`
+    return undefined
+  }, [])
+
+  const filtered = useMemo(() => {
+    const q = filters.search.trim().toLowerCase()
+    let list = rows.filter((r) => {
+      if (filters.status === 'ACTIVE' && !r.active) return false
+      if (filters.status === 'INACTIVE' && r.active) return false
+      if (filters.parameterType && r.parameterType !== filters.parameterType) return false
+      if (filters.severity && r.severity !== filters.severity) return false
+      if (!q) return true
+      const options = r.dropdownOptions?.join(' ').toLowerCase() ?? ''
+      return (
+        r.parameterCode.toLowerCase().includes(q) ||
+        r.parameterName.toLowerCase().includes(q) ||
+        r.parameterType.toLowerCase().includes(q) ||
+        options.includes(q)
+      )
+    })
+    const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' })
+    list = [...list].sort((a, b) => {
+      switch (sortBy) {
+        case 'code_desc':
+          return cmp(b.parameterCode, a.parameterCode)
+        case 'name_asc':
+          return cmp(a.parameterName, b.parameterName)
+        case 'type_asc':
+          return cmp(a.parameterType, b.parameterType)
+        case 'severity_asc':
+          return cmp(a.severity, b.severity)
+        case 'code_asc':
+        default:
+          return cmp(a.parameterCode, b.parameterCode)
+      }
+    })
+    return list
+  }, [rows, filters, sortBy])
+
+  const columns = useMemo<ColumnDef<QualityParameter, unknown>[]>(
+    () => [
+      {
+        id: 'parameterCode',
+        accessorKey: 'parameterCode',
+        header: 'Code',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <TableLink to={`/quality/parameters/${row.original.id}`}>{row.original.parameterCode}</TableLink>
+        ),
+      },
+      { id: 'parameterName', accessorKey: 'parameterName', header: 'Name' },
+      {
+        id: 'parameterType',
+        accessorKey: 'parameterType',
+        header: 'Type',
+        cell: ({ row }) => <StatusBadge status={row.original.parameterType} />,
+      },
+      {
+        id: 'options',
+        header: 'Dropdown options',
+        accessorFn: (r) => (r.parameterType === 'DROPDOWN' ? (r.dropdownOptions ?? []).join(', ') : ''),
+        cell: ({ row }) =>
+          row.original.parameterType === 'DROPDOWN' ? (
+            <span className="text-[12px] text-erp-text" title={(row.original.dropdownOptions ?? []).join(', ')}>
+              {(row.original.dropdownOptions ?? []).length > 0
+                ? (row.original.dropdownOptions ?? []).slice(0, 3).join(', ')
+                  + ((row.original.dropdownOptions ?? []).length > 3
+                    ? ` +${(row.original.dropdownOptions ?? []).length - 3}`
+                    : '')
+                : '-'}
+            </span>
+          ) : (
+            <span className="text-erp-muted">-</span>
+          ),
+      },
+      {
+        id: 'uomCode',
+        accessorKey: 'uomCode',
+        header: 'UOM',
+        cell: ({ row }) => <span className="font-mono">{row.original.uomCode || '-'}</span>,
+      },
+      {
+        id: 'mandatory',
+        accessorKey: 'mandatory',
+        header: 'Mandatory',
+        cell: ({ row }) => (row.original.mandatory ? 'Yes' : 'No'),
+      },
+      {
+        id: 'severity',
+        accessorKey: 'severity',
+        header: 'Severity',
+        cell: ({ row }) => <StatusBadge status={row.original.severity} />,
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        enableHiding: false,
+        accessorFn: (r) => (r.active ? 'ACTIVE' : 'INACTIVE'),
+        cell: ({ row }) => (
+          <StatusBadge status={row.original.active ? 'ACTIVE' : 'INACTIVE'} />
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const p = row.original
+          const busy = busyId === p.id
+          const actions: RowActionItem[] = [
+            {
+              id: 'edit',
+              label: 'Edit',
+              icon: Pencil,
+              to: `/quality/parameters/${p.id}`,
+              disabled: busy,
+            },
+            { id: 'sep', label: '', separator: true },
+            p.active
+              ? {
+                  id: 'deactivate',
+                  label: 'Deactivate',
+                  icon: CircleOff,
+                  danger: true,
+                  disabled: busy,
+                  onClick: () => void setActive(p, false),
+                }
+              : {
+                  id: 'activate',
+                  label: 'Activate',
+                  icon: CheckCircle2,
+                  disabled: busy,
+                  onClick: () => void setActive(p, true),
+                },
+          ]
+          return <EnterpriseRowActionsMenu actions={actions} />
+        },
+      },
+    ],
+    [busyId, setActive],
+  )
+
+  return (
+    <StoreRegisterListPage
+      pageId="/quality/parameters"
+      badge="Quality"
+      title="QC Parameters"
+      description="Reusable inspection parameters — type, tolerance, severity, and pass/fail rules."
+      breadcrumbs={[
+        { label: 'Quality', to: '/quality' },
+        { label: 'QC Parameters' },
+      ]}
+      rows={filtered}
+      totalRowCount={rows.length}
+      columns={columns}
+      getRowId={(r) => r.id}
+      loading={loading}
+      searchPlaceholder="Search code, name, type, options…"
+      sortOptions={PARAM_SORT_OPTIONS}
+      sortBy={sortBy}
+      onSortChange={setSortBy}
+      filters={filters}
+      defaultFilters={PARAM_DEFAULT_FILTERS}
+      onFiltersChange={setFilters}
+      filterFields={filterFields}
+      drawerTitle="Filter QC parameters"
+      chipLabelResolver={chipLabelResolver}
+      primaryAction={{
+        id: 'new',
+        label: 'New Parameter',
+        icon: Plus,
+        onClick: () => navigate('/quality/parameters/new'),
+      }}
+      secondaryActions={[
+        {
+          id: 'refresh',
+          label: 'Refresh',
+          icon: RefreshCw,
+          onClick: () => void load(),
+        },
+      ]}
+      emptyIcon={ClipboardList}
+      emptyTitle="No QC parameters yet"
+      emptyDescription="Create reusable parameters, then add them to Inspection Plans."
+      emptyAction={(
+        <Button size="sm" onClick={() => navigate('/quality/parameters/new')}>
+          New Parameter
+        </Button>
+      )}
+    />
+  )
+}
+
+const SEVERITY_LABELS: Record<QualityParameterSeverity, string> = {
+  MINOR: 'Minor',
+  MAJOR: 'Major',
+  CRITICAL: 'Critical',
+}
+
+const PASS_RULE_LABELS: Record<QualityPassFailRule, string> = {
+  BOOLEAN_TRUE: 'Must be true / pass',
+  BOOLEAN_FALSE: 'Must be false / fail',
+  NUMERIC_TOLERANCE: 'Within numeric tolerance',
+  MANUAL: 'Manual decision',
 }
 
 export function ApiQcParameterFormPage() {
@@ -126,7 +403,7 @@ export function ApiQcParameterFormPage() {
   const navigate = useNavigate()
   const isNew = !id || id === 'new'
   const [loading, setLoading] = useState(!isNew)
-  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const [dropdownText, setDropdownText] = useState('')
   const [form, setForm] = useState<CreateParameterPayload>({
     parameterCode: '',
@@ -144,7 +421,10 @@ export function ApiQcParameterFormPage() {
   })
 
   useEffect(() => {
-    if (isNew) return
+    if (isNew) {
+      setLoading(false)
+      return
+    }
     void (async () => {
       try {
         const res = await getQcParameter(id!)
@@ -173,11 +453,19 @@ export function ApiQcParameterFormPage() {
   }, [id, isNew])
 
   async function save() {
-    setError(null)
+    if (!form.parameterCode.trim() || !form.parameterName.trim()) {
+      notify.error('Parameter code and name are required')
+      return
+    }
     const dropdownOptions =
       form.parameterType === 'DROPDOWN'
         ? dropdownText.split(',').map((s) => s.trim()).filter(Boolean)
         : null
+    if (form.parameterType === 'DROPDOWN' && (!dropdownOptions || dropdownOptions.length === 0)) {
+      notify.error('Add at least one dropdown option')
+      return
+    }
+    setSaving(true)
     const payload = { ...form, dropdownOptions }
     try {
       if (isNew) await createQcParameter(payload)
@@ -185,12 +473,21 @@ export function ApiQcParameterFormPage() {
       notify.success(isNew ? 'Parameter created' : 'Parameter updated')
       navigate('/quality/parameters')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      notify.error(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
     }
   }
 
   async function deactivate() {
     if (!id || isNew) return
+    const ok = await appConfirm({
+      title: 'Deactivate QC parameter?',
+      description: `${form.parameterCode || 'This parameter'} will no longer be available for new inspection plans.`,
+      confirmLabel: 'Deactivate',
+      tone: 'danger',
+    })
+    if (!ok) return
     try {
       await deactivateQcParameter(id)
       notify.success('Parameter deactivated')
@@ -200,152 +497,290 @@ export function ApiQcParameterFormPage() {
     }
   }
 
-  if (loading) return <LoadingState variant="card" />
+  const title = isNew ? 'New QC Parameter' : form.parameterCode || 'QC Parameter'
+
+  if (loading) {
+    return (
+      <ErpCardFormPage
+        variant="dynamics"
+        badge="Quality"
+        title="QC Parameter"
+        description="Loading…"
+        breadcrumbs={[
+          { label: 'Quality', to: '/quality' },
+          { label: 'QC Parameters', to: '/quality/parameters' },
+          { label: 'Loading' },
+        ]}
+        autoBreadcrumbs={false}
+        stickyFooter
+        footer={(
+          <ErpStickySaveBar
+            sticky
+            cancelTo="/quality/parameters"
+            submitLabel="Save"
+            submitDisabled
+            isSubmitting
+          />
+        )}
+      >
+        <LoadingState variant="card" />
+      </ErpCardFormPage>
+    )
+  }
 
   return (
-    <DetailLayout
-      backTo="/quality/parameters"
-      backLabel="Parameter Master"
-      title={isNew ? 'New QC Parameter' : form.parameterCode}
-      subtitle={form.parameterName || 'Define inspection parameter'}
-    >
-      <DetailSection title="Parameter Definition">
-        <div className="grid max-w-2xl gap-4">
-          <label className="block text-sm">
-            <span className="font-medium">Parameter Code</span>
-            <input
-              className="erp-input mt-1 w-full"
-              value={form.parameterCode}
-              onChange={(e) => setForm({ ...form, parameterCode: e.target.value.toUpperCase() })}
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium">Parameter Name</span>
-            <input
-              className="erp-input mt-1 w-full"
-              value={form.parameterName}
-              onChange={(e) => setForm({ ...form, parameterName: e.target.value })}
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <label className="block text-sm">
-              <span className="font-medium">Type</span>
-              <Select
-                wrapClassName="mt-1 w-full"
-                value={form.parameterType}
-                onChange={(e) => setForm({ ...form, parameterType: e.target.value as QualityParameterType })}
+    <ErpCardFormPage
+      variant="dynamics"
+      badge="Quality"
+      title={title}
+      description={form.parameterName || 'Reusable inspection parameter for QC plans'}
+      recordNo={isNew ? undefined : form.parameterCode}
+      statusChip={
+        <StatusBadge status={form.active === false ? 'INACTIVE' : 'ACTIVE'} />
+      }
+      favoritePath={isNew ? '/quality/parameters/new' : `/quality/parameters/${id}`}
+      breadcrumbs={[
+        { label: 'Quality', to: '/quality' },
+        { label: 'QC Parameters', to: '/quality/parameters' },
+        { label: isNew ? 'New' : form.parameterCode || 'Parameter' },
+      ]}
+      autoBreadcrumbs={false}
+      stickyFooter
+      onSaveShortcut={() => void save()}
+      footer={(
+        <ErpStickySaveBar
+          sticky
+          cancelTo="/quality/parameters"
+          cancelLabel="Cancel"
+          submitLabel={isNew ? 'Create parameter' : 'Save & close'}
+          isSubmitting={saving}
+          onSave={() => void save()}
+          hint="Parameters are snapshotted onto inspection plans when a plan line is added."
+          actions={
+            !isNew ? (
+              <ErpButton
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                onClick={() => void deactivate()}
               >
-                {PARAM_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium">UOM</span>
-              <input
-                className="erp-input mt-1 w-full"
-                value={form.uomCode ?? ''}
-                onChange={(e) => setForm({ ...form, uomCode: e.target.value || null })}
-              />
-            </label>
-          </div>
-          {form.parameterType === 'NUMERIC' && (
-            <div className="grid grid-cols-3 gap-4">
-              <label className="block text-sm">
-                <span className="font-medium">Min</span>
-                <input
-                  type="number"
-                  className="erp-input mt-1 w-full"
-                  value={form.minValue ?? ''}
-                  onChange={(e) => setForm({ ...form, minValue: e.target.value === '' ? null : Number(e.target.value) })}
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium">Max</span>
-                <input
-                  type="number"
-                  className="erp-input mt-1 w-full"
-                  value={form.maxValue ?? ''}
-                  onChange={(e) => setForm({ ...form, maxValue: e.target.value === '' ? null : Number(e.target.value) })}
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium">Target</span>
-                <input
-                  type="number"
-                  className="erp-input mt-1 w-full"
-                  value={form.targetValue ?? ''}
-                  onChange={(e) =>
-                    setForm({ ...form, targetValue: e.target.value === '' ? null : Number(e.target.value) })
-                  }
-                />
-              </label>
-            </div>
-          )}
-          {form.parameterType === 'DROPDOWN' && (
-            <label className="block text-sm">
-              <span className="font-medium">Dropdown Options (comma-separated)</span>
-              <input className="erp-input mt-1 w-full" value={dropdownText} onChange={(e) => setDropdownText(e.target.value)} />
-            </label>
-          )}
-          <div className="grid grid-cols-3 gap-4">
-            <label className="block text-sm">
-              <span className="font-medium">Severity</span>
-              <Select
-                wrapClassName="mt-1 w-full"
-                value={form.severity}
-                onChange={(e) => setForm({ ...form, severity: e.target.value as QualityParameterSeverity })}
-              >
-                {SEVERITIES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium">Pass/Fail Rule</span>
-              <Select
-                wrapClassName="mt-1 w-full"
-                value={form.passFailRule}
-                onChange={(e) => setForm({ ...form, passFailRule: e.target.value as QualityPassFailRule })}
-              >
-                {PASS_RULES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="flex items-end gap-2 pb-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.mandatory ?? true}
-                onChange={(e) => setForm({ ...form, mandatory: e.target.checked })}
-              />
-              Mandatory
-            </label>
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex gap-2">
-            <Button size="sm" onClick={() => void save()}>
-              {isNew ? 'Create Parameter' : 'Save Changes'}
-            </Button>
-            {!isNew && (
-              <Button size="sm" variant="danger" onClick={() => void deactivate()}>
                 Deactivate
-              </Button>
-            )}
-          </div>
+              </ErpButton>
+            ) : null
+          }
+        />
+      )}
+    >
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <ErpCardSection title="Parameter definition">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField label="Parameter code" required>
+                <input
+                  className="erp-input h-9 w-full font-mono text-[13px]"
+                  value={form.parameterCode}
+                  onChange={(e) => setForm({ ...form, parameterCode: e.target.value.toUpperCase() })}
+                  placeholder="e.g. DIM-OD"
+                  autoComplete="off"
+                />
+              </FormField>
+              <FormField label="Parameter name" required>
+                <input
+                  className="erp-input h-9 w-full text-[13px]"
+                  value={form.parameterName}
+                  onChange={(e) => setForm({ ...form, parameterName: e.target.value })}
+                  placeholder="Outer diameter"
+                  autoComplete="off"
+                />
+              </FormField>
+              <FormField label="Type" required>
+                <Select
+                  wrapClassName="w-full"
+                  value={form.parameterType}
+                  onChange={(e) =>
+                    setForm({ ...form, parameterType: e.target.value as QualityParameterType })
+                  }
+                >
+                  {PARAM_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {PARAM_TYPE_LABELS[t]}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="UOM" hint={form.parameterType === 'NUMERIC' ? 'Recommended for numeric checks' : undefined}>
+                <input
+                  className="erp-input h-9 w-full font-mono text-[13px]"
+                  value={form.uomCode ?? ''}
+                  onChange={(e) => setForm({ ...form, uomCode: e.target.value || null })}
+                  placeholder="e.g. MM"
+                  autoComplete="off"
+                />
+              </FormField>
+            </div>
+          </ErpCardSection>
+
+          {form.parameterType === 'NUMERIC' ? (
+            <ErpCardSection title="Numeric specification">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FormField label="Min">
+                  <input
+                    type="number"
+                    className="erp-input h-9 w-full"
+                    value={form.minValue ?? ''}
+                    onChange={(e) =>
+                      setForm({ ...form, minValue: e.target.value === '' ? null : Number(e.target.value) })
+                    }
+                  />
+                </FormField>
+                <FormField label="Max">
+                  <input
+                    type="number"
+                    className="erp-input h-9 w-full"
+                    value={form.maxValue ?? ''}
+                    onChange={(e) =>
+                      setForm({ ...form, maxValue: e.target.value === '' ? null : Number(e.target.value) })
+                    }
+                  />
+                </FormField>
+                <FormField label="Target">
+                  <input
+                    type="number"
+                    className="erp-input h-9 w-full"
+                    value={form.targetValue ?? ''}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        targetValue: e.target.value === '' ? null : Number(e.target.value),
+                      })
+                    }
+                  />
+                </FormField>
+              </div>
+            </ErpCardSection>
+          ) : null}
+
+          {form.parameterType === 'DROPDOWN' ? (
+            <ErpCardSection title="Dropdown options">
+              <FormField
+                label="Options"
+                required
+                hint="Comma-separated values shown during inspection"
+              >
+                <input
+                  className="erp-input h-9 w-full text-[13px]"
+                  value={dropdownText}
+                  onChange={(e) => setDropdownText(e.target.value)}
+                  placeholder="Excellent, Acceptable, Reject"
+                  autoComplete="off"
+                />
+              </FormField>
+            </ErpCardSection>
+          ) : null}
+
+          <ErpCardSection title="Evaluation">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField label="Severity" required>
+                <Select
+                  wrapClassName="w-full"
+                  value={form.severity ?? 'MAJOR'}
+                  onChange={(e) =>
+                    setForm({ ...form, severity: e.target.value as QualityParameterSeverity })
+                  }
+                >
+                  {SEVERITIES.map((s) => (
+                    <option key={s} value={s}>
+                      {SEVERITY_LABELS[s]}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Pass / fail rule" required>
+                <Select
+                  wrapClassName="w-full"
+                  value={form.passFailRule ?? 'MANUAL'}
+                  onChange={(e) =>
+                    setForm({ ...form, passFailRule: e.target.value as QualityPassFailRule })
+                  }
+                >
+                  {PASS_RULES.map((r) => (
+                    <option key={r} value={r}>
+                      {PASS_RULE_LABELS[r]}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Mandatory">
+                <label className="flex h-9 items-center gap-2 text-[13px] text-erp-text">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-erp-border"
+                    checked={form.mandatory ?? true}
+                    onChange={(e) => setForm({ ...form, mandatory: e.target.checked })}
+                  />
+                  Required on every inspection using this parameter
+                </label>
+              </FormField>
+              <FormField label="Active">
+                <label className="flex h-9 items-center gap-2 text-[13px] text-erp-text">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-erp-border"
+                    checked={form.active !== false}
+                    onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                  />
+                  Available for new inspection plans
+                </label>
+              </FormField>
+            </div>
+          </ErpCardSection>
         </div>
-      </DetailSection>
-    </DetailLayout>
+
+        <aside className="flex flex-col gap-4">
+          <ErpCardSection title="Summary">
+            <dl className="m-0 space-y-2 text-[12px]">
+              <div className="flex justify-between gap-2">
+                <dt className="text-erp-muted">Type</dt>
+                <dd className="m-0 font-semibold text-erp-text">
+                  {PARAM_TYPE_LABELS[form.parameterType]}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-erp-muted">Severity</dt>
+                <dd className="m-0">
+                  <StatusBadge status={form.severity ?? 'MAJOR'} />
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-erp-muted">Mandatory</dt>
+                <dd className="m-0 font-semibold">{form.mandatory ? 'Yes' : 'No'}</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-erp-muted">UOM</dt>
+                <dd className="m-0 font-mono font-semibold">{form.uomCode || '-'}</dd>
+              </div>
+            </dl>
+          </ErpCardSection>
+          <ErpCardSection title="Usage">
+            <ul className="m-0 list-disc space-y-1 pl-3.5 text-[12px] leading-relaxed text-erp-muted">
+              <li>Add this parameter to an Inspection Plan checklist</li>
+              <li>Values are snapshotted when a plan line is created</li>
+              <li>
+                Link from{' '}
+                <Link to="/quality/inspection-plans" className="font-semibold text-erp-primary hover:underline">
+                  Inspection Plans
+                </Link>
+              </li>
+            </ul>
+          </ErpCardSection>
+        </aside>
+      </div>
+    </ErpCardFormPage>
   )
 }
 
-const PLAN_DEFAULT_FILTERS = { search: '', status: '', category: '' }
+const PLAN_DEFAULT_FILTERS: StoreRegisterFilters = { search: '', status: '', category: '' }
 
 const PLAN_SORT_OPTIONS = [
   { value: 'code_asc', label: 'Plan code A→Z' },
@@ -359,7 +794,7 @@ export function ApiInspectionPlanMasterPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<QualityInspectionPlan[]>([])
   const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState(PLAN_DEFAULT_FILTERS)
+  const [filters, setFilters] = useState<StoreRegisterFilters>(PLAN_DEFAULT_FILTERS)
   const [sortBy, setSortBy] = useState('code_asc')
 
   const load = useCallback(async () => {

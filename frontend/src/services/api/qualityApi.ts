@@ -359,6 +359,13 @@ export async function deactivateQcParameter(id: string) {
   return apiRequest<QualityParameter>(tenantPath(`/quality/parameters/${id}/deactivate`), { method: 'POST', body: JSON.stringify({}) })
 }
 
+export async function activateQcParameter(id: string) {
+  return apiRequest<QualityParameter>(tenantPath(`/quality/parameters/${id}/activate`), {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
 export async function listInspectionPlans(params?: {
   page?: number
   limit?: number

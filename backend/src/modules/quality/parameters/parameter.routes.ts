@@ -37,6 +37,13 @@ router.patch(
 )
 
 router.post(
+  '/:id/activate',
+  validateParams(uuidParamSchema),
+  requirePermission('quality.edit'),
+  controller.activateParameter,
+)
+
+router.post(
   '/:id/deactivate',
   validateParams(uuidParamSchema),
   requirePermission('quality.edit'),
