@@ -50,3 +50,10 @@ export const activateParameter = asyncHandler(async (req: Request, res: Response
   const row = await service.activateParameter(req, tenantId, id)
   return sendSuccess(res, 'QC parameter activated', row)
 })
+
+export const deleteParameter = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const row = await service.deleteParameter(req, tenantId, id)
+  return sendSuccess(res, 'QC parameter deleted', row)
+})

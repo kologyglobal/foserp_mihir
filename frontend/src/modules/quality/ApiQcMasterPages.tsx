@@ -38,6 +38,7 @@ import {
   createQcParameter,
   deactivateInspectionPlan,
   deactivateQcParameter,
+  deleteQcParameter,
   getInspectionPlan,
   getQcParameter,
   listInspectionPlans,
@@ -143,6 +144,30 @@ export function ApiQcParameterMasterPage() {
         await load()
       } catch (e) {
         notify.error(e instanceof Error ? e.message : 'Deactivate failed')
+      } finally {
+        setBusyId(null)
+      }
+    },
+    [load],
+  )
+
+  const deleteParameter = useCallback(
+    async (row: QualityParameter) => {
+      const ok = await appConfirm({
+        title: 'Delete QC parameter?',
+        description: `${row.parameterCode} will be removed from the parameter register. Existing inspection plan lines that already reference it are kept for history.`,
+        detail: row.parameterName,
+        confirmLabel: 'Delete',
+        tone: 'danger',
+      })
+      if (!ok) return
+      setBusyId(row.id)
+      try {
+        await deleteQcParameter(row.id)
+        notify.success(`${row.parameterCode} deleted`)
+        await load()
+      } catch (e) {
+        notify.error(e instanceof Error ? e.message : 'Delete failed')
       } finally {
         setBusyId(null)
       }
@@ -309,13 +334,12 @@ export function ApiQcParameterMasterPage() {
               to: `/quality/parameters/${p.id}`,
               disabled: busy,
             },
-            { id: 'sep', label: '', separator: true },
+            { id: 'sep-status', label: '', separator: true },
             p.active
               ? {
                   id: 'deactivate',
                   label: 'Deactivate',
                   icon: CircleOff,
-                  danger: true,
                   disabled: busy,
                   onClick: () => void setActive(p, false),
                 }
@@ -326,12 +350,21 @@ export function ApiQcParameterMasterPage() {
                   disabled: busy,
                   onClick: () => void setActive(p, true),
                 },
+            { id: 'sep-delete', label: '', separator: true },
+            {
+              id: 'delete',
+              label: 'Delete',
+              icon: Trash2,
+              danger: true,
+              disabled: busy,
+              onClick: () => void deleteParameter(p),
+            },
           ]
           return <EnterpriseRowActionsMenu actions={actions} />
         },
       },
     ],
-    [busyId, setActive],
+    [busyId, setActive, deleteParameter],
   )
 
   return (

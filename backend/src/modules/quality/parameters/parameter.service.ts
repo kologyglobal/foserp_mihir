@@ -148,3 +148,12 @@ export async function activateParameter(req: Request, tenantId: string, id: stri
   )
   return mapParameter(row)
 }
+
+/** Soft-delete — removes from registers; existing plan line FKs remain valid. */
+export async function deleteParameter(req: Request, tenantId: string, id: string) {
+  const userId = req.context?.userId ?? ''
+  const current = await repo.getParameter(tenantId, id)
+  if (!current) throw new NotFoundError('QC parameter not found')
+  const row = await prisma.$transaction((tx) => repo.softDeleteParameter(tx, tenantId, id, userId))
+  return mapParameter(row)
+}

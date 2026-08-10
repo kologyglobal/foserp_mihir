@@ -366,6 +366,12 @@ export async function activateQcParameter(id: string) {
   })
 }
 
+export async function deleteQcParameter(id: string) {
+  return apiRequest<QualityParameter>(tenantPath(`/quality/parameters/${id}`), {
+    method: 'DELETE',
+  })
+}
+
 export async function listInspectionPlans(params?: {
   page?: number
   limit?: number
