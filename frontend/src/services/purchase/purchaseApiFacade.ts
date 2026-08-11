@@ -1002,9 +1002,14 @@ export async function getPurchaseOrderLinkedDocuments(
 
 /* ─── Goods Receipt Notes (GRN) ─── */
 
-export async function getGRNs(): Promise<GoodsReceiptNote[]> {
+export async function getGRNs(opts?: { includeReturnStats?: boolean }): Promise<GoodsReceiptNote[]> {
   try {
-    const res = await grnApi.listGoodsReceiptsApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
+    const res = await grnApi.listGoodsReceiptsApi({
+      page: 1,
+      pageSize: 100,
+      sortOrder: 'desc',
+      includeReturnStats: opts?.includeReturnStats || undefined,
+    })
     return res.data.map(mapApiGoodsReceiptToDomain)
   } catch (err) {
     throwApi(err)
@@ -3321,6 +3326,7 @@ function mapWizardPrefillFromApi(api: returnApi.ApiReturnWizardPrefill): ReturnW
     vendorId: api.vendorId || '',
     purchaseOrderId: api.purchaseOrderId,
     goodsReceiptId: api.goodsReceiptId,
+    goodsReceiptNumber: api.goodsReceiptNumber,
     qualityInspectionId: api.qualityInspectionId,
     qualityInspectionNumber: api.qualityInspectionNumber,
     warehouseId: api.warehouseId,

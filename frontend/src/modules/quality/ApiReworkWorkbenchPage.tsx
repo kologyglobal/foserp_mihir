@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { RefreshCw, RotateCcw } from 'lucide-react'
+import type { ColumnDef } from '@tanstack/react-table'
+import { RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { DataGrid } from '@/components/design-system/DataGrid'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { EmptyState } from '@/components/ui/EmptyState'
-import { LoadingState } from '@/design-system/components/LoadingState'
 import { StatusDot } from '@/components/design-system/StatusDot'
+import { TableLink } from '@/components/ui/AppLink'
 import { listInspections, type QualityInspection } from '@/services/api/qualityApi'
 import { notify } from '@/store/toastStore'
 import { formatDateTime } from '@/utils/dates/format'
@@ -40,6 +42,61 @@ export function ApiReworkWorkbenchPage() {
     void load()
   }, [load])
 
+  const columns = useMemo<ColumnDef<QualityInspection, unknown>[]>(
+    () => [
+      {
+        id: 'inspectionNumber',
+        accessorKey: 'inspectionNumber',
+        header: 'Inspection',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <TableLink to={`/quality/inspections/${row.original.id}`}>{row.original.inspectionNumber}</TableLink>
+        ),
+      },
+      {
+        id: 'category',
+        accessorKey: 'category',
+        header: 'Category',
+        cell: ({ row }) => row.original.category.replace(/_/g, ' '),
+      },
+      {
+        id: 'workOrder',
+        header: 'Work Order',
+        accessorFn: (r) => r.productionOrderNumber ?? '',
+        cell: ({ row }) =>
+          row.original.productionOrderId ? (
+            <Link to={`/manufacturing/work-orders/${row.original.productionOrderId}`} className="text-erp-primary hover:underline">
+              View WO
+            </Link>
+          ) : (
+            '-'
+          ),
+      },
+      { id: 'title', accessorKey: 'title', header: 'Title' },
+      {
+        id: 'reworkQty',
+        accessorKey: 'reworkQty',
+        header: 'Rework qty',
+        meta: { align: 'right' },
+        cell: ({ row }) => row.original.reworkQty ?? '-',
+      },
+      {
+        id: 'decidedAt',
+        accessorKey: 'decidedAt',
+        header: 'Decided',
+        cell: ({ row }) => (row.original.decidedAt ? formatDateTime(row.original.decidedAt) : '-'),
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        enableHiding: false,
+        enableSorting: false,
+        cell: () => <StatusDot label="rework" tone="warning" />,
+      },
+    ],
+    [],
+  )
+
   return (
     <OperationalPageShell
       variant="dynamics"
@@ -61,61 +118,16 @@ export function ApiReworkWorkbenchPage() {
         />
       }
     >
-      {loading ? (
-        <LoadingState variant="card" />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          icon={RotateCcw}
-          title="No open rework"
-          description="Inspections decided as REWORK will appear here until they are re-decided."
+      <EnterpriseRegisterTableShell className="min-w-0 flex-1">
+        <DataGrid<QualityInspection>
+          data={rows}
+          columns={columns}
+          getRowId={(r) => r.id}
+          loading={loading}
+          columnLayoutKey="/quality/rework"
+          emptyMessage="No open rework — inspections decided as REWORK will appear here until re-decided."
         />
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-erp-border bg-white shadow-sm">
-          <table className="min-w-full text-left text-[13px]">
-            <thead className="border-b border-erp-border bg-slate-50 text-[11px] uppercase tracking-wide text-erp-muted">
-              <tr>
-                <th className="px-4 py-2">Inspection</th>
-                <th className="px-4 py-2">Category</th>
-                <th className="px-4 py-2">Work Order</th>
-                <th className="px-4 py-2">Title</th>
-                <th className="px-4 py-2">Rework qty</th>
-                <th className="px-4 py-2">Decided</th>
-                <th className="px-4 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b border-erp-border/60 last:border-0">
-                  <td className="px-4 py-2 font-mono text-xs">
-                    <Link to={`/quality/inspections/${row.id}`} className="text-erp-primary hover:underline">
-                      {row.inspectionNumber}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2">{row.category.replace(/_/g, ' ')}</td>
-                  <td className="px-4 py-2">
-                    {row.productionOrderId ? (
-                      <Link
-                        to={`/manufacturing/work-orders/${row.productionOrderId}`}
-                        className="text-erp-primary hover:underline"
-                      >
-                        View WO
-                      </Link>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                  <td className="px-4 py-2">{row.title}</td>
-                  <td className="px-4 py-2 tabular-nums">{row.reworkQty ?? '-'}</td>
-                  <td className="px-4 py-2">{row.decidedAt ? formatDateTime(row.decidedAt) : '-'}</td>
-                  <td className="px-4 py-2">
-                    <StatusDot label="rework" tone="warning" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      </EnterpriseRegisterTableShell>
     </OperationalPageShell>
   )
 }

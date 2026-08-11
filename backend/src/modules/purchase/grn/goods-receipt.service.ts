@@ -746,8 +746,25 @@ async function assertDuplicateChallanPolicy(
 
 export async function listGoodsReceipts(tenantId: string, query: ListGoodsReceiptsQuery) {
   const result = await repo.findGoodsReceipts(tenantId, query)
+  if (!query.includeReturnStats || result.items.length === 0) {
+    return {
+      items: result.items.map(mapGoodsReceiptToDto),
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    }
+  }
+  const { summarizeMaterialReturnsForGrn } = await import(
+    '../returns/returnable-quantity.service.js'
+  )
+  const items = await Promise.all(
+    result.items.map(async (grn) => {
+      const returnStats = await summarizeMaterialReturnsForGrn(tenantId, grn.id)
+      return mapGoodsReceiptToDto(grn, returnStats)
+    }),
+  )
   return {
-    items: result.items.map(mapGoodsReceiptToDto),
+    items,
     total: result.total,
     page: result.page,
     limit: result.limit,

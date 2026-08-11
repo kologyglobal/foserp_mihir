@@ -74,6 +74,7 @@ export async function computeRemainingReturnable(
   totalReturned: number
   totalRemaining: number
   goodsReceiptId: string | null
+  goodsReceiptNumber: string | null
   qualityInspectionId: string | null
   vendorId: string | null
   purchaseOrderId: string | null
@@ -276,6 +277,7 @@ export async function computeRemainingReturnable(
     totalReturned,
     totalRemaining,
     goodsReceiptId: grn?.id ?? null,
+    goodsReceiptNumber: grn?.grnNumber ?? null,
     qualityInspectionId: qi?.id ?? null,
     vendorId: qi?.vendorId ?? grn?.vendorId ?? null,
     purchaseOrderId: qi?.purchaseOrderId ?? grn?.purchaseOrderId ?? null,

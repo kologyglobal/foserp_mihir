@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import type { ColumnDef } from '@tanstack/react-table'
 import { ClipboardCheck, RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { DataGrid } from '@/components/design-system/DataGrid'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { EmptyState } from '@/components/ui/EmptyState'
-import { LoadingState } from '@/design-system/components/LoadingState'
 import { StatusDot } from '@/components/design-system/StatusDot'
+import { TableLink } from '@/components/ui/AppLink'
 import { listInspections, type QualityInspection } from '@/services/api/qualityApi'
 import { notify } from '@/store/toastStore'
 import { formatDateTime } from '@/utils/dates/format'
@@ -32,6 +34,62 @@ export function ApiQcQueuePage() {
     void load()
   }, [load])
 
+  const columns = useMemo<ColumnDef<QualityInspection, unknown>[]>(
+    () => [
+      {
+        id: 'inspectionNumber',
+        accessorKey: 'inspectionNumber',
+        header: 'Inspection',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <TableLink to={`/quality/inspections/${row.original.id}`}>{row.original.inspectionNumber}</TableLink>
+        ),
+      },
+      {
+        id: 'category',
+        accessorKey: 'category',
+        header: 'Category',
+        cell: ({ row }) =>
+          row.original.category === 'IN_PROCESS'
+            ? 'In-process'
+            : row.original.category === 'FINAL'
+              ? 'Final'
+              : row.original.category.replace(/_/g, ' '),
+      },
+      {
+        id: 'workOrder',
+        header: 'Work Order',
+        accessorFn: (r) => r.productionOrderNumber ?? '',
+        cell: ({ row }) =>
+          row.original.productionOrderId ? (
+            <Link
+              to={`/manufacturing/work-orders/${row.original.productionOrderId}`}
+              className="font-semibold text-erp-primary hover:underline"
+            >
+              {row.original.productionOrderNumber || 'Open work order'}
+            </Link>
+          ) : (
+            '-'
+          ),
+      },
+      { id: 'title', accessorKey: 'title', header: 'Title' },
+      {
+        id: 'requestedAt',
+        accessorKey: 'requestedAt',
+        header: 'Requested',
+        cell: ({ row }) => formatDateTime(row.original.requestedAt),
+      },
+      {
+        id: 'status',
+        accessorKey: 'status',
+        header: 'Status',
+        enableHiding: false,
+        cell: ({ row }) => <StatusDot label={row.original.status.toLowerCase()} tone="warning" />,
+      },
+    ],
+    [],
+  )
+
   return (
     <OperationalPageShell
       variant="dynamics"
@@ -50,61 +108,21 @@ export function ApiQcQueuePage() {
         />
       }
     >
-      {loading ? (
-        <LoadingState variant="card" />
-      ) : rows.length === 0 ? (
-        <EmptyState icon={ClipboardCheck} title="No pending inspections" description="All caught up on in-process and final QC." />
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-erp-border bg-white shadow-sm">
-          <table className="min-w-full text-left text-[13px]">
-            <thead className="border-b border-erp-border bg-slate-50 text-[11px] uppercase tracking-wide text-erp-muted">
-              <tr>
-                <th className="px-4 py-2">Inspection</th>
-                <th className="px-4 py-2">Category</th>
-                <th className="px-4 py-2">Work Order</th>
-                <th className="px-4 py-2">Title</th>
-                <th className="px-4 py-2">Requested</th>
-                <th className="px-4 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b border-erp-border/60 last:border-0">
-                  <td className="px-4 py-2 font-mono text-xs">
-                    <Link to={`/quality/inspections/${row.id}`} className="text-erp-primary hover:underline">
-                      {row.inspectionNumber}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2">
-                    {row.category === 'IN_PROCESS'
-                      ? 'In-process'
-                      : row.category === 'FINAL'
-                        ? 'Final'
-                        : row.category.replace(/_/g, ' ')}
-                  </td>
-                  <td className="px-4 py-2">
-                    {row.productionOrderId ? (
-                      <Link
-                        to={`/manufacturing/work-orders/${row.productionOrderId}`}
-                        className="font-semibold text-erp-primary hover:underline"
-                      >
-                        {row.productionOrderNumber || 'Open work order'}
-                      </Link>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                  <td className="px-4 py-2">{row.title}</td>
-                  <td className="px-4 py-2">{formatDateTime(row.requestedAt)}</td>
-                  <td className="px-4 py-2">
-                    <StatusDot label={row.status.toLowerCase()} tone="warning" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <EnterpriseRegisterTableShell className="min-w-0 flex-1">
+        <DataGrid<QualityInspection>
+          data={rows}
+          columns={columns}
+          getRowId={(r) => r.id}
+          loading={loading}
+          columnLayoutKey="/quality/queue"
+          emptyMessage="No pending inspections — all caught up on in-process and final QC."
+          emptyAction={
+            <span className="inline-flex items-center gap-1 text-[12px] text-erp-muted">
+              <ClipboardCheck className="h-3.5 w-3.5" aria-hidden />
+            </span>
+          }
+        />
+      </EnterpriseRegisterTableShell>
     </OperationalPageShell>
   )
 }

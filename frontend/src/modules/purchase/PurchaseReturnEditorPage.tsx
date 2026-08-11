@@ -63,7 +63,6 @@ import type {
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
-import { cn } from '@/utils/cn'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { filterGrnsForPurchaseReturn } from '@/utils/purchaseReturnEligibility'
@@ -381,8 +380,7 @@ export function PurchaseReturnEditorPage() {
       if (prefill.warehouseId) setWarehouseId(prefill.warehouseId)
       setReturnType(prefill.suggestedReturnType || 'CREDIT')
       setReplacementRequired(prefill.replacementRequired)
-      setOrigin(prefill.qualityInspectionId ? 'quality_rejection' : 'grn_rejected_quantity')
-      setReturnReason('quality_rejection')
+      if (prefill.qualityInspectionId) setReturnReason('quality_rejection')
       setRemarks(prefill.reason)
       setDebitNoteRequired(prefill.suggestedReturnType !== 'REPLACEMENT')
       const returnable = prefill.lines.filter(
@@ -416,6 +414,7 @@ export function PurchaseReturnEditorPage() {
       )
       const src =
         prefill.qualityInspectionNumber ||
+        prefill.goodsReceiptNumber ||
         prefill.qualityInspectionId ||
         prefill.goodsReceiptId ||
         'source'
@@ -500,7 +499,7 @@ export function PurchaseReturnEditorPage() {
         getVendors(),
         getPurchaseItems(),
         getPurchaseOrders(),
-        getGRNs(),
+        getGRNs({ includeReturnStats: true }),
         getPurchaseInvoices(),
         getQualityInspections(),
         getPurchaseWarehouses(),
@@ -547,6 +546,7 @@ export function PurchaseReturnEditorPage() {
             })
             if (cancelled) return
             applyWizardPrefill(prefill, i)
+            setOrigin(qiId ? 'quality_rejection' : 'grn_rejected_quantity')
             const nextNumber = await previewNextPurchaseReturnNumber().catch(() => null)
             if (!cancelled && nextNumber) setDocumentNumber(nextNumber)
             notify.info('Return form prefilled from inspection / receipt')
@@ -569,26 +569,35 @@ export function PurchaseReturnEditorPage() {
   const applyOriginPreset = async (mode: PurchaseReturnOrigin) => {
     setOrigin(mode)
     markDirty()
-    if (mode === 'quality_rejection' && qualityInspectionId) {
+    const isQuality = mode === 'quality_rejection'
+    if (isQuality) {
+      setGoodsReceiptId('')
+      if (!qualityInspectionId) {
+        setReturnableCatalog([])
+        setLines([])
+        setPrefillBanner(null)
+        return
+      }
       try {
-        const prefill = await getReturnWizardPrefill({
-          qualityInspectionId,
-          goodsReceiptId: goodsReceiptId || undefined,
-        })
+        const prefill = await getReturnWizardPrefill({ qualityInspectionId })
         applyWizardPrefill(prefill, items)
       } catch (err) {
         notify.error(purchaseUserMessage(err, 'Could not load QI lines'))
       }
       return
     }
-    if (goodsReceiptId) {
-      try {
-        const prefill = await getReturnWizardPrefill({ goodsReceiptId })
-        applyWizardPrefill(prefill, items)
-        setOrigin(mode)
-      } catch (err) {
-        notify.error(purchaseUserMessage(err, 'Could not load GRN lines'))
-      }
+    setQualityInspectionId('')
+    if (!goodsReceiptId) {
+      setReturnableCatalog([])
+      setLines([])
+      setPrefillBanner(null)
+      return
+    }
+    try {
+      const prefill = await getReturnWizardPrefill({ goodsReceiptId })
+      applyWizardPrefill(prefill, items)
+    } catch (err) {
+      notify.error(purchaseUserMessage(err, 'Could not load GRN lines'))
     }
   }
 
@@ -732,108 +741,90 @@ export function PurchaseReturnEditorPage() {
       {showOriginPicker ? (
         <ErpCardSection
           title="Origin"
-          subtitle="Choose return origin and load remaining returnable lines from GRN or quality inspection"
+          subtitle="Pick the GRN or quality inspection this return is against"
           icon={ClipboardList}
           accent="slate"
           collapsible
           defaultOpen
           dense
-          columns={1}
+          columns={2}
         >
-      <p className="mb-2 text-[12px] text-erp-muted">
-        Returns require a posted GRN (or QI rejection). Unreceived PO items never appear. Load remaining
-        returnable lines from GRN or quality inspection, then save draft.
-      </p>
-          <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Purchase return origin">
-            {(Object.entries(PURCHASE_RETURN_ORIGIN_LABELS) as [PurchaseReturnOrigin, string][]).map(
-              ([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  role="tab"
-                  aria-selected={origin === mode}
-                  className={cn(
-                    'rounded border px-2.5 py-1 text-[12px] font-medium transition-colors',
-                    origin === mode
-                      ? 'border-erp-primary bg-erp-primary text-white'
-                      : 'border-erp-border bg-erp-surface text-erp-text hover:border-erp-primary hover:bg-erp-primary-soft',
-                  )}
-                  onClick={() => void applyOriginPreset(mode)}
-                >
-                  {label}
-                </button>
-              ),
-            )}
-          </div>
-          <div className="space-y-2">
+          <ErpFieldRow label="Origin" hint="Controls which source picker appears next to it">
             <Select
-              value={goodsReceiptId}
-              onChange={(e) => {
-                const next = e.target.value
-                setGoodsReceiptId(next)
-                markDirty()
-                loadPrefillFromGrn(next)
-              }}
               className="max-w-md"
-              aria-label="Source GRN"
+              value={origin}
+              onChange={(e) => void applyOriginPreset(e.target.value as PurchaseReturnOrigin)}
             >
-              <option value="">{SELECT_PLACEHOLDER}</option>
-              {returnableGrns.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.documentNumber} · {g.vendor.name}
-                </option>
-              ))}
+              {(Object.entries(PURCHASE_RETURN_ORIGIN_LABELS) as [PurchaseReturnOrigin, string][]).map(
+                ([mode, label]) => (
+                  <option key={mode} value={mode}>
+                    {label}
+                  </option>
+                ),
+              )}
             </Select>
-            <Select
-              value={qualityInspectionId}
-              onChange={(e) => {
-                const next = e.target.value
-                setQualityInspectionId(next)
-                markDirty()
-                if (next) {
-                  void getReturnWizardPrefill({
-                    qualityInspectionId: next,
-                    goodsReceiptId: goodsReceiptId || undefined,
-                  })
-                    .then((prefill) => applyWizardPrefill(prefill, items))
-                    .catch((err) =>
-                      notify.error(purchaseUserMessage(err, 'Could not load returnable QI lines')),
-                    )
-                }
-              }}
-              className="max-w-md"
-              aria-label="Source quality inspection"
+          </ErpFieldRow>
+          {origin === 'quality_rejection' ? (
+            <ErpFieldRow
+              label="Quality Inspection (QI)"
+              hint="Shows rejected QIs — loads returnable lines automatically once selected"
             >
-              <option value="">{SELECT_PLACEHOLDER}</option>
-              {inspections
-                .filter((q) => q.rejectedQty > 0)
-                .map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.documentNumber} · rej {q.rejectedQty}
+              <Select
+                className="max-w-md"
+                value={qualityInspectionId}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setQualityInspectionId(next)
+                  setGoodsReceiptId('')
+                  markDirty()
+                  if (next) {
+                    void getReturnWizardPrefill({ qualityInspectionId: next })
+                      .then((prefill) => applyWizardPrefill(prefill, items))
+                      .catch((err) =>
+                        notify.error(purchaseUserMessage(err, 'Could not load returnable QI lines')),
+                      )
+                  } else {
+                    setReturnableCatalog([])
+                    setLines([])
+                    setPrefillBanner(null)
+                  }
+                }}
+              >
+                <option value="">{SELECT_PLACEHOLDER}</option>
+                {inspections
+                  .filter((q) => q.rejectedQty > 0)
+                  .map((q) => (
+                    <option key={q.id} value={q.id}>
+                      {q.documentNumber} · rej {q.rejectedQty}
+                    </option>
+                  ))}
+              </Select>
+            </ErpFieldRow>
+          ) : (
+            <ErpFieldRow
+              label="Goods Receipt (GRN)"
+              hint="Shows all posted GRNs — loads returnable lines automatically once selected"
+            >
+              <Select
+                className="max-w-md"
+                value={goodsReceiptId}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setGoodsReceiptId(next)
+                  setQualityInspectionId('')
+                  markDirty()
+                  loadPrefillFromGrn(next)
+                }}
+              >
+                <option value="">{SELECT_PLACEHOLDER}</option>
+                {returnableGrns.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.documentNumber} · {g.vendor.name}
                   </option>
                 ))}
-            </Select>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <ErpButton
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={!goodsReceiptId}
-                onClick={() => void applyOriginPreset(origin)}
-              >
-                Load lines from GRN
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={!qualityInspectionId}
-                onClick={() => void applyOriginPreset('quality_rejection')}
-              >
-                Load lines from QI
-              </ErpButton>
-            </div>
-          </div>
+              </Select>
+            </ErpFieldRow>
+          )}
         </ErpCardSection>
       ) : null}
 

@@ -21,6 +21,10 @@ export const listGoodsReceiptsQuerySchema = paginationSchema.extend({
   vendorId: z.string().uuid().optional(),
   warehouseId: z.string().uuid().optional(),
   search: z.string().trim().max(200).optional(),
+  /** Opt-in: compute per-row return-eligibility (totalReturnableQty / line returnableQty).
+   * Only requested by the Purchase Return "origin GRN" picker — skipped by default so the
+   * plain GRN register list stays cheap (no N+1 return-stats query per row). */
+  includeReturnStats: z.coerce.boolean().optional(),
 })
 
 export const goodsReceiptLineInputSchema = z.object({

@@ -4,6 +4,8 @@ import { Plus } from 'lucide-react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { DataGrid } from '../../components/design-system/DataGrid'
 import { CommandBar, CommandBarButton, CommandBarGroup } from '../../components/ui/CommandBar'
+import { ErpStickySaveBar } from '../../components/erp/card-form'
+import { ErpButton } from '../../components/erp/ErpButton'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Button } from '../../components/ui/Button'
 import { Select } from '../../components/forms/Inputs'
@@ -168,16 +170,34 @@ export function QcParameterFormPage() {
             </label>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex gap-2">
-            <Button size="sm" onClick={save}>{existing ? 'Save Changes' : 'Create Parameter'}</Button>
-            {existing && (
-              <Button size="sm" variant="danger" onClick={() => { deactivateQcParameter(existing.id); navigate('/quality/parameters') }}>
-                Deactivate
-              </Button>
-            )}
-          </div>
         </div>
       </DetailSection>
+      <ErpStickySaveBar
+        cancelTo="/quality/parameters"
+        submitLabel={existing ? 'Save changes' : 'Create parameter'}
+        onSave={save}
+        hint="Parameters are reused across inspection plan checklists."
+        actions={(
+          <>
+            <ErpButton type="button" size="sm" variant="primary" onClick={save}>
+              {existing ? 'Save changes' : 'Create parameter'}
+            </ErpButton>
+            {existing && (
+              <ErpButton
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => { deactivateQcParameter(existing.id); navigate('/quality/parameters') }}
+              >
+                Deactivate
+              </ErpButton>
+            )}
+            <ErpButton type="button" size="sm" variant="secondary" onClick={() => navigate('/quality/parameters')}>
+              Cancel
+            </ErpButton>
+          </>
+        )}
+      />
     </DetailLayout>
   )
 }
@@ -326,18 +346,8 @@ export function InspectionPlanDetailPage() {
             <label className="block text-sm"><span className="font-medium">Revision</span><input className="erp-input mt-1 w-full" value={header.revision ?? 'A'} onChange={(e) => setHeader({ ...header, revision: e.target.value })} /></label>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={saveHeader}>{isNew ? 'Create Plan' : 'Save Header'}</Button>
-            {plan && plan.status !== 'active' && (
-              <Button size="sm" variant="secondary" onClick={() => activateInspectionPlan(plan.id)}>Activate</Button>
-            )}
-            {plan && plan.status === 'active' && (
-              <Button size="sm" variant="secondary" onClick={() => deactivateInspectionPlan(plan.id)}>Deactivate</Button>
-            )}
-          </div>
         </div>
       </DetailSection>
-
       {plan && (
         <DetailSection title="Plan Lines">
           <div className="mb-4 flex flex-wrap items-end gap-2">
@@ -387,6 +397,32 @@ export function InspectionPlanDetailPage() {
           </DetailGrid>
         </DetailSection>
       )}
+      <ErpStickySaveBar
+        cancelTo="/quality/inspection-plans"
+        submitLabel={isNew ? 'Create plan' : 'Save header'}
+        onSave={saveHeader}
+        hint="ACTIVE plans resolve onto Purchase (incoming) and Manufacturing QC."
+        actions={(
+          <>
+            <ErpButton type="button" size="sm" variant="primary" onClick={saveHeader}>
+              {isNew ? 'Create plan' : 'Save header'}
+            </ErpButton>
+            {plan && plan.status !== 'active' && (
+              <ErpButton type="button" size="sm" variant="outline" onClick={() => activateInspectionPlan(plan.id)}>
+                Activate
+              </ErpButton>
+            )}
+            {plan && plan.status === 'active' && (
+              <ErpButton type="button" size="sm" variant="outline" onClick={() => deactivateInspectionPlan(plan.id)}>
+                Deactivate
+              </ErpButton>
+            )}
+            <ErpButton type="button" size="sm" variant="secondary" onClick={() => navigate('/quality/inspection-plans')}>
+              Cancel
+            </ErpButton>
+          </>
+        )}
+      />
     </DetailLayout>
   )
 }

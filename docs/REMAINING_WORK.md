@@ -16,6 +16,18 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Inventory Transaction Type Register (2026-08-11)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory / Store |
+| Description | Read-only, code-based catalogue of all `InventoryReferenceType` values (direction, owner module, postsToGl, reversible, requiredPermission) via a new registry + `GET /inventory/setup/reference-types`; drift-guard test cross-checks it against the live `isManufacturingOwnedReferenceType()` / `deriveInventoryAccountingEventType()` logic so it cannot silently diverge. Does not change any existing posting logic. Reserved two real gaps (`SALES_RETURN`, `REQUISITION_ISSUE`) as unused enum values, matching the pre-existing unused `DISPATCH`/`WIP_RECEIVE`/`MOVE_TO_WIP`/`MOVE_FROM_WIP`. |
+| Doc | [`docs/inventory/INVENTORY_TRANSACTION_TYPE_REGISTER.md`](inventory/INVENTORY_TRANSACTION_TYPE_REGISTER.md) |
+| Status | **done** (backend only) — migration `20260811000000_inventory_reference_type_gaps` is additive/safe; apply via `migrate deploy` |
+| Next step | Optional follow-ups, not started: frontend read-only register screen under Inventory Setup; wiring real posting flows for `SALES_RETURN` (Dispatch customer-return) and `REQUISITION_ISSUE` (generic Store requisition) |
+
+---
+
 ## Open — Indian GST Compliance Platform (post Phase 18)
 
 | Field | Value |

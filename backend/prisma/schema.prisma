@@ -12942,6 +12942,10 @@ enum InventoryReferenceType {
   CONTROLLED_ADJUSTMENT
   ADJUSTMENT_REVERSAL
   ISSUE_TO_MAINTENANCE
+  /// Reserved — no posting caller yet. Customer goods returned into stock (Dispatch-owned flow, not yet built).
+  SALES_RETURN
+  /// Reserved — no posting caller yet. Generic inter-department requisition issue (Store-owned flow, not yet built).
+  REQUISITION_ISSUE
 }
 
 enum InventoryReservationDemandType {
