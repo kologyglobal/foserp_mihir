@@ -477,14 +477,21 @@ export function MastersHomePage() {
         <div className="masters-index-hero">
           <div className="masters-index-hero-card">
             <div className="masters-index-hero-head">
-              <span className="masters-index-hero-icon" aria-hidden>
-                <Database className="h-6 w-6" />
-              </span>
-              <div className="masters-index-hero-copy">
-                <h1 className="masters-index-hero-title">Master register index</h1>
-                <p className="masters-index-hero-sub">
-                  Search, browse by category, or pin your most-used registers for quick access.
-                </p>
+              <h1 className="masters-index-hero-title">
+                <Database className="h-4 w-4" aria-hidden />
+                Master register index
+              </h1>
+              <div className="masters-index-search-row">
+                <SearchInput
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search masters — customer, item, HSN, vendor, code series…"
+                  size="lg"
+                  className="w-full"
+                  aria-label="Search master registers"
+                  autoFocus
+                />
+                <MastersIndexViewToggle mode={viewMode} onChange={setViewMode} />
               </div>
               <div className="masters-index-hero-stats">
                 <div className="masters-index-hero-stat">
@@ -500,18 +507,6 @@ export function MastersHomePage() {
                   <span className="masters-index-hero-stat-label">Items</span>
                 </div>
               </div>
-            </div>
-            <div className="masters-index-search-row">
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="Search masters — customer, item, HSN, vendor, code series…"
-                size="lg"
-                className="w-full"
-                aria-label="Search master registers"
-                autoFocus
-              />
-              <MastersIndexViewToggle mode={viewMode} onChange={setViewMode} />
             </div>
             <p className="masters-index-search-hint">
               {filteredRows.length} of {allIndexRows.length} registers

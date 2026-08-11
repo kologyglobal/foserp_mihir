@@ -25,6 +25,10 @@ import {
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { StatusDot } from '@/components/design-system/StatusDot'
 import { ErpCommandBar, type ErpCommandAction } from '@/components/erp/ErpCommandBar'
+import {
+  EnterpriseRowActionsMenu,
+  type RowActionItem,
+} from '@/design-system/enterprise/EnterpriseTablePrimitives'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
@@ -2734,7 +2738,7 @@ export function ApiWorkOrderDetailPage() {
                         <th className="text-right">Shortage</th>
                         <th className="text-right">Free</th>
                         <th>Status</th>
-                        <th>Actions</th>
+                        <th className="w-10" />
                       </tr>
                     </thead>
                     <tbody>
@@ -2746,6 +2750,83 @@ export function ApiWorkOrderDetailPage() {
                           0,
                           Number(line.requiredQty) - Number(line.issuedQty) + Number(line.returnedQty),
                         )
+                        const canRemoveLine =
+                          perms.canCreateMaterialRequirement &&
+                          !readOnly &&
+                          Number(line.reservedQty) === 0 &&
+                          Number(line.issuedQty) === 0
+                        const canReturnLine =
+                          perms.canReturnMaterials && Number(line.issuedQty) - Number(line.returnedQty) > 0
+                        const materialActions: RowActionItem[] = []
+                        if (perms.canCreateMaterialRequirement && !readOnly) {
+                          materialActions.push({
+                            id: 'edit',
+                            label: 'Edit…',
+                            icon: Pencil,
+                            disabled: busy,
+                            title: 'Edit required qty / remarks for this work order line only.',
+                            onClick: () => {
+                              setEditingMaterial(line)
+                              setMaterialEditorOpen(true)
+                            },
+                          })
+                        }
+                        if (perms.canReserveMaterials) {
+                          materialActions.push({
+                            id: 'reserve',
+                            label: 'Reserve',
+                            icon: Package,
+                            disabled: busy,
+                            title: 'Reserve free warehouse stock against this material line.',
+                            onClick: () =>
+                              void run(
+                                () => reserveWorkOrderMaterials(workOrderId!, { materialIds: [line.id] }),
+                                'Material reserved',
+                              ).then(() => loadMaterials()),
+                          })
+                        }
+                        if (perms.canIssueMaterials) {
+                          materialActions.push({
+                            id: 'issue',
+                            label: 'Issue…',
+                            icon: Truck,
+                            disabled: busy || remaining <= 0,
+                            disabledReason:
+                              remaining <= 0
+                                ? 'Nothing left to issue — required quantity is already fully issued.'
+                                : undefined,
+                            title: 'Post a material issue to the shop floor for this line.',
+                            onClick: () => setIssueMaterial(line),
+                          })
+                        }
+                        if (canReturnLine) {
+                          materialActions.push({
+                            id: 'return',
+                            label: 'Return…',
+                            icon: RotateCcw,
+                            disabled: busy,
+                            title: 'Return unused issued material from the shop floor back to inventory.',
+                            onClick: () => setReturnMaterial(line),
+                          })
+                        }
+                        if (canRemoveLine) {
+                          materialActions.push(
+                            { id: 'sep-remove', label: '', separator: true },
+                            {
+                              id: 'remove',
+                              label: 'Remove',
+                              icon: X,
+                              danger: true,
+                              disabled: busy,
+                              title: 'Remove this line from the work order. Only allowed when nothing is reserved or issued.',
+                              onClick: () =>
+                                void run(
+                                  () => removeWorkOrderMaterialRequirement(wo.id, line.id),
+                                  'Material removed',
+                                ).then(() => loadMaterials()),
+                            },
+                          )
+                        }
                         return (
                           <tr key={line.id}>
                             <td className="font-mono text-[11px]">{itemLabel}</td>
@@ -2761,83 +2842,7 @@ export function ApiWorkOrderDetailPage() {
                               })()}
                             </td>
                             <td>
-                              <div className="flex flex-wrap items-center gap-1">
-                                {perms.canCreateMaterialRequirement && !readOnly ? (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    disabled={busy}
-                                    title="Edit required qty / remarks for this work order line only."
-                                    onClick={() => {
-                                      setEditingMaterial(line)
-                                      setMaterialEditorOpen(true)
-                                    }}
-                                  >
-                                    Edit…
-                                  </Button>
-                                ) : null}
-                                {perms.canCreateMaterialRequirement &&
-                                !readOnly &&
-                                Number(line.reservedQty) === 0 &&
-                                Number(line.issuedQty) === 0 ? (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    disabled={busy}
-                                    title="Remove this line from the work order. Only allowed when nothing is reserved or issued."
-                                    onClick={() =>
-                                      void run(
-                                        () => removeWorkOrderMaterialRequirement(wo.id, line.id),
-                                        'Material removed',
-                                      ).then(() => loadMaterials())
-                                    }
-                                  >
-                                    Remove
-                                  </Button>
-                                ) : null}
-                                {perms.canReserveMaterials ? (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    disabled={busy}
-                                    title="Reserve free warehouse stock against this material line."
-                                    onClick={() =>
-                                      void run(
-                                        () => reserveWorkOrderMaterials(workOrderId!, { materialIds: [line.id] }),
-                                        'Material reserved',
-                                      ).then(() => loadMaterials())
-                                    }
-                                  >
-                                    Reserve
-                                  </Button>
-                                ) : null}
-                                {perms.canIssueMaterials ? (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    disabled={busy || remaining <= 0}
-                                    title={
-                                      remaining <= 0
-                                        ? 'Nothing left to issue — required quantity is already fully issued.'
-                                        : 'Post a material issue to the shop floor for this line.'
-                                    }
-                                    onClick={() => setIssueMaterial(line)}
-                                  >
-                                    Issue…
-                                  </Button>
-                                ) : null}
-                                {perms.canReturnMaterials && Number(line.issuedQty) - Number(line.returnedQty) > 0 ? (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    disabled={busy}
-                                    title="Return unused issued material from the shop floor back to inventory."
-                                    onClick={() => setReturnMaterial(line)}
-                                  >
-                                    Return…
-                                  </Button>
-                                ) : null}
-                              </div>
+                              <EnterpriseRowActionsMenu actions={materialActions} />
                             </td>
                           </tr>
                         )

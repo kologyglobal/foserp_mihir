@@ -47,6 +47,7 @@ export type ApiReturnWizardPrefill = {
   totalReturned: number
   totalRemaining: number
   goodsReceiptId: string | null
+  goodsReceiptNumber: string | null
   qualityInspectionId: string | null
   vendorId: string | null
   purchaseOrderId: string | null

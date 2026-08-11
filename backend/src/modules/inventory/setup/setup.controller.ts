@@ -3,6 +3,7 @@ import { getContext, getTenantId } from '../../../types/request-context.js'
 import { asyncHandler } from '../../../utils/asyncHandler.js'
 import { sendSuccess } from '../../../utils/response.js'
 import { migrateFifoOpeningStock } from '../costing/fifo-opening-stock-migration.service.js'
+import { listInventoryReferenceTypes } from '../shared/inventory-reference-type.registry.js'
 import * as service from './setup.service.js'
 import * as lookup from './lookup.service.js'
 
@@ -21,6 +22,10 @@ export const lookupInventoryCode = asyncHandler(async (req: Request, res: Respon
   const warehouseId = req.query.warehouseId ? String(req.query.warehouseId) : undefined
   const data = await lookup.lookupInventoryCode(getTenantId(req), code, warehouseId)
   sendSuccess(res, 'Inventory lookup completed', data)
+})
+
+export const getInventoryReferenceTypes = asyncHandler(async (_req: Request, res: Response) => {
+  sendSuccess(res, 'Inventory reference types retrieved', listInventoryReferenceTypes())
 })
 
 export const postFifoOpeningMigration = asyncHandler(async (req: Request, res: Response) => {

@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { RefreshCw, ShieldAlert } from 'lucide-react'
+import type { ColumnDef } from '@tanstack/react-table'
+import { RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { DataGrid } from '@/components/design-system/DataGrid'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 import { StatusDot } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { DetailField, DetailGrid, DetailLayout, DetailSection } from '@/components/masters/MasterLayouts'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { Select } from '@/components/forms/Inputs'
+import { TableLink } from '@/components/ui/AppLink'
+import { ErpStickySaveBar } from '@/components/erp/card-form'
 import {
   closeNcr,
   getNcr,
@@ -91,6 +95,70 @@ export function ApiNcrRegisterPage() {
     )
   }, [rows, search])
 
+  const columns = useMemo<ColumnDef<QualityNcr, unknown>[]>(
+    () => [
+      {
+        id: 'ncrNumber',
+        accessorKey: 'ncrNumber',
+        header: 'NCR',
+        enableHiding: false,
+        cell: ({ row }) => <TableLink to={`/quality/ncr/${row.original.id}`}>{row.original.ncrNumber}</TableLink>,
+      },
+      { id: 'title', accessorKey: 'title', header: 'Title' },
+      {
+        id: 'severity',
+        accessorKey: 'severity',
+        header: 'Severity',
+        cell: ({ row }) => <StatusDot label={row.original.severity.toLowerCase()} tone={severityTone(row.original.severity)} />,
+      },
+      {
+        id: 'status',
+        accessorKey: 'status',
+        header: 'Status',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <StatusDot label={row.original.status.toLowerCase().replace(/_/g, ' ')} tone={statusTone(row.original.status)} />
+        ),
+      },
+      {
+        id: 'workOrder',
+        header: 'Work Order',
+        accessorFn: (r) => r.productionOrderId ?? '',
+        cell: ({ row }) =>
+          row.original.productionOrderId ? (
+            <Link to={`/manufacturing/work-orders/${row.original.productionOrderId}`} className="text-erp-primary hover:underline">
+              View WO
+            </Link>
+          ) : (
+            '-'
+          ),
+      },
+      {
+        id: 'inspection',
+        header: 'Inspection',
+        accessorFn: (r) => r.inspectionId ?? '',
+        cell: ({ row }) =>
+          row.original.inspectionId ? (
+            <Link
+              to={`/quality/inspections/${row.original.inspectionId}`}
+              className="font-mono text-xs text-erp-primary hover:underline"
+            >
+              Open
+            </Link>
+          ) : (
+            '-'
+          ),
+      },
+      {
+        id: 'createdAt',
+        accessorKey: 'createdAt',
+        header: 'Created',
+        cell: ({ row }) => formatDateTime(row.original.createdAt),
+      },
+    ],
+    [],
+  )
+
   return (
     <OperationalPageShell
       variant="dynamics"
@@ -139,78 +207,20 @@ export function ApiNcrRegisterPage() {
         </label>
       </div>
 
-      {loading ? (
-        <LoadingState variant="card" />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={ShieldAlert}
-          title="No NCRs"
-          description={
+      <EnterpriseRegisterTableShell className="min-w-0 flex-1">
+        <DataGrid<QualityNcr>
+          data={filtered}
+          columns={columns}
+          getRowId={(r) => r.id}
+          loading={loading}
+          columnLayoutKey="/quality/ncr"
+          emptyMessage={
             statusFilter || search
               ? 'No NCRs match the current filters.'
-              : 'NCRs are created automatically when an inspection is rejected.'
+              : 'No NCRs — they are created automatically when an inspection is rejected.'
           }
         />
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-erp-border bg-white shadow-sm">
-          <table className="min-w-full text-left text-[13px]">
-            <thead className="border-b border-erp-border bg-slate-50 text-[11px] uppercase tracking-wide text-erp-muted">
-              <tr>
-                <th className="px-4 py-2">NCR</th>
-                <th className="px-4 py-2">Title</th>
-                <th className="px-4 py-2">Severity</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Work Order</th>
-                <th className="px-4 py-2">Inspection</th>
-                <th className="px-4 py-2">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((row) => (
-                <tr key={row.id} className="border-b border-erp-border/60 last:border-0">
-                  <td className="px-4 py-2 font-mono text-xs">
-                    <Link to={`/quality/ncr/${row.id}`} className="text-erp-primary hover:underline">
-                      {row.ncrNumber}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2">{row.title}</td>
-                  <td className="px-4 py-2">
-                    <StatusDot label={row.severity.toLowerCase()} tone={severityTone(row.severity)} />
-                  </td>
-                  <td className="px-4 py-2">
-                    <StatusDot label={row.status.toLowerCase().replace(/_/g, ' ')} tone={statusTone(row.status)} />
-                  </td>
-                  <td className="px-4 py-2">
-                    {row.productionOrderId ? (
-                      <Link
-                        to={`/manufacturing/work-orders/${row.productionOrderId}`}
-                        className="text-erp-primary hover:underline"
-                      >
-                        View WO
-                      </Link>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                  <td className="px-4 py-2">
-                    {row.inspectionId ? (
-                      <Link
-                        to={`/quality/inspections/${row.inspectionId}`}
-                        className="font-mono text-xs text-erp-primary hover:underline"
-                      >
-                        Open
-                      </Link>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                  <td className="px-4 py-2">{formatDateTime(row.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      </EnterpriseRegisterTableShell>
     </OperationalPageShell>
   )
 }
@@ -317,23 +327,29 @@ export function ApiNcrDetailPage() {
       </DetailSection>
 
       {canClose(ncr.status) ? (
-        <DetailSection title="Closure">
-          <div className="max-w-xl space-y-3">
-            <label className="block text-sm">
-              <span className="font-medium">Closure notes</span>
-              <textarea
-                className="erp-input mt-1 w-full"
-                rows={3}
-                value={closureNotes}
-                onChange={(e) => setClosureNotes(e.target.value)}
-                disabled={busy}
-              />
-            </label>
-            <Button type="button" size="sm" disabled={busy} onClick={() => void handleClose()}>
-              Close NCR
-            </Button>
-          </div>
-        </DetailSection>
+        <>
+          <DetailSection title="Closure">
+            <div className="max-w-xl space-y-3">
+              <label className="block text-sm">
+                <span className="font-medium">Closure notes</span>
+                <textarea
+                  className="erp-input mt-1 w-full"
+                  rows={3}
+                  value={closureNotes}
+                  onChange={(e) => setClosureNotes(e.target.value)}
+                  disabled={busy}
+                />
+              </label>
+            </div>
+          </DetailSection>
+          <ErpStickySaveBar
+            onCancel={() => navigate('/quality/ncr')}
+            submitLabel="Close NCR"
+            isSubmitting={busy}
+            onSave={() => void handleClose()}
+            hint="Closure notes are saved when the NCR is closed."
+          />
+        </>
       ) : (
         ncr.closureNotes && (
           <DetailSection title="Closure">

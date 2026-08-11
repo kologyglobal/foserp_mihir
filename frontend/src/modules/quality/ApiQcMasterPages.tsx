@@ -33,6 +33,7 @@ import { appConfirm } from '@/store/confirmDialogStore'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
 import {
+  activateInspectionPlan,
   activateQcParameter,
   createInspectionPlan,
   createQcParameter,
@@ -827,6 +828,7 @@ export function ApiInspectionPlanMasterPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<QualityInspectionPlan[]>([])
   const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [filters, setFilters] = useState<StoreRegisterFilters>(PLAN_DEFAULT_FILTERS)
   const [sortBy, setSortBy] = useState('code_asc')
 
@@ -846,6 +848,42 @@ export function ApiInspectionPlanMasterPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const setActive = useCallback(
+    async (row: QualityInspectionPlan, active: boolean) => {
+      if (active) {
+        setBusyId(row.id)
+        try {
+          await activateInspectionPlan(row.id)
+          notify.success(`${row.planCode} activated`)
+          await load()
+        } catch (e) {
+          notify.error(e instanceof Error ? e.message : 'Activate failed')
+        } finally {
+          setBusyId(null)
+        }
+        return
+      }
+      const ok = await appConfirm({
+        title: 'Deactivate inspection plan?',
+        description: `${row.planCode} will no longer resolve onto new inspections.`,
+        confirmLabel: 'Deactivate',
+        tone: 'danger',
+      })
+      if (!ok) return
+      setBusyId(row.id)
+      try {
+        await deactivateInspectionPlan(row.id)
+        notify.success(`${row.planCode} deactivated`)
+        await load()
+      } catch (e) {
+        notify.error(e instanceof Error ? e.message : 'Deactivate failed')
+      } finally {
+        setBusyId(null)
+      }
+    },
+    [load],
+  )
 
   const filterFields = useMemo(
     () => [
@@ -945,8 +983,44 @@ export function ApiInspectionPlanMasterPage() {
           <span className="tabular-nums">{row.original.lines.length}</span>
         ),
       },
+      {
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const p = row.original
+          const busy = busyId === p.id
+          const actions: RowActionItem[] = [
+            {
+              id: 'edit',
+              label: 'Edit',
+              icon: Pencil,
+              to: `/quality/inspection-plans/${p.id}`,
+              disabled: busy,
+            },
+            { id: 'sep-status', label: '', separator: true },
+            p.status === 'ACTIVE'
+              ? {
+                  id: 'deactivate',
+                  label: 'Deactivate',
+                  icon: CircleOff,
+                  disabled: busy,
+                  onClick: () => void setActive(p, false),
+                }
+              : {
+                  id: 'activate',
+                  label: 'Activate',
+                  icon: CheckCircle2,
+                  disabled: busy,
+                  onClick: () => void setActive(p, true),
+                },
+          ]
+          return <EnterpriseRowActionsMenu actions={actions} />
+        },
+      },
     ],
-    [],
+    [busyId, setActive],
   )
 
   return (

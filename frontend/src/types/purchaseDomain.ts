@@ -2854,6 +2854,7 @@ export interface ReturnWizardPrefill {
   vendorId: string
   purchaseOrderId: string | null
   goodsReceiptId: string | null
+  goodsReceiptNumber: string | null
   qualityInspectionId: string | null
   qualityInspectionNumber: string | null
   warehouseId: string | null

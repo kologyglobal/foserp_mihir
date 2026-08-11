@@ -38,6 +38,12 @@ router.get(
   controller.lookupInventoryCode,
 )
 
+router.get(
+  '/reference-types',
+  requireAnyPermission('inventory.setup.manage', 'inventory.view', 'inventory.stock.view'),
+  controller.getInventoryReferenceTypes,
+)
+
 router.post(
   '/fifo-opening-migration',
   requirePermission('inventory.setup.manage'),

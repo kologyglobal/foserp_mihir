@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Eye, Pencil, Plus, Printer, RefreshCw, RotateCcw, Trash2 } from 'lucide-react'
+import {
+  CheckCircle2,
+  Eye,
+  Pencil,
+  Plus,
+  Printer,
+  RefreshCw,
+  RotateCcw,
+  Send,
+  Trash2,
+  Truck,
+} from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
 import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
@@ -30,12 +41,20 @@ import {
   type ReturnSortKey,
 } from '@/config/returnFilterConfig'
 import { useCrmFilterDrawer } from '@/hooks/useCrmFilterDrawer'
-import { getPurchaseReturnList } from '@/services/purchase'
+import {
+  approvePurchaseReturn,
+  getPurchaseReturnList,
+  postPurchaseReturn,
+  PurchaseServiceError,
+  shipPurchaseReturn,
+  submitPurchaseReturn,
+} from '@/services/purchase'
 import type { PurchaseReturnListRow } from '@/types/purchaseDomain'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { purchaseBreadcrumbs } from '@/utils/purchaseNavigation'
 import { usePurchasePermissions } from '@/utils/permissions'
+import { notify } from '@/store/toastStore'
 
 export function PurchaseReturnListPage() {
   const navigate = useNavigate()
@@ -45,6 +64,7 @@ export function PurchaseReturnListPage() {
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<ReturnListFilters>(DEFAULT_RETURN_LIST_FILTERS)
   const [sortBy, setSortBy] = useState<ReturnSortKey>('documentDate')
+  const [busyRowId, setBusyRowId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -62,6 +82,23 @@ export function PurchaseReturnListPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const runRowAction = async (
+    rowId: string,
+    work: () => Promise<unknown>,
+    success: string,
+  ) => {
+    setBusyRowId(rowId)
+    try {
+      await work()
+      notify.success(success)
+      await load()
+    } catch (err) {
+      notify.error(err instanceof PurchaseServiceError ? err.message : 'Action failed')
+    } finally {
+      setBusyRowId(null)
+    }
+  }
 
   const vendorOptions = useMemo(
     () => [...new Set(rows.map((r) => r.vendorName).filter(Boolean))].sort(),
@@ -161,6 +198,11 @@ export function PurchaseReturnListPage() {
           const r = row.original
           const canEdit = r.status === 'draft' || r.status === 'pending_approval'
           const statusLabel = r.statusLabel || r.status
+          const busy = busyRowId === r.id
+          const canSubmit = r.status === 'draft'
+          const canApprove = r.status === 'pending_approval'
+          const canShip = r.status === 'approved'
+          const canComplete = r.status === 'approved' || r.status === 'shipped'
           const actions: RowActionItem[] = [
             {
               id: 'view',
@@ -184,18 +226,66 @@ export function PurchaseReturnListPage() {
               disabled: r.status !== 'draft',
               disabledReason: `${statusLabel} purchase returns cannot be deleted`,
             },
-            {
-              id: 'print',
-              label: 'Print Challan',
-              icon: Printer,
-              onClick: () => navigate(`/purchase/returns/${r.id}/print`),
-            },
           ]
+          if (perms.canCreateReturn && canSubmit) {
+            actions.push({
+              id: 'submit',
+              label: 'Submit',
+              icon: Send,
+              disabled: busy,
+              onClick: () =>
+                void runRowAction(r.id, () => submitPurchaseReturn(r.id), 'Submitted'),
+            })
+          }
+          if ((perms.canPostReturn || perms.canCreateReturn) && canApprove) {
+            actions.push({
+              id: 'approve',
+              label: 'Approve',
+              icon: CheckCircle2,
+              disabled: busy,
+              onClick: () =>
+                void runRowAction(r.id, () => approvePurchaseReturn(r.id), 'Approved'),
+            })
+          }
+          if (perms.canPostReturn && canShip) {
+            actions.push({
+              id: 'ship',
+              label: 'Ship to Vendor',
+              icon: Truck,
+              disabled: busy,
+              onClick: () =>
+                void runRowAction(
+                  r.id,
+                  () => shipPurchaseReturn(r.id),
+                  'Return shipped — stock marked in transit',
+                ),
+            })
+          }
+          if (perms.canPostReturn && canComplete) {
+            actions.push({
+              id: 'complete',
+              label: 'Complete Return',
+              icon: CheckCircle2,
+              disabled: busy,
+              onClick: () =>
+                void runRowAction(
+                  r.id,
+                  () => postPurchaseReturn(r.id),
+                  'Return completed — stock issued to vendor',
+                ),
+            })
+          }
+          actions.push({
+            id: 'print',
+            label: 'Print Challan',
+            icon: Printer,
+            onClick: () => navigate(`/purchase/returns/${r.id}/print`),
+          })
           return <EnterpriseRowActionsMenu actions={actions} />
         },
       },
     ],
-    [navigate],
+    [navigate, busyRowId, perms.canCreateReturn, perms.canPostReturn],
   )
 
   const shellProps = {

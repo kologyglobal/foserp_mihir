@@ -9,74 +9,57 @@
   --masters-index-muted: #6a6d70;
   background: var(--masters-index-bg);
   margin: -0.5rem -1rem 0;
-  padding: 0 1rem 2rem;
+  padding: 0 1rem 1.25rem;
 }
 
 /* ── Hero card ── */
 .masters-index-hero {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  margin: 0 -1rem 1rem;
-  padding: 1rem 1rem 0;
-  background: linear-gradient(180deg, var(--masters-index-bg) 80%, transparent);
+  margin: 0 -1rem 0.6rem;
+  padding: 0.6rem 1rem 0;
 }
 
 .masters-index-hero-card {
   max-width: 100%;
-  padding: 1.25rem 1.5rem;
-  border-radius: 0.75rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.625rem;
   border: 1px solid var(--masters-index-border);
   background: var(--masters-index-surface);
-  box-shadow: 0 0.125rem 0.5rem rgba(85, 107, 130, 0.1);
+  box-shadow: 0 0.125rem 0.5rem rgba(85, 107, 130, 0.06);
 }
 
 .masters-index-hero-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.masters-index-hero-icon {
-  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 0.625rem;
-  background: linear-gradient(135deg, #e5f0fa 0%, #d4e8f9 100%);
-  color: var(--masters-index-brand);
-  flex-shrink: 0;
-}
-
-.masters-index-hero-copy {
-  flex: 1;
-  min-width: 200px;
+  gap: 0.75rem;
 }
 
 .masters-index-hero-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--masters-index-text);
   letter-spacing: -0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.masters-index-hero-sub {
-  margin: 0.25rem 0 0;
-  font-size: 0.8125rem;
-  color: var(--masters-index-muted);
-  line-height: 1.45;
+.masters-index-hero-title svg {
+  color: var(--masters-index-brand);
+  flex-shrink: 0;
 }
 
 .masters-index-hero-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
-  margin-left: auto;
+  gap: 0.5rem 1.1rem;
+  flex-shrink: 0;
   align-self: center;
+  padding-left: 1.1rem;
+  border-left: 1px solid var(--masters-index-border);
 }
 
 .masters-index-hero-stat {
@@ -87,15 +70,15 @@
 }
 
 .masters-index-hero-stat-value {
-  font-size: 1.375rem;
-  font-weight: 300;
+  font-size: 1.125rem;
+  font-weight: 700;
   color: var(--masters-index-text);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
 .masters-index-hero-stat-label {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-weight: 600;
   color: var(--masters-index-muted);
   text-transform: uppercase;
@@ -106,17 +89,19 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
+  flex: 1 1 260px;
+  min-width: 220px;
 }
 
 .masters-index-search-row .erp-search-field {
   flex: 1;
-  min-width: min(100%, 320px);
+  min-width: min(100%, 220px);
 }
 
 .masters-index-search-row .erp-search-field--lg .erp-search-field__input {
-  height: 2.75rem;
-  font-size: 0.9375rem;
+  height: 2.35rem;
+  font-size: 0.875rem;
   padding-left: 2.5rem;
   border-radius: 0.5rem;
   border-color: var(--masters-index-border);
@@ -130,8 +115,8 @@
 }
 
 .masters-index-search-hint {
-  margin: 0.5rem 0 0;
-  font-size: 0.75rem;
+  margin: 0.3rem 0 0;
+  font-size: 0.6875rem;
   color: var(--masters-index-muted);
 }
 
@@ -146,17 +131,17 @@
 /* ── Quick access cards ── */
 .masters-index-quick {
   display: grid;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
 }
 
 .masters-index-quick-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.75rem 0.85rem 0.75rem 1rem;
+  gap: 0.2rem;
+  padding: 0.5rem 0.65rem 0.5rem 0.8rem;
   border-radius: 0.5rem;
   border: 1px solid var(--masters-index-border);
   background: var(--masters-index-surface);
@@ -205,8 +190,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 0.375rem;
   background: #e5f0fa;
   color: var(--masters-index-brand);
@@ -227,34 +212,45 @@
 }
 
 .masters-index-quick-value {
-  font-size: 1.375rem;
-  font-weight: 300;
+  font-size: 1.125rem;
+  font-weight: 700;
   color: var(--masters-index-text);
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
 
 /* ── Recent / pinned panels ── */
+/* Single unified strip — avoids CSS-grid auto-fill reserving empty
+   columns beside a lone panel (looked like a large dead-space void). */
 .masters-index-recent {
-  display: grid;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-}
-
-.masters-index-recent-panel {
-  padding: 0.85rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 0.6rem;
+  padding: 0.1rem 0;
   border-radius: 0.5rem;
   border: 1px solid var(--masters-index-border);
   background: var(--masters-index-surface);
   box-shadow: 0 0 0.125rem rgba(85, 107, 130, 0.06);
 }
 
+.masters-index-recent-panel {
+  flex: 1 1 220px;
+  min-width: 200px;
+  padding: 0.5rem 0.85rem;
+  border-left: 1px solid var(--masters-index-border);
+}
+
+.masters-index-recent-panel:first-child {
+  border-left: none;
+}
+
 .masters-index-recent-title {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.4rem;
   font-size: 0.6875rem;
   font-weight: 700;
   color: var(--masters-index-muted);
@@ -303,28 +299,28 @@
 /* ── Layout ── */
 .masters-index-layout {
   display: grid;
-  gap: 1rem;
+  gap: 0.85rem;
 }
 
 @media (min-width: 1024px) {
   .masters-index-layout {
-    grid-template-columns: 232px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr);
     align-items: start;
   }
 }
 
 .masters-index-sidebar {
   position: sticky;
-  top: 7.5rem;
+  top: 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 0.75rem;
+  gap: 0.85rem;
+  padding: 0.65rem;
   border-radius: 0.625rem;
   border: 1px solid var(--masters-index-border);
   background: var(--masters-index-surface);
   box-shadow: 0 0 0.125rem rgba(85, 107, 130, 0.08);
-  max-height: calc(100vh - 8.5rem);
+  max-height: calc(100vh - 2rem);
   overflow-y: auto;
 }
 
@@ -919,11 +915,23 @@
   .masters-index-hero-stats {
     width: 100%;
     margin-left: 0;
+    padding-left: 0;
+    border-left: none;
     justify-content: flex-start;
   }
 
   .masters-index-hero-stat {
     align-items: flex-start;
+  }
+
+  .masters-index-recent-panel {
+    flex: 1 1 100%;
+    border-left: none;
+    border-top: 1px solid var(--masters-index-border);
+  }
+
+  .masters-index-recent-panel:first-child {
+    border-top: none;
   }
 
   .masters-index-sidebar {

@@ -6,11 +6,9 @@ import {
   CheckCircle,
   ClipboardCheck,
   Clock,
-  Download,
   Printer,
   RefreshCw,
   RotateCcw,
-  Share2,
   ShieldAlert,
   SlidersHorizontal,
   TrendingDown,
@@ -41,6 +39,8 @@ import { SearchInput } from '../../components/ui/SearchInput'
 import { Badge, formatStatus, statusColor } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DetailLayout, DetailSection, DetailGrid, DetailField } from '../../components/masters/MasterLayouts'
+import { ErpStickySaveBar } from '../../components/erp/card-form'
+import { ErpButton } from '../../components/erp/ErpButton'
 import { useQualityStore } from '../../store/qualityStore'
 import {
   useOpenNcrs,
@@ -291,13 +291,11 @@ export function QcQueuePage() {
         <CommandBar>
           <CommandBarGroup label="Actions">
             <CommandBarButton icon={ClipboardCheck} label="Inspect Next" onClick={() => rows.find((r) => r.status === 'pending') && navigate(`/quality/inspections/${rows.find((r) => r.status === 'pending')!.id}`)} primary />
-            <CommandBarButton icon={Download} label="Export" onClick={() => undefined} />
             <CommandBarButton icon={Printer} label="Print" onClick={() => window.print()} />
             <CommandBarButton icon={RefreshCw} label="Refresh" onClick={() => setRefreshKey((k) => k + 1)} />
           </CommandBarGroup>
           <CommandBarGroup label="Views">
             <CommandBarButton icon={SlidersHorizontal} label="Save View" onClick={() => setSavedView('My View')} />
-            <CommandBarButton icon={Share2} label="Share View" onClick={() => undefined} />
           </CommandBarGroup>
         </CommandBar>
       }
@@ -861,6 +859,7 @@ export function QcInspectionDetailPage() {
 // ─── Rework Workbench ────────────────────────────────────────────────────────
 
 export function ReworkWorkbenchPage() {
+  const navigate = useNavigate()
   const reworks = useQualityStore((s) => s.reworks)
   const startRework = useQualityStore((s) => s.startRework)
   const completeRework = useQualityStore((s) => s.completeRework)
@@ -869,14 +868,19 @@ export function ReworkWorkbenchPage() {
   const [team, setTeam] = useState<string>(REWORK_TEAMS[0])
   const [hours, setHours] = useState(2)
   const [remarks, setRemarks] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  const active = reworks.filter((r) => r.status !== 'closed' && r.status !== 'reinspected')
+  const active = useMemo(
+    () => reworks.filter((r) => r.status !== 'closed' && r.status !== 'reinspected'),
+    [reworks, refreshKey],
+  )
   const selected = active.find((r) => r.id === selectedId) ?? active[0]
 
   const columns: ColumnDef<ReworkOrder, unknown>[] = [
     {
       accessorKey: 'reworkNo',
       header: 'Rework No',
+      enableHiding: false,
       cell: ({ row }) => (
         <button type="button" className="font-mono text-xs font-medium text-erp-accent hover:underline" onClick={() => setSelectedId(row.original.id)}>
           {row.original.reworkNo}
@@ -889,6 +893,7 @@ export function ReworkWorkbenchPage() {
     {
       accessorKey: 'status',
       header: 'Status',
+      enableHiding: false,
       cell: ({ row }) => <Badge color={statusColor(row.original.status)}>{formatStatus(row.original.status)}</Badge>,
     },
     {
@@ -912,18 +917,30 @@ export function ReworkWorkbenchPage() {
   }
 
   return (
-    <div>
+    <OperationalPageShell
+      title="Rework Workbench"
+      description="Linked rework jobs — assign team, track hours, submit for re-inspection"
+      favoritePath="/quality/rework"
+      commandBar={
+        <CommandBar>
+          <CommandBarGroup label="Actions">
+            <CommandBarButton icon={ClipboardCheck} label="QC Queue" onClick={() => navigate('/quality/queue')} primary />
+            <CommandBarButton icon={RefreshCw} label="Refresh" onClick={() => setRefreshKey((k) => k + 1)} />
+          </CommandBarGroup>
+        </CommandBar>
+      }
+    >
       <Toast message={toast} />
-      <PageHeader
-        title="Rework Workbench"
-        description="Linked rework jobs — assign team, track hours, submit for re-inspection"
-        breadcrumbs={[{ label: 'Quality', to: '/quality' }, { label: 'Rework' }]}
-      />
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Card>
-            <DataTable data={active} columns={columns} />
-          </Card>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="min-w-0 lg:col-span-2">
+          <DataTable
+            data={active}
+            columns={columns}
+            getRowId={(r: ReworkOrder) => r.id}
+            selectedRowId={selectedId ?? undefined}
+            onRowSelect={(row: ReworkOrder) => setSelectedId(row.id)}
+            emptyMessage="No open rework orders — inspections decided as REWORK will appear here."
+          />
         </div>
         <Card>
           <CardHeader>
@@ -984,7 +1001,7 @@ export function ReworkWorkbenchPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </OperationalPageShell>
   )
 }
 
@@ -1089,13 +1106,11 @@ export function NcrRegisterPage() {
         <CommandBar>
           <CommandBarGroup label="Actions">
             <CommandBarButton icon={ShieldAlert} label="QC Queue" onClick={() => navigate('/quality/queue')} primary />
-            <CommandBarButton icon={Download} label="Export" onClick={() => undefined} />
             <CommandBarButton icon={Printer} label="Print" onClick={() => window.print()} />
             <CommandBarButton icon={RefreshCw} label="Refresh" onClick={() => setRefreshKey((k) => k + 1)} />
           </CommandBarGroup>
           <CommandBarGroup label="Views">
             <CommandBarButton icon={SlidersHorizontal} label="Save View" onClick={() => setSavedView('My View')} />
-            <CommandBarButton icon={Share2} label="Share View" onClick={() => undefined} />
           </CommandBarGroup>
         </CommandBar>
       }
@@ -1152,6 +1167,7 @@ export function NcrRegisterPage() {
 
 export function NcrDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const { toast, show } = useToast()
   const ncr = useQualityStore((s) => (id ? s.getNcr(id) : undefined))
   const sourceInspection = useQualityStore((s) => (ncr?.inspectionId ? s.getInspection(ncr.inspectionId) : undefined))
@@ -1247,38 +1263,6 @@ export function NcrDetailPage() {
               <textarea className="mt-1 w-full rounded border px-3 py-2 text-sm" rows={2} value={engReview} onChange={(e) => setEngReview(e.target.value)} disabled={ncr.status === 'closed'} />
             </label>
           </div>
-          {ncr.status !== 'closed' && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={saveFields}>
-                Save
-              </Button>
-              {next && (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    saveFields()
-                    const r = advanceNcrStatus(ncr.id, next as NonConformanceReport['status'])
-                    show(r.ok ? `Advanced to ${formatStatus(next)}` : (r.error ?? 'Failed'))
-                  }}
-                >
-                  Advance to {formatStatus(next)}
-                </Button>
-              )}
-              {ncr.status === 'approved' && (
-                <Button
-                  size="sm"
-                  variant="success"
-                  onClick={() => {
-                    saveFields()
-                    const r = closeNcr(ncr.id)
-                    show(r.ok ? 'NCR closed' : (r.error ?? 'Failed'))
-                  }}
-                >
-                  Close NCR
-                </Button>
-              )}
-            </div>
-          )}
         </DetailSection>
 
         <DetailSection title="NCR Evidence & Documents">
@@ -1298,6 +1282,50 @@ export function NcrDetailPage() {
             )}
           </p>
         </DetailSection>
+        {ncr.status !== 'closed' && (
+          <ErpStickySaveBar
+            onCancel={() => navigate('/quality/ncr')}
+            hint="Save investigation notes, then advance the NCR through containment and closure."
+            actions={(
+              <>
+                <ErpButton type="button" size="sm" variant="primary" onClick={saveFields}>
+                  Save
+                </ErpButton>
+                {next && (
+                  <ErpButton
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      saveFields()
+                      const r = advanceNcrStatus(ncr.id, next as NonConformanceReport['status'])
+                      show(r.ok ? `Advanced to ${formatStatus(next)}` : (r.error ?? 'Failed'))
+                    }}
+                  >
+                    Advance to {formatStatus(next)}
+                  </ErpButton>
+                )}
+                {ncr.status === 'approved' && (
+                  <ErpButton
+                    type="button"
+                    size="sm"
+                    variant="success"
+                    onClick={() => {
+                      saveFields()
+                      const r = closeNcr(ncr.id)
+                      show(r.ok ? 'NCR closed' : (r.error ?? 'Failed'))
+                    }}
+                  >
+                    Close NCR
+                  </ErpButton>
+                )}
+                <ErpButton type="button" size="sm" variant="secondary" onClick={() => navigate('/quality/ncr')}>
+                  Cancel
+                </ErpButton>
+              </>
+            )}
+          />
+        )}
       </DetailLayout>
     </div>
   )
