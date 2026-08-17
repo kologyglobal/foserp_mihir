@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -233,6 +234,9 @@ export default function LoginScreen() {
           <Text style={styles.footer}>
             {env.appEnv.toUpperCase()} · v{env.appVersion} ({env.buildNumber})
           </Text>
+          <Pressable onPress={() => void Linking.openURL(env.privacyPolicyUrl)}>
+            <Text style={styles.privacyLink}>Privacy Policy</Text>
+          </Pressable>
           {env.isDev ? (
             <Text style={styles.devHint} selectable>
               API: {env.apiBaseUrl || '(not set)'}
@@ -320,6 +324,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   footer: { ...typography.caption, textAlign: 'center', color: colors.textMuted },
+  privacyLink: {
+    ...typography.caption,
+    textAlign: 'center',
+    color: colors.primary,
+    marginTop: spacing.sm,
+    textDecorationLine: 'underline',
+  },
   devHint: {
     ...typography.caption,
     textAlign: 'center',

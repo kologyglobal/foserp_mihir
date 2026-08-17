@@ -1,6 +1,6 @@
 # Mobile — Google Play Store Submission (Native CRM / Expo app)
 
-> **Status:** Technical fix shipped (branch `mobile_1`); listing/account work pending on Play Console (outside this repo)
+> **Status:** API-36 fix, app icon/branding, and Privacy Policy page shipped (branch `mobile_1`); Play Console account/listing steps in §4 remain (outside this repo, need a human with Play Console access)
 > **Date:** 2026-08-17
 > **Scope:** `mobile/` (Native CRM Expo app) only — **not** the `/m` factory-ops web routes, and **not** the new desktop-only work (bins, put-away, store picking, tenant SMTP, SO/PO/invoice email). Those are separate surfaces with no mobile-app change required.
 
@@ -84,6 +84,32 @@ No location, contacts-list, SMS, or background-data permissions are requested.
 
 **Branch status:** pushed to `origin/mobile_1` (tracking). No other in-flight work from `purchase_25` (item master, purchase order, inventory changes) was included — those remain uncommitted on `purchase_25` untouched.
 
+## 3b. App icon / branding assets (shipped)
+
+The app previously used a 1×1px placeholder PNG for `icon.png` / `adaptive-icon.png` / `splash-icon.png` / `favicon.png`. Replaced with a generated "FOS" flat-vector monogram (deep blue `#1e4a8a` → `#2c5eb8`, white + light-cyan mark, gear + bar-chart motif) matching the product's enterprise-software brand tone.
+
+| File | Size | Used for |
+|---|---|---|
+| `mobile/assets/icon.png` | 1024×1024 | App icon (iOS + Android legacy) |
+| `mobile/assets/adaptive-icon.png` | 1024×1024 | Android adaptive icon foreground (`backgroundColor: '#1e4a8a'` set in `app.config.ts` to match) |
+| `mobile/assets/splash-icon.png` | 1024×1024 | Launch screen (`splash.backgroundColor` also set to `#1e4a8a` for a seamless full-bleed splash) |
+| `mobile/assets/favicon.png` | 196×196 | Web export favicon |
+| `docs/mobile/store-assets/icon-512.png` | 512×512 | Play Console **Hi-res icon** upload (App content → Store settings → Main store listing) |
+| `docs/mobile/store-assets/feature-graphic-1024x500.png` | 1024×500 | Play Console **Feature graphic** upload |
+
+**Still needed (cannot be generated without a running build):** 2–8 phone screenshots (16:9 or 9:16) captured from a real device/emulator running the app, for the Play Console listing.
+
+## 3c. Privacy Policy page (shipped)
+
+Google Play requires a hosted, publicly reachable Privacy Policy URL for any app requesting Camera/Photos/Microphone or collecting personal data — both apply here.
+
+- **Page added:** `frontend/public/privacy-policy.html` — static, self-contained HTML (no auth, no JS dependency), covers data collected (account, CRM contacts, photos, voice notes), permissions used, retention/deletion, and a contact address.
+- **Served at:** the same origin as the FOS ERP web app once the frontend build ships — Vite copies `frontend/public/*` into `frontend/dist/`, and `backend/src/app.ts` serves that directory with `express.static(..., { index: false })` *before* the SPA fallback, so static files are returned verbatim.
+  - Production: `https://erp.dhurandharcrm.com/privacy-policy.html`
+  - **Action needed:** deploy `purchase_25`/`mobile_1`-adjacent frontend changes to production (or whichever branch is live on `erp.dhurandharcrm.com`) so this path resolves before submitting to Play Console — the URL will 404 until the next frontend deploy.
+- **Wired into the app:** `mobile/src/config/env.ts` exposes `env.privacyPolicyUrl` (default `https://erp.dhurandharcrm.com/privacy-policy.html`, overridable via `EXPO_PUBLIC_PRIVACY_POLICY_URL`). A "Privacy Policy" link now opens it from both the **Login screen** footer (reachable pre-auth, which reviewers check) and **Settings → Privacy**.
+- **Contact address used in the policy:** `privacy@kology.co` — update `frontend/public/privacy-policy.html` if a different mailbox should be used.
+
 ## 4. Play Console checklist (account/content — not code)
 
 ### 4a. Account-level gate (check first — longest lead time)
@@ -122,15 +148,16 @@ No location, contacts-list, SMS, or background-data permissions are requested.
 | Target audience | Not designed for children |
 | Financial features | No (payments/invoicing/accounting are desktop-only, not in this app) |
 | App access (reviewer login) | **Must provide a working demo tenant login** (tenant slug + username + password) in Play Console → App content → App access, or review stalls at the login screen. Default dev tenant slug is `vasant-trailers` (`mobile/.env.example`) — set up a real test user there. |
+| Privacy Policy URL | **Ready:** `https://erp.dhurandharcrm.com/privacy-policy.html` (see §3c) — paste into Play Console → App content → Privacy policy once the frontend is redeployed with this change |
 
-### 4d. Assets to prepare (not in this repo)
+### 4d. Assets to prepare
 
-| Asset | Spec |
-|---|---|
-| Hi-res icon | 512×512 PNG, 32-bit with alpha |
-| Feature graphic | 1024×500 PNG/JPG |
-| Phone screenshots | ≥2 (recommend 4–8), 16:9 or 9:16 |
-| Privacy Policy | Hosted URL — mandatory (camera/photo/mic + personal data) |
+| Asset | Spec | Status |
+|---|---|---|
+| Hi-res icon | 512×512 PNG | **Ready** — `docs/mobile/store-assets/icon-512.png` |
+| Feature graphic | 1024×500 PNG/JPG | **Ready** — `docs/mobile/store-assets/feature-graphic-1024x500.png` |
+| Phone screenshots | ≥2 (recommend 4–8), 16:9 or 9:16 | **Pending** — needs a real device/emulator run of the built app |
+| Privacy Policy | Hosted URL — mandatory (camera/photo/mic + personal data) | **Ready** — see §3c (pending frontend redeploy) |
 
 ## 5. Build & submit
 

@@ -40,6 +40,9 @@ export const env = {
   /** Access token proactive refresh skew */
   accessTokenSkewMs: 60_000,
   clientName: 'fos-mobile',
+  /** Public privacy policy page — required for Play/App Store listings. */
+  privacyPolicyUrl:
+    readPublic('EXPO_PUBLIC_PRIVACY_POLICY_URL') ?? 'https://erp.dhurandharcrm.com/privacy-policy.html',
 } as const
 
 export function assertApiConfigured(): void {

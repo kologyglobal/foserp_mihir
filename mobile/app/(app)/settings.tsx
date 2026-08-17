@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native'
+import { Linking, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -75,6 +75,9 @@ export default function SettingsScreen() {
             stored. Session data is cleared on logout. Biometric app unlock is architected for a
             later phase.
           </Text>
+          <Pressable onPress={() => void Linking.openURL(env.privacyPolicyUrl)} style={styles.privacyLink}>
+            <Text style={styles.link}>View Privacy Policy</Text>
+          </Pressable>
         </AppCard>
 
         <SecondaryButton
@@ -109,4 +112,6 @@ const styles = StyleSheet.create({
   hint: { ...typography.caption, marginTop: spacing.sm },
   chips: { flexDirection: 'row', gap: spacing.sm },
   logout: { marginTop: spacing.xl },
+  privacyLink: { marginTop: spacing.sm },
+  link: { ...typography.bodyStrong, color: colors.primary },
 })
