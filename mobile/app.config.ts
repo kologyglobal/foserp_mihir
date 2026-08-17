@@ -75,6 +75,18 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           microphonePermission: 'Allow FOS ERP to record CRM voice notes.',
         },
       ],
+      [
+        'expo-build-properties',
+        {
+          // Play Store requires target API 36 (Android 16) for new submissions from
+          // 31 Aug 2026 — SDK 52 defaults to targetSdkVersion 34, so override explicitly.
+          android: {
+            compileSdkVersion: 36,
+            targetSdkVersion: 36,
+            buildToolsVersion: '36.0.0',
+          },
+        },
+      ],
     ],
     experiments: {
       typedRoutes: true,
