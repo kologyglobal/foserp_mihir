@@ -117,6 +117,7 @@ function missingMandatory(line: PoLinesEditorLine) {
   const missingRate = !(Number(line.rate) > 0)
   const missingHsn =
     freeText && !(line.hsnId || line.hsnCode?.trim() || line.sacCode?.trim())
+  const missingDeliveryDate = !(line.expectedDeliveryDate || line.requiredDate)
   const started = Boolean(
     line.productType ||
       line.itemId ||
@@ -132,7 +133,8 @@ function missingMandatory(line: PoLinesEditorLine) {
     missingQty,
     missingRate,
     missingHsn,
-    any: started && (missingItem || missingQty || missingRate || missingHsn),
+    missingDeliveryDate,
+    any: started && (missingItem || missingQty || missingRate || missingHsn || missingDeliveryDate),
   }
 }
 
@@ -454,7 +456,10 @@ export function PurchaseOrderLinesTable({
                   </>
                 )}
                 <th className="num min-w-[5.75rem]">Line Total</th>
-                <th className="min-w-[9rem]">Expected Delivery Date</th>
+                <th className="min-w-[9rem]">
+                  Expected Delivery Date
+                  <span className="ml-0.5 text-erp-danger-solid">*</span>
+                </th>
                 <th className="min-w-[8rem]">Requisition no.</th>
                 <th className="min-w-[7rem]">GST Group</th>
                 <th className="min-w-[7rem]">HSN Code</th>
@@ -477,7 +482,8 @@ export function PurchaseOrderLinesTable({
                 const qtyErr = showErrors ? lineErrors[`${line.key}:quantity`] : undefined
                 const rateErr = showErrors ? lineErrors[`${line.key}:rate`] : undefined
                 const hsnErr = showErrors ? lineErrors[`${line.key}:hsn`] : undefined
-                const hasSubmitError = Boolean(itemErr || qtyErr || rateErr || hsnErr)
+                const deliveryDateErr = showErrors ? lineErrors[`${line.key}:expectedDeliveryDate`] : undefined
+                const hasSubmitError = Boolean(itemErr || qtyErr || rateErr || hsnErr || deliveryDateErr)
                 const rowCatalog = catalogForLine(line.productType, line.itemId)
                 return (
                   <tr
@@ -752,10 +758,21 @@ export function PurchaseOrderLinesTable({
                       </>
                     )}
                     <td className="num tabular-nums font-medium">{formatCurrency(line.lineTotal)}</td>
-                    <td onKeyDown={onCellKeyDown}>
+                    <td
+                      id={`purchase-line-${line.key}-expectedDeliveryDate`}
+                      className={cn(
+                        deliveryDateErr
+                          ? 'ring-1 ring-inset ring-red-400/80'
+                          : miss.missingDeliveryDate && 'ring-1 ring-inset ring-amber-400/70',
+                      )}
+                      onKeyDown={onCellKeyDown}
+                    >
                       <input
                         type="date"
-                        className="erp-input h-8 min-w-[9rem] text-[11px]"
+                        className={cn(
+                          'erp-input h-8 min-w-[9rem] text-[11px]',
+                          deliveryDateErr && 'border-erp-danger-fg',
+                        )}
                         disabled={!editable}
                         value={line.expectedDeliveryDate || line.requiredDate || ''}
                         onChange={(e) =>
@@ -765,6 +782,9 @@ export function PurchaseOrderLinesTable({
                           })
                         }
                       />
+                      {deliveryDateErr ? (
+                        <p className="mt-0.5 text-[10px] text-erp-danger-fg">{deliveryDateErr}</p>
+                      ) : null}
                     </td>
                     <td onKeyDown={onCellKeyDown}>
                       <input

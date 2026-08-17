@@ -297,6 +297,24 @@ export function StoreMovementRegisterPage({
       accessorFn: (m) => num(m.balanceAfter),
       cell: ({ row }) => <div className="text-right tabular-nums">{fmtQty(row.original.balanceAfter)}</div>,
     },
+    {
+      id: 'balanceAmount',
+      header: () => (
+        <div
+          className="text-right"
+          title="Approximate — Balance After × this row's own rate. Not weighted-average/FIFO cost; see Inventory Valuation report for true costing."
+        >
+          Balance Amount (Approx.)
+        </div>
+      ),
+      meta: { columnLabel: 'Balance Amount (Approx.)' },
+      accessorFn: (m) => num(m.balanceAfter) * num(m.rate),
+      cell: ({ row }) => (
+        <div className="text-right tabular-nums">
+          {fmtQty(num(row.original.balanceAfter) * num(row.original.rate))}
+        </div>
+      ),
+    },
   ], [detailPathBase, referenceHeader, referenceCell, showMovementType, signedQty])
 
   return (

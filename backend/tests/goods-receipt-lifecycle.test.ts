@@ -188,7 +188,18 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
         vendorId,
         orderDate: isoToday(),
         deliveryWarehouseId: warehouseId,
-        lines: [{ itemCode: `ITM-${Date.now()}`, itemName: 'Setup Item', quantity: qty, uomId, rate: 1 }],
+        lines: [
+          {
+            itemCode: `ITM-${Date.now()}`,
+            itemName: 'Setup Item',
+            quantity: qty,
+            uomId,
+            rate: 1,
+            requiredDate: isoToday(),
+            lineType: 'GOODS',
+            hsnCode: '1001',
+          },
+        ],
       })
     expect(createPo.status).toBe(201)
     const id = createPo.body.data.id as string
@@ -306,6 +317,9 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
             quantity: 100,
             uomId,
             rate: 10,
+            requiredDate: isoToday(),
+            lineType: 'GOODS',
+            hsnCode: '1001',
           },
           {
             itemCode: 'ITM-2',
@@ -313,6 +327,9 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
             quantity: 50,
             uomId,
             rate: 2,
+            requiredDate: isoToday(),
+            lineType: 'GOODS',
+            hsnCode: '1001',
           },
         ],
       })
@@ -540,8 +557,26 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
           orderDate: isoToday(),
           deliveryWarehouseId: warehouseId,
           lines: [
-            { itemCode: `ITM-A-${Date.now()}`, itemName: 'Line A', quantity: 100, uomId, rate: 1 },
-            { itemCode: `ITM-B-${Date.now()}`, itemName: 'Line B', quantity: 80, uomId, rate: 1 },
+            {
+              itemCode: `ITM-A-${Date.now()}`,
+              itemName: 'Line A',
+              quantity: 100,
+              uomId,
+              rate: 1,
+              requiredDate: isoToday(),
+              lineType: 'GOODS',
+              hsnCode: '1001',
+            },
+            {
+              itemCode: `ITM-B-${Date.now()}`,
+              itemName: 'Line B',
+              quantity: 80,
+              uomId,
+              rate: 1,
+              requiredDate: isoToday(),
+              lineType: 'GOODS',
+              hsnCode: '1001',
+            },
           ],
         })
       expect(createPo.status).toBe(201)
@@ -618,7 +653,9 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .send({
         vendorId,
         orderDate: isoToday(),
-        lines: [{ itemCode: 'X', itemName: 'X', quantity: 5, uomId, rate: 1 }],
+        lines: [
+          { itemCode: 'X', itemName: 'X', quantity: 5, uomId, rate: 1, lineType: 'GOODS', hsnCode: '1001' },
+        ],
       })
     const cancelId = createPo.body.data.id
     await request(app).post(`${poBase()}/${cancelId}/cancel`).set(auth()).send({})
@@ -692,7 +729,18 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .send({
         vendorId,
         orderDate: isoToday(),
-        lines: [{ itemCode: 'R', itemName: 'Reverse Item', quantity: 20, uomId, rate: 5 }],
+        lines: [
+          {
+            itemCode: 'R',
+            itemName: 'Reverse Item',
+            quantity: 20,
+            uomId,
+            rate: 5,
+            requiredDate: isoToday(),
+            lineType: 'GOODS',
+            hsnCode: '1001',
+          },
+        ],
       })
     const rPoId = createPo.body.data.id
     const rLineId = createPo.body.data.lines[0].id
@@ -733,8 +781,26 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
         vendorId,
         orderDate: isoToday(),
         lines: [
-          { itemCode: 'PR1', itemName: 'Partial Reverse A', quantity: 30, uomId, rate: 2 },
-          { itemCode: 'PR2', itemName: 'Partial Reverse B', quantity: 40, uomId, rate: 3 },
+          {
+            itemCode: 'PR1',
+            itemName: 'Partial Reverse A',
+            quantity: 30,
+            uomId,
+            rate: 2,
+            requiredDate: isoToday(),
+            lineType: 'GOODS',
+            hsnCode: '1001',
+          },
+          {
+            itemCode: 'PR2',
+            itemName: 'Partial Reverse B',
+            quantity: 40,
+            uomId,
+            rate: 3,
+            requiredDate: isoToday(),
+            lineType: 'GOODS',
+            hsnCode: '1001',
+          },
         ],
       })
     expect(createPo.status).toBe(201)
@@ -823,7 +889,18 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .send({
         vendorId,
         orderDate: isoToday(),
-        lines: [{ itemCode: 'E', itemName: 'Edit Block', quantity: 10, uomId, rate: 1 }],
+        lines: [
+          {
+            itemCode: 'E',
+            itemName: 'Edit Block',
+            quantity: 10,
+            uomId,
+            rate: 1,
+            requiredDate: isoToday(),
+            lineType: 'GOODS',
+            hsnCode: '1001',
+          },
+        ],
       })
     const ePoId = createPo.body.data.id
     const eLineId = createPo.body.data.lines[0].id
@@ -873,7 +950,18 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .send({
         vendorId,
         orderDate: isoToday(),
-        lines: [{ itemCode: 'T', itemName: 'Tenant', quantity: 3, uomId, rate: 1 }],
+        lines: [
+          {
+            itemCode: 'T',
+            itemName: 'Tenant',
+            quantity: 3,
+            uomId,
+            rate: 1,
+            requiredDate: isoToday(),
+            lineType: 'GOODS',
+            hsnCode: '1001',
+          },
+        ],
       })
     const tPoId = createPo.body.data.id
     await request(app).post(`${poBase()}/${tPoId}/submit`).set(auth()).send({})
@@ -919,7 +1007,18 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
       .send({
         vendorId,
         orderDate: isoToday(),
-        lines: [{ itemCode: 'P', itemName: 'Persist', quantity: 8, uomId, rate: 1 }],
+        lines: [
+          {
+            itemCode: 'P',
+            itemName: 'Persist',
+            quantity: 8,
+            uomId,
+            rate: 1,
+            requiredDate: isoToday(),
+            lineType: 'GOODS',
+            hsnCode: '1001',
+          },
+        ],
       })
     const pPoId = createPo.body.data.id
     await request(app).post(`${poBase()}/${pPoId}/submit`).set(auth()).send({})

@@ -255,6 +255,7 @@ export function CoreMasterRowActions({
   deleteRecord,
   activateRecord,
   deactivateRecord,
+  extraActions,
 }: {
   viewTo: string
   editTo?: string
@@ -264,6 +265,8 @@ export function CoreMasterRowActions({
   deleteRecord: (id: string) => MaybePromise<void>
   activateRecord: (id: string) => MaybePromise<void>
   deactivateRecord: (id: string) => MaybePromise<void>
+  /** Extra row actions inserted after Edit and before Activate/Deactivate/Delete (e.g. Clone). */
+  extraActions?: RowActionItem[]
 }) {
   const lifecycle = useMasterLifecycle({
     delete: deleteRecord,
@@ -276,6 +279,9 @@ export function CoreMasterRowActions({
   ]
   if (editTo) {
     actions.push({ id: 'edit', label: 'Edit', icon: Pencil, to: editTo })
+  }
+  if (extraActions?.length) {
+    actions.push(...extraActions)
   }
   if (isActive) {
     actions.push({

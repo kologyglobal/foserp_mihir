@@ -110,8 +110,19 @@ export interface ItemDto {
   productionBomId?: string | null
   routingNo?: string | null
   drawingNo?: string | null
+  drawingRevision?: string | null
+  partCodeNo?: string | null
+  itemMake?: string | null
+  minStockLevel?: number | string
+  maxStockLevel?: number | string
+  leadTimeDays?: number | string
+  shelfLifeDays?: number | string
+  warrantyPeriodMonths?: number | string
   subAssemblyRule?: string | null
   imageUrl?: string | null
+  defaultLocationId?: string | null
+  defaultLocationCode?: string | null
+  defaultLocationName?: string | null
   defaultBinId?: string | null
   defaultBinCode?: string | null
   defaultBinName?: string | null
@@ -349,8 +360,18 @@ export function mapItemDto(row: ItemDto): Item {
     productionBomId: row.productionBomId ?? null,
     routingNo: row.routingNo ?? null,
     drawingNo: row.drawingNo ?? null,
+    drawingRevision: row.drawingRevision ?? null,
+    partCodeNo: row.partCodeNo ?? null,
+    itemMake: row.itemMake ?? null,
+    minStockLevel: num(row.minStockLevel ?? 0),
+    maxStockLevel: num(row.maxStockLevel ?? 0),
+    leadTimeDays: num(row.leadTimeDays ?? 0),
+    shelfLifeDays: num(row.shelfLifeDays ?? 0),
+    warrantyPeriodMonths: num(row.warrantyPeriodMonths ?? 0),
     subAssemblyRule: (row.subAssemblyRule ?? null) as Item['subAssemblyRule'],
     imageUrl: row.imageUrl ?? null,
+    defaultLocationId: row.defaultLocationId ?? null,
+    defaultLocationCode: row.defaultLocationCode ?? null,
     defaultBinId: row.defaultBinId ?? null,
     defaultBinCode: row.defaultBinCode ?? null,
     createdAt: row.createdAt,
@@ -520,7 +541,16 @@ export function itemToApiPayload(data: Item): Record<string, unknown> {
     productionBomId: data.productionBomId || null,
     routingNo: data.routingNo || null,
     drawingNo: data.drawingNo || null,
+    drawingRevision: data.drawingRevision?.trim() || null,
+    partCodeNo: data.partCodeNo?.trim() || null,
+    itemMake: data.itemMake?.trim() || null,
+    minStockLevel: data.minStockLevel ?? 0,
+    maxStockLevel: data.maxStockLevel ?? 0,
+    leadTimeDays: data.leadTimeDays ?? 0,
+    shelfLifeDays: data.shelfLifeDays ?? 0,
+    warrantyPeriodMonths: data.warrantyPeriodMonths ?? 0,
     subAssemblyRule: data.subAssemblyRule,
+    defaultLocationId: data.defaultLocationId || null,
     defaultBinId: data.defaultBinId || null,
     status: toStatus(data.isActive),
     uomConversions: (data.uomConversions ?? [])

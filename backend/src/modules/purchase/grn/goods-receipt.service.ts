@@ -61,6 +61,7 @@ import {
   isGrnLineFullyReversed,
   isGrnLineReversible,
   money,
+  netLineForReverse,
   parseDateInput,
   qty,
   remainingReversibleAccepted,
@@ -1809,6 +1810,22 @@ export async function reverseGoodsReceipt(
   assertReversible(existing)
   await assertReverseNotBlocked(tenantId, id)
 
+  // Qty already shipped back to the vendor via a completed Material Return has already
+  // had its own stock-out movement posted — net it into "already reversed" so we never
+  // offer/allow reversing units that are no longer on hand from this GRN (see
+  // netLineForReverse for the full rationale).
+  const { summarizeMaterialReturnsForGrn } = await import(
+    '../returns/returnable-quantity.service.js'
+  )
+  const returnStats = await summarizeMaterialReturnsForGrn(tenantId, id)
+  const netById = new Map(
+    existing.lines.map((line) => [
+      line.id,
+      netLineForReverse(line, returnStats.byGrnLineId.get(line.id)?.returnedQuantity ?? 0),
+    ]),
+  )
+  const netOf = (line: (typeof existing.lines)[number]) => netById.get(line.id) ?? line
+
   const qtyByLineId = new Map(
     (body.lineQuantities ?? []).map((row) => [row.lineId, qty(row.quantity)]),
   )
@@ -1818,7 +1835,7 @@ export async function reverseGoodsReceipt(
       ? [...qtyByLineId.keys()]
       : null
 
-  let targetLines = existing.lines.filter((l) => isGrnLineReversible(l))
+  let targetLines = existing.lines.filter((l) => isGrnLineReversible(netOf(l)))
 
   if (selectedIds) {
     const byId = new Map(existing.lines.map((l) => [l.id, l]))
@@ -1833,7 +1850,7 @@ export async function reverseGoodsReceipt(
         })),
       )
     }
-    targetLines = selectedIds.map((lid) => byId.get(lid)!).filter((l) => isGrnLineReversible(l))
+    targetLines = selectedIds.map((lid) => byId.get(lid)!).filter((l) => isGrnLineReversible(netOf(l)))
     if (targetLines.length === 0) {
       throw new GoodsReceiptValidationError(
         purchaseMessage(PURCHASE_ERROR_CODE.GRN_REVERSE_LINE_EMPTY),
@@ -1857,7 +1874,8 @@ export async function reverseGoodsReceipt(
 
   const plans: ReversePlan[] = []
   for (const line of targetLines) {
-    const remaining = remainingReversibleReceived(line)
+    const netLine = netOf(line)
+    const remaining = remainingReversibleReceived(netLine)
     const requested = qtyByLineId.has(line.id) ? qtyByLineId.get(line.id)! : remaining
     if (requested > remaining + 1e-9) {
       throw new GoodsReceiptValidationError(
@@ -1871,7 +1889,7 @@ export async function reverseGoodsReceipt(
         ],
       )
     }
-    const split = allocatePartialReverseQuantities(line, requested)
+    const split = allocatePartialReverseQuantities(netLine, requested)
     if (split.received <= 0) continue
     plans.push({
       line,
@@ -1896,7 +1914,7 @@ export async function reverseGoodsReceipt(
     }
     const plan = planByLineId.get(l.id)
     const nextReversed = qty(l.reversedQuantity) + (plan?.reverseReceived ?? 0)
-    return nextReversed >= qty(l.receivedQuantity) - 1e-6 || isGrnLineFullyReversed(l)
+    return nextReversed >= qty(l.receivedQuantity) - 1e-6 || isGrnLineFullyReversed(netOf(l))
   })
 
   const deltas = plans.map((p) => ({
@@ -1908,7 +1926,7 @@ export async function reverseGoodsReceipt(
 
   const stockLines = plans.map((p) => {
     const { line, reverseReceived, reverseAccepted, reverseRejected } = p
-    const remReceived = remainingReversibleReceived(line)
+    const remReceived = remainingReversibleReceived(netOf(line))
     const ratio = remReceived > 0 ? reverseReceived / remReceived : 0
     const remQc = Math.max(
       0,

@@ -377,6 +377,19 @@ export function PurchaseReturnEditorPage() {
       setPurchaseOrderId(prefill.purchaseOrderId ?? '')
       setGoodsReceiptId(prefill.goodsReceiptId ?? '')
       setQualityInspectionId(prefill.qualityInspectionId ?? '')
+      // Auto-match the linked Purchase Invoice from the same GRN/PO so the user
+      // doesn't have to hunt it down manually — only fills when still empty.
+      setPurchaseInvoiceId((prev) => {
+        if (prev) return prev
+        const matched =
+          invoices.find(
+            (inv) => prefill.goodsReceiptId && inv.goodsReceiptId === prefill.goodsReceiptId,
+          ) ??
+          invoices.find(
+            (inv) => prefill.purchaseOrderId && inv.purchaseOrderId === prefill.purchaseOrderId,
+          )
+        return matched?.id ?? prev
+      })
       if (prefill.warehouseId) setWarehouseId(prefill.warehouseId)
       setReturnType(prefill.suggestedReturnType || 'CREDIT')
       setReplacementRequired(prefill.replacementRequired)
@@ -425,7 +438,7 @@ export function PurchaseReturnEditorPage() {
       )
       markDirty()
     },
-    [markDirty],
+    [markDirty, invoices],
   )
 
   const hydrate = useCallback(
@@ -943,8 +956,12 @@ export function PurchaseReturnEditorPage() {
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Linked documents</p>
         </ErpFormSpan>
-        <ErpFieldRow label="PO Number">
+        <ErpFieldRow
+          label="PO Number"
+          hint={showOriginPicker ? 'Auto-fills from the GRN/QI picked above' : undefined}
+        >
           <Select
+            className="max-w-md"
             value={purchaseOrderId}
             onChange={(e) => {
               const next = e.target.value
@@ -960,6 +977,16 @@ export function PurchaseReturnEditorPage() {
                   setLines([])
                   setPrefillBanner(null)
                 }
+              } else if (next) {
+                // Auto-match: a PO with exactly one eligible GRN can load its lines directly.
+                const eligible = filterGrnsForPurchaseReturn(grns, {
+                  vendorId: vendorId || undefined,
+                  purchaseOrderId: next,
+                })
+                if (eligible.length === 1) {
+                  setGoodsReceiptId(eligible[0].id)
+                  loadPrefillFromGrn(eligible[0].id)
+                }
               }
               markDirty()
             }}
@@ -973,30 +1000,48 @@ export function PurchaseReturnEditorPage() {
             ))}
           </Select>
         </ErpFieldRow>
-        <ErpFieldRow label="GRN Number">
+        {!showOriginPicker ? (
+          <ErpFieldRow label="GRN Number">
+            <Select
+              className="max-w-md"
+              value={goodsReceiptId}
+              onChange={(e) => {
+                const next = e.target.value
+                setGoodsReceiptId(next)
+                markDirty()
+                loadPrefillFromGrn(next)
+              }}
+              disabled={!editable}
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {vendorGrns.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.documentNumber}
+                </option>
+              ))}
+            </Select>
+          </ErpFieldRow>
+        ) : null}
+        <ErpFieldRow
+          label="Purchase Invoice"
+          hint={showOriginPicker ? 'Auto-matches the invoice linked to the same GRN/PO' : undefined}
+        >
           <Select
-            value={goodsReceiptId}
-            onChange={(e) => {
-              const next = e.target.value
-              setGoodsReceiptId(next)
-              markDirty()
-              loadPrefillFromGrn(next)
-            }}
-            disabled={!editable}
-          >
-            <option value="">{SELECT_PLACEHOLDER}</option>
-            {vendorGrns.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.documentNumber}
-              </option>
-            ))}
-          </Select>
-        </ErpFieldRow>
-        <ErpFieldRow label="Purchase Invoice">
-          <Select
+            className="max-w-md"
             value={purchaseInvoiceId}
             onChange={(e) => {
-              setPurchaseInvoiceId(e.target.value)
+              const next = e.target.value
+              setPurchaseInvoiceId(next)
+              if (!goodsReceiptId && next) {
+                const inv = invoices.find((i) => i.id === next)
+                if (inv?.goodsReceiptId) {
+                  setGoodsReceiptId(inv.goodsReceiptId)
+                  if (inv.purchaseOrderId) setPurchaseOrderId(inv.purchaseOrderId)
+                  loadPrefillFromGrn(inv.goodsReceiptId)
+                } else if (inv?.purchaseOrderId && !purchaseOrderId) {
+                  setPurchaseOrderId(inv.purchaseOrderId)
+                }
+              }
               markDirty()
             }}
             disabled={!editable}
@@ -1009,23 +1054,26 @@ export function PurchaseReturnEditorPage() {
             ))}
           </Select>
         </ErpFieldRow>
-        <ErpFieldRow label="Quality Inspection" readOnly={!editable}>
-          <Select
-            value={qualityInspectionId}
-            onChange={(e) => {
-              setQualityInspectionId(e.target.value)
-              markDirty()
-            }}
-            disabled={!editable}
-          >
-            <option value="">{SELECT_PLACEHOLDER}</option>
-            {inspections.map((q) => (
-              <option key={q.id} value={q.id}>
-                {q.documentNumber}
-              </option>
-            ))}
-          </Select>
-        </ErpFieldRow>
+        {!showOriginPicker ? (
+          <ErpFieldRow label="Quality Inspection" readOnly={!editable}>
+            <Select
+              className="max-w-md"
+              value={qualityInspectionId}
+              onChange={(e) => {
+                setQualityInspectionId(e.target.value)
+                markDirty()
+              }}
+              disabled={!editable}
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {inspections.map((q) => (
+                <option key={q.id} value={q.id}>
+                  {q.documentNumber}
+                </option>
+              ))}
+            </Select>
+          </ErpFieldRow>
+        ) : null}
 
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Logistics &amp; flags</p>

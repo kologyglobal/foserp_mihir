@@ -12,6 +12,13 @@ import { PERMISSIONS, type PermissionName } from '../src/constants/permissions.j
  */
 const app = createApp()
 
+/** N days from today, as YYYY-MM-DD — avoids backdated-PO rejection as calendar time passes. */
+function isoDaysFromToday(days: number): string {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 const dbAvailable = await prisma
   .$queryRaw`SELECT 1`
   .then(() => true)
@@ -155,8 +162,8 @@ describe.skipIf(!dbAvailable)('Purchase approvals queue', () => {
   function poBody(overrides: Record<string, unknown> = {}) {
     return {
       vendorId,
-      orderDate: '2026-07-21',
-      expectedDeliveryDate: '2026-07-30',
+      orderDate: isoDaysFromToday(0),
+      expectedDeliveryDate: isoDaysFromToday(9),
       paymentTerms: 'Net 30',
       remarks: 'Approvals queue PO',
       lines: [
@@ -166,6 +173,9 @@ describe.skipIf(!dbAvailable)('Purchase approvals queue', () => {
           quantity: 10,
           uomId,
           rate: 25,
+          requiredDate: isoDaysFromToday(9),
+          lineType: 'GOODS',
+          hsnCode: '1001',
         },
       ],
       ...overrides,

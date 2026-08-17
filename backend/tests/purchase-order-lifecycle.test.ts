@@ -3,6 +3,7 @@ import request from 'supertest'
 import { createApp } from '../src/app.js'
 import { prisma } from '../src/config/prisma.js'
 import { PERMISSIONS, type PermissionName } from '../src/constants/permissions.js'
+import { isoToday } from './helpers/purchase-live-fixture.js'
 
 /**
  * Phase 1 — Purchase Order lifecycle (live DB integration).
@@ -10,6 +11,13 @@ import { PERMISSIONS, type PermissionName } from '../src/constants/permissions.j
  * cancel / close / reopen + tenant isolation + RBAC + audit logs.
  */
 const app = createApp()
+
+/** N days from today, as YYYY-MM-DD — avoids backdated-PO rejection as calendar time passes. */
+function isoDaysFromToday(days: number): string {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
 
 const dbAvailable = await prisma
   .$queryRaw`SELECT 1`
@@ -128,8 +136,8 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
   function draftPayload(overrides: Record<string, unknown> = {}) {
     return {
       vendorId,
-      orderDate: '2026-07-21',
-      expectedDeliveryDate: '2026-07-30',
+      orderDate: isoToday(),
+      expectedDeliveryDate: isoDaysFromToday(9),
       paymentTerms: 'Net 30',
       remarks: 'Lifecycle test PO',
       lines: [
@@ -139,7 +147,9 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
           quantity: 10,
           uomId,
           rate: 25.5,
-          requiredDate: '2026-07-30',
+          requiredDate: isoDaysFromToday(9),
+          lineType: 'GOODS',
+          hsnCode: '1001',
         },
         {
           itemCode: 'ITM-PO-2',
@@ -147,6 +157,9 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
           quantity: 4,
           uomId,
           rate: 100,
+          requiredDate: isoDaysFromToday(15),
+          lineType: 'GOODS',
+          hsnCode: '1001',
         },
       ],
       ...overrides,
@@ -270,7 +283,15 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
       .send({
         remarks: 'Updated remarks',
         lines: [
-          { itemCode: 'ITM-PO-1', itemName: 'Lifecycle Item 1', quantity: 2, uomId, rate: 50 },
+          {
+            itemCode: 'ITM-PO-1',
+            itemName: 'Lifecycle Item 1',
+            quantity: 2,
+            uomId,
+            rate: 50,
+            lineType: 'GOODS',
+            hsnCode: '1001',
+          },
         ],
       })
     expect(res.status).toBe(200)
@@ -285,6 +306,33 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
       where: { tenantId, purchaseOrderId: id, status: 'PENDING' },
     })
     expect(approval).not.toBeNull()
+  })
+
+  it('blocks submit when a line has no required/expected delivery date', async () => {
+    const res = await request(app)
+      .post(poBase())
+      .set(auth())
+      .send(
+        draftPayload({
+          lines: [
+            {
+              itemCode: 'ITM-PO-NODATE',
+              itemName: 'No Date Item',
+              quantity: 5,
+              uomId,
+              rate: 20,
+              lineType: 'GOODS',
+              hsnCode: '1001',
+            },
+          ],
+        }),
+      )
+    expect(res.status).toBe(201)
+    const id = res.body.data.id as string
+
+    const submit = await request(app).post(`${poBase()}/${id}/submit`).set(auth()).send({})
+    expect(submit.status).toBe(400)
+    expect(submit.body.code ?? submit.body.error?.code).toBe('PO_REQUIRED_DATE_REQUIRED')
   })
 
   it('blocks editing a submitted PO', async () => {
@@ -349,7 +397,7 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
     const edit = await request(app)
       .patch(`${poBase()}/${id}`)
       .set(auth())
-      .send({ expectedDeliveryDate: '2026-08-05' })
+      .send({ expectedDeliveryDate: isoDaysFromToday(15) })
     expect(edit.status).toBe(200)
 
     const resubmit = await request(app).post(`${poBase()}/${id}/submit`).set(auth()).send({})

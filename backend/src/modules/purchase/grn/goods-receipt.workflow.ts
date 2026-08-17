@@ -196,6 +196,37 @@ export function isGrnLineFullyReversed(
   return received > 0 && remainingReversibleReceived(line) <= 0
 }
 
+/**
+ * Quantity already sent back to the vendor via a completed Material Return has, from a
+ * stock-on-hand perspective, already had its own stock-out movement posted — reversing
+ * the GRN on top of it would remove the same units a second time (e.g. 50 received, 15
+ * already returned, would otherwise still offer "50 reversible" instead of the 35 that
+ * are actually still on hand from this GRN). Netting the returned qty into the
+ * "already reversed" buckets keeps every reverse calculation (remaining qty, full-reversal
+ * check, accepted/rejected split) consistent without duplicating this logic per call site.
+ * Returns are assumed to come out of the rejected bucket first (the common QC-reject
+ * return case), spilling into accepted only once rejected is exhausted.
+ */
+export function netLineForReverse<
+  T extends Pick<GoodsReceiptLine, 'receivedQuantity' | 'acceptedQuantity' | 'rejectedQuantity'> & {
+    reversedQuantity?: unknown
+    reversedAcceptedQuantity?: unknown
+    reversedRejectedQuantity?: unknown
+  },
+>(line: T, returnedQuantity: number): T {
+  const returned = qty(returnedQuantity)
+  if (returned <= 0) return line
+  const remRejected = remainingReversibleRejected(line)
+  const returnedFromRejected = Math.min(remRejected, returned)
+  const returnedFromAccepted = Math.max(0, returned - returnedFromRejected)
+  return {
+    ...line,
+    reversedQuantity: qty(line.reversedQuantity) + returned,
+    reversedAcceptedQuantity: qty(line.reversedAcceptedQuantity) + returnedFromAccepted,
+    reversedRejectedQuantity: qty(line.reversedRejectedQuantity) + returnedFromRejected,
+  }
+}
+
 /** Split a partial reverse qty across remaining accepted/rejected on the line. */
 export function allocatePartialReverseQuantities(
   line: Pick<GoodsReceiptLine, 'receivedQuantity' | 'acceptedQuantity' | 'rejectedQuantity'> & {

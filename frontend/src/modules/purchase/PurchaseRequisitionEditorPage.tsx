@@ -23,12 +23,6 @@ import {
   PurchaseAuditTimeline,
   buildDemoPurchaseTimeline,
 } from '@/components/purchase/PurchaseAuditTimeline'
-import {
-  emptyPurchaseOrderAdjustments,
-  computePrOrderDocumentTotals,
-  PurchaseOrderAdjustmentsBlock,
-  type PurchaseOrderAdjustmentsState,
-} from '@/components/purchase/PurchaseOrderAdjustmentsBlock'
 import { PurchaseRequisitionPathBanner } from '@/components/purchase/PurchaseRequisitionPathBanner'
 import {
   PurchaseDocumentAttachments,
@@ -44,9 +38,7 @@ import {
   approvalActivitySummary,
   attachmentsSummary,
   formatFastTabDate,
-  hasMeaningfulTaxTotals,
   joinFastTabSummary,
-  taxTotalsSummary,
 } from '@/modules/purchase/purchaseFastTabSummaries'
 import { Badge } from '@/components/ui/Badge'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -328,10 +320,6 @@ export function PurchaseRequisitionEditorPage() {
   const [status, setStatus] = useState<PurchaseRequisition['status']>('draft')
   const [header, setHeader] = useState<PrEditorHeader>(defaultHeader)
   const [lines, setLines] = useState<PrEditorLine[]>([])
-  /** Client-side estimate only — not persisted on PR save/API yet. */
-  const [orderAdjustments, setOrderAdjustments] = useState<PurchaseOrderAdjustmentsState>(
-    emptyPurchaseOrderAdjustments,
-  )
   const [attachments, setAttachments] = useState<PurchaseRequisitionAttachmentPlaceholder[]>([])
   const [createdMeta, setCreatedMeta] = useState({ by: ACTOR.name, at: '' })
   const [updatedMeta, setUpdatedMeta] = useState({ by: '', at: '' })
@@ -390,25 +378,15 @@ export function PurchaseRequisitionEditorPage() {
   )
   const showErrors = attemptedSubmit
   const summary = useMemo(() => summarizePrLines(lines), [lines])
-  const orderTotals = useMemo(
-    // PR is demand capture — no commercial GST until RFQ/PO/invoice.
-    () => computePrOrderDocumentTotals(lines, orderAdjustments, 0),
-    [lines, orderAdjustments],
-  )
-  const financeDefaultOpen = hasMeaningfulTaxTotals(
-    orderTotals.basicAmount,
-    orderTotals.gstAmount,
-    orderTotals.grandTotal,
-  )
-  const financeSummaryText = useMemo(
-    () =>
-      taxTotalsSummary({
-        subtotal: orderTotals.basicAmount,
-        tax: orderTotals.gstAmount,
-        total: orderTotals.grandTotal,
-      }),
-    [orderTotals.basicAmount, orderTotals.gstAmount, orderTotals.grandTotal],
-  )
+  // PR is demand capture, not a commercial document — no tax/adjustments here.
+  // Just plain qty/amount rollups so the indent can be entered fast.
+  const lineTotals = useMemo(() => {
+    const usable = lines.filter((l) => l.itemName.trim() || l.itemCode.trim() || l.itemId)
+    return {
+      totalQty: usable.reduce((s, l) => s + (Number(l.quantity) || 0), 0),
+      totalAmount: usable.reduce((s, l) => s + (Number(l.amount) || 0), 0),
+    }
+  }, [lines])
   const attachmentsSummaryText = useMemo(
     () => attachmentsSummary(attachments.length),
     [attachments.length],
@@ -459,22 +437,11 @@ export function PurchaseRequisitionEditorPage() {
       },
       {
         label: 'Total Qty',
-        value: String(orderTotals.totalQty),
+        value: String(lineTotals.totalQty),
         accent: 'slate' as const,
       },
-      {
-        label: 'Est. Subtotal',
-        value: formatCurrency(orderTotals.basicAmount),
-        accent: 'blue' as const,
-      },
-      {
-        label: 'Est. Total',
-        value: formatCurrency(orderTotals.grandTotal),
-        accent: 'amber' as const,
-        highlight: orderTotals.grandTotal > 0,
-      },
     ],
-    [summary.totalLines, orderTotals],
+    [summary.totalLines, lineTotals.totalQty],
   )
 
   const deliveryRisk = useMemo(() => {
@@ -1026,6 +993,8 @@ export function PurchaseRequisitionEditorPage() {
       ]}
       commandBar={null}
       className="crm-lead-form-page purchase-pr-form-page enterprise-workspace--dynamics-form"
+      suppressFactBoxRecord
+      hideRecordBar
       factBoxLabel="Smart Context"
       factBoxSubtitle="Path, approval, and delivery summary for this requisition."
       factBox={
@@ -1060,11 +1029,6 @@ export function PurchaseRequisitionEditorPage() {
             {
               label: 'Line Count',
               value: String(summary.totalLines),
-            },
-            {
-              label: 'Estimated Total',
-              value: formatCurrency(orderTotals.grandTotal),
-              highlight: true,
             },
             {
               label: 'Delivery Risk',
@@ -1301,21 +1265,6 @@ export function PurchaseRequisitionEditorPage() {
               ))}
             </Select>
           </ErpFieldRow>
-          <ErpFieldRow
-            label="Required By"
-            horizontal={false}
-            fieldError={showErrors ? validation.fieldErrors.expectedDeliveryDate : undefined}
-            fieldState={
-              showErrors && validation.fieldErrors.expectedDeliveryDate ? 'error' : 'idle'
-            }
-          >
-            <Input
-              type="date"
-              value={header.expectedDeliveryDate}
-              disabled={!editable}
-              onChange={(e) => patchHeader({ expectedDeliveryDate: e.target.value })}
-            />
-          </ErpFieldRow>
           <ErpFieldRow label="Reference" horizontal={false}>
             <Input
               value={header.referenceNumber}
@@ -1444,7 +1393,7 @@ export function PurchaseRequisitionEditorPage() {
               showErrors={showErrors}
               lineErrors={validation.lineErrors}
               formatCurrency={formatCurrency}
-              estimatedTotal={orderTotals.grandTotal}
+              estimatedTotal={lineTotals.totalAmount}
               onAddLine={() =>
                 setLinesDirty([
                   ...lines,
@@ -1516,18 +1465,6 @@ export function PurchaseRequisitionEditorPage() {
               }}
               onSelectCatalogItem={applyItemCatalog}
             />
-            <PurchaseOrderAdjustmentsBlock
-              className="mt-4"
-              lines={lines}
-              value={orderAdjustments}
-              readOnly={!editable}
-              taxPct={0}
-              showGstSummary={false}
-              onChange={(next) => {
-                setOrderAdjustments(next)
-                markDirty()
-              }}
-            />
             {showErrors &&
             validation.errors.some(
               (e) =>
@@ -1545,14 +1482,12 @@ export function PurchaseRequisitionEditorPage() {
         <ErpCardSection
           id={purchaseSectionId('notes')}
           title="Notes"
-          subtitle="Internal remarks and estimated line totals"
-          collapsedSummary={
-            financeSummaryText || (header.remarks.trim() ? 'Remarks set' : undefined)
-          }
+          subtitle="Internal remarks for this requisition"
+          collapsedSummary={header.remarks.trim() ? 'Remarks set' : undefined}
           icon={Banknote}
           accent="blue"
           collapsible
-          defaultOpen={financeDefaultOpen || Boolean(header.remarks.trim())}
+          defaultOpen={Boolean(header.remarks.trim())}
           columns={3}
           className="crm-lead-zoho-section"
         >
@@ -1569,21 +1504,7 @@ export function PurchaseRequisitionEditorPage() {
             <Input value={String(summary.totalLines)} readOnly className="bg-erp-surface-alt" />
           </ErpFieldRow>
           <ErpFieldRow label="Total Qty" readOnly horizontal={false}>
-            <Input value={String(orderTotals.totalQty)} readOnly className="bg-erp-surface-alt" />
-          </ErpFieldRow>
-          <ErpFieldRow label="Est. Subtotal" readOnly horizontal={false}>
-            <Input
-              value={formatCurrency(orderTotals.basicAmount)}
-              readOnly
-              className="bg-erp-surface-alt"
-            />
-          </ErpFieldRow>
-          <ErpFieldRow label="Est. Total" readOnly horizontal={false}>
-            <Input
-              value={formatCurrency(orderTotals.grandTotal)}
-              readOnly
-              className="bg-erp-primary-soft font-semibold text-erp-primary"
-            />
+            <Input value={String(lineTotals.totalQty)} readOnly className="bg-erp-surface-alt" />
           </ErpFieldRow>
         </ErpCardSection>
 

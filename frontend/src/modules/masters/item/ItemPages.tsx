@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Box,
   CircleDollarSign,
+  Copy,
   Factory,
   Package,
   Percent,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react'
 import { MasterRegisterTable } from '../../../components/masters/MasterRegisterTable'
 import { MasterListShell, CoreMasterRowActions, STATUS_FILTER_OPTIONS, matchesStatusFilter } from '../../../components/masters/MasterListShell'
+import type { RowActionItem } from '../../../design-system/enterprise/EnterpriseTablePrimitives'
 import { MasterBatchImportDialog } from '../../../components/masters/MasterBatchImportDialog'
 import { isApiMode } from '../../../config/apiConfig'
 import { downloadMasterExport } from '../../../services/api/masterBatchApi'
@@ -33,7 +35,7 @@ import { formatApiError } from '../../../services/api/apiErrors'
 import { notify, notifyMasterSaved } from '../../../store/toastStore'
 import { useBomStore } from '../../../store/bomStore'
 import { useRoutingStore } from '../../../store/routingStore'
-import { useLeafCategories, useActiveUoms, useEnrichedItems } from '../../../hooks/useMasterLists'
+import { useLeafCategories, useActiveUoms, useEnrichedItems, useActiveLocations } from '../../../hooks/useMasterLists'
 import { useBinOptions } from '../../../hooks/useBinOptions'
 import { enrichItemWithDefaults } from '../../../utils/itemMasterDefaults'
 import { buildMasterBreadcrumbs } from '../../../utils/masterNavigation'
@@ -196,9 +198,22 @@ const schema = z.object({
   productionBomId: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
   routingNo: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
   drawingNo: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
+  drawingRevision: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
+  partCodeNo: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
+  itemMake: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
+  minStockLevel: z.coerce.number().min(0),
+  maxStockLevel: z.coerce.number().min(0),
+  leadTimeDays: z.coerce.number().int().min(0),
+  shelfLifeDays: z.coerce.number().int().min(0),
+  warrantyPeriodMonths: z.coerce.number().int().min(0),
   subAssemblyRule: z.preprocess(
     emptyStringToNull,
     z.enum(['phantom', 'manufactured', 'purchased', 'subcontracted']).nullable().optional(),
+  ),
+  /** Demo Location ids are not always UUID; API mode uses UUID Location Master ids. */
+  defaultLocationId: z.preprocess(
+    (value) => (value === '' || value == null ? null : String(value)),
+    z.string().nullable().optional(),
   ),
   /** Demo BIN ids are not always UUID; API mode uses UUID Bin Master ids. */
   defaultBinId: z.preprocess(
@@ -215,6 +230,9 @@ const schema = z.object({
   }
   if (!data.hsnId) {
     ctx.addIssue({ code: 'custom', message: 'HSN code is required', path: ['hsnId'] })
+  }
+  if (data.maxStockLevel > 0 && data.minStockLevel > data.maxStockLevel) {
+    ctx.addIssue({ code: 'custom', message: 'Min Stock cannot exceed Max Stock', path: ['minStockLevel'] })
   }
   // HELD (2026-08-04): MS_GRADE_SECTION item name check paused until master data is normalized.
   // if (isRawMaterialProductType(data.productType) && !isValidRawMaterialItemName(data.itemName)) {
@@ -281,6 +299,14 @@ function buildItemFormDefaults(
       productionBomId: existing.productionBomId ?? '',
       routingNo: existing.routingNo ?? '',
       drawingNo: existing.drawingNo ?? '',
+      drawingRevision: existing.drawingRevision ?? '',
+      partCodeNo: existing.partCodeNo ?? '',
+      itemMake: existing.itemMake ?? '',
+      minStockLevel: existing.minStockLevel ?? 0,
+      maxStockLevel: existing.maxStockLevel ?? 0,
+      leadTimeDays: existing.leadTimeDays ?? 0,
+      shelfLifeDays: existing.shelfLifeDays ?? 0,
+      warrantyPeriodMonths: existing.warrantyPeriodMonths ?? 0,
       subAssemblyRule: existing.subAssemblyRule ?? null,
       isBlocked: existing.isBlocked ?? false,
       qcRequired: existing.qcRequired ?? false,
@@ -305,6 +331,7 @@ function buildItemFormDefaults(
         existing.defaultFulfilmentMethod ?? defaultFulfilmentForProductType(productType),
       productionAllowed:
         existing.productionAllowed ?? defaultProductionAllowedForProductType(productType),
+      defaultLocationId: existing.defaultLocationId ?? '',
       defaultBinId: existing.defaultBinId ?? '',
     }
   }
@@ -353,11 +380,21 @@ function buildItemFormDefaults(
     productionBomId: '',
     routingNo: '',
     drawingNo: '',
+    drawingRevision: '',
+    partCodeNo: '',
+    itemMake: '',
+    minStockLevel: 0,
+    maxStockLevel: 0,
+    leadTimeDays: 0,
+    shelfLifeDays: 0,
+    warrantyPeriodMonths: 0,
+    defaultLocationId: '',
     defaultBinId: '',
   }
 }
 
 export function ItemListPage() {
+  const navigate = useNavigate()
   const items = useEnrichedItems()
   const deleteItem = useMasterStore((s) => s.deleteItem)
   const activateItem = useMasterStore((s) => s.activateItem)
@@ -385,23 +422,32 @@ export function ItemListPage() {
     { accessorKey: 'itemCode', header: 'Item Code', cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.itemCode}</span> },
     { accessorKey: 'itemName', header: 'Name' },
     { id: 'productType', header: 'Product Type', cell: ({ row }) => row.original.productType ? ENGINEERING_PRODUCT_TYPE_LABELS[row.original.productType] : '-' },
-    { id: 'category', header: 'Category', cell: ({ row }) => getCategoryName(row.original.categoryId) },
+    { id: 'category', header: 'Item Category', cell: ({ row }) => getCategoryName(row.original.categoryId) },
     { id: 'hsn', header: 'HSN', cell: ({ row }) => (row.original.hsnId ? getHsn(row.original.hsnId)?.code : row.original.hsnCode) ?? '-' },
     { id: 'uom', header: 'UOM', cell: ({ row }) => getUomName(row.original.baseUomId).split(' ')[0] },
     { accessorKey: 'standardRate', header: 'Std Rate', cell: ({ row }) => formatCurrency(row.original.standardRate) },
     { accessorKey: 'isActive', header: 'Status', cell: ({ row }) => <ActiveBadge isActive={row.original.isActive} /> },
-    { id: 'actions', header: 'Actions', enableSorting: false, cell: ({ row }) => (
-      <CoreMasterRowActions
-        viewTo={`/masters/items/${row.original.id}`}
-        editTo={`/masters/items/${row.original.id}/edit`}
-        recordId={row.original.id}
-        recordLabel={`${row.original.itemCode} — ${row.original.itemName}`}
-        isActive={row.original.isActive}
-        deleteRecord={deleteItem}
-        activateRecord={activateItem}
-        deactivateRecord={deactivateItem}
-      />
-    ) },
+    { id: 'actions', header: 'Actions', enableSorting: false, cell: ({ row }) => {
+      const cloneAction: RowActionItem = {
+        id: 'clone',
+        label: 'Repeat Item (Clone)',
+        icon: Copy,
+        onClick: () => navigate('/masters/items/new', { state: { cloneFrom: row.original } }),
+      }
+      return (
+        <CoreMasterRowActions
+          viewTo={`/masters/items/${row.original.id}`}
+          editTo={`/masters/items/${row.original.id}/edit`}
+          recordId={row.original.id}
+          recordLabel={`${row.original.itemCode} — ${row.original.itemName}`}
+          isActive={row.original.isActive}
+          deleteRecord={deleteItem}
+          activateRecord={activateItem}
+          deactivateRecord={deactivateItem}
+          extraActions={[cloneAction]}
+        />
+      )
+    } },
   ]
 
   async function handleExport() {
@@ -458,13 +504,19 @@ export function ItemListPage() {
 export function ItemFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { hash } = useLocation()
+  const { hash, state: locationState } = useLocation()
   const rawExisting = useMasterStore((s) => (id ? s.items.find((i) => i.id === id) : undefined))
   const existing = rawExisting ? enrichItemWithDefaults(rawExisting) : undefined
+  /** "Repeat Item (Clone)" — pre-fills the New Item form from a source item via router state. */
+  const cloneSource: Item | undefined =
+    !id && locationState && typeof locationState === 'object' && 'cloneFrom' in locationState
+      ? (locationState as { cloneFrom: Item }).cloneFrom
+      : undefined
   const items = useMasterStore((s) => s.items)
   const leafCategories = useLeafCategories()
   const uoms = useActiveUoms()
   const binOptions = useBinOptions()
+  const locationOptions = useActiveLocations()
   const getHsn = useMasterStore((s) => s.getHsn)
   const getHsnByCode = useMasterStore((s) => s.getHsnByCode)
   const hsnMasters = useMasterStore((s) => s.hsnMasters)
@@ -489,6 +541,8 @@ export function ItemFormPage() {
   const [uomConversionRows, setUomConversionRows] = useState<ItemUomConversionRow[]>([])
   const purchaseQtySyncRef = useRef(false)
   const prevBaseUomIdRef = useRef<string | undefined>(undefined)
+  /** UOMs present when the item was loaded — their conversion factor is locked from edits. */
+  const lockedFactorUomIdsRef = useRef<Set<string>>(new Set())
   const [qualityTestGroupOptions, setQualityTestGroupOptions] = useState<QualityTestGroupOption[]>(() =>
     QUALITY_TEST_GROUP_OPTIONS.map((o) => ({ code: o.code, label: o.label })),
   )
@@ -505,11 +559,20 @@ export function ItemFormPage() {
 
   useEffect(() => {
     if (!existing) {
-      setUomConversionRows([])
+      if (cloneSource) {
+        // Clone carries over UOM conversion rows, but none are locked — this is a brand-new,
+        // unsaved item so its factors stay fully editable.
+        setUomConversionRows(itemToUomConversionRows(cloneSource))
+      } else {
+        setUomConversionRows([])
+      }
+      lockedFactorUomIdsRef.current = new Set()
       return
     }
-    setUomConversionRows(itemToUomConversionRows(existing))
-  }, [existing?.id, existing?.updatedAt, existing?.uomConversions])
+    const rows = itemToUomConversionRows(existing)
+    setUomConversionRows(rows)
+    lockedFactorUomIdsRef.current = new Set(rows.map((r) => r.uomId).filter(Boolean))
+  }, [existing?.id, existing?.updatedAt, existing?.uomConversions, cloneSource])
 
   useEffect(() => {
     if (hash === '#attachments' || hash === '#item-section-attachments') {
@@ -527,10 +590,14 @@ export function ItemFormPage() {
     [getHsn, getHsnByCode],
   )
 
-  const formDefaults = useMemo(
-    () => buildItemFormDefaults(existing, leafCategories, uoms, taxLookup),
-    [existing, leafCategories, uoms, taxLookup],
-  )
+  const formDefaults = useMemo(() => {
+    if (cloneSource) {
+      const defaults = buildItemFormDefaults(cloneSource, leafCategories, uoms, taxLookup)
+      // Strip identity/audit fields — Clone always creates a brand-new record.
+      return { ...defaults, itemCode: '' }
+    }
+    return buildItemFormDefaults(existing, leafCategories, uoms, taxLookup)
+  }, [existing, cloneSource, leafCategories, uoms, taxLookup])
 
   const {
     register,
@@ -588,7 +655,9 @@ export function ItemFormPage() {
     setValue('purchaseQtyPerUom', factor, { shouldValidate: true, shouldDirty: true })
     const baseId = getValues('baseUomId')
     if (!baseId) return
-    setUomConversionRows((rows) => applyQuantityPerUomToPurchaseRows(factor, baseId, rows))
+    setUomConversionRows((rows) =>
+      applyQuantityPerUomToPurchaseRows(factor, baseId, rows, lockedFactorUomIdsRef.current),
+    )
   }
 
   const quantityPerUomRegister = register('quantityPerUom')
@@ -598,7 +667,9 @@ export function ItemFormPage() {
     if (purchaseQtySyncRef.current || !baseUomId) return
     const qty = Number(quantityPerUom)
     if (!Number.isFinite(qty) || qty <= 0) return
-    setUomConversionRows((rows) => applyQuantityPerUomToPurchaseRows(qty, baseUomId, rows))
+    setUomConversionRows((rows) =>
+      applyQuantityPerUomToPurchaseRows(qty, baseUomId, rows, lockedFactorUomIdsRef.current),
+    )
   }, [quantityPerUom, baseUomId])
 
   /** Rebuild purchase UOM rows when base UOM changes. */
@@ -810,7 +881,7 @@ export function ItemFormPage() {
       factBoxTitle="Item insight"
       factBoxSummary={[
         { label: 'Used in', value: 'BOM, Purchase, Inventory, Production, Sales' },
-        { label: 'Category', value: leafCategories.find((c) => c.id === watched.categoryId)?.categoryName ?? '-' },
+        { label: 'Item Category', value: leafCategories.find((c) => c.id === watched.categoryId)?.categoryName ?? '-' },
         { label: 'UOM', value: uoms.find((u) => u.id === baseUomId)?.uomCode ?? '-' },
         { label: 'Modified', value: existing ? existing.updatedAt.slice(0, 10) : 'New' },
       ]}
@@ -884,7 +955,7 @@ export function ItemFormPage() {
           <FormField label="Item Name 2">
             <Input {...register('itemName2')} placeholder="Secondary description" />
           </FormField>
-          <FormField label="Item Category Code" required error={errors.categoryId?.message}>
+          <FormField label="Item Category" required error={errors.categoryId?.message}>
             <ErpSmartSelect
               options={categoryOptions}
               value={watch('categoryId')}
@@ -919,6 +990,12 @@ export function ItemFormPage() {
           <FormField label="Material Grade">
             <Input {...register('materialGrade')} />
           </FormField>
+          <FormField label="Part Code No">
+            <Input {...register('partCodeNo')} placeholder="Vendor / customer part code" />
+          </FormField>
+          <FormField label="Item Make (Brand)">
+            <Input {...register('itemMake')} placeholder="e.g. Bosch" />
+          </FormField>
           {(productType === 'sub_assembly' || productType === 'assembly_product') ? (
             <FormField label="Sub-Assembly Rule" required error={errors.subAssemblyRule?.message}>
               <Select {...register('subAssemblyRule')}>
@@ -951,9 +1028,6 @@ export function ItemFormPage() {
           defaultOpen
           forceOpenKey={sectionForceOpen['item-section-purchase']}
         >
-          <FormField label="Purchasable" className="md:col-span-3">
-            <Checkbox {...register('isPurchasable')} label="Allow purchase on PO, GRN, and vendor documents" />
-          </FormField>
           <ItemUomConversionEditor
             baseUomId={baseUomId}
             baseUomCode={baseUomCode}
@@ -961,6 +1035,7 @@ export function ItemFormPage() {
             onChange={handleUomConversionRowsChange}
             uomCodeOf={(uomId) => uoms.find((u) => u.id === uomId)?.uomCode ?? '-'}
             defaultConversionFactor={Number(quantityPerUom) > 0 ? Number(quantityPerUom) : 1}
+            lockedUomIds={lockedFactorUomIdsRef.current}
           />
           <FormField label="Standard Rate">
             <Input type="number" step="0.01" {...register('standardRate')} />
@@ -1026,6 +1101,27 @@ export function ItemFormPage() {
           <FormField label="Require weight at receipt">
             <Checkbox {...register('requireWeightAtReceipt')} label="Weight mandatory on GRN" />
           </FormField>
+          <FormField label="Lead Time (Days)" hint="Typical procurement lead time from vendor.">
+            <Input type="number" step="1" min={0} {...register('leadTimeDays')} />
+          </FormField>
+          <FormField label="Default Location" error={errors.defaultLocationId?.message}>
+            <Select
+              value={watch('defaultLocationId') ?? ''}
+              onChange={(e) =>
+                setValue('defaultLocationId', e.target.value || null, { shouldValidate: true, shouldDirty: true })
+              }
+            >
+              <option value="">— Select —</option>
+              {locationOptions.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.locationCode} — {l.locationName}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-erp-muted">
+              Paired with Default Bin Code below for "Location with Bin No".
+            </p>
+          </FormField>
           <FormField label="Default Bin Code" error={errors.defaultBinId?.message}>
             <Select
               value={watch('defaultBinId') ?? ''}
@@ -1083,6 +1179,9 @@ export function ItemFormPage() {
               value={watch('salesUomId') ?? ''}
               onChange={(v) => setValue('salesUomId', v || null)}
             />
+          </FormField>
+          <FormField label="Warranty Period (Months)" hint="0 = no warranty.">
+            <Input type="number" step="1" min={0} {...register('warrantyPeriodMonths')} />
           </FormField>
           <FormField label="Sales description" className="col-span-full md:col-span-2 xl:col-span-3">
             <Textarea rows={2} {...register('salesDescription')} />
@@ -1156,7 +1255,7 @@ export function ItemFormPage() {
         <ErpCardSection
           id="item-section-inventory"
           title="Inventory"
-          subtitle="Read-only quantities from inventory ledger."
+          subtitle="Stock planning levels and read-only quantities from the inventory ledger."
           icon={Box}
           accent="violet"
           columns={3}
@@ -1164,6 +1263,18 @@ export function ItemFormPage() {
           defaultOpen={false}
           forceOpenKey={sectionForceOpen['item-section-inventory']}
         >
+          <FormField label="Min Stock" error={errors.minStockLevel?.message}>
+            <Input type="number" step="0.01" min={0} {...register('minStockLevel')} />
+          </FormField>
+          <FormField label="Max Stock" error={errors.maxStockLevel?.message}>
+            <Input type="number" step="0.01" min={0} {...register('maxStockLevel')} />
+          </FormField>
+          <FormField label="Re-Order Level" hint="Trigger point for replenishment.">
+            <Input type="number" step="0.01" min={0} {...register('reorderLevel')} />
+          </FormField>
+          <FormField label="Re-Order Qty" hint="Suggested quantity to raise on reorder.">
+            <Input type="number" step="0.01" min={0} {...register('reorderQty')} />
+          </FormField>
           <FormField label="Inventory">
             <Input readOnly value={formatNumber(existing?.inventoryQty ?? 0)} />
           </FormField>
@@ -1197,6 +1308,9 @@ export function ItemFormPage() {
           </FormField>
           <FormField label="Serial tracking">
             <Checkbox {...register('serialTracked')} label="Track serial numbers at receipt" />
+          </FormField>
+          <FormField label="Shelf Life (Days)" hint="0 = not perishable / no expiry tracking.">
+            <Input type="number" step="1" min={0} {...register('shelfLifeDays')} />
           </FormField>
           <FormField label="Quality Test Group Code" hint="Active incoming inspection plans (Quality → Inspection Plans).">
             {(() => {
@@ -1250,6 +1364,9 @@ export function ItemFormPage() {
           <FormField label="Drawing No">
             <Input {...register('drawingNo')} placeholder="DWG-ISO-26KL-001" />
           </FormField>
+          <FormField label="Drawing Revision">
+            <Input {...register('drawingRevision')} placeholder="e.g. Rev C" />
+          </FormField>
         </ErpCardSection>
 
         <ErpCardSection
@@ -1287,11 +1404,20 @@ export function ItemDetailPage() {
   const bins = useBinOptions()
   if (!item) return <MasterNotFound message="Item not found." />
 
+  const locations = useActiveLocations()
+
   const defaultBinLabel = (() => {
     if (item.defaultBinCode) return item.defaultBinCode
     if (!item.defaultBinId) return '-'
     const hit = bins.find((b) => b.id === item.defaultBinId)
     return hit ? `${hit.code} — ${hit.name}` : item.defaultBinId
+  })()
+
+  const defaultLocationLabel = (() => {
+    if (item.defaultLocationCode) return item.defaultLocationCode
+    if (!item.defaultLocationId) return '-'
+    const hit = locations.find((l) => l.id === item.defaultLocationId)
+    return hit ? `${hit.locationCode} — ${hit.locationName}` : item.defaultLocationId
   })()
 
   return (
@@ -1300,7 +1426,7 @@ export function ItemDetailPage() {
         <DetailGrid>
           <DetailField label="Product Type" value={item.productType ? ENGINEERING_PRODUCT_TYPE_LABELS[item.productType] : '-'} />
           <DetailField label="Type" value={item.inventoryType ? INVENTORY_POSTING_TYPE_LABELS[item.inventoryType] : '-'} />
-          <DetailField label="Category" value={getCategoryName(item.categoryId)} />
+          <DetailField label="Item Category" value={getCategoryName(item.categoryId)} />
           <DetailField label="UOM" value={getUomName(item.baseUomId)} />
           <DetailField label="Blocked" value={item.isBlocked ? 'Yes' : 'No'} />
           <DetailField label="Std Rate" value={formatCurrency(item.standardRate)} />
@@ -1308,6 +1434,9 @@ export function ItemDetailPage() {
           <DetailField label="Default sales rate" value={formatCurrency(item.defaultSalesRate ?? 0)} />
           <DetailField label="Fulfilment" value={item.defaultFulfilmentMethod ?? '-'} />
           <DetailField label="Sales lead days" value={String(item.salesLeadDays ?? 0)} />
+          <DetailField label="Part Code No" value={item.partCodeNo ?? '-'} />
+          <DetailField label="Item Make" value={item.itemMake ?? '-'} />
+          <DetailField label="Warranty Period" value={`${item.warrantyPeriodMonths ?? 0} months`} />
         </DetailGrid>
       </DetailSection>
       <DetailSection title="Tax">
@@ -1322,6 +1451,12 @@ export function ItemDetailPage() {
           <DetailField label="On PO" value={formatNumber(item.qtyOnPurchaseOrder ?? 0)} />
           <DetailField label="On Production" value={formatNumber(item.qtyOnProductionOrder ?? 0)} />
           <DetailField label="On SO" value={formatNumber(item.qtyOnSalesOrder ?? 0)} />
+          <DetailField label="Min Stock" value={formatNumber(item.minStockLevel ?? 0)} />
+          <DetailField label="Max Stock" value={formatNumber(item.maxStockLevel ?? 0)} />
+          <DetailField label="Re-Order Level" value={formatNumber(item.reorderLevel ?? 0)} />
+          <DetailField label="Re-Order Qty" value={formatNumber(item.reorderQty ?? 0)} />
+          <DetailField label="Lead Time" value={`${item.leadTimeDays ?? 0} days`} />
+          <DetailField label="Default Location" value={defaultLocationLabel} />
           <DetailField label="Default Bin" value={defaultBinLabel} />
         </DetailGrid>
       </DetailSection>
@@ -1330,9 +1465,11 @@ export function ItemDetailPage() {
           <DetailField label="QC Required" value={item.qcRequired ? 'Yes' : 'No'} />
           <DetailField label="Batch tracking" value={item.batchTracked ? 'Yes' : 'No'} />
           <DetailField label="Serial tracking" value={item.serialTracked ? 'Yes' : 'No'} />
+          <DetailField label="Shelf Life" value={`${item.shelfLifeDays ?? 0} days`} />
           <DetailField label="Test Group" value={item.qualityTestGroupCode ?? '-'} />
           <DetailField label="Routing No" value={item.routingNo ?? '-'} />
           <DetailField label="Drawing No" value={item.drawingNo ?? '-'} />
+          <DetailField label="Drawing Revision" value={item.drawingRevision ?? '-'} />
         </DetailGrid>
       </DetailSection>
       <DetailSection title="Attachments">

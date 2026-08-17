@@ -1675,9 +1675,6 @@ export function PurchaseOrderEditorPage() {
                 emptyOptionLabel="— Select —"
               />
             </ErpFieldRow>
-            <ErpFieldRow label="Buyer" readOnly>
-              <Input value={ACTOR.name} readOnly className="bg-erp-surface-alt" />
-            </ErpFieldRow>
             <ErpFieldRow
               id={purchaseFieldId('documentDate')}
               label="PO Date"

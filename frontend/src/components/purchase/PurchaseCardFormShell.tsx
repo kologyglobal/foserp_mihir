@@ -173,6 +173,10 @@ type PurchaseCardFormShellProps = {
 
   suppressFactBoxRecord?: boolean
 
+  /** Hide the in-page record status bar (record no · title · chips · Created/Modified). */
+
+  hideRecordBar?: boolean
+
   /** Persist FactBox hide preference. Defaults to `purchase.factbox.collapsed` when factBox is set. */
 
   factBoxStorageKey?: string
@@ -276,6 +280,8 @@ export function PurchaseCardFormShell({
   className,
 
   suppressFactBoxRecord,
+
+  hideRecordBar,
 
   factBoxStorageKey = factBox ? PURCHASE_FACTBOX_COLLAPSED_KEY : undefined,
 
@@ -429,6 +435,8 @@ export function PurchaseCardFormShell({
     workspaceRecordHeader: useStickyRecordHeader,
 
     showAi: false,
+
+    hideRecordBar,
 
     backLink,
 

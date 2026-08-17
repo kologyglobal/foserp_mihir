@@ -286,10 +286,30 @@ export interface Item extends MasterRecordAudit {
   productionBomId?: string | null
   routingNo?: string | null
   drawingNo?: string | null
+  /** Drawing revision letter/number (e.g. "Rev C"). */
+  drawingRevision?: string | null
+  /** Vendor/customer part code cross-reference. */
+  partCodeNo?: string | null
+  /** Item make / brand name. */
+  itemMake?: string | null
+  /** Minimum stock level for planning alerts. */
+  minStockLevel?: number
+  /** Maximum stock level for planning alerts. */
+  maxStockLevel?: number
+  /** Procurement lead time in days. */
+  leadTimeDays?: number
+  /** Shelf life in days (0 = not perishable). */
+  shelfLifeDays?: number
+  /** Warranty period in months (0 = no warranty). */
+  warrantyPeriodMonths?: number
   /** Sub-assembly MRP/BOM behaviour — required when itemType = sub_assembly */
   subAssemblyRule: SubAssemblyRule | null
   /** Product image — API storage key or demo data URL */
   imageUrl?: string | null
+  /** Default Location Master id, paired with defaultBinId for "Location with Bin No". */
+  defaultLocationId?: string | null
+  /** Resolved code snapshot from API when location included. */
+  defaultLocationCode?: string | null
   /** Default Bin Master id — auto-fills PR/PO/GRN bin when item is selected. */
   defaultBinId?: string | null
   /** Resolved code snapshot from API when bin included. */

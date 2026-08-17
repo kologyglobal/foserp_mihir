@@ -17,6 +17,7 @@ type Props = {
   uomCodeOf: (uomId: string) => string
   /** Default factor for newly added alternate UOMs (synced from General → Quantity). */
   defaultConversionFactor?: number
+  lockedUomIds?: Set<string>
 }
 
 function ensureBaseRow(baseUomId: string, rows: ItemUomConversionRow[]): ItemUomConversionRow[] {
@@ -83,6 +84,7 @@ export function ItemUomConversionEditor({
   onChange,
   uomCodeOf,
   defaultConversionFactor = 1,
+  lockedUomIds,
 }: Props) {
   const list = ensureBaseRow(baseUomId, rows)
   const newRowFactor = positiveFactor(defaultConversionFactor)
@@ -131,6 +133,7 @@ export function ItemUomConversionEditor({
           <p className="text-[12px] font-semibold text-erp-text">UOM conversions (purchase)</p>
           <p className="text-[11px] text-erp-muted">
             Stock is always tracked in base UOM ({baseUomCode}). Add alternate vendor units for PO / GRN.
+            Once saved, a UOM's factor is locked — remove and re-add it to change the conversion.
           </p>
         </div>
         <ErpButton type="button" variant="secondary" size="sm" icon={Plus} onClick={addRow}>
@@ -155,6 +158,7 @@ export function ItemUomConversionEditor({
             {list.map((row, index) => {
               const isBase = row.uomId === baseUomId
               const code = row.uomCode || uomCodeOf(row.uomId) || '-'
+              const isFactorLocked = !isBase && Boolean(row.uomId) && lockedUomIds?.has(row.uomId)
               return (
                 <tr key={`${row.uomId || 'new'}-${index}`} className="border-b border-erp-border/60">
                   <td className="px-2 py-2 align-top">
@@ -163,6 +167,7 @@ export function ItemUomConversionEditor({
                     ) : (
                       <UomMasterSelect
                         value={row.uomId}
+                        disabled={isFactorLocked}
                         onChange={(uomId) =>
                           patch(index, {
                             uomId,
@@ -177,12 +182,21 @@ export function ItemUomConversionEditor({
                       type="number"
                       step="0.001"
                       min={0.001}
-                      disabled={isBase}
+                      disabled={isBase || isFactorLocked}
+                      title={
+                        isFactorLocked
+                          ? 'Factor locked — already saved for this item. Remove this UOM and add it again to change the conversion factor.'
+                          : undefined
+                      }
+                      className={isFactorLocked ? 'bg-erp-surface-alt' : undefined}
                       value={isBase ? 1 : row.conversionFactor}
                       onChange={(e) =>
                         patch(index, { conversionFactor: Number(e.target.value) || 1 })
                       }
                     />
+                    {isFactorLocked ? (
+                      <p className="mt-1 text-[10px] text-erp-muted">Locked after save</p>
+                    ) : null}
                   </td>
                   <td className="px-2 py-2 align-top">
                     <label className="inline-flex items-center gap-2">
@@ -284,11 +298,16 @@ export function findDefaultPurchaseAlternateRowIndex(
   )
 }
 
-/** General Quantity → default purchase UOM conversion factor (when purchase UOM ≠ base). */
+/**
+ * General Quantity → default purchase UOM conversion factor (when purchase UOM ≠ base).
+ * Skips the update when the target row's UOM is in `lockedUomIds` — its factor was already
+ * saved and should not be silently overwritten via the General → Quantity sync.
+ */
 export function applyQuantityPerUomToPurchaseRows(
   quantityPerUom: number,
   baseUomId: string,
   rows: ItemUomConversionRow[],
+  lockedUomIds?: Set<string>,
 ): ItemUomConversionRow[] {
   const qty = Number(quantityPerUom)
   if (!baseUomId || !Number.isFinite(qty) || qty <= 0) return rows
@@ -307,6 +326,7 @@ export function applyQuantityPerUomToPurchaseRows(
 
   const targetIdx = findDefaultPurchaseAlternateRowIndex(baseUomId, list)
   if (targetIdx < 0) return rows
+  if (lockedUomIds?.has(list[targetIdx]?.uomId ?? '')) return rows
 
   const current = Number(list[targetIdx]?.conversionFactor)
   if (Math.abs(current - qty) < 1e-9) return rows

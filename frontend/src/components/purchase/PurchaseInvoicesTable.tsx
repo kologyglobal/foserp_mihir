@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Eye, Pencil, Printer, Trash2 } from 'lucide-react'
+import { CheckCircle2, Eye, Pencil, Printer, Send, Stamp, Trash2 } from 'lucide-react'
 import { ErpDataGrid } from '../erp/ErpDataGrid'
 import { TableLink } from '../ui/AppLink'
 import { Badge } from '../ui/Badge'
@@ -20,6 +20,7 @@ import type {
   PurchaseInvoiceListRow,
   PurchaseInvoiceStatus,
 } from '../../types/purchaseDomain'
+import { canPurchasePermission } from '../../utils/permissions'
 
 function invoiceStatusDotTone(status: PurchaseInvoiceStatus): StatusDotTone {
   const tone = purchaseStatusTone(status)
@@ -58,6 +59,9 @@ export interface PurchaseInvoiceRowHandlers {
   onView: (row: PurchaseInvoiceListRow) => void
   onEdit: (row: PurchaseInvoiceListRow) => void
   onPrint: (row: PurchaseInvoiceListRow) => void
+  onSubmit: (row: PurchaseInvoiceListRow) => void
+  onApprove: (row: PurchaseInvoiceListRow) => void
+  onPost: (row: PurchaseInvoiceListRow) => void
 }
 
 function buildRowActions(
@@ -65,8 +69,16 @@ function buildRowActions(
   handlers: PurchaseInvoiceRowHandlers,
 ): RowActionItem[] {
   const canEdit = row.status === 'draft' || row.status === 'pending_verification'
+  const canSubmit = row.status === 'draft' || row.status === 'rejected'
+  const canApprove = row.status === 'pending_approval'
+  const canPost = row.status === 'approved' || row.status === 'matched'
   const statusLabel = row.statusLabel || row.status
-  return [
+
+  const canCreatePerm = canPurchasePermission('purchase.invoice.create')
+  const canApprovePerm = canPurchasePermission('purchase.invoice.approve')
+  const canPostPerm = canPurchasePermission('purchase.invoice.post')
+
+  const actions: RowActionItem[] = [
     {
       id: 'view',
       label: 'View',
@@ -89,13 +101,38 @@ function buildRowActions(
       disabled: row.status !== 'draft',
       disabledReason: `${statusLabel} purchase invoices cannot be deleted`,
     },
-    {
-      id: 'print',
-      label: 'Print',
-      icon: Printer,
-      onClick: () => handlers.onPrint(row),
-    },
   ]
+  if (canCreatePerm && canSubmit) {
+    actions.push({
+      id: 'submit',
+      label: 'Send for Approval',
+      icon: Send,
+      onClick: () => handlers.onSubmit(row),
+    })
+  }
+  if (canApprovePerm && canApprove) {
+    actions.push({
+      id: 'approve',
+      label: 'Approve',
+      icon: CheckCircle2,
+      onClick: () => handlers.onApprove(row),
+    })
+  }
+  if (canPostPerm && canPost) {
+    actions.push({
+      id: 'post',
+      label: 'Post Invoice',
+      icon: Stamp,
+      onClick: () => handlers.onPost(row),
+    })
+  }
+  actions.push({
+    id: 'print',
+    label: 'Print',
+    icon: Printer,
+    onClick: () => handlers.onPrint(row),
+  })
+  return actions
 }
 
 export interface PurchaseInvoicesTableProps {

@@ -18,6 +18,7 @@ const itemConversionInclude = {
     include: { uom: { select: { id: true, code: true, name: true } } },
     orderBy: [{ isDefaultPurchase: 'desc' as const }, { uom: { code: 'asc' as const } }],
   },
+  defaultLocation: { select: { id: true, code: true, name: true } },
   defaultBin: { select: { id: true, code: true, name: true } },
 } as const
 
@@ -48,13 +49,18 @@ function stripUomConversions(input: Record<string, unknown>): {
 function attachUomConversions<
   T extends {
     uomConversions?: Array<Parameters<typeof mapConversionRow>[0]>
+    defaultLocation?: { id: string; code: string; name: string } | null
+    defaultLocationId?: string | null
     defaultBin?: { id: string; code: string; name: string } | null
     defaultBinId?: string | null
   },
 >(item: T) {
-  const { uomConversions, defaultBin, ...rest } = item
+  const { uomConversions, defaultLocation, defaultBin, ...rest } = item
   return {
     ...rest,
+    defaultLocationId: rest.defaultLocationId ?? defaultLocation?.id ?? null,
+    defaultLocationCode: defaultLocation?.code ?? null,
+    defaultLocationName: defaultLocation?.name ?? null,
     defaultBinId: rest.defaultBinId ?? defaultBin?.id ?? null,
     defaultBinCode: defaultBin?.code ?? null,
     defaultBinName: defaultBin?.name ?? null,
@@ -76,8 +82,12 @@ function normalizeNullableIds(input: Record<string, unknown>): Record<string, un
     'qualityTestGroupCode',
     'routingNo',
     'drawingNo',
+    'drawingRevision',
+    'partCodeNo',
+    'itemMake',
     'subAssemblyRule',
     'salesDescription',
+    'defaultLocationId',
     'defaultBinId',
   ] as const) {
     if (data[key] === '') data[key] = null
@@ -165,6 +175,12 @@ async function assertTenantFk(tenantId: string, input: Record<string, unknown>):
       where: { id: String(input.weightUomId), ...tenantActiveFilter(tenantId) },
     })
     if (!uom) throw new ValidationError('Weight UOM not found in tenant')
+  }
+  if (input.defaultLocationId) {
+    const location = await prisma.masterLocation.findFirst({
+      where: { id: String(input.defaultLocationId), ...tenantActiveFilter(tenantId) },
+    })
+    if (!location) throw new ValidationError('Default location not found in tenant')
   }
   if (input.defaultBinId) {
     const bin = await prisma.masterBin.findFirst({

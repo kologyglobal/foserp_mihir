@@ -3,6 +3,7 @@ import type { GrnMaterialReturnEntry, GrnMaterialReturnLineSummary } from '../re
 import {
   allowedActions,
   isGrnLineFullyReversed,
+  netLineForReverse,
   qty,
   remainingReversibleReceived,
 } from './goods-receipt.workflow.js'
@@ -138,6 +139,9 @@ export function mapGoodsReceiptToDto(
       const reversedRejectedQuantity = qty(
         (line as { reversedRejectedQuantity?: unknown }).reversedRejectedQuantity,
       )
+      // "Will reverse" must be net of qty already shipped back to the vendor via a
+      // completed Material Return — that stock is already gone, so it isn't reversible.
+      const netLine = netLineForReverse(line, returnLine?.returnedQuantity ?? 0)
       return {
       id: line.id,
       lineNumber: line.lineNumber,
@@ -172,8 +176,9 @@ export function mapGoodsReceiptToDto(
       reversedAcceptedQuantity,
       reversedRejectedQuantity,
       reversedAt: iso((line as { reversedAt?: Date | null }).reversedAt),
-      remainingReversibleQuantity: remainingReversibleReceived(line),
-      lineFullyReversed: isGrnLineFullyReversed(line) || (reversedQuantity > 0 && remainingReversibleReceived(line) <= 0),
+      remainingReversibleQuantity: remainingReversibleReceived(netLine),
+      lineFullyReversed:
+        isGrnLineFullyReversed(netLine) || (reversedQuantity > 0 && remainingReversibleReceived(netLine) <= 0),
       returnedQuantity: returnLine?.returnedQuantity ?? 0,
       returnableQuantity: returnLine?.returnableQuantity ?? 0,
       rate: qty(line.rate),

@@ -117,7 +117,17 @@ const itemBaseSchema = z.object({
   productionBomId: z.string().trim().max(36).nullable().optional(),
   routingNo: z.string().trim().max(64).nullable().optional(),
   drawingNo: z.string().trim().max(64).nullable().optional(),
+  drawingRevision: z.string().trim().max(64).nullable().optional(),
+  partCodeNo: z.string().trim().max(64).nullable().optional(),
+  itemMake: z.string().trim().max(100).nullable().optional(),
+  minStockLevel: z.coerce.number().min(0).optional(),
+  maxStockLevel: z.coerce.number().min(0).optional(),
+  leadTimeDays: z.coerce.number().int().min(0).optional(),
+  shelfLifeDays: z.coerce.number().int().min(0).optional(),
+  warrantyPeriodMonths: z.coerce.number().int().min(0).optional(),
   subAssemblyRule: z.enum(['phantom', 'manufactured', 'purchased', 'subcontracted']).nullable().optional(),
+  /** Optional default storage location (Location Master), paired with defaultBinId. */
+  defaultLocationId: z.string().uuid().nullable().optional(),
   /** Optional default put-away / transaction bin (Bin Master). */
   defaultBinId: z.string().uuid().nullable().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),

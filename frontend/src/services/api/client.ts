@@ -156,7 +156,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
   let res: Response
   try {
-    res = await fetch(`${API_CONFIG.baseUrl}/auth/refresh-token`, {
+    res = await fetchWithTimeout(`${API_CONFIG.baseUrl}/auth/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken: session.refreshToken }),
@@ -264,15 +264,49 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/**
+ * Default per-request timeout. Plain `fetch()` never times out on its own — if the
+ * backend process dies mid-request (or a connection just stalls), the returned promise
+ * can hang forever with nothing to catch, leaving pages stuck on their loading state
+ * indefinitely. Aborting after a bound turns that into a normal, catchable ApiError.
+ */
+const DEFAULT_REQUEST_TIMEOUT_MS = 45_000
+const REQUEST_TIMEOUT_MESSAGE =
+  'Request timed out. The backend may be restarting or unresponsive — please retry in a moment.'
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  // Respect a caller-provided signal too (e.g. component unmount) by aborting ours as well.
+  const callerSignal = init.signal
+  const onCallerAbort = () => controller.abort()
+  callerSignal?.addEventListener('abort', onCallerAbort)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new ApiError(REQUEST_TIMEOUT_MESSAGE, 408)
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+    callerSignal?.removeEventListener('abort', onCallerAbort)
+  }
+}
+
 /** GET/HEAD only — covers Vite proxy 502 while `tsx watch` restarts the API. */
 async function fetchWithGatewayRetry(url: string, init: RequestInit, maxAttempts = 3): Promise<Response> {
   const method = (init.method ?? 'GET').toUpperCase()
   const canRetry = method === 'GET' || method === 'HEAD'
-  let res = await fetch(url, init)
+  let res = await fetchWithTimeout(url, init)
   if (!canRetry || !isTransientGatewayStatus(res.status)) return res
   for (let attempt = 1; attempt < maxAttempts; attempt++) {
     await sleep(200 * attempt)
-    res = await fetch(url, init)
+    res = await fetchWithTimeout(url, init)
     if (!isTransientGatewayStatus(res.status)) return res
   }
   return res
@@ -397,13 +431,13 @@ export async function apiDownloadBlob(path: string): Promise<{ blob: Blob; filen
     headers.set('Authorization', `Bearer ${accessToken}`)
   }
 
-  let res = await fetch(`${API_CONFIG.baseUrl}${path}`, { headers })
+  let res = await fetchWithTimeout(`${API_CONFIG.baseUrl}${path}`, { headers })
 
   if (res.status === 401 && session?.refreshToken) {
     const newToken = await refreshAfterUnauthorized()
     if (newToken) {
       headers.set('Authorization', `Bearer ${newToken}`)
-      res = await fetch(`${API_CONFIG.baseUrl}${path}`, { headers })
+      res = await fetchWithTimeout(`${API_CONFIG.baseUrl}${path}`, { headers })
     } else {
       throw new ApiError(SESSION_EXPIRED_NOTICE, 401)
     }
@@ -451,13 +485,13 @@ export async function apiPostDownloadBlob(
   }
 
   const init: RequestInit = { method: 'POST', headers, body: JSON.stringify(body ?? {}) }
-  let res = await fetch(`${API_CONFIG.baseUrl}${path}`, init)
+  let res = await fetchWithTimeout(`${API_CONFIG.baseUrl}${path}`, init)
 
   if (res.status === 401 && session?.refreshToken) {
     const newToken = await refreshAfterUnauthorized()
     if (newToken) {
       headers.set('Authorization', `Bearer ${newToken}`)
-      res = await fetch(`${API_CONFIG.baseUrl}${path}`, { ...init, headers })
+      res = await fetchWithTimeout(`${API_CONFIG.baseUrl}${path}`, { ...init, headers })
     } else {
       throw new ApiError(SESSION_EXPIRED_NOTICE, 401)
     }

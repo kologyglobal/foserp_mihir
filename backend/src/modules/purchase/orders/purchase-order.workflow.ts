@@ -105,6 +105,18 @@ export function assertSubmittable(po: PoWithLines): void {
         [{ field: 'lines.rate', message: purchaseMessage(PURCHASE_ERROR_CODE.PO_RATE_INVALID) }],
       )
     }
+    if (!line.requiredDate) {
+      throw new PurchaseOrderValidationError(
+        purchaseMessage(PURCHASE_ERROR_CODE.PO_REQUIRED_DATE_REQUIRED),
+        PURCHASE_ERROR_CODE.PO_REQUIRED_DATE_REQUIRED,
+        [
+          {
+            field: 'lines.requiredDate',
+            message: purchaseMessage(PURCHASE_ERROR_CODE.PO_REQUIRED_DATE_REQUIRED),
+          },
+        ],
+      )
+    }
   }
 }
 
@@ -145,7 +157,7 @@ export function assertSendBackable(po: Pick<PurchaseOrder, 'status' | 'deletedAt
 }
 
 export function assertSendableToVendor(
-  po: Pick<PurchaseOrder, 'status' | 'deletedAt'>,
+  po: PoWithLines,
   opts: { requireApprovalOnPo?: boolean } = {},
 ): void {
   assertNotDeleted(po)
@@ -157,9 +169,25 @@ export function assertSendableToVendor(
     }
     return
   }
-  // Approval-off: release directly from Open / Sent Back.
+  // Approval-off: release directly from Open / Sent Back — bypasses assertSubmittable, so
+  // the per-line required-date rule must be enforced here too.
   if (!PO_EDITABLE_STATUSES.includes(po.status)) {
     throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_SENDABLE)
+  }
+  const validLines = po.lines.filter((l) => Number(l.quantity) > 0)
+  for (const line of validLines) {
+    if (!line.requiredDate) {
+      throw new PurchaseOrderValidationError(
+        purchaseMessage(PURCHASE_ERROR_CODE.PO_REQUIRED_DATE_REQUIRED),
+        PURCHASE_ERROR_CODE.PO_REQUIRED_DATE_REQUIRED,
+        [
+          {
+            field: 'lines.requiredDate',
+            message: purchaseMessage(PURCHASE_ERROR_CODE.PO_REQUIRED_DATE_REQUIRED),
+          },
+        ],
+      )
+    }
   }
 }
 

@@ -200,6 +200,16 @@ export function StockLedgerPage() {
     { accessorKey: 'rate', header: 'Rate', cell: ({ row }) => formatCurrency(row.original.rate), meta: { align: 'right' } },
     { accessorKey: 'value', header: 'Value', cell: ({ row }) => formatCurrency(row.original.value), meta: { align: 'right' } },
     { accessorKey: 'balanceAfter', header: 'On Hand After', cell: ({ row }) => formatNumber(row.original.balanceAfter), meta: { align: 'right' } },
+    {
+      id: 'balanceAmount',
+      header: () => (
+        <span title="Approximate — On Hand After × this row's own rate. Not weighted-average/FIFO cost; see Inventory Valuation report for true costing.">
+          Balance Amount (Approx.)
+        </span>
+      ),
+      cell: ({ row }) => formatCurrency(row.original.balanceAfter * row.original.rate),
+      meta: { align: 'right', columnLabel: 'Balance Amount (Approx.)' },
+    },
     { accessorKey: 'referenceNo', header: 'Reference' },
   ]
 

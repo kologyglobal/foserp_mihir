@@ -2939,6 +2939,7 @@ model MasterLocation {
   tenant            Tenant                  @relation(fields: [tenantId], references: [id])
   warehouse         MasterWarehouse         @relation(fields: [warehouseId], references: [id])
   bins              MasterBin[]
+  defaultLocationForItems MasterItem[]
   goodsReceiptLines GoodsReceiptLine[]
   settingsReceiving PurchaseSettings[]      @relation("PurchaseSettingsReceivingLocation")
   settingsQcHold    PurchaseSettings[]      @relation("PurchaseSettingsQcHoldLocation")
@@ -3211,9 +3212,27 @@ model MasterItem {
   productionBomId         String?                   @db.VarChar(36)
   routingNo               String?                   @db.VarChar(64)
   drawingNo               String?                   @db.VarChar(64)
+  /// Drawing revision letter/number (e.g. "Rev C").
+  drawingRevision         String?                   @db.VarChar(64)
+  /// Vendor/customer part code cross-reference.
+  partCodeNo              String?                   @db.VarChar(64)
+  /// Item make / brand name.
+  itemMake                String?                   @db.VarChar(100)
+  /// Minimum stock level for planning alerts (distinct from reorderLevel trigger point).
+  minStockLevel           Decimal                   @default(0) @db.Decimal(18, 4)
+  /// Maximum stock level for planning alerts.
+  maxStockLevel           Decimal                   @default(0) @db.Decimal(18, 4)
+  /// Procurement lead time in days.
+  leadTimeDays            Int                       @default(0)
+  /// Shelf life in days (0 = not perishable).
+  shelfLifeDays           Int                       @default(0)
+  /// Warranty period in months (0 = no warranty).
+  warrantyPeriodMonths    Int                       @default(0)
   subAssemblyRule         String?                   @db.VarChar(32)
   /// Relative storage key under uploads/items (tenantId/itemId.ext)
   imageUrl                String?                   @db.VarChar(500)
+  /// Default storage location, paired with defaultBinId for "Location with Bin No".
+  defaultLocationId       String?
   /// Default put-away / line bin from Bin Master (code resolved for PR/PO/GRN).
   defaultBinId            String?
   status                  MasterRecordStatus        @default(ACTIVE)
@@ -3232,6 +3251,7 @@ model MasterItem {
   receivingTolerance       MasterReceivingTolerance? @relation("ItemQuantityReceivingTolerance", fields: [receivingToleranceId], references: [id])
   weightReceivingTolerance MasterReceivingTolerance? @relation("ItemWeightReceivingTolerance", fields: [weightReceivingToleranceId], references: [id])
   weightUom                MasterUom?                @relation("ItemWeightUom", fields: [weightUomId], references: [id])
+  defaultLocation          MasterLocation?           @relation(fields: [defaultLocationId], references: [id], onDelete: SetNull)
   defaultBin               MasterBin?                @relation(fields: [defaultBinId], references: [id], onDelete: SetNull)
   uomConversions           MasterItemUomConversion[]
   purchaseRequisitionLines PurchaseRequisitionLine[]
@@ -3292,6 +3312,7 @@ model MasterItem {
   @@index([tenantId, receivingToleranceId])
   @@index([tenantId, weightReceivingToleranceId])
   @@index([tenantId, weightUomId])
+  @@index([tenantId, defaultLocationId])
   @@index([tenantId, defaultBinId])
   @@map("master_items")
 }

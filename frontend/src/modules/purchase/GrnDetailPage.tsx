@@ -66,6 +66,7 @@ export function GrnDetailPage() {
   const [searchParams] = useSearchParams()
   const [grn, setGrn] = useState<GoodsReceiptNote | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [postConfirmOpen, setPostConfirmOpen] = useState(false)
   const [inventoryMsgOpen, setInventoryMsgOpen] = useState(false)
@@ -78,6 +79,7 @@ export function GrnDetailPage() {
   const load = useCallback(async () => {
     if (!id) return
     setLoading(true)
+    setLoadError(null)
     try {
       const row = await getGRNById(id)
       if (!row) {
@@ -86,6 +88,13 @@ export function GrnDetailPage() {
         return
       }
       setGrn(row)
+    } catch (err) {
+      // Surface a retry-able error instead of leaving the page stuck on "Loading" —
+      // a hung/timed-out request would otherwise never reach the finally below in a
+      // way the user can recover from without a hard refresh.
+      setLoadError(
+        err instanceof PurchaseServiceError ? err.message : 'Failed to load goods receipt',
+      )
     } finally {
       setLoading(false)
     }
@@ -177,13 +186,13 @@ export function GrnDetailPage() {
     return (
       <PurchaseCardFormShell
         title="Goods Receipt Note"
-        description="Loading…"
+        description={loadError ? 'Failed to load' : 'Loading…'}
         status="-"
         favoritePath="/purchase/grn"
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
           { label: 'GRN / Receipts', to: '/purchase/grn' },
-          { label: 'Loading' },
+          { label: loadError ? 'Error' : 'Loading' },
         ]}
         footer={null}
         stickyFooter={false}
@@ -191,6 +200,17 @@ export function GrnDetailPage() {
       >
         {loading ? (
           <LoadingState variant="form" rows={6} />
+        ) : loadError ? (
+          <EmptyState
+            icon={Package}
+            title="Couldn't load this goods receipt"
+            description={loadError}
+            action={
+              <ErpButton variant="secondary" onClick={() => void load()}>
+                Retry
+              </ErpButton>
+            }
+          />
         ) : (
           <EmptyState icon={Package} title="GRN not found" />
         )}

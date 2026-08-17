@@ -18,6 +18,9 @@ export type PoEditorLineFields = {
   hsnId?: string | null
   hsnCode?: string
   sacCode?: string | null
+  /** Item-wise (per-line) expected delivery date — mandatory before submit. */
+  expectedDeliveryDate?: string | null
+  requiredDate?: string | null
 }
 
 export type PoValidationMode = 'draft' | 'submit'
@@ -210,6 +213,11 @@ export function validatePurchaseOrderForm(
       lineErrors[`${line.key}:rate`] = 'Rate invalid'
       pushSection('lines')
     }
+    if (!(line.expectedDeliveryDate || line.requiredDate)) {
+      errors.push(`${prefix}: Expected Delivery Date is required.`)
+      lineErrors[`${line.key}:expectedDeliveryDate`] = 'Required'
+      pushSection('lines')
+    }
   }
 
   let firstFieldId: string | null = null
@@ -234,6 +242,10 @@ export function validatePurchaseOrderForm(
       }
       if (lineErrors[`${line.key}:rate`]) {
         firstFieldId = purchaseLineFieldId(line.key, 'rate')
+        break
+      }
+      if (lineErrors[`${line.key}:expectedDeliveryDate`]) {
+        firstFieldId = purchaseLineFieldId(line.key, 'expectedDeliveryDate')
         break
       }
     }

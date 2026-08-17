@@ -25,9 +25,11 @@ import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import { ErpCardSection, ErpFieldRow, ErpFormSpan } from '@/components/erp/card-form'
 import { ErpSmartSelect } from '@/components/erp/ErpSmartSelect'
 import { FormActionBar } from '@/components/erp/FormActionBar'
+import { ErpButton } from '@/components/erp/ErpButton'
 import { DecimalInput, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   joinFastTabSummary,
@@ -182,6 +184,7 @@ export function GrnEditorPage() {
   const perms = usePurchasePermissions()
 
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [recordId, setRecordId] = useState<string | null>(id ?? null)
   const [documentNumber, setDocumentNumber] = useState<string | null>(null)
@@ -204,7 +207,7 @@ export function GrnEditorPage() {
   const [warehouseId, setWarehouseId] = useState('')
   const [warehouseName, setWarehouseName] = useState('')
   const [receivingLocation, setReceivingLocation] = useState('')
-  const [receivedByName, setReceivedByName] = useState('Amit Deshmukh')
+  const [receivedByName, setReceivedByName] = useState('')
   const [inspectionRequired, setInspectionRequired] = useState(true)
   const [allowExcess, setAllowExcess] = useState(false)
   const [remarks, setRemarks] = useState('')
@@ -313,18 +316,22 @@ export function GrnEditorPage() {
     [receivableVendors],
   )
 
+  /** Direct search — scoped to vendor once picked, else searchable across all receivable POs
+   *  so a user who already remembers the PO number can jump straight to it. */
   const poSelectOptions = useMemo(
     () =>
-      vendorReceivableOrders.map((o) => {
+      (vendorId ? vendorReceivableOrders : receivableOrders).map((o) => {
         const openQty = o.lines.reduce((s, l) => s + l.pendingQty, 0)
         return {
           value: o.id,
           label: o.documentNumber,
           searchText: `${o.documentNumber} ${o.vendor.name} ${o.vendor.code ?? ''} open ${openQty}`.toLowerCase(),
-          trailing: `Open ${formatNumber(openQty)}`,
+          trailing: vendorId
+            ? `Open ${formatNumber(openQty)}`
+            : `${o.vendor.name} · Open ${formatNumber(openQty)}`,
         }
       }),
-    [vendorReceivableOrders],
+    [vendorId, vendorReceivableOrders, receivableOrders],
   )
 
   /** Approved (not yet sent) — visible for guidance, not selectable for GRN. */
@@ -479,6 +486,7 @@ export function GrnEditorPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       // Refresh the item master cache first — stock/base UOM display for Accepted &
       // Rejected quantities is resolved from this cache, so a stale cache (e.g. items
@@ -591,6 +599,12 @@ export function GrnEditorPage() {
         if (nextNumber) setDocumentNumber(nextNumber)
         resetDirty()
       }
+    } catch (err) {
+      // Surface a retry-able error instead of leaving the page stuck on "Loading" —
+      // a hung/timed-out request would otherwise never reach a recoverable state.
+      setLoadError(
+        err instanceof PurchaseServiceError ? err.message : 'Failed to load goods receipt',
+      )
     } finally {
       setLoading(false)
     }
@@ -922,20 +936,33 @@ export function GrnEditorPage() {
     [validationErrorList],
   )
 
-  if (loading) {
+  if (loading || loadError) {
     return (
       <PurchaseCardFormShell
         title="Goods Receipt Note"
-        description="Loading…"
+        description={loadError ? 'Failed to load' : 'Loading…'}
         status="Draft"
         favoritePath="/purchase/grn/new"
         breadcrumbs={[
           { label: 'Goods Receipts', to: '/purchase/grn' },
-          { label: 'Loading' },
+          { label: loadError ? 'Error' : 'Loading' },
         ]}
         footer={null}
       >
-        <LoadingState variant="form" rows={8} />
+        {loadError ? (
+          <EmptyState
+            icon={Package}
+            title="Couldn't load this goods receipt"
+            description={loadError}
+            action={
+              <ErpButton variant="secondary" onClick={() => void load()}>
+                Retry
+              </ErpButton>
+            }
+          />
+        ) : (
+          <LoadingState variant="form" rows={8} />
+        )}
       </PurchaseCardFormShell>
     )
   }
@@ -982,21 +1009,24 @@ export function GrnEditorPage() {
         <ErpCardSection
           id={purchaseSectionId('po-source')}
           title="PO Source"
-          subtitle="Select vendor, then a released PO with open quantity"
+          subtitle="Search PO number directly, or select vendor first to narrow the list"
           icon={ClipboardList}
           accent="slate"
           collapsible
           defaultOpen
           dense
-          columns={1}
+          columns={6}
         >
-          <ErpFormSpan span={1}>
+          <ErpFormSpan span={3}>
             <p className="mb-2 text-[12px] text-erp-muted">
-              Choose the <strong>vendor</strong> first, then pick a PO that is{' '}
-              <strong>Sent to Vendor / Released</strong> (or partially received) with open quantity.
-              Header warehouse defaults from the PO delivery location.
+              Know the <strong>PO number</strong>? Search it directly in Purchase Order below.
+              Otherwise choose the <strong>vendor</strong> first to narrow the list. Only POs{' '}
+              <strong>Sent to Vendor / Released</strong> (or partially received) with open quantity
+              are shown. Header warehouse defaults from the PO delivery location.
             </p>
-            {receivableOrders.length === 0 ? (
+          </ErpFormSpan>
+          {receivableOrders.length === 0 ? (
+            <ErpFormSpan span={3}>
               <div className="space-y-2 text-[13px] text-erp-muted">
                 <p>
                   No receivable purchase orders.{' '}
@@ -1015,49 +1045,49 @@ export function GrnEditorPage() {
                   </p>
                 ) : null}
               </div>
-            ) : (
-              <>
-                <div className="grn-po-source-row">
-                  <ErpFieldRow
-                    label="Vendor"
-                    required
-                    fieldError={fieldErrors.vendorId}
-                    fieldState={fieldErrors.vendorId ? 'error' : 'idle'}
-                  >
-                    <ErpSmartSelect
-                      className="w-full"
-                      options={vendorSelectOptions}
-                      value={vendorId}
-                      disabled={readOnlyHeaderPo}
-                      onChange={(v) => onSelectVendor(v || '')}
-                      allowEmpty
-                      placeholder={SELECT_PLACEHOLDER}
-                      appearance="combo"
-                      dropdownMinWidth={320}
-                    />
-                  </ErpFieldRow>
-                  <ErpFieldRow
-                    label="Purchase Order"
-                    required
-                    fieldError={fieldErrors.poId}
-                    fieldState={fieldErrors.poId ? 'error' : 'idle'}
-                  >
-                    <ErpSmartSelect
-                      className="w-full"
-                      options={poSelectOptions}
-                      value={poId}
-                      disabled={readOnlyHeaderPo || !vendorId}
-                      onChange={(v) => void onSelectPo(v || '')}
-                      allowEmpty
-                      placeholder={vendorId ? 'Search PO number…' : 'Select vendor first…'}
-                      emptyMessage={vendorId ? 'No receivable POs for this vendor' : 'Select a vendor first'}
-                      appearance="combo"
-                      dropdownMinWidth={360}
-                      resolveOrphanLabel={(id) => orders.find((o) => o.id === id)?.documentNumber}
-                    />
-                  </ErpFieldRow>
-                </div>
-                {vendorId && vendorApprovedNotReleased.length > 0 ? (
+            </ErpFormSpan>
+          ) : (
+            <>
+              <ErpFieldRow
+                label="Vendor"
+                required
+                fieldError={fieldErrors.vendorId}
+                fieldState={fieldErrors.vendorId ? 'error' : 'idle'}
+              >
+                <ErpSmartSelect
+                  options={vendorSelectOptions}
+                  value={vendorId}
+                  disabled={readOnlyHeaderPo}
+                  onChange={(v) => onSelectVendor(v || '')}
+                  allowEmpty
+                  placeholder={SELECT_PLACEHOLDER}
+                  appearance="combo"
+                  dropdownMinWidth={320}
+                />
+              </ErpFieldRow>
+              <ErpFieldRow
+                label="Purchase Order"
+                required
+                fieldError={fieldErrors.poId}
+                fieldState={fieldErrors.poId ? 'error' : 'idle'}
+              >
+                <ErpSmartSelect
+                  options={poSelectOptions}
+                  value={poId}
+                  disabled={readOnlyHeaderPo}
+                  onChange={(v) => void onSelectPo(v || '')}
+                  allowEmpty
+                  placeholder="Search PO number…"
+                  emptyMessage={
+                    vendorId ? 'No receivable POs for this vendor' : 'No receivable purchase orders'
+                  }
+                  appearance="combo"
+                  dropdownMinWidth={360}
+                  resolveOrphanLabel={(id) => orders.find((o) => o.id === id)?.documentNumber}
+                />
+              </ErpFieldRow>
+              {vendorId && vendorApprovedNotReleased.length > 0 ? (
+                <ErpFormSpan span={3}>
                   <p className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
                     {vendorApprovedNotReleased.length} approved PO
                     {vendorApprovedNotReleased.length === 1 ? '' : 's'} for this vendor still need{' '}
@@ -1067,10 +1097,10 @@ export function GrnEditorPage() {
                       : ''}
                     . Only released POs appear in the list below.
                   </p>
-                ) : null}
-              </>
-            )}
-          </ErpFormSpan>
+                </ErpFormSpan>
+              ) : null}
+            </>
+          )}
         </ErpCardSection>
       ) : null}
 

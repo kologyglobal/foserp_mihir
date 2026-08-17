@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Eye, FileText, GitCompare, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Eye, FileText, GitCompare, Pencil, Plus, RefreshCw, Send, Trash2 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
 import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
@@ -30,12 +30,17 @@ import {
   type VqSortKey,
 } from '@/config/vqFilterConfig'
 import { useCrmFilterDrawer } from '@/hooks/useCrmFilterDrawer'
-import { getVendorQuotationList } from '@/services/purchase'
+import {
+  getVendorQuotationList,
+  PurchaseServiceError,
+  submitVendorQuotation,
+} from '@/services/purchase'
 import type { VendorQuotationListRow } from '@/types/purchaseDomain'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { purchaseBreadcrumbs } from '@/utils/purchaseNavigation'
 import { usePurchasePermissions } from '@/utils/permissions'
+import { notify } from '@/store/toastStore'
 
 export function VendorQuotationListPage() {
   const navigate = useNavigate()
@@ -45,6 +50,7 @@ export function VendorQuotationListPage() {
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<VqListFilters>(DEFAULT_VQ_LIST_FILTERS)
   const [sortBy, setSortBy] = useState<VqSortKey>('documentDate')
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -84,6 +90,22 @@ export function VendorQuotationListPage() {
 
   const clearFilters = () => filterDrawer.clearAll()
   const activeFilters = hasActiveVqFilters(filters)
+
+  const handleSubmit = useCallback(
+    async (row: VendorQuotationListRow) => {
+      setBusyId(row.id)
+      try {
+        await submitVendorQuotation(row.id)
+        notify.success(`${row.documentNumber} submitted`)
+        await load()
+      } catch (err) {
+        notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
+      } finally {
+        setBusyId(null)
+      }
+    },
+    [load],
+  )
 
   const columns = useMemo<ColumnDef<VendorQuotationListRow>[]>(
     () => [
@@ -188,11 +210,26 @@ export function VendorQuotationListPage() {
               onClick: () => navigate(`/purchase/comparison/${r.rfqId}`),
             },
           ]
-          return <EnterpriseRowActionsMenu actions={actions} />
+          if (isDraft) {
+            actions.push({
+              id: 'submit',
+              label: 'Submit',
+              icon: Send,
+              onClick: () => void handleSubmit(r),
+            })
+          }
+          return (
+            <div
+              className={busyId === r.id ? 'pointer-events-none opacity-50' : undefined}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <EnterpriseRowActionsMenu actions={actions} />
+            </div>
+          )
         },
       },
     ],
-    [navigate],
+    [navigate, handleSubmit, busyId],
   )
 
   const shellProps = {

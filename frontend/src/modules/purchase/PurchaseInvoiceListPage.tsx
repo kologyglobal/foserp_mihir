@@ -35,7 +35,13 @@ import {
   buildInvoiceRegisterOverview,
   buildInvoiceRegisterSuggestions,
 } from '@/utils/invoiceRegisterInsights'
-import { getPurchaseInvoiceList } from '@/services/purchase'
+import {
+  approvePurchaseInvoice,
+  getPurchaseInvoiceList,
+  postPurchaseInvoice,
+  PurchaseServiceError,
+  submitPurchaseInvoiceForApproval,
+} from '@/services/purchase'
 import type { PurchaseInvoiceListRow } from '@/types/purchaseDomain'
 import { exportRowsToCsv } from '@/utils/exportCsv'
 import { invoiceListBreadcrumbs } from '@/utils/purchaseNavigation'
@@ -94,6 +100,7 @@ export function PurchaseInvoiceListPage() {
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(async (signal?: { cancelled: boolean }) => {
     setLoadState('loading')
@@ -235,13 +242,47 @@ export function PurchaseInvoiceListPage() {
     [filtered, filters.status, perms.canCreateInvoice, applyStatusFilter, navigate],
   )
 
+  const runRowAction = useCallback(
+    async (row: PurchaseInvoiceListRow, work: () => Promise<unknown>, success: string) => {
+      setBusyId(row.id)
+      try {
+        await work()
+        notify.success(success)
+        setRefreshToken((n) => n + 1)
+      } catch (err) {
+        notify.error(err instanceof PurchaseServiceError ? err.message : 'Action failed')
+      } finally {
+        setBusyId(null)
+      }
+    },
+    [],
+  )
+
   const rowHandlers = useMemo(
     () => ({
       onView: (row: PurchaseInvoiceListRow) => navigate(`/purchase/invoices/${row.id}`),
       onEdit: (row: PurchaseInvoiceListRow) => navigate(`/purchase/invoices/${row.id}/edit`),
       onPrint: (row: PurchaseInvoiceListRow) => navigate(`/purchase/invoices/${row.id}/print`),
+      onSubmit: (row: PurchaseInvoiceListRow) =>
+        void runRowAction(
+          row,
+          () => submitPurchaseInvoiceForApproval(row.id),
+          `${row.documentNumber} sent for approval`,
+        ),
+      onApprove: (row: PurchaseInvoiceListRow) =>
+        void runRowAction(
+          row,
+          () => approvePurchaseInvoice(row.id),
+          `${row.documentNumber} approved`,
+        ),
+      onPost: (row: PurchaseInvoiceListRow) =>
+        void runRowAction(
+          row,
+          () => postPurchaseInvoice(row.id),
+          `${row.documentNumber} posted`,
+        ),
     }),
-    [navigate],
+    [navigate, runRowAction],
   )
 
   const exportList = () => {
@@ -405,6 +446,7 @@ export function PurchaseInvoiceListPage() {
               <PurchaseInvoicesTable
                 rows={filtered}
                 handlers={rowHandlers}
+                busyId={busyId}
                 hasActiveFilters={activeFilters}
                 onClearFilters={clearFilters}
                 onExport={exportList}

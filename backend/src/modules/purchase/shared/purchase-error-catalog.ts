@@ -83,6 +83,7 @@ export const PURCHASE_ERROR_CODE = {
   PO_NO_LINES: 'PO_NO_LINES',
   PO_QTY_INVALID: 'PO_QTY_INVALID',
   PO_RATE_INVALID: 'PO_RATE_INVALID',
+  PO_REQUIRED_DATE_REQUIRED: 'PO_REQUIRED_DATE_REQUIRED',
   PO_VALIDATION_FAILED: 'PO_VALIDATION_FAILED',
 
   // GRN
@@ -226,6 +227,7 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   [PURCHASE_ERROR_CODE.PO_NO_LINES]: 'Add at least one line with quantity greater than zero.',
   [PURCHASE_ERROR_CODE.PO_QTY_INVALID]: 'Line quantity must be greater than zero.',
   [PURCHASE_ERROR_CODE.PO_RATE_INVALID]: 'Line rate cannot be negative.',
+  [PURCHASE_ERROR_CODE.PO_REQUIRED_DATE_REQUIRED]: 'Expected/required delivery date is required on all order lines before submitting.',
   [PURCHASE_ERROR_CODE.PO_VALIDATION_FAILED]: 'Please correct the highlighted fields and try again.',
 
   [PURCHASE_ERROR_CODE.GRN_NOT_FOUND]: 'Goods receipt note not found.',

@@ -5,6 +5,14 @@ import { prisma } from '../src/config/prisma.js'
 import { PERMISSIONS, type PermissionName } from '../src/constants/permissions.js'
 
 const app = createApp()
+
+/** N days from today, as YYYY-MM-DD — avoids backdated-PO rejection as calendar time passes. */
+function isoDaysFromToday(days: number): string {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 const dbAvailable = await prisma
   .$queryRaw`SELECT 1`
   .then(() => true)
@@ -112,7 +120,7 @@ describe.skipIf(!dbAvailable)('Purchase approval inbox and maker-checker flow', 
       .post(`${purchaseBase()}/orders`)
       .set(auth(user))
       .send({
-        orderDate: '2026-07-21',
+        orderDate: isoDaysFromToday(0),
         vendorId,
         lines: [
           {
@@ -121,6 +129,9 @@ describe.skipIf(!dbAvailable)('Purchase approval inbox and maker-checker flow', 
             quantity: 2,
             rate: 125,
             uomId,
+            requiredDate: isoDaysFromToday(9),
+            lineType: 'GOODS',
+            hsnCode: '1001',
           },
         ],
       })
