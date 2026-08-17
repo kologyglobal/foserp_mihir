@@ -23,7 +23,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
-      backgroundColor: '#1e4a8a',
+      backgroundColor: '#ffffff',
     },
     ios: {
       supportsTablet: true,
@@ -39,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#1e4a8a',
+        backgroundColor: '#ffffff',
       },
       package: 'com.fos.erp.mobile',
       versionCode: Number.parseInt(buildNumber, 10) || 1,
