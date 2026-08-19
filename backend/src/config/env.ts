@@ -27,11 +27,11 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
-  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
-  /** Extra allowed CORS origins for a single backend serving multiple frontend domains
-   *  (comma-separated, e.g. "https://minierp.dhurandharcrm.com,https://erp.dhurandharcrm.com").
-   *  FRONTEND_URL is always included; this is additive, not a replacement. */
-  FRONTEND_URLS: z.string().optional(),
+  /** One frontend URL, or several comma-separated (e.g. for a backend serving multiple
+   *  frontend domains: "https://erp.dhurandharcrm.com,https://minierp.dhurandharcrm.com").
+   *  The first entry is the "primary" domain used for links in emails; every entry is
+   *  allowed for CORS. See env.FRONTEND_URL / env.frontendOrigins below. */
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
   /** Optional SMTP — when unset, invite/reset emails are skipped (token returned in dev/test). */
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().default(587),
@@ -161,8 +161,16 @@ if (!parsed.success) {
   process.exit(1)
 }
 
+const frontendOrigins = parsed.data.FRONTEND_URL.split(',')
+  .map((url) => url.trim())
+  .filter(Boolean)
+
 export const env = {
   ...parsed.data,
+  // Primary domain (first entry) — used for links in emails and as the single-URL default.
+  FRONTEND_URL: frontendOrigins[0] ?? 'http://localhost:5173',
+  // Every allowed domain — used for the CORS allow-list.
+  frontendOrigins,
   DATABASE_URL: buildDatabaseUrl(),
   isDev: parsed.data.NODE_ENV === 'development',
   isTest: parsed.data.NODE_ENV === 'test',
