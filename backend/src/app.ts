@@ -68,10 +68,12 @@ export function createApp() {
   app.set('trust proxy', 1)
   // CSP off when the same process also serves the Vite SPA (host-package / single-host deploy)
   app.use(helmet({ contentSecurityPolicy: false }))
+  // env.frontendOrigins holds every domain from FRONTEND_URL (comma-separated), so one
+  // backend can serve multiple frontend domains without a separate deployment per domain.
   const corsOrigins = env.isDev
     ? [
         ...new Set([
-          env.FRONTEND_URL,
+          ...env.frontendOrigins,
           'http://localhost:5173',
           'http://127.0.0.1:5173',
           'http://localhost:5174',
@@ -83,7 +85,7 @@ export function createApp() {
           'http://127.0.0.1:19006',
         ]),
       ]
-    : [env.FRONTEND_URL]
+    : [...new Set(env.frontendOrigins)]
   app.use(
     cors({
       origin(origin, callback) {
