@@ -68,10 +68,17 @@ export function createApp() {
   app.set('trust proxy', 1)
   // CSP off when the same process also serves the Vite SPA (host-package / single-host deploy)
   app.use(helmet({ contentSecurityPolicy: false }))
+  // Extra origins let one backend serve multiple frontend domains (e.g. minierp.*,
+  // erp.*) without a separate deployment per domain — see FRONTEND_URLS in env config.
+  const extraOrigins = (env.FRONTEND_URLS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
   const corsOrigins = env.isDev
     ? [
         ...new Set([
           env.FRONTEND_URL,
+          ...extraOrigins,
           'http://localhost:5173',
           'http://127.0.0.1:5173',
           'http://localhost:5174',
@@ -83,7 +90,7 @@ export function createApp() {
           'http://127.0.0.1:19006',
         ]),
       ]
-    : [env.FRONTEND_URL]
+    : [...new Set([env.FRONTEND_URL, ...extraOrigins])]
   app.use(
     cors({
       origin(origin, callback) {

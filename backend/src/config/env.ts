@@ -28,6 +28,10 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  /** Extra allowed CORS origins for a single backend serving multiple frontend domains
+   *  (comma-separated, e.g. "https://minierp.dhurandharcrm.com,https://erp.dhurandharcrm.com").
+   *  FRONTEND_URL is always included; this is additive, not a replacement. */
+  FRONTEND_URLS: z.string().optional(),
   /** Optional SMTP — when unset, invite/reset emails are skipped (token returned in dev/test). */
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().default(587),

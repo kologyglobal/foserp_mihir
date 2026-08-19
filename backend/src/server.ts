@@ -16,19 +16,29 @@ import {
 } from './modules/notifications/notification.scheduler.js'
 
 async function main(): Promise<void> {
-  await connectDatabase()
   const app = createApp()
   await setupDevSwagger(app)
 
+  // Bind the HTTP port before the DB handshake — some Node.js hosts (e.g. Hostinger)
+  // kill the process if listen() isn't called within a few seconds, and a slow/unreachable
+  // DB must not block that. Prisma also connects lazily on first query if this races.
   const server = app.listen(env.PORT, '0.0.0.0', () => {
     logger.info(`FOS ERP backend listening on 0.0.0.0:${env.PORT}`)
     if (env.isDev) {
       logger.info(`Swagger docs: http://localhost:${env.PORT}/api/docs`)
     }
-    startIndiaMartSyncScheduler()
-    startBankConnectorCronScheduler()
-    startNotificationScheduler()
   })
+
+  connectDatabase()
+    .then(() => {
+      logger.info('Database connected')
+      startIndiaMartSyncScheduler()
+      startBankConnectorCronScheduler()
+      startNotificationScheduler()
+    })
+    .catch((error) => {
+      logger.error('Database connection failed at startup — will retry lazily on first query', error)
+    })
 
   const shutdown = async (signal: string) => {
     logger.info(`${signal} received — shutting down`)
