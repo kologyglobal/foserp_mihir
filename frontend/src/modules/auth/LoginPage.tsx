@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Building2, Eye, EyeOff, Lock, Mail, Users } from 'lucide-react'
+import {
+  Building2, Eye, EyeOff, Factory, Lock, Mail, ShieldCheck, Sparkles, Users,
+} from 'lucide-react'
 import { useAuth } from '@/context/AuthProvider'
-import { API_CONFIG } from '@/config/apiConfig'
-import { forgotPassword, fetchLoginDirectory, type LoginDirectoryUser } from '@/services/api/authApi'
+import { forgotPassword } from '@/services/api/authApi'
 import { consumeAuthNotice } from '@/services/api/client'
 import { mapLoginErrorMessage } from '@/modules/auth/authMessages'
 
 const REMEMBER_KEY = 'fos_erp_login_remember'
-const VASANT_LOGO = '/brand/vasant-fabricators-logo.png'
 
 type LoginView = 'signin' | 'forgot' | 'reset' | 'accept-invite'
 
@@ -37,117 +37,11 @@ function saveRemembered(data: RememberedLogin | null) {
   }
 }
 
-const DEMO_CREDENTIALS = {
-  tenantSlug: 'vasant-trailers',
-  email: 'admin@vasant-trailers.com',
-  password: 'Admin@123',
-} as const
-
-/** Known seed passwords for one-click fill (never returned by API). */
-const SEED_PASSWORDS: Record<string, string> = {
-  'admin@vasant-trailers.com': 'Admin@123',
-  'super@fos-erp.com': 'Super@123',
-  'purchase@vasant-trailers.com': 'Purchase@123',
-  'inventory@vasant-trailers.com': 'Inventory@123',
-  'production@vasant-trailers.com': 'Production@123',
-  'sales@vasant-trailers.com': 'Sales@123',
-  'quality@vasant-trailers.com': 'Quality@123',
-  'accounts@vasant-trailers.com': 'Accounts@123',
-}
-
-/** Always-visible baseline so the login screen lists every seeded persona even if API is down. */
-const SEED_LOGIN_USERS: LoginDirectoryUser[] = [
-  {
-    id: 'seed-super',
-    email: 'super@fos-erp.com',
-    firstName: 'Super',
-    lastName: 'Admin',
-    designation: 'System Administrator',
-    department: 'Platform',
-    status: 'ACTIVE',
-    roles: ['Super Admin'],
-  },
-  {
-    id: 'seed-admin',
-    email: 'admin@vasant-trailers.com',
-    firstName: 'Rajesh',
-    lastName: 'Patel',
-    designation: 'Managing Director',
-    department: 'Management',
-    status: 'ACTIVE',
-    roles: ['Tenant Admin', 'Admin'],
-  },
-  {
-    id: 'seed-purchase',
-    email: 'purchase@vasant-trailers.com',
-    firstName: 'Priya',
-    lastName: 'Shah',
-    designation: 'Purchase Manager',
-    department: 'Purchase',
-    status: 'ACTIVE',
-    roles: ['Purchase Manager'],
-  },
-  {
-    id: 'seed-inventory',
-    email: 'inventory@vasant-trailers.com',
-    firstName: 'Amit',
-    lastName: 'Desai',
-    designation: 'Inventory Manager',
-    department: 'Inventory',
-    status: 'ACTIVE',
-    roles: ['Inventory Manager'],
-  },
-  {
-    id: 'seed-production',
-    email: 'production@vasant-trailers.com',
-    firstName: 'Vikram',
-    lastName: 'Joshi',
-    designation: 'Production Manager',
-    department: 'Production',
-    status: 'ACTIVE',
-    roles: ['Production Manager'],
-  },
-  {
-    id: 'seed-sales',
-    email: 'sales@vasant-trailers.com',
-    firstName: 'Sneha',
-    lastName: 'Mehta',
-    designation: 'Sales Manager',
-    department: 'Sales',
-    status: 'ACTIVE',
-    roles: ['Sales Manager'],
-  },
-  {
-    id: 'seed-quality',
-    email: 'quality@vasant-trailers.com',
-    firstName: 'Neha',
-    lastName: 'Trivedi',
-    designation: 'Quality Inspector',
-    department: 'Quality Control',
-    status: 'ACTIVE',
-    roles: ['Quality Inspector'],
-  },
-  {
-    id: 'seed-accounts',
-    email: 'accounts@vasant-trailers.com',
-    firstName: 'Kiran',
-    lastName: 'Bhatt',
-    designation: 'Finance Manager',
-    department: 'Accounts',
-    status: 'ACTIVE',
-    roles: ['Finance Manager'],
-  },
-]
-
-function mergeDirectoryUsers(apiUsers: LoginDirectoryUser[]): LoginDirectoryUser[] {
-  if (apiUsers.length === 0) return SEED_LOGIN_USERS
-  const byEmail = new Map(apiUsers.map((u) => [u.email.toLowerCase(), u]))
-  for (const seed of SEED_LOGIN_USERS) {
-    if (!byEmail.has(seed.email.toLowerCase())) byEmail.set(seed.email.toLowerCase(), seed)
-  }
-  return Array.from(byEmail.values()).sort((a, b) => a.email.localeCompare(b.email))
-}
-
+const FEATURES = [
+  { icon: Users, title: 'CRM & pipeline', desc: 'Leads, opportunities, and 360° customer views' },
+  { icon: Factory, title: 'Production', desc: 'Quotations, production, and inventory in one place' },
+  { icon: ShieldCheck, title: 'Enterprise security', desc: 'Role-based access with multi-tenant isolation' },
+] as const
 
 export function LoginPage() {
   const { login, isAuthenticated } = useAuth()
@@ -164,30 +58,13 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [resetToken, setResetToken] = useState(inviteFromUrl)
-  const [tenantSlug, setTenantSlug] = useState(remembered?.tenantSlug ?? API_CONFIG.tenantSlug)
+  const [tenantSlug, setTenantSlug] = useState(remembered?.tenantSlug ?? '')
   const [rememberMe, setRememberMe] = useState(Boolean(remembered))
   const [showPassword, setShowPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [directoryUsers, setDirectoryUsers] = useState<LoginDirectoryUser[]>(SEED_LOGIN_USERS)
-  const [directoryTenantName, setDirectoryTenantName] = useState<string | null>('Veer International')
-  const [directoryLoading, setDirectoryLoading] = useState(false)
-  const [directoryError, setDirectoryError] = useState<string | null>(null)
-
-  function selectDirectoryUser(user: LoginDirectoryUser) {
-    setTenantSlug((prev) => prev.trim() || DEMO_CREDENTIALS.tenantSlug)
-    setEmail(user.email)
-    const seedPassword = SEED_PASSWORDS[user.email.toLowerCase()]
-    setPassword(seedPassword ?? '')
-    setError(null)
-    setInfo(
-      seedPassword
-        ? `Filled ${user.email} / ${seedPassword}. Click Sign in.`
-        : `Filled ${user.email}. Enter the password, then Sign in.`,
-    )
-  }
 
   useEffect(() => {
     const notice = consumeAuthNotice()
@@ -195,65 +72,20 @@ export function LoginPage() {
   }, [])
 
   useEffect(() => {
-    const brand = directoryTenantName?.trim() || 'FOS ERP'
     if (view === 'forgot') {
-      document.title = `Reset password — ${brand}`
+      document.title = 'Reset password — FOS ERP'
       return
     }
     if (view === 'reset') {
-      document.title = `Choose new password — ${brand}`
+      document.title = 'Choose new password — FOS ERP'
       return
     }
     if (view === 'accept-invite') {
-      document.title = `Accept invitation — ${brand}`
+      document.title = 'Accept invitation — FOS ERP'
       return
     }
-    document.title = `Sign in — ${brand}`
-  }, [view, directoryTenantName])
-
-  useEffect(() => {
-    if (view !== 'signin') return
-    const slug = tenantSlug.trim()
-    if (slug.length < 2) {
-      setDirectoryUsers(SEED_LOGIN_USERS)
-      setDirectoryTenantName('Veer International')
-      setDirectoryError(null)
-      return
-    }
-
-    if (!API_CONFIG.useApi) {
-      setDirectoryUsers(SEED_LOGIN_USERS)
-      setDirectoryTenantName('Veer International')
-      setDirectoryError(null)
-      return
-    }
-
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      setDirectoryLoading(true)
-      setDirectoryError(null)
-      fetchLoginDirectory(slug)
-        .then((dir) => {
-          if (cancelled) return
-          setDirectoryUsers(mergeDirectoryUsers(dir.users))
-          setDirectoryTenantName(dir.tenantName)
-        })
-        .catch((err) => {
-          if (cancelled) return
-          setDirectoryUsers(SEED_LOGIN_USERS)
-          setDirectoryTenantName('Veer International')
-          setDirectoryError(err instanceof Error ? err.message : 'Could not load users')
-        })
-        .finally(() => {
-          if (!cancelled) setDirectoryLoading(false)
-        })
-    }, 300)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [tenantSlug, view])
+    document.title = 'Sign in — FOS ERP'
+  }, [view])
 
   if (isAuthenticated) {
     return <Navigate to={from} replace />
@@ -274,14 +106,7 @@ export function LoginPage() {
       navigate(from, { replace: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed'
-      const friendly = mapLoginErrorMessage(message)
-      if (friendly.toLowerCase().includes('invalid') && email.includes('kologyerp')) {
-        setError(
-          `${friendly} — use admin@vasant-trailers.com (not admin@kologyerp.com), or pick a user below.`,
-        )
-      } else {
-        setError(friendly)
-      }
+      setError(mapLoginErrorMessage(message))
     } finally {
       setLoading(false)
     }
@@ -347,87 +172,59 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex h-dvh min-h-0 bg-white">
-      {/* Left — Vasant brand panel */}
-      <aside className="login-brand-panel relative hidden h-full w-[48%] shrink-0 overflow-hidden px-12 py-10 text-white lg:grid xl:px-16">
-        <div className="login-brand-panel__glow login-brand-panel__glow--top" aria-hidden />
-        <div className="login-brand-panel__glow login-brand-panel__glow--bottom" aria-hidden />
-        <div className="login-brand-panel__grid" aria-hidden />
+    <div className="flex min-h-screen bg-white">
+      <aside className="relative hidden w-[46%] flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0f2b5b] via-[#123d7a] to-[#1a5fad] px-12 py-14 text-white lg:flex">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 left-1/3 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl" />
 
-        <header className="login-brand-panel__header relative z-10">
-          <div className="login-brand-panel__brand">
-            <div className="login-brand-panel__logo-mark-wrap">
-              <img
-                src={VASANT_LOGO}
-                alt=""
-                aria-hidden
-                className="login-brand-panel__logo-mark"
-              />
+        <div className="relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 backdrop-blur">
+              <Sparkles className="h-6 w-6 text-cyan-200" />
             </div>
-            <p className="login-brand-panel__company-name">Vasant Fabricators Pvt. Ltd.</p>
-          </div>
-          <p className="login-brand-panel__tagline">ISO Tank · Special Purpose Vehicles</p>
-          <div className="login-brand-panel__rule" aria-hidden />
-        </header>
-
-        <div className="login-brand-panel__copy relative z-10 flex flex-col justify-center">
-          <div className="login-brand-panel__intro">
-            <h1 className="login-brand-panel__headline">
-              <span className="login-brand-panel__headline-lead">Welcome to</span>
-              <span className="login-brand-panel__headline-brand">Vasant Fabrication</span>
-            </h1>
-            <div className="login-brand-panel__powered-by">
-              <span className="login-brand-panel__powered-by-accent" aria-hidden />
-              <p className="login-brand-panel__powered-by-text">
-                Powered by FOS ERP (Factory Operating System)
-              </p>
+            <div>
+              <p className="text-lg font-semibold tracking-tight">FOS ERP</p>
+              <p className="text-xs text-white/70">Manufacturing intelligence platform</p>
             </div>
           </div>
 
-          <div className="login-brand-panel__body" aria-label="Platform overview">
-            <p className="login-brand-panel__copy-text">
-              Manage leads, quotations, production, inventory, dispatch, and invoicing from one secure
-              platform.
-            </p>
-            <p className="login-brand-panel__copy-text login-brand-panel__copy-text--continued">
-              FOS ERP provides complete visibility across your factory operations—helping your team
-              work smarter, faster, and together.
-            </p>
-          </div>
-
-          <p className="login-brand-panel__closer">
-            <span className="login-brand-panel__closer-bar" aria-hidden />
-            One Factory. One System. Complete Control.
+          <h1 className="mt-16 max-w-md text-4xl font-semibold leading-tight tracking-tight">
+            Run your operations with clarity and control
+          </h1>
+          <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-white/75">
+            Unified CRM, quotations, production, and finance — designed for enterprise teams.
           </p>
         </div>
 
-        <footer className="login-brand-panel__footer relative z-10">
-          <div className="login-brand-panel__footer-divider" aria-hidden />
-          <p className="login-brand-panel__footer-tagline">
-            <span className="login-brand-panel__footer-sanskrit">सरलम् एव श्रेष्ठम्</span>
-            <span className="login-brand-panel__footer-sep" aria-hidden>
-              —
-            </span>
-            <span className="login-brand-panel__footer-english">Simplicity is Excellence</span>
-          </p>
-          <p className="login-brand-panel__footer-copy">
-            © {new Date().getFullYear()} Vasant Fabricators Pvt. Ltd.
-          </p>
-        </footer>
+        <ul className="relative z-10 space-y-5">
+          {FEATURES.map(({ icon: Icon, title, desc }) => (
+            <li key={title} className="flex gap-4">
+              <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                <Icon className="h-5 w-5 text-cyan-200" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">{title}</p>
+                <p className="mt-0.5 text-sm text-white/65">{desc}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <p className="relative z-10 text-xs text-white/50">
+          © {new Date().getFullYear()} FOS ERP · Secure multi-tenant access
+        </p>
       </aside>
 
-      {/* Right — sign-in panel (scrollable; my-auto centers when short, top-aligns when tall) */}
-      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-6 sm:px-12 sm:py-8 lg:px-16 xl:px-20">
-        <div className={`mx-auto my-auto w-full ${view === 'signin' ? 'max-w-[920px]' : 'max-w-[420px]'}`}>
-          <div className="mb-6 lg:hidden">
-            <img
-              src={VASANT_LOGO}
-              alt="Vasant Fabricators Pvt. Ltd."
-              className="h-10 w-auto max-w-[220px] object-contain object-left"
-            />
+      <main className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-12 lg:px-20 xl:px-28">
+        <div className="mx-auto w-full max-w-[420px]">
+          <div className="mb-8 lg:hidden">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-6 w-6 text-erp-primary" />
+              <span className="text-lg font-semibold text-erp-text">FOS ERP</span>
+            </div>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-8">
             <h2 className="text-2xl font-semibold tracking-tight text-erp-text">
               {view === 'signin' && 'Welcome back'}
               {view === 'forgot' && 'Reset your password'}
@@ -438,164 +235,92 @@ export function LoginPage() {
               {view === 'signin' &&
                 (fromRaw !== '/crm'
                   ? 'Sign in to continue to the page you requested.'
-                  : 'Sign in to your organization workspace — pick any user on the right')}
+                  : 'Sign in to your organization workspace')}
               {view === 'forgot' &&
-                'Enter your organization and work email. If an account exists, reset instructions will be provided (development may show a reset token when email delivery is not configured).'}
-              {view === 'reset' && 'Enter the token from your email (or the development token) and a new password'}
+                'Enter your organization and work email. If an account exists, reset instructions will be provided.'}
+              {view === 'reset' && 'Enter the token from your email and a new password'}
               {view === 'accept-invite' && 'Set a password to activate your workspace account'}
             </p>
           </div>
 
           {view === 'signin' && (
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:items-start">
-              <form className="space-y-5" onSubmit={handleSignIn}>
-                <Field label="Organization" htmlFor="tenantSlug" icon={Building2}>
+            <form className="space-y-5" onSubmit={handleSignIn}>
+              <Field label="Organization" htmlFor="tenantSlug" icon={Building2}>
+                <input
+                  id="tenantSlug"
+                  className={inputClass}
+                  value={tenantSlug}
+                  onChange={(e) => setTenantSlug(e.target.value)}
+                  placeholder="your-organization"
+                  required
+                  autoComplete="organization"
+                />
+              </Field>
+
+              <Field label="Work email" htmlFor="email" icon={Mail}>
+                <input
+                  id="email"
+                  type="email"
+                  className={inputClass}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="username"
+                />
+              </Field>
+
+              <Field label="Password" htmlFor="password" icon={Lock}>
+                <div className="relative">
                   <input
-                    id="tenantSlug"
-                    className={inputClass}
-                    value={tenantSlug}
-                    onChange={(e) => setTenantSlug(e.target.value)}
-                    placeholder="vasant-trailers"
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    className={`${inputClass} pr-11`}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
-                    autoComplete="organization"
+                    autoComplete="current-password"
                   />
-                </Field>
-
-                <Field label="Work email" htmlFor="email" icon={Mail}>
-                  <input
-                    id="email"
-                    type="email"
-                    className={inputClass}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    autoComplete="username"
-                  />
-                </Field>
-
-                <Field label="Password" htmlFor="password" icon={Lock}>
-                  <div className="relative">
-                    <input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      className={`${inputClass} pr-11`}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-erp-muted hover:text-erp-text"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </Field>
-
-                <div className="flex items-center justify-between gap-4">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-erp-text">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-erp-border text-erp-primary focus:ring-erp-primary"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                    />
-                    Remember me
-                  </label>
                   <button
                     type="button"
-                    className="text-sm font-medium text-erp-primary hover:underline"
-                    onClick={() => {
-                      setError(null)
-                      setInfo(null)
-                      setView('forgot')
-                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-erp-muted hover:text-erp-text"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    Forgot password?
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+              </Field>
 
-                {error && <Alert tone="error">{error}</Alert>}
-                {info && <Alert tone="info">{info}</Alert>}
-
-                <button type="submit" disabled={loading} className={primaryBtnClass}>
-                  {loading ? 'Signing in…' : 'Sign in'}
+              <div className="flex items-center justify-between gap-4">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-erp-text">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-erp-border text-erp-primary focus:ring-erp-primary"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  Remember me
+                </label>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-erp-primary hover:underline"
+                  onClick={() => {
+                    setError(null)
+                    setInfo(null)
+                    setView('forgot')
+                  }}
+                >
+                  Forgot password?
                 </button>
-              </form>
+              </div>
 
-              <aside className="flex max-h-[min(70dvh,560px)] flex-col overflow-hidden rounded-xl border border-erp-border bg-erp-bg-subtle p-4">
-                <div className="mb-3 flex shrink-0 items-start justify-between gap-2">
-                  <div>
-                    <p className="flex items-center gap-1.5 text-sm font-semibold text-erp-text">
-                      <Users className="h-4 w-4 text-erp-primary" />
-                      All users
-                      {directoryTenantName ? ` · ${directoryTenantName}` : ''}
-                    </p>
-                    <p className="mt-1 text-[11px] text-erp-muted">
-                      Click any user to fill email and password ({directoryUsers.length} accounts).
-                    </p>
-                  </div>
-                  {directoryLoading && (
-                    <span className="text-[11px] text-erp-muted">Refreshing…</span>
-                  )}
-                </div>
+              {error && <Alert tone="error">{error}</Alert>}
+              {info && <Alert tone="info">{info}</Alert>}
 
-                {directoryError && (
-                  <p className="mb-2 shrink-0 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
-                    Live directory unavailable — showing seeded users.
-                  </p>
-                )}
-
-                <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5">
-                  {directoryUsers.map((user) => {
-                    const selected = email.toLowerCase() === user.email.toLowerCase()
-                    const seedPassword = SEED_PASSWORDS[user.email.toLowerCase()]
-                    return (
-                      <li key={user.id}>
-                        <button
-                          type="button"
-                          onClick={() => selectDirectoryUser(user)}
-                          className={`w-full rounded-lg border px-3 py-2.5 text-left transition ${
-                            selected
-                              ? 'border-erp-primary/50 bg-white shadow-sm ring-1 ring-erp-primary/20'
-                              : 'border-erp-border/70 bg-white hover:border-erp-primary/30'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-erp-text">
-                                {user.firstName} {user.lastName}
-                              </p>
-                              <p className="truncate font-mono text-[11px] text-erp-muted">{user.email}</p>
-                              <p className="mt-0.5 truncate text-[11px] text-erp-muted">
-                                {[user.roles.join(', ') || null, user.department].filter(Boolean).join(' · ')}
-                              </p>
-                              {seedPassword && (
-                                <p className="mt-1 font-mono text-[11px] font-medium text-erp-text">
-                                  pwd: {seedPassword}
-                                </p>
-                              )}
-                            </div>
-                            <span
-                              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                                user.status === 'ACTIVE'
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-slate-100 text-slate-600'
-                              }`}
-                            >
-                              {user.status}
-                            </span>
-                          </div>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </aside>
-            </div>
+              <button type="submit" disabled={loading} className={primaryBtnClass}>
+                {loading ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
           )}
 
           {view === 'forgot' && (
@@ -606,6 +331,7 @@ export function LoginPage() {
                   className={inputClass}
                   value={tenantSlug}
                   onChange={(e) => setTenantSlug(e.target.value)}
+                  placeholder="your-organization"
                   required
                 />
               </Field>
